@@ -82,6 +82,7 @@ Seeds: `["config", reserve_mint]`. One per reserve. Written only by admin instru
 | `coverage_ratio_bps` | `u16` | `c`. Starts at `10_000` (1.0). Lower bound **TBD** (see PC-14) |
 | `fee_take_bps` | `u16` | MUTAV's take from each guarantee fee. `≤ MAX_FEE_TAKE_BPS = 3_000`. Value **TBD** |
 | `payments_account` | `Pubkey` | The whitelisted MUTAV payments token account (BRS) |
+| `treasury_account` | `Pubkey` | The whitelisted MUTAV treasury token account (BRS) that receives MUTAV's take. Changed only by the admin through the timelock |
 | `investor_allowlist_root` | `[u8; 32]` | Merkle root of allowlisted investor wallets |
 | `adapters` | `[AdapterEntry; MAX_ADAPTERS]` | Whitelisted adapters ([§3.9](#39-adapterentry)) |
 | `caps` | `Caps` | See [§8](#8-caps) |
@@ -116,7 +117,7 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | `next_redeem_seq`, `redeem_head` | `u64`, `u64` | FIFO sequence and head of the redemption queue |
 | `claim_period_start` | `i64` | Start of the current claim-payment cap window |
 | `claim_period_paid` | `u64` | Paid in the current window |
-| `fees_in_total`, `fee_take_total` | `u64`, `u64` | Lifetime net fees into the reserve; lifetime take to `fees` |
+| `fees_in_total`, `fee_take_total` | `u64`, `u64` | Lifetime net fees into the reserve; lifetime take sent to the treasury |
 | `capital_in_total`, `capital_out_total` | `u64`, `u64` | Lifetime `contribute_capital` / `withdraw_surplus` |
 | `claims_paid_total` | `u64` | Lifetime claim payments |
 | `late_payouts` | `u32` | Payouts pending past the SLA, as last counted by `refresh` |
@@ -135,7 +136,6 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | `pending_deposits` | `["pending_deposits", config]` | BRS | Escrowed deposit requests |
 | `pending_redemptions` | `["pending_redemptions", config]` | share | Escrowed redeem requests |
 | `claims` | `["claims", config]` | BRS | Assets owed to investors on fulfilled redemptions |
-| `fees` | `["fees", config]` | BRS | MUTAV's take. Not part of the reserve |
 
 TESOURO is held in each adapter's own staging/position accounts under the adapter's sub-authority ([§3.9](#39-adapterentry)), not by the vault authority.
 
@@ -239,7 +239,7 @@ Stored inline in `VaultConfig.adapters`.
 ```text
 tesouro_value      = tesouro_units × bounded_tesouro_price / PRICE_SCALE           // round down
 stable_assets      = brs_balance + tesouro_value                                   // internal accounting
-                     // excludes pending_deposits_total, claimable_assets_total and the fees account
+                     // excludes pending_deposits_total and claimable_assets_total
 remaining_cover(g) = (g.default_cover − g.default_paid) + (g.exit_cover − g.exit_paid)
 remaining_cover_total = Σ_{g active} remaining_cover(g)
 coverage_required  = ceil(c × remaining_cover_total / 10_000)                      // c = coverage_ratio_bps
@@ -346,7 +346,7 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
 
 - **Signer:** operator, who also signs the BRS transfer from its own BRS token account (fees reach it via PIX → BRS mint off-chain). Batched per invoice.
 - **Rules:** `amount > 0`; source mint = `reserve_mint`.
-- **Effects:** `take = floor(amount × fee_take_bps / 10_000)`; transfer `take` → `fees`; transfer `amount − take` → `reserve`; `brs_balance += amount − take`; `fees_in_total += amount − take`; `fee_take_total += take`. NAV rises immediately. Streaming fees into NAV (PC-15) is **not adopted**; see §12. Per-invoice idempotency on-chain is **TBD**.
+- **Effects:** `take = floor(amount × fee_take_bps / 10_000)`; transfer `take` → `config.treasury_account` (directly; the program holds no fee balance); transfer `amount − take` → `reserve`; `brs_balance += amount − take`; `fees_in_total += amount − take`; `fee_take_total += take`. NAV rises immediately. Streaming fees into NAV (PC-15) is **not adopted**; see §12. Per-invoice idempotency on-chain is **TBD**.
 - **Errors:** `Paused` (if fees are pausable, TBD), `InvalidParameter`, `InvalidMint`.
 - **Event:** `FeesContributed { invoice_ref_hash, gross, take, net }`.
 
@@ -619,7 +619,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 
 7. **Share treatment of MUTAV capital.** Does `contribute_capital` mint shares to MUTAV at NAV, and does `withdraw_surplus` burn them? Without shares, MUTAV capital is a donation to share holders on the way in and a dilution on the way out.
 8. **`withdraw_surplus` destination.** Principle 5 allows outflows only to claim escrows, the payments account or adapters. Is the destination the payments account, a separate whitelisted treasury account, or is MUTAV capital routed through `fulfil_redeems` on its own shares?
-9. **Withdrawing MUTAV's take.** No instruction moves funds out of `fees`. A `withdraw_fees` instruction (and its destination) is needed.
+9. **Withdrawing MUTAV's take.** *Resolved (ADR 0007):* `contribute_fees` sends the take directly to the whitelisted `treasury_account`. There is no `fees` account and no `withdraw_fees`.
 10. **Pause scope.** Does `pause` stop `pay_claim`, `settle_payout` and `contribute_fees`? Granular pause flags (PC-24)?
 11. **`fulfil_deposits` in under-coverage.** Allowed (adds capital) or frozen (protects incoming investors from a depressed NAV)?
 12. **NAV denominator.** Whether shares escrowed in `pending_redemptions` stay in `shares_outstanding` until fulfilment (current text: yes, they are only removed on fulfil).
