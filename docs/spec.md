@@ -1,6 +1,6 @@
 # MUTAV reserve program — specification
 
-*Status: draft for the pilot build, 2026-10-01. Derived from the MUTAV project document (§2–§7), the adversarial review and the mutav-app operations review. This file is the source of truth for the program's business rules. Any change to economic behaviour needs an ADR in [`decisions/`](decisions/).*
+*Status: draft for the pilot build, 2026-10-01; revised 2026-10-02 for partial fills at the queue head ([ADR 0010](decisions/0010-partial-fills-at-queue-head.md)), the earmark-aware solvency formula, the phase-2 instant exit and upgrade readiness ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)). Derived from the MUTAV project document (§2–§7), the adversarial review and the mutav-app operations review. This file is the source of truth for the program's business rules. Any change to economic behaviour needs an ADR in [`decisions/`](decisions/).*
 
 Where a value or behaviour is not yet decided, this spec says **TBD** and lists it under [§12 Open questions](#12-open-questions). Items marked *(derived)* are not named in the project document but follow from a rule it states; they are the minimum the program needs to enforce that rule.
 
@@ -18,6 +18,8 @@ Where a value or behaviour is not yet decided, this spec says **TBD** and lists 
 10. [Errors](#10-errors)
 11. [Requirements from the adversarial review](#11-requirements-from-the-adversarial-review)
 12. [Open questions](#12-open-questions)
+13. [Phase 2 — Instant exit (designed, disabled in the pilot)](#13-phase-2--instant-exit-designed-disabled-in-the-pilot)
+14. [Upgrade readiness](#14-upgrade-readiness)
 
 ## Conventions
 
@@ -44,7 +46,7 @@ Where a value or behaviour is not yet decided, this spec says **TBD** and lists 
    - The remaining trust in issuer backing (Nora for BRS, Etherfuse for TESOURO) is disclosed, not hidden.
 3. **MUTAV operates every chain touchpoint.** Agencies, tenants and landlords never sign on-chain. The operator key is the only writer for guarantees, claims and payouts.
 4. **The solvency gate protects the reserve. It never stops a claim payment.** It gates capital moving in and out, allocations, and new guarantees. `pay_claim` is never solvency-gated.
-5. **No arbitrary outflows.** Reserve funds leave only to (a) investor claim escrows on fulfilled redemptions, (b) the whitelisted MUTAV payments account, or (c) a whitelisted adapter's capped sub-authority.
+5. **No arbitrary outflows.** Reserve funds leave only to (a) investor claim escrows on fulfilled redemptions, (b) the whitelisted MUTAV payments account, (c) a whitelisted adapter's capped sub-authority, or (d) in phase 2 only, an instant redemption paid from the earmarked buffer to the redeeming holder ([§13](#13-phase-2--instant-exit-designed-disabled-in-the-pilot)).
 6. **Bound risk with caps and start tight.** Every outflow and every new liability is capped on-chain. Admins raise caps as the pilot proves itself.
 
 ## 2. Roles and keys
@@ -52,10 +54,12 @@ Where a value or behaviour is not yet decided, this spec says **TBD** and lists 
 | Role | Key | May call |
 |---|---|---|
 | **Admin** | Squads v4 multisig vault, with a Squads time lock | `initialize`, `set_config`, `set_roles`, `set_payments_account`, `set_allowlist_root`, `whitelist_adapter`, `remove_adapter`, `unpause`, `fulfil_deposits`, `fulfil_redeems`, `allocate`, `deallocate`. Also the program's upgrade authority |
-| **Operator** | Hot key held by mutav-app in KMS, used from Convex actions | `register_guarantee`, `close_guarantee`, `contribute_fees`, `file_claim`, `pay_claim`, `settle_payout` |
+| **Operator** | Hot key held by mutav-app in KMS, used from Convex actions | `register_guarantee`, `close_guarantee`, `contribute_fees`, `flag_claim_notice`, `close_claim_notice`, `file_claim`, `pay_claim`, `settle_payout` |
 | **Pauser** | Separate key | `pause`, `revoke_operator` |
 | **Investor** | Own wallet, on the allowlist (KYC done off-chain) | `request_deposit`, `cancel_deposit`, `claim_shares`, `request_redeem`, `cancel_redeem`, `claim_assets` |
-| **Anyone** | — | `refresh` |
+| **Anyone** | — | `refresh`, `advance_queue_heads` |
+
+Phase-2 instructions ([§13](#13-phase-2--instant-exit-designed-disabled-in-the-pilot)), not in the pilot binary: operator `fund_exit_buffer`; admin or operator `defund_exit_buffer`; investor `instant_redeem`; anyone `release_starved_buffer`, `quote_instant_redeem`.
 
 - The time lock is the Squads time lock on the admin multisig. Every admin action is time-locked except `pause` (pauser). Whether the program also enforces its own on-chain delay for privilege increases is **TBD**.
 - Roles are distinct keys. `set_roles` rejects a configuration where the operator or pauser equals the admin.
@@ -72,13 +76,13 @@ MUTAV touches the program in three roles. They never mix:
 | **MUTAV's share of the reserve** | MUTAV as a capital provider | `request_deposit` / `request_redeem` from MUTAV's allowlisted capital wallet | `pending_deposits` → `reserve` | Minted at NAV at fulfil, like any investor |
 
 Rules:
-- **Three different accounts.** `treasury_account`, `payments_account` (claim payouts) and MUTAV's capital wallet are three different accounts. `set_config` rejects `treasury_account == payments_account`. The capital wallet is just an allowlisted investor wallet, unknown to config.
+- **Three different accounts.** `treasury_account`, `payments_account` (claim payouts) and MUTAV's capital wallet are three different accounts. Both `set_config` and `set_payments_account` reject `treasury_account == payments_account`. The capital wallet is an ordinary allowlisted investor wallet. Its address is recorded in `config.mutav_capital_wallet` for public disclosure and so the phase-2 instant exit can bar it (ADR 0011, amending ADR 0009); it gets no other special treatment. Because `mutav_capital_wallet` is a wallet and the other two are token accounts, the check compares owners: `set_config` and `set_payments_account` receive the treasury and payments token accounts and reject `mutav_capital_wallet` equal to either account's `owner` field.
 - **Fees never mint shares and never count as MUTAV capital.** MUTAV benefits from fees only through the shares it bought with its own capital, like every holder.
 - **Separate on-chain accounting:** `fees_in_total` (net fees into the reserve), `fee_take_total` (to the treasury) and the deposit/redeem totals are tracked separately. Each has its own event (`FeesContributed`, `DepositsFulfilled`, `RedeemsFulfilled`).
 
 ## 3. Accounts
 
-All program-owned accounts carry `version: u8`, `bump: u8` and a `_reserved` padding array so later layouts can migrate without re-initialization.
+All program-owned accounts carry `version: u8`, `bump: u8` as their first fields and a zeroed `_reserved` padding array as their last field, and follow the layout rules in [§14](#14-upgrade-readiness) so that later versions add fields without migrating or re-initializing live accounts. The tables below list these three fields only where they are discussed; every account has them. Padding sizes per account are listed in §14.2. Status and mode fields are stored as `u8` with explicit constants; a value the binary does not know fails closed with `UnsupportedVersion` (§14.2 R1b).
 
 ### 3.1 `VaultConfig`
 
@@ -86,7 +90,7 @@ Seeds: `["config", reserve_mint]`. One per reserve. Written only by admin instru
 
 | Field | Type | Meaning |
 |---|---|---|
-| `version`, `bump` | `u8`, `u8` | |
+| `version`, `bump` | `u8`, `u8` | Layout version (pilot = `1`, [§14](#14-upgrade-readiness)) and PDA bump |
 | `admin` | `Pubkey` | Squads vault address |
 | `operator` | `Pubkey` | Operator key. `Pubkey::default()` when revoked |
 | `pauser` | `Pubkey` | Pauser key |
@@ -99,12 +103,15 @@ Seeds: `["config", reserve_mint]`. One per reserve. Written only by admin instru
 | `payments_account` | `Pubkey` | The whitelisted MUTAV payments token account (BRS) |
 | `treasury_account` | `Pubkey` | The whitelisted MUTAV treasury token account (BRS) that receives MUTAV's take. Changed only by the admin through the timelock |
 | `investor_allowlist_root` | `[u8; 32]` | Merkle root of allowlisted investor wallets |
-| `adapters` | `[AdapterEntry; MAX_ADAPTERS]` | Whitelisted adapters ([§3.9](#39-adapterentry)) |
-| `caps` | `Caps` | See [§8](#8-caps) |
-| `price` | `PriceParams` | See [§7](#7-price-safety) |
+| `adapters` | `[AdapterEntry; MAX_ADAPTERS]` | Whitelisted adapters ([§3.9](#39-adapterentry)). `MAX_ADAPTERS` sets the size of `VaultConfig`, so it must be decided before the first devnet deploy (§12 Q33) |
+| `caps` | `Caps` | See [§8](#8-caps). Ends with its own `_reserved: [u8; 32]`, so later caps (PC-43) are carved inside it |
+| `price` | `PriceParams` | See [§7](#7-price-safety). Ends with its own `_reserved: [u8; 32]` (e.g. a stale-price haircut, §12 Q21) |
 | `payout_sla_secs` | `i64` | Settlement SLA for payouts. Proposed 10 days |
 | `paused` | `bool` | Global pause flag. Granular flags **TBD** (PC-24) |
-| `_reserved` | `[u8; 128]` | |
+| `feature_flags` | `u64` | Bitmask of optional features. Bit 0 = `INSTANT_EXIT` ([§13](#13-phase-2--instant-exit-designed-disabled-in-the-pilot)); other bits reserved. **`0` in the pilot.** `set_config` rejects any bit outside the binary's `SUPPORTED_FEATURES` (pilot: `0`) with `FeatureNotSupported` ([§14.3](#143-feature-flags)). "`instant_exit_enabled`" means `feature_flags & INSTANT_EXIT != 0` |
+| `mutav_capital_wallet` | `Pubkey` | MUTAV's allowlisted capital wallet, disclosed on-chain (PC-34). Barred from instant exit in phase 2. Gets no other special treatment |
+| `exit` | `ExitParams` | Phase-2 instant-exit and buffer parameters ([§13.2](#132-parameters-exitparams)). **All zero in the pilot**; validated only when `INSTANT_EXIT` is enabled. Ends with its own `_reserved: [u8; 32]` |
+| `_reserved` | `[u8; 512]` | Zeroed. Room for later features ([§14.2](#142-padding-and-version)) |
 
 ### 3.2 `VaultState`
 
@@ -113,7 +120,7 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | Field | Type | Meaning |
 |---|---|---|
 | `version`, `bump` | `u8`, `u8` | |
-| `mode` | `enum Mode { Normal, UnderCovered }` | [§6](#6-under-coverage-mode) |
+| `mode` | `u8` (`MODE_NORMAL = 0`, `MODE_UNDER_COVERED = 1`) | [§6](#6-under-coverage-mode) |
 | `brs_balance` | `u64` | Tracked BRS in `reserve` (internal accounting) |
 | `tesouro_units` | `u64` | Tracked TESOURO held through adapters, in TESOURO base units |
 | `tesouro_price` | `u64` | Last bounded TESOURO price, BRS base units per 1 TESOURO (scaled by `PRICE_SCALE`) |
@@ -126,10 +133,12 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | `nav_per_share` | `u64` | Last published NAV per share (scaled by `NAV_SCALE`) |
 | `pending_deposits_total` | `u64` | BRS in `pending_deposits`. Excluded from `stable_assets` |
 | `pending_redeem_shares` | `u64` | Shares in `pending_redemptions`. Counted in `shares_outstanding` until fulfilled (confirm, §12) |
-| `claimable_assets_total` | `u64` | BRS in `claims` awaiting `claim_assets`. Excluded from `stable_assets` |
+| `claimable_assets_total` | `u64` | BRS in `claims` awaiting `claim_assets` (`Σ assets_claimable` over open redeem requests). Excluded from `stable_assets` |
+| `buffer_earmark` | `u64` | Stored level of the instant-exit buffer earmark ([§4](#4-invariants-and-formulas), [§13.3](#133-the-buffer-earmark)). BRS inside `reserve`, reserved out of surplus. **Always `0` in the pilot**: no pilot instruction can raise it |
+| `pending_notices` | `u32` | Open claim notices ([§5.4](#54-claims-and-payouts-operator)). While `> 0`, `fulfil_deposits`, `fulfil_redeems` and (phase 2) `instant_redeem` refuse |
 | `active_guarantees` | `u32` | |
 | `next_deposit_seq`, `deposit_head` | `u64`, `u64` | FIFO sequence and head of the deposit queue |
-| `next_redeem_seq`, `redeem_head` | `u64`, `u64` | FIFO sequence and head of the redemption queue |
+| `next_redeem_seq`, `redeem_head` | `u64`, `u64` | FIFO sequence and head of the redemption queue. A head may lag over dead seqs until `fulfil_*` or `advance_queue_heads` moves it ([§5.8](#58-public)) |
 | `claim_period_start` | `i64` | Start of the current claim-payment cap window |
 | `claim_period_paid` | `u64` | Paid in the current window |
 | `fees_in_total`, `fee_take_total` | `u64`, `u64` | Lifetime net fees into the reserve; lifetime take sent to the treasury |
@@ -137,7 +146,7 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | `late_payouts` | `u32` | Payouts pending past the SLA, as last counted by `refresh` |
 | `fulfil_halted` | `bool` | Set when the NAV-move guard trips ([§7](#7-price-safety)) |
 | `last_refresh_ts`, `last_refresh_slot` | `i64`, `u64` | |
-| `_reserved` | `[u8; 128]` | |
+| `_reserved` | `[u8; 256]` | Zeroed. Phase 2 carves `InstantExitState` from the front ([§13.2](#132-parameters-exitparams), [§14.2](#142-padding-and-version)) |
 
 ### 3.3 Vault authority and token accounts
 
@@ -159,10 +168,12 @@ Seeds: `["agency", config, agency_id]`. Created on the agency's first `register_
 
 | Field | Type |
 |---|---|
+| `version`, `bump` | `u8`, `u8` |
 | `agency_id` | `[u8; 32]` (stable public reference issued by the MUTAV platform) |
 | `outstanding_cover` | `u64` (`Σ` remaining cover of this agency's active guarantees) |
 | `active_guarantees` | `u32` |
 | `claims_paid_total` | `u64` |
+| `_reserved` | `[u8; 64]` |
 
 ### 3.5 `Guarantee`
 
@@ -170,6 +181,7 @@ Seeds: `["guarantee", config, id]`. One per lease: a second registration with th
 
 | Field | Type | Meaning |
 |---|---|---|
+| `version`, `bump` | `u8`, `u8` | |
 | `id` | `[u8; 32]` | Guarantee reference from the platform. Derivation (e.g. an HMAC of the lease identity) is off-chain |
 | `agency_id` | `[u8; 32]` | |
 | `refs_hash` | `[u8; 32]` | Commitment to the lease, guarantee contract and landlord mandate |
@@ -183,9 +195,10 @@ Seeds: `["guarantee", config, id]`. One per lease: a second registration with th
 | `provision_default` | `u64` | Open provisions on the default leg |
 | `provision_exit` | `u64` | Open provisions on the exit leg |
 | `open_claims` | `u16` | Filed, unpaid claims |
-| `status` | `enum GuaranteeStatus { Active, Closed }` | Richer lifecycle **TBD** (PC-6) |
+| `status` | `u8` (`ACTIVE = 0`, `CLOSED = 1`) | Richer lifecycle **TBD** (PC-6); later states get new constants, and older binaries fail closed on them |
 | `registered_at` | `i64` | |
 | `closed_at` | `i64` | `0` while active |
+| `_reserved` | `[u8; 64]` | |
 
 `provision = provision_default + provision_exit`. The account is kept after closing so the public claims history stays readable. Whether and when it may be closed for rent is **TBD**.
 
@@ -195,12 +208,14 @@ Seeds: `["claim", guarantee, notice_ref_hash]`. Created by `file_claim`. It carr
 
 | Field | Type |
 |---|---|
+| `version`, `bump` | `u8`, `u8` |
 | `guarantee` | `Pubkey` |
-| `leg` | `enum Leg { Default, Exit }` |
+| `leg` | `u8` (`LEG_DEFAULT = 0`, `LEG_EXIT = 1`) |
 | `notice_ref_hash` | `[u8; 32]` |
 | `provision` | `u64` |
 | `filed_at` | `i64` |
-| `status` | `enum ClaimStatus { Filed, Paid }` (a "Released" state for withdrawn claims is **TBD**) |
+| `status` | `u8` (`FILED = 0`, `PAID = 1`; a "Released" state for withdrawn claims is **TBD** and would be a new constant) |
+| `_reserved` | `[u8; 64]` |
 
 ### 3.7 `Payout`
 
@@ -208,30 +223,58 @@ Seeds: `["payout", guarantee, notice_ref_hash]`. Created by `pay_claim`. The see
 
 | Field | Type | Meaning |
 |---|---|---|
+| `version`, `bump` | `u8`, `u8` | |
 | `guarantee` | `Pubkey` | |
-| `leg` | `Leg` | |
+| `leg` | `u8` | As in `ClaimFiling` |
 | `amount` | `u64` | |
 | `notice_ref_hash` | `[u8; 32]` | |
 | `payments_account` | `Pubkey` | Destination at payment time |
-| `status` | `enum PayoutStatus { Pending, Settled }` | |
+| `status` | `u8` (`PENDING = 0`, `SETTLED = 1`) | |
 | `paid_at` | `i64` | |
 | `pix_e2e_hash` | `[u8; 32]` | Hash of the PIX end-to-end ID. Zero while pending |
 | `settled_at` | `i64` | `0` while pending |
-| `late` | `bool` | Set by `refresh` or `settle_payout` when settlement exceeded the SLA |
+| `late` | `u8` (`0`/`1`) | Set by `refresh` or `settle_payout` when settlement exceeded the SLA |
+| `_reserved` | `[u8; 64]` | |
 
 ### 3.8 `DepositRequest` and `RedeemRequest`
 
-Seeds: `["deposit", config, seq]` and `["redeem", config, seq]`, `seq: u64` taken from `VaultState`. Closed (rent to the owner) on claim or cancel.
+Seeds: `["deposit", config, seq]` and `["redeem", config, seq]`, `seq: u64` taken from `VaultState`. Rent is paid by the owner and returned to the owner on close.
 
-| Field | `DepositRequest` | `RedeemRequest` |
+**`DepositRequest`** (closed on `claim_shares` or `cancel_deposit`):
+
+| Field | Type | Meaning |
 |---|---|---|
-| `owner` | `Pubkey` | `Pubkey` |
-| `seq` | `u64` (FIFO position) | `u64` (FIFO position) |
-| amount in | `assets: u64` (BRS) | `shares: u64` |
-| amount out | `shares_out: u64` (set at fulfil) | `assets_out: u64` (set at fulfil) |
-| `nav_at_fulfil` | `u64` | `u64` |
-| `requested_at`, `fulfilled_at` | `i64`, `i64` | `i64`, `i64` |
-| `status` | `enum RequestStatus { Pending, Fulfilled }` | same |
+| `version`, `bump` | `u8`, `u8` | |
+| `owner` | `Pubkey` | |
+| `seq` | `u64` | FIFO position |
+| `assets` | `u64` | BRS escrowed |
+| `shares_out` | `u64` | Set at fulfil |
+| `nav_at_fulfil` | `u64` | |
+| `requested_at`, `fulfilled_at` | `i64`, `i64` | |
+| `status` | `u8` enum `RequestStatus { Pending = 0, Fulfilled = 1 }` | |
+| `_reserved` | `[u8; 64]` | |
+
+**`RedeemRequest`** — supports partial fills at the head of the queue ([ADR 0010](decisions/0010-partial-fills-at-queue-head.md)). Every fill burns part of the escrowed shares at the NAV of that fill and accrues the BRS on the request.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `version`, `bump` | `u8`, `u8` | |
+| `owner` | `Pubkey` | |
+| `seq` | `u64` | FIFO position. Never changes |
+| `shares_requested` | `u64` | Shares escrowed by `request_redeem`. Immutable |
+| `shares_remaining` | `u64` | Escrowed in `pending_redemptions`, not yet filled. Set to `0` by `cancel_redeem` |
+| `shares_filled` | `u64` | Cumulative shares burned by fills |
+| `assets_filled` | `u64` | Cumulative BRS moved to `claims` for this request, each fill at its own NAV (display and audit) |
+| `assets_claimable` | `u64` | BRS in `claims` owed to this request and not yet claimed |
+| `fill_count` | `u16` | Number of fills |
+| `last_fill_nav` | `u64` | NAV per share at the last fill (`NAV_SCALE`) |
+| `requested_at`, `last_fill_at` | `i64`, `i64` | `last_fill_at = 0` until the first fill |
+| `status` | `u8` enum `RedeemStatus { Pending = 0, PartiallyFilled = 1, Filled = 2, Cancelled = 3 }` | `Pending`: no fill. `PartiallyFilled`: `shares_filled > 0 && shares_remaining > 0`. `Filled`: `shares_remaining == 0` by fills. `Cancelled`: the owner cancelled the remainder; only `assets_claimable` may be left |
+| `_reserved` | `[u8; 64]` | |
+
+- `shares_filled + shares_remaining = shares_requested`, except after a cancel, where `shares_filled + shares returned = shares_requested`.
+- **Close rule:** the account closes (rent to the owner) when `shares_remaining == 0 && assets_claimable == 0`: on the `claim_assets` that empties a `Filled` or `Cancelled` request, or on a `cancel_redeem` with nothing left to claim. A fill never closes the account, because it always leaves `assets_claimable > 0`.
+- The blended exit price shown to the investor is `assets_filled / shares_filled`.
 
 ### 3.9 `AdapterEntry`
 
@@ -245,6 +288,42 @@ Stored inline in `VaultConfig.adapters`.
 | `cap` | `u64` | Maximum BRS-equivalent value allocated through this adapter |
 | `allocated` | `u64` | Current BRS-equivalent value allocated |
 | `enabled` | `bool` | |
+| `_reserved` | `[u8; 16]` | Fixed per entry, because `MAX_ADAPTERS × entry` is part of the `VaultConfig` layout |
+
+### 3.10 `HolderState`
+
+Seeds: `["holder", config, owner]`. One per investor wallet. Created by `request_deposit` or `claim_shares`, whichever comes first (`init_if_needed`, payer = owner). Shipped in the pilot so that the phase-2 holding period ([§13.6](#136-anti-front-running-rules)) has a stamp for every wallet that held shares before the upgrade.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `version`, `bump` | `u8`, `u8` | |
+| `owner` | `Pubkey` | |
+| `last_shares_in_ts` | `i64` | Time of the owner's last `request_deposit` or `claim_shares`. Stamped at the request too, because shares from a fulfilled but unclaimed deposit already earn NAV changes ([§13.6](#136-anti-front-running-rules) rule 4) |
+| `_reserved` | `[u8; 64]` | Phase 2 carves the per-wallet instant-exit counters: `exit_period_start: i64`, `exit_period_paid: u64` |
+
+### 3.11 `FeeReceipt`
+
+Seeds: `["fee", config, invoice_ref_hash]`. Created by `contribute_fees`; its existence makes each invoice count exactly once. Never closed.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `version`, `bump` | `u8`, `u8` | |
+| `invoice_ref_hash` | `[u8; 32]` | |
+| `gross`, `take`, `net` | `u64` ×3 | Amount received, MUTAV's take, net into `reserve` |
+| `slot` | `u64` | |
+| `_reserved` | `[u8; 64]` | |
+
+### 3.12 `ClaimNotice`
+
+Seeds: `["notice", guarantee, notice_ref_hash]`. Created by `flag_claim_notice` at the first missed-rent signal; closed by `close_claim_notice` (rent to the operator). Shipped in the pilot because it also gates the redemption and deposit queues ([§5.4](#54-claims-and-payouts-operator)).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `version`, `bump` | `u8`, `u8` | |
+| `guarantee` | `Pubkey` | |
+| `notice_ref_hash` | `[u8; 32]` | Same hash the later `ClaimFiling` and `Payout` use |
+| `flagged_at` | `i64` | |
+| `_reserved` | `[u8; 64]` | |
 
 ---
 
@@ -257,10 +336,31 @@ stable_assets      = brs_balance + tesouro_value                                
 remaining_cover(g) = (g.default_cover − g.default_paid) + (g.exit_cover − g.exit_paid)
 remaining_cover_total = Σ_{g active} remaining_cover(g)
 coverage_required  = ceil(c × remaining_cover_total / 10_000)                      // c = coverage_ratio_bps
-free_capital       = max(0, stable_assets − coverage_required)
+surplus            = max(0, stable_assets − coverage_required)                     // capital above required coverage
+earmark_eff        = see below                                                     // 0 in the pilot
+free_capital       = surplus − earmark_eff                                         // = max(0, stable_assets − coverage_required − earmark_eff)
+liquid_budget      = max(0, brs_balance − provisions − earmark_eff)                // liquid BRS a redemption fill may use
 net_assets         = stable_assets − provisions                                    // saturating at 0
 NAV/share          = net_assets / shares_outstanding                               // pending deposits and redemptions excluded
 ```
+
+**Effective earmark** (ADR 0011). The buffer earmark is BRS inside `reserve` that is reserved out of surplus for the phase-2 instant exit ([§13.3](#133-the-buffer-earmark)). It still counts in `stable_assets` and `net_assets`, so it backs coverage, and `pay_claim` can always spend it. It only reduces the surplus that can leave through the redemption queue or back new guarantees. Every instruction that reads `free_capital` computes it inline:
+
+```text
+earmark_eff  = 0                                    if feature_flags & INSTANT_EXIT == 0   // always, in the pilot
+             = 0                                    if the instruction holds the queue head and it is starved:
+                                                       now − head.requested_at > exit.buffer_release_after_secs > 0
+             = min( state.buffer_earmark,           // stored level (0 in the pilot)
+                    surplus,                        // never more than the surplus
+                    max(0, brs_balance − provisions) )  // must be liquid, after filed claims
+```
+
+- **No headroom term in the gates.** The headroom (`exit.buffer_headroom_bps`) applies only to instant-exit availability and to funding ([§13.5](#135-instructions)). A term that falls with surplus would let every outflow re-derive a smaller earmark, so the queue and new guarantees could consume the earmark step by step. With this formula, every gated outflow or new liability is bounded by `free_capital` computed **before** it, which leaves `surplus_after ≥ earmark_eff_before`, so the earmark is unchanged (invariant 16). Only ungated events lower it: claim payments and filed provisions (through the liquidity term), price mark-downs (through the surplus term), the starvation release and an explicit defund.
+- **The queue head** is the `RedeemRequest` at `seq == redeem_head` with `shares_remaining > 0`, after skipping dead seqs ([§5.5](#55-investor-capital-async), [§5.8](#58-public)). Only instructions that receive the head apply the starvation term: `fulfil_redeems`, phase-2 `release_starved_buffer`, and phase-2 `instant_redeem` / `quote_instant_redeem` whenever the queue is non-empty. `register_guarantee` and `allocate` do not; `release_starved_buffer`, cranked by mutav-app, is the canonical path that stores the release.
+- **Ratchet:** `state.buffer_earmark := earmark_eff`. Applied only by instructions that already read the price and `free_capital`: `register_guarantee`, `fulfil_redeems`, `allocate`, `deallocate`, `refresh`, and in phase 2 `instant_redeem`, `fund_exit_buffer`, `defund_exit_buffer`, `release_starved_buffer`. Every other instruction (`pay_claim`, `file_claim`, `settle_payout`, `contribute_fees`, `close_guarantee`, `fulfil_deposits`, `flag_claim_notice`, `close_claim_notice`, `advance_queue_heads`, `request_*`, `cancel_*`, `claim_*`) neither reads nor writes `buffer_earmark` and so needs no price for it. This is safe because `earmark_eff` is recomputed on every read.
+- The pilot implements and tests this function exactly. With `INSTANT_EXIT` clear it returns `0`, so `free_capital = surplus` and `liquid_budget = brs_balance − provisions`; clearing the flag therefore releases any earmark at once, in every binary. Phase 2 changes no solvency formula; it only adds the instructions that raise the stored level.
+- **`pay_claim` never reads or writes `buffer_earmark`.** The liquidity term clamps the effective earmark after a claim payment, and the next ratcheting instruction stores it. The claim path is therefore final from the pilot onwards.
+- The stored level only moves down through the ratchet, `instant_redeem`, `defund_exit_buffer` and `release_starved_buffer`. It moves up only through the phase-2 `fund_exit_buffer`.
 
 **Share conversion** (virtual offset `V = 10^k`, `k` **TBD**, against first-depositor inflation):
 
@@ -274,27 +374,49 @@ assets_for(shares) = floor(shares × (net_assets + 1) / (shares_outstanding + V)
 1. `stable_assets` uses only tracked balances and the bounded price, never raw token balances or unverifiable inputs.
 2. For every guarantee: `default_paid ≤ default_cover`, `exit_paid ≤ exit_cover`, `provision_default ≤ default_cover − default_paid`, `provision_exit ≤ exit_cover − exit_paid`.
 3. `remaining_cover_total = Σ remaining_cover(g)` over active guarantees; `provisions = Σ` open `ClaimFiling.provision`.
-4. Token-account balances are at least the tracked amounts: `reserve ≥ brs_balance`, `pending_deposits ≥ pending_deposits_total`, `claims ≥ claimable_assets_total`.
-5. `share_mint.supply + Σ shares_out of fulfilled, unclaimed deposits = shares_outstanding`. Shares escrowed in `pending_redemptions` are still minted, so they stay in `shares_outstanding` until `fulfil_redeems` burns them (see §12, NAV denominator).
+4. Token-account balances are at least the tracked amounts: `reserve ≥ brs_balance`, `pending_deposits ≥ pending_deposits_total`, `claims ≥ claimable_assets_total`, `pending_redemptions ≥ pending_redeem_shares`.
+5. `share_mint.supply + Σ shares_out of fulfilled, unclaimed deposits = shares_outstanding`. Shares escrowed in `pending_redemptions` are still minted, so they stay in `shares_outstanding` until a fill burns them (see §12, NAV denominator).
 6. A provision reduces NAV only. It never reduces `stable_assets`, so nothing is counted twice against coverage: a filed-but-unpaid claim is already inside `remaining_cover_total`.
-7. Paying a claim reduces `stable_assets` and `remaining_cover_total` by the same amount. At `c = 1.0` it leaves `free_capital` unchanged.
+7. Paying a claim reduces `stable_assets` and `remaining_cover_total` by the same amount. At `c = 1.0` it leaves `surplus` unchanged.
 
-**Gated on `free_capital` (and `mode == Normal`):** `register_guarantee`, `fulfil_redeems`, `allocate`, `deallocate` (with the under-coverage exception in [§6](#6-under-coverage-mode)).
+**Redemption-queue invariants** (ADR 0010):
 
-**Never solvency-gated:** `pay_claim`, `file_claim`, `settle_payout`, `contribute_fees`, `fulfil_deposits`, `close_guarantee`, investor `cancel_*` and `claim_*`, `refresh`.
+8. `Σ shares_remaining` over open `RedeemRequest`s `= pending_redeem_shares`.
+9. `Σ assets_claimable` over open `RedeemRequest`s `= claimable_assets_total`.
+10. **Head-only partial fills.** At most one request has `status == PartiallyFilled`, and it is the head (the lowest seq with `shares_remaining > 0`). `redeem_head` is at or below that seq; every seq between them passes the skip proof of `advance_queue_heads` ([§5.8](#58-public)). No request with a higher seq than a request that still has `shares_remaining > 0` has any fill.
+11. For every open request that is not `Cancelled`: `shares_filled + shares_remaining = shares_requested`.
+12. Every fill is priced at the NAV of that fill and rounds in the reserve's favour, so a fill never lowers NAV per share. Every fill satisfies `assets ≤ budget` at the time of the fill; a partial fill also satisfies `assets ≥ caps.min_fill_assets` and leaves a remainder worth at least `caps.min_request`.
+
+**Earmark invariants** (ADR 0011; tested in the pilot with an earmark injected through LiteSVM `set_account`):
+
+13. `0 ≤ earmark_eff ≤ buffer_earmark`; `earmark_eff ≤ surplus`; `earmark_eff ≤ brs_balance − provisions` (saturating); `earmark_eff = 0` whenever `INSTANT_EXIT` is clear.
+14. `pay_claim` reads neither `buffer_earmark` nor any instant-exit state. The property test that `pay_claim` is never refused for solvency also fuzzes a non-zero earmark with the flag set.
+15. In under-coverage, `earmark_eff = 0` and `buffer_earmark` cannot increase.
+16. **Gated changes never consume the earmark.** `register_guarantee`, every fill of `fulfil_redeems`, `allocate` and `deallocate` must fit in `free_capital` (or, for `allocate`, the liquidity check) computed **before** the change, so `earmark_eff` after the change equals `earmark_eff` before it, unless a starvation release applies. With an injected earmark `E` and the flag set, their capacity shrinks by exactly `min(E, surplus, brs_balance − provisions)`, and any number of sequential fills in one batch takes at most `surplus − earmark_eff` in total.
+17. In the pilot: `feature_flags == 0` and `buffer_earmark == 0`, so `free_capital == surplus`. With the flag clear, an injected earmark has no effect and the next ratcheting instruction stores `0`.
+
+**Gated on `free_capital` (and `mode == Normal`):** `register_guarantee`, `fulfil_redeems`, `allocate`, `deallocate` (with the under-coverage exception in [§6](#6-under-coverage-mode)); in phase 2, `fund_exit_buffer`.
+
+**Never solvency-gated:** `pay_claim`, `file_claim`, `settle_payout`, `contribute_fees`, `fulfil_deposits`, `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, investor `cancel_*` and `claim_*`, `refresh`, `advance_queue_heads`.
+
+**Claim-notice gate** (ADR 0011, pilot): while `pending_notices > 0`, `fulfil_deposits` and `fulfil_redeems` (and in phase 2 `instant_redeem`) refuse with `ClaimNoticePending`, so nobody enters or leaves at a NAV that misses a known, unprovisioned loss. The gate never touches `file_claim`, `pay_claim` or any other claim-path instruction.
 
 ---
 
 ## 5. Instructions
 
-Each instruction lists its signer, main accounts, arguments, rules (checked in this order) and effects. Every instruction that reads `stable_assets` requires a non-stale TESOURO price when `tesouro_units > 0` ([§7](#7-price-safety)), except `pay_claim`.
+Each instruction lists its signer, main accounts, arguments, rules (checked in this order) and effects. Every instruction that reads `stable_assets` requires a non-stale TESOURO price when `tesouro_units > 0` ([§7](#7-price-safety)), except `pay_claim`. Instructions outside the ratchet list in [§4](#4-invariants-and-formulas) do not compute `earmark_eff` and so do not need the price for it.
+
+Common account rules:
+- Every instruction rejects a program-owned account whose `version` is above the binary's `PROGRAM_LAYOUT_VERSION` (`UnsupportedVersion`, §14.2 R1b).
+- **Owner, never delegate.** In every investor instruction the token account the program debits (`request_deposit`, `request_redeem`, phase-2 `instant_redeem`) must have `owner == signer`, `mint` equal to the configured mint and the token program equal to that mint's program; the program transfers or burns with the signer as owner authority only, never as an approved delegate. `HolderState` and request seeds use that same owner. A delegate approved by another wallet therefore cannot redeem that wallet's shares under its own name.
 
 ### 5.1 Admin and roles
 
 #### `initialize(params)`
 
 - **Signer:** the program's upgrade authority (checked against `ProgramData`), so no one can front-run initialization. `params.admin` is the Squads vault.
-- **Accounts:** `config` (init), `state` (init), vault authority, `reserve_mint`, `share_mint` (init, authority = vault authority, 6 decimals), the five token accounts (init), token programs, system program.
+- **Accounts:** `config` (init), `state` (init), vault authority, `reserve_mint`, `share_mint` (init, authority = vault authority, 6 decimals), the four token accounts of §3.3 (init), token programs, system program.
 - **Rules:** `reserve_mint` passes the mint guard: if Token-2022, reject `PermanentDelegate`, `TransferHook`, non-zero `TransferFee`, `NonTransferable`, `DefaultAccountState = Frozen` (PC-19). `fee_take_bps ≤ 3_000`. Roles distinct. Caps within program bounds.
 - **Effects:** writes `VaultConfig` and an empty `VaultState`. Whether a seed deposit is minted to a dead address at init is **TBD**.
 - **Errors:** `Unauthorized`, `UnsupportedMintExtension`, `InvalidParameter`, `RolesNotDistinct`.
@@ -302,7 +424,10 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
 
 #### `set_config(params)`
 
-- **Signer:** admin. **Rules:** same bounds as `initialize`. `reserve_mint`, token program and decimals cannot change. **Events:** `ConfigUpdated { field, old, new }` per changed field.
+- **Signer:** admin. **Rules:** same bounds as `initialize`. `reserve_mint`, token program and decimals cannot change. **Events:** one `ConfigUpdated { field, old, new }` per changed field, including `Pubkey`, hash and nested `Caps` / `PriceParams` / `ExitParams` fields ([§9](#9-events)).
+- **Feature flags:** `feature_flags & !SUPPORTED_FEATURES != 0` fails with `FeatureNotSupported`. The pilot binary's `SUPPORTED_FEATURES = 0`, so no feature can be switched on until a program upgrade supports it ([§14.3](#143-feature-flags)).
+- **`ExitParams`:** may be written while `INSTANT_EXIT` is off (staging values for a later enable); bounds are checked only when the resulting config has `INSTANT_EXIT` on ([§13.2](#132-parameters-exitparams)).
+- **Accounts distinct:** receives the treasury and payments token accounts; `treasury_account != payments_account`, and `mutav_capital_wallet` differs from both accounts' `owner` (§2.1). Errors: `InvalidParameter`.
 
 #### `set_roles(operator, pauser)`
 
@@ -310,7 +435,7 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
 
 #### `set_payments_account(token_account)`
 
-- **Signer:** admin. **Rules:** token account mint = `reserve_mint`. Owner is MUTAV's payments wallet (off-chain fact; the program records the account). **Event:** `PaymentsAccountUpdated`.
+- **Signer:** admin. **Rules:** token account mint = `reserve_mint`; `token_account != config.treasury_account`; `token_account.owner != config.mutav_capital_wallet` (also receives the treasury token account to compare owners, §2.1). Owner is MUTAV's payments wallet (off-chain fact; the program records the account). **Errors:** `InvalidMint`, `InvalidParameter`. **Event:** `PaymentsAccountUpdated`.
 
 #### `set_allowlist_root(root)`
 
@@ -323,7 +448,7 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
 #### `pause()` / `unpause()`
 
 - **Signer:** `pause`: pauser or admin, no time lock. `unpause`: admin.
-- **Effects:** sets `config.paused`. While paused, these are rejected: capital flows (`request_*`, `fulfil_*`), new guarantees and `allocate`/`deallocate`. **These stay open** (ADRs 0008, 0009): `contribute_fees`, `pay_claim`, `file_claim`, `settle_payout`, `close_guarantee`, `refresh`, and investor `cancel_*` and `claim_*`. Claims are never blocked.
+- **Effects:** sets `config.paused`. While paused, these are rejected: capital flows (`request_*`, `fulfil_*`), new guarantees and `allocate`/`deallocate`; in phase 2 also `instant_redeem` and `fund_exit_buffer`. **These stay open** (ADRs 0008, 0009, 0011): `contribute_fees`, `pay_claim`, `file_claim`, `settle_payout`, `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, `refresh`, `advance_queue_heads`, and investor `cancel_*` and `claim_*`; in phase 2 also `defund_exit_buffer` and `release_starved_buffer`. Claims are never blocked.
 - **Events:** `Paused { by }`, `Unpaused`.
 
 #### `revoke_operator()`
@@ -341,7 +466,7 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
   2. `default_cover + exit_cover > 0`; `rent > 0`.
   3. `default_cover + exit_cover ≤ caps.max_cover_per_guarantee`.
   4. `agency.outstanding_cover + default_cover + exit_cover ≤ caps.max_cover_per_agency`.
-  5. **Solvency post-condition:** `ceil(c × (remaining_cover_total + new_cover)) ≤ stable_assets`, i.e. the new cover fits in `free_capital`.
+  5. **Solvency post-condition:** `coverage_required_after + earmark_eff_before ≤ stable_assets`, where `coverage_required_after = ceil(c × (remaining_cover_total + new_cover) / 10_000)` and `earmark_eff_before` is computed before the registration (§4). Equivalently, the added coverage fits in the `free_capital` computed before the registration, so a funded earmark is never consumed by new guarantees (invariant 16). In the pilot `earmark_eff_before = 0`.
 - **Effects:** creates `Guarantee { status: Active }`; `remaining_cover_total += new_cover`; recompute `coverage_required`; `active_guarantees += 1`; agency `outstanding_cover += new_cover`, `active_guarantees += 1`.
 - **Errors:** `Paused`, `UnderCovered`, `InvalidParameter`, `GuaranteeCapExceeded`, `AgencyCapExceeded`, `InsufficientFreeCapital`, `StalePrice`; account-already-in-use on a duplicate `id`.
 - **Event:** `GuaranteeRegistered { id, agency_id, refs_hash, rent, default_cover, exit_cover }`.
@@ -361,11 +486,28 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
 - **Signer:** operator, who also signs the BRS transfer from its own BRS token account (fees reach it via PIX → BRS mint off-chain). Batched per invoice.
 - **Accounts:** adds `fee_receipt` (init) at seeds `["fee", config, invoice_ref_hash]`.
 - **Rules:** `amount > 0`; source mint = `reserve_mint`; `fee_receipt` must not exist, so **each invoice is recorded exactly once**; `treasury_account` matches config. **Not paused, never solvency-gated:** fees are always accepted, including during pause and under-coverage (ADR 0009).
-- **Effects:** creates `FeeReceipt { invoice_ref_hash, gross, take, net, slot }`, which mutav-app reconciles against its invoices. `take = floor(amount × fee_take_bps / 10_000)`; transfer `take` → `config.treasury_account` (directly; the program holds no fee balance); transfer `amount − take` → `reserve`; `brs_balance += amount − take`; `fees_in_total += amount − take`; `fee_take_total += take`. NAV rises immediately. Streaming fees into NAV (PC-15) is **not adopted**; see §12. Never mints shares.
+- **Effects:** creates the `FeeReceipt` ([§3.11](#311-feereceipt)), which mutav-app reconciles against its invoices. `take = floor(amount × fee_take_bps / 10_000)`; transfer `take` → `config.treasury_account` (directly; the program holds no fee balance); transfer `amount − take` → `reserve`; `brs_balance += amount − take`; `fees_in_total += amount − take`; `fee_take_total += take`. NAV rises immediately. Streaming fees into NAV (PC-15) is **not adopted**; see §12. Never mints shares.
 - **Errors:** `InvalidParameter`, `InvalidMint`, `InvalidTreasuryAccount`; account-already-in-use on a duplicate `invoice_ref_hash`.
 - **Event:** `FeesContributed { invoice_ref_hash, gross, take, net }`.
 
 ### 5.4 Claims and payouts (operator)
+
+#### `flag_claim_notice(notice_ref_hash)` / `close_claim_notice(notice_ref_hash, reason)`
+
+Shipped in the pilot (ADR 0011). MUTAV learns of a missed rent up to 15 days before `file_claim` books the provision, and MUTAV is both a queue participant (its capital wallet) and the party that times admin fills. The notice keeps the queues closed while a known loss is not yet in NAV.
+
+- **Signer:** operator. Never paused, never solvency-gated. They gate only `fulfil_deposits`, `fulfil_redeems` and phase-2 `instant_redeem`; they never gate `file_claim`, `pay_claim`, `settle_payout` or `close_guarantee`, and `file_claim` does not require a notice.
+- **Accounts:** `config`, `state`, `guarantee`, `claim_notice` (init on flag, close on close); on close also the `ClaimFiling` at `["claim", guarantee, notice_ref_hash]` when it exists.
+- **`flag_claim_notice`:** guarantee `Active`. Creates `ClaimNotice` ([§3.12](#312-claimnotice)); `pending_notices += 1`. The operator flags **at the first missed-rent signal** in the platform, not when the 15-day filing is complete. Duplicate notice fails at account creation.
+- **`close_claim_notice`:** `reason` is one of
+  - `Paid`: the `ClaimFiling` exists and its status is `PAID`, so the whole payment is already out of NAV;
+  - `FullyProvisioned`: the `ClaimFiling` exists, is `FILED`, and the leg is provisioned for its whole remaining cover (`leg_provision == leg_cover − leg_paid`), so no later payment on that leg can exceed what NAV already reflects (ties to PC-12, §12 Q13);
+  - `Withdrawn`: MUTAV dropped the notice (rent was paid, or the claim was not approved).
+
+  A notice is never closed merely because a smaller provision was filed: `pay_claim` may pay up to the leg's remaining cover, which can exceed the filed provision. Otherwise `NoticeNotResolved`. Closes the notice (rent to the operator); `pending_notices −= 1`.
+- **Liveness:** while any notice is open the queues wait. MUTAV can always reopen them by provisioning the leg fully (`FullyProvisioned`), which only lowers NAV, in the reserve's favour. The transparency page shows every open notice and its age and flags any open longer than 15 days.
+- **Errors:** `GuaranteeNotActive`, `NoticeNotResolved`, `ClaimNotFiled`; account-already-in-use on a duplicate notice.
+- **Events:** `ClaimNoticeFlagged { guarantee_id, notice_ref_hash }`, `ClaimNoticeClosed { guarantee_id, notice_ref_hash, reason }`.
 
 #### `file_claim(leg, amount, notice_ref_hash)`
 
@@ -403,54 +545,89 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
 
 ### 5.5 Investor capital (async)
 
-Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` against `investor_allowlist_root`. Request-size limits are enforced (`caps.min_request`, `caps.max_request`; values **TBD**).
+Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` against `investor_allowlist_root`. Request-size limits are enforced (`caps.min_request`, `caps.max_request`; values **TBD**, proposed R$1,000 and R$30,000).
 
 #### `request_deposit(assets, proof)` / `cancel_deposit()` / `claim_shares()`
 
 - **Signer:** investor.
-- **`request_deposit`:** not paused; allowlisted; size within limits. Transfer `assets` BRS investor → `pending_deposits`; create `DepositRequest { seq: next_deposit_seq++, status: Pending }`; `pending_deposits_total += assets`. Escrowed funds are excluded from `stable_assets` and solvency until fulfilled. **Event:** `DepositRequested`.
-- **`cancel_deposit`:** owner; `status == Pending`. Refund BRS; close the request. Never pausable. **Event:** `DepositCancelled`.
-- **`claim_shares`:** owner; `status == Fulfilled`. Mint `shares_out` to the owner's share token account; close the request. Never pausable. **Event:** `SharesClaimed`.
+- **`request_deposit`:** not paused; allowlisted; size within limits; source BRS account `owner == signer`. Transfer `assets` BRS investor → `pending_deposits`; create `DepositRequest { seq: next_deposit_seq++, status: Pending }`; `pending_deposits_total += assets`; create the owner's `HolderState` if needed (payer = owner) and set `last_shares_in_ts = now`. Escrowed funds are excluded from `stable_assets` and solvency until fulfilled. **Event:** `DepositRequested`.
+- **`cancel_deposit`:** owner; `status == Pending`. Refund BRS; close the request. Only this request changes; `deposit_head` is advanced later by `fulfil_deposits` or `advance_queue_heads`. Never pausable. **Event:** `DepositCancelled`.
+- **`claim_shares`:** owner; `status == Fulfilled`. Mint `shares_out` to the owner's share token account; create the owner's `HolderState` if needed (payer = owner) and set `last_shares_in_ts = now`; close the request. Never pausable. **Event:** `SharesClaimed`.
 - **Errors:** `NotAllowlisted`, `RequestTooSmall`, `RequestTooLarge`, `InvalidRequestStatus`, `Paused`.
 
 #### `fulfil_deposits(count)`
 
 - **Signer:** admin.
-- **Accounts:** the next `count` `DepositRequest` accounts in **strict FIFO** `seq` order, starting at `deposit_head`. Cancelled sequences are skipped, and no pending request is ever skipped.
-- **Rules:** not paused; `fulfil_halted == false`; price fresh; `stable_assets + Σ assets ≤ caps.max_tvl`. Deposits **may** be fulfilled in under-coverage mode. They add capital and are the recapitalization path; the new depositor buys at the NAV, which already reflects the loss (ADR 0008).
+- **Accounts:** the next `count` `DepositRequest` accounts in **strict FIFO** `seq` order, starting at `deposit_head`. Dead seqs (cancelled and closed) are skipped under the skip proof of `advance_queue_heads` ([§5.8](#58-public)), and no pending request is ever skipped.
+- **Rules:** not paused; `pending_notices == 0` (`ClaimNoticePending`); `fulfil_halted == false`; price fresh; `stable_assets + Σ assets ≤ caps.max_tvl`. Deposits **may** be fulfilled in under-coverage mode. They add capital and are the recapitalization path; the new depositor buys at the NAV, which already reflects the loss (ADR 0008).
 - **Effects (per request, in order):** price at the NAV at fulfil: `shares_out = shares_for(assets)`; transfer BRS `pending_deposits` → `reserve`; `brs_balance += assets`; `pending_deposits_total −= assets`; `shares_outstanding += shares_out`; `status = Fulfilled`; advance `deposit_head`.
-- **Errors:** `Unauthorized`, `Paused`, `FulfilHalted`, `StalePrice`, `TvlCapExceeded`, `QueueOrderViolation`.
+- **Errors:** `Unauthorized`, `Paused`, `ClaimNoticePending`, `FulfilHalted`, `StalePrice`, `TvlCapExceeded`, `QueueOrderViolation`.
 - **Event:** `DepositsFulfilled { from_seq, to_seq, assets, shares, nav }`.
 
-#### `request_redeem(shares, proof)` / `cancel_redeem()` / `claim_assets()`
+#### `request_redeem(shares, proof)`
 
-- **`request_redeem`:** investor; not paused; allowlisted; size within limits. Transfer `shares` → `pending_redemptions`; create `RedeemRequest { seq: next_redeem_seq++ }`; `pending_redeem_shares += shares`. **Event:** `RedeemRequested`.
-- **`cancel_redeem`:** owner; `Pending`. Return shares; close. Never pausable. Queue-position and cooldown semantics (PC-29) are **TBD**. **Event:** `RedeemCancelled`.
-- **`claim_assets`:** owner; `Fulfilled`. Transfer `assets_out` from `claims` to the owner's BRS account (owner and mint checked); `claimable_assets_total −= assets_out`; close. Never pausable. A frozen destination leaves the request `Fulfilled` and claimable later. **Event:** `AssetsClaimed`.
+- **Signer:** investor. **Rules:** not paused; allowlisted; share token account `owner == signer` (no delegate); `shares > 0`; size within limits, checked in BRS at the current NAV (`caps.min_request ≤ assets_for(shares) ≤ caps.max_request`; later NAV drift is ignored).
+- **Effects:** transfer `shares` → `pending_redemptions`; create `RedeemRequest { seq: next_redeem_seq++, shares_requested = shares_remaining = shares, status: Pending }`; `pending_redeem_shares += shares`.
+- **Event:** `RedeemRequested { owner, seq, shares }`.
 
-#### `fulfil_redeems(count)`
+#### `fulfil_redeems(count, max_assets)` — partial fills at the head (ADR 0010)
 
 - **Signer:** admin.
-- **Accounts:** the next `count` `RedeemRequest` accounts in strict `seq` order from `redeem_head`.
-- **Rules:** not paused; `mode == Normal`; `fulfil_halted == false`; price fresh. **Strict FIFO:** requests are processed from the head and never skipped. For each request, `assets_out = assets_for(shares)` at the NAV at fulfil, and `assets_out ≤ free_capital` (recomputed after each fill) and `assets_out ≤ brs_balance`. The first request that does not fit stops the batch. Partial fills at the head (PC-29) are **TBD**. There is no weekly cap.
-- **Effects (per request):** burn the escrowed shares; transfer BRS `reserve` → `claims`; `brs_balance −= assets_out`; `claimable_assets_total += assets_out`; `shares_outstanding −= shares`; `pending_redeem_shares −= shares`; `status = Fulfilled`; advance `redeem_head`.
-- **Errors:** `Unauthorized`, `Paused`, `UnderCovered`, `FulfilHalted`, `StalePrice`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `QueueOrderViolation`.
-- **Event:** `RedeemsFulfilled { from_seq, to_seq, shares, assets, nav }`.
+- **Accounts:** the `RedeemRequest` accounts from `redeem_head` in strict `seq` order (up to `count`, at most `MAX_FULFIL_BATCH`). A seq is skipped only under the skip proof of `advance_queue_heads` ([§5.8](#58-public)); any other gap or reordering fails with `QueueOrderViolation`. In practice mutav-app cranks `advance_queue_heads` first, so the admin's batch starts at a live head and its size does not grow with the number of cancelled seqs. The Squads vault transaction references the static vault accounts through a per-reserve address lookup table.
+- **Arguments:** `max_assets` lets the admin fulfil **less** than the available budget, for example to keep room for new guarantees (PC-30, §12). It can never change the order. `u64::MAX` means no admin limit.
+- **Rules:** not paused; `pending_notices == 0` (`ClaimNoticePending`); `mode == Normal`; `fulfil_halted == false`; price fresh. There is no weekly cap. **Strict FIFO:** the head is filled as far as the budget allows, and no request is filled while an earlier one still has `shares_remaining > 0`.
+- **Budget**, recomputed before every fill (paying a fill at NAV reduces `stable_assets`, `surplus` and `free_capital` one-for-one and leaves `coverage_required` unchanged):
+
+  ```text
+  budget = min(max_assets − assets_paid_in_this_call, free_capital, liquid_budget)
+  ```
+
+  The head request is passed, so `earmark_eff` includes the starvation term ([§4](#4-invariants-and-formulas)) and the ratchet applies.
+- **Loop**, from the head:
+  1. `value = assets_for(shares_remaining)` at the current NAV.
+  2. **Full fill** if `value ≤ budget`: fill all of `shares_remaining` for `value`; continue with the next seq.
+  3. Otherwise **partial fill, then stop the batch**:
+     - `fill_max = budget`;
+     - if `value − fill_max < caps.min_request`, then `fill_max = value − caps.min_request` (saturating at 0), so the remainder stays a normal-size request;
+     - if `fill_max < caps.min_fill_assets`, there is **no fill**: the head is left untouched and the batch stops;
+     - `shares_fill = floor(fill_max × (shares_outstanding + V) / (net_assets + 1))` and `assets = assets_for(shares_fill)`; both round down, so `assets ≤ fill_max`;
+     - **checks on the rounded values:** while `assets_for(shares_remaining − shares_fill) < caps.min_request`, decrease `shares_fill` by 1 and recompute `assets`; then, if `assets < caps.min_fill_assets` or `assets == 0`, there is **no fill**. Invariant 12 therefore holds on the amounts actually moved.
+  - A head whose value is below `caps.min_request + caps.min_fill_assets` can therefore only be filled whole.
+- **Effects per fill:** burn `shares_fill` from `pending_redemptions`; transfer `assets` BRS `reserve` → `claims`; `brs_balance −= assets`; `claimable_assets_total += assets`; `shares_outstanding −= shares_fill`; `pending_redeem_shares −= shares_fill`. On the request: `shares_remaining −= shares_fill`, `shares_filled += shares_fill`, `assets_filled += assets`, `assets_claimable += assets`, `fill_count += 1`, `last_fill_nav = nav`, `last_fill_at = now`, `status = Filled` if `shares_remaining == 0` else `PartiallyFilled`. Advance `redeem_head` past a completed request.
+- If the call makes no fill at all, it fails with `InsufficientFreeCapital` (or `InsufficientLiquidBalance` when `liquid_budget` was the binding term), so an empty batch is never recorded as a success.
+- **Errors:** `Unauthorized`, `Paused`, `ClaimNoticePending`, `UnderCovered`, `FulfilHalted`, `StalePrice`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `QueueOrderViolation`.
+- **Events:** one `RedeemFilled` per fill, then a batch summary `RedeemsFulfilled`.
+
+#### `claim_assets()`
+
+- **Signer:** owner. Never pausable. Works **between fills**: a holder whose request is `PartiallyFilled` collects what has been filled so far without losing the place in the queue.
+- **Rules:** `assets_claimable > 0`.
+- **Effects:** transfer `assets_claimable` from `claims` to the owner's BRS account (owner and mint checked); `claimable_assets_total −= assets_claimable`; `assets_claimable = 0`; close the account if `shares_remaining == 0`. A frozen destination fails cleanly and leaves the amount claimable later.
+- **Event:** `AssetsClaimed { owner, seq, assets, closed }`.
+
+#### `cancel_redeem()`
+
+- **Signer:** owner. Never pausable. No cooldown: investors are allowlisted, a cancel only costs the canceller the place in line, and request-size limits bound spam. Request/cancel cycles cannot stall the admin: dead seqs are cleared by the permissionless `advance_queue_heads` crank, which moves no funds, so the number of timelocked admin transactions does not grow with the number of cancelled seqs.
+- **Rules:** `shares_remaining > 0` (status `Pending` or `PartiallyFilled`).
+- **Effects:** return `shares_remaining` shares from `pending_redemptions` to the owner; `pending_redeem_shares −= shares_remaining`; `shares_remaining = 0`; `status = Cancelled`. Assets already filled stay on the request: if `assets_claimable == 0` the account closes now, otherwise it stays open until `claim_assets` empties it. Only this request changes: `redeem_head` is not moved here (the instruction cannot see later seqs); `fulfil_redeems`, `advance_queue_heads` and phase-2 `release_starved_buffer` advance it. A new `request_redeem` takes a fresh tail seq.
+- **Event:** `RedeemCancelled { owner, seq, shares_returned, assets_claimable }`.
 
 ### 5.6 MUTAV capital
 
-MUTAV contributes and withdraws capital through the **same async flow as every investor** (ADR 0008). MUTAV's wallet is allowlisted, and it receives shares at the NAV at fulfil and redeems them only out of `free_capital`, in strict FIFO. There is no `contribute_capital` or `withdraw_surplus` instruction.
+MUTAV contributes and withdraws capital through the **same async flow as every investor** (ADR 0008). MUTAV's wallet is allowlisted, and it receives shares at the NAV at fulfil and redeems them only out of `free_capital`, in strict FIFO, with the same partial-fill rules. Because MUTAV also controls the admin multisig (which times fills) and the operator (which learns of missed rents first), the claim-notice gate ([§5.4](#54-claims-and-payouts-operator)) closes both queues while a known loss is not yet in NAV: neither MUTAV nor anyone else is filled at a NAV that misses it, and no depositor buys in at that NAV. The gate is only as good as the operator's flagging discipline, which the transparency page makes auditable (§12 Q29). There is no `contribute_capital` or `withdraw_surplus` instruction. Its address is recorded in `config.mutav_capital_wallet`, and in phase 2 it is **barred from instant exit** ([§13.6](#136-anti-front-running-rules)): MUTAV earns from instant-exit haircuts only through its shares, like every holder, so it never sits on the exit side.
 
 ### 5.7 Reserve allocation (admin, through adapters)
 
 The core never passes the vault authority or the share-mint authority into a CPI. Each adapter acts only through its own capped sub-authority PDA, which owns only that adapter's staging account.
 
+**CPI depth.** Admin instructions run inside Squads `vault_transaction_execute`, so `allocate` is already Squads (1) → mutav (2) → adapter (3) → venue (4) → token program (5), the maximum invoke stack height. Adapter rule: an adapter makes at most one level of CPI into its venue, the venue path must not exceed one further CPI, and the adapter emits no events by self-CPI (the core emits them). Plan Tasks 13–14 test `allocate` / `deallocate` executed through a real Squads v4 vault transaction, not only `fulfil_redeems`.
+
 #### `allocate(adapter_program, amount)`
 
 - **Signer:** admin.
-- **Rules:** not paused; `mode == Normal`; adapter whitelisted and enabled; `allocated + amount ≤ adapter.cap`; price fresh; after the move, `tesouro_value ≤ caps.max_tesouro_share_bps × stable_assets / 10_000`; **solvency post-condition** `stable_assets_after ≥ coverage_required`, with `stable_assets_after` valued at the bounded price. Whether `amount` itself must also fit in `free_capital` is **TBD**.
+- **Rules:** not paused; `mode == Normal`; adapter whitelisted and enabled; `allocated + amount ≤ adapter.cap`; price fresh; after the move, `tesouro_value ≤ caps.max_tesouro_share_bps × stable_assets / 10_000`; **solvency post-condition** `stable_assets_after ≥ coverage_required`, with `stable_assets_after` valued at the bounded price; **liquidity post-condition** `brs_balance_after ≥ provisions + earmark_eff_before`, with `earmark_eff_before` computed before the transfer (a value recomputed afterwards would be clamped by the same liquidity and make the check vacuous), so an allocation into TESOURO cannot spend BRS that filed claims or the buffer earmark rely on (ADR 0011). The ratchet is applied only after the check passes; a failing allocation leaves `buffer_earmark` unchanged. Whether `amount` itself must also fit in `free_capital` is **TBD**.
 - **Effects:** core transfers `amount` BRS `reserve` → adapter staging (vault-authority signed); CPI `adapter.deposit` signed by the sub-authority only; reload accounts; record the received `tesouro_units`; update `brs_balance`, `tesouro_units`, `adapter.allocated`. **Post-CPI checks:** every vault token account and the share supply are unchanged except for the expected deltas.
-- **Errors:** `AdapterNotWhitelisted`, `AdapterCapExceeded`, `TesouroShareCapExceeded`, `InsufficientFreeCapital`, `UnderCovered`, `PostCpiCheckFailed`, `StalePrice`.
+- **Errors:** `AdapterNotWhitelisted`, `AdapterCapExceeded`, `TesouroShareCapExceeded`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `UnderCovered`, `PostCpiCheckFailed`, `StalePrice`.
 - **Event:** `Allocated { adapter, brs_out, tesouro_in }`.
 
 #### `deallocate(adapter_program, tesouro_units)`
@@ -473,21 +650,33 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
 - **Accounts:** `config`, `state`, the reserve token accounts, the TESOURO price account(s), and optionally any number of pending `Payout` accounts as remaining accounts.
 - **Effects:**
   1. Detect frozen reserve token accounts and fail closed: emit `ReserveFrozenDetected`; frozen balances do not count in `stable_assets`.
-  2. Read and bound the TESOURO price ([§7](#7-price-safety)); recompute `tesouro_value`, `stable_assets`, `coverage_required`, `free_capital`, `net_assets`, `nav_per_share`.
+  2. Read and bound the TESOURO price ([§7](#7-price-safety)); recompute `tesouro_value`, `stable_assets`, `coverage_required`, `surplus`, `earmark_eff` (and apply the ratchet), `free_capital`, `net_assets`, `nav_per_share`.
   3. If NAV per share moved more than `price.max_nav_move_bps` since the last refresh, set `fulfil_halted = true` (cleared by admin `set_config`, TBD exact clearing path).
   4. Set `mode` ([§6](#6-under-coverage-mode)).
   5. For each passed `Payout` with `status == Pending` and `now > paid_at + payout_sla_secs`, set `late = true`; update `late_payouts`.
 - **Errors:** none for stale prices: a stale price is recorded and flagged, and the gated instructions refuse to run on it.
-- **Event:** `StateRefreshed { stable_assets, coverage_required, free_capital, provisions, nav_per_share, mode, tesouro_price, price_stale }`, plus `PayoutLate` per newly late payout and `ModeChanged` on a transition.
+- **Event:** `StateRefreshed { stable_assets, coverage_required, surplus, buffer_earmark, free_capital, provisions, nav_per_share, mode, tesouro_price, price_stale }`, plus `PayoutLate` per newly late payout and `ModeChanged` on a transition.
+
+#### `advance_queue_heads(max)`
+
+- **Signer:** anyone (a crank run by mutav-app before every admin fulfil). Moves no funds and involves no discretion. Never paused.
+- **Accounts:** `config`, `state`, then up to `max` request accounts as remaining accounts, for the redeem queue from `redeem_head` and for the deposit queue from `deposit_head`, each at the PDA derived for that seq.
+- **Skip proof**, per seq, in order:
+  - the account address equals the PDA for `seq`, **and**
+  - either the account is closed (`owner == system_program && data_is_empty()`; lamports may be non-zero, because anyone can send lamports to a closed address), **or** it decodes as a valid request of this config with nothing left in the queue (`RedeemRequest.shares_remaining == 0`; for deposits, `status == Fulfilled`).
+- **Effects:** advances `redeem_head` / `deposit_head` over every seq that passes the proof and stops at the first seq that does not (a live request) or at `next_*_seq`. Seq numbers are never reused, so a closed seq can never come back to life.
+- **Event:** `QueueHeadsAdvanced { redeem_head, deposit_head }`.
+
+`fulfil_deposits` and `fulfil_redeems` apply the same skip proof inline. "The queue head" in §4 and §13 is the request at `seq == redeem_head` with `shares_remaining > 0`; an instruction that needs it fails with `QueueOrderViolation` if the passed account is not that request.
 
 ---
 
 ## 6. Under-coverage mode
 
 - **Trigger:** `stable_assets < coverage_required`, for example after a TESOURO mark-down or an issuer freeze. Set by `refresh`, and checked inline by every gated instruction.
-- **Frozen automatically:** `register_guarantee`, `fulfil_redeems`, `allocate`.
+- **Frozen automatically:** `register_guarantee`, `fulfil_redeems`, `allocate`; in phase 2 also `instant_redeem` and `fund_exit_buffer`. Because `surplus = 0`, `earmark_eff = 0` and the ratchet releases any stored earmark.
 - **Restricted:** `deallocate` only if it does not worsen coverage ([§5.7](#57-reserve-allocation-admin-through-adapters)).
-- **Keeps working:** `pay_claim`, `file_claim`, `settle_payout`, `contribute_fees`, `fulfil_deposits`, `close_guarantee`, `refresh`, investor `cancel_*` and `claim_*`, `request_*` (queued, not fulfilled). `fulfil_deposits` is **TBD**.
+- **Keeps working:** `pay_claim`, `file_claim`, `settle_payout`, `contribute_fees`, `fulfil_deposits` (ADR 0008; still subject to the claim-notice gate), `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, `refresh`, `advance_queue_heads`, investor `cancel_*` and `claim_*`, `request_*` (queued, not fulfilled).
 - **Alert:** a `ModeChanged { to: UnderCovered, deficit }` event, consumed by the mutav-app indexer to alert admins.
 - **Exit:** `refresh` sets `mode = Normal` once `stable_assets ≥ coverage_required` again (through fees, capital contributions, a price recovery or run-off).
 
@@ -500,9 +689,10 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
   - **Staleness bound:** if the price's publish time is older than `price.max_staleness_secs`, it is stale. Gated instructions fail with `StalePrice`; `pay_claim` never reads the price. Valuing a stale price with a haircut instead (PC-17) is **TBD**.
   - **Deviation bound:** if the on-chain price moved more than `price.max_deviation_bps` against the last accepted price, it is rejected as stale until admin review.
 - **NAV-move guard:** a NAV-per-share move of more than `price.max_nav_move_bps` ("X%") in one refresh sets `fulfil_halted`, which pauses `fulfil_deposits` and `fulfil_redeems`. X is **TBD**.
+- **Instant exit** (phase 2) uses the tighter bound `min(exit.max_price_age_secs, price.max_staleness_secs)` ([§13.6](#136-anti-front-running-rules)).
 - Price-source changes are admin actions (time-locked).
 
-`PriceParams` fields: `tesouro_price_account: Pubkey`, `p0: u64`, `t0: i64`, `y_max_bps: u16`, `max_staleness_secs: i64`, `max_deviation_bps: u16`, `max_nav_move_bps: u16`.
+`PriceParams` fields: `tesouro_price_account: Pubkey`, `p0: u64`, `t0: i64`, `y_max_bps: u16`, `max_staleness_secs: i64`, `max_deviation_bps: u16`, `max_nav_move_bps: u16`, `_reserved: [u8; 32]`.
 
 ## 8. Caps
 
@@ -517,12 +707,17 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). Valu
 | `max_claim_per_period` | `u64` | `pay_claim` | R$20k |
 | `claim_period_secs` | `i64` | `pay_claim` | 30 days |
 | `max_tesouro_share_bps` | `u16` | `allocate` | 5_000 (min BRS buffer 50%) |
-| `min_request`, `max_request` | `u64`, `u64` | `request_deposit`, `request_redeem` | TBD |
+| `min_request`, `max_request` | `u64`, `u64` | `request_deposit`, `request_redeem`; `min_request` also bounds a partial fill's remainder | TBD; proposed R$1,000 / R$30,000 |
+| `min_fill_assets` | `u64` | `fulfil_redeems` (smallest partial fill) | TBD; proposed R$500 |
 | `coverage_ratio_bps` (`c`) | `u16` | all gates | 10_000 |
 | `fee_take_bps` | `u16` | `contribute_fees` | TBD, program max 3_000 |
 | `payout_sla_secs` | `i64` | `refresh`, `settle_payout` | 10 days |
 
-Program constants: `MAX_FEE_TAKE_BPS = 3_000`, `MAX_ADAPTERS` (TBD, small), `PRICE_SCALE`, `NAV_SCALE`.
+`Caps` ends with `_reserved: [u8; 32]`, so later caps (PC-43: `max_guarantees`, concentration, new coverage per period) are carved inside it.
+
+Program constants: `MAX_FEE_TAKE_BPS = 3_000`, `MAX_ADAPTERS` (TBD, small; must be fixed before the first devnet deploy because it sizes `VaultConfig`, §12 Q33), `PRICE_SCALE`, `NAV_SCALE`, `INSTANT_EXIT = 1 << 0`, `SUPPORTED_FEATURES` (pilot `0`), `PROGRAM_LAYOUT_VERSION` (pilot `1`), `MAX_FULFIL_BATCH` (pinned from a Mollusk benchmark of `fulfil_redeems` through a Squads vault transaction, with three CPIs and one `emit_cpi!` per fill and the boxed `VaultConfig` decode).
+
+Instant-exit caps (per transaction, per wallet, global per period) live in `VaultConfig.exit` and apply only to the phase-2 instant exit ([§13.2](#132-parameters-exitparams)). The redemption queue keeps **no weekly cap**.
 
 ## 9. Events
 
@@ -531,7 +726,7 @@ Emitted with `emit_cpi!` for every token movement and every state change the mut
 | Event | Fields (besides `config`, `ts`) |
 |---|---|
 | `VaultInitialized` | `admin, operator, pauser, reserve_mint, share_mint` |
-| `ConfigUpdated` | `field: u8, old: u64, new: u64` |
+| `ConfigUpdated` | `field: u16, old: [u8; 32], new: [u8; 32]`. Integers are encoded little-endian in the first bytes and zero-padded; `Pubkey`s and hashes are carried as is. `field` ids form an append-only table in `constants.rs` that covers every `VaultConfig` field, including each `Caps`, `PriceParams` and `ExitParams` sub-field, each `exit.barred` slot, `mutav_capital_wallet`, `treasury_account` and `feature_flags` |
 | `RolesUpdated` / `OperatorRevoked` | `operator, pauser` / `by` |
 | `PaymentsAccountUpdated` | `old, new` |
 | `AllowlistRootUpdated` | `root` |
@@ -546,17 +741,25 @@ Emitted with `emit_cpi!` for every token movement and every state change the mut
 | `PayoutLate` | `guarantee_id, notice_ref_hash, paid_at` |
 | `DepositRequested` / `DepositCancelled` / `SharesClaimed` | `owner, seq, assets` / `owner, seq, assets` / `owner, seq, shares` |
 | `DepositsFulfilled` | `from_seq, to_seq, assets, shares, nav` |
-| `RedeemRequested` / `RedeemCancelled` / `AssetsClaimed` | `owner, seq, shares` / `owner, seq, shares` / `owner, seq, assets` |
-| `RedeemsFulfilled` | `from_seq, to_seq, shares, assets, nav` |
-| `CapitalContributed` / `SurplusWithdrawn` | `amount, shares` / `amount, destination` |
+| `RedeemRequested` | `owner, seq, shares` |
+| `RedeemFilled` (one per fill) | `owner, seq, shares_filled, assets, nav, shares_remaining, partial: bool` |
+| `RedeemsFulfilled` (batch summary) | `from_seq, to_seq, shares, assets, nav, head_partial: bool, idle_free_capital` |
+| `RedeemCancelled` | `owner, seq, shares_returned, assets_claimable` |
+| `AssetsClaimed` | `owner, seq, assets, closed: bool` |
+| `ClaimNoticeFlagged` / `ClaimNoticeClosed` | `guarantee_id, notice_ref_hash` / `guarantee_id, notice_ref_hash, reason: u8 { Paid, FullyProvisioned, Withdrawn }` |
+| `QueueHeadsAdvanced` | `redeem_head, deposit_head` |
 | `Allocated` / `Deallocated` | `adapter, brs_out, tesouro_in` / `adapter, tesouro_out, brs_in` |
-| `StateRefreshed` | `stable_assets, coverage_required, free_capital, provisions, nav_per_share, mode, tesouro_price, price_stale` |
+| `StateRefreshed` | `stable_assets, coverage_required, surplus, buffer_earmark, free_capital, provisions, nav_per_share, mode, tesouro_price, price_stale` |
 | `ModeChanged` | `from, to, deficit` |
 | `ReserveFrozenDetected` | `token_account` |
 
+`idle_free_capital` (free capital left after a batch) makes head-of-line blocking visible on the transparency page. MUTAV capital is visible through `DepositsFulfilled` / `RedeemFilled` filtered by `mutav_capital_wallet`; there are no separate capital events (ADR 0008). Phase-2 events are listed in [§13.8](#138-events). Existing events never change fields; new information goes in a new event ([§14.4](#144-client-and-idl-compatibility)), and the mutav-app indexer skips unknown event discriminators.
+
 ## 10. Errors
 
-`Unauthorized`, `RolesNotDistinct`, `Paused`, `InvalidParameter`, `InvalidMint`, `UnsupportedMintExtension`, `ReserveFrozen`, `UnderCovered`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `StalePrice`, `PriceDeviation`, `FulfilHalted`, `TvlCapExceeded`, `GuaranteeCapExceeded`, `AgencyCapExceeded`, `GuaranteeNotActive`, `OpenClaims`, `ExceedsRemainingCover`, `ClaimNotFiled`, `LegMismatch`, `ClaimCallCapExceeded`, `ClaimPeriodCapExceeded`, `InvalidPaymentsAccount`, `PayoutAlreadySettled`, `NotAllowlisted`, `RequestTooSmall`, `RequestTooLarge`, `InvalidRequestStatus`, `QueueOrderViolation`, `AdapterNotWhitelisted`, `AdapterCapExceeded`, `TesouroShareCapExceeded`, `WorsensCoverage`, `PostCpiCheckFailed`, `MathOverflow`.
+`Unauthorized`, `RolesNotDistinct`, `Paused`, `InvalidParameter`, `InvalidMint`, `UnsupportedMintExtension`, `ReserveFrozen`, `UnderCovered`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `StalePrice`, `PriceDeviation`, `FulfilHalted`, `TvlCapExceeded`, `GuaranteeCapExceeded`, `AgencyCapExceeded`, `GuaranteeNotActive`, `OpenClaims`, `ExceedsRemainingCover`, `ClaimNotFiled`, `LegMismatch`, `ClaimCallCapExceeded`, `ClaimPeriodCapExceeded`, `InvalidPaymentsAccount`, `PayoutAlreadySettled`, `NotAllowlisted`, `RequestTooSmall`, `RequestTooLarge`, `InvalidRequestStatus`, `QueueOrderViolation`, `AdapterNotWhitelisted`, `AdapterCapExceeded`, `TesouroShareCapExceeded`, `WorsensCoverage`, `PostCpiCheckFailed`, `MathOverflow`, `FeatureNotSupported`, `InvalidTreasuryAccount`, `ClaimNoticePending`, `NoticeNotResolved`, `UnsupportedVersion`.
+
+Error codes are numbered by enum order, so the list is **append-only** from the first devnet deploy: new errors go at the end and none is reordered or removed. Phase 2 appends `FeatureDisabled`, `InstantExitBarred`, `InsufficientExitBuffer`, `SlippageExceeded`, `ZeroOutput`, `InstantExitCapExceeded`, `HoldingPeriodActive`, `QueueHeadNotStarved` ([§13.9](#139-errors)).
 
 ---
 
@@ -578,7 +781,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 | PC-10 | Gate scope: capital flows, new guarantees, allocations; never payouts; property test | Adopted | §1, §4, §5.4 |
 | PC-11 | Under-coverage mode | Adopted | §6 |
 | PC-12 | Provision booked at filing | Partial: provision = filed amount; full-leg and expected-exit terms TBD | §5.4 |
-| PC-13 | Payouts senior to redemptions for the liquid buffer | Not adopted | §12 |
+| PC-13 | Payouts senior to redemptions for the liquid buffer | Partial: redemption fills and allocations leave `provisions` (filed claims) in liquid BRS (`liquid_budget`, ADR 0011); while a claim notice is open (missed rent known, not yet provisioned) both queues are closed; unfiled exposure is not reserved | §4, §5.4, §5.5, §5.7, §12 |
 | PC-14 | Coverage ratio floor of 1.0 as a program constant | Not decided (`c` starts at 1.0, configurable) | §3.1, §12 |
 | PC-15 | Fees streamed into NAV over 30 days | Not adopted (fees raise NAV on receipt) | §5.3, §12 |
 | PC-16 | Explicit TESOURO coverage weight | Not adopted: TESOURO counts toward coverage at its bounded price, capped at 50% of the reserve | §4, §8, §12 |
@@ -593,11 +796,11 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 | PC-26 | Capped sub-authority per adapter; master authority never in a CPI | Adopted | §3.9, §5.7 |
 | PC-27 | Pinned adapter code and post-CPI checks | Partial: post-CPI checks adopted; slot pinning TBD | §5.7 |
 | PC-28 | Request size limits | Adopted (values TBD) | §5.5, §8 |
-| PC-29 | Partial head fills and cancel semantics | Not adopted (strict FIFO, whole requests) | §5.5, §12 |
+| PC-29 | Partial head fills and cancel semantics | Adopted (ADR 0010): head-only partial fills at the NAV of each fill, minimum fill and remainder, claim between fills, owner cancel of the remainder with no cooldown, a permissionless head-advance crank against cancel spam; fills refused while a claim notice is open (ADR 0011) | §3.8, §4, §5.4, §5.5, §5.8 |
 | PC-30 | Queued redemptions take priority over new guarantees | Not decided | §12 |
 | PC-31 | Fixed fulfil epochs with a permissionless fallback | Not adopted (admin fulfils at NAV at fulfil) | §12 |
 | PC-32 | Share transfers gated to verified wallets | Not decided | §12 |
-| PC-34 | MUTAV backstop disclosed on-chain | Partial: backstop is off-chain; on-chain disclosure TBD | §12 |
+| PC-34 | MUTAV backstop disclosed on-chain | Partial: `mutav_capital_wallet` disclosed in config; the backstop itself is off-chain, its on-chain disclosure TBD | §3.1, §12 |
 | PC-35 | Junior/senior share classes | Not decided | §12 |
 | PC-36 | Take-rate holdback, applied prospectively | Not adopted | §12 |
 | PC-37 | Per-guarantee terms bounded by config maxima | Adopted as absolute per-lease covers (ADR 0006) | §3.5, §5.2 |
@@ -622,16 +825,333 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 7. **Share treatment of MUTAV capital.** *Resolved (ADR 0008):* MUTAV uses the async flow and holds shares like any investor.
 8. **`withdraw_surplus` destination.** *Resolved:* the instruction is removed (ADR 0008).
 9. **Withdrawing MUTAV's take.** *Resolved (ADR 0007):* `contribute_fees` sends the take directly to the whitelisted `treasury_account`. There is no `fees` account and no `withdraw_fees`.
-10. **Pause scope.** *Resolved (ADR 0008):* pause stops capital flows, new guarantees, fees and allocation; claims, settlement, `refresh`, `cancel_*` and `claim_*` stay open. Granular flags (PC-24) are still optional.
+10. **Pause scope.** *Resolved (ADR 0008):* pause stops capital flows, new guarantees and allocation; fees (ADR 0009), claims, settlement, claim notices, `refresh`, `cancel_*` and `claim_*` stay open. Granular flags (PC-24) are still optional.
 11. **`fulfil_deposits` in under-coverage.** *Resolved (ADR 0008):* allowed. It is the recapitalization path.
-12. **NAV denominator.** Whether shares escrowed in `pending_redemptions` stay in `shares_outstanding` until fulfilment (current text: yes, they are only removed on fulfil).
+12. **NAV denominator.** Whether shares escrowed in `pending_redemptions` stay in `shares_outstanding` until fulfilment (current text: yes, they are only removed when a fill burns them). This also decides whether queued holders share in phase-2 instant-exit haircuts (current text: they do).
 13. **Provision formula.** Provision = filed amount (current text) or the full outstanding default leg plus an expected-exit term (PC-12). Also: how a filed claim that MUTAV later withdraws releases its provision.
 14. **Filing window on-chain.** Enforce the 15-day filing window in the program (PC-2) or only in the platform.
-15. **Program-level time lock.** Rely on the Squads time lock only, or also delay privilege increases on-chain.
+15. **Program-level time lock and multisig split.** Rely on the Squads time lock only, or also delay privilege increases on-chain. The Squads v4 time lock applies to the **whole** multisig and counts from approval, so with one multisig every `fulfil_redeems` waits as long as a program upgrade. Options: (a) one multisig with a moderate time lock (e.g. 24 h; fills are priced at NAV at execution, so the delay only postpones them), or (b) an `upgrade` multisig as upgrade authority (72 h–7 d) and a separate `admin` multisig as `VaultConfig.admin` with a shorter time lock ([§14.5](#145-upgrade-runbook)). Needs an ADR.
 16. **Pauser powers.** Can the pauser appoint the replacement operator, or only revoke? Can it unpause?
 17. **`coverage_ratio_bps` floor.** Configurable from 1.0, or a program constant floor of 1.0 (PC-14).
 18. **Allocation gate.** Must the allocated amount itself fit in `free_capital`, or is the solvency post-condition plus the TESOURO share cap enough?
 19. **Per-invoice idempotency for fees.** *Resolved (ADR 0009):* a `FeeReceipt` PDA seeded by `invoice_ref_hash`.
 20. **Virtual offset and seed deposit.** The value of `k` and whether a seed deposit is minted at `initialize`.
 21. **NAV-move threshold X**, staleness window, deviation bound and stale-price behaviour (fail vs haircut).
-22. **Adversarial-review items not yet decided:** PC-4, PC-6, PC-8, PC-9, PC-13, PC-15, PC-16, PC-21, PC-22, PC-29, PC-30, PC-31, PC-32, PC-34, PC-35, PC-36, PC-38, PC-43 (extra caps). See §11.
+22. **Adversarial-review items not yet decided:** PC-4, PC-6, PC-8, PC-9, PC-13 (beyond filed claims), PC-15, PC-16, PC-21, PC-22, PC-30, PC-31, PC-32, PC-34, PC-35, PC-36, PC-38, PC-43 (extra caps). See §11. PC-29 is resolved by ADR 0010.
+
+**Raised by the redemption-liquidity design (ADRs 0010, 0011):**
+
+23. **Partial fills (PC-29).** *Resolved (ADR 0010):* head-only partial fills, each at the NAV of its fill; claim between fills; owner cancel returns the unfilled remainder, keeps filled assets claimable, and needs no cooldown.
+24. **Partial-fill floors.** Values of `min_fill_assets` (proposed R$500) and `min_request` / `max_request` (proposed R$1,000 / R$30,000). Whether a per-owner limit on open requests (e.g. 3) and a short re-request cooldown are wanted on top of the `advance_queue_heads` crank.
+25. **`max_assets` and PC-30.** `fulfil_redeems(count, max_assets)` lets the admin hold surplus back from the queue to back new guarantees (discretion over *how much*, never over *order*), and a funded phase-2 earmark is senior to new guarantees because `register_guarantee` must fit in the `free_capital` computed before it (invariant 16). Confirm both; PC-30 itself stays open. Also for phase 2: whether "queue empty" for `fund_exit_buffer` should mean "no request older than a short grace period" instead of `pending_redeem_shares == 0`, so one small standing request cannot block refills.
+26. **Claims-senior liquidity (PC-13, part).** `liquid_budget = brs_balance − provisions − earmark_eff` caps redemption fills, and `allocate` keeps `brs_balance ≥ provisions + earmark_eff`. This is new in the pilot even with the earmark at 0. Confirm.
+27. **`RedeemRequest` seeds.** Seeding by `seq` makes concurrent `request_redeem` calls race on `next_redeem_seq` (one fails and retries). Alternative: seeds `["redeem", config, owner, client_nonce]` with `seq` still stored and checked by `fulfil_redeems`.
+28. **Earmark form.** Accounting-only inside `reserve` (this spec) or a separate `["exit_buffer", config]` token account. The accounting form keeps the earmark spendable by `pay_claim` and adds no freeze-exposed account.
+29. **Claim-notice definition.** On-chain meaning of "an unprovisioned claim is pending": the operator flag `flag_claim_notice` at the first missed-rent signal, **shipped in the pilot** and gating `fulfil_deposits`, `fulfil_redeems` and phase-2 `instant_redeem` ([§5.4](#54-claims-and-payouts-operator)). The flag's timing is the main residual front-running risk (MUTAV controls the operator); the notice SLA and how it shows on the transparency page need confirming.
+30. **Effectiveness of the MUTAV bar.** If shares are freely transferable (PC-32), MUTAV or any holder can move shares to another allowlisted wallet and dodge the bar, the holding period and the per-wallet caps. Options: allowlist leaves of the form `hash(wallet, identity_hash)` with caps keyed by identity (LGPD review: a salted hash, not personal data), and/or restricting share transfers.
+31. **Haircut curve.** The integral curve and pilot parameters in §13.4 (50 bps floor, +600 bps at the full target, quadratic, 10% marginal cap, 7-day pressure epoch) are proposals, to be re-calibrated before enabling.
+32. **Queue liveness under notices.** While any notice is open the queues wait; a notice closes only when the claim is paid, the leg is fully provisioned, or the notice is withdrawn. Confirm that this delay is acceptable, or narrow the queue gate to requests owned by `mutav_capital_wallet` / `exit.barred` (instant exit keeps the global gate).
+33. **`MAX_ADAPTERS`.** Sizes `VaultConfig`; must be fixed before the first devnet deploy.
+
+---
+
+## 13. Phase 2 — Instant exit (designed, disabled in the pilot)
+
+*Status: designed now so that the pilot's layouts, solvency formula and pause/mode semantics already cover it ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)). None of the instructions in this section exist in the pilot binary. Enabling it takes a Squads-timelocked program upgrade and then a separate timelocked `set_config` that sets the `INSTANT_EXIT` flag ([§14.5](#145-upgrade-runbook)). Design reference: OnRe's Prop AMM sell (`onre-finance/onre-sol`, MIT), adapted; see [`provenance.md`](provenance.md).*
+
+### 13.1 What it is
+
+- An allowlisted holder burns shares and receives BRS **immediately**, at NAV minus a convex **haircut**. There is no queue and no admin fulfilment.
+- It pays **only** from the **buffer earmark**: BRS inside `reserve`, reserved out of surplus that the redemption queue does not need ([§13.3](#133-the-buffer-earmark)). Investors never deposit into the buffer.
+- The haircut **stays in the reserve**: NAV rises for every remaining holder. It is never MUTAV revenue and never counts as a guarantee fee.
+- It is **off automatically** when: the flag is off, the program is paused, `mode == UnderCovered`, `fulfil_halted`, the TESOURO price is stale, a claim notice is pending (an unprovisioned claim), the exit would take surplus below the headroom, or the queue head is starved. MUTAV's capital wallet and listed affiliates are barred.
+- It is the one deliberate exception to "withdrawals are strict FIFO and admin-fulfilled" (ADR 0008, amended by ADR 0011). What is kept: exits come only from the earmarked surplus, and they never reduce `free_capital` (the haircut even adds to it), so they never take capacity from the queue.
+
+### 13.2 Parameters (`ExitParams`)
+
+`VaultConfig.exit` is a **real field from the pilot onwards**, all zero, so that phase 2 needs no layout change in `VaultConfig`. Every value is checked only when the resulting config has `INSTANT_EXIT` on; a zero cap makes a half-configured enable fail closed.
+
+| Field | Type | Meaning | Enable-time rule | Proposed phase-2 start |
+|---|---|---|---|---|
+| `buffer_target_bps` | `u16` | Target earmark as a share of `stable_assets`; also the curve's reference size `E` | `0 < x ≤ MAX_BUFFER_TARGET_BPS` (1_000) | 500 (5%) |
+| `buffer_headroom_bps` | `u16` | Headroom as a share of `coverage_required`. Instant exit requires `stable_assets − out ≥ coverage_required + headroom`, and funding stops at `surplus − headroom`. Not part of the gates' `earmark_eff` (§4) | `> 0` | 1_000 (10%) |
+| `buffer_release_after_secs` | `i64` | Queue-head wait after which the earmark is released to the queue | `> 0` | 14 days |
+| `curve_version` | `u8` | `1` = quadratic integral curve (§13.4). `0` = none | `== 1` | 1 |
+| `h_min_bps`, `h_peg_bps`, `h_max_bps` | `u16` ×3 | Marginal haircut floor; added marginal rate at `x = E`; marginal cap | `0 < h_min ≤ h_max ≤ MAX_EXIT_HAIRCUT_BPS` (2_000); `h_peg > 0` | 50 / 600 / 1_000 |
+| `pressure_epoch_secs` | `i64` | Decay epoch for recent exit volume | `> 0` | 7 days |
+| `min_instant_assets` | `u64` | Smallest exit, in BRS at NAV | `> 0` | R$100 |
+| `max_instant_per_tx` | `u64` | Largest single exit | `> 0` | R$2,500 |
+| `max_instant_per_wallet` | `u64` | Per wallet, per `instant_period_secs` | `> 0`, `≤ max_instant_per_period` | R$2,500 |
+| `max_instant_per_period` | `u64` | Global, per `instant_period_secs` | `> 0` | R$10,000 |
+| `instant_period_secs` | `i64` | Cap window | `> 0` | 30 days |
+| `min_hold_secs` | `i64` | Minimum time since the wallet's last `claim_shares` | `> 0` | 30 days |
+| `max_price_age_secs` | `i64` | Tighter staleness bound for instant exit | `0 < x ≤ price.max_staleness_secs` | TBD |
+| `allowlist_root` | `[u8; 32]` | Merkle root of wallets eligible for instant exit (may be narrower than `investor_allowlist_root`) | `!= [0; 32]` | — |
+| `barred` | `[Pubkey; 4]` | Affiliated or insider wallets barred in addition to `mutav_capital_wallet`; `Pubkey::default()` = empty slot | — | — |
+| `_reserved` | `[u8; 32]` | Room for later exit parameters | — | — |
+
+Enabling also requires `mutav_capital_wallet != Pubkey::default()`.
+
+**`InstantExitState`** — carved by the phase-2 binary from the front of `VaultState._reserved` (88 of 256 bytes, leaving `[u8; 168]`; the number is pinned by a test of the serialized size, not by hand; zero is the correct starting value of every field). `pending_notices` is not here: it is a real `VaultState` field from the pilot (§3.2).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `exit_epoch_start` | `i64` | Start of the current pressure epoch |
+| `exit_curr`, `exit_prev` | `u64`, `u64` | Exit volume (raw BRS) in the current and previous epoch |
+| `exit_period_start`, `exit_period_paid` | `i64`, `u64` | Global cap window |
+| `instant_assets_total`, `instant_shares_total`, `haircut_total` | `u64` ×3 | Lifetime BRS paid out, shares burned, haircut retained. `haircut_total` is separate from `fees_in_total` |
+| `buffer_funded_total`, `buffer_released_total` | `u64`, `u64` | Lifetime earmark increases and releases |
+| `last_instant_ts` | `i64` | |
+
+**State created after the upgrade** (no migration; seed prefixes reserved now, [§14.2](#142-padding-and-version)). `ClaimNotice` is a pilot account ([§3.12](#312-claimnotice)).
+
+| State | Where | Created by | Fields |
+|---|---|---|---|
+| Per-wallet counters | carved from `HolderState._reserved` | first `instant_redeem` | `exit_period_start: i64`, `exit_period_paid: u64` |
+
+The earmark is **not** a separate token account: it is accounting inside `reserve`, so it still counts in `stable_assets`, `pay_claim` can always spend it, a direct transfer cannot inflate it, and no new freeze-exposed account appears. The prefix `"exit_buffer"` is reserved in case §12 Q28 decides otherwise.
+
+### 13.3 The buffer earmark
+
+The pilot already computes `earmark_eff` and the earmark-aware `free_capital` ([§4](#4-invariants-and-formulas)). Phase 2 only adds the instructions that move the stored level `buffer_earmark`.
+
+- **Reserved, not soft.** `earmark_eff = min(buffer_earmark, surplus, brs_balance − provisions)`, `0` with the flag clear or for a starved head (§4). Every gated outflow and new liability (queue fills, `register_guarantee`, `allocate`, `deallocate`) must fit in the `free_capital` computed before it, so none of them can consume the earmark (invariant 16). Only claims and filed provisions (liquidity term), price mark-downs (surplus term), the starvation release and a defund lower it.
+- **Headroom applies to instant exit only.** `instant_redeem` requires `stable_assets − out ≥ coverage_required + headroom`, so instant exit switches itself off **before** the reserve is anywhere near under-coverage, and `fund_exit_buffer` funds at most `surplus − headroom`. When surplus falls below `earmark + headroom` (a mark-down or claims), the earmark stays reserved but cannot be spent by instant exit; if the queue waits meanwhile, the starvation release (or a defund) returns it to free capital.
+- **Clamp to the target.** Phase-2 instructions that touch the earmark (`instant_redeem`, `fund_exit_buffer`, `defund_exit_buffer`, `release_starved_buffer`) first store `buffer_earmark := min(buffer_earmark, E)`, with `E` from the current `exit.buffer_target_bps` (§13.4), so lowering the target lowers what instant exit can pay. `E` is not part of the gates' formula, because `E` falls with every outflow and would leak the earmark the same way a headroom term would.
+- **Ratchet.** The ratcheting instructions of §4 store `buffer_earmark := earmark_eff`, so the stored level never rises by itself. Recovered surplus goes to free capital (the queue) first; the earmark rises again only through `fund_exit_buffer`.
+- **Queue priority.** `fund_exit_buffer` runs only while the redemption queue is empty (`pending_redeem_shares == 0`). An earmark that existed before a request arrived is not drained into the queue, but once the queue head has waited longer than `buffer_release_after_secs`, the earmark is released to free capital (`release_starved_buffer`, and inline in `fulfil_redeems`), and `instant_redeem`, which must present the head whenever the queue is non-empty, sees `earmark_eff = 0` and refuses. A buffer can never be spent ahead of, or sit idle next to, a starving queue.
+- **Seniority.** A funded earmark is senior to new guarantees (`register_guarantee` must fit in the `free_capital` computed before it) and junior to claims (`pay_claim` spends it without reading it). Because it refills only when the queue is empty and only up to `buffer_target_bps` of the reserve, the cost to new-guarantee capacity is small (PC-30, §12 Q25).
+- `allocate` keeps the earmark liquid: `brs_balance_after ≥ provisions + earmark_eff_before` ([§5.7](#57-reserve-allocation-admin-through-adapters)).
+
+### 13.4 Haircut
+
+The haircut is the **integral of a convex marginal rate** over the buffer's utilization state. Both terms of `x` rise by exactly `raw` per exit (`exit_curr += raw`, and the stored earmark falls by `raw`, not by `out`), so inside one pressure epoch splitting an exit into pieces pays the same total as one exit, up to rounding and to the small drift of `E` with `stable_assets`. In the edge case where the surplus or liquidity term, not the stored level, sets `earmark_eff`, depletion rises by `out` only and splitting can save at most `Σ haircut × h_max / 10_000`, a second-order amount. (OnRe's per-order formula is not split-proof: with a 50 bps floor, a 300 bps peg, exponent 2 and a R$5,000 buffer, one R$2,500 exit pays R$54.69 while five R$500 exits pay R$15.54 in total.)
+
+```text
+E        = floor(stable_assets × buffer_target_bps / 10_000)             // reference size; E == 0 → refuse
+raw      = assets_for(shares)                                            // NAV value, round down
+V_window = exit_prev × max(0, pressure_epoch − (now − exit_epoch_start)) / pressure_epoch + exit_curr
+x        = max(V_window, E − earmark_eff)                                // recent exit volume, or depletion, whichever is worse
+m(x)     = min(h_max, h_min + h_peg × (x / E)²)                          // marginal rate (bps)
+H(x)     = ∫₀ˣ m                                                         // closed form below
+haircut  = ceil(H(x + raw) − H(x))                                       // one exact rational, rounded up once
+out      = raw − haircut
+
+x*   = floor(E × sqrt((h_max − h_min) / h_peg))                          // where the marginal hits the cap; floor = reserve's favour
+H(x) = (h_min·x + h_peg·x³ / (3·E²)) / 10_000                            for x ≤ x*
+     = H(x*) + h_max·(x − x*) / 10_000                                   for x > x*
+```
+
+- Arithmetic in `u128` with an integer square root. The haircut is computed as **one** exact rational and rounded up once, never as a difference of separately rounded `H` values: for `a = x`, `b = x + raw ≤ x*`, `haircut = ceil((h_min·raw·3E² + h_peg·(b³ − a³)) / (3E²·10_000))`; across or above `x*` the same is done piecewise with a common denominator. Tests pin the examples below to the base unit.
+- **Epoch roll:** when `now ≥ exit_epoch_start + pressure_epoch`, `exit_prev = exit_curr`, `exit_curr = 0` and the epoch start moves forward by whole epochs; after two or more empty epochs, both are zero.
+- `V_window` makes a burst price worse even after a refill; `E − earmark_eff` makes a depleted buffer (including depletion from surplus shrinkage) price worse. Patience — waiting for the window to decay **and** for a refill, which happens only when the queue is empty — lowers the price. Splitting does not.
+- The haircut prices liquidity and run speed only. It is **not** the defence against exits by holders who know of a coming claim; the claim-notice gate is ([§13.6](#136-anti-front-running-rules)).
+
+**Worked examples** (proposed parameters; `E` = R$5,000; NAV R$1.00; 100,000 shares):
+
+| Case | `x` before | `raw` | Haircut | Effective | `out` |
+|---|---|---|---|---|---|
+| Minimum exit | 0 | R$100 | R$0.50 | 0.50% | R$99.50 |
+| Small exit | 0 | R$500 | R$2.60 | 0.52% | R$497.40 |
+| At the per-wallet cap | 0 | R$2,500 | R$25.00 | 1.00% | R$2,475.00 |
+| Same R$2,500 as 5 × R$500 in one epoch | 0 → 2,000 | 5 × R$500 | R$25.00 total | 1.00% | R$2,475.00 |
+| R$2,000 right after a R$2,500 exit | 2,500 | R$2,000 | R$70.40 | 3.52% | R$1,929.60 |
+| Whole buffer drained by several wallets in one epoch | 0 | R$5,000 | R$125.00 | 2.50% | R$4,875.00 |
+| Burst past the target after a refill, same epoch | 5,000 | R$2,500 | R$226.54 | 9.06% | R$2,273.46 |
+
+After the R$2,500 exit: 2,500 shares burned, R$2,475 paid, the R$25 haircut stays in `reserve`, so NAV goes from R$1.000000 to R$1.000256 for the 97,500 remaining shares (queued shares included). `surplus` falls by R$2,475 and `buffer_earmark` by R$2,500, so `free_capital` rises by the R$25 haircut: the retained haircut goes to the queue, never back into the buffer.
+
+### 13.5 Instructions
+
+#### `instant_redeem(shares, min_out, proof)`
+
+- **Signer:** investor (owner of the shares). The share token account must have `owner == signer`; shares are burned with the signer as owner authority, never as a delegate (§5 common rules), so the bars, the holding period and the caps apply to the real holder.
+- **Accounts:** `config`, `state`, the owner's `HolderState`, owner share token account, owner BRS token account, `reserve`, share mint, BRS mint, vault authority, token programs, TESOURO price account(s); **the queue head `RedeemRequest` whenever `pending_redeem_shares > 0`** (checked as `seq == redeem_head` with `shares_remaining > 0`, otherwise `QueueOrderViolation`).
+- **Rules (in order):**
+  1. `INSTANT_EXIT` set (`FeatureDisabled`).
+  2. Not paused; `mode == Normal`; `fulfil_halted == false`.
+  3. TESOURO price fresh against `min(exit.max_price_age_secs, price.max_staleness_secs)` when `tesouro_units > 0` (`StalePrice`).
+  4. `pending_notices == 0` (`ClaimNoticePending`).
+  5. `owner != mutav_capital_wallet` and `owner ∉ exit.barred` (`InstantExitBarred`).
+  6. Merkle proof of `owner` against `exit.allowlist_root` (`NotAllowlisted`).
+  7. `HolderState` exists and `now − last_shares_in_ts ≥ min_hold_secs` (`HoldingPeriodActive`). The stamp is refreshed by `request_deposit` and `claim_shares`. A wallet that never requested a deposit is not eligible.
+  8. `raw = assets_for(shares)`; `min_instant_assets ≤ raw ≤ max_instant_per_tx`; per-wallet and global period caps, after rolling their windows (`InstantExitCapExceeded`).
+  9. Clamp the stored level to `E` (§13.3), then compute `earmark_eff` with the head (a starved head gives `0`). Require `raw ≤ earmark_eff` and `stable_assets − out ≥ coverage_required + headroom`, with `headroom = ceil(coverage_required × exit.buffer_headroom_bps / 10_000)` (`InsufficientExitBuffer`).
+  10. Compute `haircut` and `out` (§13.4). `out > 0` (`ZeroOutput`), whatever `min_out` is; `out ≥ min_out` (`SlippageExceeded`). Both are checked before any transfer.
+- **Effects:** apply the ratchet; burn `shares` from the owner; transfer `out` BRS `reserve` → owner (vault-authority signed, direct: no `claims` escrow); `brs_balance −= out`; `shares_outstanding −= shares`; `buffer_earmark −= raw` (the haircut is released to free capital); `exit_curr += raw`; period counters and `HolderState.exit_period_paid += raw`; `instant_assets_total += out`, `instant_shares_total += shares`, `haircut_total += haircut`; `last_instant_ts = now`.
+- **Not** solvency-gated beyond rule 9. It never lowers `free_capital`: `surplus` falls by `out` and the earmark by `raw`, so `free_capital` rises by the haircut.
+- **Event:** `InstantRedeemed`.
+
+#### `quote_instant_redeem(owner, shares, proof)`
+
+- **Signer:** none (view, run by simulation; returns data). Takes the same accounts as `instant_redeem`, including the queue head when the queue is non-empty, and applies rules 1–10 without side effects. Returns `{ raw, haircut, out, x_before, earmark_eff }`, or the error that would apply. The client sets `min_out` from it with a slippage tolerance.
+
+#### `fund_exit_buffer()`
+
+- **Signer:** operator (a crank run by mutav-app). It moves no tokens. Restricted to the operator so that nobody can lock surplus away from new guarantees, or from a wave of incoming requests, by funding at an inconvenient moment.
+- **Rules:** `INSTANT_EXIT` set; not paused; `mode == Normal`; price fresh; **`pending_redeem_shares == 0`**; `surplus ≥ headroom`.
+- **Effects:** clamp to `E`; `buffer_earmark = min(E, surplus − headroom, brs_balance − provisions)`, never lower than the current `earmark_eff`; `buffer_funded_total += increase`.
+- **Event:** `ExitBufferFunded { amount, level }`.
+
+#### `defund_exit_buffer(amount)`
+
+- **Signer:** admin or operator. It only reduces risk (returns surplus to the queue), so the operator may run it without the admin time lock. Allowed while paused and in under-coverage.
+- **Effects:** clamp to `E`; `buffer_earmark = earmark_eff − min(amount, earmark_eff)`; `buffer_released_total += released`.
+- **Event:** `ExitBufferReleased { amount, level, reason: Defund }`.
+
+#### `release_starved_buffer()`
+
+- **Signer:** anyone (cranked by mutav-app; the canonical path that stores a starvation release). **Accounts:** the queue head `RedeemRequest`, checked as `seq == redeem_head` with `shares_remaining > 0` (`QueueOrderViolation` otherwise; run `advance_queue_heads` first if the head has died).
+- **Rules:** `now − head.requested_at > buffer_release_after_secs` (`QueueHeadNotStarved`).
+- **Effects:** `buffer_earmark = 0`; `buffer_released_total += released`. `fulfil_redeems` applies the same rule inline.
+- **Event:** `ExitBufferReleased { amount, level: 0, reason: Starvation }`.
+
+Claim notices (`flag_claim_notice`, `close_claim_notice`) are pilot instructions ([§5.4](#54-claims-and-payouts-operator)); phase 2 only adds `instant_redeem` to what they gate.
+
+### 13.6 Anti-front-running rules
+
+1. **Claim notices gate exits.** While any notice is open, every instant exit fails (as do queue fills and deposit fulfilments since the pilot, §5.4), so a holder cannot exit at a NAV that does not yet reflect a known missed rent. A notice closes only when the claim is paid, the leg is fully provisioned, or the notice is withdrawn, so exits resume at a NAV that already carries the whole possible payment on that leg. An operator who abuses the flag can only push exits back to the queue at NAV. The transparency page shows every open notice and its age from `ClaimNoticeFlagged` events, and flags any open longer than 15 days. A late flag is the main residual risk (§12 Q29).
+2. **MUTAV and affiliates are barred.** `mutav_capital_wallet` and `exit.barred` are public, so anyone can verify the bar. MUTAV exits only through the queue, like any holder (ADR 0008).
+3. **Price.** A fresh bounded TESOURO price within the tighter `max_price_age_secs`, and `fulfil_halted == false`: an atomic exit is more sensitive to a stale mark than an admin-timed fill.
+4. **Holding period.** `HolderState.last_shares_in_ts` (stamped by `request_deposit` and `claim_shares` since the pilot) must be at least `min_hold_secs` old. `contribute_fees` raises NAV on receipt (PC-15 not adopted), so without it a deposit → fee batch → instant exit round trip could be profitable. Stamping at the request closes the variant where a holder with old shares leaves a new deposit fulfilled but unclaimed (its shares already earn the fee) and instant-exits the same amount of old shares.
+5. **Caps.** Per transaction, per wallet and global per period. With freely transferable shares (PC-32) wallet-level rules can be dodged across allowlisted wallets (§12 Q30).
+
+### 13.7 Interaction with the FIFO queue and NAV
+
+- **Separate pots.** The queue pays only from `free_capital`, which excludes the earmark, and every fill must fit in the `free_capital` computed before it, so fills never eat into the earmark (invariant 16). Instant exit pays only from the earmark, never lowers `free_capital`, and refuses while the queue head is starved. The earmark refills only when the queue is empty. Unlike OnRe, where atomic sells and queued fills draw on one vault, an atomic exit cannot take what a waiting queue is owed.
+- **Queue first.** Surplus goes to queued holders at NAV before it goes into the buffer; a starved head releases the buffer and blocks instant exit; retained haircuts go to free capital.
+- **Queued shares** sit in `pending_redemptions` and cannot be instant-redeemed. A holder may `cancel_redeem` and then use instant exit, subject to every gate, losing the place in line.
+- **NAV accrual of the haircut:**
+
+  ```text
+  before:  NAV₀ = net_assets / S
+  exit:    burn s shares, pay out = s·NAV₀ − haircut
+  after:   NAV₁ = (net_assets − s·NAV₀ + haircut) / (S − s) = NAV₀ + haircut / (S − s)
+  ```
+
+  The haircut goes pro rata to every remaining share, including shares escrowed in the queue (§12 Q12). It never goes to `treasury_account`, and it is tracked as `haircut_total`, separately from `fees_in_total`.
+
+### 13.8 Events
+
+| Event | Fields (besides `config`, `ts`) |
+|---|---|
+| `InstantRedeemed` | `owner, shares, raw, haircut, out, nav_before, nav_after, x_before, earmark_after` |
+| `ExitBufferFunded` | `amount, level` |
+| `ExitBufferReleased` | `amount, level, reason: u8 { Defund, Starvation }` |
+
+`ClaimNoticeFlagged` / `ClaimNoticeClosed` are pilot events (§9).
+
+A ratchet that lowers the stored level emits no event of its own; the level is visible in every `StateRefreshed { buffer_earmark }`. This keeps the pilot instructions that apply the ratchet unchanged in phase 2.
+
+### 13.9 Errors
+
+Appended after the pilot list, in this order: `FeatureDisabled`, `InstantExitBarred`, `InsufficientExitBuffer`, `SlippageExceeded`, `ZeroOutput`, `InstantExitCapExceeded`, `HoldingPeriodActive`, `QueueHeadNotStarved`.
+
+---
+
+## 14. Upgrade readiness
+
+*Goal: phase 2 is enabled on a **live** reserve through a Squads-timelocked program upgrade, **with no account migration** and no change to any existing instruction, account layout, event or error ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)). The patterns follow programs that have done this on live accounts: OnRe (fields carved from `reserved`, a layout-compatibility test), Kamino klend (a FIFO withdraw queue added to live reserves from padding, per-feature flags) and Drift (bit-flag features; new config PDAs once padding ran out).*
+
+### 14.1 Principle: zero means off
+
+Anchor 1.2 decodes `#[account]` structs with Borsh and ignores trailing bytes. Splitting `_reserved: [u8; N]` into `new_field: T, _reserved: [u8; N − size_of(T)]` therefore reads the same bytes on a live account, and the new field reads as zero. Every phase-2 field is designed so that **zero is the correct pilot behaviour** (`0` = disabled / empty / no notices, `Pubkey::default()` = unset, status constant 0 = the safe default). A field that cannot meet this would need a `version` bump and a one-shot initializer — a migration — and is not allowed in phase 2.
+
+### 14.2 Padding and version
+
+**Layout rules** for every program-owned account:
+
+- **R1.** The first fields are `version: u8` (pilot = `1`) and `bump: u8`. `version` changes only for a real migration; phase 2 needs none.
+- **R1b.** Every instruction requires `account.version ≤ PROGRAM_LAYOUT_VERSION` for every program-owned account it reads (`UnsupportedVersion` otherwise), and `init` writes `PROGRAM_LAYOUT_VERSION`. An older binary therefore refuses, instead of misreading, an account that a later migration rewrote. Unknown `u8` status or mode values fail the same way.
+- **R2.** Fixed-size types only: integers, `Pubkey`, `[u8; N]`, fixed arrays of fixed structs. Statuses, legs and modes are `u8` with explicit constants, not Borsh enums, so a later state is a new constant that older decoders read without failing to deserialize. **No `Option`, `Vec`, `String` or enums with data**; use sentinels. Nested config structs (`Caps`, `PriceParams`, `ExitParams`) end with their own `_reserved: [u8; 32]`.
+- **R3.** Fields carved from padding decode from zero to the pilot behaviour; carved flags are `u8` or bits in a `u64`, never `bool` (Borsh rejects any byte other than 0 or 1).
+- **R4.** `_reserved` is the last field, initialized to `[0; N]`, never read or written by logic. Fields are carved from its front.
+- **R5.** Append-only: never reorder, retype or delete fields; a retired field becomes `_deprecated_<name>`. Never rename an account struct (it changes the discriminator).
+- **R6.** Code updates accounts **in place** (`config.field = x`) and never rebuilds a struct over an existing account, so bytes written by a newer binary survive a rollback.
+- **R7.** Sizes are pinned: `const _: () = assert!(8 + T::INIT_SPACE == T_SIZE);` per account, with the constant committed.
+- **R8.** Large accounts are boxed in instruction contexts (`Box<Account<'info, VaultConfig>>`); the SBF stack frame is 4 KiB.
+
+**Padding per account** (sized at about 3× the known phase-2 need; rent is about 6,960 lamports per byte):
+
+| Account | `_reserved` | Phase-2 use |
+|---|---|---|
+| `VaultConfig` | `[u8; 512]` | None needed: `feature_flags`, `mutav_capital_wallet` and `ExitParams` are real fields from the pilot. Left for granular pause bits (PC-24), share classes (PC-35), a program-level time lock (§12 Q15) |
+| `VaultState` | `[u8; 256]` | `InstantExitState`, 88 bytes, leaving `[u8; 168]` ([§13.2](#132-parameters-exitparams)); the figure is pinned by a serialized-size test |
+| `RedeemRequest`, `DepositRequest` | `[u8; 64]` | None planned. Per-request accounts live at upgrade time cannot be migrated, so the partial-fill fields are real from the pilot |
+| `HolderState` | `[u8; 64]` | Per-wallet exit counters, 16 bytes |
+| `Guarantee`, `ClaimFiling`, `Payout`, `AgencyExposure`, `FeeReceipt`, `ClaimNotice` | `[u8; 64]` | None planned |
+| `Caps`, `PriceParams`, `ExitParams` (nested in config) | `[u8; 32]` each | Later caps (PC-43), stale-price haircut (Q21), later exit parameters |
+| `AdapterEntry` (inline in config) | `[u8; 16]` per entry | None planned |
+
+**Real fields from the pilot** (read by pilot code, all in the pilot IDL): `VaultConfig.version`, `feature_flags`, `mutav_capital_wallet`, `exit: ExitParams`, `caps.min_fill_assets`; `VaultState.buffer_earmark`, `pending_notices`; the partial-fill fields of `RedeemRequest`; `HolderState`; `ClaimNotice`; `FeeReceipt`.
+
+**Layout freeze** (checked in plan Tasks 1 and 12, before the first devnet deploy): `MAX_ADAPTERS` pinned; `Caps`, `PriceParams`, `ExitParams` carry their tails; every status is a `u8` constant; every account has `version`, `bump` and `_reserved`; the event set (including `ConfigUpdated`'s final form) and the error list are final for append-only use.
+
+**Reserved seed prefixes** — no pilot PDA may use them: `"exit_buffer"`, `"exit_limit"`, `"instant_exit"`. (`"notice"` is used by the pilot `ClaimNotice`.) If padding ever runs out, new state goes in a new PDA (`["instant_exit", config]`), loaded as optional by code that runs before it exists.
+
+**Realloc** (Anchor `realloc`, `Migration<From, To>`) is an emergency fallback for the singletons only. It cannot reach per-user accounts that are live at upgrade time, such as pending `RedeemRequest`s.
+
+### 14.3 Feature flags
+
+- `VaultConfig.feature_flags: u64`, bit 0 `INSTANT_EXIT`; other bits reserved. The pilot's `SUPPORTED_FEATURES = 0`.
+- `set_config` rejects any bit outside `SUPPORTED_FEATURES` (`FeatureNotSupported`). Code paths for unsupported features do not exist in the binary.
+- Turning a feature on takes **two separate timelocked proposals**: (1) the program upgrade that adds the feature to `SUPPORTED_FEATURES`, then, after an observation period with the code live and the feature off, (2) `set_config` that sets the bit (which validates the feature's parameters).
+- Clearing a bit is always allowed. Combined with the pauser's untimelocked `pause`, it is the fast way to stop a feature. Clearing `INSTANT_EXIT` also makes `earmark_eff = 0` at once (§4), so the earmark returns to free capital without a separate defund, and the next ratcheting instruction stores `0`.
+
+### 14.4 Client and IDL compatibility
+
+| Change | Allowed? |
+|---|---|
+| New instruction, account type, event or error (appended) | Yes. Publish the client as a minor version |
+| Field carved from `_reserved` | Yes. Size and offsets of existing fields unchanged; regenerate the client |
+| Changing an existing instruction's args or accounts | **No.** Add a `_v2` instruction |
+| Changing an existing event's fields | **No.** Add a new event |
+| Reordering, retyping or removing fields or errors; changing an account's size | **No** |
+
+- The IDL lives in a Program Metadata account written by the upgrade authority, so it is written inside the same Squads proposal as the upgrade.
+- CI adds an `idl-compat` job from the first tagged release: it diffs `target/idl/mutav.json` against the last released IDL and fails on any change in the "No" rows.
+- The mutav-app indexer skips unknown event discriminators and decodes accounts by discriminator, not by `dataSize` alone.
+
+### 14.5 Upgrade runbook
+
+**Before the PR merges.** ADR and spec update in the same PR. New fields carved from `_reserved`, new instructions added, `SUPPORTED_FEATURES` extended, and **no diff** in the `pay_claim` path. CI green: layout and fixture tests (§14.7), padding preservation, `idl-compat`, Codama regenerated with no diff, the full LiteSVM suite, Mollusk CU benchmarks. Review or audit of the diff. Client published as a minor version, and mutav-app deploys decoders that tolerate the new fields and events **before** the program changes.
+
+**Rehearsal.** Surfpool fork of the live cluster: deploy the new `.so` over the forked program and run `tests-fork` against real accounts, including pending `RedeemRequest`s (decode, cancel, fill, claim). Then the full flow on devnet with the same Squads threshold and time lock, end to end through `apps/admin`.
+
+**Build and buffer.**
+1. `solana-verify build` in the x86 release workflow; record `solana-verify get-executable-hash target/deploy/mutav.so`.
+2. `solana program show <PROGRAM_ID>`: if ProgramData is smaller than the new `.so`, it must be extended. Check the target cluster's feature set: where loader-v3 `ExtendProgramChecked` (SIMD-0164) is active, extending needs the upgrade authority's signature, so the extend instruction (signed by the upgrade-authority vault) goes **first in the same bundled Squads vault transaction**, before `Upgrade`; only where the unchecked variant still applies may it be run beforehand by any payer. The rehearsal asserts: new `.so` larger than ProgramData ⇒ the extend instruction is in the bundle.
+3. `solana program write-buffer`, then `solana program set-buffer-authority <BUFFER> --new-buffer-authority <UPGRADE_VAULT>`, where `UPGRADE_VAULT` is the vault of the multisig that is the program's upgrade authority (the upgrade multisig under §12 Q15 option (b), not the admin multisig).
+4. `solana-verify get-buffer-hash <BUFFER>` must equal step 1. The proposal memo carries both hashes, the git tag and the commit.
+5. Write the IDL buffer and export the verify-PDA transaction (`solana-verify export-pda-tx … --uploader <UPGRADE_VAULT>`).
+
+**Proposal.**
+6. One Squads vault transaction bundling the BPF Loader Upgradeable `Upgrade` (plus `ExtendProgramChecked` first if needed), the Program Metadata IDL write and the verify-PDA write.
+7. Each signer reproduces the executable hash from the tag and checks it against the buffer hash, **and decodes every instruction in the stored vault-transaction message**: the only allowed program IDs are BPF Loader Upgradeable (`Upgrade` with the expected program, buffer and spill accounts, and `ExtendProgramChecked`), Program Metadata and the verify program; any `SetAuthority` on the program, ProgramData or buffer, or any other instruction, is a reason to reject.
+8. Before approving, check the multisig: `config_authority == Pubkey::default()` (a "controlled" multisig could change members, threshold or time lock without a timelocked proposal) and `time_lock ≥` the agreed floor. Both are also checked at launch (plan Task 12) and shown on the transparency page. No Squads config change is proposed during an upgrade window, because a config change makes in-flight proposals stale. Approve. **The time lock counts from approval.** MUTAV announces the pending upgrade on the transparency page with the commit link. Members can reject or cancel during the window; the pauser can `pause` at any time.
+
+**Execute and verify.**
+9. Execute after the time lock; the program is live from the next slot.
+10. `solana-verify get-program-hash` equals step 1; `solana-verify remote submit-job`; explorers show "verified".
+11. Smoke checks: `refresh` succeeds; `VaultConfig` and `VaultState` decode with the new client and every carved field reads zero; `buffer_earmark == 0`; `instant_redeem` fails with `FeatureDisabled`.
+
+**Enable (separate, later proposals, each timelocked).**
+12. `set_config` with `ExitParams` (conservative caps) and `exit.allowlist_root`; confirm every known missed rent is flagged (notices exist since the pilot).
+13. `set_config` setting `INSTANT_EXIT`. Then `fund_exit_buffer` runs whenever the queue is empty.
+14. Monitor events; raise caps gradually through further proposals.
+
+### 14.6 Rollback
+
+- **Fast:** the pauser runs `pause` (no time lock), which stops instant exit with the other capital flows; the operator may `defund_exit_buffer` at once; an admin proposal then clears `INSTANT_EXIT`, which by itself returns any earmark to free capital (§14.3).
+- **Slow:** a timelocked upgrade back to the previous verified `.so` (keep its artefact and hash in the release notes), in this order: `pause` → clear `INSTANT_EXIT` (and let a ratcheting instruction store `buffer_earmark = 0`) → downgrade. The downgrade proposal is approved only after checking `feature_flags == 0 && buffer_earmark == 0`; otherwise the pilot `set_config` would reject every call that keeps the bit (`FeatureNotSupported`). Safe because the phase-2 binary adds no status constants to shared accounts, the pilot binary preserves `_reserved` bytes it does not understand (R6), and R1b refuses any account a later migration rewrote. Phase-2 state stays inert.
+
+### 14.7 Layout-stability tests (pilot)
+
+1. **Golden layout test** (OnRe `layout_compatibility.rs` pattern): frozen v1 copies of each struct (`VaultConfigV1`, `VaultStateV1`, `RedeemRequestV1`, `HolderStateV1`, …) in `tests/layout/v1.rs`. Assert `8 + INIT_SPACE` equals the committed constant; v1 bytes decode under the current struct; a field-offset table, computed by serializing sentinel values, matches.
+2. **v1 → v2 decode:** a test-only `VaultStateV2` / `VaultConfigV2` with the §13.2 fields carved from `_reserved` decodes v1 bytes, every carved field reads zero, and every v1 field keeps its value and offset.
+3. **Live fixtures:** at devnet and mainnet launch, dump live accounts into `tests/fixtures/layout/v1/` and decode them in CI.
+4. **Padding preservation:** for every instruction, inject random bytes into `_reserved` with LiteSVM `set_account`, run it, and assert they are unchanged.
+5. **Padding zero at init:** every `init` leaves `_reserved` all zero.
+6. **Feature flags fail closed:** `set_config` with `INSTANT_EXIT` or any undefined bit fails `FeatureNotSupported`.
+7. **Earmark at 0 and injected:** invariants 13–17 of §4, with the earmark injected both with `INSTANT_EXIT` clear (no effect) and set (capacity shrinks; sequential fills never consume it).
+8. **Version guard:** an account injected with `version = 2` is refused with `UnsupportedVersion` by every pilot instruction that reads it; an unknown status constant is refused the same way.

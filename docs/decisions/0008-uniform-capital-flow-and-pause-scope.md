@@ -1,6 +1,6 @@
 # 0008 — One capital flow for everyone; FIFO deposits; pause never blocks claims
 
-- **Status:** accepted (2026-10-01)
+- **Status:** accepted (2026-10-01). Refined by ADR 0010 (partial fills at the queue head); amended by ADR 0011 (phase-2 instant exit as an exception to FIFO-only withdrawals).
 
 ## Context
 

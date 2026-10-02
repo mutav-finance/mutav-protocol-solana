@@ -1,6 +1,6 @@
 # 0009 — Guarantee fees, MUTAV operation and MUTAV's reserve share are separate flows
 
-- **Status:** accepted (2026-10-01). Amends ADR 0008 (pause scope).
+- **Status:** accepted (2026-10-01). Amends ADR 0008 (pause scope). Amended by ADR 0011: the capital wallet is recorded in `config.mutav_capital_wallet` and barred from the phase-2 instant exit.
 
 ## Context
 
