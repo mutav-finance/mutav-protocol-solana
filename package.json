@@ -1,0 +1,16 @@
+{
+  "name": "mutav-protocol-solana",
+  "private": true,
+  "license": "Apache-2.0",
+  "workspaces": ["clients/js"],
+  "scripts": {
+    "generate:client": "bun scripts/generate-client.ts",
+    "typecheck": "bun run --cwd clients/js typecheck"
+  },
+  "devDependencies": {
+    "@codama/nodes-from-anchor": "1.5.6",
+    "@codama/renderers-js": "2.5.0",
+    "codama": "1.11.0",
+    "typescript": "^5.9.0"
+  }
+}
