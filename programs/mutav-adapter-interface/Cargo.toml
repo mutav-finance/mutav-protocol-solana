@@ -1,0 +1,13 @@
+[package]
+name = "mutav-adapter-interface"
+version = "0.1.0"
+description = "Interface between the MUTAV core program and reserve yield adapters"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "mutav_adapter_interface"
+
+[dependencies]

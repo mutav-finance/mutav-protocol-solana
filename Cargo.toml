@@ -1,0 +1,28 @@
+[workspace]
+members = [
+    "programs/mutav",
+    "programs/mutav-adapter-interface",
+    "programs/mutav-adapter-mock",
+    "tests",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.89.0"
+license = "Apache-2.0"
+repository = "https://github.com/mutav-finance/mutav-protocol-solana"
+
+[workspace.dependencies]
+anchor-lang = "1.2.0"
+anchor-spl = { version = "1.2.0", default-features = false, features = ["token", "token_2022"] }
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
