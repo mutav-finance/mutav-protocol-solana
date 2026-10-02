@@ -23,7 +23,7 @@ Work that existed before this repository and that this build relies on:
 | Source | License | Use |
 |---|---|---|
 | [`solana-foundation/vault`](https://github.com/solana-foundation/vault) | MIT | The async deposit/redemption core is forked and adapted. Its unrestricted asset withdrawal is removed. Affected files carry an attribution header |
-| [`onre-finance/onre-sol`](https://github.com/onre-finance/onre-sol) | MIT | Patterns: Squads-held admin authority, supply caps, per-purpose token accounts. Any adapted code carries an attribution header |
+| [`onre-finance/onre-sol`](https://github.com/onre-finance/onre-sol) | MIT | Patterns: Squads-held admin authority, supply caps, per-purpose token accounts. **Design reference for redemptions** (read at commit `c049083`): per-request partial fills (`RedemptionRequest.fulfilled_amount`, priced per fill) behind [ADR 0010](decisions/0010-partial-fills-at-queue-head.md); the Prop AMM sell (convex haircut kept in the vault, decayed exit-volume tracker, `minimum_out`) behind the phase-2 instant exit, and its `reserved`-byte layouts and `layout_compatibility.rs` test behind the upgrade-readiness rules ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)). MUTAV changes the design: strict FIFO head-only fills, a separate earmark so instant exits never draw on queue capacity, a split-proof integral haircut, automatic disables. No OnRe code is copied; any adapted code will carry an attribution header |
 
 Attributions are collected in [`NOTICE`](../NOTICE).
 
@@ -35,4 +35,5 @@ Attributions are collected in [`NOTICE`](../NOTICE).
 |---|---|---|
 | 2026-10-01 | Repository created; Anchor workspace scaffold | |
 | 2026-10-01 | Protocol spec, implementation plan, ADRs 0001–0006, repo docs | |
+| 2026-10-02 | Redemption liquidity design: partial fills at the queue head, phase-2 instant exit, upgrade readiness (spec §5.5, §13, §14; ADRs 0010, 0011) | |
 | | | |
