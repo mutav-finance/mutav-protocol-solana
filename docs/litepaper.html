@@ -361,7 +361,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 </tr>
 <tr>
 <td>Expected claims against fees</td>
-<td>≈20% for rent arrears alone (RS base delinquency); ≈30–45% once exit debts are included, by scope (§12)</td>
+<td>≈20% for rent arrears alone (RS base delinquency); ≈21–37% once exit debts are included, by scope (§12)</td>
 </tr>
 <tr>
 <td>MUTAV revenue</td>
@@ -881,7 +881,7 @@ NAV per share         = net_assets / shares_outstanding</code></pre>
 </tbody>
 </table></div>
 <p>At <code>c</code> = 1 the pilot is a cost centre by design; the levers are more capital, covers matched to risk, and a lower <code>c</code> (§8).</p>
-<p><strong>Claims against fees, by scope of the exit leg</strong> (working parameters; expected payouts per lease-year ÷ gross guarantee fees; fee 10% of rent per 30 days; rent arrears at 2.01% of annual rent, the Superlógica IIL three-month average for RS apartments; evictions at 2% of leases a year consuming the 6× exit sub-limit; non-eviction exit debts 0.19× rent a year). Scope A, all liquidated tenant debts including the early-termination penalty: <strong>≈45%</strong>. Scope B, the same without the penalty (the spec default): <strong>≈39%</strong>. Scope C, arrears, evictions and abandonment only: <strong>≈30%</strong>. Rent arrears alone are ≈20%. Which scope the instrument covers is <strong>open</strong>. These figures are inferences; no Brazilian dataset measures exit-cost frequency.</p>
+<p><strong>Claims against fees, by scope of the exit leg</strong> (working parameters; expected payouts per lease-year ÷ gross guarantee fees; fee 10% of rent per 30 days; rent arrears at 2.01% of annual rent, the Superlógica IIL three-month average for RS apartments; evictions at 0.25% of leases a year (range 0.10–0.60%: CNJ DataJud filings in TJRS, TJSC and TJPR over IBGE PNAD rented households, adjusted for outcomes and for an underwritten book; not MUTAV data), each consuming the 6× exit sub-limit; non-eviction exit debts 0.19× rent a year). Scope A, all liquidated tenant debts including the early-termination penalty: <strong>≈37%</strong>. Scope B, the same without the penalty (the spec default): <strong>≈30%</strong>. Scope C, arrears, evictions and abandonment only: <strong>≈21%</strong>. Rent arrears alone are ≈20%. Evictions are rare but expensive: while the fiança is in force the fast eviction order (Lei 8.245/91 art. 59 §1º IX) is unavailable, so each one uses about the full exit sub-limit; at 0.25% a year they add only about one point. Which scope the instrument covers is <strong>open</strong>. These figures are inferences; no Brazilian dataset measures exit-cost frequency.</p>
 <p><strong>Region.</strong> A Passo Fundo (RS) corridor, chosen for <strong>access</strong> to the team's agency relationships, with at most five partner agencies in phase 0. Working loss anchors (three-month averages of the latest 2026 prints): 2.01% of annual rent for RS apartments (Superlógica IIL, base), 2.87% for RS overall (stress), and 5.93% on a looser 15-day threshold (Loft IIA RS, tail). Nationally the IIL fell from 3.29% in January to 3.05% in July 2026, and the South is the lowest region at 2.67%. Five agencies in one corridor make defaults correlated, which the per-agency caps bound.</p>
 <p><strong>Success over six months.</strong> We measure operations, not a claims-to-fees ratio. With a handful of guarantees and delinquency around 2%, six months may see zero or one missed rent, so the demo runs a full drill on devnet, and we propose a published mainnet drill with MUTAV's own capital.</p>
 <p><strong>Table 7. Success metrics</strong> (proposed)</p>
@@ -993,7 +993,7 @@ NAV per share         = net_assets / shares_outstanding</code></pre>
 <li>reserve sizing: <code>c</code> = 1 or expected loss plus a tail year, a floor for <code>c</code>, and which coverage figure may be published (§8);</li>
 <li>capital source: MUTAV's balance sheet only, or also selected third-party providers (§9);</li>
 <li>asset mix: TESOURO 50% or ~80%; liquidity sleeve in BRS or a USD stablecoin (§10);</li>
-<li>exit-leg scope A, B (spec default) or C, at ≈45% / 39% / 30% claims-to-fees (§12);</li>
+<li>exit-leg scope A, B (spec default) or C, at ≈37% / 30% / 21% claims-to-fees (§12);</li>
 <li>the 12× ceiling (legal review) and the per-guarantee cap against the R$39,600 working product;</li>
 <li>the claims tail, the payment term N, and the filing window (T0+9 or the spec's 15 days);</li>
 <li>for counsel: whether an accessories-inclusive ceiling displaces CC 822, whether exhaustion extinguishes the fiança for the art. 59 liminar, and whether a public below-target flag invites a CC 826 / LI 40 II argument;</li>

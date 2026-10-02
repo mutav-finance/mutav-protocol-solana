@@ -101,14 +101,14 @@ Revenue is the *taxa da fiança*, billed monthly to partner agencies. Claim paym
 | Who pays whom | Tenant → agency, with the rent. Agency → MUTAV, one consolidated bill a month, boleto or PIX |
 | *Valor afiançado* per lease | Default sub-limit 12× rent (under legal review) + exit sub-limit 6× rent = **R$39,600** |
 | Pilot book | ~170 leases across up to 5 partner agencies (~34 each), ~6 months; gross fees ≈R$37,400 a month at full book |
-| Expected claims against fees | ≈20% for rent arrears alone (RS base delinquency); ≈30–45% once exit debts are included, by scope (§12) |
+| Expected claims against fees | ≈20% for rent arrears alone (RS base delinquency); ≈21–37% once exit debts are included, by scope (§12) |
 | MUTAV revenue | Take `t` on each fee (open; program maximum 30%) |
 | Reserve | Working target R$300k; sizing rule open (§8) |
 
 ```figure id="fig-1b-agency-month" title="Figure 1b. One agency, one month"
 Left-to-right flow (Sankey or stacked flow), labelled "working parameters, illustrative".
 [34 guarantees in force × R$220] = [Consolidated bill R$7,480] --"paid by boleto or PIX"--> [BRL at MUTAV] --"1:1 via authorized minter"--> [7,480 BRS]; a thinner parallel branch [Consolidated bill] --"or paid in BRS (Solana Pay)"--> [7,480 BRS] --"contribute_fees (1 FeeReceipt)"--> split into [MUTAV treasury: take t (open)] and [Reserve: net].
-Side branch from the reserve: "expected claim payments ≈ 20% of fees (rent arrears, RS base) to ≈ 39% (with exit debts, scope B)".
+Side branch from the reserve: "expected claim payments ≈ 20% of fees (rent arrears, RS base) to ≈ 30% (with exit debts, scope B)".
 Reserve box annotation: "c governed: full backing or expected-loss sizing (§8)".
 Footnote: "Not a return; take and c are open."
 ```
@@ -487,7 +487,7 @@ The proposed caps (Appendix B) are a R$100k reserve (`max_tvl`), `c` (open: 1.0 
 
 At `c` = 1 the pilot is a cost centre by design; the levers are more capital, covers matched to risk, and a lower `c` (§8).
 
-**Claims against fees, by scope of the exit leg** (working parameters; expected payouts per lease-year ÷ gross guarantee fees; fee 10% of rent per 30 days; rent arrears at 2.01% of annual rent, the Superlógica IIL three-month average for RS apartments; evictions at 2% of leases a year consuming the 6× exit sub-limit; non-eviction exit debts 0.19× rent a year). Scope A, all liquidated tenant debts including the early-termination penalty: **≈45%**. Scope B, the same without the penalty (the spec default): **≈39%**. Scope C, arrears, evictions and abandonment only: **≈30%**. Rent arrears alone are ≈20%. Which scope the instrument covers is **open**. These figures are inferences; no Brazilian dataset measures exit-cost frequency.
+**Claims against fees, by scope of the exit leg** (working parameters; expected payouts per lease-year ÷ gross guarantee fees; fee 10% of rent per 30 days; rent arrears at 2.01% of annual rent, the Superlógica IIL three-month average for RS apartments; evictions at 0.25% of leases a year (range 0.10–0.60%: CNJ DataJud filings in TJRS, TJSC and TJPR over IBGE PNAD rented households, adjusted for outcomes and for an underwritten book; not MUTAV data), each consuming the 6× exit sub-limit; non-eviction exit debts 0.19× rent a year). Scope A, all liquidated tenant debts including the early-termination penalty: **≈37%**. Scope B, the same without the penalty (the spec default): **≈30%**. Scope C, arrears, evictions and abandonment only: **≈21%**. Rent arrears alone are ≈20%. Evictions are rare but expensive: while the fiança is in force the fast eviction order (Lei 8.245/91 art. 59 §1º IX) is unavailable, so each one uses about the full exit sub-limit; at 0.25% a year they add only about one point. Which scope the instrument covers is **open**. These figures are inferences; no Brazilian dataset measures exit-cost frequency.
 
 **Region.** A Passo Fundo (RS) corridor, chosen for **access** to the team's agency relationships, with at most five partner agencies in phase 0. Working loss anchors (three-month averages of the latest 2026 prints): 2.01% of annual rent for RS apartments (Superlógica IIL, base), 2.87% for RS overall (stress), and 5.93% on a looser 15-day threshold (Loft IIA RS, tail). Nationally the IIL fell from 3.29% in January to 3.05% in July 2026, and the South is the lowest region at 2.67%. Five agencies in one corridor make defaults correlated, which the per-agency caps bound.
 
@@ -555,7 +555,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 - reserve sizing: `c` = 1 or expected loss plus a tail year, a floor for `c`, and which coverage figure may be published (§8);
 - capital source: MUTAV's balance sheet only, or also selected third-party providers (§9);
 - asset mix: TESOURO 50% or ~80%; liquidity sleeve in BRS or a USD stablecoin (§10);
-- exit-leg scope A, B (spec default) or C, at ≈45% / 39% / 30% claims-to-fees (§12);
+- exit-leg scope A, B (spec default) or C, at ≈37% / 30% / 21% claims-to-fees (§12);
 - the 12× ceiling (legal review) and the per-guarantee cap against the R$39,600 working product;
 - the claims tail, the payment term N, and the filing window (T0+9 or the spec's 15 days);
 - for counsel: whether an accessories-inclusive ceiling displaces CC 822, whether exhaustion extinguishes the fiança for the art. 59 liminar, and whether a public below-target flag invites a CC 826 / LI 40 II argument;
