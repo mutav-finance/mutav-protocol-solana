@@ -76,10 +76,11 @@
 - **Goal:** `contribute_fees` with the take-rate split.
 - **Files:** `instructions/operator/contribute_fees.rs`; `tests/fees.rs`.
 - **Tests first:**
-  - `take = floor(amount × fee_take_bps / 10_000)` to `fees`; the rest to `reserve`; NAV per share rises by the net amount.
+  - `take = floor(amount × fee_take_bps / 10_000)` goes directly to `config.treasury_account`; the rest goes to `reserve`; NAV per share rises by the net amount.
+  - A treasury account other than the whitelisted one is rejected.
   - `fee_take_bps = 0` and `= 3_000` edge cases.
   - Wrong mint rejected; non-operator rejected.
-  - `fees` balance never counts toward `stable_assets`.
+  - The take never touches `reserve` or `stable_assets`.
 - **Done when:** tests pass; `FeesContributed` carries gross, take and net.
 
 ## Task 5 — Claims and payouts (Oct 4)
