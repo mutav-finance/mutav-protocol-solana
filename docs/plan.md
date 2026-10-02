@@ -81,6 +81,10 @@
   - `fee_take_bps = 0` and `= 3_000` edge cases.
   - Wrong mint rejected; non-operator rejected.
   - The take never touches `reserve` or `stable_assets`.
+  - The same `invoice_ref_hash` cannot be contributed twice (`FeeReceipt`).
+  - Fees never mint shares. MUTAV's share balance changes only via deposit/redeem.
+  - `contribute_fees` succeeds while paused and in under-coverage.
+  - `set_config` rejects `treasury_account == payments_account`.
 - **Done when:** tests pass; `FeesContributed` carries gross, take and net.
 
 ## Task 5 — Claims and payouts (Oct 4)
@@ -119,7 +123,7 @@
 - **Tests first:**
   - MUTAV's allowlisted wallet deposits, then redeems through the queue.
   - `fulfil_deposits` works in under-coverage (recapitalization).
-  - Pause blocks capital flows, fees and new guarantees, while `pay_claim`, `settle_payout`, `refresh`, `cancel_*` and `claim_*` still succeed.
+  - Pause blocks capital flows and new guarantees, while `contribute_fees`, `pay_claim`, `settle_payout`, `refresh`, `cancel_*` and `claim_*` still succeed.
 - **Done when:** tests pass.
 
 ## Task 8 — Under-coverage mode and price safety (Oct 6)
