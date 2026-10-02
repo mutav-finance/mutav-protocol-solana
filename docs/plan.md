@@ -16,8 +16,8 @@
 |---|---|
 | Oct 1 | 0 — scaffold and docs |
 | Oct 2 | 1 — core state, initialize, roles, pause · 2 — math and solvency · 2a — upgrade readiness |
-| Oct 3 | 3 — register/close guarantee · 4 — guarantee fees |
-| Oct 4 | 5 — claims and payouts |
+| Oct 3 | 3 — register/close guarantee · 3a — fiança lifecycle (ADR 0012) · 4 — guarantee fees |
+| Oct 4 | 5 — claims and payouts (categories, admin over-cap path, quitação) |
 | Oct 4–5 | 6 — async deposits and redemptions · 7 — MUTAV capital |
 | Oct 6 | 8 — under-coverage mode and price safety |
 | Oct 6–7 | 9 — adapters · 10 — refresh and events |
@@ -49,7 +49,8 @@
   - `reserve_mint` cannot change after init.
   - `set_config` emits one `ConfigUpdated { field: u16, old: [u8; 32], new: [u8; 32] }` per changed field, for every `VaultConfig` field including `Pubkey`, hash and nested `Caps` / `PriceParams` / `ExitParams` fields (a test walks the field-id table and asserts every field has an event path).
   - `set_config` and `set_payments_account` both reject `payments_account == treasury_account` and a `mutav_capital_wallet` equal to either token account's owner.
-- **Done when:** all tests pass; every account starts with `version`/`bump` and ends with the `_reserved` padding sized in spec §14.2 (`VaultConfig` 512, `VaultState` 256, others 64; `Caps`, `PriceParams`, `ExitParams` 32 each); statuses and modes are `u8` constants; `VaultConfig` carries `feature_flags`, `mutav_capital_wallet` and a zeroed `ExitParams`; events emitted via `emit_cpi!`. **Layout freeze checklist** (spec §14.2) ticked: `MAX_ADAPTERS` pinned (spec §12 Q33 answered), nested tails present, event set and error list final. Layout tests are in Task 2a.
+  - ADR 0012 config fields: `set_config` rejects `optional_categories` bits outside `SUPPORTED_OPTIONAL_CATEGORIES` (`InvalidParameter`) and negative `claims_tail_secs` / `payment_term_secs`; `claims_tail_secs` above the 3-year bound is rejected; `backstop_amount` and `backstop_commitment_hash` are settable and each emits `ConfigUpdated`; all five start at `0` after `initialize`.
+- **Done when:** all tests pass; every account starts with `version`/`bump` and ends with the padding budget of spec §14.2 (`VaultConfig` 512, `VaultState` 256, `Guarantee` 192, `ClaimFiling` and `Payout` 128, others 64; `Caps`, `PriceParams`, `ExitParams` 32 each), with the ADR 0012 fields carved from the front; statuses and modes are `u8` constants; `VaultConfig` carries `feature_flags`, `mutav_capital_wallet` and a zeroed `ExitParams`; events emitted via `emit_cpi!`. **Layout freeze checklist** (spec §14.2) ticked: `MAX_ADAPTERS` pinned (spec §12 Q33 answered), nested tails present, event set and error list final. Layout tests are in Task 2a.
 
 ## Task 2 — Math and solvency module (Oct 2)
 
@@ -75,24 +76,41 @@
   - **Padding zero at init** for every `init`; **padding preservation:** random bytes injected into `_reserved` with `set_account` survive every instruction (in-place updates, R6).
   - **Feature flags fail closed:** `set_config` with `INSTANT_EXIT` or any undefined bit → `FeatureNotSupported`; `ExitParams` can be staged while the flag is off.
   - **Version guard (R1b):** an account injected with `version = 2`, or with an unknown status constant, is refused with `UnsupportedVersion`.
-  - **Carve size pinned:** a test asserts the serialized size of the test-only `InstantExitState` (88 bytes) and the remaining `VaultState._reserved` (168).
+  - **Carve size pinned:** a test asserts the serialized size of the ADR 0012 carves (`VaultConfig` 57 → `[u8; 455]`, `VaultState` 16 → `[u8; 240]`, `Guarantee` 88 → `[u8; 104]`, `ClaimFiling` 49 → `[u8; 79]`, `Payout` 74 → `[u8; 54]`), of the test-only `InstantExitState` (88 bytes) and of the `VaultState._reserved` left after it (152).
+  - **ADR 0012 fields are zero-safe:** an account whose ADR 0012 fields are all zero decodes, and every pilot instruction treats it as "not recorded / not happened / off" (no exoneration, keys not returned, no tail, no backstop, termination penalty disabled); a `Guarantee` with an injected status `5` is refused with `UnsupportedVersion`.
   - **Earmark = 0 in the pilot:** after any sequence of pilot instructions, `buffer_earmark == 0` and `free_capital == surplus`.
   - **Injected earmark** (`set_account`, with the `INSTANT_EXIT` bit injected too): `register_guarantee`, `fulfil_redeems` and `allocate` capacity shrink by exactly `earmark_eff`; **two or more fills in one `fulfil_redeems` batch take at most `surplus − earmark_eff` in total**, and a registration that fits leaves `earmark_eff` unchanged; the ratchet lowers the stored level when surplus or liquidity falls; in under-coverage `earmark_eff == 0`; with the flag injected clear, the earmark has no effect and the next ratcheting instruction stores `0`; `pay_claim` neither reads nor writes `buffer_earmark` and is never refused (extend the Task 5 property test to fuzz the earmark).
-  - **Ratchet scope:** with a stale price and `tesouro_units > 0`, `file_claim`, `contribute_fees`, `close_guarantee`, `flag_claim_notice`, `cancel_redeem` and `claim_assets` still succeed (they neither read nor write `buffer_earmark`).
+  - **Ratchet scope:** with a stale price and `tesouro_units > 0`, `file_claim`, `contribute_fees`, `notify_exoneration`, `record_keys_returned`, `close_guarantee`, `flag_claim_notice`, `cancel_redeem` and `claim_assets` still succeed (they neither read nor write `buffer_earmark`).
 - **Done when:** tests pass; no `Option`/`Vec`/`String` in any account; large accounts boxed in contexts; fixtures dumped at devnet launch (Task 12) are decoded in CI.
 
 ## Task 3 — Register and close guarantees (Oct 3)
 
-- **Goal:** `Guarantee`, `AgencyExposure`; `register_guarantee` (solvency-gated, per-guarantee and per-agency caps) and `close_guarantee`.
-- **Files:** `state/guarantee.rs`, `state/agency.rs`, `instructions/operator/{register_guarantee.rs,close_guarantee.rs}`; `tests/solvency_gate.rs`, `tests/caps.rs`.
+- **Goal:** `Guarantee`, `AgencyExposure`; `register_guarantee` (solvency-gated, per-guarantee and per-agency caps, storing the valor afiançado with `contract_cap_hash` and `landlord_mandate_hash`) and `close_guarantee(id, reason)` with the ADR 0012 state rules.
+- **Files:** `state/guarantee.rs`, `state/agency.rs`, `instructions/operator/{register_guarantee.rs,close_guarantee.rs}`; `tests/solvency_gate.rs`, `tests/caps.rs`, `tests/lifecycle.rs`.
 - **Tests first:**
   - Registration succeeds exactly up to `free_capital` and fails one base unit above (`InsufficientFreeCapital`); the check is `coverage_required_after + earmark_eff_before ≤ stable_assets` (spec §5.2 rule 5), also with an injected earmark and flag.
+  - A zero `contract_cap_hash` or `landlord_mandate_hash` is rejected (`InvalidParameter`); both are stored and appear in `GuaranteeRegistered`; the lifecycle fields start at `0`.
   - Duplicate `id` fails.
   - `GuaranteeCapExceeded`, `AgencyCapExceeded` at the boundary.
   - Non-operator signer rejected; rejected while paused.
-  - `close_guarantee` releases the remaining cover; fails with `OpenClaims` when a claim is filed.
-  - Invariant: `remaining_cover_total` equals the sum over active guarantees after any sequence.
+  - **Close rules (invariant 21):** `close_guarantee(RELEASED)` on an `ACTIVE` guarantee fails (`InvalidGuaranteeStatus`); `VOID` succeeds on `ACTIVE` with nothing paid and fails after any payment; every close fails with `OpenClaims` while a claim is filed; a close releases exactly `remaining_cover(g)` and `GuaranteeClosed` carries `reason` and `from_status`.
+  - Invariant: `remaining_cover_total` equals the sum over guarantees that are not `CLOSED`, after any sequence.
 - **Done when:** tests pass and the gate demo case ("an over-capacity registration is refused") is scripted.
+
+## Task 3a — Fiança lifecycle (Oct 3)
+
+- **Goal:** `notify_exoneration`, `record_keys_returned`, the claims tail and the release-by-state rules ([ADR 0012](decisions/0012-fianca-aligned-guarantee-lifecycle.md), spec §3.5.1, §5.2).
+- **Files:** `instructions/operator/{notify_exoneration.rs,record_keys_returned.rs}`, `state/guarantee.rs` (status constants, `liability_end`), `constants.rs` (`EXONERATION_NOTICE_SECS`), `errors.rs` (ADR 0012 errors appended); `tests/lifecycle.rs`.
+- **Tests first:**
+  - **Tail not set fails closed:** with `claims_tail_secs == 0`, both transitions fail with `ClaimsTailNotSet` and the guarantee stays `ACTIVE` with full cover.
+  - `notify_exoneration` only from `ACTIVE` (`GuaranteeNotActive`); sets `exoneration_effective_ts = now + 120 days` and `claims_tail_until_ts = effective + tail`; `remaining_cover_total` unchanged; `ExonerationNotified` emitted.
+  - `record_keys_returned` from `ACTIVE` and from `EXONERATING` (only with `keys_ts < exoneration_effective_ts`); rejects `keys_ts > now`, `keys_ts < registered_at` and a zero evidence hash; recomputes the tail from `keys_ts`; cover unchanged; `KeysReturned` emitted.
+  - **The tail is fixed at the transition:** a later `set_config` that shortens `claims_tail_secs` does not move an existing `claims_tail_until_ts`.
+  - **Release by state (invariant 18):** walk `ACTIVE → EXONERATING → LEASE_ENDED → CLOSED` and `ACTIVE → LEASE_ENDED → CLOSED` with the clock warped through the 120 days and the tail; `remaining_cover_total` changes only at payments and at the close; `close_guarantee` fails with `ClaimsTailNotElapsed` one second before the tail ends and succeeds one second after.
+  - From `EXONERATING`, close succeeds only after `exoneration_effective_ts + tail`.
+  - Both transitions work while paused and in under-coverage, and with a stale price.
+  - Unknown status values fail closed (R1b).
+- **Done when:** tests pass; the lifecycle table of spec §3.5.1 is covered row by row.
 
 ## Task 4 — Guarantee fees (Oct 3)
 
@@ -111,8 +129,8 @@
 
 ## Task 5 — Claims and payouts (Oct 4)
 
-- **Goal:** `ClaimFiling`, `Payout`, `ClaimNotice`; `flag_claim_notice`, `close_claim_notice`, `file_claim`, `pay_claim`, `settle_payout` (spec §5.4).
-- **Files:** `state/{claim.rs,payout.rs,notice.rs}`, `instructions/operator/{flag_claim_notice.rs,close_claim_notice.rs,file_claim.rs,pay_claim.rs,settle_payout.rs}`; `tests/claims.rs`, `tests/notices.rs`, `tests/freeze.rs` (payout cases).
+- **Goal:** `ClaimFiling`, `Payout`, `ClaimNotice`; `flag_claim_notice`, `close_claim_notice`, `file_claim`, `pay_claim`, `pay_claim_admin`, `settle_payout` (spec §5.4), with claim categories (spec §3.13), exhaustion, the backstop-reimbursement flag and the quitação at settlement (ADR 0012).
+- **Files:** `state/{claim.rs,payout.rs,notice.rs}`, `instructions/operator/{flag_claim_notice.rs,close_claim_notice.rs,file_claim.rs,pay_claim.rs,settle_payout.rs}`, `instructions/admin/pay_claim_admin.rs`, `claim_path.rs` (shared payment logic for both paths); `tests/claims.rs`, `tests/claim_categories.rs`, `tests/claims_admin.rs`, `tests/notices.rs`, `tests/freeze.rs` (payout cases).
 - **Tests first:**
   - `file_claim` books the provision; NAV per share drops immediately; `stable_assets` unchanged.
   - `pay_claim` pays only `payments_account`; any other destination fails (`InvalidPaymentsAccount`).
@@ -122,6 +140,14 @@
   - At `c = 1.0`, paying a claim leaves `free_capital` unchanged.
   - Frozen `reserve` → `ReserveFrozen`, clean failure, retry succeeds after thaw.
   - `settle_payout` records `pix_e2e_hash`; late flag set when past the SLA; second settle fails.
+  - **Categories (spec §3.13):** `CAT_UNSPECIFIED` and unknown codes fail (`CategoryNotAllowed`); `CAT_DAMAGE`, `CAT_COURT_COSTS`, `CAT_TERMINATION_PENALTY` and `CAT_ABANDONMENT` fail on the default leg; `CAT_TERMINATION_PENALTY` fails while `optional_categories == 0` and succeeds once bit 0 is set; `CAT_DAMAGE` and `CAT_ABANDONMENT` fail with `KeysNotReturned` before `record_keys_returned`; a zero `debt_calc_hash` or a future `request_complete_ts` fails; `pay_claim` with a category that differs from the filing fails (`CategoryMismatch`); the category, `request_complete_ts` and flags reach the `Payout` and the events.
+  - **Liability end and tail:** rent or charges with `accrued_until_ts` after `keys_returned_ts`, or after `exoneration_effective_ts`, fail (`AccruedAfterLiabilityEnd`); `file_claim` and `flag_claim_notice` after `claims_tail_until_ts` fail (`ClaimsTailExpired` / `InvalidGuaranteeStatus`); **a claim filed inside the tail is still paid after the tail ends**, and the guarantee cannot close until it is.
+  - **Two filings on one leg:** paying the first never takes cover the second has provisioned (`ExceedsRemainingCover`); invariant 2 holds after every step.
+  - **Exhaustion:** the payment that brings `default_paid + exit_paid` to the valor afiançado sets `EXHAUSTED` and emits `GuaranteeExhausted`, through both `pay_claim` and `pay_claim_admin`, from `ACTIVE`, `EXONERATING` and `LEASE_ENDED`; afterwards `file_claim` fails (`InvalidGuaranteeStatus`) and `close_guarantee(RELEASED)` succeeds; a payment that leaves one base unit does not exhaust.
+  - **Admin over-cap path:** `pay_claim_admin` by a non-admin fails (`Unauthorized`); it pays above `max_claim_per_call` and past an exhausted period window; it does not move `claim_period_paid`; it still pays only `payments_account`, within remaining cover and liquid BRS; it sets `PAYOUT_ADMIN_PATH` and `admin_claims_paid_total`; it works while paused, in under-coverage and with a stale price; executed through a Squads v4 vault transaction (Task 13).
+  - **Backstop reimbursement:** `flags = PAYOUT_BACKSTOP_REIMBURSEMENT` on either path pays the same `payments_account`, adds to `backstop_reimbursed_total`, and still obeys every cover rule; any other caller-set bit fails (`InvalidParameter`).
+  - **Quitação:** `settle_payout` with a zero `quitacao_hash` fails; on success the `Payout` stores `quitacao_hash` and copies `landlord_mandate_hash` from the guarantee, and `PayoutSettled` carries both.
+  - **Property test (extended):** across random lifecycle states, tails, categories, flags and both paths, `pay_claim` and `pay_claim_admin` are never refused for solvency, mode, guarantee status or tail expiry on a validly filed claim.
   - **Claim notices:** flag increments `pending_notices`; duplicate notice fails; close as `Paid` requires the `ClaimFiling` to be `PAID`; close as `FullyProvisioned` requires `leg_provision == leg_cover − leg_paid`; **a notice whose filing has a provision smaller than the eventual payment cannot be closed as filed** (`NoticeNotResolved`); close as `Withdrawn`; notices never affect `file_claim`, `pay_claim`, `settle_payout` or `close_guarantee`; flag and close work while paused and in under-coverage.
 - **Done when:** tests pass; the payout flow matches [ADR 0003](decisions/0003-payments-operated-by-mutav.md).
 
@@ -167,7 +193,7 @@
 - **Tests first:**
   - MUTAV's allowlisted wallet deposits, then redeems through the queue.
   - `fulfil_deposits` works in under-coverage (recapitalization).
-  - Pause blocks capital flows and new guarantees, while `contribute_fees`, `file_claim`, `pay_claim`, `settle_payout`, `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, `refresh`, `advance_queue_heads`, `cancel_*` and `claim_*` still succeed.
+  - Pause blocks capital flows and new guarantees, while `contribute_fees`, `file_claim`, `pay_claim`, `pay_claim_admin`, `settle_payout`, `notify_exoneration`, `record_keys_returned`, `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, `refresh`, `advance_queue_heads`, `cancel_*` and `claim_*` still succeed.
 - **Done when:** tests pass.
 
 ## Task 8 — Under-coverage mode and price safety (Oct 6)
@@ -175,7 +201,7 @@
 - **Goal:** `mode` transitions; TESOURO valued at `min(on-chain price, accrual curve)` with staleness and deviation bounds; NAV-move guard halting fulfilment.
 - **Files:** `pricing.rs`, `solvency.rs`; `tests/solvency_gate.rs`, `tests/pricing.rs`.
 - **Tests first:**
-  - A mark-down below `coverage_required` → `UnderCovered`: `register_guarantee`, `fulfil_redeems`, `allocate` fail; `pay_claim` succeeds.
+  - A mark-down below `coverage_required` → `UnderCovered`: `register_guarantee`, `fulfil_redeems`, `allocate` fail; `pay_claim`, `pay_claim_admin`, `notify_exoneration` and `record_keys_returned` succeed; `backstop_amount` stays out of `stable_assets` and `coverage_required`.
   - Recovery returns `mode` to `Normal`.
   - Price above the accrual curve is capped; stale price → gated instructions fail with `StalePrice`; deviation beyond the bound rejected.
   - NAV move > threshold sets `fulfil_halted`; fulfils fail until cleared.
@@ -203,15 +229,15 @@
   - `refresh` by a random signer recomputes the public state exactly as the math module does.
   - Pending payout past the SLA is flagged late and counted.
   - Frozen reserve account detected; balance excluded; event emitted.
-  - Event coverage test: every token movement is covered by an event whose amounts match (one `RedeemFilled` per fill, one `RedeemsFulfilled` per batch, one `FeesContributed` covering both of its transfers).
+  - Event coverage test: every token movement is covered by an event whose amounts match (one `RedeemFilled` per fill, one `RedeemsFulfilled` per batch, one `FeesContributed` covering both of its transfers, one `ClaimPaid` per payment on either path), and every guarantee state change emits its event (`ExonerationNotified`, `KeysReturned`, `GuaranteeExhausted`, `GuaranteeClosed`).
   - `StateRefreshed` carries `surplus` and `buffer_earmark`.
 - **Done when:** tests pass; Mollusk CU benchmark recorded for `refresh`, `pay_claim`, `fulfil_redeems` (multi-fill batch with a partial head, `emit_cpi!` per fill, boxed `VaultConfig`), including the Borsh cost of the 512/256-byte padding; `MAX_FULFIL_BATCH` pinned from it.
 
 ## Task 11 — Codama client and publication (Oct 7–8)
 
-- **Goal:** generate `@mutav-finance/mutav-protocol-solana` from the IDL with Codama for `@solana/kit`; add PDA helpers and read helpers (`VaultState`, guarantees, payouts, queue position) and a TS mirror of the math for previews. No signing code.
+- **Goal:** generate `@mutav-finance/mutav-protocol-solana` from the IDL with Codama for `@solana/kit`; add PDA helpers and read helpers (`VaultState`, guarantees, payouts, queue position) and a TS mirror of the math for previews. Export the ADR 0012 constants (guarantee statuses, claim categories with their allowed legs, `Payout.flags`, `EXONERATION_NOTICE_SECS`) and pure helpers `liabilityEnd`, `canFile(category, leg, guarantee, now)` and `canClose(guarantee, reason, now)` that mirror the program's rules, so mutav-app can pre-check before it composes a transaction. No signing code.
 - **Files:** `clients/js/*`, `scripts/generate-client.ts`, CI Codama diff check.
-- **Tests first:** client unit tests (Bun) for PDA derivation against known addresses, instruction encoding round-trips, math-mirror parity with Rust test vectors (including `earmark_eff`, `free_capital`, `liquid_budget` and the partial-fill sizing); a grep check that fails CI on secret-key APIs.
+- **Tests first:** client unit tests (Bun) for PDA derivation against known addresses, instruction encoding round-trips, math-mirror parity with Rust test vectors (including `earmark_eff`, `free_capital`, `liquid_budget`, the partial-fill sizing and the ADR 0012 `canFile` / `canClose` predicates); a grep check that fails CI on secret-key APIs.
 - **IDL compatibility:** an `idl-compat` CI job, active from the first tagged release, diffs `target/idl/mutav.json` against the last released IDL and fails on changed instruction args/accounts, account sizes, field offsets or types, renumbered errors, or changed events (spec §14.4).
 - **Done when:** CI regenerates the client and finds no diff; package published (GitHub Packages or npm, under `@mutav-finance`) and installable from mutav-app.
 
@@ -228,7 +254,7 @@
 
 - **Goal:** run the core flows against Nora's devnet BRS mint `BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4` and a Squads proposal flow on a fork.
 - **Files:** `tests-fork/*`, `.github/workflows/fork.yml` (manual trigger).
-- **Tests first:** initialize with the real mint; deposit → fulfil → claim; register → fee → file → pay → settle; admin fulfil executed through a Squads proposal, including a partial head fill; `allocate` and `deallocate` executed through a Squads proposal (CPI depth); a no-op program upgrade through a timelocked Squads proposal, after which every live account still decodes.
+- **Tests first:** initialize with the real mint; deposit → fulfil → claim; register → fee → file → pay → settle (with quitação); register → keys returned → damage claim → exhaustion → close; an over-cap `pay_claim_admin` through a Squads proposal; admin fulfil executed through a Squads proposal, including a partial head fill; `allocate` and `deallocate` executed through a Squads proposal (CPI depth); a no-op program upgrade through a timelocked Squads proposal, after which every live account still decodes.
 - **Done when:** the fork suite passes on demand; findings about the real mint's authorities recorded in the spec's open questions.
 
 ## Tasks 14–18 — mutav-app integration (Oct 8–9) [mutav-app]
@@ -237,12 +263,12 @@ These happen in `mutav-finance/mutav-app`, consuming `@mutav-finance/mutav-proto
 
 ### Task 14 — Convex operator actions [mutav-app]
 
-- **Goal:** KMS-backed Convex actions that call `register_guarantee` on activation, `close_guarantee` on close, `contribute_fees` when an invoice is paid, `file_claim`/`pay_claim` on claim approval, and `settle_payout` on PIX confirmation; a Solana event indexer.
-- **Done when:** each lifecycle transition in the platform produces the matching instruction on devnet, idempotently; the indexer stores events for the transparency views, skips unknown event discriminators, and decodes accounts by discriminator (not `dataSize` alone), so a later program upgrade cannot break it.
+- **Goal:** KMS-backed Convex actions that call `register_guarantee` on activation (only when the arguments equal the signed instrument's cap schedule, with `contract_cap_hash` and `landlord_mandate_hash`), `notify_exoneration` when MUTAV's notice reaches the landlord, `record_keys_returned` on the agency's handover or repossession report, `close_guarantee` once the tail has passed (or `VOID`), `contribute_fees` when an invoice is paid, `file_claim`/`pay_claim` on approval of a complete payment request (with category, `accrued_until_ts`, `request_complete_ts` and `debt_calc_hash`), a hand-off to an admin proposal when a payment exceeds the operator caps, and `settle_payout` on PIX confirmation plus the agency's quitação; a Solana event indexer. Off-chain duties of spec §2.2: the `Landlord` and `Mandate` records, the consent workflow for payment plans and addenda (CC 838 I), the backstop advance runbook, and the extinction notice on `GuaranteeExhausted`.
+- **Done when:** each lifecycle transition in the platform produces the matching instruction on devnet, idempotently; a payment request older than `payment_term_secs` raises an alert; the indexer stores events for the transparency views, skips unknown event discriminators, and decodes accounts by discriminator (not `dataSize` alone), so a later program upgrade cannot break it.
 
 ### Task 15 — Admin Squads proposals in `apps/admin` [mutav-app]
 
-- **Goal:** compose admin instructions (fulfil queues, allowlist, caps, payments account, adapters, allocate/deallocate, roles) as Squads v4 proposals, signed by each admin's own wallet.
+- **Goal:** compose admin instructions (fulfil queues, allowlist, caps, payments account, adapters, allocate/deallocate, roles, `pay_claim_admin` for over-cap payments, the ADR 0012 config fields) as Squads v4 proposals, signed by each admin's own wallet.
 - **Done when:** a fulfil executed end to end through a proposal on devnet.
 
 ### Task 16 — Investor flow in `apps/fund` [mutav-app]
@@ -252,12 +278,12 @@ These happen in `mutav-finance/mutav-app`, consuming `@mutav-finance/mutav-proto
 
 ### Task 17 — Agency transparency in `apps/agency` [mutav-app]
 
-- **Goal:** replace the env-constant capacity panel with on-chain `stable_assets`, `coverage_required`, `free_capital` and the payouts ledger.
+- **Goal:** replace the env-constant capacity panel with on-chain `stable_assets`, `coverage_required`, `free_capital` and the payouts ledger. Use the pt-BR terms of spec §15: "valor afiançado", "pedido de pagamento", "taxa da fiança", never "cobertura", "sinistro" or "prêmio".
 - **Done when:** the page reads only program state and indexed events.
 
 ### Task 18 — Public transparency route [mutav-app]
 
-- **Goal:** an unauthenticated page for judges and landlords: reserve, coverage, surplus, guarantees, payouts with PIX settlement status and SLA flags. Which app hosts it is undecided.
+- **Goal:** an unauthenticated page for judges and landlords: reserve, coverage, surplus, guarantees by state (including exhausted), payouts with PIX settlement status, the quitação and SLA flags, and the time from a complete payment request to settlement. Reserve health and MUTAV's backstop are shown as **two separate layers**, and under-coverage reads "reserve below target; MUTAV backstop active" (spec §6). Which app hosts it is undecided.
 - **Done when:** reachable without login and linked from the submission.
 
 ## Tasks 19–22 — Submission
