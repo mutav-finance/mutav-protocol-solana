@@ -115,18 +115,19 @@
 
 ## Task 7 — MUTAV capital (Oct 5)
 
-- **Goal:** `contribute_capital` and `withdraw_surplus`.
-- **Files:** `instructions/capital/{contribute_capital.rs,withdraw_surplus.rs}`; `tests/capital_async.rs`.
-- **Tests first:** withdraw succeeds up to `free_capital` and fails above; fails in under-coverage; contribute works in under-coverage; `max_tvl` enforced; admin-only.
-- **Blocked on:** spec §12 Q7–Q8 (share treatment, destination). Implement with the destination restricted and share minting behind a `TODO(spec)` until decided.
-- **Done when:** tests pass for the decided behaviour.
+- **Goal:** none beyond Task 6. MUTAV uses the async deposit/redeem flow (ADR 0008).
+- **Tests first:**
+  - MUTAV's allowlisted wallet deposits, then redeems through the queue.
+  - `fulfil_deposits` works in under-coverage (recapitalization).
+  - Pause blocks capital flows, fees and new guarantees, while `pay_claim`, `settle_payout`, `refresh`, `cancel_*` and `claim_*` still succeed.
+- **Done when:** tests pass.
 
 ## Task 8 — Under-coverage mode and price safety (Oct 6)
 
 - **Goal:** `mode` transitions; TESOURO valued at `min(on-chain price, accrual curve)` with staleness and deviation bounds; NAV-move guard halting fulfilment.
 - **Files:** `pricing.rs`, `solvency.rs`; `tests/solvency_gate.rs`, `tests/pricing.rs`.
 - **Tests first:**
-  - A mark-down below `coverage_required` → `UnderCovered`: `register_guarantee`, `fulfil_redeems`, `withdraw_surplus`, `allocate` fail; `pay_claim` succeeds.
+  - A mark-down below `coverage_required` → `UnderCovered`: `register_guarantee`, `fulfil_redeems`, `allocate` fail; `pay_claim` succeeds.
   - Recovery returns `mode` to `Normal`.
   - Price above the accrual curve is capped; stale price → gated instructions fail with `StalePrice`; deviation beyond the bound rejected.
   - NAV move > threshold sets `fulfil_halted`; fulfils fail until cleared.
