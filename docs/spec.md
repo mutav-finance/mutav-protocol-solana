@@ -51,7 +51,7 @@ Where a value or behaviour is not yet decided, this spec says **TBD** and lists 
 
 | Role | Key | May call |
 |---|---|---|
-| **Admin** | Squads v4 multisig vault, with a Squads time lock | `initialize`, `set_config`, `set_roles`, `set_payments_account`, `set_allowlist_root`, `whitelist_adapter`, `remove_adapter`, `unpause`, `fulfil_deposits`, `fulfil_redeems`, `contribute_capital`, `withdraw_surplus`, `allocate`, `deallocate`. Also the program's upgrade authority |
+| **Admin** | Squads v4 multisig vault, with a Squads time lock | `initialize`, `set_config`, `set_roles`, `set_payments_account`, `set_allowlist_root`, `whitelist_adapter`, `remove_adapter`, `unpause`, `fulfil_deposits`, `fulfil_redeems`, `allocate`, `deallocate`. Also the program's upgrade authority |
 | **Operator** | Hot key held by mutav-app in KMS, used from Convex actions | `register_guarantee`, `close_guarantee`, `contribute_fees`, `file_claim`, `pay_claim`, `settle_payout` |
 | **Pauser** | Separate key | `pause`, `revoke_operator` |
 | **Investor** | Own wallet, on the allowlist (KYC done off-chain) | `request_deposit`, `cancel_deposit`, `claim_shares`, `request_redeem`, `cancel_redeem`, `claim_assets` |
@@ -118,7 +118,6 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | `claim_period_start` | `i64` | Start of the current claim-payment cap window |
 | `claim_period_paid` | `u64` | Paid in the current window |
 | `fees_in_total`, `fee_take_total` | `u64`, `u64` | Lifetime net fees into the reserve; lifetime take sent to the treasury |
-| `capital_in_total`, `capital_out_total` | `u64`, `u64` | Lifetime `contribute_capital` / `withdraw_surplus` |
 | `claims_paid_total` | `u64` | Lifetime claim payments |
 | `late_payouts` | `u32` | Payouts pending past the SLA, as last counted by `refresh` |
 | `fulfil_halted` | `bool` | Set when the NAV-move guard trips ([§7](#7-price-safety)) |
@@ -265,9 +264,9 @@ assets_for(shares) = floor(shares × (net_assets + 1) / (shares_outstanding + V)
 6. A provision reduces NAV only. It never reduces `stable_assets`, so nothing is counted twice against coverage: a filed-but-unpaid claim is already inside `remaining_cover_total`.
 7. Paying a claim reduces `stable_assets` and `remaining_cover_total` by the same amount. At `c = 1.0` it leaves `free_capital` unchanged.
 
-**Gated on `free_capital` (and `mode == Normal`):** `register_guarantee`, `fulfil_redeems`, `withdraw_surplus`, `allocate`, `deallocate` (with the under-coverage exception in [§6](#6-under-coverage-mode)).
+**Gated on `free_capital` (and `mode == Normal`):** `register_guarantee`, `fulfil_redeems`, `allocate`, `deallocate` (with the under-coverage exception in [§6](#6-under-coverage-mode)).
 
-**Never solvency-gated:** `pay_claim`, `file_claim`, `settle_payout`, `contribute_fees`, `contribute_capital`, `close_guarantee`, investor `cancel_*` and `claim_*`, `refresh`.
+**Never solvency-gated:** `pay_claim`, `file_claim`, `settle_payout`, `contribute_fees`, `fulfil_deposits`, `close_guarantee`, investor `cancel_*` and `claim_*`, `refresh`.
 
 ---
 
@@ -309,7 +308,7 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
 #### `pause()` / `unpause()`
 
 - **Signer:** `pause`: pauser or admin, no time lock. `unpause`: admin.
-- **Effects:** sets `config.paused`. While paused, every instruction that moves value in or out is rejected **except**: `refresh`, investor `cancel_*` and `claim_*`. Whether `pay_claim`, `settle_payout` and `contribute_fees` stay open during a pause is **TBD** (PC-24).
+- **Effects:** sets `config.paused`. While paused, these are rejected: capital flows (`request_*`, `fulfil_*`), new guarantees, `contribute_fees` and `allocate`/`deallocate`. **These stay open** (ADR 0008): `pay_claim`, `file_claim`, `settle_payout`, `close_guarantee`, `refresh`, and investor `cancel_*` and `claim_*`. Claims are never blocked.
 - **Events:** `Paused { by }`, `Unpaused`.
 
 #### `revoke_operator()`
@@ -401,8 +400,8 @@ Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` a
 #### `fulfil_deposits(count)`
 
 - **Signer:** admin.
-- **Accounts:** the next `count` `DepositRequest` accounts in `seq` order, starting at `deposit_head` (cancelled sequences are skipped).
-- **Rules:** not paused; `fulfil_halted == false`; price fresh; `stable_assets + Σ assets ≤ caps.max_tvl`. Whether deposits may be fulfilled in under-coverage mode is **TBD** (they add capital, but at a depressed NAV).
+- **Accounts:** the next `count` `DepositRequest` accounts in **strict FIFO** `seq` order, starting at `deposit_head`. Cancelled sequences are skipped, and no pending request is ever skipped.
+- **Rules:** not paused; `fulfil_halted == false`; price fresh; `stable_assets + Σ assets ≤ caps.max_tvl`. Deposits **may** be fulfilled in under-coverage mode. They add capital and are the recapitalization path; the new depositor buys at the NAV, which already reflects the loss (ADR 0008).
 - **Effects (per request, in order):** price at the NAV at fulfil: `shares_out = shares_for(assets)`; transfer BRS `pending_deposits` → `reserve`; `brs_balance += assets`; `pending_deposits_total −= assets`; `shares_outstanding += shares_out`; `status = Fulfilled`; advance `deposit_head`.
 - **Errors:** `Unauthorized`, `Paused`, `FulfilHalted`, `StalePrice`, `TvlCapExceeded`, `QueueOrderViolation`.
 - **Event:** `DepositsFulfilled { from_seq, to_seq, assets, shares, nav }`.
@@ -422,22 +421,9 @@ Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` a
 - **Errors:** `Unauthorized`, `Paused`, `UnderCovered`, `FulfilHalted`, `StalePrice`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `QueueOrderViolation`.
 - **Event:** `RedeemsFulfilled { from_seq, to_seq, shares, assets, nav }`.
 
-### 5.6 MUTAV capital (admin)
+### 5.6 MUTAV capital
 
-#### `contribute_capital(amount)`
-
-- **Signer:** admin (MUTAV), signing the BRS transfer from MUTAV's source account.
-- **Rules:** not paused; `amount > 0`; `stable_assets + amount ≤ caps.max_tvl`.
-- **Effects:** transfer BRS → `reserve`; `brs_balance += amount`; `capital_in_total += amount`. Whether this mints shares to MUTAV at NAV or is a non-share contribution is **TBD** (§12). Not solvency-gated; it is the recapitalization path in under-coverage.
-- **Event:** `CapitalContributed { amount, shares }`.
-
-#### `withdraw_surplus(amount)`
-
-- **Signer:** admin.
-- **Rules:** not paused; `mode == Normal`; `amount ≤ free_capital`; `amount ≤ brs_balance`. Destination **TBD**: it must be a whitelisted account to respect principle 5 (§12).
-- **Effects:** transfer BRS `reserve` → destination; `brs_balance −= amount`; `capital_out_total += amount`. Share treatment follows `contribute_capital` (TBD).
-- **Errors:** `UnderCovered`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `Paused`.
-- **Event:** `SurplusWithdrawn { amount, destination }`.
+MUTAV contributes and withdraws capital through the **same async flow as every investor** (ADR 0008). MUTAV's wallet is allowlisted, and it receives shares at the NAV at fulfil and redeems them only out of `free_capital`, in strict FIFO. There is no `contribute_capital` or `withdraw_surplus` instruction.
 
 ### 5.7 Reserve allocation (admin, through adapters)
 
@@ -483,9 +469,9 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
 ## 6. Under-coverage mode
 
 - **Trigger:** `stable_assets < coverage_required`, for example after a TESOURO mark-down or an issuer freeze. Set by `refresh`, and checked inline by every gated instruction.
-- **Frozen automatically:** `register_guarantee`, `fulfil_redeems`, `withdraw_surplus`, `allocate`.
+- **Frozen automatically:** `register_guarantee`, `fulfil_redeems`, `allocate`.
 - **Restricted:** `deallocate` only if it does not worsen coverage ([§5.7](#57-reserve-allocation-admin-through-adapters)).
-- **Keeps working:** `pay_claim`, `file_claim`, `settle_payout`, `contribute_fees`, `contribute_capital`, `close_guarantee`, `refresh`, investor `cancel_*` and `claim_*`, `request_*` (queued, not fulfilled). `fulfil_deposits` is **TBD**.
+- **Keeps working:** `pay_claim`, `file_claim`, `settle_payout`, `contribute_fees`, `fulfil_deposits`, `close_guarantee`, `refresh`, investor `cancel_*` and `claim_*`, `request_*` (queued, not fulfilled). `fulfil_deposits` is **TBD**.
 - **Alert:** a `ModeChanged { to: UnderCovered, deficit }` event, consumed by the mutav-app indexer to alert admins.
 - **Exit:** `refresh` sets `mode = Normal` once `stable_assets ≥ coverage_required` again (through fees, capital contributions, a price recovery or run-off).
 
@@ -508,7 +494,7 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). Valu
 
 | Field | Type | Enforced in | Proposed |
 |---|---|---|---|
-| `max_tvl` | `u64` | `fulfil_deposits`, `contribute_capital` | R$100k |
+| `max_tvl` | `u64` | `fulfil_deposits` | R$100k |
 | `max_cover_per_guarantee` | `u64` | `register_guarantee` | R$30k |
 | `max_cover_per_agency` | `u64` | `register_guarantee` | R$60k |
 | `max_claim_per_call` | `u64` | `pay_claim` | R$10k |
@@ -617,11 +603,11 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 
 **Raised while writing this spec:**
 
-7. **Share treatment of MUTAV capital.** Does `contribute_capital` mint shares to MUTAV at NAV, and does `withdraw_surplus` burn them? Without shares, MUTAV capital is a donation to share holders on the way in and a dilution on the way out.
-8. **`withdraw_surplus` destination.** Principle 5 allows outflows only to claim escrows, the payments account or adapters. Is the destination the payments account, a separate whitelisted treasury account, or is MUTAV capital routed through `fulfil_redeems` on its own shares?
+7. **Share treatment of MUTAV capital.** *Resolved (ADR 0008):* MUTAV uses the async flow and holds shares like any investor.
+8. **`withdraw_surplus` destination.** *Resolved:* the instruction is removed (ADR 0008).
 9. **Withdrawing MUTAV's take.** *Resolved (ADR 0007):* `contribute_fees` sends the take directly to the whitelisted `treasury_account`. There is no `fees` account and no `withdraw_fees`.
-10. **Pause scope.** Does `pause` stop `pay_claim`, `settle_payout` and `contribute_fees`? Granular pause flags (PC-24)?
-11. **`fulfil_deposits` in under-coverage.** Allowed (adds capital) or frozen (protects incoming investors from a depressed NAV)?
+10. **Pause scope.** *Resolved (ADR 0008):* pause stops capital flows, new guarantees, fees and allocation; claims, settlement, `refresh`, `cancel_*` and `claim_*` stay open. Granular flags (PC-24) are still optional.
+11. **`fulfil_deposits` in under-coverage.** *Resolved (ADR 0008):* allowed. It is the recapitalization path.
 12. **NAV denominator.** Whether shares escrowed in `pending_redemptions` stay in `shares_outstanding` until fulfilment (current text: yes, they are only removed on fulfil).
 13. **Provision formula.** Provision = filed amount (current text) or the full outstanding default leg plus an expected-exit term (PC-12). Also: how a filed claim that MUTAV later withdraws releases its provision.
 14. **Filing window on-chain.** Enforce the 15-day filing window in the program (PC-2) or only in the platform.

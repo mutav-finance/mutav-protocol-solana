@@ -10,7 +10,7 @@ MUTAV's promise to agencies and landlords is that claims are paid. A gate that c
 ## Decision
 
 - Solvency rule: `stable_assets ≥ coverage_required`, where `coverage_required = c × Σ remaining cover of active guarantees` and `c` starts at 1.0.
-- **Gated on `free_capital` and normal mode:** `register_guarantee`, `fulfil_redeems`, `withdraw_surplus`, `allocate`, `deallocate`.
+- **Gated on `free_capital` and normal mode:** `register_guarantee`, `fulfil_redeems`, `allocate`, `deallocate`.
 - **Never solvency-gated:** `pay_claim`. It is bounded only by the guarantee's remaining cover on the leg and by the payment caps. A property test asserts that a payment is never refused for solvency.
 - **Under-coverage mode:** when `stable_assets < coverage_required`, new guarantees, redemptions, surplus withdrawals and allocations freeze automatically; claim payments continue; admins are alerted by event.
 - In under-coverage, `deallocate` is allowed only if it does not worsen coverage, so moving TESOURO into BRS remains possible.
