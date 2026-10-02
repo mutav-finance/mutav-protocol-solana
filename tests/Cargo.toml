@@ -1,0 +1,22 @@
+[package]
+name = "mutav-tests"
+version = "0.0.0"
+description = "LiteSVM integration tests for the MUTAV programs (run after `anchor build`)"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+mutav = { path = "../programs/mutav", features = ["no-entrypoint"] }
+anchor-lang.workspace = true
+litesvm = "0.16.0"
+litesvm-token = "0.16.0"
+solana-keypair = "3"
+solana-signer = "3"
+solana-message = "4"
+solana-transaction = "4"
+solana-program-pack = "3"

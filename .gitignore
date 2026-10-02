@@ -1,0 +1,22 @@
+# Build output (includes target/deploy/*-keypair.json — program keypairs never enter git)
+target/
+.anchor/
+.surfpool/
+test-ledger/
+**/*.rs.bk
+
+# Keys: never commit any keypair
+**/*-keypair.json
+keys/*.json
+
+# JS
+node_modules/
+.yarn/
+dist/
+
+# Env / OS
+.env
+.env.*
+.DS_Store
+
+# Cargo.lock and bun.lock are intentionally tracked.
