@@ -15,8 +15,8 @@ The first spec draft gave MUTAV its own capital instructions, `contribute_capita
 2. **Deposits are fulfilled in strict FIFO**, the same as redemptions.
 3. **`fulfil_deposits` is allowed in under-coverage mode.** New capital is the recapitalization path, and it is priced at a NAV that already reflects the loss.
 4. **`pause` scope:**
-   - **Stopped:** capital flows (`request_*`, `fulfil_*`), `register_guarantee`, `contribute_fees` and `allocate`/`deallocate`.
-   - **Stay open:** `pay_claim`, `file_claim`, `settle_payout`, `close_guarantee`, `refresh`, and investors' `cancel_*`/`claim_*`. Claims are never blocked.
+   - **Stopped:** capital flows (`request_*`, `fulfil_*`), `register_guarantee` and `allocate`/`deallocate`. (`contribute_fees` was originally in this list; ADR 0009 moved it to stay open.)
+   - **Stay open:** `contribute_fees` (per ADR 0009), `pay_claim`, `file_claim`, `settle_payout`, `close_guarantee`, `refresh`, and investors' `cancel_*`/`claim_*`. Claims are never blocked.
 
 ## Consequences
 

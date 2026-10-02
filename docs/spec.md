@@ -61,6 +61,21 @@ Where a value or behaviour is not yet decided, this spec says **TBD** and lists 
 - Roles are distinct keys. `set_roles` rejects a configuration where the operator or pauser equals the admin.
 - The pauser can revoke the operator immediately (`revoke_operator`). Appointing the replacement operator is an admin action (`set_roles`). Whether the pauser may also appoint the replacement is **TBD**.
 
+### 2.1 Three separate MUTAV money flows (ADR 0009)
+
+MUTAV touches the program in three roles. They never mix:
+
+| Flow | What it is | Instruction | Destination | Shares |
+|---|---|---|---|---|
+| **Guarantee fees → reserve** | The net guarantee fee from each contract after MUTAV's take. It belongs to the reserve and raises NAV for **all** shareholders pro rata | `contribute_fees` (operator) | `reserve` | **Never minted** |
+| **MUTAV operation** | MUTAV's take (`fee_take_bps`): operating revenue | Same `contribute_fees` call, as a separate transfer | `treasury_account` (whitelisted) | None; never part of the reserve or NAV |
+| **MUTAV's share of the reserve** | MUTAV as a capital provider | `request_deposit` / `request_redeem` from MUTAV's allowlisted capital wallet | `pending_deposits` → `reserve` | Minted at NAV at fulfil, like any investor |
+
+Rules:
+- **Three different accounts.** `treasury_account`, `payments_account` (claim payouts) and MUTAV's capital wallet are three different accounts. `set_config` rejects `treasury_account == payments_account`. The capital wallet is just an allowlisted investor wallet, unknown to config.
+- **Fees never mint shares and never count as MUTAV capital.** MUTAV benefits from fees only through the shares it bought with its own capital, like every holder.
+- **Separate on-chain accounting:** `fees_in_total` (net fees into the reserve), `fee_take_total` (to the treasury) and the deposit/redeem totals are tracked separately. Each has its own event (`FeesContributed`, `DepositsFulfilled`, `RedeemsFulfilled`).
+
 ## 3. Accounts
 
 All program-owned accounts carry `version: u8`, `bump: u8` and a `_reserved` padding array so later layouts can migrate without re-initialization.
@@ -308,7 +323,7 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
 #### `pause()` / `unpause()`
 
 - **Signer:** `pause`: pauser or admin, no time lock. `unpause`: admin.
-- **Effects:** sets `config.paused`. While paused, these are rejected: capital flows (`request_*`, `fulfil_*`), new guarantees, `contribute_fees` and `allocate`/`deallocate`. **These stay open** (ADR 0008): `pay_claim`, `file_claim`, `settle_payout`, `close_guarantee`, `refresh`, and investor `cancel_*` and `claim_*`. Claims are never blocked.
+- **Effects:** sets `config.paused`. While paused, these are rejected: capital flows (`request_*`, `fulfil_*`), new guarantees and `allocate`/`deallocate`. **These stay open** (ADRs 0008, 0009): `contribute_fees`, `pay_claim`, `file_claim`, `settle_payout`, `close_guarantee`, `refresh`, and investor `cancel_*` and `claim_*`. Claims are never blocked.
 - **Events:** `Paused { by }`, `Unpaused`.
 
 #### `revoke_operator()`
@@ -344,9 +359,10 @@ Each instruction lists its signer, main accounts, arguments, rules (checked in t
 #### `contribute_fees(invoice_ref_hash, amount)`
 
 - **Signer:** operator, who also signs the BRS transfer from its own BRS token account (fees reach it via PIX → BRS mint off-chain). Batched per invoice.
-- **Rules:** `amount > 0`; source mint = `reserve_mint`.
-- **Effects:** `take = floor(amount × fee_take_bps / 10_000)`; transfer `take` → `config.treasury_account` (directly; the program holds no fee balance); transfer `amount − take` → `reserve`; `brs_balance += amount − take`; `fees_in_total += amount − take`; `fee_take_total += take`. NAV rises immediately. Streaming fees into NAV (PC-15) is **not adopted**; see §12. Per-invoice idempotency on-chain is **TBD**.
-- **Errors:** `Paused` (if fees are pausable, TBD), `InvalidParameter`, `InvalidMint`.
+- **Accounts:** adds `fee_receipt` (init) at seeds `["fee", config, invoice_ref_hash]`.
+- **Rules:** `amount > 0`; source mint = `reserve_mint`; `fee_receipt` must not exist, so **each invoice is recorded exactly once**; `treasury_account` matches config. **Not paused, never solvency-gated:** fees are always accepted, including during pause and under-coverage (ADR 0009).
+- **Effects:** creates `FeeReceipt { invoice_ref_hash, gross, take, net, slot }`, which mutav-app reconciles against its invoices. `take = floor(amount × fee_take_bps / 10_000)`; transfer `take` → `config.treasury_account` (directly; the program holds no fee balance); transfer `amount − take` → `reserve`; `brs_balance += amount − take`; `fees_in_total += amount − take`; `fee_take_total += take`. NAV rises immediately. Streaming fees into NAV (PC-15) is **not adopted**; see §12. Never mints shares.
+- **Errors:** `InvalidParameter`, `InvalidMint`, `InvalidTreasuryAccount`; account-already-in-use on a duplicate `invoice_ref_hash`.
 - **Event:** `FeesContributed { invoice_ref_hash, gross, take, net }`.
 
 ### 5.4 Claims and payouts (operator)
@@ -615,7 +631,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 16. **Pauser powers.** Can the pauser appoint the replacement operator, or only revoke? Can it unpause?
 17. **`coverage_ratio_bps` floor.** Configurable from 1.0, or a program constant floor of 1.0 (PC-14).
 18. **Allocation gate.** Must the allocated amount itself fit in `free_capital`, or is the solvency post-condition plus the TESOURO share cap enough?
-19. **Per-invoice idempotency for fees.** Add a `FeeReceipt` PDA seeded by `invoice_ref_hash`, or rely on mutav-app's ledger.
+19. **Per-invoice idempotency for fees.** *Resolved (ADR 0009):* a `FeeReceipt` PDA seeded by `invoice_ref_hash`.
 20. **Virtual offset and seed deposit.** The value of `k` and whether a seed deposit is minted at `initialize`.
 21. **NAV-move threshold X**, staleness window, deviation bound and stale-price behaviour (fail vs haircut).
 22. **Adversarial-review items not yet decided:** PC-4, PC-6, PC-8, PC-9, PC-13, PC-15, PC-16, PC-21, PC-22, PC-29, PC-30, PC-31, PC-32, PC-34, PC-35, PC-36, PC-38, PC-43 (extra caps). See §11.
