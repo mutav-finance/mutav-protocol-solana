@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { compareIdl, type Idl } from '../idl-compat';
 
-const struct = (name: string, fields: [string, unknown][]) => ({
+const struct = (name: string, fields: [string, any][]) => ({
   name,
   type: { kind: 'struct', fields: fields.map(([n, type]) => ({ name: n, type })) },
 });

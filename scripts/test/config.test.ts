@@ -45,7 +45,7 @@ describe('devnet.example.json', () => {
   test('loads once filled; the NAV-move bound is high for the demo', () => {
     const c = parseConfig(filled());
     expect(c.cluster).toBe('devnet');
-    expect(c.reserveMint).toBe('BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4');
+    expect(c.reserveMint as string).toBe('BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4');
     expect(c.price.maxNavMoveBps).toBe(10_000);
     expect(c.caps.maxTesouroShareBps).toBe(0);
   });

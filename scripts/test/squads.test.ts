@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { address, getAddressEncoder } from '@solana/kit';
+import { address, getAddressEncoder, type Address } from '@solana/kit';
 import {
   checkSquadsMultisig,
   decodeSquadsMultisig,
@@ -10,17 +10,17 @@ import {
 } from '../devnet/lib/squads';
 
 const enc = getAddressEncoder();
-const A = address('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM');
-const B = address('2JgjeWXmFMtYhbqFrBy4xR4yLTeRKt9Qs5MvVr9ZJmKz');
-const C = address('7Np41oeYqPefeNQEHSv1UDhYrehxin3NStELsSKCT4K2');
+const A: Address = address('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM');
+const B: Address = address('2JgjeWXmFMtYhbqFrBy4xR4yLTeRKt9Qs5MvVr9ZJmKz');
+const C: Address = address('7Np41oeYqPefeNQEHSv1UDhYrehxin3NStELsSKCT4K2');
 
 /** Fixture bytes in the Squads v4 Multisig layout. */
 function multisigBytes(o: {
-  configAuthority?: typeof A;
+  configAuthority?: Address;
   threshold?: number;
   timeLock?: number;
-  rentCollector?: typeof A | null;
-  members?: [typeof A, number][];
+  rentCollector?: Address | null;
+  members?: [Address, number][];
 }): Uint8Array {
   const members = o.members ?? [
     [A, 7],
@@ -28,7 +28,7 @@ function multisigBytes(o: {
     [C, 7],
   ];
   const parts: number[] = [...MULTISIG_DISCRIMINATOR];
-  const push32 = (a: typeof A) => parts.push(...enc.encode(a));
+  const push32 = (a: Address) => parts.push(...enc.encode(a));
   const le = (v: bigint, n: number) => {
     for (let i = 0; i < n; i++) parts.push(Number((v >> BigInt(8 * i)) & 0xffn));
   };

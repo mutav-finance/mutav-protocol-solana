@@ -26,6 +26,18 @@ export const BPF_LOADER_UPGRADEABLE = address('BPFLoaderUpgradeab1e1111111111111
 export const SYSTEM_PROGRAM = address('11111111111111111111111111111111');
 export const TOKEN_PROGRAM = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 
+export const ASSOCIATED_TOKEN_PROGRAM = address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+
+/** The associated token account of `owner` for `mint` (classic SPL Token). */
+export async function associatedTokenAddress(owner: Address, mint: Address, tokenProgram = TOKEN_PROGRAM): Promise<Address> {
+  const e = getAddressEncoder();
+  const [ata] = await getProgramDerivedAddress({
+    programAddress: ASSOCIATED_TOKEN_PROGRAM,
+    seeds: [e.encode(owner), e.encode(tokenProgram), e.encode(mint)],
+  });
+  return ata;
+}
+
 export async function programDataAddress(programId: Address): Promise<Address> {
   const [pda] = await getProgramDerivedAddress({
     programAddress: BPF_LOADER_UPGRADEABLE,
