@@ -4,6 +4,7 @@
 //! grouped by the role allowed to call it (admin, operator, capital, reserve,
 //! public). Business logic lands in later PRs; see `docs/spec.md`.
 
+pub mod allowlist;
 pub mod constants;
 pub mod errors;
 pub mod events;

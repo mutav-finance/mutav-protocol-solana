@@ -65,6 +65,20 @@ pub fn assets_for(shares: u64, shares_outstanding: u64, net_assets: u64) -> Resu
     )?)
 }
 
+/// The price `shares_for` and `assets_for` apply, as a NAV per share scaled
+/// by `NAV_SCALE`: `floor((net_assets + 1) × NAV_SCALE / (shares_outstanding +
+/// V))`. Recorded as `nav_at_fulfil`, `last_fill_nav` and the `nav` of the
+/// capital events, so each record states the rate it was priced at (defined
+/// with zero shares too, unlike the published `nav_per_share`).
+pub fn conversion_nav(shares_outstanding: u64, net_assets: u64) -> Result<u64> {
+    to_u64(mul_div_u128(
+        net_assets as u128 + 1,
+        crate::constants::NAV_SCALE as u128,
+        shares_outstanding as u128 + VIRTUAL_OFFSET as u128,
+        Rounding::Down,
+    )?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,6 +139,15 @@ mod tests {
             assets_for(5_000_000, 5_000_000, 5_000_000).unwrap(),
             5_000_000
         );
+    }
+
+    #[test]
+    fn conversion_nav_is_the_applied_rate() {
+        // Empty reserve: (0 + 1) / (0 + 1) = 1.0.
+        assert_eq!(conversion_nav(0, 0).unwrap(), 1_000_000_000);
+        // 2,000,000 net over 1,000,000 shares: (2e6 + 1) / (1e6 + 1).
+        assert_eq!(conversion_nav(1_000_000, 2_000_000).unwrap(), 1_999_999_000);
+        assert!(conversion_nav(0, u64::MAX).is_err());
     }
 
     #[test]
