@@ -358,3 +358,65 @@ pub const FEE_RECEIPT_V1: OffsetTable = &[
     ("slot", 58, 8),
     ("_reserved", 66, 64),
 ];
+
+// ---------------------------------------------------------------------------
+// Claims and payouts (Task 5)
+// ---------------------------------------------------------------------------
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ClaimFilingV1 {
+    pub version: u8,
+    pub bump: u8,
+    pub guarantee: Pubkey,
+    pub leg: u8,
+    pub notice_ref_hash: [u8; 32],
+    pub provision: u64,
+    pub filed_at: i64,
+    pub status: u8,
+    pub _reserved: [u8; 64],
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct PayoutV1 {
+    pub version: u8,
+    pub bump: u8,
+    pub guarantee: Pubkey,
+    pub leg: u8,
+    pub amount: u64,
+    pub notice_ref_hash: [u8; 32],
+    pub payments_account: Pubkey,
+    pub status: u8,
+    pub paid_at: i64,
+    pub pix_e2e_hash: [u8; 32],
+    pub settled_at: i64,
+    pub late: u8,
+    pub _reserved: [u8; 64],
+}
+
+pub const CLAIM_FILING_V1: OffsetTable = &[
+    ("version", 0, 1),
+    ("bump", 1, 1),
+    ("guarantee", 2, 32),
+    ("leg", 34, 1),
+    ("notice_ref_hash", 35, 32),
+    ("provision", 67, 8),
+    ("filed_at", 75, 8),
+    ("status", 83, 1),
+    ("_reserved", 84, 64),
+];
+
+pub const PAYOUT_V1: OffsetTable = &[
+    ("version", 0, 1),
+    ("bump", 1, 1),
+    ("guarantee", 2, 32),
+    ("leg", 34, 1),
+    ("amount", 35, 8),
+    ("notice_ref_hash", 43, 32),
+    ("payments_account", 75, 32),
+    ("status", 107, 1),
+    ("paid_at", 108, 8),
+    ("pix_e2e_hash", 116, 32),
+    ("settled_at", 148, 8),
+    ("late", 156, 1),
+    ("_reserved", 157, 64),
+];

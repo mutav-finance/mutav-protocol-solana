@@ -36,16 +36,22 @@ import {
 } from "@solana/kit/program-client-core";
 import {
   getAgencyExposureCodec,
+  getClaimFilingCodec,
   getFeeReceiptCodec,
   getGuaranteeCodec,
+  getPayoutCodec,
   getVaultConfigCodec,
   getVaultStateCodec,
   type AgencyExposure,
   type AgencyExposureArgs,
+  type ClaimFiling,
+  type ClaimFilingArgs,
   type FeeReceipt,
   type FeeReceiptArgs,
   type Guarantee,
   type GuaranteeArgs,
+  type Payout,
+  type PayoutArgs,
   type VaultConfig,
   type VaultConfigArgs,
   type VaultState,
@@ -54,54 +60,68 @@ import {
 import {
   getCloseGuaranteeInstructionAsync,
   getContributeFeesInstructionAsync,
+  getFileClaimInstructionAsync,
   getInitializeInstructionAsync,
   getPauseInstruction,
+  getPayClaimInstructionAsync,
   getRegisterGuaranteeInstructionAsync,
   getRevokeOperatorInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
   getSetPaymentsAccountInstruction,
   getSetRolesInstruction,
+  getSettlePayoutInstructionAsync,
   getUnpauseInstruction,
   parseCloseGuaranteeInstruction,
   parseContributeFeesInstruction,
+  parseFileClaimInstruction,
   parseInitializeInstruction,
   parsePauseInstruction,
+  parsePayClaimInstruction,
   parseRegisterGuaranteeInstruction,
   parseRevokeOperatorInstruction,
   parseSetAllowlistRootInstruction,
   parseSetConfigInstruction,
   parseSetPaymentsAccountInstruction,
   parseSetRolesInstruction,
+  parseSettlePayoutInstruction,
   parseUnpauseInstruction,
   type CloseGuaranteeAsyncInput,
   type ContributeFeesAsyncInput,
+  type FileClaimAsyncInput,
   type InitializeAsyncInput,
   type ParsedCloseGuaranteeInstruction,
   type ParsedContributeFeesInstruction,
+  type ParsedFileClaimInstruction,
   type ParsedInitializeInstruction,
   type ParsedPauseInstruction,
+  type ParsedPayClaimInstruction,
   type ParsedRegisterGuaranteeInstruction,
   type ParsedRevokeOperatorInstruction,
   type ParsedSetAllowlistRootInstruction,
   type ParsedSetConfigInstruction,
   type ParsedSetPaymentsAccountInstruction,
   type ParsedSetRolesInstruction,
+  type ParsedSettlePayoutInstruction,
   type ParsedUnpauseInstruction,
   type PauseInput,
+  type PayClaimAsyncInput,
   type RegisterGuaranteeAsyncInput,
   type RevokeOperatorInput,
   type SetAllowlistRootInput,
   type SetConfigInput,
   type SetPaymentsAccountInput,
   type SetRolesInput,
+  type SettlePayoutAsyncInput,
   type UnpauseInput,
 } from "../instructions";
 import {
+  findClaimFilingPda,
   findClaimsPda,
   findConfigPda,
   findFeeReceiptPda,
   findGuaranteePda,
+  findPayoutPda,
   findPendingDepositsPda,
   findPendingRedemptionsPda,
   findReservePda,
@@ -115,8 +135,10 @@ export const MUTAV_PROGRAM_ADDRESS =
 
 export enum MutavAccount {
   AgencyExposure,
+  ClaimFiling,
   FeeReceipt,
   Guarantee,
+  Payout,
   VaultConfig,
   VaultState,
 }
@@ -140,6 +162,17 @@ export function identifyMutavAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([177, 42, 215, 113, 249, 140, 198, 201]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.ClaimFiling;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([135, 174, 32, 77, 183, 44, 26, 107]),
       ),
       0,
@@ -157,6 +190,17 @@ export function identifyMutavAccount(
     )
   ) {
     return MutavAccount.Guarantee;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([69, 45, 245, 131, 218, 101, 158, 228]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.Payout;
   }
   if (
     containsBytes(
@@ -609,14 +653,17 @@ export function identifyMutavEvent(
 export enum MutavInstruction {
   CloseGuarantee,
   ContributeFees,
+  FileClaim,
   Initialize,
   Pause,
+  PayClaim,
   RegisterGuarantee,
   RevokeOperator,
   SetAllowlistRoot,
   SetConfig,
   SetPaymentsAccount,
   SetRoles,
+  SettlePayout,
   Unpause,
 }
 
@@ -650,6 +697,17 @@ export function identifyMutavInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([187, 254, 40, 13, 146, 223, 230, 97]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.FileClaim;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([175, 175, 109, 31, 13, 152, 155, 237]),
       ),
       0,
@@ -667,6 +725,17 @@ export function identifyMutavInstruction(
     )
   ) {
     return MutavInstruction.Pause;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([73, 127, 176, 110, 67, 8, 221, 170]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.PayClaim;
   }
   if (
     containsBytes(
@@ -738,6 +807,17 @@ export function identifyMutavInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([245, 141, 29, 81, 209, 73, 180, 155]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SettlePayout;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([169, 144, 4, 38, 10, 141, 188, 255]),
       ),
       0,
@@ -761,11 +841,17 @@ export type ParsedMutavInstruction<
       instructionType: MutavInstruction.ContributeFees;
     } & ParsedContributeFeesInstruction<TProgram>)
   | ({
+      instructionType: MutavInstruction.FileClaim;
+    } & ParsedFileClaimInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.Initialize;
     } & ParsedInitializeInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.Pause;
     } & ParsedPauseInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.PayClaim;
+    } & ParsedPayClaimInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.RegisterGuarantee;
     } & ParsedRegisterGuaranteeInstruction<TProgram>)
@@ -784,6 +870,9 @@ export type ParsedMutavInstruction<
   | ({
       instructionType: MutavInstruction.SetRoles;
     } & ParsedSetRolesInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SettlePayout;
+    } & ParsedSettlePayoutInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.Unpause;
     } & ParsedUnpauseInstruction<TProgram>);
@@ -807,6 +896,13 @@ export function parseMutavInstruction<TProgram extends string>(
         ...parseContributeFeesInstruction(instruction),
       };
     }
+    case MutavInstruction.FileClaim: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.FileClaim,
+        ...parseFileClaimInstruction(instruction),
+      };
+    }
     case MutavInstruction.Initialize: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -819,6 +915,13 @@ export function parseMutavInstruction<TProgram extends string>(
       return {
         instructionType: MutavInstruction.Pause,
         ...parsePauseInstruction(instruction),
+      };
+    }
+    case MutavInstruction.PayClaim: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.PayClaim,
+        ...parsePayClaimInstruction(instruction),
       };
     }
     case MutavInstruction.RegisterGuarantee: {
@@ -863,6 +966,13 @@ export function parseMutavInstruction<TProgram extends string>(
         ...parseSetRolesInstruction(instruction),
       };
     }
+    case MutavInstruction.SettlePayout: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SettlePayout,
+        ...parseSettlePayoutInstruction(instruction),
+      };
+    }
     case MutavInstruction.Unpause: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -890,10 +1000,14 @@ export type MutavPlugin = {
 export type MutavPluginAccounts = {
   agencyExposure: ReturnType<typeof getAgencyExposureCodec> &
     SelfFetchFunctions<AgencyExposureArgs, AgencyExposure>;
+  claimFiling: ReturnType<typeof getClaimFilingCodec> &
+    SelfFetchFunctions<ClaimFilingArgs, ClaimFiling>;
   feeReceipt: ReturnType<typeof getFeeReceiptCodec> &
     SelfFetchFunctions<FeeReceiptArgs, FeeReceipt>;
   guarantee: ReturnType<typeof getGuaranteeCodec> &
     SelfFetchFunctions<GuaranteeArgs, Guarantee>;
+  payout: ReturnType<typeof getPayoutCodec> &
+    SelfFetchFunctions<PayoutArgs, Payout>;
   vaultConfig: ReturnType<typeof getVaultConfigCodec> &
     SelfFetchFunctions<VaultConfigArgs, VaultConfig>;
   vaultState: ReturnType<typeof getVaultStateCodec> &
@@ -909,6 +1023,10 @@ export type MutavPluginInstructions = {
     input: MakeOptional<ContributeFeesAsyncInput, "payer">,
   ) => ReturnType<typeof getContributeFeesInstructionAsync> &
     SelfPlanAndSendFunctions;
+  fileClaim: (
+    input: MakeOptional<FileClaimAsyncInput, "payer">,
+  ) => ReturnType<typeof getFileClaimInstructionAsync> &
+    SelfPlanAndSendFunctions;
   initialize: (
     input: MakeOptional<InitializeAsyncInput, "payer">,
   ) => ReturnType<typeof getInitializeInstructionAsync> &
@@ -916,6 +1034,10 @@ export type MutavPluginInstructions = {
   pause: (
     input: PauseInput,
   ) => ReturnType<typeof getPauseInstruction> & SelfPlanAndSendFunctions;
+  payClaim: (
+    input: MakeOptional<PayClaimAsyncInput, "payer">,
+  ) => ReturnType<typeof getPayClaimInstructionAsync> &
+    SelfPlanAndSendFunctions;
   registerGuarantee: (
     input: MakeOptional<RegisterGuaranteeAsyncInput, "payer">,
   ) => ReturnType<typeof getRegisterGuaranteeInstructionAsync> &
@@ -938,6 +1060,10 @@ export type MutavPluginInstructions = {
   setRoles: (
     input: SetRolesInput,
   ) => ReturnType<typeof getSetRolesInstruction> & SelfPlanAndSendFunctions;
+  settlePayout: (
+    input: SettlePayoutAsyncInput,
+  ) => ReturnType<typeof getSettlePayoutInstructionAsync> &
+    SelfPlanAndSendFunctions;
   unpause: (
     input: UnpauseInput,
   ) => ReturnType<typeof getUnpauseInstruction> & SelfPlanAndSendFunctions;
@@ -948,12 +1074,14 @@ export type MutavPluginPdas = {
   guarantee: typeof findGuaranteePda;
   feeReceipt: typeof findFeeReceiptPda;
   reserve: typeof findReservePda;
+  claimFiling: typeof findClaimFilingPda;
   config: typeof findConfigPda;
   vaultAuthority: typeof findVaultAuthorityPda;
   shareMint: typeof findShareMintPda;
   pendingDeposits: typeof findPendingDepositsPda;
   pendingRedemptions: typeof findPendingRedemptionsPda;
   claims: typeof findClaimsPda;
+  payout: typeof findPayoutPda;
 };
 
 export type MutavPluginRequirements = ClientWithRpc<
@@ -974,8 +1102,10 @@ export function mutavProgram() {
             client,
             getAgencyExposureCodec(),
           ),
+          claimFiling: addSelfFetchFunctions(client, getClaimFilingCodec()),
           feeReceipt: addSelfFetchFunctions(client, getFeeReceiptCodec()),
           guarantee: addSelfFetchFunctions(client, getGuaranteeCodec()),
+          payout: addSelfFetchFunctions(client, getPayoutCodec()),
           vaultConfig: addSelfFetchFunctions(client, getVaultConfigCodec()),
           vaultState: addSelfFetchFunctions(client, getVaultStateCodec()),
         },
@@ -993,6 +1123,14 @@ export function mutavProgram() {
                 payer: input.payer ?? client.payer,
               }),
             ),
+          fileClaim: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getFileClaimInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
           initialize: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1003,6 +1141,14 @@ export function mutavProgram() {
             ),
           pause: (input) =>
             addSelfPlanAndSendFunctions(client, getPauseInstruction(input)),
+          payClaim: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getPayClaimInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
           registerGuarantee: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1030,6 +1176,11 @@ export function mutavProgram() {
             ),
           setRoles: (input) =>
             addSelfPlanAndSendFunctions(client, getSetRolesInstruction(input)),
+          settlePayout: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSettlePayoutInstructionAsync(input),
+            ),
           unpause: (input) =>
             addSelfPlanAndSendFunctions(client, getUnpauseInstruction(input)),
         },
@@ -1038,12 +1189,14 @@ export function mutavProgram() {
           guarantee: findGuaranteePda,
           feeReceipt: findFeeReceiptPda,
           reserve: findReservePda,
+          claimFiling: findClaimFilingPda,
           config: findConfigPda,
           vaultAuthority: findVaultAuthorityPda,
           shareMint: findShareMintPda,
           pendingDeposits: findPendingDepositsPda,
           pendingRedemptions: findPendingRedemptionsPda,
           claims: findClaimsPda,
+          payout: findPayoutPda,
         },
         identifyAccount: identifyMutavAccount,
         identifyInstruction: identifyMutavInstruction,

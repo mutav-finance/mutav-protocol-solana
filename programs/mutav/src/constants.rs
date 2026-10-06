@@ -33,6 +33,11 @@ pub const AGENCY_SEED: &[u8] = b"agency";
 /// `FeeReceipt`: `["fee", config, invoice_ref_hash]` (spec §3.11).
 pub const FEE_SEED: &[u8] = b"fee";
 
+/// `ClaimFiling`: `["claim", guarantee, notice_ref_hash]` (spec §3.6).
+pub const CLAIM_SEED: &[u8] = b"claim";
+/// `Payout`: `["payout", guarantee, notice_ref_hash]` (spec §3.7).
+pub const PAYOUT_SEED: &[u8] = b"payout";
+
 /// Seed prefixes reserved for phase 2 (spec §14.2). No pilot PDA may use them.
 /// (`"notice"` is used by the pilot `ClaimNotice`.)
 pub const RESERVED_SEED_PREFIXES: [&[u8]; 3] = [b"exit_buffer", b"exit_limit", b"instant_exit"];
@@ -125,6 +130,8 @@ pub const VAULT_STATE_SIZE: usize = 480;
 pub const GUARANTEE_SIZE: usize = 249;
 pub const AGENCY_EXPOSURE_SIZE: usize = 126;
 pub const FEE_RECEIPT_SIZE: usize = 138;
+pub const CLAIM_FILING_SIZE: usize = 156;
+pub const PAYOUT_SIZE: usize = 229;
 
 // ---------------------------------------------------------------------------
 // `ConfigUpdated.field` ids (spec §9). Append-only. Top-level fields use

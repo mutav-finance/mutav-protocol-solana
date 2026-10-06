@@ -7,7 +7,9 @@
  */
 
 export * from "./agencyExposure";
+export * from "./claimFiling";
 export * from "./feeReceipt";
 export * from "./guarantee";
+export * from "./payout";
 export * from "./vaultConfig";
 export * from "./vaultState";

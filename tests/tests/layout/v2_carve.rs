@@ -150,8 +150,7 @@ fn pilot_accounts_read_as_v2() {
     f.write_state(&s);
     // Building the list funds the reserve for the operator instructions.
     let ixs = f.pilot_instructions();
-    let funded = f.state().brs_balance;
-    assert!(funded >= 123);
+    assert!(f.state().brs_balance >= 123);
     for (name, ix, signer) in ixs {
         f.send(ix, &signer)
             .unwrap_or_else(|e| panic!("{name}: {:?}", e.err));
@@ -162,10 +161,11 @@ fn pilot_accounts_read_as_v2() {
     assert_eq!(v2._reserved, [0; 168]);
     // Every v1 field reads the same through the v2 struct.
     let cur = f.state();
-    assert!(cur.brs_balance >= funded);
     assert_eq!(v2.brs_balance, cur.brs_balance);
     assert_eq!(v2.fees_in_total, cur.fees_in_total);
     assert_eq!(v2.remaining_cover_total, cur.remaining_cover_total);
+    assert_eq!(v2.claims_paid_total, cur.claims_paid_total);
+    assert_eq!(v2.claim_period_start, cur.claim_period_start);
     assert_eq!(v2.pending_notices, 2);
     assert_eq!(v2.last_refresh_slot, 99);
     assert_eq!(v2.version, s.version);

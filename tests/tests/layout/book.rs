@@ -5,7 +5,7 @@
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, Discriminator, Space};
 use mutav::{
     constants::*,
-    state::{AgencyExposure, FeeReceipt, Guarantee},
+    state::{AgencyExposure, ClaimFiling, FeeReceipt, Guarantee, Payout},
 };
 
 use crate::{pattern, ser, spans, v1::*, zeroed};
@@ -128,5 +128,53 @@ fn fee_receipt_layout_is_frozen() {
     assert_eq!(
         FeeReceipt::DISCRIMINATOR,
         &[135, 174, 32, 77, 183, 44, 26, 107]
+    );
+}
+
+#[test]
+fn claim_filing_layout_is_frozen() {
+    assert_eq!(8 + ClaimFiling::INIT_SPACE, CLAIM_FILING_SIZE);
+    assert_eq!(CLAIM_FILING_SIZE, 156);
+    assert_eq!(8 + ser(&zeroed::<ClaimFiling>()).len(), CLAIM_FILING_SIZE);
+    assert_eq!(8 + ser(&zeroed::<ClaimFilingV1>()).len(), CLAIM_FILING_SIZE);
+    macro_rules! fields {
+        ($t:ty) => {
+            spans!($t;
+                "version" => version, "bump" => bump, "guarantee" => guarantee, "leg" => leg,
+                "notice_ref_hash" => notice_ref_hash, "provision" => provision,
+                "filed_at" => filed_at, "status" => status, "_reserved" => _reserved)
+        };
+    }
+    assert_eq!(fields!(ClaimFilingV1), CLAIM_FILING_V1.to_vec());
+    assert_eq!(fields!(ClaimFiling), CLAIM_FILING_V1.to_vec());
+    v1_round_trip::<ClaimFilingV1, ClaimFiling>(CLAIM_FILING_SIZE);
+    assert_eq!(
+        ClaimFiling::DISCRIMINATOR,
+        &[177, 42, 215, 113, 249, 140, 198, 201]
+    );
+}
+
+#[test]
+fn payout_layout_is_frozen() {
+    assert_eq!(8 + Payout::INIT_SPACE, PAYOUT_SIZE);
+    assert_eq!(PAYOUT_SIZE, 229);
+    assert_eq!(8 + ser(&zeroed::<Payout>()).len(), PAYOUT_SIZE);
+    assert_eq!(8 + ser(&zeroed::<PayoutV1>()).len(), PAYOUT_SIZE);
+    macro_rules! fields {
+        ($t:ty) => {
+            spans!($t;
+                "version" => version, "bump" => bump, "guarantee" => guarantee, "leg" => leg,
+                "amount" => amount, "notice_ref_hash" => notice_ref_hash,
+                "payments_account" => payments_account, "status" => status,
+                "paid_at" => paid_at, "pix_e2e_hash" => pix_e2e_hash,
+                "settled_at" => settled_at, "late" => late, "_reserved" => _reserved)
+        };
+    }
+    assert_eq!(fields!(PayoutV1), PAYOUT_V1.to_vec());
+    assert_eq!(fields!(Payout), PAYOUT_V1.to_vec());
+    v1_round_trip::<PayoutV1, Payout>(PAYOUT_SIZE);
+    assert_eq!(
+        Payout::DISCRIMINATOR,
+        &[69, 45, 245, 131, 218, 101, 158, 228]
     );
 }
