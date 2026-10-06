@@ -53,13 +53,22 @@ export class LocalCluster {
   private proc: ReturnType<typeof Bun.spawn> | null = null;
   readonly rpc: LocalRpc;
 
-  constructor(readonly url: string, private readonly cmd: string[], private readonly logPath: string) {
+  constructor(
+    readonly url: string,
+    private readonly cmd: string[],
+    private readonly logPath: string,
+    private readonly cwd?: string,
+  ) {
     assertLocal(url);
     this.rpc = createSolanaRpc(url) as unknown as LocalRpc;
   }
 
   async start(timeoutMs = 120_000) {
-    this.proc = Bun.spawn(this.cmd, { stdout: Bun.file(this.logPath), stderr: Bun.file(this.logPath + '.err') });
+    this.proc = Bun.spawn(this.cmd, {
+      cwd: this.cwd,
+      stdout: Bun.file(this.logPath),
+      stderr: Bun.file(this.logPath + '.err'),
+    });
     const stop = () => this.stopSync();
     process.once('SIGINT', stop);
     process.once('SIGTERM', stop);
