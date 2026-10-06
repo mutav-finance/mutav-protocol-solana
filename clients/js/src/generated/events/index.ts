@@ -21,6 +21,7 @@ export * from "./depositCancelled";
 export * from "./depositRequested";
 export * from "./depositsFulfilled";
 export * from "./feesContributed";
+export * from "./fulfilHaltCleared";
 export * from "./guaranteeClosed";
 export * from "./guaranteeRegistered";
 export * from "./modeChanged";

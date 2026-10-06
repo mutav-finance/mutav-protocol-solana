@@ -53,7 +53,7 @@ Where a value or behaviour is not yet decided, this spec says **TBD** and lists 
 
 | Role | Key | May call |
 |---|---|---|
-| **Admin** | Squads v4 multisig vault, with a Squads time lock | `initialize`, `set_config`, `set_roles`, `set_payments_account`, `set_allowlist_root`, `whitelist_adapter`, `remove_adapter`, `unpause`, `fulfil_deposits`, `fulfil_redeems`, `allocate`, `deallocate`. Also the program's upgrade authority |
+| **Admin** | Squads v4 multisig vault, with a Squads time lock | `initialize`, `set_config`, `set_roles`, `set_payments_account`, `set_allowlist_root`, `clear_fulfil_halt`, `whitelist_adapter`, `remove_adapter`, `unpause`, `fulfil_deposits`, `fulfil_redeems`, `allocate`, `deallocate`. Also the program's upgrade authority |
 | **Operator** | Hot key held by mutav-app in KMS, used from Convex actions | `register_guarantee`, `close_guarantee`, `contribute_fees`, `flag_claim_notice`, `close_claim_notice`, `file_claim`, `pay_claim`, `settle_payout` |
 | **Pauser** | Separate key | `pause`, `revoke_operator` |
 | **Investor** | Own wallet, on the allowlist (KYC done off-chain) | `request_deposit`, `cancel_deposit`, `claim_shares`, `request_redeem`, `cancel_redeem`, `claim_assets` |
@@ -133,7 +133,7 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | `coverage_required` | `u64` | `c × remaining_cover_total`, rounded up |
 | `provisions` | `u64` | `Σ` open claim provisions |
 | `shares_outstanding` | `u64` | Minted shares plus shares owed on fulfilled, unclaimed deposits |
-| `nav_per_share` | `u64` | Last published NAV per share (scaled by `NAV_SCALE`) |
+| `nav_per_share` | `u64` | Last published NAV per share (scaled by `NAV_SCALE`). `0` exactly when no shares are outstanding; otherwise floored at `1`, so `0` is never a real NAV ([§7](#7-price-safety)) |
 | `pending_deposits_total` | `u64` | BRS in `pending_deposits`. Excluded from `stable_assets` |
 | `pending_redeem_shares` | `u64` | Shares in `pending_redemptions`. Counted in `shares_outstanding` until fulfilled (confirm, §12) |
 | `claimable_assets_total` | `u64` | BRS in `claims` awaiting `claim_assets` (`Σ assets_claimable` over open redeem requests). Excluded from `stable_assets` |
@@ -450,6 +450,15 @@ Common account rules:
 
 - **Signer:** admin. **Event:** `AllowlistRootUpdated`.
 
+#### `clear_fulfil_halt()`
+
+Proposed in [ADR 0015](decisions/0015-admin-clear-fulfil-halt.md), pending founder confirmation.
+
+- **Signer:** admin. **Accounts:** `config`, `state`. Never paused.
+- **Rules:** `fulfil_halted == true` (otherwise `InvalidParameter`); price as for `refresh` ([§7](#7-price-safety)).
+- **Effects:** `fulfil_halted = false`; `nav_per_share` (the NAV-move guard's baseline) is set to the published NAV of now ([§7](#7-price-safety)). Nothing else changes.
+- **Errors:** `Unauthorized`, `InvalidParameter`, `StalePrice`. **Event:** `FulfilHaltCleared { nav_per_share }`.
+
 #### `whitelist_adapter(program_id, asset_mint, cap)` / `remove_adapter(program_id)`
 
 - **Signer:** admin. **Rules:** `remove_adapter` requires `allocated == 0`. Pinning the adapter's deployed slot and upgrade authority (PC-27) is **TBD**. **Events:** `AdapterWhitelisted`, `AdapterRemoved`.
@@ -513,7 +522,7 @@ Shipped in the pilot (ADR 0011). MUTAV learns of a missed rent up to 15 days bef
   - `FullyProvisioned`: the `ClaimFiling` exists, is `FILED`, and the leg is provisioned for its whole remaining cover (`leg_provision == leg_cover − leg_paid`), so no later payment on that leg can exceed what NAV already reflects (ties to PC-12, §12 Q13);
   - `Withdrawn`: MUTAV dropped the notice (rent was paid, or the claim was not approved).
 
-  A notice is never closed merely because a smaller provision was filed: `pay_claim` may pay up to the leg's remaining cover, which can exceed the filed provision. Otherwise `NoticeNotResolved`. Closes the notice (rent to the operator); `pending_notices −= 1`.
+  A notice is never closed merely because a smaller provision was filed: `pay_claim` may pay up to the filing's provision plus the leg's unprovisioned cover ([ADR 0014](decisions/0014-pay-claim-bound-with-concurrent-filings.md)), which can exceed the filed provision. Otherwise `NoticeNotResolved`. Closes the notice (rent to the operator); `pending_notices −= 1`.
 - **Liveness:** while any notice is open the queues wait. MUTAV can always reopen them by provisioning the leg fully (`FullyProvisioned`), which only lowers NAV, in the reserve's favour. The transparency page shows every open notice and its age and flags any open longer than 15 days.
 - **Errors:** `GuaranteeNotActive`, `NoticeNotResolved`, `ClaimNotFiled`; account-already-in-use on a duplicate notice.
 - **Events:** `ClaimNoticeFlagged { guarantee_id, notice_ref_hash }`, `ClaimNoticeClosed { guarantee_id, notice_ref_hash, reason }`.
@@ -533,7 +542,7 @@ Shipped in the pilot (ADR 0011). MUTAV learns of a missed rent up to 15 days bef
 - **Accounts:** `config`, `state`, `guarantee`, `claim_filing`, `payout` (init), `reserve`, `payments_account`, vault authority, BRS mint, token program.
 - **Rules:**
   1. `claim_filing.status == Filed` and `claim_filing.leg == leg`.
-  2. `amount > 0`; `amount ≤ leg_cover − leg_paid` (remaining cover on the leg).
+  2. `amount > 0`; `amount ≤ filing.provision + (leg_cover − leg_paid − leg_provision)`: this filing's own provision plus the leg's unprovisioned cover, so a payment never spends cover another open filing has provisioned ([ADR 0014](decisions/0014-pay-claim-bound-with-concurrent-filings.md), proposed). With one open filing this equals the leg's remaining cover.
   3. `amount ≤ caps.max_claim_per_call`.
   4. Roll the window if `now ≥ claim_period_start + caps.claim_period_secs`; then `claim_period_paid + amount ≤ caps.max_claim_per_period`.
   5. Destination equals `config.payments_account`.
@@ -593,7 +602,7 @@ Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` a
 
   The head request is passed, so `earmark_eff` includes the starvation term ([§4](#4-invariants-and-formulas)) and the ratchet applies.
 - **Loop**, from the head:
-  1. `value = assets_for(shares_remaining)` at the current NAV.
+  1. `value = assets_for(shares_remaining)` at the current NAV. If `value == 0`, there is **no fill**: the batch stops with the head untouched (a fill always leaves `assets_claimable > 0`, §3.8).
   2. **Full fill** if `value ≤ budget`: fill all of `shares_remaining` for `value`; continue with the next seq.
   3. Otherwise **partial fill, then stop the batch**:
      - `fill_max = budget`;
@@ -604,7 +613,7 @@ Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` a
   - A head whose value is below `caps.min_request + caps.min_fill_assets` can therefore only be filled whole.
 - **Effects per fill:** burn `shares_fill` from `pending_redemptions`; transfer `assets` BRS `reserve` → `claims`; `brs_balance −= assets`; `claimable_assets_total += assets`; `shares_outstanding −= shares_fill`; `pending_redeem_shares −= shares_fill`. On the request: `shares_remaining −= shares_fill`, `shares_filled += shares_fill`, `assets_filled += assets`, `assets_claimable += assets`, `fill_count += 1`, `last_fill_nav = nav`, `last_fill_at = now`, `status = Filled` if `shares_remaining == 0` else `PartiallyFilled`. Advance `redeem_head` past a completed request.
 - If the call makes no fill at all, it fails with `InsufficientFreeCapital` (or `InsufficientLiquidBalance` when `liquid_budget` was the binding term), so an empty batch is never recorded as a success.
-- **Errors:** `Unauthorized`, `Paused`, `ClaimNoticePending`, `UnderCovered`, `FulfilHalted`, `StalePrice`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `QueueOrderViolation`.
+- **Errors:** `Unauthorized`, `Paused`, `ClaimNoticePending`, `UnderCovered`, `FulfilHalted`, `StalePrice`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `RequestTooSmall` (the head is worth 0 assets and nothing was filled), `QueueOrderViolation`.
 - **Events:** one `RedeemFilled` per fill, then a batch summary `RedeemsFulfilled`.
 
 #### `claim_assets()`
@@ -660,7 +669,7 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
 - **Effects:**
   1. Detect frozen reserve token accounts and fail closed: emit `ReserveFrozenDetected`; frozen balances do not count in `stable_assets`.
   2. Read and bound the TESOURO price ([§7](#7-price-safety)); recompute `tesouro_value`, `stable_assets`, `coverage_required`, `surplus`, `earmark_eff` (and apply the ratchet), `free_capital`, `net_assets`, `nav_per_share`.
-  3. If NAV per share moved more than `price.max_nav_move_bps` since the last refresh, set `fulfil_halted = true` (cleared by admin `set_config`, TBD exact clearing path).
+  3. If NAV per share moved more than `price.max_nav_move_bps` since the last refresh, set `fulfil_halted = true`. Only the admin's [`clear_fulfil_halt`](#clear_fulfil_halt) clears it and resets the baseline (ADR 0015, proposed).
   4. Set `mode` ([§6](#6-under-coverage-mode)).
   5. For each passed `Payout` with `status == Pending` and `now > paid_at + payout_sla_secs`, set `late = true`; update `late_payouts`.
 - **Errors:** none for stale prices: a stale price is recorded and flagged, and the gated instructions refuse to run on it.
@@ -697,7 +706,7 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
   - `accrual curve`: `p0 × (1 + y_max)^((t − t0) / year)`, a ceiling from a reference price `p0` at `t0` and a maximum annual yield `y_max`, all in `PriceParams`. Values **TBD**.
   - **Staleness bound:** if the price's publish time is older than `price.max_staleness_secs`, it is stale. Gated instructions fail with `StalePrice`; `pay_claim` never reads the price. Valuing a stale price with a haircut instead (PC-17) is **TBD**.
   - **Deviation bound:** if the on-chain price moved more than `price.max_deviation_bps` against the last accepted price, it is rejected as stale until admin review.
-- **NAV-move guard:** a NAV-per-share move of more than `price.max_nav_move_bps` ("X%") in one refresh sets `fulfil_halted`, which pauses `fulfil_deposits` and `fulfil_redeems`. X is **TBD**.
+- **NAV-move guard:** a NAV-per-share move of more than `price.max_nav_move_bps` ("X%") in one refresh sets `fulfil_halted`, which pauses `fulfil_deposits` and `fulfil_redeems`. X is **TBD**. The move is measured between published NAVs. A published NAV is `0` only when no shares are outstanding, and the guard skips a refresh only when the previous or the current published NAV is `0` (no shares behind it: nothing to protect). With shares outstanding the published NAV is floored at `1` (10⁻⁹ BRS per share), so a collapse to NAV 0 (provisions ≥ `stable_assets`, or frozen balances counted as 0) trips the guard, and so does the recovery from it.
 - **Instant exit** (phase 2) uses the tighter bound `min(exit.max_price_age_secs, price.max_staleness_secs)` ([§13.6](#136-anti-front-running-rules)).
 - Price-source changes are admin actions (time-locked).
 
@@ -760,6 +769,7 @@ Emitted with `emit_cpi!` for every token movement and every state change the mut
 | `Allocated` / `Deallocated` | `adapter, brs_out, tesouro_in` / `adapter, tesouro_out, brs_in` |
 | `StateRefreshed` | `stable_assets, coverage_required, surplus, buffer_earmark, free_capital, provisions, nav_per_share, mode, tesouro_price, price_stale` |
 | `ModeChanged` | `from, to, deficit` |
+| `FulfilHaltCleared` | `nav_per_share` (the guard's new baseline; ADR 0015) |
 | `ReserveFrozenDetected` | `token_account` |
 
 `idle_free_capital` (free capital left after a batch) makes head-of-line blocking visible on the transparency page. MUTAV capital is visible through `DepositsFulfilled` / `RedeemFilled` filtered by `mutav_capital_wallet`; there are no separate capital events (ADR 0008). Phase-2 events are listed in [§13.8](#138-events). Existing events never change fields; new information goes in a new event ([§14.4](#144-client-and-idl-compatibility)), and the mutav-app indexer skips unknown event discriminators.
@@ -845,7 +855,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 18. **Allocation gate.** Must the allocated amount itself fit in `free_capital`, or is the solvency post-condition plus the TESOURO share cap enough?
 19. **Per-invoice idempotency for fees.** *Resolved (ADR 0009):* a `FeeReceipt` PDA seeded by `invoice_ref_hash`.
 20. **Virtual offset and seed deposit.** *Resolved (2026-10-06):* `k = 0`, so `V = 1`: one share is worth 1 BRS at launch with the 6-decimal share mint. No seed deposit is minted at `initialize`. Rationale: NAV ignores direct transfers (internal accounting, invariant 1), and deposits are allowlisted and fulfilled by the admin, so a larger offset is not needed against first-depositor inflation. `PRICE_SCALE = NAV_SCALE = 10^9` (§8).
-21. **NAV-move threshold X**, staleness window, deviation bound and stale-price behaviour (fail vs haircut).
+21. **NAV-move threshold X**, staleness window, deviation bound and stale-price behaviour (fail vs haircut). The clearing path for `fulfil_halted` is proposed in ADR 0015: an admin `clear_fulfil_halt` that also resets the guard's baseline (pending founder confirmation).
 22. **Adversarial-review items not yet decided:** PC-4, PC-6, PC-8, PC-9, PC-13 (beyond filed claims), PC-15, PC-16, PC-21, PC-22, PC-30, PC-31, PC-32, PC-34, PC-35, PC-36, PC-38, PC-43 (extra caps). See §11. PC-29 is resolved by ADR 0010.
 
 **Raised by the redemption-liquidity design (ADRs 0010, 0011):**

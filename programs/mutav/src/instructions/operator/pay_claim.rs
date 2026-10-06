@@ -114,12 +114,11 @@ pub fn handle_pay_claim(
     require!(filing.status == CLAIM_FILED, MutavError::ClaimNotFiled);
     require!(filing.leg == leg, MutavError::LegMismatch);
 
-    // Rule 2: `0 < amount ≤ leg_cover − leg_paid`. Also keep invariant 2 for
-    // the other open filings on the leg: their provisions must still fit in
-    // the cover left after this payment.
-    // TODO(spec: §5.4 rule 2 vs §4 invariant 2 — with two open filings on one
-    // leg, rule 2 alone lets one payment eat the other's provision). Fails
-    // closed; needs a spec decision.
+    // Rule 2 (ADR 0014): `0 < amount ≤ filing.provision + (leg_cover −
+    // leg_paid − leg_provision)` — this filing's provision plus the leg's
+    // unprovisioned cover, so the other open filings' provisions still fit in
+    // the cover left after this payment (invariant 2). Checked throughout: an
+    // underflow means invariant 2 is already broken, and must surface.
     require!(amount > 0, MutavError::InvalidParameter);
     let g = &ctx.accounts.guarantee;
     let (cover, paid, leg_provision) = g.leg(leg)?;
@@ -127,10 +126,10 @@ pub fn handle_pay_claim(
     let others = leg_provision
         .checked_sub(filing.provision)
         .ok_or(MutavError::MathOverflow)?;
-    require!(
-        amount <= remaining.saturating_sub(others),
-        MutavError::ExceedsRemainingCover
-    );
+    let bound = remaining
+        .checked_sub(others)
+        .ok_or(MutavError::MathOverflow)?;
+    require!(amount <= bound, MutavError::ExceedsRemainingCover);
 
     // Rule 3: per-call cap.
     let caps = &ctx.accounts.config.caps;

@@ -11,6 +11,7 @@ export * from "./cancelDeposit";
 export * from "./cancelRedeem";
 export * from "./claimAssets";
 export * from "./claimShares";
+export * from "./clearFulfilHalt";
 export * from "./closeGuarantee";
 export * from "./contributeFees";
 export * from "./fileClaim";

@@ -328,7 +328,7 @@ fn pay_claim_is_bounded_by_the_remaining_cover_on_the_leg() {
 fn pay_claim_cannot_take_another_open_filings_provision() {
     // Two open filings on one leg (6k + 4k = the whole 10k cover). Paying the
     // first above 6k would leave the second's provision above the cover left
-    // on the leg, breaking invariant 2. Fail closed (see the PR's spec notes).
+    // on the leg, breaking invariant 2. Bound: ADR 0014 (proposed).
     let (mut f, g) = book(30_000 * BRL, 10_000 * BRL, 0);
     let a = Claim::on(&g, 6_000 * BRL);
     let b = Claim::on(&g, 4_000 * BRL);
@@ -345,6 +345,22 @@ fn pay_claim_cannot_take_another_open_filings_provision() {
         (gg.default_paid, gg.provision_default, gg.open_claims),
         (10_000 * BRL, 0, 0)
     );
+}
+
+#[test]
+fn pay_claim_surfaces_a_broken_leg_invariant_instead_of_masking_it() {
+    // ADR 0014: the bound uses checked subtraction. If the leg's other
+    // provisions already exceed its remaining cover (invariant 2 broken,
+    // injected here), the payment fails with `MathOverflow`, not a clamp.
+    let (mut f, g) = book(30_000 * BRL, 10_000 * BRL, 0);
+    let a = Claim::on(&g, 6_000 * BRL);
+    let b = Claim::on(&g, 4_000 * BRL);
+    f.file_claim(a).unwrap();
+    f.file_claim(b).unwrap();
+    let mut gg = f.guarantee(&g.id);
+    gg.default_paid = 7_000 * BRL; // remaining 3k < b's 4k provision
+    f.write_guarantee(&gg);
+    assert_mutav_err(f.pay_claim(a.amount(1)), MutavError::MathOverflow);
 }
 
 #[test]

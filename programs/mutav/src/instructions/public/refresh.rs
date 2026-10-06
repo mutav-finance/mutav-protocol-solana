@@ -9,8 +9,8 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::{ModeChanged, PayoutLate, ReserveFrozenDetected, StateRefreshed},
-    pricing::nav_move_exceeds,
-    solvency::{nav_per_share, Solvency, SolvencyInputs},
+    pricing::{nav_move_exceeds, published_nav},
+    solvency::{Solvency, SolvencyInputs},
     state::{Guarantee, Payout, VaultConfig, VaultState},
 };
 
@@ -88,7 +88,7 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
         feature_flags: config.feature_flags,
         head_starved: false,
     })?;
-    let nav = nav_per_share(sol.net_assets, state.shares_outstanding)?;
+    let nav = published_nav(sol.net_assets, state.shares_outstanding)?;
 
     // 5. Late payouts, from `(Guarantee, Payout)` pairs.
     let sla = config.payout_sla_secs;
@@ -144,9 +144,10 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
     let max_nav_move_bps = config.price.max_nav_move_bps;
     let state = &mut ctx.accounts.state;
 
-    // 3. NAV-move guard (spec §7): measured against the last published NAV.
-    // TODO(spec: §5.8 step 3 — the clearing path for `fulfil_halted` is TBD).
-    // Nothing clears it yet: fail closed.
+    // 3. NAV-move guard (spec §7): measured against the last published NAV,
+    // which is 0 only when no shares were outstanding. A frozen reserve
+    // counted as 0 is a measured move, and so is the thaw.
+    // Only the admin's `clear_fulfil_halt` clears the flag (ADR 0015).
     if nav_move_exceeds(state.nav_per_share, nav, max_nav_move_bps) {
         state.fulfil_halted = true;
     }

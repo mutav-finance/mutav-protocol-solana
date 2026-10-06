@@ -1,6 +1,7 @@
 //! Admin and role instructions (spec §5.1). Planned later: `whitelist_adapter`,
 //! `remove_adapter` (Task 9).
 
+pub mod clear_fulfil_halt;
 pub mod initialize;
 pub mod pause;
 pub mod revoke_operator;
@@ -9,6 +10,7 @@ pub mod set_config;
 pub mod set_payments_account;
 pub mod set_roles;
 
+pub use clear_fulfil_halt::*;
 pub use initialize::*;
 pub use pause::*;
 pub use revoke_operator::*;

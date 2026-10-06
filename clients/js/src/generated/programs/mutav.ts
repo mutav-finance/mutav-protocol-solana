@@ -72,6 +72,7 @@ import {
   getCancelRedeemInstructionAsync,
   getClaimAssetsInstructionAsync,
   getClaimSharesInstructionAsync,
+  getClearFulfilHaltInstructionAsync,
   getCloseGuaranteeInstructionAsync,
   getContributeFeesInstructionAsync,
   getFileClaimInstructionAsync,
@@ -96,6 +97,7 @@ import {
   parseCancelRedeemInstruction,
   parseClaimAssetsInstruction,
   parseClaimSharesInstruction,
+  parseClearFulfilHaltInstruction,
   parseCloseGuaranteeInstruction,
   parseContributeFeesInstruction,
   parseFileClaimInstruction,
@@ -120,6 +122,7 @@ import {
   type CancelRedeemAsyncInput,
   type ClaimAssetsAsyncInput,
   type ClaimSharesAsyncInput,
+  type ClearFulfilHaltAsyncInput,
   type CloseGuaranteeAsyncInput,
   type ContributeFeesAsyncInput,
   type FileClaimAsyncInput,
@@ -131,6 +134,7 @@ import {
   type ParsedCancelRedeemInstruction,
   type ParsedClaimAssetsInstruction,
   type ParsedClaimSharesInstruction,
+  type ParsedClearFulfilHaltInstruction,
   type ParsedCloseGuaranteeInstruction,
   type ParsedContributeFeesInstruction,
   type ParsedFileClaimInstruction,
@@ -332,6 +336,7 @@ export enum MutavEvent {
   DepositRequested,
   DepositsFulfilled,
   FeesContributed,
+  FulfilHaltCleared,
   GuaranteeClosed,
   GuaranteeRegistered,
   ModeChanged,
@@ -521,6 +526,17 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.FeesContributed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([118, 167, 32, 183, 37, 113, 242, 59]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.FulfilHaltCleared;
   }
   if (
     containsBytes(
@@ -742,6 +758,7 @@ export enum MutavInstruction {
   CancelRedeem,
   ClaimAssets,
   ClaimShares,
+  ClearFulfilHalt,
   CloseGuarantee,
   ContributeFees,
   FileClaim,
@@ -821,6 +838,17 @@ export function identifyMutavInstruction(
     )
   ) {
     return MutavInstruction.ClaimShares;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([72, 92, 0, 5, 100, 214, 187, 39]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ClearFulfilHalt;
   }
   if (
     containsBytes(
@@ -1056,6 +1084,9 @@ export type ParsedMutavInstruction<
       instructionType: MutavInstruction.ClaimShares;
     } & ParsedClaimSharesInstruction<TProgram>)
   | ({
+      instructionType: MutavInstruction.ClearFulfilHalt;
+    } & ParsedClearFulfilHaltInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.CloseGuarantee;
     } & ParsedCloseGuaranteeInstruction<TProgram>)
   | ({
@@ -1151,6 +1182,13 @@ export function parseMutavInstruction<TProgram extends string>(
       return {
         instructionType: MutavInstruction.ClaimShares,
         ...parseClaimSharesInstruction(instruction),
+      };
+    }
+    case MutavInstruction.ClearFulfilHalt: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ClearFulfilHalt,
+        ...parseClearFulfilHaltInstruction(instruction),
       };
     }
     case MutavInstruction.CloseGuarantee: {
@@ -1347,6 +1385,10 @@ export type MutavPluginInstructions = {
     input: ClaimSharesAsyncInput,
   ) => ReturnType<typeof getClaimSharesInstructionAsync> &
     SelfPlanAndSendFunctions;
+  clearFulfilHalt: (
+    input: ClearFulfilHaltAsyncInput,
+  ) => ReturnType<typeof getClearFulfilHaltInstructionAsync> &
+    SelfPlanAndSendFunctions;
   closeGuarantee: (
     input: CloseGuaranteeAsyncInput,
   ) => ReturnType<typeof getCloseGuaranteeInstructionAsync> &
@@ -1492,6 +1534,11 @@ export function mutavProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getClaimSharesInstructionAsync(input),
+            ),
+          clearFulfilHalt: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClearFulfilHaltInstructionAsync(input),
             ),
           closeGuarantee: (input) =>
             addSelfPlanAndSendFunctions(
