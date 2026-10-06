@@ -68,7 +68,7 @@ Fork tests (Surfpool, against Nora's devnet BRS mint) run separately and on dema
 
 ### Client
 
-The client in `clients/js` is generated from the program IDL with Codama (see `clients/js/package.json` for the generate and build scripts). Regenerate it after any change to the program interface, and commit the result.
+The client in `clients/js` is generated from the program IDL with Codama (see `clients/js/package.json` for the generate and build scripts). Regenerate it after any change to the program interface, and commit the result. Hand-written PDA, read and preview helpers sit next to the generated code; see [`clients/js/README.md`](clients/js/README.md). `bun run test:client` checks them against vectors exported from the program.
 
 No command in this repo runs in watch mode.
 
