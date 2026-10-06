@@ -208,6 +208,7 @@ fn params_out_of_program_bounds_rejected() {
         Box::new(|a| a.caps.max_tesouro_share_bps = 10_001),
         Box::new(|a| a.price.max_deviation_bps = 10_001),
         Box::new(|a| a.price.max_nav_move_bps = 10_001),
+        Box::new(|a| a.price.y_max_bps = 10_001),
         Box::new(|a| a.caps.min_request = a.caps.max_request + 1),
         Box::new(|a| a.caps.claim_period_secs = 0),
         Box::new(|a| a.payout_sla_secs = -1),
@@ -302,4 +303,46 @@ fn each_reserve_mint_gets_its_own_config() {
     send_ix(&mut f.svm, ix, &[&payer]).expect("second reserve");
     assert_ne!(Pdas::new(&other_mint).config, f.pdas.config);
     assert_eq!(f.config().reserve_mint, f.reserve_mint);
+}
+
+#[test]
+fn treasury_and_payments_cannot_be_reserve_accounts() {
+    // The reserve's own token accounts are owned by the vault authority; none
+    // may stand in for MUTAV's treasury or payments account (spec §2.1).
+    let mut f = Fixture::uninitialized();
+    let payer = f.payer.insecure_clone();
+    let authority = f.pdas.authority;
+    let reserve = f.pdas.reserve;
+
+    // The `reserve` PDA created by this same instruction, as the treasury:
+    // Anchor loads the treasury before `reserve` exists, so it is rejected
+    // before the handler runs.
+    let mut accts = f.init_accounts();
+    accts.treasury = reserve;
+    let ix = initialize_ix(&accts, f.init_args());
+    assert_anchor_err(
+        send_ix(&mut f.svm, ix, &[&payer]),
+        anchor_lang::error::ErrorCode::AccountNotInitialized,
+    );
+
+    // Any BRS account owned by the vault authority, as treasury or payments.
+    let owned = f.token_account(&authority);
+    let mut accts = f.init_accounts();
+    accts.treasury = owned;
+    let ix = initialize_ix(&accts, f.init_args());
+    assert_mutav_err(
+        send_ix(&mut f.svm, ix, &[&payer]),
+        MutavError::InvalidParameter,
+    );
+
+    let mut accts = f.init_accounts();
+    accts.payments = owned;
+    let ix = initialize_ix(&accts, f.init_args());
+    assert_mutav_err(
+        send_ix(&mut f.svm, ix, &[&payer]),
+        MutavError::InvalidParameter,
+    );
+
+    // The valid accounts still initialize.
+    f.initialize(f.init_args()).expect("initialize");
 }
