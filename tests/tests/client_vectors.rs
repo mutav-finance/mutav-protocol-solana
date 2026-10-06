@@ -602,3 +602,42 @@ fn client_vectors_match_the_program() {
         "tests/fixtures/client/vectors.json is stale; regenerate with MUTAV_WRITE_VECTORS=1 and re-run the client tests"
     );
 }
+
+/// The allowlist trees the TypeScript builder produced
+/// (`tests/fixtures/client/allowlist-proofs.json`, written by
+/// `bun scripts/devnet/allowlist.ts --write-fixture` and reproduced by the
+/// client tests) verify under the program's own `allowlist::verify`.
+#[test]
+fn client_built_allowlist_proofs_verify_in_the_program() {
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/client/allowlist-proofs.json");
+    let text = std::fs::read_to_string(&path).unwrap();
+    let v: Value = serde_json::from_str(&text).unwrap();
+    let unhex = |h: &str| -> [u8; 32] {
+        let mut out = [0u8; 32];
+        for (i, b) in out.iter_mut().enumerate() {
+            *b = u8::from_str_radix(&h[2 * i..2 * i + 2], 16).unwrap();
+        }
+        out
+    };
+    let trees = v["trees"].as_array().unwrap();
+    assert_eq!(trees.len(), 5);
+    for tree in trees {
+        let root = unhex(tree["root"].as_str().unwrap());
+        for entry in tree["proofs"].as_array().unwrap() {
+            let owner: Pubkey = entry["owner"].as_str().unwrap().parse().unwrap();
+            let proof: Vec<[u8; 32]> = entry["proof"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|p| unhex(p.as_str().unwrap()))
+                .collect();
+            assert!(
+                allowlist::verify(&root, &owner, &proof),
+                "proof for {owner} does not verify"
+            );
+            // A proof never verifies for another owner.
+            assert!(!allowlist::verify(&root, &Pubkey::new_unique(), &proof));
+        }
+    }
+}
