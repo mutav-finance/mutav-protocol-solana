@@ -8,6 +8,7 @@
 
 export * from "./claims";
 export * from "./config";
+export * from "./feeReceipt";
 export * from "./guarantee";
 export * from "./pendingDeposits";
 export * from "./pendingRedemptions";

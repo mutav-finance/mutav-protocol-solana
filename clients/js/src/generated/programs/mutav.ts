@@ -36,11 +36,14 @@ import {
 } from "@solana/kit/program-client-core";
 import {
   getAgencyExposureCodec,
+  getFeeReceiptCodec,
   getGuaranteeCodec,
   getVaultConfigCodec,
   getVaultStateCodec,
   type AgencyExposure,
   type AgencyExposureArgs,
+  type FeeReceipt,
+  type FeeReceiptArgs,
   type Guarantee,
   type GuaranteeArgs,
   type VaultConfig,
@@ -50,6 +53,7 @@ import {
 } from "../accounts";
 import {
   getCloseGuaranteeInstructionAsync,
+  getContributeFeesInstructionAsync,
   getInitializeInstructionAsync,
   getPauseInstruction,
   getRegisterGuaranteeInstructionAsync,
@@ -60,6 +64,7 @@ import {
   getSetRolesInstruction,
   getUnpauseInstruction,
   parseCloseGuaranteeInstruction,
+  parseContributeFeesInstruction,
   parseInitializeInstruction,
   parsePauseInstruction,
   parseRegisterGuaranteeInstruction,
@@ -70,8 +75,10 @@ import {
   parseSetRolesInstruction,
   parseUnpauseInstruction,
   type CloseGuaranteeAsyncInput,
+  type ContributeFeesAsyncInput,
   type InitializeAsyncInput,
   type ParsedCloseGuaranteeInstruction,
+  type ParsedContributeFeesInstruction,
   type ParsedInitializeInstruction,
   type ParsedPauseInstruction,
   type ParsedRegisterGuaranteeInstruction,
@@ -93,6 +100,7 @@ import {
 import {
   findClaimsPda,
   findConfigPda,
+  findFeeReceiptPda,
   findGuaranteePda,
   findPendingDepositsPda,
   findPendingRedemptionsPda,
@@ -107,6 +115,7 @@ export const MUTAV_PROGRAM_ADDRESS =
 
 export enum MutavAccount {
   AgencyExposure,
+  FeeReceipt,
   Guarantee,
   VaultConfig,
   VaultState,
@@ -126,6 +135,17 @@ export function identifyMutavAccount(
     )
   ) {
     return MutavAccount.AgencyExposure;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([135, 174, 32, 77, 183, 44, 26, 107]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.FeeReceipt;
   }
   if (
     containsBytes(
@@ -588,6 +608,7 @@ export function identifyMutavEvent(
 
 export enum MutavInstruction {
   CloseGuarantee,
+  ContributeFees,
   Initialize,
   Pause,
   RegisterGuarantee,
@@ -613,6 +634,17 @@ export function identifyMutavInstruction(
     )
   ) {
     return MutavInstruction.CloseGuarantee;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([44, 53, 150, 77, 255, 250, 76, 164]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ContributeFees;
   }
   if (
     containsBytes(
@@ -726,6 +758,9 @@ export type ParsedMutavInstruction<
       instructionType: MutavInstruction.CloseGuarantee;
     } & ParsedCloseGuaranteeInstruction<TProgram>)
   | ({
+      instructionType: MutavInstruction.ContributeFees;
+    } & ParsedContributeFeesInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.Initialize;
     } & ParsedInitializeInstruction<TProgram>)
   | ({
@@ -763,6 +798,13 @@ export function parseMutavInstruction<TProgram extends string>(
       return {
         instructionType: MutavInstruction.CloseGuarantee,
         ...parseCloseGuaranteeInstruction(instruction),
+      };
+    }
+    case MutavInstruction.ContributeFees: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ContributeFees,
+        ...parseContributeFeesInstruction(instruction),
       };
     }
     case MutavInstruction.Initialize: {
@@ -848,6 +890,8 @@ export type MutavPlugin = {
 export type MutavPluginAccounts = {
   agencyExposure: ReturnType<typeof getAgencyExposureCodec> &
     SelfFetchFunctions<AgencyExposureArgs, AgencyExposure>;
+  feeReceipt: ReturnType<typeof getFeeReceiptCodec> &
+    SelfFetchFunctions<FeeReceiptArgs, FeeReceipt>;
   guarantee: ReturnType<typeof getGuaranteeCodec> &
     SelfFetchFunctions<GuaranteeArgs, Guarantee>;
   vaultConfig: ReturnType<typeof getVaultConfigCodec> &
@@ -860,6 +904,10 @@ export type MutavPluginInstructions = {
   closeGuarantee: (
     input: CloseGuaranteeAsyncInput,
   ) => ReturnType<typeof getCloseGuaranteeInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  contributeFees: (
+    input: MakeOptional<ContributeFeesAsyncInput, "payer">,
+  ) => ReturnType<typeof getContributeFeesInstructionAsync> &
     SelfPlanAndSendFunctions;
   initialize: (
     input: MakeOptional<InitializeAsyncInput, "payer">,
@@ -898,10 +946,11 @@ export type MutavPluginInstructions = {
 export type MutavPluginPdas = {
   state: typeof findStatePda;
   guarantee: typeof findGuaranteePda;
+  feeReceipt: typeof findFeeReceiptPda;
+  reserve: typeof findReservePda;
   config: typeof findConfigPda;
   vaultAuthority: typeof findVaultAuthorityPda;
   shareMint: typeof findShareMintPda;
-  reserve: typeof findReservePda;
   pendingDeposits: typeof findPendingDepositsPda;
   pendingRedemptions: typeof findPendingRedemptionsPda;
   claims: typeof findClaimsPda;
@@ -925,6 +974,7 @@ export function mutavProgram() {
             client,
             getAgencyExposureCodec(),
           ),
+          feeReceipt: addSelfFetchFunctions(client, getFeeReceiptCodec()),
           guarantee: addSelfFetchFunctions(client, getGuaranteeCodec()),
           vaultConfig: addSelfFetchFunctions(client, getVaultConfigCodec()),
           vaultState: addSelfFetchFunctions(client, getVaultStateCodec()),
@@ -934,6 +984,14 @@ export function mutavProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getCloseGuaranteeInstructionAsync(input),
+            ),
+          contributeFees: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getContributeFeesInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
             ),
           initialize: (input) =>
             addSelfPlanAndSendFunctions(
@@ -978,10 +1036,11 @@ export function mutavProgram() {
         pdas: {
           state: findStatePda,
           guarantee: findGuaranteePda,
+          feeReceipt: findFeeReceiptPda,
+          reserve: findReservePda,
           config: findConfigPda,
           vaultAuthority: findVaultAuthorityPda,
           shareMint: findShareMintPda,
-          reserve: findReservePda,
           pendingDeposits: findPendingDepositsPda,
           pendingRedemptions: findPendingRedemptionsPda,
           claims: findClaimsPda,
