@@ -35,6 +35,11 @@ fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
     .unwrap()
 }
 
+/// Pilot instructions that apply the ratchet `buffer_earmark := earmark_eff`
+/// (spec §4). Later tasks add `fulfil_redeems`, `allocate`, `deallocate` and
+/// `refresh`.
+const RATCHETING: &[&str] = &["register_guarantee"];
+
 fn assert_pilot_earmark(f: &Fixture, at: &str) {
     let (c, s) = (f.config(), f.state());
     assert_eq!(c.feature_flags, 0, "{at}: feature flags");
@@ -55,8 +60,17 @@ fn earmark_stays_zero_through_any_pilot_sequence() {
         x ^= x << 17;
         let mut ixs = f.pilot_instructions();
         let (name, ix, signer) = ixs.swap_remove((x % ixs.len() as u64) as usize);
-        f.send(ix, &signer)
-            .unwrap_or_else(|e| panic!("step {step} {name}: {:?}", e.err));
+        // A random order can make a call invalid (an operator instruction
+        // after `revoke_operator`, a close before its registration). A
+        // refused call changes nothing; the earmark must hold either way.
+        let before = (f.raw(&f.pdas.config), f.raw(&f.pdas.state));
+        if f.send(ix, &signer).is_err() {
+            assert_eq!(
+                (f.raw(&f.pdas.config), f.raw(&f.pdas.state)),
+                before,
+                "{name}"
+            );
+        }
         assert_pilot_earmark(&f, &format!("step {step} {name}"));
     }
 }
@@ -74,8 +88,9 @@ fn set_config_cannot_enable_the_earmark() {
 #[test]
 fn injected_earmark_with_the_flag_clear_has_no_effect() {
     // A stored level left by a newer binary, with the flag cleared (the
-    // rollback path, spec §14.6): the pilot computes `earmark_eff = 0`, and no
-    // pilot instruction reads or writes the stored level.
+    // rollback path, spec §14.6): the pilot computes `earmark_eff = 0`. Only
+    // the ratcheting instructions (spec §4) write the stored level, and they
+    // store that `0`; every other instruction leaves it alone.
     let mut f = Fixture::new();
     let mut s = f.state();
     s.brs_balance = 1_000 * BRL;
@@ -89,7 +104,18 @@ fn injected_earmark_with_the_flag_clear_has_no_effect() {
     for (name, ix, signer) in f.pilot_instructions() {
         f.send(ix, &signer)
             .unwrap_or_else(|e| panic!("{name}: {:?}", e.err));
-        assert_eq!(f.state().buffer_earmark, 300 * BRL, "{name} touched it");
+        if RATCHETING.contains(&name) {
+            assert_eq!(
+                f.state().buffer_earmark,
+                0,
+                "{name} must store earmark_eff = 0"
+            );
+            let mut s = f.state();
+            s.buffer_earmark = 300 * BRL;
+            f.write_state(&s);
+        } else {
+            assert_eq!(f.state().buffer_earmark, 300 * BRL, "{name} touched it");
+        }
     }
 
     // With the flag injected set, the same state reserves the stored level.
@@ -97,5 +123,5 @@ fn injected_earmark_with_the_flag_clear_has_no_effect() {
     c.feature_flags = INSTANT_EXIT;
     let sol = solvency(&c, &f.state());
     assert_eq!(sol.earmark_eff, 300 * BRL);
-    assert_eq!(sol.free_capital, 700 * BRL);
+    assert_eq!(sol.free_capital, sol.surplus - 300 * BRL);
 }

@@ -2,7 +2,10 @@
 //! mints (classic SPL and Token-2022 with extensions), an initialized reserve
 //! fixture, error and event assertions.
 
+pub mod book;
 pub mod mints;
+
+pub use book::*;
 
 use std::path::PathBuf;
 
@@ -163,6 +166,40 @@ fn assert_custom_err(res: TransactionResult, code: u32, name: &str) {
             ),
         },
     }
+}
+
+/// Asserts an `init` failed because the account already exists (the system
+/// program's `AccountAlreadyInUse`, custom error 0): the duplicate-key path of
+/// every one-per-reference PDA (spec §3.5–§3.7, §3.11).
+pub fn assert_already_in_use(res: TransactionResult) {
+    match res {
+        Ok(_) => panic!("expected account-already-in-use, transaction succeeded"),
+        Err(FailedTransactionMetadata { err, meta }) => match err {
+            TransactionError::InstructionError(_, InstructionError::Custom(0)) => {
+                assert!(
+                    meta.logs.iter().any(|l| l.contains("already in use")),
+                    "custom 0 without an already-in-use log:\n{}",
+                    meta.logs.join("\n")
+                );
+            }
+            other => panic!(
+                "expected account-already-in-use, got {other:?}\nlogs:\n{}",
+                meta.logs.join("\n")
+            ),
+        },
+    }
+}
+
+/// The current `Clock` sysvar.
+pub fn clock(svm: &LiteSVM) -> anchor_lang::prelude::Clock {
+    svm.get_sysvar::<anchor_lang::prelude::Clock>()
+}
+
+/// Moves the clock to `unix_timestamp` (slot unchanged).
+pub fn set_time(svm: &mut LiteSVM, unix_timestamp: i64) {
+    let mut c = clock(svm);
+    c.unix_timestamp = unix_timestamp;
+    svm.set_sysvar(&c);
 }
 
 /// Events of type `E` emitted with `emit_cpi!` in a transaction, in order.
@@ -632,8 +669,16 @@ impl Fixture {
     /// One valid call of every instruction that exists after `initialize`,
     /// in an order where each succeeds on a fresh fixture. Each entry is
     /// `(name, instruction, signer)`. Extend this list as instructions land:
-    /// padding, version and earmark tests walk it.
+    /// padding, version and earmark tests walk it. The operator instructions
+    /// come first, before `set_roles` and `revoke_operator` replace the
+    /// operator.
     pub fn pilot_instructions(&mut self) -> Vec<(&'static str, Instruction, Keypair)> {
+        let mut out = self.book_instructions();
+        out.extend(self.admin_instructions());
+        out
+    }
+
+    fn admin_instructions(&mut self) -> Vec<(&'static str, Instruction, Keypair)> {
         let admin = self.admin.insecure_clone();
         let c = self.config();
 
