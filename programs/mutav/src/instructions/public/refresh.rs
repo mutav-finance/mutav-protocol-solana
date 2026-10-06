@@ -42,8 +42,7 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
 
     // NAV-move guard (spec §7): measured against the last published NAV,
     // which is 0 only when no shares were outstanding.
-    // TODO(spec: §5.8 step 3 — the clearing path for `fulfil_halted` is TBD).
-    // Nothing clears it yet: fail closed.
+    // Only the admin's `clear_fulfil_halt` clears the flag (ADR 0015).
     if nav_move_exceeds(state.nav_per_share, nav, max_nav_move_bps) {
         state.fulfil_halted = true;
     }

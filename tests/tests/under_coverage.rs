@@ -10,7 +10,7 @@
 use mutav::{
     constants::*,
     errors::MutavError,
-    events::{ModeChanged, StateRefreshed},
+    events::{FulfilHaltCleared, ModeChanged, StateRefreshed},
     solvency::{nav_per_share, Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
 };
@@ -286,7 +286,7 @@ fn a_nav_move_beyond_the_bound_halts_fulfilment() {
         f.fulfil_redeems(1, u64::MAX, &[redeem]),
         MutavError::FulfilHalted,
     );
-    // TODO(spec: §5.8 step 3 — the clearing path is TBD): fail closed. Later
+    // Only the admin's `clear_fulfil_halt` clears it (ADR 0015): later
     // refreshes and `set_config` leave it set.
     f.refresh().unwrap();
     let args = set_config_args(&f.config());
@@ -351,6 +351,81 @@ fn with_no_shares_outstanding_the_guard_does_not_apply() {
     let s = f.state();
     assert!(!s.fulfil_halted);
     assert_eq!(s.nav_per_share, 2 * NAV_SCALE);
+}
+
+// ---------------------------------------------------------------------------
+// clear_fulfil_halt (spec §5.1, §5.8; ADR 0015, proposed)
+// ---------------------------------------------------------------------------
+
+/// `guarded()` with a provision beyond the bound filed and refreshed: halted.
+fn halted() -> (Fixture, mutav::RegisterGuaranteeArgs, u64, u64) {
+    let (mut f, g, d, redeem) = guarded();
+    f.file_claim(Claim::on(&g, 300 * BRL + 1)).unwrap();
+    f.refresh().unwrap();
+    assert!(f.state().fulfil_halted);
+    (f, g, d, redeem)
+}
+
+#[test]
+fn admin_clears_the_halt_and_resets_the_baseline() {
+    let (mut f, _, d, redeem) = halted();
+    // A further move after the halt: the clear takes the NAV of now as the
+    // new baseline, not the one of the last refresh.
+    let mut s = f.state();
+    s.provisions += 50 * BRL;
+    f.write_state(&s);
+    let s = f.state();
+    let sol = Solvency::compute(&SolvencyInputs {
+        brs_balance: s.brs_balance,
+        tesouro_units: s.tesouro_units,
+        tesouro_price: s.tesouro_price,
+        remaining_cover_total: s.remaining_cover_total,
+        coverage_ratio_bps: f.config().coverage_ratio_bps,
+        provisions: s.provisions,
+        buffer_earmark: s.buffer_earmark,
+        feature_flags: f.config().feature_flags,
+        head_starved: false,
+    })
+    .unwrap();
+    let nav = mutav::pricing::published_nav(sol.net_assets, s.shares_outstanding).unwrap();
+    assert_ne!(nav, s.nav_per_share);
+
+    let meta = f.clear_fulfil_halt().expect("admin clears");
+    let s = f.state();
+    assert!(!s.fulfil_halted);
+    assert_eq!(s.nav_per_share, nav, "baseline reset to the current NAV");
+    let ev = events::<FulfilHaltCleared>(&meta);
+    assert_eq!(ev.len(), 1);
+    assert_eq!((ev[0].config, ev[0].nav_per_share), (f.pdas.config, nav));
+
+    // No move since the reset: a refresh keeps fulfilment open.
+    f.refresh().unwrap();
+    assert!(!f.state().fulfil_halted);
+    f.fulfil_deposits(1, &[d]).expect("fills work again");
+    f.fulfil_redeems(1, u64::MAX, &[redeem])
+        .expect("fills work again");
+}
+
+#[test]
+fn only_the_admin_clears_the_halt() {
+    let (mut f, _, _, _) = halted();
+    for k in [
+        f.operator.insecure_clone(),
+        f.pauser.insecure_clone(),
+        solana_keypair::Keypair::new(),
+    ] {
+        use solana_signer::Signer;
+        f.svm.airdrop(&k.pubkey(), 1_000_000_000).unwrap();
+        let ix = f.clear_fulfil_halt_ix(&k.pubkey());
+        assert_mutav_err(f.send(ix, &k), MutavError::Unauthorized);
+    }
+    assert!(f.state().fulfil_halted);
+}
+
+#[test]
+fn clearing_needs_a_halt() {
+    let (mut f, _, _, _) = guarded();
+    assert_mutav_err(f.clear_fulfil_halt(), MutavError::InvalidParameter);
 }
 
 #[test]

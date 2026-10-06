@@ -54,6 +54,12 @@ pub mod mutav {
         instructions::admin::set_allowlist_root::handle_set_allowlist_root(ctx, root)
     }
 
+    /// Clear `fulfil_halted` and reset the NAV-move guard's baseline to the
+    /// current NAV (ADR 0015, proposed). Admin.
+    pub fn clear_fulfil_halt(ctx: Context<ClearFulfilHalt>) -> Result<()> {
+        instructions::admin::clear_fulfil_halt::handle_clear_fulfil_halt(ctx)
+    }
+
     /// Pause capital flows, new guarantees and allocation. Pauser or admin.
     pub fn pause(ctx: Context<Pause>) -> Result<()> {
         instructions::admin::pause::handle_pause(ctx)

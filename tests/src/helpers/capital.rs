@@ -689,6 +689,29 @@ impl Fixture {
         Instruction::new_with_bytes(mutav::ID, &mutav::instruction::Refresh {}.data(), metas)
     }
 
+    /// `clear_fulfil_halt` (spec §5.1; ADR 0015) signed by `signer`.
+    pub fn clear_fulfil_halt_ix(&self, signer: &Pubkey) -> Instruction {
+        Instruction::new_with_bytes(
+            mutav::ID,
+            &mutav::instruction::ClearFulfilHalt {}.data(),
+            mutav::accounts::ClearFulfilHalt {
+                admin: *signer,
+                config: self.pdas.config,
+                state: self.pdas.state,
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    /// `clear_fulfil_halt` signed by the admin.
+    pub fn clear_fulfil_halt(&mut self) -> TransactionResult {
+        let admin = self.admin.insecure_clone();
+        let ix = self.clear_fulfil_halt_ix(&admin.pubkey());
+        self.send(ix, &admin)
+    }
+
     /// `refresh` sent by a fresh, unrelated signer (it is permissionless).
     pub fn refresh(&mut self) -> TransactionResult {
         let anyone = Keypair::new();
