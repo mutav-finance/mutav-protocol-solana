@@ -3,9 +3,11 @@
 //! fixture, error and event assertions.
 
 pub mod book;
+pub mod capital;
 pub mod mints;
 
 pub use book::*;
+pub use capital::*;
 
 use std::path::PathBuf;
 
@@ -674,6 +676,7 @@ impl Fixture {
     /// operator.
     pub fn pilot_instructions(&mut self) -> Vec<(&'static str, Instruction, Keypair)> {
         let mut out = self.book_instructions();
+        out.extend(self.capital_instructions());
         out.extend(self.admin_instructions());
         out
     }

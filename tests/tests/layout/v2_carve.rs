@@ -4,8 +4,7 @@
 //! every v1 field at its value and offset. The carve sizes are pinned here,
 //! not by hand.
 //!
-//! `HolderStateV2` (per-wallet exit counters) lands with `HolderState` in
-//! Task 6.
+//! `HolderStateV2` (per-wallet exit counters) is in `capital.rs`.
 
 use anchor_lang::{prelude::*, AccountDeserialize, Discriminator};
 use mutav::{constants::VAULT_STATE_SIZE, state::VaultState};
@@ -145,7 +144,7 @@ fn pilot_accounts_read_as_v2() {
     let mut s = f.state();
     s.brs_balance = 123;
     s.buffer_earmark = 0;
-    s.pending_notices = 2;
+    s.late_payouts = 2;
     s.last_refresh_slot = 99;
     f.write_state(&s);
     // Building the list funds the reserve for the operator instructions.
@@ -166,7 +165,10 @@ fn pilot_accounts_read_as_v2() {
     assert_eq!(v2.remaining_cover_total, cur.remaining_cover_total);
     assert_eq!(v2.claims_paid_total, cur.claims_paid_total);
     assert_eq!(v2.claim_period_start, cur.claim_period_start);
-    assert_eq!(v2.pending_notices, 2);
+    assert_eq!(v2.pending_notices, cur.pending_notices);
+    assert_eq!(v2.late_payouts, cur.late_payouts);
+    assert_eq!(v2.shares_outstanding, cur.shares_outstanding);
+    assert_eq!(v2.next_redeem_seq, cur.next_redeem_seq);
     assert_eq!(v2.last_refresh_slot, 99);
     assert_eq!(v2.version, s.version);
 
