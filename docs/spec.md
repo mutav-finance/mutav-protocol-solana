@@ -133,7 +133,7 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | `coverage_required` | `u64` | `c × remaining_cover_total`, rounded up |
 | `provisions` | `u64` | `Σ` open claim provisions |
 | `shares_outstanding` | `u64` | Minted shares plus shares owed on fulfilled, unclaimed deposits |
-| `nav_per_share` | `u64` | Last published NAV per share (scaled by `NAV_SCALE`) |
+| `nav_per_share` | `u64` | Last published NAV per share (scaled by `NAV_SCALE`). `0` exactly when no shares are outstanding; otherwise floored at `1`, so `0` is never a real NAV ([§7](#7-price-safety)) |
 | `pending_deposits_total` | `u64` | BRS in `pending_deposits`. Excluded from `stable_assets` |
 | `pending_redeem_shares` | `u64` | Shares in `pending_redemptions`. Counted in `shares_outstanding` until fulfilled (confirm, §12) |
 | `claimable_assets_total` | `u64` | BRS in `claims` awaiting `claim_assets` (`Σ assets_claimable` over open redeem requests). Excluded from `stable_assets` |
@@ -697,7 +697,7 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
   - `accrual curve`: `p0 × (1 + y_max)^((t − t0) / year)`, a ceiling from a reference price `p0` at `t0` and a maximum annual yield `y_max`, all in `PriceParams`. Values **TBD**.
   - **Staleness bound:** if the price's publish time is older than `price.max_staleness_secs`, it is stale. Gated instructions fail with `StalePrice`; `pay_claim` never reads the price. Valuing a stale price with a haircut instead (PC-17) is **TBD**.
   - **Deviation bound:** if the on-chain price moved more than `price.max_deviation_bps` against the last accepted price, it is rejected as stale until admin review.
-- **NAV-move guard:** a NAV-per-share move of more than `price.max_nav_move_bps` ("X%") in one refresh sets `fulfil_halted`, which pauses `fulfil_deposits` and `fulfil_redeems`. X is **TBD**.
+- **NAV-move guard:** a NAV-per-share move of more than `price.max_nav_move_bps` ("X%") in one refresh sets `fulfil_halted`, which pauses `fulfil_deposits` and `fulfil_redeems`. X is **TBD**. The move is measured between published NAVs. A published NAV is `0` only when no shares are outstanding, and the guard skips a refresh only when the previous or the current published NAV is `0` (no shares behind it: nothing to protect). With shares outstanding the published NAV is floored at `1` (10⁻⁹ BRS per share), so a collapse to NAV 0 (provisions ≥ `stable_assets`, or frozen balances counted as 0) trips the guard, and so does the recovery from it.
 - **Instant exit** (phase 2) uses the tighter bound `min(exit.max_price_age_secs, price.max_staleness_secs)` ([§13.6](#136-anti-front-running-rules)).
 - Price-source changes are admin actions (time-locked).
 

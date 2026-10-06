@@ -8,8 +8,7 @@ use crate::{
     errors::MutavError,
     events::{ModeChanged, StateRefreshed},
     instructions::operator::solvency_snapshot,
-    pricing::nav_move_exceeds,
-    solvency::nav_per_share,
+    pricing::{nav_move_exceeds, published_nav},
     state::{VaultConfig, VaultState},
 };
 
@@ -39,9 +38,10 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
     let clock = Clock::get()?;
 
     let state = &mut ctx.accounts.state;
-    let nav = nav_per_share(sol.net_assets, state.shares_outstanding)?;
+    let nav = published_nav(sol.net_assets, state.shares_outstanding)?;
 
-    // NAV-move guard (spec §7): measured against the last published NAV.
+    // NAV-move guard (spec §7): measured against the last published NAV,
+    // which is 0 only when no shares were outstanding.
     // TODO(spec: §5.8 step 3 — the clearing path for `fulfil_halted` is TBD).
     // Nothing clears it yet: fail closed.
     if nav_move_exceeds(state.nav_per_share, nav, max_nav_move_bps) {

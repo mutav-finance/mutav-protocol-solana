@@ -299,6 +299,60 @@ fn a_nav_move_beyond_the_bound_halts_fulfilment() {
     f.pay_claim(c).expect("pay_claim");
 }
 
+/// Net assets 0 with shares outstanding: provisions equal stable assets.
+fn collapse_net_assets(f: &mut Fixture) {
+    let mut s = f.state();
+    s.provisions = s.brs_balance;
+    f.write_state(&s);
+}
+
+#[test]
+fn a_collapse_to_zero_nav_with_shares_outstanding_halts() {
+    let (mut f, _, d, _) = guarded();
+    assert!(f.state().shares_outstanding > 0);
+    collapse_net_assets(&mut f);
+    f.refresh().unwrap();
+    let s = f.state();
+    assert!(s.fulfil_halted, "a collapse to NAV 0 must trip the guard");
+    // With shares outstanding the published NAV is floored at one unit, so 0
+    // always means "no shares" (spec §7).
+    assert_eq!(s.nav_per_share, 1);
+    assert_mutav_err(f.fulfil_deposits(1, &[d]), MutavError::FulfilHalted);
+}
+
+#[test]
+fn a_recovery_from_zero_nav_with_shares_outstanding_halts() {
+    let (mut f, _, _, _) = guarded();
+    collapse_net_assets(&mut f);
+    f.refresh().unwrap();
+    // Un-halt by hand, keeping the collapsed baseline.
+    let mut s = f.state();
+    s.fulfil_halted = false;
+    s.provisions = 0;
+    f.write_state(&s);
+    f.refresh().unwrap();
+    assert!(
+        f.state().fulfil_halted,
+        "a move up from a NAV-0 baseline must trip the guard"
+    );
+    assert_eq!(f.state().nav_per_share, NAV_SCALE);
+}
+
+#[test]
+fn with_no_shares_outstanding_the_guard_does_not_apply() {
+    // An empty reserve publishes NAV 0 and never trips; the first refresh
+    // with shares has no earlier NAV to compare with.
+    let mut f = Fixture::new();
+    f.fund_reserve(10_000 * BRL);
+    f.refresh().unwrap();
+    assert_eq!(f.state().nav_per_share, 0);
+    f.inject_shares(5_000 * BRL);
+    f.refresh().unwrap();
+    let s = f.state();
+    assert!(!s.fulfil_halted);
+    assert_eq!(s.nav_per_share, 2 * NAV_SCALE);
+}
+
 #[test]
 fn a_large_fee_batch_above_the_bound_halts_fulfilment() {
     // TODO(adr 0013: inflow-adjusted NAV guard) — the spec measures the move
