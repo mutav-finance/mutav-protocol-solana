@@ -18,13 +18,13 @@ use mutav::{
 use mutav_tests::helpers::*;
 
 /// The solvency snapshot an instruction would compute from these accounts.
-/// The pilot holds no TESOURO, so the price terms are inert.
+/// The pilot holds no TESOURO, so the price terms are inert (`PRICE_SCALE`
+/// is pinned in `constants.rs`).
 fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
     Solvency::compute(&SolvencyInputs {
         brs_balance: s.brs_balance,
         tesouro_units: s.tesouro_units,
         tesouro_price: s.tesouro_price,
-        price_scale: 1,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
         provisions: s.provisions,
