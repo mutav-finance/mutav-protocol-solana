@@ -36,22 +36,63 @@ import {
 } from "@solana/kit/program-client-core";
 import {
   getVaultConfigCodec,
+  getVaultStateCodec,
   type VaultConfig,
   type VaultConfigArgs,
+  type VaultState,
+  type VaultStateArgs,
 } from "../accounts";
 import {
   getInitializeInstructionAsync,
+  getPauseInstruction,
+  getRevokeOperatorInstruction,
+  getSetAllowlistRootInstruction,
+  getSetConfigInstruction,
+  getSetPaymentsAccountInstruction,
+  getSetRolesInstruction,
+  getUnpauseInstruction,
   parseInitializeInstruction,
+  parsePauseInstruction,
+  parseRevokeOperatorInstruction,
+  parseSetAllowlistRootInstruction,
+  parseSetConfigInstruction,
+  parseSetPaymentsAccountInstruction,
+  parseSetRolesInstruction,
+  parseUnpauseInstruction,
   type InitializeAsyncInput,
   type ParsedInitializeInstruction,
+  type ParsedPauseInstruction,
+  type ParsedRevokeOperatorInstruction,
+  type ParsedSetAllowlistRootInstruction,
+  type ParsedSetConfigInstruction,
+  type ParsedSetPaymentsAccountInstruction,
+  type ParsedSetRolesInstruction,
+  type ParsedUnpauseInstruction,
+  type PauseInput,
+  type RevokeOperatorInput,
+  type SetAllowlistRootInput,
+  type SetConfigInput,
+  type SetPaymentsAccountInput,
+  type SetRolesInput,
+  type UnpauseInput,
 } from "../instructions";
-import { findConfigPda } from "../pdas";
+import {
+  findClaimsPda,
+  findConfigPda,
+  findPendingDepositsPda,
+  findPendingRedemptionsPda,
+  findReservePda,
+  findShareMintPda,
+  findStatePda,
+  findVaultAuthorityPda,
+} from "../pdas";
 
 export const MUTAV_PROGRAM_ADDRESS =
   "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9" as Address<"8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9">;
 
 export enum MutavAccount {
   VaultConfig,
+  VaultState,
 }
 
 export function identifyMutavAccount(
@@ -69,6 +110,17 @@ export function identifyMutavAccount(
   ) {
     return MutavAccount.VaultConfig;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([228, 196, 82, 165, 98, 210, 235, 152]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.VaultState;
+  }
   throw new SolanaError(
     SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
     { accountData: data, programName: "mutav" },
@@ -76,6 +128,39 @@ export function identifyMutavAccount(
 }
 
 export enum MutavEvent {
+  AdapterRemoved,
+  AdapterWhitelisted,
+  Allocated,
+  AllowlistRootUpdated,
+  AssetsClaimed,
+  ClaimFiled,
+  ClaimNoticeClosed,
+  ClaimNoticeFlagged,
+  ClaimPaid,
+  ConfigUpdated,
+  Deallocated,
+  DepositCancelled,
+  DepositRequested,
+  DepositsFulfilled,
+  FeesContributed,
+  GuaranteeClosed,
+  GuaranteeRegistered,
+  ModeChanged,
+  OperatorRevoked,
+  Paused,
+  PaymentsAccountUpdated,
+  PayoutLate,
+  PayoutSettled,
+  QueueHeadsAdvanced,
+  RedeemCancelled,
+  RedeemFilled,
+  RedeemRequested,
+  RedeemsFulfilled,
+  ReserveFrozenDetected,
+  RolesUpdated,
+  SharesClaimed,
+  StateRefreshed,
+  Unpaused,
   VaultInitialized,
 }
 
@@ -83,6 +168,369 @@ export function identifyMutavEvent(
   event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MutavEvent {
   const data = "data" in event ? event.data : event;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([2, 66, 22, 230, 197, 67, 75, 103]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.AdapterRemoved;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([237, 172, 209, 145, 139, 69, 188, 193]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.AdapterWhitelisted;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([146, 11, 194, 76, 4, 220, 226, 43]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.Allocated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([66, 208, 202, 83, 119, 62, 45, 227]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.AllowlistRootUpdated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([196, 227, 60, 16, 11, 22, 161, 101]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.AssetsClaimed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([78, 228, 214, 247, 197, 67, 130, 19]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ClaimFiled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([254, 5, 224, 199, 243, 170, 23, 131]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ClaimNoticeClosed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([65, 185, 171, 58, 20, 163, 142, 210]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ClaimNoticeFlagged;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([212, 155, 88, 118, 128, 99, 132, 42]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ClaimPaid;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([40, 241, 230, 122, 11, 19, 198, 194]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ConfigUpdated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([59, 63, 181, 119, 97, 158, 40, 6]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.Deallocated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([233, 23, 42, 206, 203, 207, 147, 35]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.DepositCancelled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([35, 33, 229, 138, 116, 238, 192, 22]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.DepositRequested;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([148, 218, 46, 245, 54, 4, 150, 45]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.DepositsFulfilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([211, 134, 99, 97, 98, 255, 102, 252]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.FeesContributed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([138, 189, 159, 88, 255, 202, 106, 95]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.GuaranteeClosed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([141, 137, 122, 128, 123, 176, 145, 55]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.GuaranteeRegistered;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([149, 123, 78, 29, 237, 72, 67, 229]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ModeChanged;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([234, 41, 78, 23, 191, 224, 103, 64]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.OperatorRevoked;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([172, 248, 5, 253, 49, 255, 255, 232]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.Paused;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([106, 117, 225, 117, 157, 194, 200, 92]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.PaymentsAccountUpdated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([97, 40, 69, 153, 143, 21, 251, 4]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.PayoutLate;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([17, 47, 89, 192, 158, 89, 180, 5]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.PayoutSettled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([243, 37, 151, 250, 162, 73, 156, 224]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.QueueHeadsAdvanced;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([209, 166, 7, 223, 49, 25, 200, 82]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemCancelled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([227, 40, 159, 41, 95, 31, 202, 26]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemFilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([5, 130, 67, 249, 243, 168, 11, 88]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemRequested;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([195, 255, 153, 60, 144, 62, 185, 157]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemsFulfilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([172, 223, 216, 222, 220, 1, 124, 57]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ReserveFrozenDetected;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([81, 37, 176, 32, 30, 204, 251, 246]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RolesUpdated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([135, 17, 55, 130, 218, 208, 153, 101]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.SharesClaimed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([187, 112, 210, 246, 60, 119, 40, 60]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.StateRefreshed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([156, 150, 47, 174, 120, 216, 93, 117]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.Unpaused;
+  }
   if (
     containsBytes(
       data,
@@ -101,6 +549,13 @@ export function identifyMutavEvent(
 
 export enum MutavInstruction {
   Initialize,
+  Pause,
+  RevokeOperator,
+  SetAllowlistRoot,
+  SetConfig,
+  SetPaymentsAccount,
+  SetRoles,
+  Unpause,
 }
 
 export function identifyMutavInstruction(
@@ -118,6 +573,83 @@ export function identifyMutavInstruction(
   ) {
     return MutavInstruction.Initialize;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([211, 22, 221, 251, 74, 121, 193, 47]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.Pause;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([185, 25, 87, 77, 88, 8, 30, 175]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.RevokeOperator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([145, 238, 252, 173, 15, 3, 94, 23]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SetAllowlistRoot;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([108, 158, 154, 175, 212, 98, 52, 66]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SetConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([0, 150, 170, 5, 132, 244, 20, 241]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SetPaymentsAccount;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([119, 86, 129, 161, 55, 23, 250, 12]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SetRoles;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([169, 144, 4, 38, 10, 141, 188, 255]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.Unpause;
+  }
   throw new SolanaError(
     SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
     { instructionData: data, programName: "mutav" },
@@ -126,9 +658,31 @@ export function identifyMutavInstruction(
 
 export type ParsedMutavInstruction<
   TProgram extends string = "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9",
-> = {
-  instructionType: MutavInstruction.Initialize;
-} & ParsedInitializeInstruction<TProgram>;
+> =
+  | ({
+      instructionType: MutavInstruction.Initialize;
+    } & ParsedInitializeInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.Pause;
+    } & ParsedPauseInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.RevokeOperator;
+    } & ParsedRevokeOperatorInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SetAllowlistRoot;
+    } & ParsedSetAllowlistRootInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SetConfig;
+    } & ParsedSetConfigInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SetPaymentsAccount;
+    } & ParsedSetPaymentsAccountInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SetRoles;
+    } & ParsedSetRolesInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.Unpause;
+    } & ParsedUnpauseInstruction<TProgram>);
 
 export function parseMutavInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
@@ -140,6 +694,55 @@ export function parseMutavInstruction<TProgram extends string>(
       return {
         instructionType: MutavInstruction.Initialize,
         ...parseInitializeInstruction(instruction),
+      };
+    }
+    case MutavInstruction.Pause: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.Pause,
+        ...parsePauseInstruction(instruction),
+      };
+    }
+    case MutavInstruction.RevokeOperator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.RevokeOperator,
+        ...parseRevokeOperatorInstruction(instruction),
+      };
+    }
+    case MutavInstruction.SetAllowlistRoot: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SetAllowlistRoot,
+        ...parseSetAllowlistRootInstruction(instruction),
+      };
+    }
+    case MutavInstruction.SetConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SetConfig,
+        ...parseSetConfigInstruction(instruction),
+      };
+    }
+    case MutavInstruction.SetPaymentsAccount: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SetPaymentsAccount,
+        ...parseSetPaymentsAccountInstruction(instruction),
+      };
+    }
+    case MutavInstruction.SetRoles: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SetRoles,
+        ...parseSetRolesInstruction(instruction),
+      };
+    }
+    case MutavInstruction.Unpause: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.Unpause,
+        ...parseUnpauseInstruction(instruction),
       };
     }
     default:
@@ -162,6 +765,8 @@ export type MutavPlugin = {
 export type MutavPluginAccounts = {
   vaultConfig: ReturnType<typeof getVaultConfigCodec> &
     SelfFetchFunctions<VaultConfigArgs, VaultConfig>;
+  vaultState: ReturnType<typeof getVaultStateCodec> &
+    SelfFetchFunctions<VaultStateArgs, VaultState>;
 };
 
 export type MutavPluginInstructions = {
@@ -169,9 +774,42 @@ export type MutavPluginInstructions = {
     input: MakeOptional<InitializeAsyncInput, "payer">,
   ) => ReturnType<typeof getInitializeInstructionAsync> &
     SelfPlanAndSendFunctions;
+  pause: (
+    input: PauseInput,
+  ) => ReturnType<typeof getPauseInstruction> & SelfPlanAndSendFunctions;
+  revokeOperator: (
+    input: RevokeOperatorInput,
+  ) => ReturnType<typeof getRevokeOperatorInstruction> &
+    SelfPlanAndSendFunctions;
+  setAllowlistRoot: (
+    input: SetAllowlistRootInput,
+  ) => ReturnType<typeof getSetAllowlistRootInstruction> &
+    SelfPlanAndSendFunctions;
+  setConfig: (
+    input: SetConfigInput,
+  ) => ReturnType<typeof getSetConfigInstruction> & SelfPlanAndSendFunctions;
+  setPaymentsAccount: (
+    input: SetPaymentsAccountInput,
+  ) => ReturnType<typeof getSetPaymentsAccountInstruction> &
+    SelfPlanAndSendFunctions;
+  setRoles: (
+    input: SetRolesInput,
+  ) => ReturnType<typeof getSetRolesInstruction> & SelfPlanAndSendFunctions;
+  unpause: (
+    input: UnpauseInput,
+  ) => ReturnType<typeof getUnpauseInstruction> & SelfPlanAndSendFunctions;
 };
 
-export type MutavPluginPdas = { config: typeof findConfigPda };
+export type MutavPluginPdas = {
+  config: typeof findConfigPda;
+  state: typeof findStatePda;
+  vaultAuthority: typeof findVaultAuthorityPda;
+  shareMint: typeof findShareMintPda;
+  reserve: typeof findReservePda;
+  pendingDeposits: typeof findPendingDepositsPda;
+  pendingRedemptions: typeof findPendingRedemptionsPda;
+  claims: typeof findClaimsPda;
+};
 
 export type MutavPluginRequirements = ClientWithRpc<
   GetAccountInfoApi & GetMultipleAccountsApi
@@ -188,6 +826,7 @@ export function mutavProgram() {
       mutav: <MutavPlugin>{
         accounts: {
           vaultConfig: addSelfFetchFunctions(client, getVaultConfigCodec()),
+          vaultState: addSelfFetchFunctions(client, getVaultStateCodec()),
         },
         instructions: {
           initialize: (input) =>
@@ -198,8 +837,40 @@ export function mutavProgram() {
                 payer: input.payer ?? client.payer,
               }),
             ),
+          pause: (input) =>
+            addSelfPlanAndSendFunctions(client, getPauseInstruction(input)),
+          revokeOperator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRevokeOperatorInstruction(input),
+            ),
+          setAllowlistRoot: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetAllowlistRootInstruction(input),
+            ),
+          setConfig: (input) =>
+            addSelfPlanAndSendFunctions(client, getSetConfigInstruction(input)),
+          setPaymentsAccount: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetPaymentsAccountInstruction(input),
+            ),
+          setRoles: (input) =>
+            addSelfPlanAndSendFunctions(client, getSetRolesInstruction(input)),
+          unpause: (input) =>
+            addSelfPlanAndSendFunctions(client, getUnpauseInstruction(input)),
         },
-        pdas: { config: findConfigPda },
+        pdas: {
+          config: findConfigPda,
+          state: findStatePda,
+          vaultAuthority: findVaultAuthorityPda,
+          shareMint: findShareMintPda,
+          reserve: findReservePda,
+          pendingDeposits: findPendingDepositsPda,
+          pendingRedemptions: findPendingRedemptionsPda,
+          claims: findClaimsPda,
+        },
         identifyAccount: identifyMutavAccount,
         identifyInstruction: identifyMutavInstruction,
         parseInstruction: parseMutavInstruction,

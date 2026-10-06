@@ -76,7 +76,7 @@ MUTAV touches the program in three roles. They never mix:
 | **MUTAV's share of the reserve** | MUTAV as a capital provider | `request_deposit` / `request_redeem` from MUTAV's allowlisted capital wallet | `pending_deposits` → `reserve` | Minted at NAV at fulfil, like any investor |
 
 Rules:
-- **Three different accounts.** `treasury_account`, `payments_account` (claim payouts) and MUTAV's capital wallet are three different accounts. Both `set_config` and `set_payments_account` reject `treasury_account == payments_account`. The capital wallet is an ordinary allowlisted investor wallet. Its address is recorded in `config.mutav_capital_wallet` for public disclosure and so the phase-2 instant exit can bar it (ADR 0011, amending ADR 0009); it gets no other special treatment. Because `mutav_capital_wallet` is a wallet and the other two are token accounts, the check compares owners: `set_config` and `set_payments_account` receive the treasury and payments token accounts and reject `mutav_capital_wallet` equal to either account's `owner` field.
+- **Three different accounts.** `treasury_account`, `payments_account` (claim payouts) and MUTAV's capital wallet are three different accounts. Both `set_config` and `set_payments_account` reject `treasury_account == payments_account`. The capital wallet is an ordinary allowlisted investor wallet. Its address is recorded in `config.mutav_capital_wallet` for public disclosure and so the phase-2 instant exit can bar it (ADR 0011, amending ADR 0009); it gets no other special treatment. Because `mutav_capital_wallet` is a wallet and the other two are token accounts, the check compares owners: `set_config` and `set_payments_account` receive the treasury and payments token accounts and reject `mutav_capital_wallet` equal to either account's `owner` field. Neither may be one of the reserve's own token accounts (§3.3): `initialize`, `set_config` and `set_payments_account` reject a treasury or payments account whose `owner` is the vault authority PDA (`InvalidParameter`).
 - **Fees never mint shares and never count as MUTAV capital.** MUTAV benefits from fees only through the shares it bought with its own capital, like every holder.
 - **Separate on-chain accounting:** `fees_in_total` (net fees into the reserve), `fee_take_total` (to the treasury) and the deposit/redeem totals are tracked separately. Each has its own event (`FeesContributed`, `DepositsFulfilled`, `RedeemsFulfilled`).
 
@@ -91,6 +91,7 @@ Seeds: `["config", reserve_mint]`. One per reserve. Written only by admin instru
 | Field | Type | Meaning |
 |---|---|---|
 | `version`, `bump` | `u8`, `u8` | Layout version (pilot = `1`, [§14](#14-upgrade-readiness)) and PDA bump |
+| `authority_bump` | `u8` | Bump of the vault authority PDA ([§3.3](#33-vault-authority-and-token-accounts)), stored so signing CPIs need no `find_program_address`. Fixed at `initialize` |
 | `admin` | `Pubkey` | Squads vault address |
 | `operator` | `Pubkey` | Operator key. `Pubkey::default()` when revoked |
 | `pauser` | `Pubkey` | Pauser key |
@@ -103,7 +104,7 @@ Seeds: `["config", reserve_mint]`. One per reserve. Written only by admin instru
 | `payments_account` | `Pubkey` | The whitelisted MUTAV payments token account (BRS) |
 | `treasury_account` | `Pubkey` | The whitelisted MUTAV treasury token account (BRS) that receives MUTAV's take. Changed only by the admin through the timelock |
 | `investor_allowlist_root` | `[u8; 32]` | Merkle root of allowlisted investor wallets |
-| `adapters` | `[AdapterEntry; MAX_ADAPTERS]` | Whitelisted adapters ([§3.9](#39-adapterentry)). `MAX_ADAPTERS` sets the size of `VaultConfig`, so it must be decided before the first devnet deploy (§12 Q33) |
+| `adapters` | `[AdapterEntry; MAX_ADAPTERS]` | Whitelisted adapters ([§3.9](#39-adapterentry)). `MAX_ADAPTERS = 8` (§12 Q33, decided 2026-10-06); it sets the size of `VaultConfig` (8 × 177 = 1,416 bytes) |
 | `caps` | `Caps` | See [§8](#8-caps). Ends with its own `_reserved: [u8; 32]`, so later caps (PC-43) are carved inside it |
 | `price` | `PriceParams` | See [§7](#7-price-safety). Ends with its own `_reserved: [u8; 32]` (e.g. a stale-price haircut, §12 Q21) |
 | `payout_sla_secs` | `i64` | Settlement SLA for payouts. Proposed 10 days |
@@ -112,6 +113,8 @@ Seeds: `["config", reserve_mint]`. One per reserve. Written only by admin instru
 | `mutav_capital_wallet` | `Pubkey` | MUTAV's allowlisted capital wallet, disclosed on-chain (PC-34). Barred from instant exit in phase 2. Gets no other special treatment |
 | `exit` | `ExitParams` | Phase-2 instant-exit and buffer parameters ([§13.2](#132-parameters-exitparams)). **All zero in the pilot**; validated only when `INSTANT_EXIT` is enabled. Ends with its own `_reserved: [u8; 32]` |
 | `_reserved` | `[u8; 512]` | Zeroed. Room for later features ([§14.2](#142-padding-and-version)) |
+
+Size: **2,756 bytes** including the 8-byte discriminator (`Caps` 106, `PriceParams` 94, `ExitParams` 275, `adapters` 1,416, `_reserved` 512), pinned in `constants.rs` (§14.2 R7). Instructions take it boxed (R8).
 
 ### 3.2 `VaultState`
 
@@ -148,9 +151,12 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | `last_refresh_ts`, `last_refresh_slot` | `i64`, `u64` | |
 | `_reserved` | `[u8; 256]` | Zeroed. Phase 2 carves `InstantExitState` from the front ([§13.2](#132-parameters-exitparams), [§14.2](#142-padding-and-version)) |
 
+Size: **480 bytes** including the discriminator, pinned in `constants.rs`.
+
 ### 3.3 Vault authority and token accounts
 
 - **Vault authority**: PDA `["authority", config]`, no data. Owns every reserve token account and is the share mint's mint authority. It is never passed as a signer into an adapter CPI.
+- **Share mint**: PDA `["share_mint", config]`, a classic SPL Token mint with 6 decimals, created by `initialize`. Mint authority and freeze authority are the vault authority; no pilot instruction uses the freeze authority (it keeps share-transfer gating, PC-32, possible without a new mint).
 - **Token accounts** (each a PDA owned by the vault authority, so one issuer freeze does not trap every balance):
 
 | Account | Seeds | Mint | Holds |
@@ -288,7 +294,9 @@ Stored inline in `VaultConfig.adapters`.
 | `cap` | `u64` | Maximum BRS-equivalent value allocated through this adapter |
 | `allocated` | `u64` | Current BRS-equivalent value allocated |
 | `enabled` | `bool` | |
-| `_reserved` | `[u8; 16]` | Fixed per entry, because `MAX_ADAPTERS × entry` is part of the `VaultConfig` layout |
+| `_reserved` | `[u8; 64]` | Fixed per entry, because `MAX_ADAPTERS × entry` is part of the `VaultConfig` layout. Sized so adapter pinning (PC-27: deployed slot `u64` plus upgrade authority `Pubkey`, 40 bytes) can be carved later without a migration; whether to pin is still open |
+
+Entry size: 177 bytes.
 
 ### 3.10 `HolderState`
 
@@ -416,8 +424,9 @@ Common account rules:
 #### `initialize(params)`
 
 - **Signer:** the program's upgrade authority (checked against `ProgramData`), so no one can front-run initialization. `params.admin` is the Squads vault.
-- **Accounts:** `config` (init), `state` (init), vault authority, `reserve_mint`, `share_mint` (init, authority = vault authority, 6 decimals), the four token accounts of §3.3 (init), token programs, system program.
-- **Rules:** `reserve_mint` passes the mint guard: if Token-2022, reject `PermanentDelegate`, `TransferHook`, non-zero `TransferFee`, `NonTransferable`, `DefaultAccountState = Frozen` (PC-19). `fee_take_bps ≤ 3_000`. Roles distinct. Caps within program bounds.
+- **Accounts:** `config` (init), `state` (init), `ProgramData` of this program, vault authority, `reserve_mint`, `share_mint` (init, §3.3), the four token accounts of §3.3 (init), the treasury and payments token accounts, token programs, system program.
+- **Arguments:** `admin`, `operator`, `pauser`, `mutav_capital_wallet`, `coverage_ratio_bps`, `fee_take_bps`, `payout_sla_secs`, `caps`, `price`. The allowlist root starts at zero (nobody allowlisted) and is set with `set_allowlist_root`; `feature_flags`, `exit` and `adapters` start at zero.
+- **Rules:** `reserve_mint` passes the mint guard: if Token-2022, reject `PermanentDelegate`, `TransferHook`, a non-zero `TransferFee` in either epoch configuration, `NonTransferable`, `DefaultAccountState = Frozen` (PC-19). `fee_take_bps ≤ 3_000`. Roles set and distinct. Caps within program bounds: bps fields `≤ 10_000`, `min_request ≤ max_request`, `claim_period_secs > 0`, durations `≥ 0`, and `coverage_ratio_bps ≥ 10_000` until its floor is decided (§12 Q17; fails closed). Treasury and payments accounts as in `set_config` (§2.1).
 - **Effects:** writes `VaultConfig` and an empty `VaultState`. Whether a seed deposit is minted to a dead address at init is **TBD**.
 - **Errors:** `Unauthorized`, `UnsupportedMintExtension`, `InvalidParameter`, `RolesNotDistinct`.
 - **Event:** `VaultInitialized`.
@@ -427,7 +436,7 @@ Common account rules:
 - **Signer:** admin. **Rules:** same bounds as `initialize`. `reserve_mint`, token program and decimals cannot change. **Events:** one `ConfigUpdated { field, old, new }` per changed field, including `Pubkey`, hash and nested `Caps` / `PriceParams` / `ExitParams` fields ([§9](#9-events)).
 - **Feature flags:** `feature_flags & !SUPPORTED_FEATURES != 0` fails with `FeatureNotSupported`. The pilot binary's `SUPPORTED_FEATURES = 0`, so no feature can be switched on until a program upgrade supports it ([§14.3](#143-feature-flags)).
 - **`ExitParams`:** may be written while `INSTANT_EXIT` is off (staging values for a later enable); bounds are checked only when the resulting config has `INSTANT_EXIT` on ([§13.2](#132-parameters-exitparams)).
-- **Accounts distinct:** receives the treasury and payments token accounts; `treasury_account != payments_account`, and `mutav_capital_wallet` differs from both accounts' `owner` (§2.1). Errors: `InvalidParameter`.
+- **Accounts distinct:** receives the treasury and payments token accounts; `treasury_account != payments_account`, `mutav_capital_wallet` differs from both accounts' `owner`, and neither account's `owner` is the vault authority PDA, so no reserve token account can stand in for either (§2.1). Errors: `InvalidParameter`.
 
 #### `set_roles(operator, pauser)`
 
@@ -435,7 +444,7 @@ Common account rules:
 
 #### `set_payments_account(token_account)`
 
-- **Signer:** admin. **Rules:** token account mint = `reserve_mint`; `token_account != config.treasury_account`; `token_account.owner != config.mutav_capital_wallet` (also receives the treasury token account to compare owners, §2.1). Owner is MUTAV's payments wallet (off-chain fact; the program records the account). **Errors:** `InvalidMint`, `InvalidParameter`. **Event:** `PaymentsAccountUpdated`.
+- **Signer:** admin. **Rules:** token account mint = `reserve_mint`; `token_account != config.treasury_account`; `token_account.owner != config.mutav_capital_wallet`; neither `token_account.owner` nor the treasury's `owner` is the vault authority PDA (also receives the treasury token account to compare owners, §2.1). Owner is MUTAV's payments wallet (off-chain fact; the program records the account). **Errors:** `InvalidMint`, `InvalidParameter`. **Event:** `PaymentsAccountUpdated`.
 
 #### `set_allowlist_root(root)`
 
@@ -715,7 +724,7 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). Valu
 
 `Caps` ends with `_reserved: [u8; 32]`, so later caps (PC-43: `max_guarantees`, concentration, new coverage per period) are carved inside it.
 
-Program constants: `MAX_FEE_TAKE_BPS = 3_000`, `MAX_ADAPTERS` (TBD, small; must be fixed before the first devnet deploy because it sizes `VaultConfig`, §12 Q33), `PRICE_SCALE`, `NAV_SCALE`, `INSTANT_EXIT = 1 << 0`, `SUPPORTED_FEATURES` (pilot `0`), `PROGRAM_LAYOUT_VERSION` (pilot `1`), `MAX_FULFIL_BATCH` (pinned from a Mollusk benchmark of `fulfil_redeems` through a Squads vault transaction, with three CPIs and one `emit_cpi!` per fill and the boxed `VaultConfig` decode).
+Program constants: `MAX_FEE_TAKE_BPS = 3_000`, `MAX_ADAPTERS = 8` (§12 Q33, decided 2026-10-06; it sizes `VaultConfig`), `PRICE_SCALE`, `NAV_SCALE`, `INSTANT_EXIT = 1 << 0`, `SUPPORTED_FEATURES` (pilot `0`), `PROGRAM_LAYOUT_VERSION` (pilot `1`), `MAX_FULFIL_BATCH` (pinned from a Mollusk benchmark of `fulfil_redeems` through a Squads vault transaction, with three CPIs and one `emit_cpi!` per fill and the boxed `VaultConfig` decode).
 
 Instant-exit caps (per transaction, per wallet, global per period) live in `VaultConfig.exit` and apply only to the phase-2 instant exit ([§13.2](#132-parameters-exitparams)). The redemption queue keeps **no weekly cap**.
 
@@ -794,7 +803,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 | PC-23 | Guardian that can only reduce privilege | Partial: pauser pauses and revokes the operator | §2, §5.1 |
 | PC-24 | Granular pause that never traps funds | Partial: `cancel_*`/`claim_*` never pausable; granular flags TBD | §5.1 |
 | PC-26 | Capped sub-authority per adapter; master authority never in a CPI | Adopted | §3.9, §5.7 |
-| PC-27 | Pinned adapter code and post-CPI checks | Partial: post-CPI checks adopted; slot pinning TBD | §5.7 |
+| PC-27 | Pinned adapter code and post-CPI checks | Partial: post-CPI checks adopted; slot pinning TBD. Room is reserved: `AdapterEntry._reserved` is 64 bytes, enough for a pinned slot and upgrade authority without a migration | §3.9, §5.7 |
 | PC-28 | Request size limits | Adopted (values TBD) | §5.5, §8 |
 | PC-29 | Partial head fills and cancel semantics | Adopted (ADR 0010): head-only partial fills at the NAV of each fill, minimum fill and remainder, claim between fills, owner cancel of the remainder with no cooldown, a permissionless head-advance crank against cancel spam; fills refused while a claim notice is open (ADR 0011) | §3.8, §4, §5.4, §5.5, §5.8 |
 | PC-30 | Queued redemptions take priority over new guarantees | Not decided | §12 |
@@ -851,7 +860,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 30. **Effectiveness of the MUTAV bar.** If shares are freely transferable (PC-32), MUTAV or any holder can move shares to another allowlisted wallet and dodge the bar, the holding period and the per-wallet caps. Options: allowlist leaves of the form `hash(wallet, identity_hash)` with caps keyed by identity (LGPD review: a salted hash, not personal data), and/or restricting share transfers.
 31. **Haircut curve.** The integral curve and pilot parameters in §13.4 (50 bps floor, +600 bps at the full target, quadratic, 10% marginal cap, 7-day pressure epoch) are proposals, to be re-calibrated before enabling.
 32. **Queue liveness under notices.** While any notice is open the queues wait; a notice closes only when the claim is paid, the leg is fully provisioned, or the notice is withdrawn. Confirm that this delay is acceptable, or narrow the queue gate to requests owned by `mutav_capital_wallet` / `exit.barred` (instant exit keeps the global gate).
-33. **`MAX_ADAPTERS`.** Sizes `VaultConfig`; must be fixed before the first devnet deploy.
+33. **`MAX_ADAPTERS`.** *Resolved (2026-10-06):* `MAX_ADAPTERS = 8`. `AdapterEntry._reserved` widened to 64 bytes so PC-27 pinning can be added later without a migration.
 
 ---
 
@@ -1081,11 +1090,13 @@ Anchor 1.2 decodes `#[account]` structs with Borsh and ignores trailing bytes. S
 | `HolderState` | `[u8; 64]` | Per-wallet exit counters, 16 bytes |
 | `Guarantee`, `ClaimFiling`, `Payout`, `AgencyExposure`, `FeeReceipt`, `ClaimNotice` | `[u8; 64]` | None planned |
 | `Caps`, `PriceParams`, `ExitParams` (nested in config) | `[u8; 32]` each | Later caps (PC-43), stale-price haircut (Q21), later exit parameters |
-| `AdapterEntry` (inline in config) | `[u8; 16]` per entry | None planned |
+| `AdapterEntry` (inline in config) | `[u8; 64]` per entry | PC-27 adapter pinning (deployed slot and upgrade authority, 40 bytes), if adopted |
 
 **Real fields from the pilot** (read by pilot code, all in the pilot IDL): `VaultConfig.version`, `feature_flags`, `mutav_capital_wallet`, `exit: ExitParams`, `caps.min_fill_assets`; `VaultState.buffer_earmark`, `pending_notices`; the partial-fill fields of `RedeemRequest`; `HolderState`; `ClaimNotice`; `FeeReceipt`.
 
-**Layout freeze** (checked in plan Tasks 1 and 12, before the first devnet deploy): `MAX_ADAPTERS` pinned; `Caps`, `PriceParams`, `ExitParams` carry their tails; every status is a `u8` constant; every account has `version`, `bump` and `_reserved`; the event set (including `ConfigUpdated`'s final form) and the error list are final for append-only use.
+**Pinned sizes** (discriminator included): `VaultConfig` 2,756 bytes (`MAX_ADAPTERS = 8`), `VaultState` 480 bytes.
+
+**Layout freeze** (checked in plan Tasks 1 and 12, before the first devnet deploy): `MAX_ADAPTERS` pinned (8); `Caps`, `PriceParams`, `ExitParams` carry their tails; every status is a `u8` constant; every account has `version`, `bump` and `_reserved`; the event set (including `ConfigUpdated`'s final form) and the error list are final for append-only use.
 
 **Reserved seed prefixes** — no pilot PDA may use them: `"exit_buffer"`, `"exit_limit"`, `"instant_exit"`. (`"notice"` is used by the pilot `ClaimNotice`.) If padding ever runs out, new state goes in a new PDA (`["instant_exit", config]`), loaded as optional by code that runs before it exists.
 

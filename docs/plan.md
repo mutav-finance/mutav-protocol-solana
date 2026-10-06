@@ -27,6 +27,29 @@
 | Oct 12 | 22 — buffer and submission |
 | Post-pilot | P2-1…P2-8 — phase 2, instant exit (not in the hackathon window) |
 
+### Rescheduled (2026-10-06)
+
+Program work started on Oct 6, so the hackathon build runs in five phases, with one branch and one PR per phase. The task definitions below are unchanged; this table only sets the order and the scope.
+
+| Phase | Dates | Tasks | Done when |
+|---|---|---|---|
+| **A — Foundation** | Oct 6–7 | 1, 2, 2a | Account layouts frozen for devnet; math module covered by property tests |
+| **B — Guarantee book** | Oct 7–8 | 3, 4, 5 (`file_claim`, `pay_claim`, `settle_payout`) | Every demo step has a LiteSVM test: refused registration, fee, claim, payout while under-covered |
+| **C — Capital and safety** | Oct 8–9 | 6 (whole fills only), 7, 8 (BRS only), 10 | Deposit → shares → redeem in FIFO order; under-coverage mode; `refresh` and event audit |
+| **D — Ship** | Oct 9–10 | 11, 12, 13 (one happy path), minimal 14 and 18 [mutav-app] | Devnet deploy with Squads as upgrade authority; client published; demo runs on Nora's devnet BRS |
+| **E — Submit** | Oct 10–12 | 19–22 | Submitted before Oct 12, 23:59 BRT |
+
+**Built later** (designed in the ADRs, labelled "not built" in the README and litepaper):
+
+- partial fills at the queue head (ADR 0010; Task 6 ships whole fills only);
+- claim notices and their gate (Task 5's `flag_claim_notice` / `close_claim_notice`);
+- adapters, `allocate` / `deallocate` and TESOURO pricing (Task 9; parts of Tasks 8 and 13), with the TESOURO cap at 0% in the pilot;
+- the lifecycle states beyond active and closed (ADR 0012, PR #4);
+- the IDL-compatibility CI job (Task 11);
+- phase 2 (P2-1…P2-8).
+
+Layout fields for anything built later are carved from the `_reserved` padding (spec §14.2), so none of these need a migration.
+
 ---
 
 ## Task 0 — Scaffold and docs (Oct 1)
@@ -49,7 +72,7 @@
   - `reserve_mint` cannot change after init.
   - `set_config` emits one `ConfigUpdated { field: u16, old: [u8; 32], new: [u8; 32] }` per changed field, for every `VaultConfig` field including `Pubkey`, hash and nested `Caps` / `PriceParams` / `ExitParams` fields (a test walks the field-id table and asserts every field has an event path).
   - `set_config` and `set_payments_account` both reject `payments_account == treasury_account` and a `mutav_capital_wallet` equal to either token account's owner.
-- **Done when:** all tests pass; every account starts with `version`/`bump` and ends with the `_reserved` padding sized in spec §14.2 (`VaultConfig` 512, `VaultState` 256, others 64; `Caps`, `PriceParams`, `ExitParams` 32 each); statuses and modes are `u8` constants; `VaultConfig` carries `feature_flags`, `mutav_capital_wallet` and a zeroed `ExitParams`; events emitted via `emit_cpi!`. **Layout freeze checklist** (spec §14.2) ticked: `MAX_ADAPTERS` pinned (spec §12 Q33 answered), nested tails present, event set and error list final. Layout tests are in Task 2a.
+- **Done when:** all tests pass; every account starts with `version`/`bump` and ends with the `_reserved` padding sized in spec §14.2 (`VaultConfig` 512, `VaultState` 256, others 64; `Caps`, `PriceParams`, `ExitParams` 32 each); statuses and modes are `u8` constants; `VaultConfig` carries `feature_flags`, `mutav_capital_wallet` and a zeroed `ExitParams`; events emitted via `emit_cpi!`. **Layout freeze checklist** (spec §14.2) ticked: `MAX_ADAPTERS` pinned (spec §12 Q33 answered: `MAX_ADAPTERS = 8`, `AdapterEntry._reserved` 64 bytes, decided 2026-10-06), nested tails present, event set and error list final. Layout tests are in Task 2a.
 
 ## Task 2 — Math and solvency module (Oct 2)
 

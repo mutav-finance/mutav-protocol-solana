@@ -17,10 +17,20 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
+  getArrayDecoder,
+  getArrayEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
+  getI64Decoder,
+  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
+  getU16Decoder,
+  getU16Encoder,
+  getU64Decoder,
+  getU64Encoder,
   getU8Decoder,
   getU8Encoder,
   transformEncoder,
@@ -36,6 +46,24 @@ import {
   type MaybeEncodedAccount,
   type ReadonlyUint8Array,
 } from "@solana/kit";
+import {
+  getAdapterEntryDecoder,
+  getAdapterEntryEncoder,
+  getCapsDecoder,
+  getCapsEncoder,
+  getExitParamsDecoder,
+  getExitParamsEncoder,
+  getPriceParamsDecoder,
+  getPriceParamsEncoder,
+  type AdapterEntry,
+  type AdapterEntryArgs,
+  type Caps,
+  type CapsArgs,
+  type ExitParams,
+  type ExitParamsArgs,
+  type PriceParams,
+  type PriceParamsArgs,
+} from "../types";
 
 export const VAULT_CONFIG_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   99, 86, 43, 216, 184, 102, 119, 77,
@@ -49,32 +77,106 @@ export function getVaultConfigDiscriminatorBytes(): ReadonlyUint8Array {
 
 export type VaultConfig = {
   discriminator: ReadonlyUint8Array;
-  /** Protocol admin (a Squads multisig vault in production). */
-  admin: Address;
-  /** Operator authority (mutav-app KMS-backed server wallet). */
-  operator: Address;
-  /** May pause the vault; cannot unpause or move funds. */
-  pauser: Address;
-  /** The reserve asset mint (BRS), SPL Token or Token-2022. */
-  reserveMint: Address;
-  /** Canonical bump of this PDA. */
+  /** Layout version (pilot = 1). */
+  version: number;
+  /** Bump of this PDA. */
   bump: number;
-  /** Padding for future fields without a realloc. */
+  /**
+   * Bump of the vault authority PDA `["authority", config]`, stored so
+   * signing CPIs need no `find_program_address`.
+   */
+  authorityBump: number;
+  /** Squads vault address. */
+  admin: Address;
+  /** Operator key. `Pubkey::default()` when revoked. */
+  operator: Address;
+  /** Pauser key. */
+  pauser: Address;
+  /** BRS mint. Immutable after `initialize`. */
+  reserveMint: Address;
+  /** Token program owning `reserve_mint`. Immutable. */
+  reserveTokenProgram: Address;
+  /** Immutable. */
+  reserveDecimals: number;
+  /** Share mint (authority = vault authority). */
+  shareMint: Address;
+  /** Coverage ratio `c` in bps. */
+  coverageRatioBps: number;
+  /** MUTAV's take from each guarantee fee, `<= MAX_FEE_TAKE_BPS`. */
+  feeTakeBps: number;
+  /** Whitelisted MUTAV payments token account (BRS). */
+  paymentsAccount: Address;
+  /** Whitelisted MUTAV treasury token account (BRS). */
+  treasuryAccount: Address;
+  /** Merkle root of allowlisted investor wallets. */
+  investorAllowlistRoot: ReadonlyUint8Array;
+  /** Whitelisted adapters. */
+  adapters: Array<AdapterEntry>;
+  caps: Caps;
+  price: PriceParams;
+  /** Settlement SLA for payouts. */
+  payoutSlaSecs: bigint;
+  /** Global pause flag. */
+  paused: boolean;
+  /** Bitmask of optional features. `0` in the pilot. */
+  featureFlags: bigint;
+  /** MUTAV's allowlisted capital wallet, disclosed on-chain. */
+  mutavCapitalWallet: Address;
+  /** Phase-2 instant-exit parameters. All zero in the pilot. */
+  exit: ExitParams;
+  /** Zeroed. Never read or written by logic. */
   reserved: ReadonlyUint8Array;
 };
 
 export type VaultConfigArgs = {
-  /** Protocol admin (a Squads multisig vault in production). */
-  admin: Address;
-  /** Operator authority (mutav-app KMS-backed server wallet). */
-  operator: Address;
-  /** May pause the vault; cannot unpause or move funds. */
-  pauser: Address;
-  /** The reserve asset mint (BRS), SPL Token or Token-2022. */
-  reserveMint: Address;
-  /** Canonical bump of this PDA. */
+  /** Layout version (pilot = 1). */
+  version: number;
+  /** Bump of this PDA. */
   bump: number;
-  /** Padding for future fields without a realloc. */
+  /**
+   * Bump of the vault authority PDA `["authority", config]`, stored so
+   * signing CPIs need no `find_program_address`.
+   */
+  authorityBump: number;
+  /** Squads vault address. */
+  admin: Address;
+  /** Operator key. `Pubkey::default()` when revoked. */
+  operator: Address;
+  /** Pauser key. */
+  pauser: Address;
+  /** BRS mint. Immutable after `initialize`. */
+  reserveMint: Address;
+  /** Token program owning `reserve_mint`. Immutable. */
+  reserveTokenProgram: Address;
+  /** Immutable. */
+  reserveDecimals: number;
+  /** Share mint (authority = vault authority). */
+  shareMint: Address;
+  /** Coverage ratio `c` in bps. */
+  coverageRatioBps: number;
+  /** MUTAV's take from each guarantee fee, `<= MAX_FEE_TAKE_BPS`. */
+  feeTakeBps: number;
+  /** Whitelisted MUTAV payments token account (BRS). */
+  paymentsAccount: Address;
+  /** Whitelisted MUTAV treasury token account (BRS). */
+  treasuryAccount: Address;
+  /** Merkle root of allowlisted investor wallets. */
+  investorAllowlistRoot: ReadonlyUint8Array;
+  /** Whitelisted adapters. */
+  adapters: Array<AdapterEntryArgs>;
+  caps: CapsArgs;
+  price: PriceParamsArgs;
+  /** Settlement SLA for payouts. */
+  payoutSlaSecs: number | bigint;
+  /** Global pause flag. */
+  paused: boolean;
+  /** Bitmask of optional features. `0` in the pilot. */
+  featureFlags: number | bigint;
+  /** MUTAV's allowlisted capital wallet, disclosed on-chain. */
+  mutavCapitalWallet: Address;
+  /** Phase-2 instant-exit parameters. All zero in the pilot. */
+  exit: ExitParamsArgs;
+  /** Zeroed. Never read or written by logic. */
   reserved: ReadonlyUint8Array;
 };
 
@@ -83,12 +185,30 @@ export function getVaultConfigEncoder(): FixedSizeEncoder<VaultConfigArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["version", getU8Encoder()],
+      ["bump", getU8Encoder()],
+      ["authorityBump", getU8Encoder()],
       ["admin", getAddressEncoder()],
       ["operator", getAddressEncoder()],
       ["pauser", getAddressEncoder()],
       ["reserveMint", getAddressEncoder()],
-      ["bump", getU8Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 128)],
+      ["reserveTokenProgram", getAddressEncoder()],
+      ["reserveDecimals", getU8Encoder()],
+      ["shareMint", getAddressEncoder()],
+      ["coverageRatioBps", getU16Encoder()],
+      ["feeTakeBps", getU16Encoder()],
+      ["paymentsAccount", getAddressEncoder()],
+      ["treasuryAccount", getAddressEncoder()],
+      ["investorAllowlistRoot", fixEncoderSize(getBytesEncoder(), 32)],
+      ["adapters", getArrayEncoder(getAdapterEntryEncoder(), { size: 8 })],
+      ["caps", getCapsEncoder()],
+      ["price", getPriceParamsEncoder()],
+      ["payoutSlaSecs", getI64Encoder()],
+      ["paused", getBooleanEncoder()],
+      ["featureFlags", getU64Encoder()],
+      ["mutavCapitalWallet", getAddressEncoder()],
+      ["exit", getExitParamsEncoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 512)],
     ]),
     (value) => ({ ...value, discriminator: VAULT_CONFIG_DISCRIMINATOR }),
   );
@@ -98,12 +218,30 @@ export function getVaultConfigEncoder(): FixedSizeEncoder<VaultConfigArgs> {
 export function getVaultConfigDecoder(): FixedSizeDecoder<VaultConfig> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["version", getU8Decoder()],
+    ["bump", getU8Decoder()],
+    ["authorityBump", getU8Decoder()],
     ["admin", getAddressDecoder()],
     ["operator", getAddressDecoder()],
     ["pauser", getAddressDecoder()],
     ["reserveMint", getAddressDecoder()],
-    ["bump", getU8Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 128)],
+    ["reserveTokenProgram", getAddressDecoder()],
+    ["reserveDecimals", getU8Decoder()],
+    ["shareMint", getAddressDecoder()],
+    ["coverageRatioBps", getU16Decoder()],
+    ["feeTakeBps", getU16Decoder()],
+    ["paymentsAccount", getAddressDecoder()],
+    ["treasuryAccount", getAddressDecoder()],
+    ["investorAllowlistRoot", fixDecoderSize(getBytesDecoder(), 32)],
+    ["adapters", getArrayDecoder(getAdapterEntryDecoder(), { size: 8 })],
+    ["caps", getCapsDecoder()],
+    ["price", getPriceParamsDecoder()],
+    ["payoutSlaSecs", getI64Decoder()],
+    ["paused", getBooleanDecoder()],
+    ["featureFlags", getU64Decoder()],
+    ["mutavCapitalWallet", getAddressDecoder()],
+    ["exit", getExitParamsDecoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 512)],
   ]);
 }
 
@@ -169,5 +307,5 @@ export async function fetchAllMaybeVaultConfig(
 }
 
 export function getVaultConfigSize(): number {
-  return 265;
+  return 2756;
 }

@@ -22,8 +22,8 @@ custom-heap = []
 custom-panic = []
 
 [dependencies]
-anchor-lang.workspace = true
-anchor-spl.workspace = true
+anchor-lang = { workspace = true, features = ["event-cpi"] }
+anchor-spl = { workspace = true, features = ["token_2022_extensions"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
