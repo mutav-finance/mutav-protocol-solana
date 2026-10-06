@@ -139,9 +139,8 @@ fn pause_blocks_capital_flows_and_new_guarantees_only() {
         MutavError::Paused,
     );
 
-    // Open: fees, claims, settlement, closing, the crank, cancel_* and
-    // claim_*. (`refresh` is added with Task 10; claim notices are built
-    // later.)
+    // Open: fees, claims, settlement, closing, `refresh`, the crank,
+    // cancel_* and claim_*. (Claim notices are built later.)
     f.contribute(1_000 * BRL).0.expect("contribute_fees");
     let c2 = Claim::on(&g, 500 * BRL);
     f.file_claim(c2).expect("file_claim");
