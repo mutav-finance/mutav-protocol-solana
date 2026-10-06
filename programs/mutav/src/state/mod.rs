@@ -2,13 +2,17 @@
 //! and ends with `_reserved` (spec §14.2).
 
 pub mod agency;
+pub mod claim;
 pub mod config;
 pub mod fee;
 pub mod guarantee;
+pub mod payout;
 pub mod state;
 
 pub use agency::*;
+pub use claim::*;
 pub use config::*;
 pub use fee::*;
 pub use guarantee::*;
+pub use payout::*;
 pub use state::*;

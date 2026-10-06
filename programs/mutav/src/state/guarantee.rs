@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{GUARANTEE_ACTIVE, GUARANTEE_CLOSED, GUARANTEE_SIZE},
+    constants::{GUARANTEE_ACTIVE, GUARANTEE_CLOSED, GUARANTEE_SIZE, LEG_DEFAULT, LEG_EXIT},
     errors::MutavError,
 };
 
@@ -70,5 +70,28 @@ impl Guarantee {
             .checked_sub(self.exit_paid)
             .ok_or(MutavError::MathOverflow)?;
         Ok(d.checked_add(e).ok_or(MutavError::MathOverflow)?)
+    }
+
+    /// `(cover, paid, provision)` of `leg`; `InvalidParameter` for an unknown
+    /// leg.
+    pub fn leg(&self, leg: u8) -> Result<(u64, u64, u64)> {
+        match leg {
+            LEG_DEFAULT => Ok((
+                self.default_cover,
+                self.default_paid,
+                self.provision_default,
+            )),
+            LEG_EXIT => Ok((self.exit_cover, self.exit_paid, self.provision_exit)),
+            _ => err!(MutavError::InvalidParameter),
+        }
+    }
+
+    /// Mutable `(paid, provision)` of `leg`.
+    pub fn leg_mut(&mut self, leg: u8) -> Result<(&mut u64, &mut u64)> {
+        match leg {
+            LEG_DEFAULT => Ok((&mut self.default_paid, &mut self.provision_default)),
+            LEG_EXIT => Ok((&mut self.exit_paid, &mut self.provision_exit)),
+            _ => err!(MutavError::InvalidParameter),
+        }
     }
 }
