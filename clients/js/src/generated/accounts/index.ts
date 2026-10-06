@@ -7,3 +7,4 @@
  */
 
 export * from "./vaultConfig";
+export * from "./vaultState";

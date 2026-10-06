@@ -7,3 +7,10 @@
  */
 
 export * from "./initialize";
+export * from "./pause";
+export * from "./revokeOperator";
+export * from "./setAllowlistRoot";
+export * from "./setConfig";
+export * from "./setPaymentsAccount";
+export * from "./setRoles";
+export * from "./unpause";
