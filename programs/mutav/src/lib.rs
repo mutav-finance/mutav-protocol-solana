@@ -67,4 +67,19 @@ pub mod mutav {
     pub fn revoke_operator(ctx: Context<RevokeOperator>) -> Result<()> {
         instructions::admin::revoke_operator::handle_revoke_operator(ctx)
     }
+
+    /// Register a guarantee: solvency-gated, per-guarantee and per-agency
+    /// capped. Operator.
+    pub fn register_guarantee(
+        ctx: Context<RegisterGuarantee>,
+        args: RegisterGuaranteeArgs,
+    ) -> Result<()> {
+        instructions::operator::register_guarantee::handle_register_guarantee(ctx, args)
+    }
+
+    /// Close an active guarantee with no open claims, releasing its remaining
+    /// cover. Operator.
+    pub fn close_guarantee(ctx: Context<CloseGuarantee>, id: [u8; 32]) -> Result<()> {
+        instructions::operator::close_guarantee::handle_close_guarantee(ctx, id)
+    }
 }

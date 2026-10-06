@@ -1,0 +1,104 @@
+//! Golden layouts of the guarantee-book accounts (plan Tasks 3–5, carried
+//! from 2a): size pins, frozen v1 offset tables, v1 bytes decoding under the
+//! current structs, and frozen discriminators.
+
+use anchor_lang::{AccountDeserialize, AnchorDeserialize, Discriminator, Space};
+use mutav::{
+    constants::*,
+    state::{AgencyExposure, Guarantee},
+};
+
+use crate::{pattern, ser, spans, v1::*, zeroed};
+
+macro_rules! guarantee_fields {
+    ($t:ty) => {
+        spans!($t;
+            "version" => version, "bump" => bump, "id" => id, "agency_id" => agency_id,
+            "refs_hash" => refs_hash, "rent" => rent,
+            "default_multiplier_bps" => default_multiplier_bps,
+            "exit_multiplier_bps" => exit_multiplier_bps,
+            "default_cover" => default_cover, "exit_cover" => exit_cover,
+            "default_paid" => default_paid, "exit_paid" => exit_paid,
+            "provision_default" => provision_default, "provision_exit" => provision_exit,
+            "open_claims" => open_claims, "status" => status,
+            "registered_at" => registered_at, "closed_at" => closed_at,
+            "_reserved" => _reserved,
+        )
+    };
+}
+
+macro_rules! agency_fields {
+    ($t:ty) => {
+        spans!($t;
+            "version" => version, "bump" => bump, "agency_id" => agency_id,
+            "outstanding_cover" => outstanding_cover,
+            "active_guarantees" => active_guarantees,
+            "claims_paid_total" => claims_paid_total, "_reserved" => _reserved,
+        )
+    };
+}
+
+/// Re-decodes v1 bytes under the current account type and checks nothing
+/// moved.
+fn v1_round_trip<
+    V: AnchorDeserialize + anchor_lang::AnchorSerialize,
+    T: AccountDeserialize + anchor_lang::AnchorSerialize + Discriminator,
+>(
+    size: usize,
+) {
+    let bytes = pattern(size - 8, &[]);
+    let v1 = V::deserialize(&mut bytes.as_slice()).unwrap();
+    assert_eq!(ser(&v1), bytes);
+    let mut account = T::DISCRIMINATOR.to_vec();
+    account.extend(&bytes);
+    let cur = T::try_deserialize(&mut account.as_slice()).unwrap();
+    assert_eq!(ser(&cur), bytes, "bytes moved");
+}
+
+#[test]
+fn book_sizes_are_pinned() {
+    assert_eq!(8 + Guarantee::INIT_SPACE, GUARANTEE_SIZE);
+    assert_eq!(8 + AgencyExposure::INIT_SPACE, AGENCY_EXPOSURE_SIZE);
+    assert_eq!(GUARANTEE_SIZE, 249);
+    assert_eq!(AGENCY_EXPOSURE_SIZE, 126);
+    assert_eq!(8 + ser(&zeroed::<Guarantee>()).len(), GUARANTEE_SIZE);
+    assert_eq!(8 + ser(&zeroed::<GuaranteeV1>()).len(), GUARANTEE_SIZE);
+    assert_eq!(
+        8 + ser(&zeroed::<AgencyExposure>()).len(),
+        AGENCY_EXPOSURE_SIZE
+    );
+    assert_eq!(
+        8 + ser(&zeroed::<AgencyExposureV1>()).len(),
+        AGENCY_EXPOSURE_SIZE
+    );
+}
+
+#[test]
+fn book_offsets_match_v1() {
+    assert_eq!(guarantee_fields!(GuaranteeV1), GUARANTEE_V1.to_vec());
+    assert_eq!(guarantee_fields!(Guarantee), GUARANTEE_V1.to_vec());
+    assert_eq!(
+        agency_fields!(AgencyExposureV1),
+        AGENCY_EXPOSURE_V1.to_vec()
+    );
+    assert_eq!(agency_fields!(AgencyExposure), AGENCY_EXPOSURE_V1.to_vec());
+}
+
+#[test]
+fn book_v1_bytes_decode_under_the_current_structs() {
+    v1_round_trip::<GuaranteeV1, Guarantee>(GUARANTEE_SIZE);
+    v1_round_trip::<AgencyExposureV1, AgencyExposure>(AGENCY_EXPOSURE_SIZE);
+}
+
+#[test]
+fn book_discriminators_are_frozen() {
+    // sha256("account:<Name>")[..8], computed independently and committed.
+    assert_eq!(
+        Guarantee::DISCRIMINATOR,
+        &[198, 16, 124, 172, 230, 249, 200, 37]
+    );
+    assert_eq!(
+        AgencyExposure::DISCRIMINATOR,
+        &[1, 250, 85, 98, 115, 180, 168, 59]
+    );
+}

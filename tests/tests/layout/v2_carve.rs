@@ -139,8 +139,8 @@ fn v1_bytes_read_as_v2_with_zero_carve() {
 
 #[test]
 fn pilot_accounts_read_as_v2() {
-    // Accounts produced by the pilot program, with v1 fields injected (no
-    // pilot instruction writes VaultState yet), then every instruction run.
+    // Accounts produced by the pilot program, with v1 fields injected, then
+    // every instruction run.
     let mut f = Fixture::new();
     let mut s = f.state();
     s.brs_balance = 123;
@@ -148,7 +148,11 @@ fn pilot_accounts_read_as_v2() {
     s.pending_notices = 2;
     s.last_refresh_slot = 99;
     f.write_state(&s);
-    for (name, ix, signer) in f.pilot_instructions() {
+    // Building the list funds the reserve for the operator instructions.
+    let ixs = f.pilot_instructions();
+    let funded = f.state().brs_balance;
+    assert!(funded >= 123);
+    for (name, ix, signer) in ixs {
         f.send(ix, &signer)
             .unwrap_or_else(|e| panic!("{name}: {:?}", e.err));
     }
@@ -156,7 +160,7 @@ fn pilot_accounts_read_as_v2() {
     let v2 = v2(&raw);
     assert_eq!(v2.instant_exit, InstantExitState::default());
     assert_eq!(v2._reserved, [0; 168]);
-    assert_eq!(v2.brs_balance, 123);
+    assert_eq!(v2.brs_balance, funded);
     assert_eq!(v2.pending_notices, 2);
     assert_eq!(v2.last_refresh_slot, 99);
     assert_eq!(v2.version, s.version);
