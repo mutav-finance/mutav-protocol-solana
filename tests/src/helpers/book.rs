@@ -10,7 +10,7 @@ use litesvm::types::TransactionResult;
 use litesvm_token::MintTo;
 use mutav::{
     constants::*,
-    state::{AgencyExposure, Guarantee},
+    state::{AgencyExposure, FeeReceipt, Guarantee},
     RegisterGuaranteeArgs,
 };
 use solana_keypair::Keypair;
@@ -35,6 +35,22 @@ pub fn guarantee_pda(config: &Pubkey, id: &[u8; 32]) -> Pubkey {
 /// `AgencyExposure`: `["agency", config, agency_id]`.
 pub fn agency_pda(config: &Pubkey, agency_id: &[u8; 32]) -> Pubkey {
     pda(&[AGENCY_SEED, config.as_ref(), agency_id])
+}
+
+/// `FeeReceipt`: `["fee", config, invoice_ref_hash]`.
+pub fn fee_receipt_pda(config: &Pubkey, invoice_ref_hash: &[u8; 32]) -> Pubkey {
+    pda(&[FEE_SEED, config.as_ref(), invoice_ref_hash])
+}
+
+/// Accounts of `contribute_fees` that tests vary.
+#[derive(Clone, Copy, Debug)]
+pub struct FeeAccounts {
+    pub operator: Pubkey,
+    pub source: Pubkey,
+    pub reserve: Pubkey,
+    pub treasury: Pubkey,
+    pub reserve_mint: Pubkey,
+    pub token_program: Pubkey,
 }
 
 /// Registration args with fresh `id` and `refs_hash`, rent R$2,000 and the
@@ -75,6 +91,126 @@ impl Fixture {
         let mut s = self.state();
         s.brs_balance += amount;
         self.write_state(&s);
+    }
+
+    /// Mints `amount` BRS into any token account (the test holds the mint
+    /// authority).
+    pub fn mint_brs(&mut self, to: &Pubkey, amount: u64) {
+        let payer = self.payer.insecure_clone();
+        let mint = self.reserve_mint;
+        MintTo::new(&mut self.svm, &payer, &mint, to, amount)
+            .token_program_id(&self.token_program.clone())
+            .send()
+            .expect("mint BRS");
+    }
+
+    /// A BRS token account owned by the operator holding `amount`: guarantee
+    /// fees reach it via PIX → BRS off-chain (spec §5.3).
+    pub fn operator_brs(&mut self, amount: u64) -> Pubkey {
+        let op = self.operator.pubkey();
+        let acc = self.token_account(&op);
+        self.mint_brs(&acc, amount);
+        acc
+    }
+
+    /// The default `contribute_fees` accounts for `source`.
+    pub fn fee_accounts(&self, source: Pubkey) -> FeeAccounts {
+        FeeAccounts {
+            operator: self.operator.pubkey(),
+            source,
+            reserve: self.pdas.reserve,
+            treasury: self.config().treasury_account,
+            reserve_mint: self.reserve_mint,
+            token_program: self.token_program,
+        }
+    }
+
+    pub fn contribute_fees_ix(
+        &self,
+        a: FeeAccounts,
+        invoice_ref_hash: [u8; 32],
+        amount: u64,
+    ) -> Instruction {
+        let config = self.pdas.config;
+        Instruction::new_with_bytes(
+            mutav::ID,
+            &mutav::instruction::ContributeFees {
+                invoice_ref_hash,
+                amount,
+            }
+            .data(),
+            mutav::accounts::ContributeFees {
+                operator: a.operator,
+                config,
+                state: self.pdas.state,
+                fee_receipt: fee_receipt_pda(&config, &invoice_ref_hash),
+                source: a.source,
+                reserve: a.reserve,
+                treasury_account: a.treasury,
+                reserve_mint: a.reserve_mint,
+                token_program: a.token_program,
+                payer: self.payer.pubkey(),
+                system_program: anchor_lang::solana_program::system_program::ID,
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    /// `contribute_fees` by the operator from a freshly funded source, with a
+    /// fresh invoice. Returns the invoice hash.
+    pub fn contribute(&mut self, amount: u64) -> (TransactionResult, [u8; 32]) {
+        let source = self.operator_brs(amount);
+        let invoice = unique_hash();
+        let ix = self.contribute_fees_ix(self.fee_accounts(source), invoice, amount);
+        let op = self.operator.insecure_clone();
+        (self.send(ix, &op), invoice)
+    }
+
+    pub fn fee_receipt(&self, invoice_ref_hash: &[u8; 32]) -> FeeReceipt {
+        let acc = self
+            .svm
+            .get_account(&fee_receipt_pda(&self.pdas.config, invoice_ref_hash))
+            .expect("fee receipt");
+        FeeReceipt::try_deserialize(&mut acc.data.as_slice()).expect("decode fee receipt")
+    }
+
+    /// Injects `shares` outstanding, as fulfilled deposits (Task 6) would
+    /// leave them: `VaultState.shares_outstanding` and the share mint's
+    /// supply both rise (invariant 5).
+    pub fn inject_shares(&mut self, shares: u64) {
+        let mut s = self.state();
+        s.shares_outstanding += shares;
+        self.write_state(&s);
+        let mint = self.pdas.share_mint;
+        let mut acc = self.svm.get_account(&mint).expect("share mint");
+        let supply = u64::from_le_bytes(acc.data[36..44].try_into().unwrap()) + shares;
+        acc.data[36..44].copy_from_slice(&supply.to_le_bytes());
+        self.svm.set_account(mint, acc).expect("set share mint");
+    }
+
+    /// Share mint supply.
+    pub fn share_supply(&self) -> u64 {
+        let acc = self
+            .svm
+            .get_account(&self.pdas.share_mint)
+            .expect("share mint");
+        u64::from_le_bytes(acc.data[36..44].try_into().unwrap())
+    }
+
+    /// NAV per share (`NAV_SCALE`) computed from the current state with the
+    /// spec §4 formulas, as `refresh` (Task 10) publishes it. No TESOURO in
+    /// these tests.
+    pub fn nav(&self) -> u64 {
+        use mutav::solvency::{nav_per_share, net_assets};
+        let s = self.state();
+        assert_eq!(s.tesouro_units, 0);
+        nav_per_share(
+            net_assets(s.brs_balance, s.provisions),
+            s.shares_outstanding,
+        )
+        .unwrap()
     }
 
     /// Token balance of a token account.
@@ -192,15 +328,19 @@ impl Fixture {
     }
 
     /// Operator instructions for the pilot list, each valid in this order on
-    /// a fresh fixture: fund the reserve, register a guarantee, close it.
-    /// Fresh ids on every call, so the list can be built many times.
+    /// a fresh fixture: contribute a fee, fund the reserve, register a
+    /// guarantee, close it. Fresh ids on every call, so the list can be built
+    /// many times.
     pub fn book_instructions(&mut self) -> Vec<(&'static str, Instruction, Keypair)> {
         let op = self.operator.insecure_clone();
         let cover = 10_000 * BRL;
         self.fund_reserve(cover);
         let args = guarantee_args(unique_hash(), cover, 0);
         let (id, agency) = (args.id, args.agency_id);
+        let source = self.operator_brs(1_000 * BRL);
+        let fee = self.contribute_fees_ix(self.fee_accounts(source), unique_hash(), 1_000 * BRL);
         vec![
+            ("contribute_fees", fee, op.insecure_clone()),
             (
                 "register_guarantee",
                 self.register_guarantee_ix(&op.pubkey(), args),

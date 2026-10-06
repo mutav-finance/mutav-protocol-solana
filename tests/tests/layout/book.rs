@@ -5,7 +5,7 @@
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, Discriminator, Space};
 use mutav::{
     constants::*,
-    state::{AgencyExposure, Guarantee},
+    state::{AgencyExposure, FeeReceipt, Guarantee},
 };
 
 use crate::{pattern, ser, spans, v1::*, zeroed};
@@ -100,5 +100,33 @@ fn book_discriminators_are_frozen() {
     assert_eq!(
         AgencyExposure::DISCRIMINATOR,
         &[1, 250, 85, 98, 115, 180, 168, 59]
+    );
+}
+
+#[test]
+fn fee_receipt_layout_is_frozen() {
+    assert_eq!(8 + FeeReceipt::INIT_SPACE, FEE_RECEIPT_SIZE);
+    assert_eq!(FEE_RECEIPT_SIZE, 138);
+    assert_eq!(8 + ser(&zeroed::<FeeReceipt>()).len(), FEE_RECEIPT_SIZE);
+    assert_eq!(8 + ser(&zeroed::<FeeReceiptV1>()).len(), FEE_RECEIPT_SIZE);
+    let fields = |t: Vec<(&'static str, usize, usize)>| t;
+    assert_eq!(
+        fields(spans!(FeeReceiptV1;
+            "version" => version, "bump" => bump, "invoice_ref_hash" => invoice_ref_hash,
+            "gross" => gross, "take" => take, "net" => net, "slot" => slot,
+            "_reserved" => _reserved)),
+        FEE_RECEIPT_V1.to_vec()
+    );
+    assert_eq!(
+        fields(spans!(FeeReceipt;
+            "version" => version, "bump" => bump, "invoice_ref_hash" => invoice_ref_hash,
+            "gross" => gross, "take" => take, "net" => net, "slot" => slot,
+            "_reserved" => _reserved)),
+        FEE_RECEIPT_V1.to_vec()
+    );
+    v1_round_trip::<FeeReceiptV1, FeeReceipt>(FEE_RECEIPT_SIZE);
+    assert_eq!(
+        FeeReceipt::DISCRIMINATOR,
+        &[135, 174, 32, 77, 183, 44, 26, 107]
     );
 }

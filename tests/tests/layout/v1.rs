@@ -331,3 +331,30 @@ pub const AGENCY_EXPOSURE_V1: OffsetTable = &[
     ("claims_paid_total", 46, 8),
     ("_reserved", 54, 64),
 ];
+
+// ---------------------------------------------------------------------------
+// Guarantee fees (Task 4)
+// ---------------------------------------------------------------------------
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct FeeReceiptV1 {
+    pub version: u8,
+    pub bump: u8,
+    pub invoice_ref_hash: [u8; 32],
+    pub gross: u64,
+    pub take: u64,
+    pub net: u64,
+    pub slot: u64,
+    pub _reserved: [u8; 64],
+}
+
+pub const FEE_RECEIPT_V1: OffsetTable = &[
+    ("version", 0, 1),
+    ("bump", 1, 1),
+    ("invoice_ref_hash", 2, 32),
+    ("gross", 34, 8),
+    ("take", 42, 8),
+    ("net", 50, 8),
+    ("slot", 58, 8),
+    ("_reserved", 66, 64),
+];
