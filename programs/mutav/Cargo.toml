@@ -27,3 +27,6 @@ anchor-spl = { workspace = true, features = ["token_2022_extensions"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
+
+[dev-dependencies]
+proptest = { version = "1", default-features = false, features = ["std"] }

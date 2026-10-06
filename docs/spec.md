@@ -370,7 +370,7 @@ earmark_eff  = 0                                    if feature_flags & INSTANT_E
 - **`pay_claim` never reads or writes `buffer_earmark`.** The liquidity term clamps the effective earmark after a claim payment, and the next ratcheting instruction stores it. The claim path is therefore final from the pilot onwards.
 - The stored level only moves down through the ratchet, `instant_redeem`, `defund_exit_buffer` and `release_starved_buffer`. It moves up only through the phase-2 `fund_exit_buffer`.
 
-**Share conversion** (virtual offset `V = 10^k`, `k` **TBD**, against first-depositor inflation):
+**Share conversion** (virtual offset `V = 10^k` with `k = 0`, so `V = 1`; decided 2026-10-06, [§12 Q20](#12-open-questions)). With the 6-decimal share mint, one share is worth 1 BRS at launch. No seed deposit is minted at `initialize`. A larger offset is not needed against first-depositor inflation: NAV uses internal accounting and ignores direct token transfers (invariant 1), so only the operator's `contribute_fees` can raise `net_assets` without minting shares, and deposits are allowlisted and fulfilled by the admin. At `V = 1` an inflation attempt is never profitable for the attacker.
 
 ```text
 shares_for(assets) = floor(assets × (shares_outstanding + V) / (net_assets + 1))     // deposit: round down
@@ -724,7 +724,7 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). Valu
 
 `Caps` ends with `_reserved: [u8; 32]`, so later caps (PC-43: `max_guarantees`, concentration, new coverage per period) are carved inside it.
 
-Program constants: `MAX_FEE_TAKE_BPS = 3_000`, `MAX_ADAPTERS = 8` (§12 Q33, decided 2026-10-06; it sizes `VaultConfig`), `PRICE_SCALE`, `NAV_SCALE`, `INSTANT_EXIT = 1 << 0`, `SUPPORTED_FEATURES` (pilot `0`), `PROGRAM_LAYOUT_VERSION` (pilot `1`), `MAX_FULFIL_BATCH` (pinned from a Mollusk benchmark of `fulfil_redeems` through a Squads vault transaction, with three CPIs and one `emit_cpi!` per fill and the boxed `VaultConfig` decode).
+Program constants: `MAX_FEE_TAKE_BPS = 3_000`, `MAX_ADAPTERS = 8` (§12 Q33, decided 2026-10-06; it sizes `VaultConfig`), `PRICE_SCALE = 10^9` and `NAV_SCALE = 10^9` (decided 2026-10-06; `NAV_SCALE` is NAV 1.0), `VIRTUAL_OFFSET = 10^0 = 1` (§12 Q20, decided 2026-10-06), `INSTANT_EXIT = 1 << 0`, `SUPPORTED_FEATURES` (pilot `0`), `PROGRAM_LAYOUT_VERSION` (pilot `1`), `MAX_FULFIL_BATCH` (pinned from a Mollusk benchmark of `fulfil_redeems` through a Squads vault transaction, with three CPIs and one `emit_cpi!` per fill and the boxed `VaultConfig` decode).
 
 Instant-exit caps (per transaction, per wallet, global per period) live in `VaultConfig.exit` and apply only to the phase-2 instant exit ([§13.2](#132-parameters-exitparams)). The redemption queue keeps **no weekly cap**.
 
@@ -844,7 +844,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 17. **`coverage_ratio_bps` floor.** Configurable from 1.0, or a program constant floor of 1.0 (PC-14).
 18. **Allocation gate.** Must the allocated amount itself fit in `free_capital`, or is the solvency post-condition plus the TESOURO share cap enough?
 19. **Per-invoice idempotency for fees.** *Resolved (ADR 0009):* a `FeeReceipt` PDA seeded by `invoice_ref_hash`.
-20. **Virtual offset and seed deposit.** The value of `k` and whether a seed deposit is minted at `initialize`.
+20. **Virtual offset and seed deposit.** *Resolved (2026-10-06):* `k = 0`, so `V = 1`: one share is worth 1 BRS at launch with the 6-decimal share mint. No seed deposit is minted at `initialize`. Rationale: NAV ignores direct transfers (internal accounting, invariant 1), and deposits are allowlisted and fulfilled by the admin, so a larger offset is not needed against first-depositor inflation. `PRICE_SCALE = NAV_SCALE = 10^9` (§8).
 21. **NAV-move threshold X**, staleness window, deviation bound and stale-price behaviour (fail vs haircut).
 22. **Adversarial-review items not yet decided:** PC-4, PC-6, PC-8, PC-9, PC-13 (beyond filed claims), PC-15, PC-16, PC-21, PC-22, PC-30, PC-31, PC-32, PC-34, PC-35, PC-36, PC-38, PC-43 (extra caps). See §11. PC-29 is resolved by ADR 0010.
 
