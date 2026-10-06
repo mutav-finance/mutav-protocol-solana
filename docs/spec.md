@@ -513,7 +513,7 @@ Shipped in the pilot (ADR 0011). MUTAV learns of a missed rent up to 15 days bef
   - `FullyProvisioned`: the `ClaimFiling` exists, is `FILED`, and the leg is provisioned for its whole remaining cover (`leg_provision == leg_cover − leg_paid`), so no later payment on that leg can exceed what NAV already reflects (ties to PC-12, §12 Q13);
   - `Withdrawn`: MUTAV dropped the notice (rent was paid, or the claim was not approved).
 
-  A notice is never closed merely because a smaller provision was filed: `pay_claim` may pay up to the leg's remaining cover, which can exceed the filed provision. Otherwise `NoticeNotResolved`. Closes the notice (rent to the operator); `pending_notices −= 1`.
+  A notice is never closed merely because a smaller provision was filed: `pay_claim` may pay up to the filing's provision plus the leg's unprovisioned cover ([ADR 0014](decisions/0014-pay-claim-bound-with-concurrent-filings.md)), which can exceed the filed provision. Otherwise `NoticeNotResolved`. Closes the notice (rent to the operator); `pending_notices −= 1`.
 - **Liveness:** while any notice is open the queues wait. MUTAV can always reopen them by provisioning the leg fully (`FullyProvisioned`), which only lowers NAV, in the reserve's favour. The transparency page shows every open notice and its age and flags any open longer than 15 days.
 - **Errors:** `GuaranteeNotActive`, `NoticeNotResolved`, `ClaimNotFiled`; account-already-in-use on a duplicate notice.
 - **Events:** `ClaimNoticeFlagged { guarantee_id, notice_ref_hash }`, `ClaimNoticeClosed { guarantee_id, notice_ref_hash, reason }`.
@@ -533,7 +533,7 @@ Shipped in the pilot (ADR 0011). MUTAV learns of a missed rent up to 15 days bef
 - **Accounts:** `config`, `state`, `guarantee`, `claim_filing`, `payout` (init), `reserve`, `payments_account`, vault authority, BRS mint, token program.
 - **Rules:**
   1. `claim_filing.status == Filed` and `claim_filing.leg == leg`.
-  2. `amount > 0`; `amount ≤ leg_cover − leg_paid` (remaining cover on the leg).
+  2. `amount > 0`; `amount ≤ filing.provision + (leg_cover − leg_paid − leg_provision)`: this filing's own provision plus the leg's unprovisioned cover, so a payment never spends cover another open filing has provisioned ([ADR 0014](decisions/0014-pay-claim-bound-with-concurrent-filings.md), proposed). With one open filing this equals the leg's remaining cover.
   3. `amount ≤ caps.max_claim_per_call`.
   4. Roll the window if `now ≥ claim_period_start + caps.claim_period_secs`; then `claim_period_paid + amount ≤ caps.max_claim_per_period`.
   5. Destination equals `config.payments_account`.

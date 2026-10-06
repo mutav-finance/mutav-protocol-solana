@@ -188,7 +188,11 @@ export type ContributeFeesAsyncInput<
   config: TAccountConfig;
   state?: TAccountState;
   feeReceipt?: TAccountFeeReceipt;
-  /** The operator's BRS token account (fees reach it via PIX → BRS). */
+  /**
+   * The operator's own BRS token account (fees reach it via PIX → BRS).
+   * Must be owned by the operator: spending through a delegate is refused
+   * (spec §5.3).
+   */
   source: TAccountSource;
   reserve?: TAccountReserve;
   /** The whitelisted MUTAV treasury: receives the take directly. */
@@ -506,7 +510,11 @@ export type ContributeFeesInput<
   config: TAccountConfig;
   state: TAccountState;
   feeReceipt: TAccountFeeReceipt;
-  /** The operator's BRS token account (fees reach it via PIX → BRS). */
+  /**
+   * The operator's own BRS token account (fees reach it via PIX → BRS).
+   * Must be owned by the operator: spending through a delegate is refused
+   * (spec §5.3).
+   */
   source: TAccountSource;
   reserve: TAccountReserve;
   /** The whitelisted MUTAV treasury: receives the take directly. */
@@ -772,7 +780,11 @@ export type ParsedContributeFeesInstruction<
     config: TAccountMetas[1];
     state: TAccountMetas[2];
     feeReceipt: TAccountMetas[3];
-    /** The operator's BRS token account (fees reach it via PIX → BRS). */
+    /**
+     * The operator's own BRS token account (fees reach it via PIX → BRS).
+     * Must be owned by the operator: spending through a delegate is refused
+     * (spec §5.3).
+     */
     source: TAccountMetas[4];
     reserve: TAccountMetas[5];
     /** The whitelisted MUTAV treasury: receives the take directly. */

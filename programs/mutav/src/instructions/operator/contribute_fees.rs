@@ -43,8 +43,14 @@ pub struct ContributeFees<'info> {
     )]
     pub fee_receipt: Box<Account<'info, FeeReceipt>>,
 
-    /// The operator's BRS token account (fees reach it via PIX → BRS).
-    #[account(mut, constraint = source.mint == config.reserve_mint @ MutavError::InvalidMint)]
+    /// The operator's own BRS token account (fees reach it via PIX → BRS).
+    /// Must be owned by the operator: spending through a delegate is refused
+    /// (spec §5.3).
+    #[account(
+        mut,
+        constraint = source.mint == config.reserve_mint @ MutavError::InvalidMint,
+        constraint = source.owner == operator.key() @ MutavError::InvalidParameter,
+    )]
     pub source: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(mut, seeds = [RESERVE_SEED, config.key().as_ref()], bump)]
