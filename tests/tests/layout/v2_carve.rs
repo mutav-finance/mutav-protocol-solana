@@ -169,7 +169,8 @@ fn pilot_accounts_read_as_v2() {
     assert_eq!(v2.late_payouts, cur.late_payouts);
     assert_eq!(v2.shares_outstanding, cur.shares_outstanding);
     assert_eq!(v2.next_redeem_seq, cur.next_redeem_seq);
-    assert_eq!(v2.last_refresh_slot, 99);
+    assert_eq!(v2.last_refresh_slot, cur.last_refresh_slot);
+    assert_eq!(v2.nav_per_share, cur.nav_per_share);
     assert_eq!(v2.version, s.version);
 
     // The committed fixture also reads as v2.

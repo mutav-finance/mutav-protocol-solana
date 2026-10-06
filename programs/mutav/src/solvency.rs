@@ -196,6 +196,20 @@ impl Solvency {
     pub fn under_covered(&self) -> bool {
         self.stable_assets < self.coverage_required
     }
+
+    /// The `mode` this snapshot calls for (spec §6).
+    pub fn mode(&self) -> u8 {
+        if self.under_covered() {
+            crate::constants::MODE_UNDER_COVERED
+        } else {
+            crate::constants::MODE_NORMAL
+        }
+    }
+
+    /// `coverage_required − stable_assets`, saturating at 0 (`ModeChanged`).
+    pub fn deficit(&self) -> u64 {
+        self.coverage_required.saturating_sub(self.stable_assets)
+    }
 }
 
 #[cfg(test)]
@@ -247,6 +261,22 @@ mod tests {
         assert_eq!(coverage_required(0, 15_000).unwrap(), 0);
         assert_eq!(coverage_required(u64::MAX, 10_000).unwrap(), u64::MAX);
         assert!(coverage_required(u64::MAX, 10_001).is_err());
+    }
+
+    #[test]
+    fn mode_and_deficit() {
+        use crate::constants::{MODE_NORMAL, MODE_UNDER_COVERED};
+        let s = |stable_assets, coverage_required| Solvency {
+            stable_assets,
+            coverage_required,
+            ..Default::default()
+        };
+        assert_eq!((s(10, 10).mode(), s(10, 10).deficit()), (MODE_NORMAL, 0));
+        assert_eq!((s(11, 10).mode(), s(11, 10).deficit()), (MODE_NORMAL, 0));
+        assert_eq!(
+            (s(9, 10).mode(), s(9, 10).deficit()),
+            (MODE_UNDER_COVERED, 1)
+        );
     }
 
     #[test]

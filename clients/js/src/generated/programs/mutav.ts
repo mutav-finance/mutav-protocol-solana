@@ -72,6 +72,7 @@ import {
   getCancelRedeemInstructionAsync,
   getClaimAssetsInstructionAsync,
   getClaimSharesInstructionAsync,
+  getClearFulfilHaltInstructionAsync,
   getCloseGuaranteeInstructionAsync,
   getContributeFeesInstructionAsync,
   getFileClaimInstructionAsync,
@@ -80,6 +81,7 @@ import {
   getInitializeInstructionAsync,
   getPauseInstruction,
   getPayClaimInstructionAsync,
+  getRefreshInstructionAsync,
   getRegisterGuaranteeInstructionAsync,
   getRequestDepositInstructionAsync,
   getRequestRedeemInstructionAsync,
@@ -95,6 +97,7 @@ import {
   parseCancelRedeemInstruction,
   parseClaimAssetsInstruction,
   parseClaimSharesInstruction,
+  parseClearFulfilHaltInstruction,
   parseCloseGuaranteeInstruction,
   parseContributeFeesInstruction,
   parseFileClaimInstruction,
@@ -103,6 +106,7 @@ import {
   parseInitializeInstruction,
   parsePauseInstruction,
   parsePayClaimInstruction,
+  parseRefreshInstruction,
   parseRegisterGuaranteeInstruction,
   parseRequestDepositInstruction,
   parseRequestRedeemInstruction,
@@ -118,6 +122,7 @@ import {
   type CancelRedeemAsyncInput,
   type ClaimAssetsAsyncInput,
   type ClaimSharesAsyncInput,
+  type ClearFulfilHaltAsyncInput,
   type CloseGuaranteeAsyncInput,
   type ContributeFeesAsyncInput,
   type FileClaimAsyncInput,
@@ -129,6 +134,7 @@ import {
   type ParsedCancelRedeemInstruction,
   type ParsedClaimAssetsInstruction,
   type ParsedClaimSharesInstruction,
+  type ParsedClearFulfilHaltInstruction,
   type ParsedCloseGuaranteeInstruction,
   type ParsedContributeFeesInstruction,
   type ParsedFileClaimInstruction,
@@ -137,6 +143,7 @@ import {
   type ParsedInitializeInstruction,
   type ParsedPauseInstruction,
   type ParsedPayClaimInstruction,
+  type ParsedRefreshInstruction,
   type ParsedRegisterGuaranteeInstruction,
   type ParsedRequestDepositInstruction,
   type ParsedRequestRedeemInstruction,
@@ -149,6 +156,7 @@ import {
   type ParsedUnpauseInstruction,
   type PauseInput,
   type PayClaimAsyncInput,
+  type RefreshAsyncInput,
   type RegisterGuaranteeAsyncInput,
   type RequestDepositAsyncInput,
   type RequestRedeemAsyncInput,
@@ -328,6 +336,7 @@ export enum MutavEvent {
   DepositRequested,
   DepositsFulfilled,
   FeesContributed,
+  FulfilHaltCleared,
   GuaranteeClosed,
   GuaranteeRegistered,
   ModeChanged,
@@ -517,6 +526,17 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.FeesContributed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([118, 167, 32, 183, 37, 113, 242, 59]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.FulfilHaltCleared;
   }
   if (
     containsBytes(
@@ -738,6 +758,7 @@ export enum MutavInstruction {
   CancelRedeem,
   ClaimAssets,
   ClaimShares,
+  ClearFulfilHalt,
   CloseGuarantee,
   ContributeFees,
   FileClaim,
@@ -746,6 +767,7 @@ export enum MutavInstruction {
   Initialize,
   Pause,
   PayClaim,
+  Refresh,
   RegisterGuarantee,
   RequestDeposit,
   RequestRedeem,
@@ -816,6 +838,17 @@ export function identifyMutavInstruction(
     )
   ) {
     return MutavInstruction.ClaimShares;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([72, 92, 0, 5, 100, 214, 187, 39]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ClearFulfilHalt;
   }
   if (
     containsBytes(
@@ -904,6 +937,17 @@ export function identifyMutavInstruction(
     )
   ) {
     return MutavInstruction.PayClaim;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([170, 155, 22, 254, 147, 181, 49, 161]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.Refresh;
   }
   if (
     containsBytes(
@@ -1040,6 +1084,9 @@ export type ParsedMutavInstruction<
       instructionType: MutavInstruction.ClaimShares;
     } & ParsedClaimSharesInstruction<TProgram>)
   | ({
+      instructionType: MutavInstruction.ClearFulfilHalt;
+    } & ParsedClearFulfilHaltInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.CloseGuarantee;
     } & ParsedCloseGuaranteeInstruction<TProgram>)
   | ({
@@ -1063,6 +1110,9 @@ export type ParsedMutavInstruction<
   | ({
       instructionType: MutavInstruction.PayClaim;
     } & ParsedPayClaimInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.Refresh;
+    } & ParsedRefreshInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.RegisterGuarantee;
     } & ParsedRegisterGuaranteeInstruction<TProgram>)
@@ -1134,6 +1184,13 @@ export function parseMutavInstruction<TProgram extends string>(
         ...parseClaimSharesInstruction(instruction),
       };
     }
+    case MutavInstruction.ClearFulfilHalt: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ClearFulfilHalt,
+        ...parseClearFulfilHaltInstruction(instruction),
+      };
+    }
     case MutavInstruction.CloseGuarantee: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1188,6 +1245,13 @@ export function parseMutavInstruction<TProgram extends string>(
       return {
         instructionType: MutavInstruction.PayClaim,
         ...parsePayClaimInstruction(instruction),
+      };
+    }
+    case MutavInstruction.Refresh: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.Refresh,
+        ...parseRefreshInstruction(instruction),
       };
     }
     case MutavInstruction.RegisterGuarantee: {
@@ -1321,6 +1385,10 @@ export type MutavPluginInstructions = {
     input: ClaimSharesAsyncInput,
   ) => ReturnType<typeof getClaimSharesInstructionAsync> &
     SelfPlanAndSendFunctions;
+  clearFulfilHalt: (
+    input: ClearFulfilHaltAsyncInput,
+  ) => ReturnType<typeof getClearFulfilHaltInstructionAsync> &
+    SelfPlanAndSendFunctions;
   closeGuarantee: (
     input: CloseGuaranteeAsyncInput,
   ) => ReturnType<typeof getCloseGuaranteeInstructionAsync> &
@@ -1352,6 +1420,9 @@ export type MutavPluginInstructions = {
     input: MakeOptional<PayClaimAsyncInput, "payer">,
   ) => ReturnType<typeof getPayClaimInstructionAsync> &
     SelfPlanAndSendFunctions;
+  refresh: (
+    input: RefreshAsyncInput,
+  ) => ReturnType<typeof getRefreshInstructionAsync> & SelfPlanAndSendFunctions;
   registerGuarantee: (
     input: MakeOptional<RegisterGuaranteeAsyncInput, "payer">,
   ) => ReturnType<typeof getRegisterGuaranteeInstructionAsync> &
@@ -1464,6 +1535,11 @@ export function mutavProgram() {
               client,
               getClaimSharesInstructionAsync(input),
             ),
+          clearFulfilHalt: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClearFulfilHaltInstructionAsync(input),
+            ),
           closeGuarantee: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1512,6 +1588,11 @@ export function mutavProgram() {
                 ...input,
                 payer: input.payer ?? client.payer,
               }),
+            ),
+          refresh: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRefreshInstructionAsync(input),
             ),
           registerGuarantee: (input) =>
             addSelfPlanAndSendFunctions(

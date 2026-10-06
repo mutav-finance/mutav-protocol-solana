@@ -77,8 +77,8 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
         &args.mutav_capital_wallet,
         &vault_authority,
     )?;
-    // TODO(spec: §5.8 step 3 — the exact clearing path for
-    // `VaultState.fulfil_halted` is TBD). `set_config` does not clear it yet.
+    // `VaultState.fulfil_halted` is cleared by `clear_fulfil_halt`, not here
+    // (ADR 0015).
 
     let treasury = ctx.accounts.treasury_account.key();
     let config = &mut ctx.accounts.config;

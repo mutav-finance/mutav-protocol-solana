@@ -452,6 +452,15 @@ pub struct ReserveFrozenDetected {
     pub token_account: Pubkey,
 }
 
+/// The admin cleared `fulfil_halted`; `nav_per_share` is the new baseline of
+/// the NAV-move guard (ADR 0015).
+#[event]
+pub struct FulfilHaltCleared {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub nav_per_share: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
