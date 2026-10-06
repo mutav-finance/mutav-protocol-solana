@@ -49,6 +49,21 @@ pub const MAX_FEE_TAKE_BPS: u16 = 3_000;
 /// Share mint decimals (spec Conventions).
 pub const SHARE_DECIMALS: u8 = 6;
 
+/// Exponent `k` of the share-conversion virtual offset `V = 10^k` (spec §4).
+/// Decided 2026-10-06 (spec §12 Q20): `k = 0`, so one share is worth 1 BRS at
+/// launch (both mints have 6 decimals). No seed deposit is minted at
+/// `initialize`.
+pub const VIRTUAL_OFFSET_EXP: u32 = 0;
+/// The virtual offset `V = 10^k` (spec §4).
+pub const VIRTUAL_OFFSET: u64 = 10u64.pow(VIRTUAL_OFFSET_EXP);
+
+/// Scale of `VaultState.tesouro_price` and every bounded TESOURO price: BRS
+/// base units per TESOURO base unit, times `10^9` (spec §8, decided 2026-10-06).
+pub const PRICE_SCALE: u64 = 1_000_000_000;
+/// Scale of `nav_per_share` and `last_fill_nav`: BRS base units per share base
+/// unit, times `10^9`, so `NAV_SCALE` is NAV 1.0 (spec §8, decided 2026-10-06).
+pub const NAV_SCALE: u64 = 1_000_000_000;
+
 /// `feature_flags` bit 0: phase-2 instant exit (spec §14.3).
 pub const INSTANT_EXIT: u64 = 1 << 0;
 /// Feature bits this binary supports. The pilot supports none.

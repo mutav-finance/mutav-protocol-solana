@@ -7,7 +7,7 @@
 
 use anchor_lang::prelude::*;
 
-use crate::errors::MutavError;
+use crate::{constants::VIRTUAL_OFFSET, errors::MutavError};
 
 /// Rounding direction of a division.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,22 +43,12 @@ pub fn to_u64(x: u128) -> Result<u64> {
 }
 
 /// Shares minted for `assets` on a deposit (spec §4), rounded down:
-/// `floor(assets × (shares_outstanding + V) / (net_assets + 1))`.
-///
-/// `virtual_offset` is `V = 10^k`.
-// TODO(spec: §12 Q20 — the virtual offset exponent `k` is TBD). Callers pass
-// `V`; no value is pinned in `constants.rs` until it is decided. `V == 0`
-// fails closed.
-pub fn shares_for(
-    assets: u64,
-    shares_outstanding: u64,
-    net_assets: u64,
-    virtual_offset: u64,
-) -> Result<u64> {
-    require!(virtual_offset != 0, MutavError::InvalidParameter);
+/// `floor(assets × (shares_outstanding + V) / (net_assets + 1))`, with
+/// `V = VIRTUAL_OFFSET` (`10^0 = 1`, spec §12 Q20).
+pub fn shares_for(assets: u64, shares_outstanding: u64, net_assets: u64) -> Result<u64> {
     to_u64(mul_div_u128(
         assets as u128,
-        shares_outstanding as u128 + virtual_offset as u128,
+        shares_outstanding as u128 + VIRTUAL_OFFSET as u128,
         net_assets as u128 + 1,
         Rounding::Down,
     )?)
@@ -66,17 +56,11 @@ pub fn shares_for(
 
 /// Assets paid for `shares` on a redemption (spec §4), rounded down:
 /// `floor(shares × (net_assets + 1) / (shares_outstanding + V))`.
-pub fn assets_for(
-    shares: u64,
-    shares_outstanding: u64,
-    net_assets: u64,
-    virtual_offset: u64,
-) -> Result<u64> {
-    require!(virtual_offset != 0, MutavError::InvalidParameter);
+pub fn assets_for(shares: u64, shares_outstanding: u64, net_assets: u64) -> Result<u64> {
     to_u64(mul_div_u128(
         shares as u128,
         net_assets as u128 + 1,
-        shares_outstanding as u128 + virtual_offset as u128,
+        shares_outstanding as u128 + VIRTUAL_OFFSET as u128,
         Rounding::Down,
     )?)
 }
@@ -86,7 +70,13 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    const V: u64 = 1_000;
+    use crate::constants::VIRTUAL_OFFSET;
+
+    #[test]
+    fn virtual_offset_is_pinned_to_one() {
+        // Spec §12 Q20 (decided 2026-10-06): k = 0, V = 10^0 = 1.
+        assert_eq!(VIRTUAL_OFFSET, 1);
+    }
 
     #[test]
     fn mul_div_rounds_as_asked() {
@@ -127,38 +117,36 @@ mod tests {
     }
 
     #[test]
-    fn empty_reserve_mints_v_shares_per_unit() {
-        // shares_for(a) = a × (0 + V) / (0 + 1).
-        assert_eq!(shares_for(5, 0, 0, V).unwrap(), 5 * V);
-        assert_eq!(assets_for(5 * V, 5 * V, 5, V).unwrap(), 5);
+    fn empty_reserve_mints_one_share_per_base_unit() {
+        // shares_for(a) = a × (0 + 1) / (0 + 1): one share = 1 BRS at launch
+        // (both mints have 6 decimals).
+        assert_eq!(shares_for(5_000_000, 0, 0).unwrap(), 5_000_000);
+        assert_eq!(
+            assets_for(5_000_000, 5_000_000, 5_000_000).unwrap(),
+            5_000_000
+        );
     }
 
     #[test]
     fn conversion_rounds_down() {
-        // 10 × (100 + 1000) / (333 + 1) = 32.93… → 32.
-        assert_eq!(shares_for(10, 100, 333, V).unwrap(), 32);
-        // 32 × (333 + 1) / (100 + 1000) = 9.71… → 9.
-        assert_eq!(assets_for(32, 100, 333, V).unwrap(), 9);
-    }
-
-    #[test]
-    fn zero_virtual_offset_fails_closed() {
-        assert!(shares_for(1, 0, 0, 0).is_err());
-        assert!(assets_for(1, 0, 0, 0).is_err());
+        // 10 × (100 + 1) / (333 + 1) = 3.02… → 3.
+        assert_eq!(shares_for(10, 100, 333).unwrap(), 3);
+        // 32 × (333 + 1) / (100 + 1) = 105.82… → 105.
+        assert_eq!(assets_for(32, 100, 333).unwrap(), 105);
     }
 
     #[test]
     fn conversion_errors_at_extremes() {
         // A result above u64::MAX is an error.
-        assert!(shares_for(u64::MAX, u64::MAX, 0, V).is_err());
+        assert!(shares_for(u64::MAX, u64::MAX, 0).is_err());
         // u64::MAX inputs that fit still convert:
         // MAX × MAX / (MAX + 1) = MAX − 1, remainder 1.
         assert_eq!(
-            assets_for(u64::MAX, u64::MAX, u64::MAX - 1, 1).unwrap(),
+            assets_for(u64::MAX, u64::MAX, u64::MAX - 1).unwrap(),
             u64::MAX - 1
         );
         assert_eq!(
-            shares_for(u64::MAX, u64::MAX - 1, u64::MAX, 1).unwrap(),
+            shares_for(u64::MAX, u64::MAX - 1, u64::MAX).unwrap(),
             u64::MAX - 1
         );
     }

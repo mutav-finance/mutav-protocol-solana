@@ -15,12 +15,13 @@
 //! liquid_budget     = max(0, brs_balance − provisions − earmark_eff)
 //! net_assets        = max(0, stable_assets − provisions)
 //! nav_per_share     = floor(net_assets × NAV_SCALE / shares_outstanding)
+//! PRICE_SCALE = NAV_SCALE = 10^9 (spec §8)
 //! ```
 
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{BPS_DENOMINATOR, INSTANT_EXIT},
+    constants::{BPS_DENOMINATOR, INSTANT_EXIT, NAV_SCALE, PRICE_SCALE},
     errors::MutavError,
     math::{mul_div, Rounding},
 };
@@ -28,11 +29,9 @@ use crate::{
 /// Value of the TESOURO position in BRS base units, rounded down.
 ///
 /// `bounded_price` is BRS base units per TESOURO unit, scaled by
-/// `price_scale` (spec §3.2, §7).
-// TODO(spec: §8 — `PRICE_SCALE` and `NAV_SCALE` are named but not valued).
-// Callers pass the scale; no value is pinned until the spec gives one.
-pub fn tesouro_value(tesouro_units: u64, bounded_price: u64, price_scale: u64) -> Result<u64> {
-    mul_div(tesouro_units, bounded_price, price_scale, Rounding::Down)
+/// [`PRICE_SCALE`] (spec §3.2, §7, §8).
+pub fn tesouro_value(tesouro_units: u64, bounded_price: u64) -> Result<u64> {
+    mul_div(tesouro_units, bounded_price, PRICE_SCALE, Rounding::Down)
 }
 
 /// `brs_balance + tesouro_value`, from tracked balances only (invariant 1).
@@ -124,16 +123,19 @@ pub fn net_assets(stable_assets: u64, provisions: u64) -> u64 {
     stable_assets.saturating_sub(provisions)
 }
 
-/// `floor(net_assets × nav_scale / shares_outstanding)`. Pending deposits and
+/// `floor(net_assets × NAV_SCALE / shares_outstanding)`. Pending deposits and
 /// redemptions are excluded by the caller's inputs.
 // TODO(spec: §4 — NAV per share with `shares_outstanding == 0` is undefined).
 // Returns 0 (no published NAV) until the spec says otherwise; fills price
-// through `assets_for` / `shares_for`, never through this value.
-pub fn nav_per_share(net_assets: u64, shares_outstanding: u64, nav_scale: u64) -> Result<u64> {
+// through `assets_for` / `shares_for`, never through this value. Returning
+// `NAV_SCALE` (1.0) is not implied by §4: with zero shares and
+// `net_assets > 0` (e.g. fees before the first deposit) the conversion price
+// is `(net_assets + 1) / V`, not 1.0.
+pub fn nav_per_share(net_assets: u64, shares_outstanding: u64) -> Result<u64> {
     if shares_outstanding == 0 {
         return Ok(0);
     }
-    mul_div(net_assets, nav_scale, shares_outstanding, Rounding::Down)
+    mul_div(net_assets, NAV_SCALE, shares_outstanding, Rounding::Down)
 }
 
 /// Everything §4 derives from one snapshot of state, config and price.
@@ -141,9 +143,8 @@ pub fn nav_per_share(net_assets: u64, shares_outstanding: u64, nav_scale: u64) -
 pub struct SolvencyInputs {
     pub brs_balance: u64,
     pub tesouro_units: u64,
-    /// Bounded TESOURO price (spec §7), scaled by `price_scale`.
+    /// Bounded TESOURO price (spec §7), scaled by [`PRICE_SCALE`].
     pub tesouro_price: u64,
-    pub price_scale: u64,
     pub remaining_cover_total: u64,
     pub coverage_ratio_bps: u16,
     pub provisions: u64,
@@ -167,7 +168,7 @@ pub struct Solvency {
 
 impl Solvency {
     pub fn compute(i: &SolvencyInputs) -> Result<Self> {
-        let tesouro_value = tesouro_value(i.tesouro_units, i.tesouro_price, i.price_scale)?;
+        let tesouro_value = tesouro_value(i.tesouro_units, i.tesouro_price)?;
         let stable_assets = stable_assets(i.brs_balance, tesouro_value)?;
         let coverage_required = coverage_required(i.remaining_cover_total, i.coverage_ratio_bps)?;
         let surplus = surplus(stable_assets, coverage_required);
@@ -213,12 +214,21 @@ mod tests {
     // -- point tests ------------------------------------------------------
 
     #[test]
+    fn scales_are_pinned() {
+        // Spec §8 (decided 2026-10-06).
+        assert_eq!(PRICE_SCALE, 1_000_000_000);
+        assert_eq!(NAV_SCALE, 1_000_000_000);
+    }
+
+    #[test]
     fn tesouro_value_rounds_down() {
-        // 3 units × 1.5 (scale 10) = 4.5 → 4.
-        assert_eq!(tesouro_value(3, 15, 10).unwrap(), 4);
-        assert_eq!(tesouro_value(0, 15, 10).unwrap(), 0);
-        assert!(tesouro_value(1, 1, 0).is_err());
-        assert!(tesouro_value(u64::MAX, 2, 1).is_err());
+        // 3 units × 1.5 = 4.5 → 4.
+        assert_eq!(tesouro_value(3, 1_500_000_000).unwrap(), 4);
+        assert_eq!(tesouro_value(0, 1_500_000_000).unwrap(), 0);
+        // Sub-unit price: 7 units × 0.000000001 = 0.000000007 → 0.
+        assert_eq!(tesouro_value(7, 1).unwrap(), 0);
+        assert_eq!(tesouro_value(u64::MAX, PRICE_SCALE).unwrap(), u64::MAX);
+        assert!(tesouro_value(u64::MAX, 2 * PRICE_SCALE).is_err());
     }
 
     #[test]
@@ -324,11 +334,13 @@ mod tests {
 
     #[test]
     fn nav_per_share_floors() {
-        // 10 / 3 at scale 1_000 = 3_333.3… → 3_333.
-        assert_eq!(nav_per_share(10, 3, 1_000).unwrap(), 3_333);
-        assert_eq!(nav_per_share(0, 3, 1_000).unwrap(), 0);
-        assert_eq!(nav_per_share(10, 0, 1_000).unwrap(), 0);
-        assert!(nav_per_share(u64::MAX, 1, 2).is_err());
+        // 10 / 3 at NAV_SCALE = 3.333333333… → 3_333_333_333.
+        assert_eq!(nav_per_share(10, 3).unwrap(), 3_333_333_333);
+        // One share per BRS base unit is NAV 1.0.
+        assert_eq!(nav_per_share(5_000_000, 5_000_000).unwrap(), NAV_SCALE);
+        assert_eq!(nav_per_share(0, 3).unwrap(), 0);
+        assert_eq!(nav_per_share(10, 0).unwrap(), 0);
+        assert!(nav_per_share(u64::MAX, 1).is_err());
     }
 
     #[test]
@@ -336,8 +348,7 @@ mod tests {
         let i = SolvencyInputs {
             brs_balance: 60_000,
             tesouro_units: 40,
-            tesouro_price: 1_005,
-            price_scale: 1,
+            tesouro_price: 1_005 * PRICE_SCALE,
             remaining_cover_total: 80_000,
             coverage_ratio_bps: 10_000,
             provisions: 2_000,
@@ -372,8 +383,7 @@ mod tests {
         let i = SolvencyInputs {
             brs_balance: u64::MAX,
             tesouro_units: 1,
-            tesouro_price: 1,
-            price_scale: 1,
+            tesouro_price: PRICE_SCALE,
             ..Default::default()
         };
         assert!(Solvency::compute(&i).is_err());
@@ -382,7 +392,6 @@ mod tests {
             remaining_cover_total: u64::MAX,
             coverage_ratio_bps: 10_000,
             provisions: u64::MAX,
-            price_scale: 1,
             ..Default::default()
         };
         let s = Solvency::compute(&i).unwrap();
@@ -397,7 +406,7 @@ mod tests {
         (
             0u64..=1u64 << 50,
             0u64..=1u64 << 40,
-            1u64..=1u64 << 20,
+            1u64..=1u64 << 40,
             0u64..=1u64 << 50,
             10_000u16..=20_000,
             0u64..=1u64 << 50,
@@ -409,7 +418,6 @@ mod tests {
                     brs_balance: brs,
                     tesouro_units: units,
                     tesouro_price: price,
-                    price_scale: 1 << 10,
                     remaining_cover_total: cover,
                     coverage_ratio_bps: c,
                     provisions: prov,
@@ -422,7 +430,7 @@ mod tests {
 
     /// Independent oracle for `surplus`, in `u128`.
     fn oracle_surplus(i: &SolvencyInputs) -> u64 {
-        let tv = i.tesouro_units as u128 * i.tesouro_price as u128 / i.price_scale as u128;
+        let tv = i.tesouro_units as u128 * i.tesouro_price as u128 / PRICE_SCALE as u128;
         let stable = i.brs_balance as u128 + tv;
         let cov = (i.remaining_cover_total as u128 * i.coverage_ratio_bps as u128).div_ceil(10_000);
         stable.saturating_sub(cov) as u64
@@ -497,7 +505,7 @@ mod tests {
         ) {
             let mut i = SolvencyInputs {
                 feature_flags: INSTANT_EXIT,
-                tesouro_price: i.price_scale, // par: 1 TESOURO = 1 BRS
+                tesouro_price: PRICE_SCALE, // par: 1 TESOURO = 1 BRS
                 ..i
             };
             let e0 = Solvency::compute(&i).unwrap().earmark_eff;
