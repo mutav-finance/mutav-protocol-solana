@@ -19,6 +19,7 @@ export * from "./fulfilRedeems";
 export * from "./initialize";
 export * from "./pause";
 export * from "./payClaim";
+export * from "./refresh";
 export * from "./registerGuarantee";
 export * from "./requestDeposit";
 export * from "./requestRedeem";

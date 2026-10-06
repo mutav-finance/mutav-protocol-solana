@@ -80,6 +80,7 @@ import {
   getInitializeInstructionAsync,
   getPauseInstruction,
   getPayClaimInstructionAsync,
+  getRefreshInstructionAsync,
   getRegisterGuaranteeInstructionAsync,
   getRequestDepositInstructionAsync,
   getRequestRedeemInstructionAsync,
@@ -103,6 +104,7 @@ import {
   parseInitializeInstruction,
   parsePauseInstruction,
   parsePayClaimInstruction,
+  parseRefreshInstruction,
   parseRegisterGuaranteeInstruction,
   parseRequestDepositInstruction,
   parseRequestRedeemInstruction,
@@ -137,6 +139,7 @@ import {
   type ParsedInitializeInstruction,
   type ParsedPauseInstruction,
   type ParsedPayClaimInstruction,
+  type ParsedRefreshInstruction,
   type ParsedRegisterGuaranteeInstruction,
   type ParsedRequestDepositInstruction,
   type ParsedRequestRedeemInstruction,
@@ -149,6 +152,7 @@ import {
   type ParsedUnpauseInstruction,
   type PauseInput,
   type PayClaimAsyncInput,
+  type RefreshAsyncInput,
   type RegisterGuaranteeAsyncInput,
   type RequestDepositAsyncInput,
   type RequestRedeemAsyncInput,
@@ -746,6 +750,7 @@ export enum MutavInstruction {
   Initialize,
   Pause,
   PayClaim,
+  Refresh,
   RegisterGuarantee,
   RequestDeposit,
   RequestRedeem,
@@ -909,6 +914,17 @@ export function identifyMutavInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([170, 155, 22, 254, 147, 181, 49, 161]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.Refresh;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([54, 160, 13, 129, 200, 87, 163, 55]),
       ),
       0,
@@ -1064,6 +1080,9 @@ export type ParsedMutavInstruction<
       instructionType: MutavInstruction.PayClaim;
     } & ParsedPayClaimInstruction<TProgram>)
   | ({
+      instructionType: MutavInstruction.Refresh;
+    } & ParsedRefreshInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.RegisterGuarantee;
     } & ParsedRegisterGuaranteeInstruction<TProgram>)
   | ({
@@ -1188,6 +1207,13 @@ export function parseMutavInstruction<TProgram extends string>(
       return {
         instructionType: MutavInstruction.PayClaim,
         ...parsePayClaimInstruction(instruction),
+      };
+    }
+    case MutavInstruction.Refresh: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.Refresh,
+        ...parseRefreshInstruction(instruction),
       };
     }
     case MutavInstruction.RegisterGuarantee: {
@@ -1352,6 +1378,9 @@ export type MutavPluginInstructions = {
     input: MakeOptional<PayClaimAsyncInput, "payer">,
   ) => ReturnType<typeof getPayClaimInstructionAsync> &
     SelfPlanAndSendFunctions;
+  refresh: (
+    input: RefreshAsyncInput,
+  ) => ReturnType<typeof getRefreshInstructionAsync> & SelfPlanAndSendFunctions;
   registerGuarantee: (
     input: MakeOptional<RegisterGuaranteeAsyncInput, "payer">,
   ) => ReturnType<typeof getRegisterGuaranteeInstructionAsync> &
@@ -1512,6 +1541,11 @@ export function mutavProgram() {
                 ...input,
                 payer: input.payer ?? client.payer,
               }),
+            ),
+          refresh: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRefreshInstructionAsync(input),
             ),
           registerGuarantee: (input) =>
             addSelfPlanAndSendFunctions(
