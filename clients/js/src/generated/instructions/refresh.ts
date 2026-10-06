@@ -37,7 +37,13 @@ import {
   type ResolvedInstructionAccount,
   type ResolvedInstructionAccountMeta,
 } from "@solana/kit/program-client-core";
-import { findStatePda } from "../pdas";
+import {
+  findClaimsPda,
+  findPendingDepositsPda,
+  findPendingRedemptionsPda,
+  findReservePda,
+  findStatePda,
+} from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 
 export const REFRESH_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
@@ -52,6 +58,10 @@ export type RefreshInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
+  TAccountReserve extends string | AccountMeta<string> = string,
+  TAccountPendingDeposits extends string | AccountMeta<string> = string,
+  TAccountPendingRedemptions extends string | AccountMeta<string> = string,
+  TAccountClaims extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -65,6 +75,18 @@ export type RefreshInstruction<
       TAccountState extends string
         ? WritableAccount<TAccountState>
         : TAccountState,
+      TAccountReserve extends string
+        ? ReadonlyAccount<TAccountReserve>
+        : TAccountReserve,
+      TAccountPendingDeposits extends string
+        ? ReadonlyAccount<TAccountPendingDeposits>
+        : TAccountPendingDeposits,
+      TAccountPendingRedemptions extends string
+        ? ReadonlyAccount<TAccountPendingRedemptions>
+        : TAccountPendingRedemptions,
+      TAccountClaims extends string
+        ? ReadonlyAccount<TAccountClaims>
+        : TAccountClaims,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -105,12 +127,23 @@ export function getRefreshInstructionDataCodec(): FixedSizeCodec<
 export type RefreshAsyncInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPendingDeposits extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPendingRedemptions extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountClaims extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   config: TAccountConfig;
   state?: TAccountState;
+  /** The four reserve token accounts (spec §3.3), for freeze detection. */
+  reserve?: TAccountReserve;
+  pendingDeposits?: TAccountPendingDeposits;
+  pendingRedemptions?: TAccountPendingRedemptions;
+  claims?: TAccountClaims;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
 };
@@ -118,6 +151,10 @@ export type RefreshAsyncInput<
 export async function getRefreshInstructionAsync<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput,
+  TAccountPendingDeposits extends InstructionAccountInput,
+  TAccountPendingRedemptions extends InstructionAccountInput,
+  TAccountClaims extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -125,6 +162,10 @@ export async function getRefreshInstructionAsync<
   input: RefreshAsyncInput<
     TAccountConfig,
     TAccountState,
+    TAccountReserve,
+    TAccountPendingDeposits,
+    TAccountPendingRedemptions,
+    TAccountClaims,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -139,6 +180,22 @@ export async function getRefreshInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountState,
       InstructionAccountInputAddress<TAccountState>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingDeposits,
+      InstructionAccountInputAddress<TAccountPendingDeposits>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingRedemptions,
+      InstructionAccountInputAddress<TAccountPendingRedemptions>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountClaims,
+      InstructionAccountInputAddress<TAccountClaims>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -160,6 +217,22 @@ export async function getRefreshInstructionAsync<
   const originalAccounts = {
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
+    reserve: {
+      value: input.reserve ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    pendingDeposits: {
+      value: input.pendingDeposits ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    pendingRedemptions: {
+      value: input.pendingRedemptions ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    claims: { value: input.claims ?? null, isSigner: false, isWritable: false },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -188,11 +261,59 @@ export async function getRefreshInstructionAsync<
       { programAddress },
     );
   }
+  if (!accounts.reserve.value) {
+    accounts.reserve.value = await findReservePda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.pendingDeposits.value) {
+    accounts.pendingDeposits.value = await findPendingDepositsPda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.pendingRedemptions.value) {
+    accounts.pendingRedemptions.value = await findPendingRedemptionsPda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.claims.value) {
+    accounts.claims.value = await findClaimsPda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
 
   return Object.freeze({
     accounts: [
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
+      getAccountMeta("reserve", accounts.reserve),
+      getAccountMeta("pendingDeposits", accounts.pendingDeposits),
+      getAccountMeta("pendingRedemptions", accounts.pendingRedemptions),
+      getAccountMeta("claims", accounts.claims),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -209,6 +330,22 @@ export async function getRefreshInstructionAsync<
       InstructionAccountInputAddress<TAccountState>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingDeposits,
+      InstructionAccountInputAddress<TAccountPendingDeposits>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingRedemptions,
+      InstructionAccountInputAddress<TAccountPendingRedemptions>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountClaims,
+      InstructionAccountInputAddress<TAccountClaims>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -222,12 +359,23 @@ export async function getRefreshInstructionAsync<
 export type RefreshInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPendingDeposits extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPendingRedemptions extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountClaims extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   config: TAccountConfig;
   state: TAccountState;
+  /** The four reserve token accounts (spec §3.3), for freeze detection. */
+  reserve: TAccountReserve;
+  pendingDeposits: TAccountPendingDeposits;
+  pendingRedemptions: TAccountPendingRedemptions;
+  claims: TAccountClaims;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
 };
@@ -235,6 +383,10 @@ export type RefreshInput<
 export function getRefreshInstruction<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput,
+  TAccountPendingDeposits extends InstructionAccountInput,
+  TAccountPendingRedemptions extends InstructionAccountInput,
+  TAccountClaims extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -242,6 +394,10 @@ export function getRefreshInstruction<
   input: RefreshInput<
     TAccountConfig,
     TAccountState,
+    TAccountReserve,
+    TAccountPendingDeposits,
+    TAccountPendingRedemptions,
+    TAccountClaims,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -255,6 +411,22 @@ export function getRefreshInstruction<
   ResolvedInstructionAccountMeta<
     TAccountState,
     InstructionAccountInputAddress<TAccountState>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountReserve,
+    InstructionAccountInputAddress<TAccountReserve>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPendingDeposits,
+    InstructionAccountInputAddress<TAccountPendingDeposits>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPendingRedemptions,
+    InstructionAccountInputAddress<TAccountPendingRedemptions>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountClaims,
+    InstructionAccountInputAddress<TAccountClaims>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -275,6 +447,22 @@ export function getRefreshInstruction<
   const originalAccounts = {
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
+    reserve: {
+      value: input.reserve ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    pendingDeposits: {
+      value: input.pendingDeposits ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    pendingRedemptions: {
+      value: input.pendingRedemptions ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    claims: { value: input.claims ?? null, isSigner: false, isWritable: false },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -295,6 +483,10 @@ export function getRefreshInstruction<
     accounts: [
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
+      getAccountMeta("reserve", accounts.reserve),
+      getAccountMeta("pendingDeposits", accounts.pendingDeposits),
+      getAccountMeta("pendingRedemptions", accounts.pendingRedemptions),
+      getAccountMeta("claims", accounts.claims),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -309,6 +501,22 @@ export function getRefreshInstruction<
     ResolvedInstructionAccountMeta<
       TAccountState,
       InstructionAccountInputAddress<TAccountState>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingDeposits,
+      InstructionAccountInputAddress<TAccountPendingDeposits>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingRedemptions,
+      InstructionAccountInputAddress<TAccountPendingRedemptions>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountClaims,
+      InstructionAccountInputAddress<TAccountClaims>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -329,8 +537,13 @@ export type ParsedRefreshInstruction<
   accounts: {
     config: TAccountMetas[0];
     state: TAccountMetas[1];
-    eventAuthority: TAccountMetas[2];
-    program: TAccountMetas[3];
+    /** The four reserve token accounts (spec §3.3), for freeze detection. */
+    reserve: TAccountMetas[2];
+    pendingDeposits: TAccountMetas[3];
+    pendingRedemptions: TAccountMetas[4];
+    claims: TAccountMetas[5];
+    eventAuthority: TAccountMetas[6];
+    program: TAccountMetas[7];
   };
   data: RefreshInstructionData;
 };
@@ -343,12 +556,12 @@ export function parseRefreshInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedRefreshInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 4) {
+  if (instruction.accounts.length < 8) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 4,
+        expectedAccountMetas: 8,
       },
     );
   }
@@ -363,6 +576,10 @@ export function parseRefreshInstruction<
     accounts: {
       config: getNextAccount(),
       state: getNextAccount(),
+      reserve: getNextAccount(),
+      pendingDeposits: getNextAccount(),
+      pendingRedemptions: getNextAccount(),
+      claims: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

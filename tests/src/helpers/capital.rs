@@ -678,6 +678,10 @@ impl Fixture {
         let mut metas = mutav::accounts::Refresh {
             config: self.pdas.config,
             state: self.pdas.state,
+            reserve: self.pdas.reserve,
+            pending_deposits: self.pdas.pending_deposits,
+            pending_redemptions: self.pdas.pending_redemptions,
+            claims: self.pdas.claims,
             event_authority: self.pdas.event_authority,
             program: mutav::ID,
         }
@@ -714,11 +718,25 @@ impl Fixture {
 
     /// `refresh` sent by a fresh, unrelated signer (it is permissionless).
     pub fn refresh(&mut self) -> TransactionResult {
+        self.refresh_with(&[])
+    }
+
+    /// `refresh` passing the payouts of `claims` (their guarantee and payout
+    /// accounts).
+    pub fn refresh_with(&mut self, claims: &[super::Claim]) -> TransactionResult {
         let anyone = Keypair::new();
         self.svm
             .airdrop(&anyone.pubkey(), 1_000_000_000)
             .expect("airdrop");
-        let ix = self.refresh_ix(&[]);
+        let config = self.pdas.config;
+        let pairs: Vec<(Pubkey, Pubkey)> = claims
+            .iter()
+            .map(|c| {
+                let g = super::guarantee_pda(&config, &c.id);
+                (g, super::payout_pda(&g, &c.notice))
+            })
+            .collect();
+        let ix = self.refresh_ix(&pairs);
         super::send_ix(&mut self.svm, ix, &[&anyone])
     }
 }
