@@ -1836,6 +1836,7 @@ dependencies = [
  "litesvm",
  "litesvm-token",
  "mutav",
+ "proptest",
  "solana-instruction",
  "solana-keypair",
  "solana-message",
