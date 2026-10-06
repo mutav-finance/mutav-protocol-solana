@@ -82,4 +82,18 @@ pub mod mutav {
     pub fn close_guarantee(ctx: Context<CloseGuarantee>, id: [u8; 32]) -> Result<()> {
         instructions::operator::close_guarantee::handle_close_guarantee(ctx, id)
     }
+
+    /// Record one invoice's guarantee fee: MUTAV's take to the treasury, the
+    /// rest to the reserve. Never paused, never solvency-gated. Operator.
+    pub fn contribute_fees(
+        ctx: Context<ContributeFees>,
+        invoice_ref_hash: [u8; 32],
+        amount: u64,
+    ) -> Result<()> {
+        instructions::operator::contribute_fees::handle_contribute_fees(
+            ctx,
+            invoice_ref_hash,
+            amount,
+        )
+    }
 }

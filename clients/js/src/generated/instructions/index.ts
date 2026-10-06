@@ -7,6 +7,7 @@
  */
 
 export * from "./closeGuarantee";
+export * from "./contributeFees";
 export * from "./initialize";
 export * from "./pause";
 export * from "./registerGuarantee";

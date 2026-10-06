@@ -160,7 +160,12 @@ fn pilot_accounts_read_as_v2() {
     let v2 = v2(&raw);
     assert_eq!(v2.instant_exit, InstantExitState::default());
     assert_eq!(v2._reserved, [0; 168]);
-    assert_eq!(v2.brs_balance, funded);
+    // Every v1 field reads the same through the v2 struct.
+    let cur = f.state();
+    assert!(cur.brs_balance >= funded);
+    assert_eq!(v2.brs_balance, cur.brs_balance);
+    assert_eq!(v2.fees_in_total, cur.fees_in_total);
+    assert_eq!(v2.remaining_cover_total, cur.remaining_cover_total);
     assert_eq!(v2.pending_notices, 2);
     assert_eq!(v2.last_refresh_slot, 99);
     assert_eq!(v2.version, s.version);

@@ -6,9 +6,11 @@
 //! `close_claim_notice` are built later; `pending_notices` stays `0`.
 
 pub mod close_guarantee;
+pub mod contribute_fees;
 pub mod register_guarantee;
 
 pub use close_guarantee::*;
+pub use contribute_fees::*;
 pub use register_guarantee::*;
 
 use anchor_lang::prelude::*;
