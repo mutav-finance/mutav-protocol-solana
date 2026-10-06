@@ -103,6 +103,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - **Injected earmark** (`set_account`, with the `INSTANT_EXIT` bit injected too): `register_guarantee`, `fulfil_redeems` and `allocate` capacity shrink by exactly `earmark_eff`; **two or more fills in one `fulfil_redeems` batch take at most `surplus − earmark_eff` in total**, and a registration that fits leaves `earmark_eff` unchanged; the ratchet lowers the stored level when surplus or liquidity falls; in under-coverage `earmark_eff == 0`; with the flag injected clear, the earmark has no effect and the next ratcheting instruction stores `0`; `pay_claim` neither reads nor writes `buffer_earmark` and is never refused (extend the Task 5 property test to fuzz the earmark).
   - **Ratchet scope:** with a stale price and `tesouro_units > 0`, `file_claim`, `contribute_fees`, `close_guarantee`, `flag_claim_notice`, `cancel_redeem` and `claim_assets` still succeed (they neither read nor write `buffer_earmark`).
 - **Done when:** tests pass; no `Option`/`Vec`/`String` in any account; large accounts boxed in contexts; fixtures dumped at devnet launch (Task 12) are decoded in CI.
+- **Built in 2a (2026-10-06)**, for the accounts and instructions that exist after Task 1 (`VaultConfig`, `VaultState`; the seven admin instructions): size pins, golden v1 layouts with offset tables, the `VaultStateV2` carve, padding zero at init and preserved, feature flags failing closed, the version guard (including unknown `mode`), carve sizes, earmark = 0 through the pilot instructions, and the IDL check for fixed-size types. Fixtures from a LiteSVM reserve are in `tests/fixtures/layout/v1/`. `Fixture::pilot_instructions()` lists one valid call of every instruction; each later task appends its instructions, so the padding, version and earmark tests cover them. The rest moved to the task that adds the instruction or account it needs, as bullets marked **carried from 2a**.
 
 ## Task 3 — Register and close guarantees (Oct 3)
 
@@ -115,6 +116,11 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - Non-operator signer rejected; rejected while paused.
   - `close_guarantee` releases the remaining cover; fails with `OpenClaims` when a claim is filed.
   - Invariant: `remaining_cover_total` equals the sum over active guarantees after any sequence.
+  - **Carried from 2a:**
+    - Golden layout: `GuaranteeV1` and `AgencyExposureV1` with offset tables in `tests/tests/layout/v1.rs`; size pins; padding zero at init.
+    - Add `register_guarantee` and `close_guarantee` to `Fixture::pilot_instructions()`, so padding preservation, the version guard and the pilot-earmark sequence cover them.
+    - Version guard on `VaultState`: injected `version = 2` or an unknown `mode` is refused with `UnsupportedVersion` (`VaultState::is_supported`); an unknown `Guarantee` status is refused the same way.
+    - Injected earmark (`INSTANT_EXIT` also injected): `register_guarantee` capacity shrinks by exactly `earmark_eff`; a registration that fits leaves `earmark_eff` unchanged; the ratchet stores `earmark_eff`, and lowers the stored level when surplus or liquidity has fallen. With the flag injected clear, the earmark has no effect and `register_guarantee` stores `0`.
 - **Done when:** tests pass and the gate demo case ("an over-capacity registration is refused") is scripted.
 
 ## Task 4 — Guarantee fees (Oct 3)
@@ -130,6 +136,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - The same `invoice_ref_hash` cannot be contributed twice (`FeeReceipt`).
   - Fees never mint shares. MUTAV's share balance changes only via deposit/redeem.
   - `contribute_fees` succeeds while paused and in under-coverage.
+  - **Carried from 2a:** `FeeReceiptV1` golden layout and padding zero at init; `contribute_fees` added to `Fixture::pilot_instructions()` (padding preserved, version guard, `buffer_earmark` neither read nor written).
 - **Done when:** tests pass; `FeesContributed` carries gross, take and net.
 
 ## Task 5 — Claims and payouts (Oct 4)
@@ -144,6 +151,10 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - **Property test:** `pay_claim` is never refused for solvency or under-coverage (fuzz `stable_assets` below `coverage_required`).
   - At `c = 1.0`, paying a claim leaves `free_capital` unchanged.
   - Frozen `reserve` → `ReserveFrozen`, clean failure, retry succeeds after thaw.
+  - **Carried from 2a:**
+    - `ClaimFilingV1` and `PayoutV1` golden layouts; padding zero at init; unknown leg or status constants refused with `UnsupportedVersion`; `file_claim`, `pay_claim` and `settle_payout` added to `Fixture::pilot_instructions()`.
+    - `pay_claim` neither reads nor writes `buffer_earmark` and is never refused: the solvency property test above also fuzzes an injected earmark with `INSTANT_EXIT` set (spec §4 invariant 14).
+    - `ClaimNoticeV1` golden layout, with the claim notices (built later).
   - `settle_payout` records `pix_e2e_hash`; late flag set when past the SLA; second settle fails.
   - **Claim notices:** flag increments `pending_notices`; duplicate notice fails; close as `Paid` requires the `ClaimFiling` to be `PAID`; close as `FullyProvisioned` requires `leg_provision == leg_cover − leg_paid`; **a notice whose filing has a provision smaller than the eventual payment cannot be closed as filed** (`NoticeNotResolved`); close as `Withdrawn`; notices never affect `file_claim`, `pay_claim`, `settle_payout` or `close_guarantee`; flag and close work while paused and in under-coverage.
 - **Done when:** tests pass; the payout flow matches [ADR 0003](decisions/0003-payments-operated-by-mutav.md).
@@ -182,6 +193,11 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - Frozen investor destination: `claim_assets` fails, `assets_claimable` and the status (`Filled` or `PartiallyFilled`) are unchanged, the account stays open, and the claim succeeds after thaw; same for a `Cancelled` request with `assets_claimable > 0`.
   - Request accounts close on claim/cancel, rent to owner.
   - `request_deposit` creates `HolderState` if needed and refreshes `last_shares_in_ts`; `claim_shares` refreshes it again.
+  - **Carried from 2a:**
+    - `DepositRequestV1`, `RedeemRequestV1` and `HolderStateV1` golden layouts; padding zero at init; unknown status constants refused with `UnsupportedVersion`; every capital instruction added to `Fixture::pilot_instructions()`.
+    - Test-only `HolderStateV2` (per-wallet exit counters `exit_period_start: i64`, `exit_period_paid: u64` carved from `_reserved`) decodes v1 accounts produced by the pilot instructions, with a zero carve and unchanged v1 fields; carve size pinned (16 bytes, 48 left).
+    - Injected earmark (`INSTANT_EXIT` also injected): `fulfil_redeems` capacity shrinks by exactly `earmark_eff`; **two or more fills in one batch take at most `surplus − earmark_eff` in total**; a starved head sees `earmark_eff = 0`; the ratchet stores `earmark_eff`.
+    - `cancel_redeem` and `claim_assets` neither read nor write `buffer_earmark`.
 - **Done when:** tests pass; forked files carry the MIT header; `NOTICE` updated.
 
 ## Task 7 — MUTAV capital (Oct 5)
@@ -202,6 +218,9 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - Recovery returns `mode` to `Normal`.
   - Price above the accrual curve is capped; stale price → gated instructions fail with `StalePrice`; deviation beyond the bound rejected.
   - NAV move > threshold sets `fulfil_halted`; fulfils fail until cleared.
+  - **Carried from 2a:**
+    - In under-coverage with an injected earmark and flag, `earmark_eff == 0`, and the next ratcheting instruction stores `0`.
+    - **Ratchet scope:** with a stale price and `tesouro_units > 0`, `file_claim`, `contribute_fees`, `close_guarantee`, `cancel_redeem`, `claim_assets` (and `flag_claim_notice`, when notices are built) still succeed; they neither read nor write `buffer_earmark`. This needs the TESOURO pricing, which is built later.
 - **Done when:** tests pass using a mock price account (real layout pending Etherfuse, spec §12 Q2).
 
 ## Task 9 — Adapter interface, mock adapter, allocate/deallocate (Oct 6–7)
@@ -216,6 +235,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - Allocation fails when it would breach the solvency post-condition, or the liquidity post-condition `brs_balance_after ≥ provisions + earmark_eff_before` (`InsufficientLiquidBalance`); with an injected earmark `E` (flag set), a failing allocation leaves `buffer_earmark` unchanged.
   - **CPI depth:** `allocate` and `deallocate` succeed when executed through a Squads v4 vault transaction (Task 13); the mock adapter makes one CPI level and emits no self-CPI events.
   - **Deallocate rule:** in under-coverage, deallocating TESOURO → BRS at or above its bounded value succeeds; a deallocation that lowers `stable_assets` fails with `WorsensCoverage`. In normal mode, any value loss must fit in `free_capital`.
+  - **Carried from 2a:** with an injected earmark and flag, `allocate` capacity shrinks by exactly `earmark_eff`; `allocate`, `deallocate`, `whitelist_adapter` and `remove_adapter` added to `Fixture::pilot_instructions()`; adapter entry padding preserved.
 - **Done when:** tests pass; [ADR 0002](decisions/0002-core-program-and-capped-adapters.md) holds in code.
 
 ## Task 10 — Refresh and events (Oct 7)
@@ -228,6 +248,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - Frozen reserve account detected; balance excluded; event emitted.
   - Event coverage test: every token movement is covered by an event whose amounts match (one `RedeemFilled` per fill, one `RedeemsFulfilled` per batch, one `FeesContributed` covering both of its transfers).
   - `StateRefreshed` carries `surplus` and `buffer_earmark`.
+  - **Carried from 2a:** `refresh` with an injected earmark ratchets the stored level down when surplus or liquidity has fallen, and stores `0` with the flag injected clear; `refresh` and `advance_queue_heads` added to `Fixture::pilot_instructions()`, so the pilot-earmark sequence covers every instruction.
 - **Done when:** tests pass; Mollusk CU benchmark recorded for `refresh`, `pay_claim`, `fulfil_redeems` (multi-fill batch with a partial head, `emit_cpi!` per fill, boxed `VaultConfig`), including the Borsh cost of the 512/256-byte padding; `MAX_FULFIL_BATCH` pinned from it.
 
 ## Task 11 — Codama client and publication (Oct 7–8)
