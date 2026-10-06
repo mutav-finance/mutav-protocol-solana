@@ -6,13 +6,22 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./advanceQueueHeads";
+export * from "./cancelDeposit";
+export * from "./cancelRedeem";
+export * from "./claimAssets";
+export * from "./claimShares";
 export * from "./closeGuarantee";
 export * from "./contributeFees";
 export * from "./fileClaim";
+export * from "./fulfilDeposits";
+export * from "./fulfilRedeems";
 export * from "./initialize";
 export * from "./pause";
 export * from "./payClaim";
 export * from "./registerGuarantee";
+export * from "./requestDeposit";
+export * from "./requestRedeem";
 export * from "./revokeOperator";
 export * from "./setAllowlistRoot";
 export * from "./setConfig";
