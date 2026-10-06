@@ -168,8 +168,8 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
         &args.mutav_capital_wallet,
         &ctx.accounts.vault_authority.key(),
     )?;
-    // TODO(spec: §12 Q20 — whether a seed deposit is minted to a dead address
-    // at init is TBD). None is minted: the reserve starts with zero shares.
+    // No seed deposit (spec §12 Q20, decided 2026-10-06): the reserve starts
+    // with zero shares and `V = 1` handles the empty-reserve conversion.
 
     let config_key = ctx.accounts.config.key();
     let share_mint = ctx.accounts.share_mint.key();
