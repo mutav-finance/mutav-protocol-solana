@@ -92,6 +92,23 @@ fn unsupported_feature_bits_fail_closed() {
 }
 
 #[test]
+fn every_feature_bit_fails_closed_and_clearing_is_allowed() {
+    let mut f = Fixture::new();
+    let base = set_config_args(&f.config());
+    for bit in 0..64 {
+        let mut a = base.clone();
+        a.feature_flags = 1u64 << bit;
+        assert_mutav_err(f.set_config(a), MutavError::FeatureNotSupported);
+    }
+    // Zero (all bits clear) is always accepted.
+    let mut a = base.clone();
+    a.fee_take_bps += 1;
+    a.feature_flags = 0;
+    f.set_config(a).expect("clear flags");
+    assert_eq!(f.config().feature_flags, 0);
+}
+
+#[test]
 fn exit_params_can_be_staged_while_the_flag_is_off() {
     let mut f = Fixture::new();
     let mut a = set_config_args(&f.config());

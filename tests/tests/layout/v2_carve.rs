@@ -8,10 +8,7 @@
 //! Task 6.
 
 use anchor_lang::{prelude::*, AccountDeserialize, Discriminator};
-use mutav::{
-    constants::VAULT_STATE_SIZE,
-    state::VaultState,
-};
+use mutav::{constants::VAULT_STATE_SIZE, state::VaultState};
 use mutav_tests::helpers::*;
 
 use super::{pattern, ser, span, spans, v1::*, vault_state_fields, zeroed, Sentinel, STATE_BOOLS};
