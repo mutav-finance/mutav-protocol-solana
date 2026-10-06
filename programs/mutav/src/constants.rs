@@ -86,8 +86,9 @@ pub const NAV_SCALE: u64 = 1_000_000_000;
 
 /// Most `RedeemRequest` accounts one `fulfil_redeems` call may fill (spec §8).
 // TODO(plan: Task 10 — pin from a Mollusk benchmark of `fulfil_redeems`
-// through a Squads vault transaction). Conservative until then; a LiteSVM
-// measurement is recorded in `tests/tests/capital_redeem.rs`.
+// through a Squads vault transaction; skipped for the hackathon build).
+// Conservative until then; `tests/tests/compute.rs` checks that a full batch
+// of whole fills fits the default 200k CU in LiteSVM.
 pub const MAX_FULFIL_BATCH: u8 = 8;
 
 /// Deepest allowlist Merkle proof accepted (2^32 leaves).
