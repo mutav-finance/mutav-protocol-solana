@@ -304,6 +304,34 @@ mod tests {
     }
 
     #[test]
+    fn pilot_seeds_avoid_reserved_prefixes() {
+        let pilot = [
+            CONFIG_SEED,
+            STATE_SEED,
+            AUTHORITY_SEED,
+            SHARE_MINT_SEED,
+            RESERVE_SEED,
+            PENDING_DEPOSITS_SEED,
+            PENDING_REDEMPTIONS_SEED,
+            CLAIMS_SEED,
+        ];
+        for seed in pilot {
+            for reserved in RESERVED_SEED_PREFIXES {
+                assert!(
+                    !seed.starts_with(reserved) && !reserved.starts_with(seed),
+                    "{:?} collides with reserved {:?}",
+                    std::str::from_utf8(seed),
+                    std::str::from_utf8(reserved)
+                );
+            }
+        }
+        assert_eq!(
+            RESERVED_SEED_PREFIXES,
+            [&b"exit_buffer"[..], b"exit_limit", b"instant_exit"]
+        );
+    }
+
+    #[test]
     fn instant_exit_is_not_supported_in_the_pilot() {
         assert_eq!(SUPPORTED_FEATURES & INSTANT_EXIT, 0);
     }
