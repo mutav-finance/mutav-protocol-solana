@@ -6,8 +6,10 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./closeGuarantee";
 export * from "./initialize";
 export * from "./pause";
+export * from "./registerGuarantee";
 export * from "./revokeOperator";
 export * from "./setAllowlistRoot";
 export * from "./setConfig";

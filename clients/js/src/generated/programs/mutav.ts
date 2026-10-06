@@ -35,33 +35,46 @@ import {
   type SelfPlanAndSendFunctions,
 } from "@solana/kit/program-client-core";
 import {
+  getAgencyExposureCodec,
+  getGuaranteeCodec,
   getVaultConfigCodec,
   getVaultStateCodec,
+  type AgencyExposure,
+  type AgencyExposureArgs,
+  type Guarantee,
+  type GuaranteeArgs,
   type VaultConfig,
   type VaultConfigArgs,
   type VaultState,
   type VaultStateArgs,
 } from "../accounts";
 import {
+  getCloseGuaranteeInstructionAsync,
   getInitializeInstructionAsync,
   getPauseInstruction,
+  getRegisterGuaranteeInstructionAsync,
   getRevokeOperatorInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
   getSetPaymentsAccountInstruction,
   getSetRolesInstruction,
   getUnpauseInstruction,
+  parseCloseGuaranteeInstruction,
   parseInitializeInstruction,
   parsePauseInstruction,
+  parseRegisterGuaranteeInstruction,
   parseRevokeOperatorInstruction,
   parseSetAllowlistRootInstruction,
   parseSetConfigInstruction,
   parseSetPaymentsAccountInstruction,
   parseSetRolesInstruction,
   parseUnpauseInstruction,
+  type CloseGuaranteeAsyncInput,
   type InitializeAsyncInput,
+  type ParsedCloseGuaranteeInstruction,
   type ParsedInitializeInstruction,
   type ParsedPauseInstruction,
+  type ParsedRegisterGuaranteeInstruction,
   type ParsedRevokeOperatorInstruction,
   type ParsedSetAllowlistRootInstruction,
   type ParsedSetConfigInstruction,
@@ -69,6 +82,7 @@ import {
   type ParsedSetRolesInstruction,
   type ParsedUnpauseInstruction,
   type PauseInput,
+  type RegisterGuaranteeAsyncInput,
   type RevokeOperatorInput,
   type SetAllowlistRootInput,
   type SetConfigInput,
@@ -79,6 +93,7 @@ import {
 import {
   findClaimsPda,
   findConfigPda,
+  findGuaranteePda,
   findPendingDepositsPda,
   findPendingRedemptionsPda,
   findReservePda,
@@ -91,6 +106,8 @@ export const MUTAV_PROGRAM_ADDRESS =
   "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9" as Address<"8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9">;
 
 export enum MutavAccount {
+  AgencyExposure,
+  Guarantee,
   VaultConfig,
   VaultState,
 }
@@ -99,6 +116,28 @@ export function identifyMutavAccount(
   account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MutavAccount {
   const data = "data" in account ? account.data : account;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([1, 250, 85, 98, 115, 180, 168, 59]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.AgencyExposure;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([198, 16, 124, 172, 230, 249, 200, 37]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.Guarantee;
+  }
   if (
     containsBytes(
       data,
@@ -548,8 +587,10 @@ export function identifyMutavEvent(
 }
 
 export enum MutavInstruction {
+  CloseGuarantee,
   Initialize,
   Pause,
+  RegisterGuarantee,
   RevokeOperator,
   SetAllowlistRoot,
   SetConfig,
@@ -562,6 +603,17 @@ export function identifyMutavInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MutavInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([215, 51, 54, 138, 43, 241, 79, 231]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.CloseGuarantee;
+  }
   if (
     containsBytes(
       data,
@@ -583,6 +635,17 @@ export function identifyMutavInstruction(
     )
   ) {
     return MutavInstruction.Pause;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([54, 160, 13, 129, 200, 87, 163, 55]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.RegisterGuarantee;
   }
   if (
     containsBytes(
@@ -660,11 +723,17 @@ export type ParsedMutavInstruction<
   TProgram extends string = "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9",
 > =
   | ({
+      instructionType: MutavInstruction.CloseGuarantee;
+    } & ParsedCloseGuaranteeInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.Initialize;
     } & ParsedInitializeInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.Pause;
     } & ParsedPauseInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.RegisterGuarantee;
+    } & ParsedRegisterGuaranteeInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.RevokeOperator;
     } & ParsedRevokeOperatorInstruction<TProgram>)
@@ -689,6 +758,13 @@ export function parseMutavInstruction<TProgram extends string>(
 ): ParsedMutavInstruction<TProgram> {
   const instructionType = identifyMutavInstruction(instruction);
   switch (instructionType) {
+    case MutavInstruction.CloseGuarantee: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.CloseGuarantee,
+        ...parseCloseGuaranteeInstruction(instruction),
+      };
+    }
     case MutavInstruction.Initialize: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -701,6 +777,13 @@ export function parseMutavInstruction<TProgram extends string>(
       return {
         instructionType: MutavInstruction.Pause,
         ...parsePauseInstruction(instruction),
+      };
+    }
+    case MutavInstruction.RegisterGuarantee: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.RegisterGuarantee,
+        ...parseRegisterGuaranteeInstruction(instruction),
       };
     }
     case MutavInstruction.RevokeOperator: {
@@ -763,6 +846,10 @@ export type MutavPlugin = {
 };
 
 export type MutavPluginAccounts = {
+  agencyExposure: ReturnType<typeof getAgencyExposureCodec> &
+    SelfFetchFunctions<AgencyExposureArgs, AgencyExposure>;
+  guarantee: ReturnType<typeof getGuaranteeCodec> &
+    SelfFetchFunctions<GuaranteeArgs, Guarantee>;
   vaultConfig: ReturnType<typeof getVaultConfigCodec> &
     SelfFetchFunctions<VaultConfigArgs, VaultConfig>;
   vaultState: ReturnType<typeof getVaultStateCodec> &
@@ -770,6 +857,10 @@ export type MutavPluginAccounts = {
 };
 
 export type MutavPluginInstructions = {
+  closeGuarantee: (
+    input: CloseGuaranteeAsyncInput,
+  ) => ReturnType<typeof getCloseGuaranteeInstructionAsync> &
+    SelfPlanAndSendFunctions;
   initialize: (
     input: MakeOptional<InitializeAsyncInput, "payer">,
   ) => ReturnType<typeof getInitializeInstructionAsync> &
@@ -777,6 +868,10 @@ export type MutavPluginInstructions = {
   pause: (
     input: PauseInput,
   ) => ReturnType<typeof getPauseInstruction> & SelfPlanAndSendFunctions;
+  registerGuarantee: (
+    input: MakeOptional<RegisterGuaranteeAsyncInput, "payer">,
+  ) => ReturnType<typeof getRegisterGuaranteeInstructionAsync> &
+    SelfPlanAndSendFunctions;
   revokeOperator: (
     input: RevokeOperatorInput,
   ) => ReturnType<typeof getRevokeOperatorInstruction> &
@@ -801,8 +896,9 @@ export type MutavPluginInstructions = {
 };
 
 export type MutavPluginPdas = {
-  config: typeof findConfigPda;
   state: typeof findStatePda;
+  guarantee: typeof findGuaranteePda;
+  config: typeof findConfigPda;
   vaultAuthority: typeof findVaultAuthorityPda;
   shareMint: typeof findShareMintPda;
   reserve: typeof findReservePda;
@@ -825,10 +921,20 @@ export function mutavProgram() {
     return extendClient(client, {
       mutav: <MutavPlugin>{
         accounts: {
+          agencyExposure: addSelfFetchFunctions(
+            client,
+            getAgencyExposureCodec(),
+          ),
+          guarantee: addSelfFetchFunctions(client, getGuaranteeCodec()),
           vaultConfig: addSelfFetchFunctions(client, getVaultConfigCodec()),
           vaultState: addSelfFetchFunctions(client, getVaultStateCodec()),
         },
         instructions: {
+          closeGuarantee: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCloseGuaranteeInstructionAsync(input),
+            ),
           initialize: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -839,6 +945,14 @@ export function mutavProgram() {
             ),
           pause: (input) =>
             addSelfPlanAndSendFunctions(client, getPauseInstruction(input)),
+          registerGuarantee: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRegisterGuaranteeInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
           revokeOperator: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -862,8 +976,9 @@ export function mutavProgram() {
             addSelfPlanAndSendFunctions(client, getUnpauseInstruction(input)),
         },
         pdas: {
-          config: findConfigPda,
           state: findStatePda,
+          guarantee: findGuaranteePda,
+          config: findConfigPda,
           vaultAuthority: findVaultAuthorityPda,
           shareMint: findShareMintPda,
           reserve: findReservePda,

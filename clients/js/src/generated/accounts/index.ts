@@ -6,5 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./agencyExposure";
+export * from "./guarantee";
 export * from "./vaultConfig";
 export * from "./vaultState";
