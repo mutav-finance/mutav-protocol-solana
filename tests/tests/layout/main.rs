@@ -8,6 +8,7 @@
 //! current program structs with the frozen v1 copies and the committed
 //! fixtures in `tests/fixtures/layout/v1/`.
 
+mod book;
 mod v1;
 mod v2_carve;
 

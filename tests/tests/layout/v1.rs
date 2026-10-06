@@ -261,3 +261,73 @@ pub const ADAPTER_ENTRY_V1: OffsetTable = &[
     ("enabled", 112, 1),
     ("_reserved", 113, 64),
 ];
+
+// ---------------------------------------------------------------------------
+// Guarantee book (Task 3)
+// ---------------------------------------------------------------------------
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct GuaranteeV1 {
+    pub version: u8,
+    pub bump: u8,
+    pub id: [u8; 32],
+    pub agency_id: [u8; 32],
+    pub refs_hash: [u8; 32],
+    pub rent: u64,
+    pub default_multiplier_bps: u16,
+    pub exit_multiplier_bps: u16,
+    pub default_cover: u64,
+    pub exit_cover: u64,
+    pub default_paid: u64,
+    pub exit_paid: u64,
+    pub provision_default: u64,
+    pub provision_exit: u64,
+    pub open_claims: u16,
+    pub status: u8,
+    pub registered_at: i64,
+    pub closed_at: i64,
+    pub _reserved: [u8; 64],
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct AgencyExposureV1 {
+    pub version: u8,
+    pub bump: u8,
+    pub agency_id: [u8; 32],
+    pub outstanding_cover: u64,
+    pub active_guarantees: u32,
+    pub claims_paid_total: u64,
+    pub _reserved: [u8; 64],
+}
+
+pub const GUARANTEE_V1: OffsetTable = &[
+    ("version", 0, 1),
+    ("bump", 1, 1),
+    ("id", 2, 32),
+    ("agency_id", 34, 32),
+    ("refs_hash", 66, 32),
+    ("rent", 98, 8),
+    ("default_multiplier_bps", 106, 2),
+    ("exit_multiplier_bps", 108, 2),
+    ("default_cover", 110, 8),
+    ("exit_cover", 118, 8),
+    ("default_paid", 126, 8),
+    ("exit_paid", 134, 8),
+    ("provision_default", 142, 8),
+    ("provision_exit", 150, 8),
+    ("open_claims", 158, 2),
+    ("status", 160, 1),
+    ("registered_at", 161, 8),
+    ("closed_at", 169, 8),
+    ("_reserved", 177, 64),
+];
+
+pub const AGENCY_EXPOSURE_V1: OffsetTable = &[
+    ("version", 0, 1),
+    ("bump", 1, 1),
+    ("agency_id", 2, 32),
+    ("outstanding_cover", 34, 8),
+    ("active_guarantees", 42, 4),
+    ("claims_paid_total", 46, 8),
+    ("_reserved", 54, 64),
+];
