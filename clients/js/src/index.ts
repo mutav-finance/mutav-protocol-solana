@@ -6,3 +6,4 @@ export * from './math';
 export * from './pdas';
 export * from './preview';
 export * from './reads';
+export * from './allowlist';

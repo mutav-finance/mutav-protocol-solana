@@ -277,6 +277,16 @@ Layout fields for anything built later are carved from the `_reserved` padding (
 - **Tests first:** a script dry-run against a local validator; a check that the upgrade authority equals the Squads vault after deploy; a check that the Squads multisig has `config_authority == Pubkey::default()` and `time_lock ≥` the agreed floor; a check that `feature_flags == 0` and `buffer_earmark == 0` after `init`; a per-reserve address lookup table created for the static accounts of admin vault transactions.
 - **Layout freeze:** re-tick the spec §14.2 checklist before the first deploy; from then on errors and events are append-only.
 - **Done when:** program deployed and verified; upgrade authority = Squads vault; addresses recorded in `README.md`; live `VaultConfig`/`VaultState` dumped into `tests/fixtures/layout/v1/`; no keypair committed; the one-vs-two-multisig question (spec §12 Q15) answered or recorded as an open item.
+- **Prepared in Phase D (2026-10-06); deploy not run.**
+  - `scripts/devnet/{deploy,init,roles,caps,allowlist,verify}.ts`, plus `dry-run.ts`. Every admin step is written as an unsigned Squads proposal. `deploy.ts` hands keypair paths to the Solana CLI and nothing else.
+  - The Merkle builder lives in `clients/js/src/allowlist.ts`, and the program's `allowlist::verify` checks it on a committed fixture.
+  - `dry-run.ts` passed against a throwaway `solana-test-validator`: deploy → initialize → roles → caps → allowlist → checks, plus an allowlisted `request_deposit`. It stops the validator itself.
+  - The Squads checks are unit-tested on fixture bytes.
+  - `release.yml` runs `solana-verify build`, takes the hash, writes the buffer and checks its hash, then writes the upgrade proposal payload and the verify-PDA transaction. It is `workflow_dispatch` only and does nothing past the build without secrets.
+  - **Not done (needs approval and founder inputs):**
+    - the devnet deploy itself, the Squads multisig and the live fixtures;
+    - the per-reserve address lookup table;
+    - the Program Metadata IDL write, which is still a manual step in the proposal.
 
 ## Task 13 — Surfpool fork tests (Oct 8–9)
 
@@ -284,6 +294,12 @@ Layout fields for anything built later are carved from the `_reserved` padding (
 - **Files:** `tests-fork/*`, `.github/workflows/fork.yml` (manual trigger).
 - **Tests first:** initialize with the real mint; deposit → fulfil → claim; register → fee → file → pay → settle; admin fulfil executed through a Squads proposal, including a partial head fill; `allocate` and `deallocate` executed through a Squads proposal (CPI depth); a no-op program upgrade through a timelocked Squads proposal, after which every live account still decodes.
 - **Done when:** the fork suite passes on demand; findings about the real mint's authorities recorded in the spec's open questions.
+- **Built in Phase D (2026-10-06), one happy path.** `tests-fork/happy-path.ts` forks devnet in Surfpool and runs:
+  - `initialize` with Nora's BRS mint (classic SPL, passes the mint guard);
+  - deposit → fulfil → claim shares;
+  - register → fee → file → pay → settle.
+
+  Balances come from `surfnet_setTokenAccount`. `fork.yml` triggers it manually. The mint's authorities are recorded in spec §12 Q34. **Built later:** the Squads-proposal flows, partial fills, adapters and the upgrade rehearsal.
 
 ## Tasks 14–18 — mutav-app integration (Oct 8–9) [mutav-app]
 

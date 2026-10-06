@@ -872,6 +872,13 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 32. **Queue liveness under notices.** While any notice is open the queues wait; a notice closes only when the claim is paid, the leg is fully provisioned, or the notice is withdrawn. Confirm that this delay is acceptable, or narrow the queue gate to requests owned by `mutav_capital_wallet` / `exit.barred` (instant exit keeps the global gate).
 33. **`MAX_ADAPTERS`.** *Resolved (2026-10-06):* `MAX_ADAPTERS = 8`. `AdapterEntry._reserved` widened to 64 bytes so PC-27 pinning can be added later without a migration.
 
+**Raised by the devnet fork test (plan Task 13):**
+
+34. **Authorities of the devnet BRS mint.** Read on 2026-10-06 from devnet. `BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4` is a classic SPL Token mint (not Token-2022), with 6 decimals, so it passes the mint guard. Its **mint authority** is `7764rLMKF8fd4daejEESKBDPjE5EQBEQNgKCKNCpMwJv`, a 186-byte account owned by program `9fBSeVHUCaHHUzkktiRp5Yn35emxx3S1ERzn7oHsi8je` (presumably Nora's minting program). Its **freeze authority** is `nora7ZTxmDrLdVheVazpsthHFB8u3JzgHeyh9foTZWC`, a system-owned wallet, so a single key can freeze any BRS token account, the reserve's included. Freeze detection (`refresh`, Task 10) and the fail-closed `stable_assets` cover this. Still to confirm with Nora:
+    - who holds the freeze key on mainnet, and under what policy (multisig, published freeze criteria);
+    - whether the mainnet mint has the same authorities and stays classic SPL;
+    - whether the mint authority's program can be upgraded (and so change mint policy).
+
 ---
 
 ## 13. Phase 2 — Instant exit (designed, disabled in the pilot)
