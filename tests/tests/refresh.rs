@@ -175,6 +175,40 @@ fn a_frozen_reserve_is_detected_and_excluded() {
 }
 
 #[test]
+fn a_freeze_and_the_thaw_both_trip_the_nav_move_guard() {
+    // Spec §7: a frozen `reserve` counts as 0, so NAV collapses with shares
+    // outstanding. The published NAV is floored at 1, so the freeze and the
+    // thaw are both measured moves; a freeze cannot reset the baseline.
+    let (mut f, _) = reserve();
+    f.refresh().unwrap();
+    assert_eq!(f.state().nav_per_share, NAV_SCALE);
+    let reserve = f.pdas.reserve;
+
+    f.set_frozen(&reserve, true);
+    f.refresh().unwrap();
+    let s = f.state();
+    assert!(s.fulfil_halted, "the freeze trips the guard");
+    assert_eq!(s.nav_per_share, 1);
+
+    // Clearing while still frozen re-opens nothing for long: the baseline is
+    // the tracked NAV, and the next refresh, still frozen, trips again.
+    f.clear_fulfil_halt().expect("admin clears");
+    assert_eq!(f.state().nav_per_share, NAV_SCALE);
+    f.refresh().unwrap();
+    assert!(f.state().fulfil_halted, "still frozen: halted again");
+
+    // With the collapsed baseline kept, the thaw is a measured move too.
+    let mut s = f.state();
+    s.fulfil_halted = false;
+    f.write_state(&s);
+    f.set_frozen(&reserve, false);
+    f.refresh().unwrap();
+    let s = f.state();
+    assert!(s.fulfil_halted, "the thaw trips the guard");
+    assert_eq!(s.nav_per_share, NAV_SCALE);
+}
+
+#[test]
 fn frozen_escrow_accounts_are_reported_but_not_in_stable_assets() {
     let (mut f, _) = reserve();
     let (claims, deposits) = (f.pdas.claims, f.pdas.pending_deposits);
