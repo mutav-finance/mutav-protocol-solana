@@ -585,7 +585,7 @@ impl Fixture {
     /// Capital instructions for the pilot list, each valid in this order
     /// after `book_instructions`: request two deposits, cancel one, fulfil,
     /// claim the shares, request two redemptions, cancel one, fulfil, claim
-    /// the assets, crank the heads. Building the list allowlists a fresh
+    /// the assets, crank the heads, refresh. Building the list allowlists a fresh
     /// investor (by injecting the root) and, if the reserve holds BRS but no
     /// shares (funding injected by `book_instructions`), injects shares at
     /// NAV 1.0 so the deposit buys a normal amount.
@@ -666,6 +666,36 @@ impl Fixture {
                 self.advance_queue_heads_ix(4, &[r0, r1], &[d0, d1]),
                 self.payer.insecure_clone(),
             ),
+            ("refresh", self.refresh_ix(&[]), self.payer.insecure_clone()),
         ]
+    }
+}
+
+impl Fixture {
+    /// `refresh` (spec §5.8), with `payouts` as `(guarantee, payout)` pairs of
+    /// remaining accounts (Task 10).
+    pub fn refresh_ix(&self, payouts: &[(Pubkey, Pubkey)]) -> Instruction {
+        let mut metas = mutav::accounts::Refresh {
+            config: self.pdas.config,
+            state: self.pdas.state,
+            event_authority: self.pdas.event_authority,
+            program: mutav::ID,
+        }
+        .to_account_metas(None);
+        for (g, p) in payouts {
+            metas.push(AccountMeta::new_readonly(*g, false));
+            metas.push(AccountMeta::new(*p, false));
+        }
+        Instruction::new_with_bytes(mutav::ID, &mutav::instruction::Refresh {}.data(), metas)
+    }
+
+    /// `refresh` sent by a fresh, unrelated signer (it is permissionless).
+    pub fn refresh(&mut self) -> TransactionResult {
+        let anyone = Keypair::new();
+        self.svm
+            .airdrop(&anyone.pubkey(), 1_000_000_000)
+            .expect("airdrop");
+        let ix = self.refresh_ix(&[]);
+        super::send_ix(&mut self.svm, ix, &[&anyone])
     }
 }

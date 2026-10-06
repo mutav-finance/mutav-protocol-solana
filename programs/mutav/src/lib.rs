@@ -192,4 +192,10 @@ pub mod mutav {
     pub fn advance_queue_heads(ctx: Context<AdvanceQueueHeads>, max: u8) -> Result<()> {
         instructions::public::advance_queue_heads::handle_advance_queue_heads(ctx, max)
     }
+
+    /// Recompute and publish `stable_assets`, `coverage_required`, NAV per
+    /// share and `mode`; run the NAV-move guard. Anyone.
+    pub fn refresh(ctx: Context<Refresh>) -> Result<()> {
+        instructions::public::refresh::handle_refresh(ctx)
+    }
 }
