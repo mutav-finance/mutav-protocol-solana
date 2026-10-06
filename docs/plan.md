@@ -209,7 +209,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - `fulfil_deposits` works in under-coverage (recapitalization).
   - Pause blocks capital flows and new guarantees, while `contribute_fees`, `file_claim`, `pay_claim`, `settle_payout`, `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, `refresh`, `advance_queue_heads`, `cancel_*` and `claim_*` still succeed.
 - **Done when:** tests pass.
-- **Built in Phase C (2026-10-06):** `tests/mutav_capital.rs`. Under-coverage is reached by raising `coverage_ratio_bps`, with `mode` injected until `refresh` (Task 10) records it. The pause test leaves out `refresh` (added with Task 10) and the claim-notice instructions (built later).
+- **Built in Phase C (2026-10-06):** `tests/mutav_capital.rs`. Under-coverage is reached by raising `coverage_ratio_bps`, with `mode` injected until `refresh` (Task 10) records it. The pause test covers `refresh` (from Task 8) and leaves out the claim-notice instructions (built later).
 
 ## Task 8 — Under-coverage mode and price safety (Oct 6)
 
@@ -224,6 +224,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
     - In under-coverage with an injected earmark and flag, `earmark_eff == 0`, and the next ratcheting instruction stores `0`.
     - **Ratchet scope:** with a stale price and `tesouro_units > 0`, `file_claim`, `contribute_fees`, `close_guarantee`, `cancel_redeem`, `claim_assets` (and `flag_claim_notice`, when notices are built) still succeed; they neither read nor write `buffer_earmark`. This needs the TESOURO pricing, which is built later.
 - **Done when:** tests pass using a mock price account (real layout pending Etherfuse, spec §12 Q2).
+- **Built in Phase C (2026-10-06), BRS only.** The spec puts the mode transition and the NAV-move guard in `refresh`, so `refresh`'s core lands here: it recomputes and publishes `stable_assets`, `coverage_required` and NAV per share, sets `mode` (emitting `ModeChanged` on a transition), runs the guard and emits `StateRefreshed`. Task 10 adds freeze detection, late payouts and the event audit. `register_guarantee` and `fulfil_redeems` also check under-coverage inline; `pay_claim` and `fulfil_deposits` are never blocked. The guard trips on a move strictly above `max_nav_move_bps` of the last published NAV. It is skipped while either NAV is 0 (no shares, spec §4 TODO), and it measures the move gross, so a large fee batch trips it too (`TODO(adr 0013: inflow-adjusted NAV guard)`). Nothing clears `fulfil_halted` yet: it fails closed. Tests: `tests/under_coverage.rs`. **Built later:** TESOURO pricing (`tesouro_units > 0` fails closed with `StalePrice`, `refresh` included), the ratchet-scope test that needs a stale price, `allocate`.
 
 ## Task 9 — Adapter interface, mock adapter, allocate/deallocate (Oct 6–7)
 
