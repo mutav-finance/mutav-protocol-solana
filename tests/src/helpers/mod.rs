@@ -593,3 +593,89 @@ impl Fixture {
         self.send(ix, &admin)
     }
 }
+
+// ---------------------------------------------------------------------------
+// Account injection and the pilot instruction set (spec §14.7)
+// ---------------------------------------------------------------------------
+
+impl Fixture {
+    /// Raw bytes of an account (discriminator included).
+    pub fn raw(&self, addr: &Pubkey) -> Vec<u8> {
+        self.svm.get_account(addr).expect("account").data
+    }
+
+    /// Overwrites an account's data in place, as a newer binary (or a test)
+    /// could. Length and owner are kept.
+    pub fn write_raw(&mut self, addr: &Pubkey, data: &[u8]) {
+        let mut acc = self.svm.get_account(addr).expect("account");
+        assert_eq!(acc.data.len(), data.len(), "injected length");
+        acc.data.copy_from_slice(data);
+        self.svm.set_account(*addr, acc).expect("set_account");
+    }
+
+    /// Serializes `c` over the config account (discriminator included).
+    pub fn write_config(&mut self, c: &VaultConfig) {
+        let mut data = VaultConfig::DISCRIMINATOR.to_vec();
+        anchor_lang::AnchorSerialize::serialize(c, &mut data).unwrap();
+        let addr = self.pdas.config;
+        self.write_raw(&addr, &data);
+    }
+
+    /// Serializes `s` over the state account (discriminator included).
+    pub fn write_state(&mut self, s: &VaultState) {
+        let mut data = VaultState::DISCRIMINATOR.to_vec();
+        anchor_lang::AnchorSerialize::serialize(s, &mut data).unwrap();
+        let addr = self.pdas.state;
+        self.write_raw(&addr, &data);
+    }
+
+    /// One valid call of every instruction that exists after `initialize`,
+    /// in an order where each succeeds on a fresh fixture. Each entry is
+    /// `(name, instruction, signer)`. Extend this list as instructions land:
+    /// padding, version and earmark tests walk it.
+    pub fn pilot_instructions(&mut self) -> Vec<(&'static str, Instruction, Keypair)> {
+        let admin = self.admin.insecure_clone();
+        let c = self.config();
+
+        let mut args = set_config_args(&c);
+        args.fee_take_bps = c.fee_take_bps + 1;
+        args.caps.max_tvl = c.caps.max_tvl + 1;
+        args.exit.buffer_target_bps = 500;
+        let set_config = self.set_config_ix(&admin.pubkey(), args, &c.treasury_account);
+
+        let new_payments = self.token_account(&Pubkey::new_unique());
+        let set_payments =
+            self.set_payments_account_ix(&admin.pubkey(), &new_payments, &c.treasury_account);
+
+        let (op, pa) = (Pubkey::new_unique(), Pubkey::new_unique());
+        vec![
+            ("set_config", set_config, admin.insecure_clone()),
+            (
+                "set_roles",
+                self.set_roles_ix(&admin.pubkey(), op, pa),
+                admin.insecure_clone(),
+            ),
+            ("set_payments_account", set_payments, admin.insecure_clone()),
+            (
+                "set_allowlist_root",
+                self.set_allowlist_root_ix(&admin.pubkey(), [7; 32]),
+                admin.insecure_clone(),
+            ),
+            (
+                "pause",
+                self.pause_ix(&admin.pubkey()),
+                admin.insecure_clone(),
+            ),
+            (
+                "unpause",
+                self.unpause_ix(&admin.pubkey()),
+                admin.insecure_clone(),
+            ),
+            (
+                "revoke_operator",
+                self.revoke_operator_ix(&admin.pubkey()),
+                admin.insecure_clone(),
+            ),
+        ]
+    }
+}
