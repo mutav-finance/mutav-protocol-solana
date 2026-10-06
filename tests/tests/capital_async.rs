@@ -763,6 +763,42 @@ fn whole_fills_stop_at_a_head_that_does_not_fit() {
 }
 
 #[test]
+fn a_head_worth_zero_assets_is_not_filled() {
+    // Spec §3.8: a fill always leaves `assets_claimable > 0`. A head whose
+    // shares are worth 0 at the NAV of the fill stops the batch untouched;
+    // a 0-asset fill would leave a `Filled` account that can never close.
+    let (mut f, list, inv) = queue_book();
+    let (_, seq) = f.request_redeem(&inv[0], &list, 20_000 * BRL);
+    // Net assets 0 with shares outstanding (provisions = stable assets).
+    inject(&mut f, |s| s.provisions = s.brs_balance);
+    assert_eq!(net_assets(&f), 0);
+    let before = f.state();
+    assert_mutav_err(
+        f.fulfil_redeems(1, u64::MAX, &[seq]),
+        MutavError::RequestTooSmall,
+    );
+    let r = f.redeem_request(seq).unwrap();
+    assert_eq!(
+        (
+            r.status,
+            r.shares_remaining,
+            r.assets_claimable,
+            r.fill_count
+        ),
+        (REDEEM_PENDING, 20_000 * BRL, 0, 0)
+    );
+    let s = f.state();
+    assert_eq!(
+        (
+            s.redeem_head,
+            s.shares_outstanding,
+            s.claimable_assets_total
+        ),
+        (before.redeem_head, before.shares_outstanding, 0)
+    );
+}
+
+#[test]
 fn max_assets_limits_the_batch_never_the_order() {
     let (mut f, list, inv) = queue_book();
     let (_, sa) = f.request_redeem(&inv[0], &list, 10_000 * BRL);
