@@ -41,8 +41,8 @@ Program work started on Oct 6, so the hackathon build runs in five phases, with 
 
 **Built later** (designed in the ADRs, labelled "not built" in the README and litepaper):
 
-- partial fills at the queue head (ADR 0010; Task 6 ships whole fills only);
-- claim notices and their gate (Task 5's `flag_claim_notice` / `close_claim_notice`);
+- partial fills at the queue head (ADR 0010; Task 6 ships whole fills only), with Task 6's partial-fill tests, the Alice/Bob/Carol scenario and the frozen-destination case for a `Cancelled` request that still has `assets_claimable > 0`;
+- claim notices and their gate (Task 5's `flag_claim_notice` / `close_claim_notice`); `fulfil_deposits` and `fulfil_redeems` already check `pending_notices == 0`, which always passes until notices exist, and Task 6's claim-notice-gate tests run on an injected count;
 - adapters, `allocate` / `deallocate` and TESOURO pricing (Task 9; parts of Tasks 8 and 13), with the TESOURO cap at 0% in the pilot;
 - the lifecycle states beyond active and closed (ADR 0012, PR #4);
 - the IDL-compatibility CI job (Task 11);
@@ -199,6 +199,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
     - Injected earmark (`INSTANT_EXIT` also injected): `fulfil_redeems` capacity shrinks by exactly `earmark_eff`; **two or more fills in one batch take at most `surplus − earmark_eff` in total**; a starved head sees `earmark_eff = 0`; the ratchet stores `earmark_eff`.
     - `cancel_redeem` and `claim_assets` neither read nor write `buffer_earmark`.
 - **Done when:** tests pass; forked files carry the MIT header; `NOTICE` updated.
+- **Built in Phase C (2026-10-06), whole fills only.** All nine instructions, the allowlist Merkle proof (`allowlist.rs`: `leaf = sha256(0x00 ‖ owner)`, `node = sha256(0x01 ‖ min ‖ max)`, zero root allowlists nobody), the request and holder layouts with their golden tables and the `HolderStateV2` carve, and every capital instruction in `Fixture::pilot_instructions()`. `fulfil_redeems` fills whole requests from the head while they fit `min(max_assets − paid, free_capital, liquid_budget)`; the first head that does not fit stops the batch untouched (`TODO(plan: partial fills deferred, ADR 0010)` marks the sizing). The partial-fill layout fields and statuses are real, so ADR 0010 ships with no migration. Tests: `tests/capital_async.rs`, `tests/freeze.rs` (escrow cases), `tests/layout/capital.rs`. **Built later:** the partial-fill bullets above, the Alice/Bob/Carol scenario and the `Cancelled`-with-claimable freeze case; the claim-notice gate is tested on an injected `pending_notices`.
 
 ## Task 7 — MUTAV capital (Oct 5)
 
@@ -208,6 +209,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - `fulfil_deposits` works in under-coverage (recapitalization).
   - Pause blocks capital flows and new guarantees, while `contribute_fees`, `file_claim`, `pay_claim`, `settle_payout`, `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, `refresh`, `advance_queue_heads`, `cancel_*` and `claim_*` still succeed.
 - **Done when:** tests pass.
+- **Built in Phase C (2026-10-06):** `tests/mutav_capital.rs`. Under-coverage is reached by raising `coverage_ratio_bps`, with `mode` injected until `refresh` (Task 10) records it. The pause test leaves out `refresh` (added with Task 10) and the claim-notice instructions (built later).
 
 ## Task 8 — Under-coverage mode and price safety (Oct 6)
 
