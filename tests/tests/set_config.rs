@@ -67,6 +67,7 @@ fn same_bounds_as_initialize() {
         Box::new(|a| a.caps.max_tesouro_share_bps = 10_001),
         Box::new(|a| a.price.max_deviation_bps = 10_001),
         Box::new(|a| a.price.max_nav_move_bps = 10_001),
+        Box::new(|a| a.price.y_max_bps = 10_001),
         Box::new(|a| a.caps.min_request = a.caps.max_request + 1),
         Box::new(|a| a.caps.claim_period_secs = 0),
         Box::new(|a| a.payout_sla_secs = -1),

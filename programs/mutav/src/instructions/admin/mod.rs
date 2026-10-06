@@ -60,6 +60,7 @@ pub(crate) fn validate_params(
         caps.max_tesouro_share_bps,
         price.max_deviation_bps,
         price.max_nav_move_bps,
+        price.y_max_bps,
     ] {
         require!(bps <= BPS_DENOMINATOR, MutavError::InvalidParameter);
     }
