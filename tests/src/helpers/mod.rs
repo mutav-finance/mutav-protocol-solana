@@ -727,3 +727,79 @@ impl Fixture {
         ]
     }
 }
+
+// ---------------------------------------------------------------------------
+// Token movements and freezes
+// ---------------------------------------------------------------------------
+
+/// A token-program CPI made inside a transaction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TokenMove {
+    Transfer(u64),
+    MintTo(u64),
+    Burn(u64),
+}
+
+/// Every SPL Token / Token-2022 `transfer`, `transfer_checked`, `mint_to`
+/// (checked or not) and `burn` (checked or not) among the inner
+/// instructions, in order. `keys` are the transaction's account keys.
+pub fn token_moves(meta: &TransactionMetadata, keys: &[Pubkey]) -> Vec<TokenMove> {
+    let mut out = vec![];
+    for ix in meta.inner_instructions.iter().flatten() {
+        let program = keys[ix.instruction.program_id_index as usize];
+        if program != TOKEN_PROGRAM && program != TOKEN_2022_PROGRAM {
+            continue;
+        }
+        let d = &ix.instruction.data;
+        let amount = || u64::from_le_bytes(d[1..9].try_into().unwrap());
+        match d[0] {
+            3 | 12 => out.push(TokenMove::Transfer(amount())),
+            7 | 14 => out.push(TokenMove::MintTo(amount())),
+            8 | 15 => out.push(TokenMove::Burn(amount())),
+            _ => {}
+        }
+    }
+    out
+}
+
+impl Fixture {
+    /// Like `send`, also returning the transaction's account keys (for
+    /// `token_moves`).
+    pub fn send_traced(
+        &mut self,
+        ix: Instruction,
+        signer: &Keypair,
+    ) -> (TransactionResult, Vec<Pubkey>) {
+        let payer = self.payer.insecure_clone();
+        let signers: Vec<&Keypair> = if signer.pubkey() == payer.pubkey() {
+            vec![&payer]
+        } else {
+            vec![&payer, signer]
+        };
+        let msg =
+            Message::new_with_blockhash(&[ix], Some(&payer.pubkey()), &self.svm.latest_blockhash());
+        let keys = msg.account_keys.clone();
+        let tx =
+            VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &signers).expect("sign");
+        let res = self.svm.send_transaction(tx);
+        self.svm.expire_blockhash();
+        (res, keys)
+    }
+
+    /// Freezes or thaws a BRS token account (the test holds the mint's
+    /// freeze authority, as a BRS issuer would).
+    pub fn set_frozen(&mut self, account: &Pubkey, frozen: bool) {
+        use anchor_spl::token::spl_token::instruction::{freeze_account, thaw_account};
+        let auth = self.freeze_authority.insecure_clone();
+        let build = if frozen { freeze_account } else { thaw_account };
+        let ix = build(
+            &TOKEN_PROGRAM,
+            account,
+            &self.reserve_mint,
+            &auth.pubkey(),
+            &[],
+        )
+        .unwrap();
+        self.send(ix, &auth).expect("freeze/thaw");
+    }
+}
