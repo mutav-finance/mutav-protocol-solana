@@ -2,10 +2,16 @@
   "name": "mutav-protocol-solana",
   "private": true,
   "license": "Apache-2.0",
-  "workspaces": ["clients/js"],
+  "workspaces": [
+    "clients/js"
+  ],
   "scripts": {
     "generate:client": "bun scripts/generate-client.ts",
-    "typecheck": "bun run --cwd clients/js typecheck"
+    "typecheck": "bun run --cwd clients/js typecheck",
+    "test:client": "bun test --cwd clients/js",
+    "test:scripts": "bun test scripts/test",
+    "check:no-keys": "bash scripts/check-no-keys.sh clients/js/src",
+    "idl-compat": "bun scripts/idl-compat.ts"
   },
   "devDependencies": {
     "@codama/nodes-from-anchor": "1.5.6",
