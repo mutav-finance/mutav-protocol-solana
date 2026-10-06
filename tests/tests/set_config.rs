@@ -210,3 +210,27 @@ fn set_payments_account_rules() {
     assert_eq!(cu.len(), 1);
     assert_eq!(cu[0].field, field::PAYMENTS_ACCOUNT);
 }
+
+#[test]
+fn treasury_cannot_be_a_reserve_account() {
+    let mut f = Fixture::new();
+    let admin = f.admin.insecure_clone();
+    let args = set_config_args(&f.config());
+    for acct in [f.pdas.claims, f.pdas.reserve] {
+        let ix = f.set_config_ix(&admin.pubkey(), args.clone(), &acct);
+        assert_mutav_err(f.send(ix, &admin), MutavError::InvalidParameter);
+    }
+    assert_eq!(f.config().treasury_account, f.treasury);
+}
+
+#[test]
+fn payments_cannot_be_a_reserve_account() {
+    let mut f = Fixture::new();
+    let admin = f.admin.insecure_clone();
+    let treasury = f.treasury;
+    for acct in [f.pdas.claims, f.pdas.reserve] {
+        let ix = f.set_payments_account_ix(&admin.pubkey(), &acct, &treasury);
+        assert_mutav_err(f.send(ix, &admin), MutavError::InvalidParameter);
+    }
+    assert_eq!(f.config().payments_account, f.payments);
+}

@@ -7,7 +7,7 @@ use crate::{
     constants::{field, PROGRAM_LAYOUT_VERSION, SUPPORTED_FEATURES},
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges},
-    instructions::admin::{validate_money_accounts, validate_params},
+    instructions::admin::{validate_money_accounts, validate_params, vault_authority_key},
     state::{CapsInput, ExitInput, PriceInput, VaultConfig},
 };
 
@@ -66,11 +66,16 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
         &args.caps,
         &args.price,
     )?;
+    let vault_authority = vault_authority_key(
+        &ctx.accounts.config.key(),
+        ctx.accounts.config.authority_bump,
+    )?;
     validate_money_accounts(
         &ctx.accounts.config.reserve_mint,
         &ctx.accounts.treasury_account,
         &ctx.accounts.payments_account,
         &args.mutav_capital_wallet,
+        &vault_authority,
     )?;
     // TODO(spec: §5.8 step 3 — the exact clearing path for
     // `VaultState.fulfil_halted` is TBD). `set_config` does not clear it yet.

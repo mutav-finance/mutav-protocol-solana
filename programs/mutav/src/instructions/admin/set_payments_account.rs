@@ -7,7 +7,7 @@ use crate::{
     constants::{field, PROGRAM_LAYOUT_VERSION},
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges, PaymentsAccountUpdated},
-    instructions::admin::validate_money_accounts,
+    instructions::admin::{validate_money_accounts, vault_authority_key},
     state::VaultConfig,
 };
 
@@ -33,11 +33,16 @@ pub struct SetPaymentsAccount<'info> {
 }
 
 pub fn handle_set_payments_account(ctx: Context<SetPaymentsAccount>) -> Result<()> {
+    let vault_authority = vault_authority_key(
+        &ctx.accounts.config.key(),
+        ctx.accounts.config.authority_bump,
+    )?;
     validate_money_accounts(
         &ctx.accounts.config.reserve_mint,
         &ctx.accounts.treasury_account,
         &ctx.accounts.payments_account,
         &ctx.accounts.config.mutav_capital_wallet,
+        &vault_authority,
     )?;
 
     let new = ctx.accounts.payments_account.key();

@@ -166,6 +166,7 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
         &ctx.accounts.treasury_account,
         &ctx.accounts.payments_account,
         &args.mutav_capital_wallet,
+        &ctx.accounts.vault_authority.key(),
     )?;
     // TODO(spec: §12 Q20 — whether a seed deposit is minted to a dead address
     // at init is TBD). None is minted: the reserve starts with zero shares.
