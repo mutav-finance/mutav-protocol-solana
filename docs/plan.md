@@ -253,6 +253,12 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - `StateRefreshed` carries `surplus` and `buffer_earmark`.
   - **Carried from 2a:** `refresh` with an injected earmark ratchets the stored level down when surplus or liquidity has fallen, and stores `0` with the flag injected clear; `refresh` and `advance_queue_heads` added to `Fixture::pilot_instructions()`, so the pilot-earmark sequence covers every instruction.
 - **Done when:** tests pass; Mollusk CU benchmark recorded for `refresh`, `pay_claim`, `fulfil_redeems` (multi-fill batch with a partial head, `emit_cpi!` per fill, boxed `VaultConfig`), including the Borsh cost of the 512/256-byte padding; `MAX_FULFIL_BATCH` pinned from it.
+- **Built in Phase C (2026-10-06).** On top of Task 8's `refresh` core:
+  - **Freeze detection.** `refresh` receives the four reserve token accounts and emits `ReserveFrozenDetected` for each frozen one. A frozen `reserve` counts as 0 in the published `stable_assets`, which fails closed into under-coverage; the tracked `brs_balance` is unchanged.
+  - **Late payouts.** Late-payout flags come from `(Guarantee, Payout)` pairs passed as remaining accounts. A mismatched pair fails with `InvalidParameter`. Each payout is flagged once, emitting `PayoutLate`, and `late_payouts` counts the payouts `refresh` flagged (`TODO(spec: §3.2 …)`: whether a settlement lowers it is not specified).
+  - **Event audit.** `tests/events.rs` walks `pilot_instructions()`, matches every token CPI against its event's amounts, and fails on any instruction that moves tokens without a mapping.
+  - **Benchmark skipped.** The Mollusk benchmark is skipped. `tests/compute.rs` measures LiteSVM CUs instead: `fulfil_redeems` with 8 whole fills 109,540, `refresh` 29,141, `pay_claim` 41,451. `MAX_FULFIL_BATCH` stays a conservative 8 (`TODO(plan: Task 10 …)` in `constants.rs`).
+  - **Tests:** `tests/refresh.rs`, `tests/events.rs`, `tests/compute.rs`.
 
 ## Task 11 — Codama client and publication (Oct 7–8)
 
