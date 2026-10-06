@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{field, PROGRAM_LAYOUT_VERSION},
+    constants::field,
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges, OperatorRevoked},
     state::VaultConfig,
@@ -17,7 +17,7 @@ pub struct RevokeOperator<'info> {
 
     #[account(
         mut,
-        constraint = config.version <= PROGRAM_LAYOUT_VERSION @ MutavError::UnsupportedVersion,
+        constraint = config.is_supported() @ MutavError::UnsupportedVersion,
         constraint = config.is_pauser_or_admin(&signer.key()) @ MutavError::Unauthorized,
     )]
     pub config: Box<Account<'info, VaultConfig>>,

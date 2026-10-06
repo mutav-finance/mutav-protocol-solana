@@ -9,7 +9,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{field, MAX_ADAPTERS, VAULT_CONFIG_SIZE},
+    constants::{field, MAX_ADAPTERS, PROGRAM_LAYOUT_VERSION, VAULT_CONFIG_SIZE},
     events::ConfigChanges,
 };
 
@@ -71,6 +71,11 @@ pub struct VaultConfig {
 const _: () = assert!(8 + VaultConfig::INIT_SPACE == VAULT_CONFIG_SIZE);
 
 impl VaultConfig {
+    /// Version guard (spec §14.2 R1b). `VaultConfig` has no status fields.
+    pub fn is_supported(&self) -> bool {
+        self.version <= PROGRAM_LAYOUT_VERSION
+    }
+
     /// `true` only for the current, non-revoked operator.
     pub fn is_operator(&self, key: &Pubkey) -> bool {
         self.operator != Pubkey::default() && *key == self.operator
@@ -372,6 +377,17 @@ mod tests {
     fn zeroed() -> VaultConfig {
         let bytes = vec![0u8; VaultConfig::INIT_SPACE];
         VaultConfig::deserialize(&mut bytes.as_slice()).unwrap()
+    }
+
+    #[test]
+    fn version_guard() {
+        let mut c = zeroed();
+        c.version = PROGRAM_LAYOUT_VERSION;
+        assert!(c.is_supported());
+        c.version = PROGRAM_LAYOUT_VERSION + 1;
+        assert!(!c.is_supported());
+        c.version = u8::MAX;
+        assert!(!c.is_supported());
     }
 
     #[test]

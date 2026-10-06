@@ -2,7 +2,7 @@
 
 use anchor_lang::prelude::*;
 
-use crate::constants::VAULT_STATE_SIZE;
+use crate::constants::{MODE_NORMAL, MODE_UNDER_COVERED, PROGRAM_LAYOUT_VERSION, VAULT_STATE_SIZE};
 
 /// Seeds: `["state", config]`. Written by every state-changing instruction;
 /// recomputed by `refresh`. Starts empty (all zero) at `initialize`.
@@ -52,3 +52,39 @@ pub struct VaultState {
 }
 
 const _: () = assert!(8 + VaultState::INIT_SPACE == VAULT_STATE_SIZE);
+
+impl VaultState {
+    /// Version guard (spec §14.2 R1b): a layout version this binary
+    /// understands and a known `mode`. Instructions that read `VaultState`
+    /// refuse anything else with `UnsupportedVersion`.
+    pub fn is_supported(&self) -> bool {
+        self.version <= PROGRAM_LAYOUT_VERSION
+            && matches!(self.mode, MODE_NORMAL | MODE_UNDER_COVERED)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn zeroed() -> VaultState {
+        let bytes = vec![0u8; VaultState::INIT_SPACE];
+        VaultState::deserialize(&mut bytes.as_slice()).unwrap()
+    }
+
+    #[test]
+    fn version_and_mode_guard() {
+        let mut s = zeroed();
+        s.version = PROGRAM_LAYOUT_VERSION;
+        assert!(s.is_supported());
+        s.mode = MODE_UNDER_COVERED;
+        assert!(s.is_supported());
+        s.mode = MODE_UNDER_COVERED + 1;
+        assert!(!s.is_supported(), "unknown mode");
+        s.mode = u8::MAX;
+        assert!(!s.is_supported(), "unknown mode");
+        s.mode = MODE_NORMAL;
+        s.version = PROGRAM_LAYOUT_VERSION + 1;
+        assert!(!s.is_supported(), "newer layout");
+    }
+}

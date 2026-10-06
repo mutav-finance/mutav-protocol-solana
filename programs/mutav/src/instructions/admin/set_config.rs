@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
-    constants::{field, PROGRAM_LAYOUT_VERSION, SUPPORTED_FEATURES},
+    constants::{field, SUPPORTED_FEATURES},
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges},
     instructions::admin::{validate_money_accounts, validate_params},
@@ -35,7 +35,7 @@ pub struct SetConfig<'info> {
 
     #[account(
         mut,
-        constraint = config.version <= PROGRAM_LAYOUT_VERSION @ MutavError::UnsupportedVersion,
+        constraint = config.is_supported() @ MutavError::UnsupportedVersion,
         constraint = config.admin == admin.key() @ MutavError::Unauthorized,
     )]
     pub config: Box<Account<'info, VaultConfig>>,
