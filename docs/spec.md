@@ -53,7 +53,7 @@ Where a value or behaviour is not yet decided, this spec says **TBD** and lists 
 
 | Role | Key | May call |
 |---|---|---|
-| **Admin** | Squads v4 multisig vault, with a Squads time lock | `initialize`, `set_config`, `set_roles`, `set_payments_account`, `set_allowlist_root`, `whitelist_adapter`, `remove_adapter`, `unpause`, `fulfil_deposits`, `fulfil_redeems`, `allocate`, `deallocate`. Also the program's upgrade authority |
+| **Admin** | Squads v4 multisig vault, with a Squads time lock | `initialize`, `set_config`, `set_roles`, `set_payments_account`, `set_allowlist_root`, `clear_fulfil_halt`, `whitelist_adapter`, `remove_adapter`, `unpause`, `fulfil_deposits`, `fulfil_redeems`, `allocate`, `deallocate`. Also the program's upgrade authority |
 | **Operator** | Hot key held by mutav-app in KMS, used from Convex actions | `register_guarantee`, `close_guarantee`, `contribute_fees`, `flag_claim_notice`, `close_claim_notice`, `file_claim`, `pay_claim`, `settle_payout` |
 | **Pauser** | Separate key | `pause`, `revoke_operator` |
 | **Investor** | Own wallet, on the allowlist (KYC done off-chain) | `request_deposit`, `cancel_deposit`, `claim_shares`, `request_redeem`, `cancel_redeem`, `claim_assets` |
@@ -450,6 +450,15 @@ Common account rules:
 
 - **Signer:** admin. **Event:** `AllowlistRootUpdated`.
 
+#### `clear_fulfil_halt()`
+
+Proposed in [ADR 0015](decisions/0015-admin-clear-fulfil-halt.md), pending founder confirmation.
+
+- **Signer:** admin. **Accounts:** `config`, `state`. Never paused.
+- **Rules:** `fulfil_halted == true` (otherwise `InvalidParameter`); price as for `refresh` ([§7](#7-price-safety)).
+- **Effects:** `fulfil_halted = false`; `nav_per_share` (the NAV-move guard's baseline) is set to the published NAV of now ([§7](#7-price-safety)). Nothing else changes.
+- **Errors:** `Unauthorized`, `InvalidParameter`, `StalePrice`. **Event:** `FulfilHaltCleared { nav_per_share }`.
+
 #### `whitelist_adapter(program_id, asset_mint, cap)` / `remove_adapter(program_id)`
 
 - **Signer:** admin. **Rules:** `remove_adapter` requires `allocated == 0`. Pinning the adapter's deployed slot and upgrade authority (PC-27) is **TBD**. **Events:** `AdapterWhitelisted`, `AdapterRemoved`.
@@ -660,7 +669,7 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
 - **Effects:**
   1. Detect frozen reserve token accounts and fail closed: emit `ReserveFrozenDetected`; frozen balances do not count in `stable_assets`.
   2. Read and bound the TESOURO price ([§7](#7-price-safety)); recompute `tesouro_value`, `stable_assets`, `coverage_required`, `surplus`, `earmark_eff` (and apply the ratchet), `free_capital`, `net_assets`, `nav_per_share`.
-  3. If NAV per share moved more than `price.max_nav_move_bps` since the last refresh, set `fulfil_halted = true` (cleared by admin `set_config`, TBD exact clearing path).
+  3. If NAV per share moved more than `price.max_nav_move_bps` since the last refresh, set `fulfil_halted = true`. Only the admin's [`clear_fulfil_halt`](#clear_fulfil_halt) clears it and resets the baseline (ADR 0015, proposed).
   4. Set `mode` ([§6](#6-under-coverage-mode)).
   5. For each passed `Payout` with `status == Pending` and `now > paid_at + payout_sla_secs`, set `late = true`; update `late_payouts`.
 - **Errors:** none for stale prices: a stale price is recorded and flagged, and the gated instructions refuse to run on it.
@@ -760,6 +769,7 @@ Emitted with `emit_cpi!` for every token movement and every state change the mut
 | `Allocated` / `Deallocated` | `adapter, brs_out, tesouro_in` / `adapter, tesouro_out, brs_in` |
 | `StateRefreshed` | `stable_assets, coverage_required, surplus, buffer_earmark, free_capital, provisions, nav_per_share, mode, tesouro_price, price_stale` |
 | `ModeChanged` | `from, to, deficit` |
+| `FulfilHaltCleared` | `nav_per_share` (the guard's new baseline; ADR 0015) |
 | `ReserveFrozenDetected` | `token_account` |
 
 `idle_free_capital` (free capital left after a batch) makes head-of-line blocking visible on the transparency page. MUTAV capital is visible through `DepositsFulfilled` / `RedeemFilled` filtered by `mutav_capital_wallet`; there are no separate capital events (ADR 0008). Phase-2 events are listed in [§13.8](#138-events). Existing events never change fields; new information goes in a new event ([§14.4](#144-client-and-idl-compatibility)), and the mutav-app indexer skips unknown event discriminators.
@@ -845,7 +855,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 18. **Allocation gate.** Must the allocated amount itself fit in `free_capital`, or is the solvency post-condition plus the TESOURO share cap enough?
 19. **Per-invoice idempotency for fees.** *Resolved (ADR 0009):* a `FeeReceipt` PDA seeded by `invoice_ref_hash`.
 20. **Virtual offset and seed deposit.** *Resolved (2026-10-06):* `k = 0`, so `V = 1`: one share is worth 1 BRS at launch with the 6-decimal share mint. No seed deposit is minted at `initialize`. Rationale: NAV ignores direct transfers (internal accounting, invariant 1), and deposits are allowlisted and fulfilled by the admin, so a larger offset is not needed against first-depositor inflation. `PRICE_SCALE = NAV_SCALE = 10^9` (§8).
-21. **NAV-move threshold X**, staleness window, deviation bound and stale-price behaviour (fail vs haircut).
+21. **NAV-move threshold X**, staleness window, deviation bound and stale-price behaviour (fail vs haircut). The clearing path for `fulfil_halted` is proposed in ADR 0015: an admin `clear_fulfil_halt` that also resets the guard's baseline (pending founder confirmation).
 22. **Adversarial-review items not yet decided:** PC-4, PC-6, PC-8, PC-9, PC-13 (beyond filed claims), PC-15, PC-16, PC-21, PC-22, PC-30, PC-31, PC-32, PC-34, PC-35, PC-36, PC-38, PC-43 (extra caps). See §11. PC-29 is resolved by ADR 0010.
 
 **Raised by the redemption-liquidity design (ADRs 0010, 0011):**
