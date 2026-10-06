@@ -420,3 +420,90 @@ pub const PAYOUT_V1: OffsetTable = &[
     ("late", 156, 1),
     ("_reserved", 157, 64),
 ];
+
+// ---------------------------------------------------------------------------
+// Investor capital (Task 6)
+// ---------------------------------------------------------------------------
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct DepositRequestV1 {
+    pub version: u8,
+    pub bump: u8,
+    pub owner: Pubkey,
+    pub seq: u64,
+    pub assets: u64,
+    pub shares_out: u64,
+    pub nav_at_fulfil: u64,
+    pub requested_at: i64,
+    pub fulfilled_at: i64,
+    pub status: u8,
+    pub _reserved: [u8; 64],
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RedeemRequestV1 {
+    pub version: u8,
+    pub bump: u8,
+    pub owner: Pubkey,
+    pub seq: u64,
+    pub shares_requested: u64,
+    pub shares_remaining: u64,
+    pub shares_filled: u64,
+    pub assets_filled: u64,
+    pub assets_claimable: u64,
+    pub fill_count: u16,
+    pub last_fill_nav: u64,
+    pub requested_at: i64,
+    pub last_fill_at: i64,
+    pub status: u8,
+    pub _reserved: [u8; 64],
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct HolderStateV1 {
+    pub version: u8,
+    pub bump: u8,
+    pub owner: Pubkey,
+    pub last_shares_in_ts: i64,
+    pub _reserved: [u8; 64],
+}
+
+pub const DEPOSIT_REQUEST_V1: OffsetTable = &[
+    ("version", 0, 1),
+    ("bump", 1, 1),
+    ("owner", 2, 32),
+    ("seq", 34, 8),
+    ("assets", 42, 8),
+    ("shares_out", 50, 8),
+    ("nav_at_fulfil", 58, 8),
+    ("requested_at", 66, 8),
+    ("fulfilled_at", 74, 8),
+    ("status", 82, 1),
+    ("_reserved", 83, 64),
+];
+
+pub const REDEEM_REQUEST_V1: OffsetTable = &[
+    ("version", 0, 1),
+    ("bump", 1, 1),
+    ("owner", 2, 32),
+    ("seq", 34, 8),
+    ("shares_requested", 42, 8),
+    ("shares_remaining", 50, 8),
+    ("shares_filled", 58, 8),
+    ("assets_filled", 66, 8),
+    ("assets_claimable", 74, 8),
+    ("fill_count", 82, 2),
+    ("last_fill_nav", 84, 8),
+    ("requested_at", 92, 8),
+    ("last_fill_at", 100, 8),
+    ("status", 108, 1),
+    ("_reserved", 109, 64),
+];
+
+pub const HOLDER_STATE_V1: OffsetTable = &[
+    ("version", 0, 1),
+    ("bump", 1, 1),
+    ("owner", 2, 32),
+    ("last_shares_in_ts", 34, 8),
+    ("_reserved", 42, 64),
+];

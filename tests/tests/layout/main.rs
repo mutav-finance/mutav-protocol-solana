@@ -9,6 +9,7 @@
 //! fixtures in `tests/fixtures/layout/v1/`.
 
 mod book;
+mod capital;
 mod v1;
 mod v2_carve;
 

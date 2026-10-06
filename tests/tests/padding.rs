@@ -101,3 +101,47 @@ fn padding_bytes_are_where_the_layout_says() {
     let s = f.raw(&f.pdas.state);
     assert_eq!(&s[s.len() - 256..], noise(142, 256).as_slice());
 }
+
+#[test]
+fn request_and_holder_padding_is_zero_at_init_and_preserved() {
+    let mut f = Fixture::new();
+    let a = f.investor(20_000 * BRL);
+    let list = f.allowlist(&[a.pubkey()]);
+    let (r, d) = f.request_deposit(&a, &list, 5_000 * BRL);
+    r.unwrap();
+    let config = f.pdas.config;
+    let dep = deposit_pda(&config, d);
+    let holder = holder_pda(&config, &a.pubkey());
+    // Zero at init.
+    let raw = f.raw(&dep);
+    assert_eq!(&raw[raw.len() - 64..], &[0; 64]);
+    let raw = f.raw(&holder);
+    assert_eq!(&raw[raw.len() - 64..], &[0; 64]);
+
+    // Preserved by fulfil (in-place update) and by a holder re-stamp.
+    let tail = |f: &mut Fixture, addr: &anchor_lang::prelude::Pubkey, seed: u64| {
+        let mut raw = f.raw(addr);
+        let n = raw.len();
+        raw[n - 64..].copy_from_slice(&noise(seed, 64));
+        f.write_raw(addr, &raw);
+    };
+    tail(&mut f, &dep, 1);
+    tail(&mut f, &holder, 2);
+    f.fulfil_deposits(1, &[d]).unwrap();
+    let raw = f.raw(&dep);
+    assert_eq!(&raw[raw.len() - 64..], noise(1, 64).as_slice());
+    f.request_deposit(&a, &list, 1_000 * BRL).0.unwrap();
+    let raw = f.raw(&holder);
+    assert_eq!(&raw[raw.len() - 64..], noise(2, 64).as_slice());
+    f.claim_shares(&a, d).unwrap();
+
+    let (r, seq) = f.request_redeem(&a, &list, 2_000 * BRL);
+    r.unwrap();
+    let red = redeem_pda(&config, seq);
+    let raw = f.raw(&red);
+    assert_eq!(&raw[raw.len() - 64..], &[0; 64]);
+    tail(&mut f, &red, 3);
+    f.fulfil_redeems(1, u64::MAX, &[seq]).unwrap();
+    let raw = f.raw(&red);
+    assert_eq!(&raw[raw.len() - 64..], noise(3, 64).as_slice());
+}

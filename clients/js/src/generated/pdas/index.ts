@@ -11,6 +11,7 @@ export * from "./claims";
 export * from "./config";
 export * from "./feeReceipt";
 export * from "./guarantee";
+export * from "./holderState";
 export * from "./payout";
 export * from "./pendingDeposits";
 export * from "./pendingRedemptions";

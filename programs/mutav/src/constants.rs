@@ -38,6 +38,13 @@ pub const CLAIM_SEED: &[u8] = b"claim";
 /// `Payout`: `["payout", guarantee, notice_ref_hash]` (spec §3.7).
 pub const PAYOUT_SEED: &[u8] = b"payout";
 
+/// `DepositRequest`: `["deposit", config, seq]`, `seq` as `u64` LE (spec §3.8).
+pub const DEPOSIT_SEED: &[u8] = b"deposit";
+/// `RedeemRequest`: `["redeem", config, seq]`, `seq` as `u64` LE (spec §3.8).
+pub const REDEEM_SEED: &[u8] = b"redeem";
+/// `HolderState`: `["holder", config, owner]` (spec §3.10).
+pub const HOLDER_SEED: &[u8] = b"holder";
+
 /// Seed prefixes reserved for phase 2 (spec §14.2). No pilot PDA may use them.
 /// (`"notice"` is used by the pilot `ClaimNotice`.)
 pub const RESERVED_SEED_PREFIXES: [&[u8]; 3] = [b"exit_buffer", b"exit_limit", b"instant_exit"];
@@ -76,6 +83,15 @@ pub const PRICE_SCALE: u64 = 1_000_000_000;
 /// Scale of `nav_per_share` and `last_fill_nav`: BRS base units per share base
 /// unit, times `10^9`, so `NAV_SCALE` is NAV 1.0 (spec §8, decided 2026-10-06).
 pub const NAV_SCALE: u64 = 1_000_000_000;
+
+/// Most `RedeemRequest` accounts one `fulfil_redeems` call may fill (spec §8).
+// TODO(plan: Task 10 — pin from a Mollusk benchmark of `fulfil_redeems`
+// through a Squads vault transaction). Conservative until then; a LiteSVM
+// measurement is recorded in `tests/tests/capital_redeem.rs`.
+pub const MAX_FULFIL_BATCH: u8 = 8;
+
+/// Deepest allowlist Merkle proof accepted (2^32 leaves).
+pub const MAX_ALLOWLIST_PROOF_LEN: usize = 32;
 
 /// `feature_flags` bit 0: phase-2 instant exit (spec §14.3).
 pub const INSTANT_EXIT: u64 = 1 << 0;
@@ -132,6 +148,9 @@ pub const AGENCY_EXPOSURE_SIZE: usize = 126;
 pub const FEE_RECEIPT_SIZE: usize = 138;
 pub const CLAIM_FILING_SIZE: usize = 156;
 pub const PAYOUT_SIZE: usize = 229;
+pub const DEPOSIT_REQUEST_SIZE: usize = 155;
+pub const REDEEM_REQUEST_SIZE: usize = 181;
+pub const HOLDER_STATE_SIZE: usize = 114;
 
 // ---------------------------------------------------------------------------
 // `ConfigUpdated.field` ids (spec §9). Append-only. Top-level fields use
@@ -332,6 +351,9 @@ mod tests {
             PENDING_DEPOSITS_SEED,
             PENDING_REDEMPTIONS_SEED,
             CLAIMS_SEED,
+            DEPOSIT_SEED,
+            REDEEM_SEED,
+            HOLDER_SEED,
         ];
         for seed in pilot {
             for reserved in RESERVED_SEED_PREFIXES {

@@ -4,6 +4,7 @@
 //! grouped by the role allowed to call it (admin, operator, capital, reserve,
 //! public). Business logic lands in later PRs; see `docs/spec.md`.
 
+pub mod allowlist;
 pub mod constants;
 pub mod errors;
 pub mod events;
@@ -130,5 +131,65 @@ pub mod mutav {
             notice_ref_hash,
             pix_e2e_hash,
         )
+    }
+
+    /// Escrow BRS in `pending_deposits` and join the deposit queue. Not
+    /// paused; allowlisted; size-limited; owner signs. Investor.
+    pub fn request_deposit(
+        ctx: Context<RequestDeposit>,
+        assets: u64,
+        proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        instructions::capital::request_deposit::handle_request_deposit(ctx, assets, proof)
+    }
+
+    /// Refund a pending deposit request and close it. Never paused. Owner.
+    pub fn cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
+        instructions::capital::cancel_deposit::handle_cancel_deposit(ctx)
+    }
+
+    /// Fulfil up to `count` deposit requests in FIFO order at the NAV at
+    /// fulfil. Allowed in under-coverage. Admin.
+    pub fn fulfil_deposits(ctx: Context<FulfilDeposits>, count: u8) -> Result<()> {
+        instructions::capital::fulfil_deposits::handle_fulfil_deposits(ctx, count)
+    }
+
+    /// Mint a fulfilled request's shares to its owner and close it. Never
+    /// paused. Owner.
+    pub fn claim_shares(ctx: Context<ClaimShares>) -> Result<()> {
+        instructions::capital::claim_shares::handle_claim_shares(ctx)
+    }
+
+    /// Escrow shares in `pending_redemptions` and join the redemption queue.
+    /// Not paused; allowlisted; size-limited at the current NAV; owner, never
+    /// a delegate. Investor.
+    pub fn request_redeem(
+        ctx: Context<RequestRedeem>,
+        shares: u64,
+        proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        instructions::capital::request_redeem::handle_request_redeem(ctx, shares, proof)
+    }
+
+    /// Return a redeem request's unfilled shares. Never paused. Owner.
+    pub fn cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
+        instructions::capital::cancel_redeem::handle_cancel_redeem(ctx)
+    }
+
+    /// Fill redeem requests in strict FIFO order out of `free_capital` and
+    /// `liquid_budget`, each at its own NAV, up to `max_assets`. Admin.
+    pub fn fulfil_redeems(ctx: Context<FulfilRedeems>, count: u8, max_assets: u64) -> Result<()> {
+        instructions::capital::fulfil_redeems::handle_fulfil_redeems(ctx, count, max_assets)
+    }
+
+    /// Pay a redeem request's filled BRS to its owner. Never paused. Owner.
+    pub fn claim_assets(ctx: Context<ClaimAssets>) -> Result<()> {
+        instructions::capital::claim_assets::handle_claim_assets(ctx)
+    }
+
+    /// Move `redeem_head` / `deposit_head` over dead seqs (skip proof).
+    /// Moves no funds. Never paused. Anyone.
+    pub fn advance_queue_heads(ctx: Context<AdvanceQueueHeads>, max: u8) -> Result<()> {
+        instructions::public::advance_queue_heads::handle_advance_queue_heads(ctx, max)
     }
 }

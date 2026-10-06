@@ -593,7 +593,7 @@ Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` a
 
   The head request is passed, so `earmark_eff` includes the starvation term ([§4](#4-invariants-and-formulas)) and the ratchet applies.
 - **Loop**, from the head:
-  1. `value = assets_for(shares_remaining)` at the current NAV.
+  1. `value = assets_for(shares_remaining)` at the current NAV. If `value == 0`, there is **no fill**: the batch stops with the head untouched (a fill always leaves `assets_claimable > 0`, §3.8).
   2. **Full fill** if `value ≤ budget`: fill all of `shares_remaining` for `value`; continue with the next seq.
   3. Otherwise **partial fill, then stop the batch**:
      - `fill_max = budget`;
@@ -604,7 +604,7 @@ Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` a
   - A head whose value is below `caps.min_request + caps.min_fill_assets` can therefore only be filled whole.
 - **Effects per fill:** burn `shares_fill` from `pending_redemptions`; transfer `assets` BRS `reserve` → `claims`; `brs_balance −= assets`; `claimable_assets_total += assets`; `shares_outstanding −= shares_fill`; `pending_redeem_shares −= shares_fill`. On the request: `shares_remaining −= shares_fill`, `shares_filled += shares_fill`, `assets_filled += assets`, `assets_claimable += assets`, `fill_count += 1`, `last_fill_nav = nav`, `last_fill_at = now`, `status = Filled` if `shares_remaining == 0` else `PartiallyFilled`. Advance `redeem_head` past a completed request.
 - If the call makes no fill at all, it fails with `InsufficientFreeCapital` (or `InsufficientLiquidBalance` when `liquid_budget` was the binding term), so an empty batch is never recorded as a success.
-- **Errors:** `Unauthorized`, `Paused`, `ClaimNoticePending`, `UnderCovered`, `FulfilHalted`, `StalePrice`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `QueueOrderViolation`.
+- **Errors:** `Unauthorized`, `Paused`, `ClaimNoticePending`, `UnderCovered`, `FulfilHalted`, `StalePrice`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `RequestTooSmall` (the head is worth 0 assets and nothing was filled), `QueueOrderViolation`.
 - **Events:** one `RedeemFilled` per fill, then a batch summary `RedeemsFulfilled`.
 
 #### `claim_assets()`

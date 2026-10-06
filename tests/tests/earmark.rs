@@ -36,9 +36,8 @@ fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
 }
 
 /// Pilot instructions that apply the ratchet `buffer_earmark := earmark_eff`
-/// (spec §4). Later tasks add `fulfil_redeems`, `allocate`, `deallocate` and
-/// `refresh`.
-const RATCHETING: &[&str] = &["register_guarantee"];
+/// (spec §4). Later tasks add `allocate`, `deallocate` and `refresh`.
+const RATCHETING: &[&str] = &["register_guarantee", "fulfil_redeems"];
 
 fn assert_pilot_earmark(f: &Fixture, at: &str) {
     let (c, s) = (f.config(), f.state());
