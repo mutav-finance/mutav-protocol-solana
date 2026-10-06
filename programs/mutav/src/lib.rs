@@ -96,4 +96,39 @@ pub mod mutav {
             amount,
         )
     }
+
+    /// File an approved claim: books the provision, so NAV reflects it at
+    /// once. Never paused, never solvency-gated. Operator.
+    pub fn file_claim(
+        ctx: Context<FileClaim>,
+        leg: u8,
+        amount: u64,
+        notice_ref_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::operator::file_claim::handle_file_claim(ctx, leg, amount, notice_ref_hash)
+    }
+
+    /// Pay a filed claim to the whitelisted payments account. Never paused,
+    /// never solvency-gated, no mode check. Operator.
+    pub fn pay_claim(
+        ctx: Context<PayClaim>,
+        leg: u8,
+        amount: u64,
+        notice_ref_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::operator::pay_claim::handle_pay_claim(ctx, leg, amount, notice_ref_hash)
+    }
+
+    /// Record the PIX settlement of a payout. Operator.
+    pub fn settle_payout(
+        ctx: Context<SettlePayout>,
+        notice_ref_hash: [u8; 32],
+        pix_e2e_hash: [u8; 32],
+    ) -> Result<()> {
+        instructions::operator::settle_payout::handle_settle_payout(
+            ctx,
+            notice_ref_hash,
+            pix_e2e_hash,
+        )
+    }
 }

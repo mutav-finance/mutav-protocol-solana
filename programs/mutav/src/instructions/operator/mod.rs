@@ -7,11 +7,17 @@
 
 pub mod close_guarantee;
 pub mod contribute_fees;
+pub mod file_claim;
+pub mod pay_claim;
 pub mod register_guarantee;
+pub mod settle_payout;
 
 pub use close_guarantee::*;
 pub use contribute_fees::*;
+pub use file_claim::*;
+pub use pay_claim::*;
 pub use register_guarantee::*;
+pub use settle_payout::*;
 
 use anchor_lang::prelude::*;
 

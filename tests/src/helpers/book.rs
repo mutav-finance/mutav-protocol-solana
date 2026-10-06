@@ -10,7 +10,7 @@ use litesvm::types::TransactionResult;
 use litesvm_token::MintTo;
 use mutav::{
     constants::*,
-    state::{AgencyExposure, FeeReceipt, Guarantee},
+    state::{AgencyExposure, ClaimFiling, FeeReceipt, Guarantee, Payout},
     RegisterGuaranteeArgs,
 };
 use solana_keypair::Keypair;
@@ -40,6 +40,49 @@ pub fn agency_pda(config: &Pubkey, agency_id: &[u8; 32]) -> Pubkey {
 /// `FeeReceipt`: `["fee", config, invoice_ref_hash]`.
 pub fn fee_receipt_pda(config: &Pubkey, invoice_ref_hash: &[u8; 32]) -> Pubkey {
     pda(&[FEE_SEED, config.as_ref(), invoice_ref_hash])
+}
+
+/// `ClaimFiling`: `["claim", guarantee, notice_ref_hash]`.
+pub fn claim_pda(guarantee: &Pubkey, notice_ref_hash: &[u8; 32]) -> Pubkey {
+    pda(&[CLAIM_SEED, guarantee.as_ref(), notice_ref_hash])
+}
+
+/// `Payout`: `["payout", guarantee, notice_ref_hash]`.
+pub fn payout_pda(guarantee: &Pubkey, notice_ref_hash: &[u8; 32]) -> Pubkey {
+    pda(&[PAYOUT_SEED, guarantee.as_ref(), notice_ref_hash])
+}
+
+/// One claim: the guarantee (id and agency), leg, amount and notice.
+#[derive(Clone, Copy, Debug)]
+pub struct Claim {
+    pub id: [u8; 32],
+    pub agency_id: [u8; 32],
+    pub leg: u8,
+    pub amount: u64,
+    pub notice: [u8; 32],
+}
+
+impl Claim {
+    /// A default-leg claim on `g` with a fresh notice.
+    pub fn on(g: &RegisterGuaranteeArgs, amount: u64) -> Self {
+        Self {
+            id: g.id,
+            agency_id: g.agency_id,
+            leg: LEG_DEFAULT,
+            amount,
+            notice: unique_hash(),
+        }
+    }
+
+    pub fn leg(mut self, leg: u8) -> Self {
+        self.leg = leg;
+        self
+    }
+
+    pub fn amount(mut self, amount: u64) -> Self {
+        self.amount = amount;
+        self
+    }
 }
 
 /// Accounts of `contribute_fees` that tests vary.
@@ -327,9 +370,155 @@ impl Fixture {
         self.write_raw(&addr, &data);
     }
 
+    pub fn file_claim_ix(&self, signer: &Pubkey, c: Claim) -> Instruction {
+        let config = self.pdas.config;
+        let guarantee = guarantee_pda(&config, &c.id);
+        Instruction::new_with_bytes(
+            mutav::ID,
+            &mutav::instruction::FileClaim {
+                leg: c.leg,
+                amount: c.amount,
+                notice_ref_hash: c.notice,
+            }
+            .data(),
+            mutav::accounts::FileClaim {
+                operator: *signer,
+                config,
+                state: self.pdas.state,
+                guarantee,
+                claim_filing: claim_pda(&guarantee, &c.notice),
+                payer: self.payer.pubkey(),
+                system_program: anchor_lang::solana_program::system_program::ID,
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    /// `pay_claim` to `payments` (normally `config.payments_account`).
+    pub fn pay_claim_ix(&self, signer: &Pubkey, c: Claim, payments: &Pubkey) -> Instruction {
+        let config = self.pdas.config;
+        let guarantee = guarantee_pda(&config, &c.id);
+        Instruction::new_with_bytes(
+            mutav::ID,
+            &mutav::instruction::PayClaim {
+                leg: c.leg,
+                amount: c.amount,
+                notice_ref_hash: c.notice,
+            }
+            .data(),
+            mutav::accounts::PayClaim {
+                operator: *signer,
+                config,
+                state: self.pdas.state,
+                guarantee,
+                agency_exposure: agency_pda(&config, &c.agency_id),
+                claim_filing: claim_pda(&guarantee, &c.notice),
+                payout: payout_pda(&guarantee, &c.notice),
+                reserve: self.pdas.reserve,
+                payments_account: *payments,
+                vault_authority: self.pdas.authority,
+                reserve_mint: self.reserve_mint,
+                token_program: self.token_program,
+                payer: self.payer.pubkey(),
+                system_program: anchor_lang::solana_program::system_program::ID,
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    pub fn settle_payout_ix(
+        &self,
+        signer: &Pubkey,
+        c: Claim,
+        pix_e2e_hash: [u8; 32],
+    ) -> Instruction {
+        let config = self.pdas.config;
+        let guarantee = guarantee_pda(&config, &c.id);
+        Instruction::new_with_bytes(
+            mutav::ID,
+            &mutav::instruction::SettlePayout {
+                notice_ref_hash: c.notice,
+                pix_e2e_hash,
+            }
+            .data(),
+            mutav::accounts::SettlePayout {
+                operator: *signer,
+                config,
+                guarantee,
+                payout: payout_pda(&guarantee, &c.notice),
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    /// `file_claim` signed by the operator.
+    pub fn file_claim(&mut self, c: Claim) -> TransactionResult {
+        let op = self.operator.insecure_clone();
+        let ix = self.file_claim_ix(&op.pubkey(), c);
+        self.send(ix, &op)
+    }
+
+    /// `pay_claim` to the configured payments account, signed by the operator.
+    pub fn pay_claim(&mut self, c: Claim) -> TransactionResult {
+        let op = self.operator.insecure_clone();
+        let payments = self.config().payments_account;
+        let ix = self.pay_claim_ix(&op.pubkey(), c, &payments);
+        self.send(ix, &op)
+    }
+
+    /// `settle_payout` signed by the operator.
+    pub fn settle_payout(&mut self, c: Claim, pix_e2e_hash: [u8; 32]) -> TransactionResult {
+        let op = self.operator.insecure_clone();
+        let ix = self.settle_payout_ix(&op.pubkey(), c, pix_e2e_hash);
+        self.send(ix, &op)
+    }
+
+    pub fn claim_filing(&self, c: &Claim) -> ClaimFiling {
+        let g = guarantee_pda(&self.pdas.config, &c.id);
+        let acc = self
+            .svm
+            .get_account(&claim_pda(&g, &c.notice))
+            .expect("claim filing");
+        ClaimFiling::try_deserialize(&mut acc.data.as_slice()).expect("decode claim filing")
+    }
+
+    pub fn payout(&self, c: &Claim) -> Payout {
+        let g = guarantee_pda(&self.pdas.config, &c.id);
+        let acc = self
+            .svm
+            .get_account(&payout_pda(&g, &c.notice))
+            .expect("payout");
+        Payout::try_deserialize(&mut acc.data.as_slice()).expect("decode payout")
+    }
+
+    /// Serializes `x` over the claim filing of `c`.
+    pub fn write_claim_filing(&mut self, c: &Claim, x: &ClaimFiling) {
+        use anchor_lang::Discriminator;
+        let mut data = ClaimFiling::DISCRIMINATOR.to_vec();
+        anchor_lang::AnchorSerialize::serialize(x, &mut data).unwrap();
+        let g = guarantee_pda(&self.pdas.config, &c.id);
+        self.write_raw(&claim_pda(&g, &c.notice), &data);
+    }
+
+    /// Serializes `x` over the payout of `c`.
+    pub fn write_payout(&mut self, c: &Claim, x: &Payout) {
+        use anchor_lang::Discriminator;
+        let mut data = Payout::DISCRIMINATOR.to_vec();
+        anchor_lang::AnchorSerialize::serialize(x, &mut data).unwrap();
+        let g = guarantee_pda(&self.pdas.config, &c.id);
+        self.write_raw(&payout_pda(&g, &c.notice), &data);
+    }
+
     /// Operator instructions for the pilot list, each valid in this order on
-    /// a fresh fixture: contribute a fee, fund the reserve, register a
-    /// guarantee, close it. Fresh ids on every call, so the list can be built
+    /// a fresh fixture: contribute a fee, register a guarantee (on a reserve
+    /// funded while building the list), file a claim on it, pay it, settle
+    /// the payout, close the guarantee. Fresh ids on every call, so the list can be built
     /// many times.
     pub fn book_instructions(&mut self) -> Vec<(&'static str, Instruction, Keypair)> {
         let op = self.operator.insecure_clone();
@@ -339,11 +528,28 @@ impl Fixture {
         let (id, agency) = (args.id, args.agency_id);
         let source = self.operator_brs(1_000 * BRL);
         let fee = self.contribute_fees_ix(self.fee_accounts(source), unique_hash(), 1_000 * BRL);
+        let claim = Claim::on(&args, 1_000 * BRL);
+        let payments = self.config().payments_account;
         vec![
             ("contribute_fees", fee, op.insecure_clone()),
             (
                 "register_guarantee",
                 self.register_guarantee_ix(&op.pubkey(), args),
+                op.insecure_clone(),
+            ),
+            (
+                "file_claim",
+                self.file_claim_ix(&op.pubkey(), claim),
+                op.insecure_clone(),
+            ),
+            (
+                "pay_claim",
+                self.pay_claim_ix(&op.pubkey(), claim, &payments),
+                op.insecure_clone(),
+            ),
+            (
+                "settle_payout",
+                self.settle_payout_ix(&op.pubkey(), claim, unique_hash()),
                 op.insecure_clone(),
             ),
             (
