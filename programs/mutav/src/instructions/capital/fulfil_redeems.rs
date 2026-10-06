@@ -174,6 +174,13 @@ pub fn handle_fulfil_redeems(
         let admin_left = max_assets - paid; // paid ≤ max_assets by construction
         let budget = admin_left.min(sol.free_capital).min(sol.liquid_budget);
         let value = assets_for(r.shares_remaining, shares_outstanding, sol.net_assets)?;
+        if value == 0 {
+            // Worth nothing at this NAV: no fill. A fill always leaves
+            // `assets_claimable > 0` (spec §3.8); a 0-asset fill would strand
+            // a `Filled` account. Stop the batch with the head untouched.
+            blocked = Some(MutavError::RequestTooSmall);
+            break;
+        }
         if value > budget {
             // TODO(plan: partial fills deferred, ADR 0010) — the pilot fills
             // whole requests only: a head that does not fit stops the batch

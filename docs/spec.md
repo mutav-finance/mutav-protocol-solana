@@ -513,7 +513,7 @@ Shipped in the pilot (ADR 0011). MUTAV learns of a missed rent up to 15 days bef
   - `FullyProvisioned`: the `ClaimFiling` exists, is `FILED`, and the leg is provisioned for its whole remaining cover (`leg_provision == leg_cover − leg_paid`), so no later payment on that leg can exceed what NAV already reflects (ties to PC-12, §12 Q13);
   - `Withdrawn`: MUTAV dropped the notice (rent was paid, or the claim was not approved).
 
-  A notice is never closed merely because a smaller provision was filed: `pay_claim` may pay up to the leg's remaining cover, which can exceed the filed provision. Otherwise `NoticeNotResolved`. Closes the notice (rent to the operator); `pending_notices −= 1`.
+  A notice is never closed merely because a smaller provision was filed: `pay_claim` may pay up to the filing's provision plus the leg's unprovisioned cover ([ADR 0014](decisions/0014-pay-claim-bound-with-concurrent-filings.md)), which can exceed the filed provision. Otherwise `NoticeNotResolved`. Closes the notice (rent to the operator); `pending_notices −= 1`.
 - **Liveness:** while any notice is open the queues wait. MUTAV can always reopen them by provisioning the leg fully (`FullyProvisioned`), which only lowers NAV, in the reserve's favour. The transparency page shows every open notice and its age and flags any open longer than 15 days.
 - **Errors:** `GuaranteeNotActive`, `NoticeNotResolved`, `ClaimNotFiled`; account-already-in-use on a duplicate notice.
 - **Events:** `ClaimNoticeFlagged { guarantee_id, notice_ref_hash }`, `ClaimNoticeClosed { guarantee_id, notice_ref_hash, reason }`.
@@ -533,7 +533,7 @@ Shipped in the pilot (ADR 0011). MUTAV learns of a missed rent up to 15 days bef
 - **Accounts:** `config`, `state`, `guarantee`, `claim_filing`, `payout` (init), `reserve`, `payments_account`, vault authority, BRS mint, token program.
 - **Rules:**
   1. `claim_filing.status == Filed` and `claim_filing.leg == leg`.
-  2. `amount > 0`; `amount ≤ leg_cover − leg_paid` (remaining cover on the leg).
+  2. `amount > 0`; `amount ≤ filing.provision + (leg_cover − leg_paid − leg_provision)`: this filing's own provision plus the leg's unprovisioned cover, so a payment never spends cover another open filing has provisioned ([ADR 0014](decisions/0014-pay-claim-bound-with-concurrent-filings.md), proposed). With one open filing this equals the leg's remaining cover.
   3. `amount ≤ caps.max_claim_per_call`.
   4. Roll the window if `now ≥ claim_period_start + caps.claim_period_secs`; then `claim_period_paid + amount ≤ caps.max_claim_per_period`.
   5. Destination equals `config.payments_account`.
@@ -593,7 +593,7 @@ Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` a
 
   The head request is passed, so `earmark_eff` includes the starvation term ([§4](#4-invariants-and-formulas)) and the ratchet applies.
 - **Loop**, from the head:
-  1. `value = assets_for(shares_remaining)` at the current NAV.
+  1. `value = assets_for(shares_remaining)` at the current NAV. If `value == 0`, there is **no fill**: the batch stops with the head untouched (a fill always leaves `assets_claimable > 0`, §3.8).
   2. **Full fill** if `value ≤ budget`: fill all of `shares_remaining` for `value`; continue with the next seq.
   3. Otherwise **partial fill, then stop the batch**:
      - `fill_max = budget`;
@@ -604,7 +604,7 @@ Investors are allowlisted: every `request_*` carries a Merkle proof of `owner` a
   - A head whose value is below `caps.min_request + caps.min_fill_assets` can therefore only be filled whole.
 - **Effects per fill:** burn `shares_fill` from `pending_redemptions`; transfer `assets` BRS `reserve` → `claims`; `brs_balance −= assets`; `claimable_assets_total += assets`; `shares_outstanding −= shares_fill`; `pending_redeem_shares −= shares_fill`. On the request: `shares_remaining −= shares_fill`, `shares_filled += shares_fill`, `assets_filled += assets`, `assets_claimable += assets`, `fill_count += 1`, `last_fill_nav = nav`, `last_fill_at = now`, `status = Filled` if `shares_remaining == 0` else `PartiallyFilled`. Advance `redeem_head` past a completed request.
 - If the call makes no fill at all, it fails with `InsufficientFreeCapital` (or `InsufficientLiquidBalance` when `liquid_budget` was the binding term), so an empty batch is never recorded as a success.
-- **Errors:** `Unauthorized`, `Paused`, `ClaimNoticePending`, `UnderCovered`, `FulfilHalted`, `StalePrice`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `QueueOrderViolation`.
+- **Errors:** `Unauthorized`, `Paused`, `ClaimNoticePending`, `UnderCovered`, `FulfilHalted`, `StalePrice`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `RequestTooSmall` (the head is worth 0 assets and nothing was filled), `QueueOrderViolation`.
 - **Events:** one `RedeemFilled` per fill, then a batch summary `RedeemsFulfilled`.
 
 #### `claim_assets()`
