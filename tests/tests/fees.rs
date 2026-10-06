@@ -227,6 +227,28 @@ fn wrong_mint_or_token_program_is_rejected() {
 }
 
 #[test]
+fn a_source_not_owned_by_the_operator_is_rejected_even_as_delegate() {
+    // Spec §5.3: the operator pays from "its own BRS token account". A
+    // third party's account with the operator as delegate is refused.
+    let mut f = Fixture::new();
+    let op = f.operator.insecure_clone();
+    let other = Keypair::new();
+    let source = f.token_account(&other.pubkey());
+    f.mint_brs(&source, 1_000 * BRL);
+    let payer = f.payer.insecure_clone();
+    litesvm_token::Approve::new(&mut f.svm, &payer, &op.pubkey(), &source, 1_000 * BRL)
+        .owner(&other)
+        .send()
+        .expect("approve operator as delegate");
+
+    let a = f.fee_accounts(source);
+    let ix = f.contribute_fees_ix(a, unique_hash(), 1_000 * BRL);
+    assert_mutav_err(f.send(ix, &op), MutavError::InvalidParameter);
+    assert_eq!(f.balance(&source), 1_000 * BRL);
+    assert_eq!(f.state().fees_in_total, 0);
+}
+
+#[test]
 fn only_the_reserve_receives_the_net() {
     let mut f = Fixture::new();
     let source = f.operator_brs(1_000 * BRL);
