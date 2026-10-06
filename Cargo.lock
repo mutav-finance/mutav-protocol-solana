@@ -307,8 +307,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85f6d2ad797b45d3e4b3364b433e78e4e95729ae2a187fe7032b976f54b5a2fb"
 dependencies = [
  "anchor-lang",
+ "spl-pod",
  "spl-token-2022-interface",
+ "spl-token-group-interface",
  "spl-token-interface 2.0.0",
+ "spl-token-metadata-interface",
 ]
 
 [[package]]
@@ -1828,14 +1831,18 @@ name = "mutav-tests"
 version = "0.0.0"
 dependencies = [
  "anchor-lang",
+ "anchor-spl",
  "litesvm",
  "litesvm-token",
  "mutav",
+ "solana-instruction",
  "solana-keypair",
  "solana-message",
  "solana-program-pack",
  "solana-signer",
+ "solana-system-interface 3.2.0",
  "solana-transaction",
+ "solana-transaction-error",
 ]
 
 [[package]]

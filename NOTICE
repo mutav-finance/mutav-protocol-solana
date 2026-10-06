@@ -10,8 +10,11 @@ is reproduced below.
 ------------------------------------------------------------------------------
 solana-foundation/vault
 https://github.com/solana-foundation/vault
-Used for: the asynchronous deposit and redemption core (adapted; the
-unrestricted asset-withdrawal instruction is removed).
+Used for: the account and authority skeleton (reserve config, per-purpose
+token accounts, program-held share mint authority, Token-2022 mint extension
+check) and the asynchronous deposit and redemption core (adapted from commit
+c35996268b52fef785c691938c54f643b2442880; the unrestricted asset-withdrawal
+instruction is removed).
 
 MIT License
 
