@@ -49,6 +49,19 @@ describe('devnet.example.json', () => {
     expect(c.price.maxNavMoveBps).toBe(10_000);
     expect(c.caps.maxTesouroShareBps).toBe(0);
   });
+
+  test('starts at c = 0.10 with caps sized for it (ADR 0016)', () => {
+    const c = parseConfig(filled());
+    const BRL = 1_000_000n;
+    expect(c.coverageRatioBps).toBe(1_000);
+    expect(c.caps.maxTvl).toBe(300_000n * BRL);
+    expect(c.caps.maxCoverPerGuarantee).toBe(40_000n * BRL);
+    // max_tvl / 0.10: the per-agency cap never binds.
+    expect(c.caps.maxCoverPerAgency).toBe((c.caps.maxTvl * 10_000n) / BigInt(c.coverageRatioBps));
+    expect([c.caps.maxClaimPerCall, c.caps.maxClaimPerPeriod]).toEqual([10_000n * BRL, 20_000n * BRL]);
+    expect([c.caps.minRequest, c.caps.maxRequest]).toEqual([1_000n * BRL, 100_000n * BRL]);
+    expect(c.caps.minFillAssets).toBe(500n * BRL);
+  });
 });
 
 describe('parseConfig bounds mirror the program', () => {
@@ -58,7 +71,12 @@ describe('parseConfig bounds mirror the program', () => {
     expect(() => parseConfig(c)).toThrow(msg);
   };
   test('take rate', () => bad((c) => (c.feeTakeBps = 3_001), 'feeTakeBps'));
-  test('coverage floor', () => bad((c) => (c.coverageRatioBps = 9_999), 'coverageRatioBps'));
+  test('coverage floor', () => bad((c) => (c.coverageRatioBps = 999), 'coverageRatioBps'));
+  test('coverage floor accepts 0.10', () => {
+    const c = filled();
+    c.coverageRatioBps = 1_000;
+    expect(parseConfig(c).coverageRatioBps).toBe(1_000);
+  });
   test('bps fields', () => bad((c) => (c.price.maxNavMoveBps = 10_001), 'price.maxNavMoveBps'));
   test('request bounds', () => bad((c) => (c.caps.minRequest = '999999999999999'), 'minRequest'));
   test('claim period', () => bad((c) => (c.caps.claimPeriodSecs = 0), 'claimPeriodSecs'));

@@ -1,5 +1,5 @@
 {
-  "_comment": "Devnet deploy config. Copy to a path outside the repo (it names real wallets), fill every <FILL: ...>, and pass it with --config. Values without <FILL> are proposals from spec §8; the founder confirms them (spec §12 Q3).",
+  "_comment": "Devnet deploy config. Copy to a path outside the repo (it names real wallets), fill every <FILL: ...>, and pass it with --config. Values without <FILL> are proposals (spec §8, ADR 0016: c = 0.10); the founder confirms them (spec §12 Q3).",
   "cluster": "devnet",
   "programId": "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9",
   "reserveMint": "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4",
@@ -16,20 +16,20 @@
   "mutavCapitalWallet": "<FILL: MUTAV capital wallet (owns neither money account)>",
   "treasuryAccount": "<FILL: BRS token account receiving MUTAV's fee take>",
   "paymentsAccount": "<FILL: BRS token account receiving claim payments>",
-  "coverageRatioBps": 10000,
+  "coverageRatioBps": 1000,
   "feeTakeBps": "<FILL: take rate in bps, at most 3000 (spec §12 Q4)>",
   "payoutSlaSecs": 172800,
   "caps": {
-    "_comment": "BRS base units (6 dp). Spec §8 proposals: R$100k reserve, R$30k per guarantee, R$60k per agency, R$10k / R$20k claim payments per call / per 30 days, TESOURO 0% in the pilot, requests R$1k–R$30k, partial-fill floor R$500.",
-    "maxTvl": 100000000000,
-    "maxCoverPerGuarantee": 30000000000,
-    "maxCoverPerAgency": 60000000000,
+    "_comment": "BRS base units (6 dp). Sized for c = 0.10 (ADR 0016): R$300k reserve, R$40k per guarantee, R$3M per agency (= maxTvl / 0.10, so it never binds while MUTAV's operator allocates every lease to this reserve), R$10k / R$20k claim payments per call / per 30 days, TESOURO 0% (no adapter on devnet), requests R$1k–R$100k, partial-fill floor R$500.",
+    "maxTvl": 300000000000,
+    "maxCoverPerGuarantee": 40000000000,
+    "maxCoverPerAgency": 3000000000000,
     "maxClaimPerCall": 10000000000,
     "maxClaimPerPeriod": 20000000000,
     "claimPeriodSecs": 2592000,
     "maxTesouroShareBps": 0,
     "minRequest": 1000000000,
-    "maxRequest": 30000000000,
+    "maxRequest": 100000000000,
     "minFillAssets": 500000000
   },
   "price": {
