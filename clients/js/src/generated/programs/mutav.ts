@@ -35,29 +35,263 @@ import {
   type SelfPlanAndSendFunctions,
 } from "@solana/kit/program-client-core";
 import {
+  getAgencyExposureCodec,
+  getClaimFilingCodec,
+  getDepositRequestCodec,
+  getFeeReceiptCodec,
+  getGuaranteeCodec,
+  getHolderStateCodec,
+  getPayoutCodec,
+  getRedeemRequestCodec,
   getVaultConfigCodec,
+  getVaultStateCodec,
+  type AgencyExposure,
+  type AgencyExposureArgs,
+  type ClaimFiling,
+  type ClaimFilingArgs,
+  type DepositRequest,
+  type DepositRequestArgs,
+  type FeeReceipt,
+  type FeeReceiptArgs,
+  type Guarantee,
+  type GuaranteeArgs,
+  type HolderState,
+  type HolderStateArgs,
+  type Payout,
+  type PayoutArgs,
+  type RedeemRequest,
+  type RedeemRequestArgs,
   type VaultConfig,
   type VaultConfigArgs,
+  type VaultState,
+  type VaultStateArgs,
 } from "../accounts";
 import {
+  getAdvanceQueueHeadsInstructionAsync,
+  getCancelDepositInstructionAsync,
+  getCancelRedeemInstructionAsync,
+  getClaimAssetsInstructionAsync,
+  getClaimSharesInstructionAsync,
+  getClearFulfilHaltInstructionAsync,
+  getCloseGuaranteeInstructionAsync,
+  getContributeFeesInstructionAsync,
+  getFileClaimInstructionAsync,
+  getFulfilDepositsInstructionAsync,
+  getFulfilRedeemsInstructionAsync,
   getInitializeInstructionAsync,
+  getPauseInstruction,
+  getPayClaimInstructionAsync,
+  getRefreshInstructionAsync,
+  getRegisterGuaranteeInstructionAsync,
+  getRequestDepositInstructionAsync,
+  getRequestRedeemInstructionAsync,
+  getRevokeOperatorInstruction,
+  getSetAllowlistRootInstruction,
+  getSetConfigInstruction,
+  getSetPaymentsAccountInstruction,
+  getSetRolesInstruction,
+  getSettlePayoutInstructionAsync,
+  getUnpauseInstruction,
+  parseAdvanceQueueHeadsInstruction,
+  parseCancelDepositInstruction,
+  parseCancelRedeemInstruction,
+  parseClaimAssetsInstruction,
+  parseClaimSharesInstruction,
+  parseClearFulfilHaltInstruction,
+  parseCloseGuaranteeInstruction,
+  parseContributeFeesInstruction,
+  parseFileClaimInstruction,
+  parseFulfilDepositsInstruction,
+  parseFulfilRedeemsInstruction,
   parseInitializeInstruction,
+  parsePauseInstruction,
+  parsePayClaimInstruction,
+  parseRefreshInstruction,
+  parseRegisterGuaranteeInstruction,
+  parseRequestDepositInstruction,
+  parseRequestRedeemInstruction,
+  parseRevokeOperatorInstruction,
+  parseSetAllowlistRootInstruction,
+  parseSetConfigInstruction,
+  parseSetPaymentsAccountInstruction,
+  parseSetRolesInstruction,
+  parseSettlePayoutInstruction,
+  parseUnpauseInstruction,
+  type AdvanceQueueHeadsAsyncInput,
+  type CancelDepositAsyncInput,
+  type CancelRedeemAsyncInput,
+  type ClaimAssetsAsyncInput,
+  type ClaimSharesAsyncInput,
+  type ClearFulfilHaltAsyncInput,
+  type CloseGuaranteeAsyncInput,
+  type ContributeFeesAsyncInput,
+  type FileClaimAsyncInput,
+  type FulfilDepositsAsyncInput,
+  type FulfilRedeemsAsyncInput,
   type InitializeAsyncInput,
+  type ParsedAdvanceQueueHeadsInstruction,
+  type ParsedCancelDepositInstruction,
+  type ParsedCancelRedeemInstruction,
+  type ParsedClaimAssetsInstruction,
+  type ParsedClaimSharesInstruction,
+  type ParsedClearFulfilHaltInstruction,
+  type ParsedCloseGuaranteeInstruction,
+  type ParsedContributeFeesInstruction,
+  type ParsedFileClaimInstruction,
+  type ParsedFulfilDepositsInstruction,
+  type ParsedFulfilRedeemsInstruction,
   type ParsedInitializeInstruction,
+  type ParsedPauseInstruction,
+  type ParsedPayClaimInstruction,
+  type ParsedRefreshInstruction,
+  type ParsedRegisterGuaranteeInstruction,
+  type ParsedRequestDepositInstruction,
+  type ParsedRequestRedeemInstruction,
+  type ParsedRevokeOperatorInstruction,
+  type ParsedSetAllowlistRootInstruction,
+  type ParsedSetConfigInstruction,
+  type ParsedSetPaymentsAccountInstruction,
+  type ParsedSetRolesInstruction,
+  type ParsedSettlePayoutInstruction,
+  type ParsedUnpauseInstruction,
+  type PauseInput,
+  type PayClaimAsyncInput,
+  type RefreshAsyncInput,
+  type RegisterGuaranteeAsyncInput,
+  type RequestDepositAsyncInput,
+  type RequestRedeemAsyncInput,
+  type RevokeOperatorInput,
+  type SetAllowlistRootInput,
+  type SetConfigInput,
+  type SetPaymentsAccountInput,
+  type SetRolesInput,
+  type SettlePayoutAsyncInput,
+  type UnpauseInput,
 } from "../instructions";
-import { findConfigPda } from "../pdas";
+import {
+  findClaimFilingPda,
+  findClaimsPda,
+  findConfigPda,
+  findFeeReceiptPda,
+  findGuaranteePda,
+  findHolderStatePda,
+  findPayoutPda,
+  findPendingDepositsPda,
+  findPendingRedemptionsPda,
+  findReservePda,
+  findShareMintPda,
+  findStatePda,
+  findVaultAuthorityPda,
+} from "../pdas";
 
 export const MUTAV_PROGRAM_ADDRESS =
   "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9" as Address<"8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9">;
 
 export enum MutavAccount {
+  AgencyExposure,
+  ClaimFiling,
+  DepositRequest,
+  FeeReceipt,
+  Guarantee,
+  HolderState,
+  Payout,
+  RedeemRequest,
   VaultConfig,
+  VaultState,
 }
 
 export function identifyMutavAccount(
   account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MutavAccount {
   const data = "data" in account ? account.data : account;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([1, 250, 85, 98, 115, 180, 168, 59]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.AgencyExposure;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([177, 42, 215, 113, 249, 140, 198, 201]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.ClaimFiling;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([86, 27, 56, 8, 25, 62, 62, 243]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.DepositRequest;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([135, 174, 32, 77, 183, 44, 26, 107]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.FeeReceipt;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([198, 16, 124, 172, 230, 249, 200, 37]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.Guarantee;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([222, 82, 176, 75, 3, 75, 155, 184]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.HolderState;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([69, 45, 245, 131, 218, 101, 158, 228]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.Payout;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([103, 82, 139, 51, 199, 234, 111, 115]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.RedeemRequest;
+  }
   if (
     containsBytes(
       data,
@@ -69,6 +303,17 @@ export function identifyMutavAccount(
   ) {
     return MutavAccount.VaultConfig;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([228, 196, 82, 165, 98, 210, 235, 152]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.VaultState;
+  }
   throw new SolanaError(
     SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_ACCOUNT,
     { accountData: data, programName: "mutav" },
@@ -76,6 +321,40 @@ export function identifyMutavAccount(
 }
 
 export enum MutavEvent {
+  AdapterRemoved,
+  AdapterWhitelisted,
+  Allocated,
+  AllowlistRootUpdated,
+  AssetsClaimed,
+  ClaimFiled,
+  ClaimNoticeClosed,
+  ClaimNoticeFlagged,
+  ClaimPaid,
+  ConfigUpdated,
+  Deallocated,
+  DepositCancelled,
+  DepositRequested,
+  DepositsFulfilled,
+  FeesContributed,
+  FulfilHaltCleared,
+  GuaranteeClosed,
+  GuaranteeRegistered,
+  ModeChanged,
+  OperatorRevoked,
+  Paused,
+  PaymentsAccountUpdated,
+  PayoutLate,
+  PayoutSettled,
+  QueueHeadsAdvanced,
+  RedeemCancelled,
+  RedeemFilled,
+  RedeemRequested,
+  RedeemsFulfilled,
+  ReserveFrozenDetected,
+  RolesUpdated,
+  SharesClaimed,
+  StateRefreshed,
+  Unpaused,
   VaultInitialized,
 }
 
@@ -83,6 +362,380 @@ export function identifyMutavEvent(
   event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MutavEvent {
   const data = "data" in event ? event.data : event;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([2, 66, 22, 230, 197, 67, 75, 103]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.AdapterRemoved;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([237, 172, 209, 145, 139, 69, 188, 193]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.AdapterWhitelisted;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([146, 11, 194, 76, 4, 220, 226, 43]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.Allocated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([66, 208, 202, 83, 119, 62, 45, 227]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.AllowlistRootUpdated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([196, 227, 60, 16, 11, 22, 161, 101]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.AssetsClaimed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([78, 228, 214, 247, 197, 67, 130, 19]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ClaimFiled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([254, 5, 224, 199, 243, 170, 23, 131]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ClaimNoticeClosed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([65, 185, 171, 58, 20, 163, 142, 210]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ClaimNoticeFlagged;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([212, 155, 88, 118, 128, 99, 132, 42]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ClaimPaid;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([40, 241, 230, 122, 11, 19, 198, 194]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ConfigUpdated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([59, 63, 181, 119, 97, 158, 40, 6]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.Deallocated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([233, 23, 42, 206, 203, 207, 147, 35]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.DepositCancelled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([35, 33, 229, 138, 116, 238, 192, 22]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.DepositRequested;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([148, 218, 46, 245, 54, 4, 150, 45]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.DepositsFulfilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([211, 134, 99, 97, 98, 255, 102, 252]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.FeesContributed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([118, 167, 32, 183, 37, 113, 242, 59]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.FulfilHaltCleared;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([138, 189, 159, 88, 255, 202, 106, 95]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.GuaranteeClosed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([141, 137, 122, 128, 123, 176, 145, 55]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.GuaranteeRegistered;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([149, 123, 78, 29, 237, 72, 67, 229]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ModeChanged;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([234, 41, 78, 23, 191, 224, 103, 64]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.OperatorRevoked;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([172, 248, 5, 253, 49, 255, 255, 232]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.Paused;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([106, 117, 225, 117, 157, 194, 200, 92]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.PaymentsAccountUpdated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([97, 40, 69, 153, 143, 21, 251, 4]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.PayoutLate;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([17, 47, 89, 192, 158, 89, 180, 5]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.PayoutSettled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([243, 37, 151, 250, 162, 73, 156, 224]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.QueueHeadsAdvanced;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([209, 166, 7, 223, 49, 25, 200, 82]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemCancelled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([227, 40, 159, 41, 95, 31, 202, 26]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemFilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([5, 130, 67, 249, 243, 168, 11, 88]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemRequested;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([195, 255, 153, 60, 144, 62, 185, 157]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemsFulfilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([172, 223, 216, 222, 220, 1, 124, 57]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ReserveFrozenDetected;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([81, 37, 176, 32, 30, 204, 251, 246]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RolesUpdated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([135, 17, 55, 130, 218, 208, 153, 101]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.SharesClaimed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([187, 112, 210, 246, 60, 119, 40, 60]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.StateRefreshed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([156, 150, 47, 174, 120, 216, 93, 117]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.Unpaused;
+  }
   if (
     containsBytes(
       data,
@@ -100,13 +753,158 @@ export function identifyMutavEvent(
 }
 
 export enum MutavInstruction {
+  AdvanceQueueHeads,
+  CancelDeposit,
+  CancelRedeem,
+  ClaimAssets,
+  ClaimShares,
+  ClearFulfilHalt,
+  CloseGuarantee,
+  ContributeFees,
+  FileClaim,
+  FulfilDeposits,
+  FulfilRedeems,
   Initialize,
+  Pause,
+  PayClaim,
+  Refresh,
+  RegisterGuarantee,
+  RequestDeposit,
+  RequestRedeem,
+  RevokeOperator,
+  SetAllowlistRoot,
+  SetConfig,
+  SetPaymentsAccount,
+  SetRoles,
+  SettlePayout,
+  Unpause,
 }
 
 export function identifyMutavInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MutavInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([111, 181, 141, 177, 121, 200, 92, 20]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.AdvanceQueueHeads;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([207, 37, 219, 229, 183, 50, 54, 245]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.CancelDeposit;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([111, 76, 232, 50, 39, 175, 48, 242]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.CancelRedeem;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([173, 208, 147, 111, 25, 185, 29, 44]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ClaimAssets;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([130, 131, 29, 237, 134, 20, 110, 245]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ClaimShares;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([72, 92, 0, 5, 100, 214, 187, 39]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ClearFulfilHalt;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([215, 51, 54, 138, 43, 241, 79, 231]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.CloseGuarantee;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([44, 53, 150, 77, 255, 250, 76, 164]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ContributeFees;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([187, 254, 40, 13, 146, 223, 230, 97]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.FileClaim;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([59, 104, 0, 162, 184, 213, 184, 219]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.FulfilDeposits;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([251, 45, 1, 253, 65, 153, 188, 203]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.FulfilRedeems;
+  }
   if (
     containsBytes(
       data,
@@ -118,6 +916,149 @@ export function identifyMutavInstruction(
   ) {
     return MutavInstruction.Initialize;
   }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([211, 22, 221, 251, 74, 121, 193, 47]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.Pause;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([73, 127, 176, 110, 67, 8, 221, 170]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.PayClaim;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([170, 155, 22, 254, 147, 181, 49, 161]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.Refresh;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([54, 160, 13, 129, 200, 87, 163, 55]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.RegisterGuarantee;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([243, 202, 197, 215, 135, 97, 213, 109]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.RequestDeposit;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([105, 49, 44, 38, 207, 241, 33, 173]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.RequestRedeem;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([185, 25, 87, 77, 88, 8, 30, 175]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.RevokeOperator;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([145, 238, 252, 173, 15, 3, 94, 23]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SetAllowlistRoot;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([108, 158, 154, 175, 212, 98, 52, 66]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SetConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([0, 150, 170, 5, 132, 244, 20, 241]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SetPaymentsAccount;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([119, 86, 129, 161, 55, 23, 250, 12]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SetRoles;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([245, 141, 29, 81, 209, 73, 180, 155]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SettlePayout;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([169, 144, 4, 38, 10, 141, 188, 255]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.Unpause;
+  }
   throw new SolanaError(
     SOLANA_ERROR__PROGRAM_CLIENTS__FAILED_TO_IDENTIFY_INSTRUCTION,
     { instructionData: data, programName: "mutav" },
@@ -126,20 +1067,261 @@ export function identifyMutavInstruction(
 
 export type ParsedMutavInstruction<
   TProgram extends string = "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9",
-> = {
-  instructionType: MutavInstruction.Initialize;
-} & ParsedInitializeInstruction<TProgram>;
+> =
+  | ({
+      instructionType: MutavInstruction.AdvanceQueueHeads;
+    } & ParsedAdvanceQueueHeadsInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.CancelDeposit;
+    } & ParsedCancelDepositInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.CancelRedeem;
+    } & ParsedCancelRedeemInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.ClaimAssets;
+    } & ParsedClaimAssetsInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.ClaimShares;
+    } & ParsedClaimSharesInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.ClearFulfilHalt;
+    } & ParsedClearFulfilHaltInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.CloseGuarantee;
+    } & ParsedCloseGuaranteeInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.ContributeFees;
+    } & ParsedContributeFeesInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.FileClaim;
+    } & ParsedFileClaimInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.FulfilDeposits;
+    } & ParsedFulfilDepositsInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.FulfilRedeems;
+    } & ParsedFulfilRedeemsInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.Initialize;
+    } & ParsedInitializeInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.Pause;
+    } & ParsedPauseInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.PayClaim;
+    } & ParsedPayClaimInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.Refresh;
+    } & ParsedRefreshInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.RegisterGuarantee;
+    } & ParsedRegisterGuaranteeInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.RequestDeposit;
+    } & ParsedRequestDepositInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.RequestRedeem;
+    } & ParsedRequestRedeemInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.RevokeOperator;
+    } & ParsedRevokeOperatorInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SetAllowlistRoot;
+    } & ParsedSetAllowlistRootInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SetConfig;
+    } & ParsedSetConfigInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SetPaymentsAccount;
+    } & ParsedSetPaymentsAccountInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SetRoles;
+    } & ParsedSetRolesInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SettlePayout;
+    } & ParsedSettlePayoutInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.Unpause;
+    } & ParsedUnpauseInstruction<TProgram>);
 
 export function parseMutavInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedMutavInstruction<TProgram> {
   const instructionType = identifyMutavInstruction(instruction);
   switch (instructionType) {
+    case MutavInstruction.AdvanceQueueHeads: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.AdvanceQueueHeads,
+        ...parseAdvanceQueueHeadsInstruction(instruction),
+      };
+    }
+    case MutavInstruction.CancelDeposit: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.CancelDeposit,
+        ...parseCancelDepositInstruction(instruction),
+      };
+    }
+    case MutavInstruction.CancelRedeem: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.CancelRedeem,
+        ...parseCancelRedeemInstruction(instruction),
+      };
+    }
+    case MutavInstruction.ClaimAssets: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ClaimAssets,
+        ...parseClaimAssetsInstruction(instruction),
+      };
+    }
+    case MutavInstruction.ClaimShares: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ClaimShares,
+        ...parseClaimSharesInstruction(instruction),
+      };
+    }
+    case MutavInstruction.ClearFulfilHalt: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ClearFulfilHalt,
+        ...parseClearFulfilHaltInstruction(instruction),
+      };
+    }
+    case MutavInstruction.CloseGuarantee: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.CloseGuarantee,
+        ...parseCloseGuaranteeInstruction(instruction),
+      };
+    }
+    case MutavInstruction.ContributeFees: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ContributeFees,
+        ...parseContributeFeesInstruction(instruction),
+      };
+    }
+    case MutavInstruction.FileClaim: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.FileClaim,
+        ...parseFileClaimInstruction(instruction),
+      };
+    }
+    case MutavInstruction.FulfilDeposits: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.FulfilDeposits,
+        ...parseFulfilDepositsInstruction(instruction),
+      };
+    }
+    case MutavInstruction.FulfilRedeems: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.FulfilRedeems,
+        ...parseFulfilRedeemsInstruction(instruction),
+      };
+    }
     case MutavInstruction.Initialize: {
       assertIsInstructionWithAccounts(instruction);
       return {
         instructionType: MutavInstruction.Initialize,
         ...parseInitializeInstruction(instruction),
+      };
+    }
+    case MutavInstruction.Pause: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.Pause,
+        ...parsePauseInstruction(instruction),
+      };
+    }
+    case MutavInstruction.PayClaim: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.PayClaim,
+        ...parsePayClaimInstruction(instruction),
+      };
+    }
+    case MutavInstruction.Refresh: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.Refresh,
+        ...parseRefreshInstruction(instruction),
+      };
+    }
+    case MutavInstruction.RegisterGuarantee: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.RegisterGuarantee,
+        ...parseRegisterGuaranteeInstruction(instruction),
+      };
+    }
+    case MutavInstruction.RequestDeposit: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.RequestDeposit,
+        ...parseRequestDepositInstruction(instruction),
+      };
+    }
+    case MutavInstruction.RequestRedeem: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.RequestRedeem,
+        ...parseRequestRedeemInstruction(instruction),
+      };
+    }
+    case MutavInstruction.RevokeOperator: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.RevokeOperator,
+        ...parseRevokeOperatorInstruction(instruction),
+      };
+    }
+    case MutavInstruction.SetAllowlistRoot: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SetAllowlistRoot,
+        ...parseSetAllowlistRootInstruction(instruction),
+      };
+    }
+    case MutavInstruction.SetConfig: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SetConfig,
+        ...parseSetConfigInstruction(instruction),
+      };
+    }
+    case MutavInstruction.SetPaymentsAccount: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SetPaymentsAccount,
+        ...parseSetPaymentsAccountInstruction(instruction),
+      };
+    }
+    case MutavInstruction.SetRoles: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SetRoles,
+        ...parseSetRolesInstruction(instruction),
+      };
+    }
+    case MutavInstruction.SettlePayout: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SettlePayout,
+        ...parseSettlePayoutInstruction(instruction),
+      };
+    }
+    case MutavInstruction.Unpause: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.Unpause,
+        ...parseUnpauseInstruction(instruction),
       };
     }
     default:
@@ -160,18 +1342,141 @@ export type MutavPlugin = {
 };
 
 export type MutavPluginAccounts = {
+  agencyExposure: ReturnType<typeof getAgencyExposureCodec> &
+    SelfFetchFunctions<AgencyExposureArgs, AgencyExposure>;
+  claimFiling: ReturnType<typeof getClaimFilingCodec> &
+    SelfFetchFunctions<ClaimFilingArgs, ClaimFiling>;
+  depositRequest: ReturnType<typeof getDepositRequestCodec> &
+    SelfFetchFunctions<DepositRequestArgs, DepositRequest>;
+  feeReceipt: ReturnType<typeof getFeeReceiptCodec> &
+    SelfFetchFunctions<FeeReceiptArgs, FeeReceipt>;
+  guarantee: ReturnType<typeof getGuaranteeCodec> &
+    SelfFetchFunctions<GuaranteeArgs, Guarantee>;
+  holderState: ReturnType<typeof getHolderStateCodec> &
+    SelfFetchFunctions<HolderStateArgs, HolderState>;
+  payout: ReturnType<typeof getPayoutCodec> &
+    SelfFetchFunctions<PayoutArgs, Payout>;
+  redeemRequest: ReturnType<typeof getRedeemRequestCodec> &
+    SelfFetchFunctions<RedeemRequestArgs, RedeemRequest>;
   vaultConfig: ReturnType<typeof getVaultConfigCodec> &
     SelfFetchFunctions<VaultConfigArgs, VaultConfig>;
+  vaultState: ReturnType<typeof getVaultStateCodec> &
+    SelfFetchFunctions<VaultStateArgs, VaultState>;
 };
 
 export type MutavPluginInstructions = {
+  advanceQueueHeads: (
+    input: AdvanceQueueHeadsAsyncInput,
+  ) => ReturnType<typeof getAdvanceQueueHeadsInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  cancelDeposit: (
+    input: CancelDepositAsyncInput,
+  ) => ReturnType<typeof getCancelDepositInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  cancelRedeem: (
+    input: CancelRedeemAsyncInput,
+  ) => ReturnType<typeof getCancelRedeemInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  claimAssets: (
+    input: ClaimAssetsAsyncInput,
+  ) => ReturnType<typeof getClaimAssetsInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  claimShares: (
+    input: ClaimSharesAsyncInput,
+  ) => ReturnType<typeof getClaimSharesInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  clearFulfilHalt: (
+    input: ClearFulfilHaltAsyncInput,
+  ) => ReturnType<typeof getClearFulfilHaltInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  closeGuarantee: (
+    input: CloseGuaranteeAsyncInput,
+  ) => ReturnType<typeof getCloseGuaranteeInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  contributeFees: (
+    input: MakeOptional<ContributeFeesAsyncInput, "payer">,
+  ) => ReturnType<typeof getContributeFeesInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  fileClaim: (
+    input: MakeOptional<FileClaimAsyncInput, "payer">,
+  ) => ReturnType<typeof getFileClaimInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  fulfilDeposits: (
+    input: FulfilDepositsAsyncInput,
+  ) => ReturnType<typeof getFulfilDepositsInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  fulfilRedeems: (
+    input: FulfilRedeemsAsyncInput,
+  ) => ReturnType<typeof getFulfilRedeemsInstructionAsync> &
+    SelfPlanAndSendFunctions;
   initialize: (
     input: MakeOptional<InitializeAsyncInput, "payer">,
   ) => ReturnType<typeof getInitializeInstructionAsync> &
     SelfPlanAndSendFunctions;
+  pause: (
+    input: PauseInput,
+  ) => ReturnType<typeof getPauseInstruction> & SelfPlanAndSendFunctions;
+  payClaim: (
+    input: MakeOptional<PayClaimAsyncInput, "payer">,
+  ) => ReturnType<typeof getPayClaimInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  refresh: (
+    input: RefreshAsyncInput,
+  ) => ReturnType<typeof getRefreshInstructionAsync> & SelfPlanAndSendFunctions;
+  registerGuarantee: (
+    input: MakeOptional<RegisterGuaranteeAsyncInput, "payer">,
+  ) => ReturnType<typeof getRegisterGuaranteeInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  requestDeposit: (
+    input: RequestDepositAsyncInput,
+  ) => ReturnType<typeof getRequestDepositInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  requestRedeem: (
+    input: RequestRedeemAsyncInput,
+  ) => ReturnType<typeof getRequestRedeemInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  revokeOperator: (
+    input: RevokeOperatorInput,
+  ) => ReturnType<typeof getRevokeOperatorInstruction> &
+    SelfPlanAndSendFunctions;
+  setAllowlistRoot: (
+    input: SetAllowlistRootInput,
+  ) => ReturnType<typeof getSetAllowlistRootInstruction> &
+    SelfPlanAndSendFunctions;
+  setConfig: (
+    input: SetConfigInput,
+  ) => ReturnType<typeof getSetConfigInstruction> & SelfPlanAndSendFunctions;
+  setPaymentsAccount: (
+    input: SetPaymentsAccountInput,
+  ) => ReturnType<typeof getSetPaymentsAccountInstruction> &
+    SelfPlanAndSendFunctions;
+  setRoles: (
+    input: SetRolesInput,
+  ) => ReturnType<typeof getSetRolesInstruction> & SelfPlanAndSendFunctions;
+  settlePayout: (
+    input: SettlePayoutAsyncInput,
+  ) => ReturnType<typeof getSettlePayoutInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  unpause: (
+    input: UnpauseInput,
+  ) => ReturnType<typeof getUnpauseInstruction> & SelfPlanAndSendFunctions;
 };
 
-export type MutavPluginPdas = { config: typeof findConfigPda };
+export type MutavPluginPdas = {
+  state: typeof findStatePda;
+  pendingDeposits: typeof findPendingDepositsPda;
+  vaultAuthority: typeof findVaultAuthorityPda;
+  pendingRedemptions: typeof findPendingRedemptionsPda;
+  claims: typeof findClaimsPda;
+  holderState: typeof findHolderStatePda;
+  guarantee: typeof findGuaranteePda;
+  feeReceipt: typeof findFeeReceiptPda;
+  reserve: typeof findReservePda;
+  claimFiling: typeof findClaimFilingPda;
+  config: typeof findConfigPda;
+  shareMint: typeof findShareMintPda;
+  payout: typeof findPayoutPda;
+};
 
 export type MutavPluginRequirements = ClientWithRpc<
   GetAccountInfoApi & GetMultipleAccountsApi
@@ -187,9 +1492,85 @@ export function mutavProgram() {
     return extendClient(client, {
       mutav: <MutavPlugin>{
         accounts: {
+          agencyExposure: addSelfFetchFunctions(
+            client,
+            getAgencyExposureCodec(),
+          ),
+          claimFiling: addSelfFetchFunctions(client, getClaimFilingCodec()),
+          depositRequest: addSelfFetchFunctions(
+            client,
+            getDepositRequestCodec(),
+          ),
+          feeReceipt: addSelfFetchFunctions(client, getFeeReceiptCodec()),
+          guarantee: addSelfFetchFunctions(client, getGuaranteeCodec()),
+          holderState: addSelfFetchFunctions(client, getHolderStateCodec()),
+          payout: addSelfFetchFunctions(client, getPayoutCodec()),
+          redeemRequest: addSelfFetchFunctions(client, getRedeemRequestCodec()),
           vaultConfig: addSelfFetchFunctions(client, getVaultConfigCodec()),
+          vaultState: addSelfFetchFunctions(client, getVaultStateCodec()),
         },
         instructions: {
+          advanceQueueHeads: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAdvanceQueueHeadsInstructionAsync(input),
+            ),
+          cancelDeposit: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCancelDepositInstructionAsync(input),
+            ),
+          cancelRedeem: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCancelRedeemInstructionAsync(input),
+            ),
+          claimAssets: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClaimAssetsInstructionAsync(input),
+            ),
+          claimShares: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClaimSharesInstructionAsync(input),
+            ),
+          clearFulfilHalt: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getClearFulfilHaltInstructionAsync(input),
+            ),
+          closeGuarantee: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCloseGuaranteeInstructionAsync(input),
+            ),
+          contributeFees: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getContributeFeesInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          fileClaim: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getFileClaimInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          fulfilDeposits: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getFulfilDepositsInstructionAsync(input),
+            ),
+          fulfilRedeems: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getFulfilRedeemsInstructionAsync(input),
+            ),
           initialize: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -198,8 +1579,81 @@ export function mutavProgram() {
                 payer: input.payer ?? client.payer,
               }),
             ),
+          pause: (input) =>
+            addSelfPlanAndSendFunctions(client, getPauseInstruction(input)),
+          payClaim: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getPayClaimInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          refresh: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRefreshInstructionAsync(input),
+            ),
+          registerGuarantee: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRegisterGuaranteeInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
+          requestDeposit: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRequestDepositInstructionAsync(input),
+            ),
+          requestRedeem: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRequestRedeemInstructionAsync(input),
+            ),
+          revokeOperator: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRevokeOperatorInstruction(input),
+            ),
+          setAllowlistRoot: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetAllowlistRootInstruction(input),
+            ),
+          setConfig: (input) =>
+            addSelfPlanAndSendFunctions(client, getSetConfigInstruction(input)),
+          setPaymentsAccount: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetPaymentsAccountInstruction(input),
+            ),
+          setRoles: (input) =>
+            addSelfPlanAndSendFunctions(client, getSetRolesInstruction(input)),
+          settlePayout: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSettlePayoutInstructionAsync(input),
+            ),
+          unpause: (input) =>
+            addSelfPlanAndSendFunctions(client, getUnpauseInstruction(input)),
         },
-        pdas: { config: findConfigPda },
+        pdas: {
+          state: findStatePda,
+          pendingDeposits: findPendingDepositsPda,
+          vaultAuthority: findVaultAuthorityPda,
+          pendingRedemptions: findPendingRedemptionsPda,
+          claims: findClaimsPda,
+          holderState: findHolderStatePda,
+          guarantee: findGuaranteePda,
+          feeReceipt: findFeeReceiptPda,
+          reserve: findReservePda,
+          claimFiling: findClaimFilingPda,
+          config: findConfigPda,
+          shareMint: findShareMintPda,
+          payout: findPayoutPda,
+        },
         identifyAccount: identifyMutavAccount,
         identifyInstruction: identifyMutavInstruction,
         parseInstruction: parseMutavInstruction,

@@ -14,8 +14,13 @@ import {
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
+  getI64Decoder,
+  getI64Encoder,
+  getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
+  getU16Decoder,
+  getU16Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
   SolanaError,
   transformEncoder,
@@ -29,6 +34,7 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
+  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type WritableAccount,
   type WritableSignerAccount,
@@ -42,8 +48,27 @@ import {
   type ResolvedInstructionAccount,
   type ResolvedInstructionAccountMeta,
 } from "@solana/kit/program-client-core";
-import { findConfigPda } from "../pdas";
+import {
+  findClaimsPda,
+  findConfigPda,
+  findPendingDepositsPda,
+  findPendingRedemptionsPda,
+  findReservePda,
+  findShareMintPda,
+  findStatePda,
+  findVaultAuthorityPda,
+} from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
+import {
+  getCapsInputDecoder,
+  getCapsInputEncoder,
+  getPriceInputDecoder,
+  getPriceInputEncoder,
+  type CapsInput,
+  type CapsInputArgs,
+  type PriceInput,
+  type PriceInputArgs,
+} from "../types";
 
 export const INITIALIZE_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   175, 175, 109, 31, 13, 152, 155, 237,
@@ -56,10 +81,26 @@ export function getInitializeDiscriminatorBytes(): ReadonlyUint8Array {
 export type InitializeInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
   TAccountPayer extends string | AccountMeta<string> = string,
+  TAccountUpgradeAuthority extends string | AccountMeta<string> = string,
+  TAccountProgramData extends string | AccountMeta<string> = string,
   TAccountReserveMint extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
+  TAccountState extends string | AccountMeta<string> = string,
+  TAccountVaultAuthority extends string | AccountMeta<string> = string,
+  TAccountShareMint extends string | AccountMeta<string> = string,
+  TAccountReserve extends string | AccountMeta<string> = string,
+  TAccountPendingDeposits extends string | AccountMeta<string> = string,
+  TAccountPendingRedemptions extends string | AccountMeta<string> = string,
+  TAccountClaims extends string | AccountMeta<string> = string,
+  TAccountTreasuryAccount extends string | AccountMeta<string> = string,
+  TAccountPaymentsAccount extends string | AccountMeta<string> = string,
+  TAccountReserveTokenProgram extends string | AccountMeta<string> = string,
+  TAccountShareTokenProgram extends string | AccountMeta<string> =
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
+  TAccountEventAuthority extends string | AccountMeta<string> = string,
+  TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -69,30 +110,90 @@ export type InitializeInstruction<
         ? WritableSignerAccount<TAccountPayer> &
             AccountSignerMeta<TAccountPayer>
         : TAccountPayer,
+      TAccountUpgradeAuthority extends string
+        ? ReadonlySignerAccount<TAccountUpgradeAuthority> &
+            AccountSignerMeta<TAccountUpgradeAuthority>
+        : TAccountUpgradeAuthority,
+      TAccountProgramData extends string
+        ? ReadonlyAccount<TAccountProgramData>
+        : TAccountProgramData,
       TAccountReserveMint extends string
         ? ReadonlyAccount<TAccountReserveMint>
         : TAccountReserveMint,
       TAccountConfig extends string
         ? WritableAccount<TAccountConfig>
         : TAccountConfig,
+      TAccountState extends string
+        ? WritableAccount<TAccountState>
+        : TAccountState,
+      TAccountVaultAuthority extends string
+        ? ReadonlyAccount<TAccountVaultAuthority>
+        : TAccountVaultAuthority,
+      TAccountShareMint extends string
+        ? WritableAccount<TAccountShareMint>
+        : TAccountShareMint,
+      TAccountReserve extends string
+        ? WritableAccount<TAccountReserve>
+        : TAccountReserve,
+      TAccountPendingDeposits extends string
+        ? WritableAccount<TAccountPendingDeposits>
+        : TAccountPendingDeposits,
+      TAccountPendingRedemptions extends string
+        ? WritableAccount<TAccountPendingRedemptions>
+        : TAccountPendingRedemptions,
+      TAccountClaims extends string
+        ? WritableAccount<TAccountClaims>
+        : TAccountClaims,
+      TAccountTreasuryAccount extends string
+        ? ReadonlyAccount<TAccountTreasuryAccount>
+        : TAccountTreasuryAccount,
+      TAccountPaymentsAccount extends string
+        ? ReadonlyAccount<TAccountPaymentsAccount>
+        : TAccountPaymentsAccount,
+      TAccountReserveTokenProgram extends string
+        ? ReadonlyAccount<TAccountReserveTokenProgram>
+        : TAccountReserveTokenProgram,
+      TAccountShareTokenProgram extends string
+        ? ReadonlyAccount<TAccountShareTokenProgram>
+        : TAccountShareTokenProgram,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
+      TAccountEventAuthority extends string
+        ? ReadonlyAccount<TAccountEventAuthority>
+        : TAccountEventAuthority,
+      TAccountProgram extends string
+        ? ReadonlyAccount<TAccountProgram>
+        : TAccountProgram,
       ...TRemainingAccounts,
     ]
   >;
 
 export type InitializeInstructionData = {
   discriminator: ReadonlyUint8Array;
+  /** Squads vault address. */
   admin: Address;
   operator: Address;
   pauser: Address;
+  mutavCapitalWallet: Address;
+  coverageRatioBps: number;
+  feeTakeBps: number;
+  payoutSlaSecs: bigint;
+  caps: CapsInput;
+  price: PriceInput;
 };
 
 export type InitializeInstructionDataArgs = {
+  /** Squads vault address. */
   admin: Address;
   operator: Address;
   pauser: Address;
+  mutavCapitalWallet: Address;
+  coverageRatioBps: number;
+  feeTakeBps: number;
+  payoutSlaSecs: number | bigint;
+  caps: CapsInputArgs;
+  price: PriceInputArgs;
 };
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
@@ -102,6 +203,12 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<Initiali
       ["admin", getAddressEncoder()],
       ["operator", getAddressEncoder()],
       ["pauser", getAddressEncoder()],
+      ["mutavCapitalWallet", getAddressEncoder()],
+      ["coverageRatioBps", getU16Encoder()],
+      ["feeTakeBps", getU16Encoder()],
+      ["payoutSlaSecs", getI64Encoder()],
+      ["caps", getCapsInputEncoder()],
+      ["price", getPriceInputEncoder()],
     ]),
     (value) => ({ ...value, discriminator: INITIALIZE_DISCRIMINATOR }),
   );
@@ -113,6 +220,12 @@ export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<Initiali
     ["admin", getAddressDecoder()],
     ["operator", getAddressDecoder()],
     ["pauser", getAddressDecoder()],
+    ["mutavCapitalWallet", getAddressDecoder()],
+    ["coverageRatioBps", getU16Decoder()],
+    ["feeTakeBps", getU16Decoder()],
+    ["payoutSlaSecs", getI64Decoder()],
+    ["caps", getCapsInputDecoder()],
+    ["price", getPriceInputDecoder()],
   ]);
 }
 
@@ -128,33 +241,114 @@ export function getInitializeInstructionDataCodec(): FixedSizeCodec<
 
 export type InitializeAsyncInput<
   TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+  TAccountUpgradeAuthority extends InstructionSignerInput =
+    InstructionSignerInput,
+  TAccountProgramData extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
+  TAccountState extends InstructionAccountInput = InstructionAccountInput,
+  TAccountVaultAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountShareMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPendingDeposits extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPendingRedemptions extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountClaims extends InstructionAccountInput = InstructionAccountInput,
+  TAccountTreasuryAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPaymentsAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountReserveTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountShareTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   payer: TAccountPayer;
-  /** Reserve asset mint; owner is checked against SPL Token / Token-2022. */
+  /**
+   * Must be the program's upgrade authority, so nobody can front-run
+   * initialization.
+   */
+  upgradeAuthority: TAccountUpgradeAuthority;
+  programData?: TAccountProgramData;
   reserveMint: TAccountReserveMint;
   config?: TAccountConfig;
+  state?: TAccountState;
+  vaultAuthority?: TAccountVaultAuthority;
+  shareMint?: TAccountShareMint;
+  reserve?: TAccountReserve;
+  pendingDeposits?: TAccountPendingDeposits;
+  pendingRedemptions?: TAccountPendingRedemptions;
+  claims?: TAccountClaims;
+  /** MUTAV treasury token account (BRS); receives the fee take. */
+  treasuryAccount: TAccountTreasuryAccount;
+  /** MUTAV payments token account (BRS); receives claim payments. */
+  paymentsAccount: TAccountPaymentsAccount;
+  reserveTokenProgram: TAccountReserveTokenProgram;
+  /** The share mint is a classic SPL Token mint. */
+  shareTokenProgram?: TAccountShareTokenProgram;
   systemProgram?: TAccountSystemProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
   admin: InitializeInstructionDataArgs["admin"];
   operator: InitializeInstructionDataArgs["operator"];
   pauser: InitializeInstructionDataArgs["pauser"];
+  mutavCapitalWallet: InitializeInstructionDataArgs["mutavCapitalWallet"];
+  coverageRatioBps: InitializeInstructionDataArgs["coverageRatioBps"];
+  feeTakeBps: InitializeInstructionDataArgs["feeTakeBps"];
+  payoutSlaSecs: InitializeInstructionDataArgs["payoutSlaSecs"];
+  caps: InitializeInstructionDataArgs["caps"];
+  price: InitializeInstructionDataArgs["price"];
 };
 
 export async function getInitializeInstructionAsync<
   TAccountPayer extends InstructionSignerInput,
+  TAccountUpgradeAuthority extends InstructionSignerInput,
+  TAccountProgramData extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput,
+  TAccountState extends InstructionAccountInput,
+  TAccountVaultAuthority extends InstructionAccountInput,
+  TAccountShareMint extends InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput,
+  TAccountPendingDeposits extends InstructionAccountInput,
+  TAccountPendingRedemptions extends InstructionAccountInput,
+  TAccountClaims extends InstructionAccountInput,
+  TAccountTreasuryAccount extends InstructionAccountInput,
+  TAccountPaymentsAccount extends InstructionAccountInput,
+  TAccountReserveTokenProgram extends InstructionAccountInput,
+  TAccountShareTokenProgram extends InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
   input: InitializeAsyncInput<
     TAccountPayer,
+    TAccountUpgradeAuthority,
+    TAccountProgramData,
     TAccountReserveMint,
     TAccountConfig,
-    TAccountSystemProgram
+    TAccountState,
+    TAccountVaultAuthority,
+    TAccountShareMint,
+    TAccountReserve,
+    TAccountPendingDeposits,
+    TAccountPendingRedemptions,
+    TAccountClaims,
+    TAccountTreasuryAccount,
+    TAccountPaymentsAccount,
+    TAccountReserveTokenProgram,
+    TAccountShareTokenProgram,
+    TAccountSystemProgram,
+    TAccountEventAuthority,
+    TAccountProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): Promise<
@@ -165,6 +359,14 @@ export async function getInitializeInstructionAsync<
       InstructionAccountInputAddress<TAccountPayer>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountUpgradeAuthority,
+      InstructionAccountInputAddress<TAccountUpgradeAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgramData,
+      InstructionAccountInputAddress<TAccountProgramData>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountReserveMint,
       InstructionAccountInputAddress<TAccountReserveMint>
     >,
@@ -173,8 +375,60 @@ export async function getInitializeInstructionAsync<
       InstructionAccountInputAddress<TAccountConfig>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountState,
+      InstructionAccountInputAddress<TAccountState>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountVaultAuthority,
+      InstructionAccountInputAddress<TAccountVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountShareMint,
+      InstructionAccountInputAddress<TAccountShareMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingDeposits,
+      InstructionAccountInputAddress<TAccountPendingDeposits>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingRedemptions,
+      InstructionAccountInputAddress<TAccountPendingRedemptions>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountClaims,
+      InstructionAccountInputAddress<TAccountClaims>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTreasuryAccount,
+      InstructionAccountInputAddress<TAccountTreasuryAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPaymentsAccount,
+      InstructionAccountInputAddress<TAccountPaymentsAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserveTokenProgram,
+      InstructionAccountInputAddress<TAccountReserveTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountShareTokenProgram,
+      InstructionAccountInputAddress<TAccountShareTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountSystemProgram,
       InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
     >
   >
 > {
@@ -187,14 +441,81 @@ export async function getInitializeInstructionAsync<
   // Original accounts.
   const originalAccounts = {
     payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+    upgradeAuthority: {
+      value: input.upgradeAuthority ?? null,
+      isSigner: true,
+      isWritable: false,
+    },
+    programData: {
+      value: input.programData ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     reserveMint: {
       value: input.reserveMint ?? null,
       isSigner: false,
       isWritable: false,
     },
     config: { value: input.config ?? null, isSigner: false, isWritable: true },
+    state: { value: input.state ?? null, isSigner: false, isWritable: true },
+    vaultAuthority: {
+      value: input.vaultAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    shareMint: {
+      value: input.shareMint ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    reserve: {
+      value: input.reserve ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    pendingDeposits: {
+      value: input.pendingDeposits ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    pendingRedemptions: {
+      value: input.pendingRedemptions ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    claims: { value: input.claims ?? null, isSigner: false, isWritable: true },
+    treasuryAccount: {
+      value: input.treasuryAccount ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    paymentsAccount: {
+      value: input.paymentsAccount ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    reserveTokenProgram: {
+      value: input.reserveTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    shareTokenProgram: {
+      value: input.shareTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     systemProgram: {
       value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
       isSigner: false,
       isWritable: false,
     },
@@ -208,6 +529,21 @@ export async function getInitializeInstructionAsync<
   const args = { ...input };
 
   // Resolve default values.
+  if (!accounts.programData.value) {
+    accounts.programData.value = await getProgramDerivedAddress({
+      programAddress:
+        "BPFLoaderUpgradeab1e11111111111111111111111" as Address<"BPFLoaderUpgradeab1e11111111111111111111111">,
+      seeds: [
+        getBytesEncoder().encode(
+          new Uint8Array([
+            116, 248, 163, 219, 253, 52, 204, 95, 176, 223, 95, 138, 126, 173,
+            81, 46, 203, 227, 195, 6, 40, 61, 172, 71, 96, 53, 55, 175, 156,
+            245, 30, 130,
+          ]),
+        ),
+      ],
+    });
+  }
   if (!accounts.config.value) {
     accounts.config.value = await findConfigPda(
       {
@@ -219,6 +555,87 @@ export async function getInitializeInstructionAsync<
       { programAddress },
     );
   }
+  if (!accounts.state.value) {
+    accounts.state.value = await findStatePda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.vaultAuthority.value) {
+    accounts.vaultAuthority.value = await findVaultAuthorityPda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.shareMint.value) {
+    accounts.shareMint.value = await findShareMintPda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.reserve.value) {
+    accounts.reserve.value = await findReservePda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.pendingDeposits.value) {
+    accounts.pendingDeposits.value = await findPendingDepositsPda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.pendingRedemptions.value) {
+    accounts.pendingRedemptions.value = await findPendingRedemptionsPda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.claims.value) {
+    accounts.claims.value = await findClaimsPda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.shareTokenProgram.value) {
+    accounts.shareTokenProgram.value =
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -227,9 +644,24 @@ export async function getInitializeInstructionAsync<
   return Object.freeze({
     accounts: [
       getAccountMeta("payer", accounts.payer),
+      getAccountMeta("upgradeAuthority", accounts.upgradeAuthority),
+      getAccountMeta("programData", accounts.programData),
       getAccountMeta("reserveMint", accounts.reserveMint),
       getAccountMeta("config", accounts.config),
+      getAccountMeta("state", accounts.state),
+      getAccountMeta("vaultAuthority", accounts.vaultAuthority),
+      getAccountMeta("shareMint", accounts.shareMint),
+      getAccountMeta("reserve", accounts.reserve),
+      getAccountMeta("pendingDeposits", accounts.pendingDeposits),
+      getAccountMeta("pendingRedemptions", accounts.pendingRedemptions),
+      getAccountMeta("claims", accounts.claims),
+      getAccountMeta("treasuryAccount", accounts.treasuryAccount),
+      getAccountMeta("paymentsAccount", accounts.paymentsAccount),
+      getAccountMeta("reserveTokenProgram", accounts.reserveTokenProgram),
+      getAccountMeta("shareTokenProgram", accounts.shareTokenProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getInitializeInstructionDataEncoder().encode(
       args as InitializeInstructionDataArgs,
@@ -242,6 +674,14 @@ export async function getInitializeInstructionAsync<
       InstructionAccountInputAddress<TAccountPayer>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountUpgradeAuthority,
+      InstructionAccountInputAddress<TAccountUpgradeAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgramData,
+      InstructionAccountInputAddress<TAccountProgramData>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountReserveMint,
       InstructionAccountInputAddress<TAccountReserveMint>
     >,
@@ -250,41 +690,174 @@ export async function getInitializeInstructionAsync<
       InstructionAccountInputAddress<TAccountConfig>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountState,
+      InstructionAccountInputAddress<TAccountState>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountVaultAuthority,
+      InstructionAccountInputAddress<TAccountVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountShareMint,
+      InstructionAccountInputAddress<TAccountShareMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingDeposits,
+      InstructionAccountInputAddress<TAccountPendingDeposits>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingRedemptions,
+      InstructionAccountInputAddress<TAccountPendingRedemptions>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountClaims,
+      InstructionAccountInputAddress<TAccountClaims>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTreasuryAccount,
+      InstructionAccountInputAddress<TAccountTreasuryAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPaymentsAccount,
+      InstructionAccountInputAddress<TAccountPaymentsAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserveTokenProgram,
+      InstructionAccountInputAddress<TAccountReserveTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountShareTokenProgram,
+      InstructionAccountInputAddress<TAccountShareTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountSystemProgram,
       InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
     >
   >);
 }
 
 export type InitializeInput<
   TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
+  TAccountUpgradeAuthority extends InstructionSignerInput =
+    InstructionSignerInput,
+  TAccountProgramData extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
+  TAccountState extends InstructionAccountInput = InstructionAccountInput,
+  TAccountVaultAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountShareMint extends InstructionAccountInput = InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPendingDeposits extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPendingRedemptions extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountClaims extends InstructionAccountInput = InstructionAccountInput,
+  TAccountTreasuryAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPaymentsAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountReserveTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountShareTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   payer: TAccountPayer;
-  /** Reserve asset mint; owner is checked against SPL Token / Token-2022. */
+  /**
+   * Must be the program's upgrade authority, so nobody can front-run
+   * initialization.
+   */
+  upgradeAuthority: TAccountUpgradeAuthority;
+  programData: TAccountProgramData;
   reserveMint: TAccountReserveMint;
   config: TAccountConfig;
+  state: TAccountState;
+  vaultAuthority: TAccountVaultAuthority;
+  shareMint: TAccountShareMint;
+  reserve: TAccountReserve;
+  pendingDeposits: TAccountPendingDeposits;
+  pendingRedemptions: TAccountPendingRedemptions;
+  claims: TAccountClaims;
+  /** MUTAV treasury token account (BRS); receives the fee take. */
+  treasuryAccount: TAccountTreasuryAccount;
+  /** MUTAV payments token account (BRS); receives claim payments. */
+  paymentsAccount: TAccountPaymentsAccount;
+  reserveTokenProgram: TAccountReserveTokenProgram;
+  /** The share mint is a classic SPL Token mint. */
+  shareTokenProgram?: TAccountShareTokenProgram;
   systemProgram?: TAccountSystemProgram;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
   admin: InitializeInstructionDataArgs["admin"];
   operator: InitializeInstructionDataArgs["operator"];
   pauser: InitializeInstructionDataArgs["pauser"];
+  mutavCapitalWallet: InitializeInstructionDataArgs["mutavCapitalWallet"];
+  coverageRatioBps: InitializeInstructionDataArgs["coverageRatioBps"];
+  feeTakeBps: InitializeInstructionDataArgs["feeTakeBps"];
+  payoutSlaSecs: InitializeInstructionDataArgs["payoutSlaSecs"];
+  caps: InitializeInstructionDataArgs["caps"];
+  price: InitializeInstructionDataArgs["price"];
 };
 
 export function getInitializeInstruction<
   TAccountPayer extends InstructionSignerInput,
+  TAccountUpgradeAuthority extends InstructionSignerInput,
+  TAccountProgramData extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput,
+  TAccountState extends InstructionAccountInput,
+  TAccountVaultAuthority extends InstructionAccountInput,
+  TAccountShareMint extends InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput,
+  TAccountPendingDeposits extends InstructionAccountInput,
+  TAccountPendingRedemptions extends InstructionAccountInput,
+  TAccountClaims extends InstructionAccountInput,
+  TAccountTreasuryAccount extends InstructionAccountInput,
+  TAccountPaymentsAccount extends InstructionAccountInput,
+  TAccountReserveTokenProgram extends InstructionAccountInput,
+  TAccountShareTokenProgram extends InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
   input: InitializeInput<
     TAccountPayer,
+    TAccountUpgradeAuthority,
+    TAccountProgramData,
     TAccountReserveMint,
     TAccountConfig,
-    TAccountSystemProgram
+    TAccountState,
+    TAccountVaultAuthority,
+    TAccountShareMint,
+    TAccountReserve,
+    TAccountPendingDeposits,
+    TAccountPendingRedemptions,
+    TAccountClaims,
+    TAccountTreasuryAccount,
+    TAccountPaymentsAccount,
+    TAccountReserveTokenProgram,
+    TAccountShareTokenProgram,
+    TAccountSystemProgram,
+    TAccountEventAuthority,
+    TAccountProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): InitializeInstruction<
@@ -292,6 +865,14 @@ export function getInitializeInstruction<
   ResolvedInstructionAccountMeta<
     TAccountPayer,
     InstructionAccountInputAddress<TAccountPayer>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUpgradeAuthority,
+    InstructionAccountInputAddress<TAccountUpgradeAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgramData,
+    InstructionAccountInputAddress<TAccountProgramData>
   >,
   ResolvedInstructionAccountMeta<
     TAccountReserveMint,
@@ -302,8 +883,60 @@ export function getInitializeInstruction<
     InstructionAccountInputAddress<TAccountConfig>
   >,
   ResolvedInstructionAccountMeta<
+    TAccountState,
+    InstructionAccountInputAddress<TAccountState>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountVaultAuthority,
+    InstructionAccountInputAddress<TAccountVaultAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountShareMint,
+    InstructionAccountInputAddress<TAccountShareMint>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountReserve,
+    InstructionAccountInputAddress<TAccountReserve>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPendingDeposits,
+    InstructionAccountInputAddress<TAccountPendingDeposits>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPendingRedemptions,
+    InstructionAccountInputAddress<TAccountPendingRedemptions>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountClaims,
+    InstructionAccountInputAddress<TAccountClaims>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountTreasuryAccount,
+    InstructionAccountInputAddress<TAccountTreasuryAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPaymentsAccount,
+    InstructionAccountInputAddress<TAccountPaymentsAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountReserveTokenProgram,
+    InstructionAccountInputAddress<TAccountReserveTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountShareTokenProgram,
+    InstructionAccountInputAddress<TAccountShareTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
     TAccountSystemProgram,
     InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountEventAuthority,
+    InstructionAccountInputAddress<TAccountEventAuthority>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountProgram,
+    InstructionAccountInputAddress<TAccountProgram>
   >
 > {
   // Program address.
@@ -315,14 +948,81 @@ export function getInitializeInstruction<
   // Original accounts.
   const originalAccounts = {
     payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
+    upgradeAuthority: {
+      value: input.upgradeAuthority ?? null,
+      isSigner: true,
+      isWritable: false,
+    },
+    programData: {
+      value: input.programData ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     reserveMint: {
       value: input.reserveMint ?? null,
       isSigner: false,
       isWritable: false,
     },
     config: { value: input.config ?? null, isSigner: false, isWritable: true },
+    state: { value: input.state ?? null, isSigner: false, isWritable: true },
+    vaultAuthority: {
+      value: input.vaultAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    shareMint: {
+      value: input.shareMint ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    reserve: {
+      value: input.reserve ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    pendingDeposits: {
+      value: input.pendingDeposits ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    pendingRedemptions: {
+      value: input.pendingRedemptions ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
+    claims: { value: input.claims ?? null, isSigner: false, isWritable: true },
+    treasuryAccount: {
+      value: input.treasuryAccount ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    paymentsAccount: {
+      value: input.paymentsAccount ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    reserveTokenProgram: {
+      value: input.reserveTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    shareTokenProgram: {
+      value: input.shareTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     systemProgram: {
       value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
       isSigner: false,
       isWritable: false,
     },
@@ -336,6 +1036,10 @@ export function getInitializeInstruction<
   const args = { ...input };
 
   // Resolve default values.
+  if (!accounts.shareTokenProgram.value) {
+    accounts.shareTokenProgram.value =
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -344,9 +1048,24 @@ export function getInitializeInstruction<
   return Object.freeze({
     accounts: [
       getAccountMeta("payer", accounts.payer),
+      getAccountMeta("upgradeAuthority", accounts.upgradeAuthority),
+      getAccountMeta("programData", accounts.programData),
       getAccountMeta("reserveMint", accounts.reserveMint),
       getAccountMeta("config", accounts.config),
+      getAccountMeta("state", accounts.state),
+      getAccountMeta("vaultAuthority", accounts.vaultAuthority),
+      getAccountMeta("shareMint", accounts.shareMint),
+      getAccountMeta("reserve", accounts.reserve),
+      getAccountMeta("pendingDeposits", accounts.pendingDeposits),
+      getAccountMeta("pendingRedemptions", accounts.pendingRedemptions),
+      getAccountMeta("claims", accounts.claims),
+      getAccountMeta("treasuryAccount", accounts.treasuryAccount),
+      getAccountMeta("paymentsAccount", accounts.paymentsAccount),
+      getAccountMeta("reserveTokenProgram", accounts.reserveTokenProgram),
+      getAccountMeta("shareTokenProgram", accounts.shareTokenProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
     ],
     data: getInitializeInstructionDataEncoder().encode(
       args as InitializeInstructionDataArgs,
@@ -359,6 +1078,14 @@ export function getInitializeInstruction<
       InstructionAccountInputAddress<TAccountPayer>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountUpgradeAuthority,
+      InstructionAccountInputAddress<TAccountUpgradeAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgramData,
+      InstructionAccountInputAddress<TAccountProgramData>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountReserveMint,
       InstructionAccountInputAddress<TAccountReserveMint>
     >,
@@ -367,8 +1094,60 @@ export function getInitializeInstruction<
       InstructionAccountInputAddress<TAccountConfig>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountState,
+      InstructionAccountInputAddress<TAccountState>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountVaultAuthority,
+      InstructionAccountInputAddress<TAccountVaultAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountShareMint,
+      InstructionAccountInputAddress<TAccountShareMint>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingDeposits,
+      InstructionAccountInputAddress<TAccountPendingDeposits>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPendingRedemptions,
+      InstructionAccountInputAddress<TAccountPendingRedemptions>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountClaims,
+      InstructionAccountInputAddress<TAccountClaims>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTreasuryAccount,
+      InstructionAccountInputAddress<TAccountTreasuryAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPaymentsAccount,
+      InstructionAccountInputAddress<TAccountPaymentsAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserveTokenProgram,
+      InstructionAccountInputAddress<TAccountReserveTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountShareTokenProgram,
+      InstructionAccountInputAddress<TAccountShareTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountSystemProgram,
       InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
     >
   >);
 }
@@ -380,10 +1159,31 @@ export type ParsedInitializeInstruction<
   programAddress: Address<TProgram>;
   accounts: {
     payer: TAccountMetas[0];
-    /** Reserve asset mint; owner is checked against SPL Token / Token-2022. */
-    reserveMint: TAccountMetas[1];
-    config: TAccountMetas[2];
-    systemProgram: TAccountMetas[3];
+    /**
+     * Must be the program's upgrade authority, so nobody can front-run
+     * initialization.
+     */
+    upgradeAuthority: TAccountMetas[1];
+    programData: TAccountMetas[2];
+    reserveMint: TAccountMetas[3];
+    config: TAccountMetas[4];
+    state: TAccountMetas[5];
+    vaultAuthority: TAccountMetas[6];
+    shareMint: TAccountMetas[7];
+    reserve: TAccountMetas[8];
+    pendingDeposits: TAccountMetas[9];
+    pendingRedemptions: TAccountMetas[10];
+    claims: TAccountMetas[11];
+    /** MUTAV treasury token account (BRS); receives the fee take. */
+    treasuryAccount: TAccountMetas[12];
+    /** MUTAV payments token account (BRS); receives claim payments. */
+    paymentsAccount: TAccountMetas[13];
+    reserveTokenProgram: TAccountMetas[14];
+    /** The share mint is a classic SPL Token mint. */
+    shareTokenProgram: TAccountMetas[15];
+    systemProgram: TAccountMetas[16];
+    eventAuthority: TAccountMetas[17];
+    program: TAccountMetas[18];
   };
   data: InitializeInstructionData;
 };
@@ -396,12 +1196,12 @@ export function parseInitializeInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 4) {
+  if (instruction.accounts.length < 19) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 4,
+        expectedAccountMetas: 19,
       },
     );
   }
@@ -415,9 +1215,24 @@ export function parseInitializeInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       payer: getNextAccount(),
+      upgradeAuthority: getNextAccount(),
+      programData: getNextAccount(),
       reserveMint: getNextAccount(),
       config: getNextAccount(),
+      state: getNextAccount(),
+      vaultAuthority: getNextAccount(),
+      shareMint: getNextAccount(),
+      reserve: getNextAccount(),
+      pendingDeposits: getNextAccount(),
+      pendingRedemptions: getNextAccount(),
+      claims: getNextAccount(),
+      treasuryAccount: getNextAccount(),
+      paymentsAccount: getNextAccount(),
+      reserveTokenProgram: getNextAccount(),
+      shareTokenProgram: getNextAccount(),
       systemProgram: getNextAccount(),
+      eventAuthority: getNextAccount(),
+      program: getNextAccount(),
     },
     data: getInitializeInstructionDataDecoder().decode(instruction.data),
   };

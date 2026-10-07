@@ -6,4 +6,13 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./agencyExposure";
+export * from "./claimFiling";
+export * from "./depositRequest";
+export * from "./feeReceipt";
+export * from "./guarantee";
+export * from "./holderState";
+export * from "./payout";
+export * from "./redeemRequest";
 export * from "./vaultConfig";
+export * from "./vaultState";

@@ -2,14 +2,26 @@
   "name": "mutav-protocol-solana",
   "private": true,
   "license": "Apache-2.0",
-  "workspaces": ["clients/js"],
+  "workspaces": [
+    "clients/js"
+  ],
   "scripts": {
     "generate:client": "bun scripts/generate-client.ts",
-    "typecheck": "bun run --cwd clients/js typecheck"
+    "typecheck": "bun run --cwd clients/js typecheck",
+    "test:client": "bun test --cwd clients/js",
+    "test:scripts": "bun test scripts/test",
+    "check:no-keys": "bash scripts/check-no-keys.sh clients/js/src",
+    "idl-compat": "bun scripts/idl-compat.ts",
+    "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
+    "dry-run": "bun scripts/devnet/dry-run.ts",
+    "fork": "bun tests-fork/happy-path.ts"
   },
   "devDependencies": {
     "@codama/nodes-from-anchor": "1.5.6",
     "@codama/renderers-js": "2.5.0",
+    "@solana/kit": "8.4.0",
+    "@types/bun": "1.3.1",
+    "@types/node": "^24.0.0",
     "codama": "1.11.0",
     "typescript": "^5.9.0"
   }

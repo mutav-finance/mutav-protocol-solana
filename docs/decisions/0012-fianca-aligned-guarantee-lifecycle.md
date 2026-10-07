@@ -59,7 +59,7 @@ MUTAV's guarantee is a **fiança onerosa** under Lei 8.245/91 art. 37 II, owed *
 - **Cover is released later.** Cover stays counted through the exoneration window and the claims tail. Guarantees close later, and capacity for new guarantees grows more slowly.
 - **The fail-closed tail.** Until `claims_tail_secs` is set, no guarantee can leave `ACTIVE` except by exhaustion or `VOID`.
 - **The admin path widens who can move reserve funds.** It still pays only `payments_account` and stays within remaining cover. The Squads time lock delays it, and the backstop advance covers that delay. One multisig or two (spec §12 Q15) now also affects claim latency.
-- **`pay_claim` gains two effects.** It takes a category, and it may set `EXHAUSTED`. Neither adds a solvency or mode check. Its cover bound now also keeps other open filings' provisions, so spec invariant 2 holds when one leg has two filings. The never-refused-for-solvency property test is unchanged.
+- **`pay_claim` gains two effects.** It takes a category, and it may set `EXHAUSTED`. Neither adds a solvency or mode check. Its cover bound is ADR 0014's (see below), which `pay_claim_admin` shares. The never-refused-for-solvency property test is unchanged.
 - **New operator duties:** notifying exonerations, recording key handovers with evidence, obtaining the quitação before settlement, and following the consent workflow for arrangements with the tenant.
 - **Pilot accounts get larger,** by 128 bytes for `Guarantee` and 64 bytes each for `ClaimFiling` and `Payout`, at about 0.0009 and 0.0004 SOL of rent per account.
 - **Open:**
@@ -69,4 +69,12 @@ MUTAV's guarantee is a **fiança onerosa** under Lei 8.245/91 art. 37 II, owed *
   - the `VOID` path's limits
   - keeping two legs or only categories
 
-  See spec §12 Q34–Q45.
+  See spec §12 Q35–Q46.
+
+## Interaction with later ADRs
+
+Merged with ADRs 0014 and 0015 and the 2026-10-06 decisions. None of them contradicts this ADR. Where both touch the same text, the spec keeps both:
+
+- **ADR 0014 (`pay_claim` bound).** This ADR's draft bound, `leg_cover − leg_paid − (leg_provision − filing.provision)`, is algebraically ADR 0014's `filing.provision + (leg_cover − leg_paid − leg_provision)`. The spec states ADR 0014's form, with its checked subtraction, as rule 2. This ADR adds the `CategoryMismatch` check to rule 1. `pay_claim_admin` applies the same rule 2.
+- **ADR 0015 (`clear_fulfil_halt`).** It is a separate admin instruction. The admin role lists it next to `pay_claim_admin`.
+- **2026-10-06 decisions.** `VaultConfig` stays 2,756 bytes and `VaultState` 480 bytes. This ADR's fields are carved from their `_reserved` blocks (512 → 455 and 256 → 240), so neither total changes. `AdapterEntry._reserved` is 64 bytes per entry. §12 Q34 now records the devnet BRS mint's authorities, so this ADR's open questions are Q35–Q46.

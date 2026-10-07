@@ -27,6 +27,29 @@
 | Oct 12 | 22 — buffer and submission |
 | Post-pilot | P2-1…P2-8 — phase 2, instant exit (not in the hackathon window) |
 
+### Rescheduled (2026-10-06)
+
+Program work started on Oct 6, so the hackathon build runs in five phases, with one branch and one PR per phase. The task definitions below are unchanged; this table only sets the order and the scope.
+
+| Phase | Dates | Tasks | Done when |
+|---|---|---|---|
+| **A — Foundation** | Oct 6–7 | 1, 2, 2a | Account layouts frozen for devnet; math module covered by property tests |
+| **B — Guarantee book** | Oct 7–8 | 3, 4, 5 (`file_claim`, `pay_claim`, `settle_payout`) | Every demo step has a LiteSVM test: refused registration, fee, claim, payout while under-covered |
+| **C — Capital and safety** | Oct 8–9 | 6 (whole fills only), 7, 8 (BRS only), 10 | Deposit → shares → redeem in FIFO order; under-coverage mode; `refresh` and event audit |
+| **D — Ship** | Oct 9–10 | 11, 12, 13 (one happy path), minimal 14 and 18 [mutav-app] | Devnet deploy with Squads as upgrade authority; client published; demo runs on Nora's devnet BRS |
+| **E — Submit** | Oct 10–12 | 19–22 | Submitted before Oct 12, 23:59 BRT |
+
+**Built later** (designed in the ADRs, labelled "not built" in the README and litepaper):
+
+- partial fills at the queue head (ADR 0010; Task 6 ships whole fills only), with Task 6's partial-fill tests, the Alice/Bob/Carol scenario and the frozen-destination case for a `Cancelled` request that still has `assets_claimable > 0`;
+- claim notices and their gate (Task 5's `flag_claim_notice` / `close_claim_notice`); `fulfil_deposits` and `fulfil_redeems` already check `pending_notices == 0`, which always passes until notices exist, and Task 6's claim-notice-gate tests run on an injected count;
+- adapters, `allocate` / `deallocate` and TESOURO pricing (Task 9; parts of Tasks 8 and 13), with the TESOURO cap at 0% in the pilot;
+- the lifecycle states beyond active and closed (ADR 0012, PR #4);
+- the IDL-compatibility CI job (Task 11);
+- phase 2 (P2-1…P2-8).
+
+Layout fields for anything built later are carved from the `_reserved` padding (spec §14.2), so none of these need a migration.
+
 ---
 
 ## Task 0 — Scaffold and docs (Oct 1)
@@ -50,7 +73,7 @@
   - `set_config` emits one `ConfigUpdated { field: u16, old: [u8; 32], new: [u8; 32] }` per changed field, for every `VaultConfig` field including `Pubkey`, hash and nested `Caps` / `PriceParams` / `ExitParams` fields (a test walks the field-id table and asserts every field has an event path).
   - `set_config` and `set_payments_account` both reject `payments_account == treasury_account` and a `mutav_capital_wallet` equal to either token account's owner.
   - ADR 0012 config fields: `set_config` rejects `optional_categories` bits outside `SUPPORTED_OPTIONAL_CATEGORIES` (`InvalidParameter`) and negative `claims_tail_secs` / `payment_term_secs`; `claims_tail_secs` above the 3-year bound is rejected; `backstop_amount` and `backstop_commitment_hash` are settable and each emits `ConfigUpdated`; all five start at `0` after `initialize`.
-- **Done when:** all tests pass; every account starts with `version`/`bump` and ends with the padding budget of spec §14.2 (`VaultConfig` 512, `VaultState` 256, `Guarantee` 192, `ClaimFiling` and `Payout` 128, others 64; `Caps`, `PriceParams`, `ExitParams` 32 each), with the ADR 0012 fields carved from the front; statuses and modes are `u8` constants; `VaultConfig` carries `feature_flags`, `mutav_capital_wallet` and a zeroed `ExitParams`; events emitted via `emit_cpi!`. **Layout freeze checklist** (spec §14.2) ticked: `MAX_ADAPTERS` pinned (spec §12 Q33 answered), nested tails present, event set and error list final. Layout tests are in Task 2a.
+- **Done when:** all tests pass; every account starts with `version`/`bump` and ends with the padding budget of spec §14.2 (`VaultConfig` 512, `VaultState` 256, `Guarantee` 192, `ClaimFiling` and `Payout` 128, others 64; `Caps`, `PriceParams`, `ExitParams` 32 each), with the ADR 0012 fields carved from the front; statuses and modes are `u8` constants; `VaultConfig` carries `feature_flags`, `mutav_capital_wallet` and a zeroed `ExitParams`; events emitted via `emit_cpi!`. **Layout freeze checklist** (spec §14.2) ticked: `MAX_ADAPTERS` pinned (spec §12 Q33 answered: `MAX_ADAPTERS = 8`, `AdapterEntry._reserved` 64 bytes, decided 2026-10-06), nested tails present, event set and error list final. Layout tests are in Task 2a.
 
 ## Task 2 — Math and solvency module (Oct 2)
 
@@ -82,6 +105,7 @@
   - **Injected earmark** (`set_account`, with the `INSTANT_EXIT` bit injected too): `register_guarantee`, `fulfil_redeems` and `allocate` capacity shrink by exactly `earmark_eff`; **two or more fills in one `fulfil_redeems` batch take at most `surplus − earmark_eff` in total**, and a registration that fits leaves `earmark_eff` unchanged; the ratchet lowers the stored level when surplus or liquidity falls; in under-coverage `earmark_eff == 0`; with the flag injected clear, the earmark has no effect and the next ratcheting instruction stores `0`; `pay_claim` neither reads nor writes `buffer_earmark` and is never refused (extend the Task 5 property test to fuzz the earmark).
   - **Ratchet scope:** with a stale price and `tesouro_units > 0`, `file_claim`, `contribute_fees`, `notify_exoneration`, `record_keys_returned`, `close_guarantee`, `flag_claim_notice`, `cancel_redeem` and `claim_assets` still succeed (they neither read nor write `buffer_earmark`).
 - **Done when:** tests pass; no `Option`/`Vec`/`String` in any account; large accounts boxed in contexts; fixtures dumped at devnet launch (Task 12) are decoded in CI.
+- **Built in 2a (2026-10-06)**, for the accounts and instructions that exist after Task 1 (`VaultConfig`, `VaultState`; the seven admin instructions): size pins, golden v1 layouts with offset tables, the `VaultStateV2` carve, padding zero at init and preserved, feature flags failing closed, the version guard (including unknown `mode`), carve sizes, earmark = 0 through the pilot instructions, and the IDL check for fixed-size types. Fixtures from a LiteSVM reserve are in `tests/fixtures/layout/v1/`. `Fixture::pilot_instructions()` lists one valid call of every instruction; each later task appends its instructions, so the padding, version and earmark tests cover them. The rest moved to the task that adds the instruction or account it needs, as bullets marked **carried from 2a**.
 
 ## Task 3 — Register and close guarantees (Oct 3)
 
@@ -95,6 +119,11 @@
   - Non-operator signer rejected; rejected while paused.
   - **Close rules (invariant 21):** `close_guarantee(RELEASED)` on an `ACTIVE` guarantee fails (`InvalidGuaranteeStatus`); `VOID` succeeds on `ACTIVE` with nothing paid and fails after any payment; every close fails with `OpenClaims` while a claim is filed; a close releases exactly `remaining_cover(g)` and `GuaranteeClosed` carries `reason` and `from_status`.
   - Invariant: `remaining_cover_total` equals the sum over guarantees that are not `CLOSED`, after any sequence.
+  - **Carried from 2a:**
+    - Golden layout: `GuaranteeV1` and `AgencyExposureV1` with offset tables in `tests/tests/layout/v1.rs`; size pins; padding zero at init.
+    - Add `register_guarantee` and `close_guarantee` to `Fixture::pilot_instructions()`, so padding preservation, the version guard and the pilot-earmark sequence cover them.
+    - Version guard on `VaultState`: injected `version = 2` or an unknown `mode` is refused with `UnsupportedVersion` (`VaultState::is_supported`); an unknown `Guarantee` status is refused the same way.
+    - Injected earmark (`INSTANT_EXIT` also injected): `register_guarantee` capacity shrinks by exactly `earmark_eff`; a registration that fits leaves `earmark_eff` unchanged; the ratchet stores `earmark_eff`, and lowers the stored level when surplus or liquidity has fallen. With the flag injected clear, the earmark has no effect and `register_guarantee` stores `0`.
 - **Done when:** tests pass and the gate demo case ("an over-capacity registration is refused") is scripted.
 
 ## Task 3a — Fiança lifecycle (Oct 3)
@@ -125,6 +154,7 @@
   - The same `invoice_ref_hash` cannot be contributed twice (`FeeReceipt`).
   - Fees never mint shares. MUTAV's share balance changes only via deposit/redeem.
   - `contribute_fees` succeeds while paused and in under-coverage.
+  - **Carried from 2a:** `FeeReceiptV1` golden layout and padding zero at init; `contribute_fees` added to `Fixture::pilot_instructions()` (padding preserved, version guard, `buffer_earmark` neither read nor written).
 - **Done when:** tests pass; `FeesContributed` carries gross, take and net.
 
 ## Task 5 — Claims and payouts (Oct 4)
@@ -139,6 +169,10 @@
   - **Property test:** `pay_claim` is never refused for solvency or under-coverage (fuzz `stable_assets` below `coverage_required`).
   - At `c = 1.0`, paying a claim leaves `free_capital` unchanged.
   - Frozen `reserve` → `ReserveFrozen`, clean failure, retry succeeds after thaw.
+  - **Carried from 2a:**
+    - `ClaimFilingV1` and `PayoutV1` golden layouts; padding zero at init; unknown leg or status constants refused with `UnsupportedVersion`; `file_claim`, `pay_claim` and `settle_payout` added to `Fixture::pilot_instructions()`.
+    - `pay_claim` neither reads nor writes `buffer_earmark` and is never refused: the solvency property test above also fuzzes an injected earmark with `INSTANT_EXIT` set (spec §4 invariant 14).
+    - `ClaimNoticeV1` golden layout, with the claim notices (built later).
   - `settle_payout` records `pix_e2e_hash`; late flag set when past the SLA; second settle fails.
   - **Categories (spec §3.13):** `CAT_UNSPECIFIED` and unknown codes fail (`CategoryNotAllowed`); `CAT_DAMAGE`, `CAT_COURT_COSTS`, `CAT_TERMINATION_PENALTY` and `CAT_ABANDONMENT` fail on the default leg; `CAT_TERMINATION_PENALTY` fails while `optional_categories == 0` and succeeds once bit 0 is set; `CAT_DAMAGE` and `CAT_ABANDONMENT` fail with `KeysNotReturned` before `record_keys_returned`; a zero `debt_calc_hash` or a future `request_complete_ts` fails; `pay_claim` with a category that differs from the filing fails (`CategoryMismatch`); the category, `request_complete_ts` and flags reach the `Payout` and the events.
   - **Liability end and tail:** rent or charges with `accrued_until_ts` after `keys_returned_ts`, or after `exoneration_effective_ts`, fail (`AccruedAfterLiabilityEnd`); `file_claim` and `flag_claim_notice` after `claims_tail_until_ts` fail (`ClaimsTailExpired` / `InvalidGuaranteeStatus`); **a claim filed inside the tail is still paid after the tail ends**, and the guarantee cannot close until it is.
@@ -185,7 +219,13 @@
   - Frozen investor destination: `claim_assets` fails, `assets_claimable` and the status (`Filled` or `PartiallyFilled`) are unchanged, the account stays open, and the claim succeeds after thaw; same for a `Cancelled` request with `assets_claimable > 0`.
   - Request accounts close on claim/cancel, rent to owner.
   - `request_deposit` creates `HolderState` if needed and refreshes `last_shares_in_ts`; `claim_shares` refreshes it again.
+  - **Carried from 2a:**
+    - `DepositRequestV1`, `RedeemRequestV1` and `HolderStateV1` golden layouts; padding zero at init; unknown status constants refused with `UnsupportedVersion`; every capital instruction added to `Fixture::pilot_instructions()`.
+    - Test-only `HolderStateV2` (per-wallet exit counters `exit_period_start: i64`, `exit_period_paid: u64` carved from `_reserved`) decodes v1 accounts produced by the pilot instructions, with a zero carve and unchanged v1 fields; carve size pinned (16 bytes, 48 left).
+    - Injected earmark (`INSTANT_EXIT` also injected): `fulfil_redeems` capacity shrinks by exactly `earmark_eff`; **two or more fills in one batch take at most `surplus − earmark_eff` in total**; a starved head sees `earmark_eff = 0`; the ratchet stores `earmark_eff`.
+    - `cancel_redeem` and `claim_assets` neither read nor write `buffer_earmark`.
 - **Done when:** tests pass; forked files carry the MIT header; `NOTICE` updated.
+- **Built in Phase C (2026-10-06), whole fills only.** All nine instructions, the allowlist Merkle proof (`allowlist.rs`: `leaf = sha256(0x00 ‖ owner)`, `node = sha256(0x01 ‖ min ‖ max)`, zero root allowlists nobody), the request and holder layouts with their golden tables and the `HolderStateV2` carve, and every capital instruction in `Fixture::pilot_instructions()`. `fulfil_redeems` fills whole requests from the head while they fit `min(max_assets − paid, free_capital, liquid_budget)`; the first head that does not fit stops the batch untouched (`TODO(plan: partial fills deferred, ADR 0010)` marks the sizing). The partial-fill layout fields and statuses are real, so ADR 0010 ships with no migration. Tests: `tests/capital_async.rs`, `tests/freeze.rs` (escrow cases), `tests/layout/capital.rs`. **Built later:** the partial-fill bullets above, the Alice/Bob/Carol scenario and the `Cancelled`-with-claimable freeze case; the claim-notice gate is tested on an injected `pending_notices`.
 
 ## Task 7 — MUTAV capital (Oct 5)
 
@@ -195,6 +235,7 @@
   - `fulfil_deposits` works in under-coverage (recapitalization).
   - Pause blocks capital flows and new guarantees, while `contribute_fees`, `file_claim`, `pay_claim`, `pay_claim_admin`, `settle_payout`, `notify_exoneration`, `record_keys_returned`, `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, `refresh`, `advance_queue_heads`, `cancel_*` and `claim_*` still succeed.
 - **Done when:** tests pass.
+- **Built in Phase C (2026-10-06):** `tests/mutav_capital.rs`. Under-coverage is reached by raising `coverage_ratio_bps`, with `mode` injected until `refresh` (Task 10) records it. The pause test covers `refresh` (from Task 8) and leaves out the claim-notice instructions (built later).
 
 ## Task 8 — Under-coverage mode and price safety (Oct 6)
 
@@ -205,7 +246,11 @@
   - Recovery returns `mode` to `Normal`.
   - Price above the accrual curve is capped; stale price → gated instructions fail with `StalePrice`; deviation beyond the bound rejected.
   - NAV move > threshold sets `fulfil_halted`; fulfils fail until cleared.
+  - **Carried from 2a:**
+    - In under-coverage with an injected earmark and flag, `earmark_eff == 0`, and the next ratcheting instruction stores `0`.
+    - **Ratchet scope:** with a stale price and `tesouro_units > 0`, `file_claim`, `contribute_fees`, `close_guarantee`, `cancel_redeem`, `claim_assets` (and `flag_claim_notice`, when notices are built) still succeed; they neither read nor write `buffer_earmark`. This needs the TESOURO pricing, which is built later.
 - **Done when:** tests pass using a mock price account (real layout pending Etherfuse, spec §12 Q2).
+- **Built in Phase C (2026-10-06), BRS only.** The spec puts the mode transition and the NAV-move guard in `refresh`, so `refresh`'s core lands here: it recomputes and publishes `stable_assets`, `coverage_required` and NAV per share, sets `mode` (emitting `ModeChanged` on a transition), runs the guard and emits `StateRefreshed`. Task 10 adds freeze detection, late payouts and the event audit. `register_guarantee` and `fulfil_redeems` also check under-coverage inline; `pay_claim` and `fulfil_deposits` are never blocked. The guard trips on a move strictly above `max_nav_move_bps` of the last published NAV. It is skipped while either NAV is 0 (no shares, spec §4 TODO), and it measures the move gross, so a large fee batch trips it too (`TODO(adr 0013: inflow-adjusted NAV guard)`). Nothing clears `fulfil_halted` yet: it fails closed. Tests: `tests/under_coverage.rs`. **Built later:** TESOURO pricing (`tesouro_units > 0` fails closed with `StalePrice`, `refresh` included), the ratchet-scope test that needs a stale price, `allocate`.
 
 ## Task 9 — Adapter interface, mock adapter, allocate/deallocate (Oct 6–7)
 
@@ -219,6 +264,7 @@
   - Allocation fails when it would breach the solvency post-condition, or the liquidity post-condition `brs_balance_after ≥ provisions + earmark_eff_before` (`InsufficientLiquidBalance`); with an injected earmark `E` (flag set), a failing allocation leaves `buffer_earmark` unchanged.
   - **CPI depth:** `allocate` and `deallocate` succeed when executed through a Squads v4 vault transaction (Task 13); the mock adapter makes one CPI level and emits no self-CPI events.
   - **Deallocate rule:** in under-coverage, deallocating TESOURO → BRS at or above its bounded value succeeds; a deallocation that lowers `stable_assets` fails with `WorsensCoverage`. In normal mode, any value loss must fit in `free_capital`.
+  - **Carried from 2a:** with an injected earmark and flag, `allocate` capacity shrinks by exactly `earmark_eff`; `allocate`, `deallocate`, `whitelist_adapter` and `remove_adapter` added to `Fixture::pilot_instructions()`; adapter entry padding preserved.
 - **Done when:** tests pass; [ADR 0002](decisions/0002-core-program-and-capped-adapters.md) holds in code.
 
 ## Task 10 — Refresh and events (Oct 7)
@@ -231,7 +277,14 @@
   - Frozen reserve account detected; balance excluded; event emitted.
   - Event coverage test: every token movement is covered by an event whose amounts match (one `RedeemFilled` per fill, one `RedeemsFulfilled` per batch, one `FeesContributed` covering both of its transfers, one `ClaimPaid` per payment on either path), and every guarantee state change emits its event (`ExonerationNotified`, `KeysReturned`, `GuaranteeExhausted`, `GuaranteeClosed`).
   - `StateRefreshed` carries `surplus` and `buffer_earmark`.
+  - **Carried from 2a:** `refresh` with an injected earmark ratchets the stored level down when surplus or liquidity has fallen, and stores `0` with the flag injected clear; `refresh` and `advance_queue_heads` added to `Fixture::pilot_instructions()`, so the pilot-earmark sequence covers every instruction.
 - **Done when:** tests pass; Mollusk CU benchmark recorded for `refresh`, `pay_claim`, `fulfil_redeems` (multi-fill batch with a partial head, `emit_cpi!` per fill, boxed `VaultConfig`), including the Borsh cost of the 512/256-byte padding; `MAX_FULFIL_BATCH` pinned from it.
+- **Built in Phase C (2026-10-06).** On top of Task 8's `refresh` core:
+  - **Freeze detection.** `refresh` receives the four reserve token accounts and emits `ReserveFrozenDetected` for each frozen one. A frozen `reserve` counts as 0 in the published `stable_assets`, which fails closed into under-coverage; the tracked `brs_balance` is unchanged.
+  - **Late payouts.** Late-payout flags come from `(Guarantee, Payout)` pairs passed as remaining accounts. A mismatched pair fails with `InvalidParameter`. Each payout is flagged once, emitting `PayoutLate`, and `late_payouts` counts the payouts `refresh` flagged (`TODO(spec: §3.2 …)`: whether a settlement lowers it is not specified).
+  - **Event audit.** `tests/events.rs` walks `pilot_instructions()`, matches every token CPI against its event's amounts, and fails on any instruction that moves tokens without a mapping.
+  - **Benchmark skipped.** The Mollusk benchmark is skipped. `tests/compute.rs` measures LiteSVM CUs instead: `fulfil_redeems` with 8 whole fills 109,540, `refresh` 29,141, `pay_claim` 41,451. `MAX_FULFIL_BATCH` stays a conservative 8 (`TODO(plan: Task 10 …)` in `constants.rs`).
+  - **Tests:** `tests/refresh.rs`, `tests/events.rs`, `tests/compute.rs`.
 
 ## Task 11 — Codama client and publication (Oct 7–8)
 
@@ -240,6 +293,7 @@
 - **Tests first:** client unit tests (Bun) for PDA derivation against known addresses, instruction encoding round-trips, math-mirror parity with Rust test vectors (including `earmark_eff`, `free_capital`, `liquid_budget`, the partial-fill sizing and the ADR 0012 `canFile` / `canClose` predicates); a grep check that fails CI on secret-key APIs.
 - **IDL compatibility:** an `idl-compat` CI job, active from the first tagged release, diffs `target/idl/mutav.json` against the last released IDL and fails on changed instruction args/accounts, account sizes, field offsets or types, renumbered errors, or changed events (spec §14.4).
 - **Done when:** CI regenerates the client and finds no diff; package published (GitHub Packages or npm, under `@mutav-finance`) and installable from mutav-app.
+- **Built in Phase D (2026-10-06).** `clients/js/src/{pdas,math,preview,reads}.ts` on top of the Codama output. The Rust test `tests/tests/client_vectors.rs` exports math, solvency (with `earmark_eff`, `free_capital`, `liquid_budget`), PDA, allowlist and instruction-encoding vectors into `tests/fixtures/client/vectors.json` and fails when the file is stale; the Bun tests in `clients/js/test/` check the client against the same file. CI runs `scripts/check-no-keys.sh` on `clients/js/src`, the client and script tests, and an `idl-compat` job (`scripts/idl-compat.ts`) that stays inactive until a `v*` tag exists and then diffs against the `mutav.json` asset of that release. **Not done:** publishing (needs approval; the package is publish-ready, see `clients/js/README.md`); the partial-fill sizing parity, deferred with partial fills (ADR 0010).
 
 ## Task 12 — Devnet deploy with Squads as upgrade authority (Oct 7–8)
 
@@ -249,6 +303,16 @@
 - **Tests first:** a script dry-run against a local validator; a check that the upgrade authority equals the Squads vault after deploy; a check that the Squads multisig has `config_authority == Pubkey::default()` and `time_lock ≥` the agreed floor; a check that `feature_flags == 0` and `buffer_earmark == 0` after `init`; a per-reserve address lookup table created for the static accounts of admin vault transactions.
 - **Layout freeze:** re-tick the spec §14.2 checklist before the first deploy; from then on errors and events are append-only.
 - **Done when:** program deployed and verified; upgrade authority = Squads vault; addresses recorded in `README.md`; live `VaultConfig`/`VaultState` dumped into `tests/fixtures/layout/v1/`; no keypair committed; the one-vs-two-multisig question (spec §12 Q15) answered or recorded as an open item.
+- **Prepared in Phase D (2026-10-06); deploy not run.**
+  - `scripts/devnet/{deploy,init,roles,caps,allowlist,verify}.ts`, plus `dry-run.ts`. Every admin step is written as an unsigned Squads proposal. `deploy.ts` hands keypair paths to the Solana CLI and nothing else.
+  - The Merkle builder lives in `clients/js/src/allowlist.ts`, and the program's `allowlist::verify` checks it on a committed fixture.
+  - `dry-run.ts` passed against a throwaway `solana-test-validator`: deploy → initialize → roles → caps → allowlist → checks, plus an allowlisted `request_deposit`. It stops the validator itself.
+  - The Squads checks are unit-tested on fixture bytes.
+  - `release.yml` runs `solana-verify build`, takes the hash, writes the buffer and checks its hash, then writes the upgrade proposal payload and the verify-PDA transaction. It is `workflow_dispatch` only and does nothing past the build without secrets.
+  - **Not done (needs approval and founder inputs):**
+    - the devnet deploy itself, the Squads multisig and the live fixtures;
+    - the per-reserve address lookup table;
+    - the Program Metadata IDL write, which is still a manual step in the proposal.
 
 ## Task 13 — Surfpool fork tests (Oct 8–9)
 
@@ -256,6 +320,12 @@
 - **Files:** `tests-fork/*`, `.github/workflows/fork.yml` (manual trigger).
 - **Tests first:** initialize with the real mint; deposit → fulfil → claim; register → fee → file → pay → settle (with quitação); register → keys returned → damage claim → exhaustion → close; an over-cap `pay_claim_admin` through a Squads proposal; admin fulfil executed through a Squads proposal, including a partial head fill; `allocate` and `deallocate` executed through a Squads proposal (CPI depth); a no-op program upgrade through a timelocked Squads proposal, after which every live account still decodes.
 - **Done when:** the fork suite passes on demand; findings about the real mint's authorities recorded in the spec's open questions.
+- **Built in Phase D (2026-10-06), one happy path.** `tests-fork/happy-path.ts` forks devnet in Surfpool and runs:
+  - `initialize` with Nora's BRS mint (classic SPL, passes the mint guard);
+  - deposit → fulfil → claim shares;
+  - register → fee → file → pay → settle.
+
+  Balances come from `surfnet_setTokenAccount`. `fork.yml` triggers it manually. The mint's authorities are recorded in spec §12 Q34. **Built later:** the Squads-proposal flows, partial fills, adapters and the upgrade rehearsal.
 
 ## Tasks 14–18 — mutav-app integration (Oct 8–9) [mutav-app]
 

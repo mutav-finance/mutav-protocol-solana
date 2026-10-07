@@ -14,15 +14,176 @@ import {
 } from "@solana/kit";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 
-/** InvalidRole: Role must not be the default pubkey */
-export const MUTAV_ERROR__INVALID_ROLE = 0x1770; // 6000
+/** Unauthorized: Signer is not authorized for this instruction */
+export const MUTAV_ERROR__UNAUTHORIZED = 0x1770; // 6000
+/** RolesNotDistinct: Roles must be distinct keys */
+export const MUTAV_ERROR__ROLES_NOT_DISTINCT = 0x1771; // 6001
+/** Paused: The reserve is paused */
+export const MUTAV_ERROR__PAUSED = 0x1772; // 6002
+/** InvalidParameter: Invalid parameter */
+export const MUTAV_ERROR__INVALID_PARAMETER = 0x1773; // 6003
+/** InvalidMint: Invalid mint */
+export const MUTAV_ERROR__INVALID_MINT = 0x1774; // 6004
+/** UnsupportedMintExtension: Mint has an unsupported Token-2022 extension */
+export const MUTAV_ERROR__UNSUPPORTED_MINT_EXTENSION = 0x1775; // 6005
+/** ReserveFrozen: A reserve token account is frozen */
+export const MUTAV_ERROR__RESERVE_FROZEN = 0x1776; // 6006
+/** UnderCovered: The reserve is under-covered */
+export const MUTAV_ERROR__UNDER_COVERED = 0x1777; // 6007
+/** InsufficientFreeCapital: Insufficient free capital */
+export const MUTAV_ERROR__INSUFFICIENT_FREE_CAPITAL = 0x1778; // 6008
+/** InsufficientLiquidBalance: Insufficient liquid balance */
+export const MUTAV_ERROR__INSUFFICIENT_LIQUID_BALANCE = 0x1779; // 6009
+/** StalePrice: Price is stale */
+export const MUTAV_ERROR__STALE_PRICE = 0x177a; // 6010
+/** PriceDeviation: Price deviation beyond the bound */
+export const MUTAV_ERROR__PRICE_DEVIATION = 0x177b; // 6011
+/** FulfilHalted: Fulfilment is halted by the NAV-move guard */
+export const MUTAV_ERROR__FULFIL_HALTED = 0x177c; // 6012
+/** TvlCapExceeded: TVL cap exceeded */
+export const MUTAV_ERROR__TVL_CAP_EXCEEDED = 0x177d; // 6013
+/** GuaranteeCapExceeded: Per-guarantee cap exceeded */
+export const MUTAV_ERROR__GUARANTEE_CAP_EXCEEDED = 0x177e; // 6014
+/** AgencyCapExceeded: Per-agency cap exceeded */
+export const MUTAV_ERROR__AGENCY_CAP_EXCEEDED = 0x177f; // 6015
+/** GuaranteeNotActive: Guarantee is not active */
+export const MUTAV_ERROR__GUARANTEE_NOT_ACTIVE = 0x1780; // 6016
+/** OpenClaims: Guarantee has open claims */
+export const MUTAV_ERROR__OPEN_CLAIMS = 0x1781; // 6017
+/** ExceedsRemainingCover: Amount exceeds the remaining cover */
+export const MUTAV_ERROR__EXCEEDS_REMAINING_COVER = 0x1782; // 6018
+/** ClaimNotFiled: Claim has not been filed */
+export const MUTAV_ERROR__CLAIM_NOT_FILED = 0x1783; // 6019
+/** LegMismatch: Leg does not match the claim filing */
+export const MUTAV_ERROR__LEG_MISMATCH = 0x1784; // 6020
+/** ClaimCallCapExceeded: Per-call claim payment cap exceeded */
+export const MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED = 0x1785; // 6021
+/** ClaimPeriodCapExceeded: Per-period claim payment cap exceeded */
+export const MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED = 0x1786; // 6022
+/** InvalidPaymentsAccount: Invalid payments account */
+export const MUTAV_ERROR__INVALID_PAYMENTS_ACCOUNT = 0x1787; // 6023
+/** PayoutAlreadySettled: Payout already settled */
+export const MUTAV_ERROR__PAYOUT_ALREADY_SETTLED = 0x1788; // 6024
+/** NotAllowlisted: Wallet is not allowlisted */
+export const MUTAV_ERROR__NOT_ALLOWLISTED = 0x1789; // 6025
+/** RequestTooSmall: Request is below the minimum */
+export const MUTAV_ERROR__REQUEST_TOO_SMALL = 0x178a; // 6026
+/** RequestTooLarge: Request is above the maximum */
+export const MUTAV_ERROR__REQUEST_TOO_LARGE = 0x178b; // 6027
+/** InvalidRequestStatus: Invalid request status */
+export const MUTAV_ERROR__INVALID_REQUEST_STATUS = 0x178c; // 6028
+/** QueueOrderViolation: Queue order violation */
+export const MUTAV_ERROR__QUEUE_ORDER_VIOLATION = 0x178d; // 6029
+/** AdapterNotWhitelisted: Adapter is not whitelisted */
+export const MUTAV_ERROR__ADAPTER_NOT_WHITELISTED = 0x178e; // 6030
+/** AdapterCapExceeded: Adapter cap exceeded */
+export const MUTAV_ERROR__ADAPTER_CAP_EXCEEDED = 0x178f; // 6031
+/** TesouroShareCapExceeded: TESOURO share cap exceeded */
+export const MUTAV_ERROR__TESOURO_SHARE_CAP_EXCEEDED = 0x1790; // 6032
+/** WorsensCoverage: Operation worsens coverage */
+export const MUTAV_ERROR__WORSENS_COVERAGE = 0x1791; // 6033
+/** PostCpiCheckFailed: Post-CPI check failed */
+export const MUTAV_ERROR__POST_CPI_CHECK_FAILED = 0x1792; // 6034
+/** MathOverflow: Math overflow */
+export const MUTAV_ERROR__MATH_OVERFLOW = 0x1793; // 6035
+/** FeatureNotSupported: Feature not supported by this program version */
+export const MUTAV_ERROR__FEATURE_NOT_SUPPORTED = 0x1794; // 6036
+/** InvalidTreasuryAccount: Invalid treasury account */
+export const MUTAV_ERROR__INVALID_TREASURY_ACCOUNT = 0x1795; // 6037
+/** ClaimNoticePending: A claim notice is pending */
+export const MUTAV_ERROR__CLAIM_NOTICE_PENDING = 0x1796; // 6038
+/** NoticeNotResolved: Claim notice is not resolved */
+export const MUTAV_ERROR__NOTICE_NOT_RESOLVED = 0x1797; // 6039
+/** UnsupportedVersion: Unsupported account version or status */
+export const MUTAV_ERROR__UNSUPPORTED_VERSION = 0x1798; // 6040
 
-export type MutavError = typeof MUTAV_ERROR__INVALID_ROLE;
+export type MutavError =
+  | typeof MUTAV_ERROR__ADAPTER_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__ADAPTER_NOT_WHITELISTED
+  | typeof MUTAV_ERROR__AGENCY_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__CLAIM_NOT_FILED
+  | typeof MUTAV_ERROR__CLAIM_NOTICE_PENDING
+  | typeof MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__EXCEEDS_REMAINING_COVER
+  | typeof MUTAV_ERROR__FEATURE_NOT_SUPPORTED
+  | typeof MUTAV_ERROR__FULFIL_HALTED
+  | typeof MUTAV_ERROR__GUARANTEE_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__GUARANTEE_NOT_ACTIVE
+  | typeof MUTAV_ERROR__INSUFFICIENT_FREE_CAPITAL
+  | typeof MUTAV_ERROR__INSUFFICIENT_LIQUID_BALANCE
+  | typeof MUTAV_ERROR__INVALID_MINT
+  | typeof MUTAV_ERROR__INVALID_PARAMETER
+  | typeof MUTAV_ERROR__INVALID_PAYMENTS_ACCOUNT
+  | typeof MUTAV_ERROR__INVALID_REQUEST_STATUS
+  | typeof MUTAV_ERROR__INVALID_TREASURY_ACCOUNT
+  | typeof MUTAV_ERROR__LEG_MISMATCH
+  | typeof MUTAV_ERROR__MATH_OVERFLOW
+  | typeof MUTAV_ERROR__NOT_ALLOWLISTED
+  | typeof MUTAV_ERROR__NOTICE_NOT_RESOLVED
+  | typeof MUTAV_ERROR__OPEN_CLAIMS
+  | typeof MUTAV_ERROR__PAUSED
+  | typeof MUTAV_ERROR__PAYOUT_ALREADY_SETTLED
+  | typeof MUTAV_ERROR__POST_CPI_CHECK_FAILED
+  | typeof MUTAV_ERROR__PRICE_DEVIATION
+  | typeof MUTAV_ERROR__QUEUE_ORDER_VIOLATION
+  | typeof MUTAV_ERROR__REQUEST_TOO_LARGE
+  | typeof MUTAV_ERROR__REQUEST_TOO_SMALL
+  | typeof MUTAV_ERROR__RESERVE_FROZEN
+  | typeof MUTAV_ERROR__ROLES_NOT_DISTINCT
+  | typeof MUTAV_ERROR__STALE_PRICE
+  | typeof MUTAV_ERROR__TESOURO_SHARE_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__TVL_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__UNAUTHORIZED
+  | typeof MUTAV_ERROR__UNDER_COVERED
+  | typeof MUTAV_ERROR__UNSUPPORTED_MINT_EXTENSION
+  | typeof MUTAV_ERROR__UNSUPPORTED_VERSION
+  | typeof MUTAV_ERROR__WORSENS_COVERAGE;
 
 let mutavErrorMessages: Record<MutavError, string> | undefined;
 if (process.env["NODE_ENV"] !== "production") {
   mutavErrorMessages = {
-    [MUTAV_ERROR__INVALID_ROLE]: `Role must not be the default pubkey`,
+    [MUTAV_ERROR__ADAPTER_CAP_EXCEEDED]: `Adapter cap exceeded`,
+    [MUTAV_ERROR__ADAPTER_NOT_WHITELISTED]: `Adapter is not whitelisted`,
+    [MUTAV_ERROR__AGENCY_CAP_EXCEEDED]: `Per-agency cap exceeded`,
+    [MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED]: `Per-call claim payment cap exceeded`,
+    [MUTAV_ERROR__CLAIM_NOT_FILED]: `Claim has not been filed`,
+    [MUTAV_ERROR__CLAIM_NOTICE_PENDING]: `A claim notice is pending`,
+    [MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED]: `Per-period claim payment cap exceeded`,
+    [MUTAV_ERROR__EXCEEDS_REMAINING_COVER]: `Amount exceeds the remaining cover`,
+    [MUTAV_ERROR__FEATURE_NOT_SUPPORTED]: `Feature not supported by this program version`,
+    [MUTAV_ERROR__FULFIL_HALTED]: `Fulfilment is halted by the NAV-move guard`,
+    [MUTAV_ERROR__GUARANTEE_CAP_EXCEEDED]: `Per-guarantee cap exceeded`,
+    [MUTAV_ERROR__GUARANTEE_NOT_ACTIVE]: `Guarantee is not active`,
+    [MUTAV_ERROR__INSUFFICIENT_FREE_CAPITAL]: `Insufficient free capital`,
+    [MUTAV_ERROR__INSUFFICIENT_LIQUID_BALANCE]: `Insufficient liquid balance`,
+    [MUTAV_ERROR__INVALID_MINT]: `Invalid mint`,
+    [MUTAV_ERROR__INVALID_PARAMETER]: `Invalid parameter`,
+    [MUTAV_ERROR__INVALID_PAYMENTS_ACCOUNT]: `Invalid payments account`,
+    [MUTAV_ERROR__INVALID_REQUEST_STATUS]: `Invalid request status`,
+    [MUTAV_ERROR__INVALID_TREASURY_ACCOUNT]: `Invalid treasury account`,
+    [MUTAV_ERROR__LEG_MISMATCH]: `Leg does not match the claim filing`,
+    [MUTAV_ERROR__MATH_OVERFLOW]: `Math overflow`,
+    [MUTAV_ERROR__NOT_ALLOWLISTED]: `Wallet is not allowlisted`,
+    [MUTAV_ERROR__NOTICE_NOT_RESOLVED]: `Claim notice is not resolved`,
+    [MUTAV_ERROR__OPEN_CLAIMS]: `Guarantee has open claims`,
+    [MUTAV_ERROR__PAUSED]: `The reserve is paused`,
+    [MUTAV_ERROR__PAYOUT_ALREADY_SETTLED]: `Payout already settled`,
+    [MUTAV_ERROR__POST_CPI_CHECK_FAILED]: `Post-CPI check failed`,
+    [MUTAV_ERROR__PRICE_DEVIATION]: `Price deviation beyond the bound`,
+    [MUTAV_ERROR__QUEUE_ORDER_VIOLATION]: `Queue order violation`,
+    [MUTAV_ERROR__REQUEST_TOO_LARGE]: `Request is above the maximum`,
+    [MUTAV_ERROR__REQUEST_TOO_SMALL]: `Request is below the minimum`,
+    [MUTAV_ERROR__RESERVE_FROZEN]: `A reserve token account is frozen`,
+    [MUTAV_ERROR__ROLES_NOT_DISTINCT]: `Roles must be distinct keys`,
+    [MUTAV_ERROR__STALE_PRICE]: `Price is stale`,
+    [MUTAV_ERROR__TESOURO_SHARE_CAP_EXCEEDED]: `TESOURO share cap exceeded`,
+    [MUTAV_ERROR__TVL_CAP_EXCEEDED]: `TVL cap exceeded`,
+    [MUTAV_ERROR__UNAUTHORIZED]: `Signer is not authorized for this instruction`,
+    [MUTAV_ERROR__UNDER_COVERED]: `The reserve is under-covered`,
+    [MUTAV_ERROR__UNSUPPORTED_MINT_EXTENSION]: `Mint has an unsupported Token-2022 extension`,
+    [MUTAV_ERROR__UNSUPPORTED_VERSION]: `Unsupported account version or status`,
+    [MUTAV_ERROR__WORSENS_COVERAGE]: `Operation worsens coverage`,
   };
 }
 
