@@ -27,7 +27,7 @@ export function LiveStrip() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 0 0" }}>
           <span className="live-dot" aria-hidden="true" />
           <span className="font-mono" style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--color-text-3)" }}>
-            {data ? `LIVE FROM ${data.cluster.toUpperCase()} · SLOT ${data.slot}` : error ? "COULD NOT READ THE CHAIN" : "READING THE CHAIN…"}
+            {data ? `LIVE FROM ${data.cluster.toUpperCase()} · SLOT ${data.slot}` : error ? ((error as { notConfigured?: boolean }).notConfigured ? "DEPLOYING TO DEVNET · LIVE NUMBERS SOON" : "COULD NOT READ THE CHAIN") : "READING THE CHAIN…"}
           </span>
         </div>
         <dl style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 0, margin: 0, padding: "10px 0 18px" }}>
