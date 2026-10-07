@@ -3,13 +3,20 @@
  * accepts its signature for (from lib/roles, which mirrors the program's
  * signer checks). Same tags as on /reserve, /investor, /demo and /admin.
  */
+import Link from "next/link";
 import { RoleMarker, RoleTag } from "@/components/RoleTag";
 import { instructionsBy, PAUSER_OR_ADMIN, ROLE_META, type Role } from "@/lib/roles";
 
 const NOTE: Partial<Record<Role, string>> = {
   admin: "Every change goes through a time-locked Squads proposal. Only pause is instant, and a separate pauser key can also send it.",
-  operator: "The only writer for guarantees, guarantee fees and claims. It cannot change config or fulfil the queue.",
+  operator: "The only writer for guarantees, guarantee fees and claims. It cannot change config or fulfil the queue. Today MUTAV's team signs by hand; later mutav-app's backend sends these with a KMS-held key.",
   investor: "The pilot runs on MUTAV's own capital and is not open to public investment. Requests are gated by an allowlist (KYC off-chain, Merkle proof on-chain); in the pilot the allowlisted capital provider is MUTAV's capital wallet.",
+};
+
+const PAGE: Partial<Record<Role, [string, string]>> = {
+  admin: ["/admin", "Admin console"],
+  operator: ["/operator", "Operator console"],
+  investor: ["/investor", "Investor view"],
 };
 
 export function WhoDoesWhat() {
@@ -38,6 +45,11 @@ export function WhoDoesWhat() {
                 ))}
               </ul>
               {NOTE[role] && <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)", margin: 0, lineHeight: 1.5 }}>{NOTE[role]}</p>}
+              {PAGE[role] && (
+                <Link href={PAGE[role]![0]} className="font-mono ext-link" style={{ fontSize: 12, alignSelf: "flex-start", marginTop: "auto" }}>
+                  {PAGE[role]![1]} →
+                </Link>
+              )}
             </li>
           );
         })}

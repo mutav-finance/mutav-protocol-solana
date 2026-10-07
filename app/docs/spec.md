@@ -51,6 +51,16 @@ Read-only, no wallet needed.
 - A "Refresh" button that sends the permissionless `refresh` instruction from any connected wallet.
 - Links to every account on a Solana explorer (devnet).
 
+### `/operator` Operator console
+
+During the launch and the hackathon MUTAV's team operates the reserve by hand from this page with the operator wallet; later mutav-app's backend sends the same instructions with a KMS-held key. Anyone can read it; actions are enabled only when the connected wallet is `VaultConfig.operator` (localnet and devnet: the wallet signs).
+
+- **Limits now:** the claim-payment cap window (`claim_period_start`, `claim_period_paid` vs `max_claim_per_period`, `max_claim_per_call`), payouts against `payout_sla_secs`, free capital for new guarantees.
+- **Console:** a form per operator instruction (shared with `/demo`), each with its on-chain bound shown before signing and the gate preview where it applies.
+- **Responsibilities:** each instruction, what is done by hand today and what will trigger it in the backend; undocumented triggers say "triggered by the MUTAV platform".
+- **Recent activity:** the operator key's last MUTAV transactions, and the last `set_roles` in VaultConfig's recent history, when the RPC keeps history.
+- **Safety:** what bounds a compromised operator key (caps, fixed payments account, `revoke_operator`, admin-only config).
+
 ### `/investor` Investor view
 
 Read by anyone; actions gated on the allowlist.

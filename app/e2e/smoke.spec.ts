@@ -94,6 +94,17 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
+  test("/operator — read-only without the operator wallet, with limits and duties", async ({ page }) => {
+    await page.goto("/operator");
+    await expect(page.getByRole("heading", { name: "Operator", level: 1 })).toBeVisible();
+    await expect(page.getByText("READ-ONLY · NO WALLET CONNECTED")).toBeVisible();
+    await expect(page.getByRole("figure", { name: "Claim-payment caps" })).toContainText("R$ 2,500 / R$ 20,000");
+    await expect(page.locator("#console").getByRole("button", { name: "register_guarantee" })).toBeDisabled();
+    await expect(page.getByRole("table", { name: "Operator duties" }).locator("tbody tr")).toHaveCount(6);
+    await expect(page.getByRole("heading", { name: "If the operator key is compromised" })).toBeVisible();
+    await noBannedWords(page);
+  });
+
   test("API refuses to relay an unsigned or foreign transaction", async ({ request }) => {
     const res = await request.post("/api/tx/send", { data: { tx: "AA==" } });
     expect(res.status()).toBeGreaterThanOrEqual(400);

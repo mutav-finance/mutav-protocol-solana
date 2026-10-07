@@ -11,6 +11,7 @@ export function SiteFooter() {
         <nav aria-label="Footer" style={{ display: "flex", gap: 18 }}>
           {[
             ["/reserve", "Reserve"],
+            ["/operator", "Operator"],
             ["/investor", "Investor"],
             ["/demo", "Demo"],
             ["/admin", "Admin"],

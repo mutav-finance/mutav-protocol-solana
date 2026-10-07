@@ -41,6 +41,7 @@ export function useTwoNavSwap(showRef: RefObject<HTMLElement | null>, hideRef: R
 
 const LINKS = [
   ["/reserve", "Reserve"],
+  ["/operator", "Operator"],
   ["/investor", "Investor"],
   ["/demo", "Demo"],
   ["/admin", "Admin"],

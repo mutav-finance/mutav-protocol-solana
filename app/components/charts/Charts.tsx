@@ -11,7 +11,8 @@ import type { CSSProperties, ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { RoleTag } from "@/components/RoleTag";
 import { agencyCapUse, claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "@/lib/charts";
-import { fmtBps, fmtBrs, fmtDuration } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtDuration, fmtTime } from "@/lib/format";
+import type { ClaimCap } from "@/lib/operator";
 import type { AgencyRow, ClaimRow, CoverageRow, FlowTotals } from "@/lib/view";
 import type { Solvency } from "@mutav-finance/mutav-protocol-solana";
 
@@ -313,6 +314,36 @@ export function FlowChart({ totals }: { totals: FlowTotals }) {
             </Row>
           );
         })}
+      </div>
+    </ChartFrame>
+  );
+}
+
+// ── Operator claim-payment caps ─────────────────────────────────────────────
+
+/** The per-period claim-payment cap: paid in the current window against the cap, and the per-call cap, on one axis. */
+export function ClaimCapChart({ cap }: { cap: ClaimCap }) {
+  const axis = cap.perPeriod > cap.perCall ? cap.perPeriod : cap.perCall;
+  const window = cap.windowStart === null ? "No payment yet: the first pay_claim opens the window." : cap.rolled ? `The last window ended ${fmtTime(cap.windowEnd!)}; the next pay_claim opens a new one.` : `Window ${fmtTime(cap.windowStart!)} → ${fmtTime(cap.windowEnd!)}.`;
+  return (
+    <ChartFrame
+      title="Claim-payment caps"
+      legend={
+        <Legend>
+          <Swatch color={C.ink} label="paid this window" />
+          <Swatch color={C.mid} label="room left" outline />
+          <Swatch color={C.mid} label="max per call" />
+        </Legend>
+      }
+      caption={<>{window} From VaultState.claim_period_start / claim_period_paid and caps.max_claim_per_period / max_claim_per_call / claim_period_secs ({fmtDuration(cap.periodSecs)}), set by the Reserve Admin. Largest pay_claim the caps allow now: {fmtBrs(cap.maxNextPayment)}.</>}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Row label={<RowLabel>Per period</RowLabel>} value={`${fmtBrs(cap.paid, 0)} / ${fmtBrs(cap.perPeriod, 0)}`} summary={`Paid ${fmtBrs(cap.paid)} of the ${fmtBrs(cap.perPeriod)} period cap; ${fmtBrs(cap.remaining)} left.`} labelWidth={130}>
+          <Track segs={[{ f: frac(cap.paid, axis), color: C.ink }, { f: frac(cap.remaining, axis), color: C.mid, outline: true }]} />
+        </Row>
+        <Row label={<RowLabel>Per call</RowLabel>} value={fmtBrs(cap.perCall, 0)} summary={`At most ${fmtBrs(cap.perCall)} per pay_claim.`} labelWidth={130}>
+          <Track segs={[{ f: frac(cap.perCall, axis), color: C.mid }]} />
+        </Row>
       </div>
     </ChartFrame>
   );

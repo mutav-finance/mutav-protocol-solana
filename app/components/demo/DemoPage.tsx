@@ -4,22 +4,21 @@
  * /demo — the operator cockpit. Six guided steps for the demo video, then a
  * free-form panel with every operator instruction. Every step shows the
  * instruction, the accounts it touched, the transaction link and how the
- * reserve numbers moved (TxStatus + Moves inside each Action).
+ * reserve numbers moved (TxStatus + Moves inside each Action). Free-form
+ * operator actions live on /operator.
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Page, ReadError, Section } from "@/components/Section";
 import { MetricCard } from "@/components/MetricCard";
-import { RefreshButton } from "@/components/RefreshButton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallet } from "@/components/WalletProvider";
 import { navPerShare } from "@mutav-finance/mutav-protocol-solana";
 import { usePoll } from "@/lib/client/use-poll";
 import { CLUSTER } from "@/lib/client/env";
 import { fmtBrs, fmtNav } from "@/lib/format";
 import { MODE_LABEL, type Ledger, type ReserveView } from "@/lib/view";
-import { BlockedPreview, ClaimSharesList, CloseGuaranteeForm, DepositForm, FeeForm, FileClaimForm, PayClaimList, PendingDeposits, RegisterForm, SettleList } from "./forms";
+import { BlockedPreview, ClaimSharesList, DepositForm, FeeForm, FileClaimForm, PayClaimList, PendingDeposits, RegisterForm, SettleList } from "./forms";
 import { LiveProvider, Note } from "./shared";
 import { RoleLegend, RoleTag } from "@/components/RoleTag";
 import { rolesOfWallet, type Role } from "@/lib/roles";
@@ -153,23 +152,10 @@ export function DemoPage() {
             </div>
           </Section>
 
-          <Section id="panel" title="Operator panel" kicker="Free-form · by role" info="Every operator instruction, outside the script. The program checks the signer; this page only warns." roles={<RoleTag role="operator" bordered />} action={<RefreshButton onConfirmed={poll.refresh} />}>
-            <Tabs defaultValue="register">
-              <TabsList className="flex-wrap h-auto">
-                <TabsTrigger value="register">register_guarantee</TabsTrigger>
-                <TabsTrigger value="fee">contribute_fees</TabsTrigger>
-                <TabsTrigger value="file">file_claim</TabsTrigger>
-                <TabsTrigger value="pay">pay_claim</TabsTrigger>
-                <TabsTrigger value="settle">settle_payout</TabsTrigger>
-                <TabsTrigger value="close">close_guarantee</TabsTrigger>
-              </TabsList>
-              <TabsContent value="register"><RegisterForm p="panel-" /></TabsContent>
-              <TabsContent value="fee"><FeeForm p="panel-" /></TabsContent>
-              <TabsContent value="file"><FileClaimForm p="panel-" /></TabsContent>
-              <TabsContent value="pay"><PayClaimList /></TabsContent>
-              <TabsContent value="settle"><SettleList /></TabsContent>
-              <TabsContent value="close"><CloseGuaranteeForm p="panel-" /></TabsContent>
-            </Tabs>
+          <Section id="panel" title="Operator actions" kicker="Elsewhere" roles={<RoleTag role="operator" bordered />}>
+            <Note>
+              Every operator instruction, outside this script, with the on-chain limit shown before you sign, is on the <Link href="/operator#console" className="ext-link">operator console</Link>.
+            </Note>
           </Section>
 
           <Section id="investor" title="Investor actions" kicker="Elsewhere" roles={<RoleTag role="investor" bordered />}>
