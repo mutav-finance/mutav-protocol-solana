@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   // handlers on the server. Keep it out of the server bundle.
   serverExternalPackages: ["@sqds/multisig", "@solana/web3.js"],
   poweredByHeader: false,
+  // The reserve simulator is a standalone page (public/simulator.html).
+  async rewrites() {
+    return [{ source: "/simulator", destination: "/simulator.html" }];
+  },
 };
 
 export default nextConfig;
