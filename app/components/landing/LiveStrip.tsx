@@ -1,8 +1,9 @@
 "use client";
 
-/** The live reserve strip on the landing page: six on-chain numbers, linking to /reserve. */
+/** The live reserve strip on the landing page: six on-chain numbers linking to /reserve, and coverage against the reserve as a chart. */
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
+import { SolvencyChart } from "@/components/charts/Charts";
 import { usePoll } from "@/lib/client/use-poll";
 import { fmtBrs, fmtNav } from "@/lib/format";
 import { MODE_LABEL, type ReserveView } from "@/lib/view";
@@ -42,6 +43,11 @@ export function LiveStrip() {
           ))}
         </dl>
       </Link>
+      {data && (
+        <div style={{ padding: "0 0 18px", maxWidth: 720 }}>
+          <SolvencyChart s={data.solvency} ratioBps={data.config.coverageRatioBps} compact />
+        </div>
+      )}
     </section>
   );
 }
