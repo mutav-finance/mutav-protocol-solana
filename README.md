@@ -63,7 +63,7 @@ NEXT_PUBLIC_CLUSTER=localnet bun run build && bun run e2e   # Playwright smoke a
 
 ## Deploy (not done)
 
-Target: Vercel, team `mutav`, project `mutav-pilot-app` at `pilot.mutav.finance` (the wildcard DNS already resolves). No GitHub repo or Vercel project exists yet. Needed: the protocol deployed and initialized on devnet, then `CONFIG_ADDRESS`, `SQUADS_MULTISIG` and `ALLOWLIST` set in the project.
+Target: Vercel, team `mutav`, project `mutav-pilot-app` at `reserve.mutav.finance` (the wildcard DNS already resolves). No GitHub repo or Vercel project exists yet. Needed: the protocol deployed and initialized on devnet, then `CONFIG_ADDRESS`, `SQUADS_MULTISIG` and `ALLOWLIST` set in the project.
 
 ## Brand
 

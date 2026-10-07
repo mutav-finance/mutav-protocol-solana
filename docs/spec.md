@@ -16,7 +16,7 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 - Next.js 16 (App Router), React 19, TypeScript, Bun, Tailwind 4, Radix / shadcn components, React Flow (protocol diagram), Vitest, Playwright.
 - Solana: `@mutav-finance/mutav-protocol-solana` (Codama client, read helpers, math mirror, allowlist builder), `@solana/kit`, wallet-standard connection (Phantom, Solflare, Backpack). Squads v4 SDK for admin proposals.
 - Brand: vendored from the `brand` repo into `branding/` via `bun brand:import` (never edited here).
-- Deploy: Vercel, team `mutav`, at `pilot.mutav.finance` (the wildcard DNS already resolves).
+- Deploy: Vercel, team `mutav`, at `reserve.mutav.finance` (the wildcard DNS already resolves).
 
 ## Rules
 
