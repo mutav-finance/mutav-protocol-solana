@@ -16,7 +16,9 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(strip).toContainText("LIVE FROM LOCALNET");
     // Seeded: R$30,000 in, R$1,000 fee (R$800 net), R$2,500 claim paid → R$28,300.
     await expect(strip).toContainText("R$ 28,300.00");
-    await expect(page.locator(".react-flow__node")).toHaveCount(8);
+    await expect(page.locator(".react-flow__node")).toHaveCount(9);
+    await expect(page.getByRole("heading", { name: "Who does what" })).toBeVisible();
+    for (const role of ["Reserve Admin", "Operator", "Investor"]) await expect(page.locator(".role-grid").getByRole("heading", { name: role })).toBeVisible();
 
     const bar = page.getByTestId("compact-bar");
     await expect(bar).toHaveAttribute("data-visible", "false");
@@ -46,6 +48,9 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByText("BRS is issued by Nora, and Nora can freeze it")).toBeVisible();
     await expect(page.getByRole("table", { name: "Accounts" })).toContainText("8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9");
     await expect(page.getByRole("button", { name: "Refresh on-chain" })).toBeVisible();
+    await expect(page.getByRole("figure", { name: "Coverage against the reserve" })).toBeVisible();
+    await expect(page.getByRole("figure", { name: "Claim speed, from on-chain timestamps" })).toBeVisible();
+    await expect(page.getByText("The pilot runs on MUTAV's own capital and is not open to public investment")).toBeVisible();
     await noBannedWords(page);
   });
 
@@ -73,6 +78,19 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByText("NO SQUADS MULTISIG CONFIGURED")).toBeVisible();
     await expect(page.locator("#config")).toContainText("100.00%");
     await expect(page.getByRole("button", { name: "Sign directly: fulfil_deposits" })).toBeVisible();
+    await noBannedWords(page);
+  });
+
+  test("/investor — read-only without a wallet, gated on the on-chain allowlist", async ({ page, request }) => {
+    await page.goto("/investor");
+    await expect(page.getByRole("heading", { name: "Investor", level: 1 })).toBeVisible();
+    await expect(page.getByText("NO WALLET CONNECTED · READ-ONLY")).toBeVisible();
+    await expect(page.getByRole("button", { name: "request_deposit" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "request_redeem" })).toBeDisabled();
+    const seeded = await (await request.get("/api/reserve")).json();
+    const capital = (await (await request.get(`/api/investor?owner=${seeded.config.mutavCapitalWallet}`)).json()).allowlist.state;
+    const operator = (await (await request.get(`/api/investor?owner=${seeded.config.operator}`)).json()).allowlist.state;
+    expect([capital, operator]).toEqual(["allowlisted", "not-listed"]);
     await noBannedWords(page);
   });
 

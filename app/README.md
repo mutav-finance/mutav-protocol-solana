@@ -6,12 +6,15 @@ MUTAV is an institutional rental guarantor in Brazil. Every guarantee (a *fianç
 
 | Route | What it is |
 |---|---|
-| `/` | Landing: the story, a live reserve strip, how it works, the protocol diagram |
-| `/reserve` | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Explorer, and the permissionless `refresh` |
+| `/` | Landing: the story, a live reserve strip with a coverage chart, how it works, who does what, the protocol diagram |
+| `/reserve` | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Explorer, and the permissionless `refresh`; snapshot charts of each |
+| `/investor` | The capital provider's view: allowlist status (on-chain root + `ALLOWLIST`), position, own queue entries, and `request_deposit` / `cancel_deposit` / `claim_shares` / `request_redeem` / `cancel_redeem` / `claim_assets`. Read-only unless the wallet's Merkle proof verifies |
 | `/demo` | Guided operator demo (six steps, with the solvency-gate preview) plus a free-form operator panel |
 | `/admin` | `VaultConfig`, Squads v4 proposal builders (create / approve / execute, with the time lock), direct signing on localnet only |
 
 ## How it works
+
+- **Roles.** Every page tags who does what: **Reserve Admin** (Squads multisig, plus the pauser key), **Operator** (MUTAV's operator key), **Investor** (the allowlisted capital provider), and **Anyone** (cranks). The map lives in `lib/roles.ts`, and a unit test checks it against each instruction's signer constraint in `programs/mutav`.
 
 - **Reads** run in route handlers (`app/api/*`) through the protocol client's read helpers and decoders; pages poll them. Every number on screen comes from on-chain accounts. The gate preview uses the client's math mirror and is labelled as a preview.
 - **Writes**: a route composes an **unsigned** transaction (fee payer = the connected wallet), the wallet signs it (wallet-standard `solana:signTransaction`: Phantom, Solflare, Backpack), and `/api/tx/send` relays the signed bytes to the configured cluster. The relay refuses transactions for programs outside the pilot's set. No key exists anywhere in the app.
