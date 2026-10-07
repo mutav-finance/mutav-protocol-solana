@@ -46,6 +46,9 @@ export function ReservePage() {
             <Disclosures r={d.reserve} />
           </Section>
           <Section id="accounts" title="Every account" kicker="Verify it yourself">
+            <p className="font-body" style={{ fontSize: 13, color: "var(--color-text-2)", margin: "0 0 16px", lineHeight: 1.6, maxWidth: 860 }}>
+              Every account the reserve uses: the program, its state and token accounts, the mints, and the wallets that hold each role. Open any address on Solana Explorer to check the numbers above against the chain yourself.
+            </p>
             <Accounts r={d.reserve} />
           </Section>
         </>
