@@ -1,8 +1,8 @@
 @AGENTS.md
 
-# mutav-pilot-app — app rules
+# app/ — pilot web app rules
 
-Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto World's Fair, 2026). Routes: `/` landing, `/reserve` public transparency, `/demo` guided operator demo, `/admin` Squads admin console. Spec: [`docs/spec.md`](docs/spec.md). Production surfaces stay in `mutav-app`, which ports these screens later (mutav-app #369).
+Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto World's Fair, 2026). Routes: `/` landing, `/reserve` public transparency, `/demo` guided operator demo, `/admin` Squads admin console. Spec: [`docs/spec.md`](docs/spec.md). It lives in `app/` of `mutav-protocol-solana`; the repo-root [`CLAUDE.md`](../CLAUDE.md) rules apply here too. Production surfaces stay in `mutav-app`, which ports these screens later (mutav-app #369).
 
 ## Rules (from the spec — non-negotiable)
 
@@ -16,7 +16,7 @@ Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto
 
 ## Dependencies
 
-- `@mutav-finance/mutav-protocol-solana` is a `file:` dependency on the protocol repo's client (see README). Never edit it from here; never import from the protocol repo's `scripts/` in app code (only `scripts/` here may, for localnet seeding).
+- `@mutav-finance/mutav-protocol-solana` is a `file:../clients/js` dependency on this repo's client; the postinstall builds and copies it (see README). Never edit it from app work; never import from the repo-root `scripts/` in app code (only `app/scripts/` may, for localnet seeding).
 - Never edit `branding/` or `.design/branding/` — brand is vendored from the `brand` repo.
 
 ## Styling (ported from mutav-pulse — read before writing UI)
@@ -34,9 +34,9 @@ All commands exit on their own. **No watch mode. One heavy process at a time** (
 - `bun run test` — Vitest unit tests (`vitest run`; pass `--maxWorkers=2` when other work is running).
 - `bun run build` — `next build` (must pass).
 - `bun run lint`, `bun run typecheck`.
-- `bun run e2e` — Playwright smoke: starts a local validator, seeds it, serves the built app, checks every route, then stops everything and asserts with `pgrep` that nothing is left running. Run `bun run build` with `NEXT_PUBLIC_CLUSTER=localnet` first.
+- `bun run e2e` — Playwright smoke: starts a local validator, seeds it, serves the built app, checks every route, then stops everything and asserts with `pgrep` that nothing is left running. Run `anchor build` at the repo root and `bun run build` with `NEXT_PUBLIC_CLUSTER=localnet` first.
 - `bun run localnet:up` / `localnet:down` — a seeded local validator for manual demo runs.
 
 ## Git
 
-Branch + PR to `main`; conventional commits. Never push without being asked.
+Branch + PR to `main`; conventional commits with the `app` scope (`feat(app): …`). Never push without being asked.

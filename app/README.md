@@ -1,6 +1,6 @@
-# mutav-pilot-app
+# MUTAV pilot app (`app/`)
 
-A small web app that shows the MUTAV reserve program working on Solana. Built for the Colosseum Crypto World's Fair (Sep 14 – Oct 12, 2026). Spec: [`docs/spec.md`](docs/spec.md). App rules: [`CLAUDE.md`](CLAUDE.md).
+A small web app that shows the MUTAV reserve program working on Solana. Built for the Colosseum Crypto World's Fair (Sep 14 – Oct 12, 2026). Spec: [`docs/spec.md`](docs/spec.md). App rules: [`CLAUDE.md`](CLAUDE.md) (plus the repo-root [`CLAUDE.md`](../CLAUDE.md)). It lives in `app/` of `mutav-protocol-solana`, next to the program and the client it reads through.
 
 MUTAV is an institutional rental guarantor in Brazil. Every guarantee (a *fiança*) is backed by a reserve anyone can verify on Solana. The pilot reserve holds MUTAV's own capital; it is not open to outside investors.
 
@@ -21,10 +21,13 @@ MUTAV is an institutional rental guarantor in Brazil. Every guarantee (a *fianç
 ## Setup
 
 ```bash
-bun install
+cd app
+bun install                  # postinstall builds ../clients/js if its dist/ is missing
 cp .env.example .env.local   # fill CONFIG_ADDRESS (and SQUADS_MULTISIG, ALLOWLIST) for devnet
-bun run dev                  # or: bun run build && bun run start
+PORT=3001 bun run dev        # or: bun run build && PORT=3001 bun run start
 ```
+
+Port 3001 is a suggestion: 3000 is often taken by another local project.
 
 | Variable | Where | Meaning |
 |---|---|---|
@@ -39,10 +42,13 @@ Runtime variables are read per request, so a re-seeded localnet needs no rebuild
 
 ## Localnet
 
-`scripts/` drives a local `solana-test-validator` loaded with the program from the protocol repo (`target/deploy/mutav.so`), reusing the protocol's dry-run harness and composers (`scripts/devnet/lib/*`). It refuses any non-local URL.
+`scripts/` drives a local `solana-test-validator` loaded with the program built at the repo root (`../target/deploy/mutav.so`, from `anchor build`), reusing the protocol's dry-run harness and composers (`../scripts/devnet/lib/*`). Set `MUTAV_PROTOCOL_DIR` to use another checkout. It refuses any non-local URL.
 
 ```bash
+(cd .. && anchor build)  # once, so target/deploy/mutav.so exists
 bun run localnet:up      # start the validator, seed the demo state, write .localnet/env
+cp .localnet/env .env.local
+PORT=3001 bun run dev
 bun run localnet:down    # stop it and assert nothing is left running
 ```
 
@@ -55,15 +61,25 @@ bun run test                                   # Vitest (formatting, view models
 NEXT_PUBLIC_CLUSTER=localnet bun run build && bun run e2e   # Playwright smoke against a seeded localnet
 ```
 
-## Protocol client dependency (founder decision needed)
+## Protocol client dependency
 
-`@mutav-finance/mutav-protocol-solana` is a `file:` dependency on the protocol repo's `clients/js`. The read helpers, math mirror and allowlist builder exist only on the protocol's `origin/main`, while the local checkout at `../mutav-protocol-solana` is on another branch, so the dependency currently points at a detached worktree of `origin/main`: `../mutav-protocol-solana/.claude/worktrees/pilot-main/clients/js` (build it with `bun run build` in that directory). Once the protocol checkout is on an up-to-date `main`, switch the path to `file:../mutav-protocol-solana/clients/js`.
-
-**A Vercel deploy cannot resolve a `file:` path.** Before deploying, either publish the client to npm (`@mutav-finance/mutav-protocol-solana`, its package is publish-ready) or vendor its `dist/` into this repo.
+`@mutav-finance/mutav-protocol-solana` is a `file:../clients/js` dependency on this repo's own client. Bun installs `file:` dependencies as symlinks, which Turbopack cannot read, and the client's own `node_modules` would bundle a second `@solana/kit`. So the postinstall (`scripts/materialize-client.mjs`) replaces the link with a real copy of `package.json` + `dist/`. When `../clients/js/dist` is missing (fresh clone, Vercel), it first runs `bun install --frozen-lockfile` at the repo root and `bun run build` in `clients/js`. After changing the client, rebuild it (`bun run build` in `clients/js`), then `rm -rf node_modules/@mutav-finance && bun install` here to refresh the copy.
 
 ## Deploy (not done)
 
-Target: Vercel, team `mutav`, project `mutav-pilot-app` at `reserve.mutav.finance` (the wildcard DNS already resolves). No GitHub repo or Vercel project exists yet. Needed: the protocol deployed and initialized on devnet, then `CONFIG_ADDRESS`, `SQUADS_MULTISIG` and `ALLOWLIST` set in the project.
+Target: Vercel, team `mutav`, project `mutav-pilot-app` at `reserve.mutav.finance` (the wildcard DNS already resolves). The Vercel project does not exist yet. Settings:
+
+| Setting | Value |
+|---|---|
+| Git repository | `mutav-finance/mutav-protocol-solana` |
+| Root Directory | `app` |
+| Include files outside the root directory | enabled (the build reads `../clients/js`) |
+| Framework preset | Next.js |
+| Install Command | `bun install` (the postinstall builds `../clients/js`: root `bun install --frozen-lockfile`, then the client build) |
+| Build Command | `bun run build` |
+| Environment | `NEXT_PUBLIC_CLUSTER=devnet`, plus `RPC_URL`, `PROGRAM_ID`, `CONFIG_ADDRESS`, `SQUADS_MULTISIG`, `ALLOWLIST` |
+
+No separate prebuild step is needed; if the postinstall is ever skipped, use `cd ../clients/js && bun install && bun run build && cd ../../app && bun install` as the Install Command. Needed before going live: the protocol deployed and initialized on devnet, then `CONFIG_ADDRESS`, `SQUADS_MULTISIG` and `ALLOWLIST` set in the project.
 
 ## Brand
 
