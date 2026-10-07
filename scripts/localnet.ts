@@ -20,7 +20,8 @@ import { MUTAV_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
 import { APP_ROOT, defaultKeysDir, localKeys, protocolLib, waitForRpc } from "./lib/local";
 import { seed, setScenario } from "./seed";
 
-const STATE_DIR = join(APP_ROOT, ".localnet");
+// LOCALNET_STATE_DIR lets the Playwright run keep its own state next to a manual localnet.
+const STATE_DIR = process.env.LOCALNET_STATE_DIR ? join(APP_ROOT, process.env.LOCALNET_STATE_DIR) : join(APP_ROOT, ".localnet");
 const STATE = join(STATE_DIR, "state.json");
 
 type State = { pid: number; port: number; url: string; ledger: string; keysDir: string; config: string; operator: string; allowlist: string[] };
@@ -103,7 +104,8 @@ async function up() {
     console.log(`\nSeeded. VaultConfig ${r.config}`);
     console.log("Throwaway localnet keys (outside the repo; import into a wallet to act as each role):");
     for (const [role, v] of Object.entries(r.keys)) console.log(`  ${role.padEnd(14)} ${v.address}  ${v.path}`);
-    console.log(`\nApp env: .localnet/env  →  cp .localnet/env .env.local && bun run dev`);
+    const rel = STATE_DIR.slice(APP_ROOT.length + 1);
+    console.log(`\nApp env: ${rel}/env  →  cp ${rel}/env .env.local && bun run dev`);
   } catch (e) {
     console.error(`seed failed; stopping the validator. Log: ${join(ledger, "validator.log")}`);
     await down();
