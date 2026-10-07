@@ -548,8 +548,8 @@ proptest! {
     /// principle 4, §5.4 rule 7), and neither reads nor writes
     /// `buffer_earmark` (invariant 14): fuzz `stable_assets` far below
     /// `coverage_required`, the stored mode, a non-zero earmark with
-    /// `INSTANT_EXIT` set, a stale TESOURO position, other provisions and the
-    /// pause flag.
+    /// `INSTANT_EXIT` set, a stale TESOURO position, other provisions, the
+    /// pause flag and any coverage ratio in `[0.10, 2.0]` (ADR 0016).
     #[test]
     fn pay_claim_is_never_refused_for_solvency(
         cover in 1u64..=10_000,
@@ -563,6 +563,7 @@ proptest! {
         flag: bool,
         paused: bool,
         drain in 0u64..=100,
+        coverage_ratio_bps in MIN_COVERAGE_RATIO_BPS..=20_000,
     ) {
         let cover = cover * BRL;
         let (mut f, g) = book(cover, cover, 0);
@@ -576,6 +577,8 @@ proptest! {
         }
         let mut cfg = f.config();
         cfg.feature_flags = if flag { INSTANT_EXIT } else { 0 };
+        // Any c the program accepts, below and above 1.0 (ADR 0016).
+        cfg.coverage_ratio_bps = coverage_ratio_bps;
         f.write_config(&cfg);
         let mut s = f.state();
         s.mode = if under_covered { MODE_UNDER_COVERED } else { MODE_NORMAL };

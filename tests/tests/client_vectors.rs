@@ -231,6 +231,17 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
             provisions: 58_000,
             ..base
         },
+        // c at the 0.10 floor (ADR 0016): the ratio term binds, then the
+        // provisions term binds.
+        SolvencyInputs {
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            ..base
+        },
+        SolvencyInputs {
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            provisions: 30_000,
+            ..base
+        },
         // Overflow paths.
         SolvencyInputs {
             brs_balance: MAX,
@@ -563,6 +574,7 @@ fn build() -> Value {
             "navScale": s(NAV_SCALE),
             "virtualOffset": s(VIRTUAL_OFFSET),
             "bpsDenominator": BPS_DENOMINATOR,
+            "minCoverageRatioBps": MIN_COVERAGE_RATIO_BPS,
             "instantExit": s(INSTANT_EXIT),
             "modeNormal": MODE_NORMAL,
             "modeUnderCovered": MODE_UNDER_COVERED,
