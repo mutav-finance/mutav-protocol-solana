@@ -2,6 +2,31 @@
 
 MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarantee (*fiança onerosa*, Lei 8.245/91 art. 37 II) so they need neither a personal guarantor nor a deposit. Real-estate agencies distribute it through the MUTAV platform. Every guarantee is backed by an **on-chain, verifiable BRL guarantee reserve**, operated by MUTAV. This repository holds the Solana program that custodies that reserve: it records the cover of every active guarantee, admits guarantee fees, pays approved claims to MUTAV's payments account, and refuses any capital movement that would leave the guarantees under-covered. The reserve is **operational infrastructure that keeps the guarantees healthy, not a yield product**. Anyone can recompute its coverage from public state.
 
+## Try it
+
+**Live pilot app: [reserve.mutav.finance](https://reserve.mutav.finance)**. Built for the Colosseum Crypto World's Fair (Sep 14 – Oct 12, 2026).
+
+| Page | What it shows |
+|---|---|
+| [Landing](https://reserve.mutav.finance) | The story, who does what (■ Reserve Admin, ◆ Operator, ▲ Investor), the protocol diagram |
+| [`/reserve`](https://reserve.mutav.finance/reserve) | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Solana Explorer. No wallet needed |
+| [`/operator`](https://reserve.mutav.finance/operator) | Operator console. During the pilot MUTAV's team signs by hand with the operator wallet; later mutav-app's backend sends the same instructions with a KMS-held key |
+| [`/investor`](https://reserve.mutav.finance/investor) | Capital-provider view, gated by the on-chain allowlist. The pilot runs on MUTAV's own capital and is not open to public investment |
+| [`/admin`](https://reserve.mutav.finance/admin) | Reserve Admin: Squads v4 proposals (create, approve, execute after the time lock) |
+| [`/demo`](https://reserve.mutav.finance/demo) | Guided six-step walkthrough, with the solvency-gate preview |
+| [`/simulator`](https://reserve.mutav.finance/simulator) | Reserve simulator: size the reserve, coverage, yield against Selic |
+
+> **Status:** the app is live; the program (`8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9`) is being deployed to devnet under a Squads multisig. Until the reserve is initialized, the live pages show a "being deployed" notice instead of numbers. To see every page with data today, run the app against a seeded local validator ([Pilot app](#pilot-app)).
+
+**Read next:** the [litepaper](docs/litepaper.md), the [specification](docs/spec.md), the [architecture decisions](docs/decisions/) and the [development provenance](docs/provenance.md).
+
+**Where to look in the code:**
+
+- [`programs/mutav/src/solvency.rs`](programs/mutav/src/solvency.rs): the solvency gate, which refuses any capital movement that would leave the guarantees under-covered. It never blocks a claim payment.
+- [`programs/mutav/src/instructions/`](programs/mutav/src/instructions/): instructions by area: `admin/` (config, roles, pause), `operator/` (guarantees, guarantee fees, claims), `capital/` (the deposit and redemption queue), `public/` (permissionless `refresh`).
+- [`tests/`](tests/): LiteSVM integration tests. [`clients/js/`](clients/js/): the Codama client the app reads through.
+- [`app/`](app/): the pilot web app. It holds no keys; wallets sign.
+
 ## Pilot
 
 The goal of the pilot is to prove that a digital-asset reserve can be run as a viable operation: MUTAV operates it, and anyone can verify it. It runs with real money and real guarantees under a **low ceiling** of hard on-chain caps (proposed: R$100k maximum reserve, R$30k maximum cover per guarantee, R$60k per agency, R$10k / R$20k claim payments per call / per 30 days). Admins raise the caps only as the pilot proves itself. See [`docs/spec.md`](docs/spec.md#8-caps) for the full list.
@@ -24,7 +49,7 @@ mutav-protocol-solana/
 ├── tests/                        # LiteSVM integration tests
 ├── tests-fork/                   # Surfpool mainnet/devnet-fork tests
 ├── clients/js/                   # Codama-generated client (@mutav-finance/mutav-protocol-solana)
-├── app/                          # pilot web app (Next.js): landing, /reserve, /demo, /admin
+├── app/                          # pilot web app (Next.js): landing, /reserve, /operator, /investor, /admin, /demo, /simulator
 ├── scripts/                      # devnet bootstrap: initialize, roles, caps, allowlist
 └── docs/
     ├── spec.md                   # protocol specification (source of business rules)
@@ -75,7 +100,7 @@ No command in this repo runs in watch mode.
 
 ## Pilot app
 
-[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana: `/` landing (story, live reserve strip, protocol diagram), `/reserve` public transparency (health, coverage, claims timeline, flows, every account on Explorer), `/demo` a guided operator demo with the solvency-gate preview, and `/admin` Squads v4 proposal builders. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
+[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana, live at [reserve.mutav.finance](https://reserve.mutav.finance): `/` landing (story, live reserve strip, who does what, protocol diagram), `/reserve` public transparency (health, coverage, claims timeline, flows, every account on Explorer, with snapshot charts), `/operator` the operator console, `/investor` the allowlist-gated capital-provider view, `/admin` Squads v4 proposal builders, `/demo` a guided walkthrough with the solvency-gate preview, and `/simulator` the reserve simulator. Every action is tagged with the role that signs it: Reserve Admin, Operator or Investor. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
 
 Run it locally against a seeded validator (port 3001, since 3000 is often taken):
 
@@ -151,6 +176,7 @@ To fill at deploy.
 
 ## Documentation
 
+- [Litepaper](docs/litepaper.md) ([HTML](docs/litepaper.html)): the protocol and the pilot in one read.
 - [Protocol specification](docs/spec.md): accounts, instructions, invariants, caps, events.
 - [Implementation plan](docs/plan.md): task-by-task plan for the hackathon build.
 - [Architecture decisions](docs/decisions/): ADRs for the locked design choices.

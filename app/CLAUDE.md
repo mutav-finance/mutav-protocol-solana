@@ -2,7 +2,7 @@
 
 # app/ — pilot web app rules
 
-Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto World's Fair, 2026). Routes: `/` landing, `/reserve` public transparency, `/demo` guided operator demo, `/admin` Squads admin console. Spec: [`docs/spec.md`](docs/spec.md). It lives in `app/` of `mutav-protocol-solana`; the repo-root [`CLAUDE.md`](../CLAUDE.md) rules apply here too. Production surfaces stay in `mutav-app`, which ports these screens later (mutav-app #369).
+Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto World's Fair, 2026). Live at https://reserve.mutav.finance (Vercel project `mutav-pilot-app`, team `mutav`, root `app`, deploys from `main`). Routes: `/` landing, `/reserve` public transparency, `/operator` operator console, `/investor` allowlist-gated investor view, `/admin` Squads admin console, `/demo` guided walkthrough, `/simulator` reserve simulator (static `public/simulator.html`). Spec: [`docs/spec.md`](docs/spec.md). It lives in `app/` of `mutav-protocol-solana`; the repo-root [`CLAUDE.md`](../CLAUDE.md) rules apply here too. Production surfaces stay in `mutav-app`, which ports these screens later (mutav-app #369).
 
 ## Rules (from the spec — non-negotiable)
 
@@ -12,7 +12,7 @@ Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto
 - **Cluster by env:** `NEXT_PUBLIC_CLUSTER` = `localnet` or `devnet`. Mainnet is refused (`lib/cluster.ts`): in the env parser, the RPC URL check, the tx relay and the scripts.
 - **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts via the client's read helpers (`@mutav-finance/mutav-protocol-solana`). Previews (the solvency gate) use the client's math mirror and are **labelled as previews**. Never hardcode or cache a number the chain owns.
 - **Language:** English. MUTAV's guarantee is a *fiança*: say "guarantee fee", "claim payment", "reserve". Never "premium", "insurance", "policy", "yield vault" (a unit test greps the UI for these).
-- **Not investable.** The pilot reserve is MUTAV's own capital. Investor-facing copy says so.
+- **Not open to public investment.** The pilot runs on MUTAV's own capital; investor actions are gated by the on-chain allowlist (KYC off-chain). Investor-facing copy leads with that.
 
 ## Dependencies
 

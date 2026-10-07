@@ -2,7 +2,9 @@
 
 A small web app that shows the MUTAV reserve program working on Solana. Built for the Colosseum Crypto World's Fair (Sep 14 – Oct 12, 2026). Spec: [`docs/spec.md`](docs/spec.md). App rules: [`CLAUDE.md`](CLAUDE.md) (plus the repo-root [`CLAUDE.md`](../CLAUDE.md)). It lives in `app/` of `mutav-protocol-solana`, next to the program and the client it reads through.
 
-MUTAV is an institutional rental guarantor in Brazil. Every guarantee (a *fiança*) is backed by a reserve anyone can verify on Solana. The pilot reserve holds MUTAV's own capital; it is not open to outside investors.
+MUTAV is an institutional rental guarantor in Brazil. Every guarantee (a *fiança*) is backed by a reserve anyone can verify on Solana. The pilot runs on MUTAV's own capital and is not open to public investment; capital actions are gated by an on-chain allowlist (KYC off-chain).
+
+Live: [reserve.mutav.finance](https://reserve.mutav.finance).
 
 | Route | What it is |
 |---|---|
@@ -12,6 +14,7 @@ MUTAV is an institutional rental guarantor in Brazil. Every guarantee (a *fianç
 | `/operator` | Operator console: today MUTAV's team signs by hand with the operator wallet (later mutav-app's backend, KMS key). Live limits (claim caps window, payouts vs SLA, free capital), every operator instruction with its bound shown before signing, duties (today → later), recent operator transactions, safety. Actions enabled only for `VaultConfig.operator` |
 | `/demo` | Guided operator demo (six steps, with the solvency-gate preview); free-form operator actions are on `/operator` |
 | `/admin` | `VaultConfig`, Squads v4 proposal builders (create / approve / execute, with the time lock), direct signing on localnet only |
+| `/simulator` | The reserve simulator, a standalone page (`public/simulator.html`): reserve sizing, coverage, yield against Selic |
 
 ## How it works
 
