@@ -10,7 +10,7 @@ The reserve holds BRS (Nora Finance, 1:1 BRL stablecoin) and, through an adapter
 
 ## Scope of this repo
 
-This repo ships the on-chain program and a TypeScript client that composes transactions. It holds no keys and no UI. The user-facing surfaces (admin console, investor area, agency transparency page) and the operator automation live in [`mutav-finance/mutav-app`](https://github.com/mutav-finance/mutav-app), which consumes the client published from here as `@mutav-finance/mutav-protocol-solana`.
+This repo ships the on-chain program, a TypeScript client that composes transactions, and the **pilot web app** (`app/`): a demo and transparency app built for the Colosseum hackathon. It holds no keys: the client composes, wallets sign. After the hackathon, the production user-facing surfaces (admin console, investor area, agency transparency page) and the operator automation live in [`mutav-finance/mutav-app`](https://github.com/mutav-finance/mutav-app), which consumes the client published from here as `@mutav-finance/mutav-protocol-solana`.
 
 ## Layout
 
@@ -24,6 +24,7 @@ mutav-protocol-solana/
 ├── tests/                        # LiteSVM integration tests
 ├── tests-fork/                   # Surfpool mainnet/devnet-fork tests
 ├── clients/js/                   # Codama-generated client (@mutav-finance/mutav-protocol-solana)
+├── app/                          # pilot web app (Next.js): landing, /reserve, /demo, /admin
 ├── scripts/                      # devnet bootstrap: initialize, roles, caps, allowlist
 └── docs/
     ├── spec.md                   # protocol specification (source of business rules)
@@ -71,6 +72,24 @@ Fork tests (Surfpool, against Nora's devnet BRS mint) run separately and on dema
 The client in `clients/js` is generated from the program IDL with Codama (see `clients/js/package.json` for the generate and build scripts). Regenerate it after any change to the program interface, and commit the result. Hand-written PDA, read and preview helpers sit next to the generated code; see [`clients/js/README.md`](clients/js/README.md). `bun run test:client` checks them against vectors exported from the program.
 
 No command in this repo runs in watch mode.
+
+## Pilot app
+
+[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana: `/` landing (story, live reserve strip, protocol diagram), `/reserve` public transparency (health, coverage, claims timeline, flows, every account on Explorer), `/demo` a guided operator demo with the solvency-gate preview, and `/admin` Squads v4 proposal builders. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
+
+Run it locally against a seeded validator (port 3001, since 3000 is often taken):
+
+```sh
+anchor build                      # the validator loads target/deploy/mutav.so
+cd app
+bun install                       # postinstall builds clients/js if dist/ is missing
+bun run localnet:up               # start + seed a local validator, write .localnet/env
+cp .localnet/env .env.local
+NEXT_PUBLIC_CLUSTER=localnet bun run build && PORT=3001 bun run start
+bun run localnet:down             # stop the validator; asserts nothing is left running
+```
+
+Checks: `bun run typecheck && bun run test && NEXT_PUBLIC_CLUSTER=localnet bun run build`; the Playwright smoke is `bun run e2e` (starts and stops its own validator).
 
 ## Deploying
 
@@ -140,7 +159,7 @@ To fill at deploy.
 
 ## Security
 
-There are **no keys in this repository**: no keypairs, no secret keys, no private-key environment variables. The client composes transactions and never signs. The operator key is held in KMS by mutav-app, and admin authority is a Squads multisig. Program and deploy keypairs live outside the repo, and `*.json` keypair files are gitignored.
+There are **no keys in this repository**: no keypairs, no secret keys, no private-key environment variables. The client composes transactions and never signs; the pilot app's connected wallet signs, and its server only relays signed transactions. The operator key is held in KMS by mutav-app, and admin authority is a Squads multisig. Program and deploy keypairs live outside the repo, and `*.json` keypair files are gitignored.
 
 The program is **unaudited and pre-pilot**. Do not deposit funds you are not prepared to lose. To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
