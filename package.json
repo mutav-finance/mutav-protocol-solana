@@ -13,7 +13,8 @@
     "e2e": "playwright test",
     "localnet:up": "bun scripts/localnet.ts up",
     "localnet:down": "bun scripts/localnet.ts down",
-    "seed": "bun scripts/seed.ts"
+    "seed": "bun scripts/seed.ts",
+    "postinstall": "node scripts/materialize-client.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
