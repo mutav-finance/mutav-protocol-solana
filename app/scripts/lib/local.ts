@@ -1,12 +1,12 @@
 /**
  * Localnet-only harness for scripts/localnet.ts and scripts/seed.ts.
  *
- * - Reuses the protocol repo's dry-run harness and deploy composers
- *   (scripts/devnet/lib/{local,compose,config}.ts) for the validator CLIs,
+ * - Reuses the protocol's dry-run harness and deploy composers at the repo
+ *   root (scripts/devnet/lib/{local,compose,config}.ts) for the validator CLIs,
  *   airdrops, `initialize` and the allowlist root.
  * - Every entry point refuses a non-local RPC URL.
  * - Keys are throwaway localnet keys created by `solana-keygen` in a temp
- *   directory OUTSIDE this repository; only their paths are printed. Nothing
+ *   directory OUTSIDE the repository; only their paths are printed. Nothing
  *   here runs against devnet or mainnet.
  */
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -31,24 +31,22 @@ import {
 import { isLocalUrl } from "../../lib/cluster";
 
 export const APP_ROOT = resolve(import.meta.dir, "..", "..");
+/** The protocol repo root: `app/` lives inside it. */
+export const REPO_ROOT = resolve(APP_ROOT, "..");
 
-/** The protocol repo checkout that has the program build, client and dry-run scripts. */
+/** The protocol checkout with the program build and dry-run scripts: this repo, unless MUTAV_PROTOCOL_DIR overrides it. */
 export function protocolDir(): string {
-  const candidates = [
-    process.env.MUTAV_PROTOCOL_DIR,
-    resolve(APP_ROOT, "..", "mutav-protocol-solana"),
-    resolve(APP_ROOT, "..", "mutav-protocol-solana", ".claude", "worktrees", "pilot-main"),
-  ].filter(Boolean) as string[];
+  const candidates = [process.env.MUTAV_PROTOCOL_DIR, REPO_ROOT].filter(Boolean) as string[];
   for (const c of candidates) {
     if (existsSync(join(c, "scripts", "devnet", "lib", "local.ts")) && existsSync(join(c, "target", "deploy", "mutav.so"))) return c;
   }
   throw new Error(
     `no protocol checkout with scripts/devnet/lib/local.ts and target/deploy/mutav.so; tried:\n  ${candidates.join("\n  ")}\n` +
-      "Set MUTAV_PROTOCOL_DIR to a checkout of mutav-protocol-solana main and run `anchor build` there.",
+      "Run `anchor build` at the repo root (or set MUTAV_PROTOCOL_DIR to another checkout).",
   );
 }
 
-/** The protocol's dry-run harness and deploy composers (typed loosely: they live in another repo). */
+/** The protocol's dry-run harness and deploy composers (typed loosely: they live outside app/). */
 export async function protocolLib() {
   const p = protocolDir();
   const local = await import(join(p, "scripts/devnet/lib/local.ts"));
@@ -76,7 +74,7 @@ export function assertLocal(url: string): string {
 
 export function assertOutsideRepo(path: string, what: string): string {
   const abs = resolve(path);
-  if (abs === APP_ROOT || abs.startsWith(APP_ROOT + sep)) throw new Error(`${what} (${abs}) is inside the repository; keep keys outside it`);
+  if (abs === REPO_ROOT || abs.startsWith(REPO_ROOT + sep)) throw new Error(`${what} (${abs}) is inside the repository; keep keys outside it`);
   return abs;
 }
 
