@@ -4,31 +4,37 @@
  * /demo — the operator cockpit. Six guided steps for the demo video, then a
  * free-form panel with every operator instruction. Every step shows the
  * instruction, the accounts it touched, the transaction link and how the
- * reserve numbers moved (TxStatus + Moves inside each Action).
+ * reserve numbers moved (TxStatus + Moves inside each Action). Free-form
+ * operator actions live on /operator.
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Page, ReadError, Section } from "@/components/Section";
 import { MetricCard } from "@/components/MetricCard";
-import { RefreshButton } from "@/components/RefreshButton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallet } from "@/components/WalletProvider";
 import { navPerShare } from "@mutav-finance/mutav-protocol-solana";
 import { usePoll } from "@/lib/client/use-poll";
 import { CLUSTER } from "@/lib/client/env";
 import { fmtBrs, fmtNav } from "@/lib/format";
 import { MODE_LABEL, type Ledger, type ReserveView } from "@/lib/view";
-import { BlockedPreview, ClaimSharesList, CloseGuaranteeForm, DepositForm, FeeForm, FileClaimForm, PayClaimList, PendingDeposits, RegisterForm, SettleList } from "./forms";
-import { LiveProvider, Note, rolesOf } from "./shared";
+import { BlockedPreview, ClaimSharesList, DepositForm, FeeForm, FileClaimForm, PayClaimList, PendingDeposits, RegisterForm, SettleList } from "./forms";
+import { LiveProvider, Note } from "./shared";
+import { RoleLegend, RoleTag } from "@/components/RoleTag";
+import { rolesOfWallet, type Role } from "@/lib/roles";
 
-function Step({ n, title, instruction, children, why }: { n: number; title: string; instruction: string; why: ReactNode; children: ReactNode }) {
+function Step({ n, title, instruction, children, why, roles }: { n: number; title: string; instruction: string; why: ReactNode; children: ReactNode; roles: Role[] }) {
   return (
     <article id={`step-${n}`} aria-labelledby={`step-${n}-h`} style={{ border: "1px solid var(--color-border)", background: "var(--color-canvas)", padding: "20px 22px", display: "flex", flexDirection: "column", gap: 10 }}>
       <header style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>
         <span className="font-mono" style={{ fontSize: 12, color: "var(--color-accent)" }}>{String(n).padStart(2, "0")}</span>
         <h3 id={`step-${n}-h`} style={{ fontSize: 18, margin: 0 }}>{title}</h3>
         <code className="font-mono" style={{ fontSize: 12, color: "var(--color-copper)" }}>{instruction}</code>
+        <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
+          {roles.map((r) => (
+            <RoleTag key={r} role={r} bordered />
+          ))}
+        </span>
       </header>
       <p className="font-body" style={{ fontSize: 13, color: "var(--color-text-2)", margin: 0, lineHeight: 1.6, maxWidth: 860 }}>{why}</p>
       {children}
@@ -36,10 +42,12 @@ function Step({ n, title, instruction, children, why }: { n: number; title: stri
   );
 }
 
-function Sub({ title, children }: { title: string; children: ReactNode }) {
+function Sub({ title, role, children }: { title: string; role: Role; children: ReactNode }) {
   return (
     <div style={{ borderTop: "1px dashed var(--color-border)", paddingTop: 12 }}>
-      <p className="font-body" style={{ fontSize: 12, fontWeight: 600, margin: "0 0 6px", color: "var(--color-text)" }}>{title}</p>
+      <p className="font-body" style={{ fontSize: 12, fontWeight: 600, margin: "0 0 6px", color: "var(--color-text)", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        {title} <RoleTag role={role} />
+      </p>
       {children}
     </div>
   );
@@ -61,10 +69,13 @@ function Ticker({ r }: { r: ReserveView }) {
 
 function WhoAmI({ r }: { r: ReserveView }) {
   const { address } = useWallet();
-  const roles = rolesOf(address, r);
+  const roles = rolesOfWallet(address, r.config);
   return (
     <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-      <StatusBadge bordered color={roles.length ? "var(--color-success)" : "var(--color-text-3)"} label={address ? (roles.length ? `CONNECTED AS ${roles.join(" + ").toUpperCase()}` : "CONNECTED · NO CONFIGURED ROLE") : "NO WALLET CONNECTED"} />
+      <StatusBadge bordered color={roles.length ? "var(--color-success)" : "var(--color-text-3)"} label={address ? (roles.length ? "CONNECTED AS" : "CONNECTED · NO CONFIGURED ROLE") : "NO WALLET CONNECTED"} />
+      {roles.map((role) => (
+        <RoleTag key={role} role={role} bordered />
+      ))}
       {CLUSTER === "localnet" && (
         <span className="font-body" style={{ fontSize: 12, color: "var(--color-text-3)" }}>
           Localnet: import the throwaway keys printed by <code className="font-mono">bun run localnet:up</code> into your wallet.
@@ -97,31 +108,31 @@ export function DemoPage() {
             <Ticker r={d.reserve} />
           </div>
 
-          <Section id="guided" title="Guided demo" kicker="Six steps">
+          <Section id="guided" title="Guided demo" kicker="Six steps" roles={<RoleLegend />}>
             <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <Step n={1} title="Capital in" instruction="request_deposit → fulfil_deposits → claim_shares" why={<>MUTAV&apos;s allowlisted capital wallet requests a deposit. It waits in the FIFO queue until the admin multisig fulfils it at the NAV of that moment; then the wallet claims its shares. Same path as any investor: no special door for MUTAV.</>}>
-                <Sub title="a. Request (MUTAV capital wallet)"><DepositForm /></Sub>
-                <Sub title="b. Fulfil (admin)">
+              <Step n={1} title="Capital in" instruction="request_deposit → fulfil_deposits → claim_shares" roles={["investor", "admin"]} why={<>The Investor (in this pilot, MUTAV&apos;s allowlisted capital wallet) requests a deposit. It waits in the FIFO queue until the Reserve Admin multisig fulfils it at the NAV of that moment; then the Investor claims its shares. MUTAV&apos;s capital takes the same path as any allowlisted investor: no special door.</>}>
+                <Sub title="a. Request" role="investor"><DepositForm /></Sub>
+                <Sub title="b. Fulfil" role="admin">
                   <PendingDeposits />
                   <Note>The admin is a Squads multisig: fulfil it from <Link href="/admin#actions" className="ext-link">/admin</Link> as a proposal{CLUSTER === "localnet" ? " (or by direct signing on localnet)" : ""}.</Note>
                 </Sub>
-                <Sub title="c. Claim shares (MUTAV capital wallet)"><ClaimSharesList /></Sub>
+                <Sub title="c. Claim shares" role="investor"><ClaimSharesList /></Sub>
               </Step>
 
-              <Step n={2} title="Register guarantees, until the gate refuses one" instruction="register_guarantee" why={<>Each new guarantee must fit in free capital: coverage required after the registration may not exceed stable assets. The preview replays that rule with the client&apos;s math mirror. Register until it says &quot;would be refused&quot;, then send it anyway: the program refuses it on-chain. That refusal is the point.</>}>
+              <Step n={2} title="Register guarantees, until the gate refuses one" instruction="register_guarantee" roles={["operator"]} why={<>Each new guarantee must fit in free capital: coverage required after the registration may not exceed stable assets. The preview replays that rule with the client&apos;s math mirror. Register until it says &quot;would be refused&quot;, then send it anyway: the program refuses it on-chain. That refusal is the point.</>}>
                 <RegisterForm />
               </Step>
 
-              <Step n={3} title="Guarantee fee" instruction="contribute_fees" why={<>A guarantee fee comes in. MUTAV&apos;s take goes straight to the treasury; the rest goes into the reserve, so NAV rises for every shareholder. Fees never mint shares.</>}>
+              <Step n={3} title="Guarantee fee" instruction="contribute_fees" roles={["operator"]} why={<>A guarantee fee comes in. MUTAV&apos;s take goes straight to the treasury; the rest goes into the reserve, so NAV rises for every shareholder. Fees never mint shares.</>}>
                 <FeeForm />
               </Step>
 
-              <Step n={4} title="Claim filed" instruction="file_claim" why={<>A landlord&apos;s rent is unpaid and the claim is approved. Filing books a provision against the guarantee: NAV drops immediately, before any money leaves the reserve, so nobody enters or exits at a price that ignores a known loss.</>}>
+              <Step n={4} title="Claim filed" instruction="file_claim" roles={["operator"]} why={<>A landlord&apos;s rent is unpaid and the claim is approved. Filing books a provision against the guarantee: NAV drops immediately, before any money leaves the reserve, so nobody enters or exits at a price that ignores a known loss.</>}>
                 <FileClaimForm />
               </Step>
 
-              <Step n={5} title="Under-coverage: claims are still paid" instruction="pay_claim (with mode = UnderCovered)" why={<>When stable assets fall below coverage required, the reserve is under-covered: new guarantees and redemptions are frozen. Claim payments are not. They never pass the solvency gate.</>}>
-                <Sub title="a. Put the reserve under coverage">
+              <Step n={5} title="Under-coverage: claims are still paid" instruction="pay_claim (with mode = UnderCovered)" roles={["admin", "operator"]} why={<>When stable assets fall below coverage required, the reserve is under-covered: new guarantees and redemptions are frozen. Claim payments are not. They never pass the solvency gate.</>}>
+                <Sub title="a. Put the reserve under coverage (set_config)" role="admin">
                   <BlockedPreview />
                   <Note>
                     {CLUSTER === "localnet" ? (
@@ -131,33 +142,32 @@ export function DemoPage() {
                     )}
                   </Note>
                 </Sub>
-                <Sub title="b. Pay the filed claim (it succeeds)"><PayClaimList /></Sub>
+                <Sub title="b. Pay the filed claim (it succeeds)" role="operator"><PayClaimList /></Sub>
               </Step>
 
-              <Step n={6} title="Settle by PIX" instruction="settle_payout" why={<>MUTAV offramps the BRS and pays the agency by PIX, then records the hash of the PIX end-to-end id on-chain. The claims timeline on /reserve now shows filed → paid → settled, each with its on-chain timestamp, and flags any settlement past the SLA.</>}>
+              <Step n={6} title="Settle by PIX" instruction="settle_payout" roles={["operator"]} why={<>MUTAV offramps the BRS and pays the agency by PIX, then records the hash of the PIX end-to-end id on-chain. The claims timeline on /reserve now shows filed → paid → settled, each with its on-chain timestamp, and flags any settlement past the SLA.</>}>
                 <SettleList />
                 <Note><Link href="/reserve#claims" className="ext-link">Open the claims timeline →</Link></Note>
               </Step>
             </div>
           </Section>
 
-          <Section id="panel" title="Operator panel" kicker="Free-form" info="Every operator instruction, outside the script. The program checks the signer; this page only warns." action={<RefreshButton onConfirmed={poll.refresh} />}>
-            <Tabs defaultValue="register">
-              <TabsList className="flex-wrap h-auto">
-                <TabsTrigger value="register">register_guarantee</TabsTrigger>
-                <TabsTrigger value="fee">contribute_fees</TabsTrigger>
-                <TabsTrigger value="file">file_claim</TabsTrigger>
-                <TabsTrigger value="pay">pay_claim</TabsTrigger>
-                <TabsTrigger value="settle">settle_payout</TabsTrigger>
-                <TabsTrigger value="close">close_guarantee</TabsTrigger>
-              </TabsList>
-              <TabsContent value="register"><RegisterForm p="panel-" /></TabsContent>
-              <TabsContent value="fee"><FeeForm p="panel-" /></TabsContent>
-              <TabsContent value="file"><FileClaimForm p="panel-" /></TabsContent>
-              <TabsContent value="pay"><PayClaimList /></TabsContent>
-              <TabsContent value="settle"><SettleList /></TabsContent>
-              <TabsContent value="close"><CloseGuaranteeForm p="panel-" /></TabsContent>
-            </Tabs>
+          <Section id="panel" title="Operator actions" kicker="Elsewhere" roles={<RoleTag role="operator" bordered />}>
+            <Note>
+              Every operator instruction, outside this script, with the on-chain limit shown before you sign, is on the <Link href="/operator#console" className="ext-link">operator console</Link>.
+            </Note>
+          </Section>
+
+          <Section id="investor" title="Investor actions" kicker="Elsewhere" roles={<RoleTag role="investor" bordered />}>
+            <Note>
+              Deposits, redemptions, cancels and claims, with the wallet&apos;s allowlist status and position, are on <Link href="/investor" className="ext-link">/investor</Link>. Requests need an allowlisted wallet; in the pilot, MUTAV&apos;s capital wallet.
+            </Note>
+          </Section>
+
+          <Section id="admin-side" title="Reserve Admin actions" kicker="Elsewhere" roles={<RoleTag role="admin" bordered />}>
+            <Note>
+              Fulfilling the queue, config and caps, the allowlist, pause and unpause are Reserve Admin actions: time-locked Squads proposals on <Link href="/admin#actions" className="ext-link">/admin</Link>.
+            </Note>
           </Section>
         </LiveProvider>
       )}

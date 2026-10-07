@@ -171,6 +171,14 @@
   --color-accent-dim: #9E6A10;
   --color-success:    #3DAB72;
   --color-error:      #D85555; /* ≥4.5:1 at body-text sizes on canvas (WCAG 1.4.3) */
+  /* Roles (validated with the dataviz checks on #16181C; CVD ΔE 6.5 → always
+     paired with a shape marker and a text label). Charts: neutral series. */
+  --color-role-admin:    #4A8FE8;
+  --color-role-operator: #D2588A;
+  --color-role-investor: #16A2B2;
+  --color-chart-1:       #C4C8CF;
+  --color-chart-2:       #5E6470;
+  --color-chart-track:   #252830;
 }
 
 /* Dashboard Imobiliárias (light, warm neutral) */
@@ -188,6 +196,13 @@
   --color-accent-dim: #FFF0D4;
   --color-success:    #2E8B5A;
   --color-error:      #B83232;
+  /* Roles, validated on #F7F6F3 (CVD ΔE 6.9 → shape marker + label). */
+  --color-role-admin:    #2A78D6;
+  --color-role-operator: #C2457A;
+  --color-role-investor: #0A97A6;
+  --color-chart-1:       #3F444C;
+  --color-chart-2:       #A3A7AE;
+  --color-chart-track:   #EEEDEA;
 }
 
 /* Terminal (dark, copper secondary) */
@@ -209,6 +224,14 @@
   --color-copper-dim: oklch(0.420 0.091 65.34);
   --color-success:    #3DAB72;
   --color-error:      #D85555; /* ≥4.5:1 at body-text sizes on canvas (WCAG 1.4.3) */
+  /* Roles (validated with the dataviz checks on #16181C; CVD ΔE 6.5 → always
+     paired with a shape marker and a text label). Charts: neutral series. */
+  --color-role-admin:    #4A8FE8;
+  --color-role-operator: #D2588A;
+  --color-role-investor: #16A2B2;
+  --color-chart-1:       #C4C8CF;
+  --color-chart-2:       #5E6470;
+  --color-chart-track:   #252830;
 }
 
 /* ─── Base styles ─────────────────────────────────────────────────────────── */
@@ -645,4 +668,43 @@ input[type="number"]::-webkit-outer-spin-button {
   color: var(--color-copper);
   border: 1px dashed var(--color-copper-dim);
   padding: 2px 6px;
+}
+
+/* ── Role tags and charts ─────────────────────────────────────────────────── */
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .role-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Chart rows: hover/focus dims nothing but the row itself (opacity only). */
+.chart-row:hover .chart-bar,
+.chart-row:focus-visible .chart-bar {
+  opacity: 0.8;
+}
+.chart-row:focus-visible {
+  outline-offset: 0;
+}
+.chart-row {
+  display: grid;
+  grid-template-columns: minmax(90px, var(--label-w, 170px)) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.chart-row-label {
+  min-width: 0;
+}
+/* Phones: the label takes its own line so the bar keeps the width. */
+@media (max-width: 600px) {
+  .chart-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+  }
+  .chart-row-label {
+    grid-column: 1 / -1;
+  }
 }

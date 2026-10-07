@@ -28,6 +28,13 @@ export function useLive(): Live {
   return v;
 }
 
+/**
+ * Optional gate over every Action below it: /operator disables actions
+ * unless the connected wallet is the configured operator. /demo sets none.
+ */
+const GateCtx = createContext<{ locked: boolean } | null>(null);
+export const ActionGate = GateCtx.Provider;
+
 // ── Roles ───────────────────────────────────────────────────────────────────
 
 export type Role = "operator" | "admin" | "pauser" | "capital";
@@ -47,7 +54,7 @@ export function rolesOf(address: string | null, r: ReserveView): Role[] {
     .map(([, role]) => role);
 }
 
-const ROLE_LABEL: Record<Role, string> = { operator: "operator", admin: "admin", pauser: "pauser", capital: "MUTAV capital wallet" };
+const ROLE_LABEL: Record<Role, string> = { operator: "Operator", admin: "Reserve Admin", pauser: "pauser", capital: "Investor (MUTAV capital wallet)" };
 
 /** The program checks signers; the UI only warns when the wallet isn't the configured role. */
 export function RoleWarning({ need }: { need: Role }) {
@@ -153,6 +160,7 @@ export function Action({
   onDone?: () => void;
 }) {
   const live = useLive();
+  const gate = useContext(GateCtx);
   const [before, setBefore] = useState<Snap | null>(null);
   const [after, setAfter] = useState<Snap | null>(null);
   // Bumped once the post-confirmation read has landed, so "after" is fresh.
@@ -177,7 +185,7 @@ export function Action({
     <div>
       <Button
         variant={variant}
-        disabled={disabled || busy || request === null}
+        disabled={disabled || gate?.locked || busy || request === null}
         onClick={async () => {
           const req = typeof request === "function" ? await request() : request;
           if (!req) return;

@@ -1,8 +1,9 @@
 "use client";
 
-/** The live reserve strip on the landing page: six on-chain numbers, linking to /reserve. */
+/** The live reserve strip on the landing page: six on-chain numbers linking to /reserve, and coverage against the reserve as a chart. */
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
+import { SolvencyChart } from "@/components/charts/Charts";
 import { usePoll } from "@/lib/client/use-poll";
 import { fmtBrs, fmtNav } from "@/lib/format";
 import { MODE_LABEL, type ReserveView } from "@/lib/view";
@@ -26,7 +27,7 @@ export function LiveStrip() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 0 0" }}>
           <span className="live-dot" aria-hidden="true" />
           <span className="font-mono" style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--color-text-3)" }}>
-            {data ? `LIVE FROM ${data.cluster.toUpperCase()} · SLOT ${data.slot}` : error ? "COULD NOT READ THE CHAIN" : "READING THE CHAIN…"}
+            {data ? `LIVE FROM ${data.cluster.toUpperCase()} · SLOT ${data.slot}` : error ? ((error as { notConfigured?: boolean }).notConfigured ? "DEPLOYING TO DEVNET · LIVE NUMBERS SOON" : "COULD NOT READ THE CHAIN") : "READING THE CHAIN…"}
           </span>
         </div>
         <dl style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 0, margin: 0, padding: "10px 0 18px" }}>
@@ -42,6 +43,11 @@ export function LiveStrip() {
           ))}
         </dl>
       </Link>
+      {data && (
+        <div style={{ padding: "0 0 18px", maxWidth: 720 }}>
+          <SolvencyChart s={data.solvency} ratioBps={data.config.coverageRatioBps} compact />
+        </div>
+      )}
     </section>
   );
 }

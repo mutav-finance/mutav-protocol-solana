@@ -21,9 +21,14 @@ export type OperatorTx =
   | { kind: "pay_claim"; guarantee: string; leg: 0 | 1; amount: bigint; noticeRefHash: string }
   | { kind: "settle_payout"; guarantee: string; noticeRefHash: string; pixE2eHash: string };
 
+/** The allowlisted capital provider's instructions (spec §5.5); `seq` names the owner's request. */
 export type InvestorTx =
   | { kind: "request_deposit"; assets: bigint }
-  | { kind: "claim_shares"; seq: bigint };
+  | { kind: "cancel_deposit"; seq: bigint }
+  | { kind: "claim_shares"; seq: bigint }
+  | { kind: "request_redeem"; shares: bigint }
+  | { kind: "cancel_redeem"; seq: bigint }
+  | { kind: "claim_assets"; seq: bigint };
 
 export type PublicTx = { kind: "refresh" };
 

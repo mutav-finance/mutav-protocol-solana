@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { InfoTooltip } from "@/components/InfoTooltip";
 
 /** A page section: Geist heading, optional explainer, hairline top border. */
-export function Section({ id, title, kicker, info, children, action }: { id?: string; title: string; kicker?: string; info?: string; children: ReactNode; action?: ReactNode }) {
+/** `roles`: who signs or owns what this section shows (a RoleLine), under the heading. */
+export function Section({ id, title, kicker, info, children, action, roles }: { id?: string; title: string; kicker?: string; info?: string; children: ReactNode; action?: ReactNode; roles?: ReactNode }) {
   return (
     <section id={id} aria-labelledby={id ? `${id}-h` : undefined} style={{ borderTop: "1px solid var(--color-border)", padding: "32px 0" }}>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
@@ -18,6 +19,7 @@ export function Section({ id, title, kicker, info, children, action }: { id?: st
             </h2>
             {info && <InfoTooltip label={`About ${title}`}>{info}</InfoTooltip>}
           </div>
+          {roles && <div style={{ marginTop: 10 }}>{roles}</div>}
         </div>
         {action}
       </div>
@@ -44,10 +46,18 @@ export function Page({ children, title, lede }: { children: ReactNode; title: st
 
 /** Shown when a read fails: the app never invents a number to fill the gap. */
 export function ReadError({ error }: { error: Error & { notConfigured?: boolean } }) {
+  if (error.notConfigured)
+    return (
+      <div role="status" style={{ border: "1px solid var(--color-border)", padding: "14px 16px", background: "var(--color-surface)" }}>
+        <p className="font-body" style={{ fontSize: 13, color: "var(--color-text-2)", margin: 0, lineHeight: 1.6 }}>
+          The reserve program is being deployed to devnet. Live numbers appear here once the reserve is initialized.
+        </p>
+      </div>
+    );
   return (
     <div role="alert" style={{ border: "1px solid var(--color-error)", padding: "14px 16px", background: "var(--color-surface)" }}>
       <p className="font-mono" style={{ fontSize: 12, color: "var(--color-error)", margin: 0 }}>
-        {error.notConfigured ? "Not configured: set CONFIG_ADDRESS (see .env.example)." : `Could not read the chain: ${error.message}`}
+        Could not read the chain: {error.message}
       </p>
     </div>
   );

@@ -23,6 +23,9 @@ import {
   type ReserveView,
 } from "@/lib/view";
 import { navPerShare } from "@mutav-finance/mutav-protocol-solana";
+import { AgencyCapChart, ClaimSpeedChart, CoverChart, FlowChart, NavBasisChart, SolvencyChart } from "@/components/charts/Charts";
+import { RoleTag } from "@/components/RoleTag";
+import { ACCOUNT_ROLES, FLOW_ROLES, type AccountRole } from "@/lib/roles";
 
 const short = (hex: string) => `${hex.slice(0, 8)}…`;
 
@@ -65,6 +68,10 @@ export function Health({ r }: { r: ReserveView }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <SolvencyChip stableAssets={sol.stableAssets} coverageRequired={sol.coverageRequired} />
+      <div className="grid-2">
+        <SolvencyChart s={sol} ratioBps={r.config.coverageRatioBps} />
+        <NavBasisChart s={sol} navNow={fmtNav(navNow)} />
+      </div>
       <div className="grid-metrics">
         <MetricCard label="Stable assets" value={fmtBrs(sol.stableAssets)} unit="BRS held by the reserve (brs_balance + TESOURO value)" tooltip="Internal accounting of the reserve token account. Excludes pending deposits and assets owed to filled redemptions." />
         <MetricCard label="Coverage required" value={fmtBrs(sol.coverageRequired)} unit={`${fmtBps(r.config.coverageRatioBps)} of remaining cover`} tooltip="ceil(coverage ratio × remaining cover of every active guarantee)." />
@@ -100,6 +107,12 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       <p className="font-mono" style={{ fontSize: 12, color: matches ? "var(--color-text-3)" : "var(--color-error)", margin: 0 }}>
         {r.state.activeGuarantees} active · Σ remaining cover {fmtBrs(sum)} {matches ? "= remaining_cover_total" : `≠ remaining_cover_total ${fmtBrs(r.state.remainingCoverTotal)}`}
       </p>
+      {(rows.some((g) => g.active) || agencies.length > 0) && (
+        <div className="grid-2">
+          <CoverChart rows={rows} />
+          <AgencyCapChart rows={agencies} cap={r.config.caps.maxCoverPerAgency} />
+        </div>
+      )}
       {rows.length === 0 ? (
         <Empty>No guarantees registered yet.</Empty>
       ) : (
@@ -146,6 +159,8 @@ export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
   const rows = claimsTimeline(l, r.config.payoutSlaSecs, r.now);
   if (rows.length === 0) return <Empty>No claims filed yet.</Empty>;
   return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <ClaimSpeedChart rows={rows} slaSecs={r.config.payoutSlaSecs} now={r.now} />
     <Table label="Claims timeline" head={["Guarantee", "Leg", ["Amount", "num"], "Filed", "Paid", ["Filed → paid", "num"], "Settled (PIX)", ["Paid → settled", "num"], "PIX E2E hash", "Late"]}>
       {rows.map((c) => (
         <tr key={c.filing}>
@@ -170,6 +185,7 @@ export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
         </tr>
       ))}
     </Table>
+    </div>
   );
 }
 
@@ -188,13 +204,15 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
         <MetricCard dense label="Deposits in" value={fmtBrs(totals.depositsIn)} unit="fulfilled requests" />
         <MetricCard dense label="Redemptions out" value={fmtBrs(totals.redemptionsOut)} unit="filled requests" />
       </div>
+      <FlowChart totals={totals} />
       {rows.length === 0 ? (
         <Empty>No money has moved yet.</Empty>
       ) : (
-        <Table label="Money flows" head={["Flow", "When", ["Reserve", "num"], ["Treasury", "num"], "Detail", "Account / tx"]}>
+        <Table label="Money flows" head={["Flow", "By", "When", ["Reserve", "num"], ["Treasury", "num"], "Detail", "Account / tx"]}>
           {rows.map((f) => (
             <tr key={`${f.kind}-${f.account}`}>
               <td><Mono>{FLOW_LABEL[f.kind]}</Mono></td>
+              <td><FlowBy kind={f.kind} /></td>
               <td><Mono dim>{f.at !== null ? fmtTime(f.at) : "—"}</Mono></td>
               <Num color={f.reserveDelta >= 0n ? "var(--color-success)" : "var(--color-text)"}>{f.reserveDelta >= 0n ? "+" : "−"}{fmtBrs(f.reserveDelta < 0n ? -f.reserveDelta : f.reserveDelta)}</Num>
               <Num>{f.treasury > 0n ? fmtBrs(f.treasury) : "—"}</Num>
@@ -208,6 +226,16 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
   );
 }
 
+function FlowBy({ kind }: { kind: keyof typeof FLOW_ROLES }) {
+  const fr: { by: AccountRole["role"]; requestedBy?: AccountRole["role"] } = FLOW_ROLES[kind];
+  return (
+    <span style={{ display: "inline-flex", gap: 10 }}>
+      {fr.requestedBy && <RoleTag role={fr.requestedBy} prefix="req." />}
+      {fr.by && <RoleTag role={fr.by} prefix={fr.requestedBy ? "fill" : undefined} />}
+    </span>
+  );
+}
+
 // ── Capital queue ───────────────────────────────────────────────────────────
 
 export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
@@ -218,12 +246,17 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
       {rows.length === 0 ? (
         <Empty>Empty.</Empty>
       ) : (
-        <Table label={title} head={[["#", "num"], ["Seq", "num"], "Owner", ["Waiting", "num"], "Requested", "Account"]}>
+        <Table label={title} head={[["#", "num"], ["Seq", "num"], "Owner (investor)", ["Waiting", "num"], "Requested", "Account"]}>
           {rows.map((x) => (
             <tr key={x.address}>
               <Num>{x.position}</Num>
               <Num>{x.seq.toString()}</Num>
-              <td><Explorer value={x.owner} /></td>
+              <td>
+                <span style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
+                  <Explorer value={x.owner} />
+                  <RoleTag role="investor" suffix={x.owner === r.config.mutavCapitalWallet ? <span style={{ color: "var(--color-text-3)" }}>· MUTAV capital</span> : undefined} />
+                </span>
+              </td>
               <Num>{unit(x.waiting)}</Num>
               <td><Mono dim>{fmtTime(x.requestedAt)}</Mono></td>
               <td><Explorer value={x.address} /></td>
@@ -263,10 +296,11 @@ export function Disclosures({ r }: { r: ReserveView }) {
         </>,
       )}
       {item(
-        "The pilot capital is MUTAV's own",
+        "The pilot runs on MUTAV's own capital and is not open to public investment",
         <>
-          Every share was bought with MUTAV&apos;s capital wallet <Explorer value={r.config.mutavCapitalWallet} />, through the same FIFO queue as any investor. The
-          reserve is not open to outside investors, and nothing on this page is an offer to invest.
+          The pilot&apos;s objective is to run the reserve with MUTAV&apos;s own capital. Deposits and redemptions are gated by an on-chain allowlist (KYC is done
+          off-chain); in the pilot the allowlisted capital provider is MUTAV&apos;s capital wallet <Explorer value={r.config.mutavCapitalWallet} />, which goes through
+          the same FIFO queue as any investor would. Nothing on this page is an offer to invest.
         </>,
       )}
       {item(
@@ -287,33 +321,39 @@ export function Disclosures({ r }: { r: ReserveView }) {
 // ── Accounts ────────────────────────────────────────────────────────────────
 
 export function Accounts({ r }: { r: ReserveView }) {
-  const rows: [string, string][] = [
-    ["Program", r.programId],
-    ["VaultConfig", r.addresses.config],
-    ["VaultState", r.addresses.state],
-    ["Vault authority (PDA)", r.addresses.vaultAuthority],
-    ["Reserve token account", r.addresses.reserve],
-    ["Pending deposits escrow", r.addresses.pendingDeposits],
-    ["Pending redemptions escrow", r.addresses.pendingRedemptions],
-    ["Claims (filled redemptions)", r.addresses.claims],
-    ["Share mint", r.addresses.shareMint],
-    ["BRS mint", r.config.reserveMint],
-    ["Treasury account (fee take)", r.config.treasuryAccount],
-    ["Payments account (claim payments)", r.config.paymentsAccount],
-    ["Admin (Squads vault)", r.config.admin],
-    ["Operator", r.config.operator],
-    ["Pauser", r.config.pauser],
-    ["MUTAV capital wallet", r.config.mutavCapitalWallet],
+  const P = ACCOUNT_ROLES.program;
+  const rows: [string, string, AccountRole][] = [
+    ["Program", r.programId, { role: null, note: "upgrade authority: the Reserve Admin" }],
+    ["VaultConfig", r.addresses.config, ACCOUNT_ROLES.config],
+    ["VaultState", r.addresses.state, P],
+    ["Vault authority (PDA)", r.addresses.vaultAuthority, P],
+    ["Reserve token account", r.addresses.reserve, P],
+    ["Pending deposits escrow", r.addresses.pendingDeposits, P],
+    ["Pending redemptions escrow", r.addresses.pendingRedemptions, P],
+    ["Claims (filled redemptions)", r.addresses.claims, P],
+    ["Share mint", r.addresses.shareMint, P],
+    ["BRS mint", r.config.reserveMint, { role: null, note: "issued by Nora" }],
+    ["Treasury account (fee take)", r.config.treasuryAccount, ACCOUNT_ROLES.treasury],
+    ["Payments account (claim payments)", r.config.paymentsAccount, ACCOUNT_ROLES.payments],
+    ["Admin (Squads vault)", r.config.admin, ACCOUNT_ROLES.admin],
+    ["Pauser", r.config.pauser, ACCOUNT_ROLES.pauser],
+    ["Operator", r.config.operator, ACCOUNT_ROLES.operator],
+    ["MUTAV capital wallet", r.config.mutavCapitalWallet, ACCOUNT_ROLES.capital],
   ];
   return (
-    <Table label="Accounts" head={["Account", "Address"]}>
-      {rows.map(([k, v]) => (
+    <Table label="Accounts" head={["Account", "Role", "Address"]}>
+      {rows.map(([k, v, a]) => (
         <tr key={k}>
           <td className="font-body" style={{ fontSize: 13 }}>{k}</td>
+          <td>
+            <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+              {a.role ? <RoleTag role={a.role} /> : <Mono dim>—</Mono>}
+              <span className="font-body" style={{ fontSize: 11, color: "var(--color-text-3)" }}>{a.note}</span>
+            </span>
+          </td>
           <td><Explorer value={v} full /></td>
         </tr>
       ))}
     </Table>
   );
 }
-

@@ -28,6 +28,9 @@ import { bytesToHex } from "@/lib/serde";
 import type { AdminTx, TxRequest } from "@/lib/tx-kinds";
 import { capitalQueue, configSummary, type Ledger, type ReserveView } from "@/lib/view";
 import { Action, Grid, LiveProvider, Note, TextField, useLive } from "@/components/demo/shared";
+import Link from "next/link";
+import { RoleLine, RoleTag } from "@/components/RoleTag";
+import { ACCOUNT_ROLES } from "@/lib/roles";
 
 type ProposalView = {
   index: bigint;
@@ -61,13 +64,22 @@ function modeOf(sq: SquadsResp | null): Mode {
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
-function KV({ rows }: { rows: [string, ReactNode][] }) {
+function RoleKey({ label, a }: { label: string; a: (typeof ACCOUNT_ROLES)[keyof typeof ACCOUNT_ROLES] }) {
+  return (
+    <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {label}
+      {a.role && <RoleTag role={a.role} suffix={<span style={{ color: "var(--color-text-3)", textTransform: "none", letterSpacing: 0 }}>· {a.note}</span>} />}
+    </span>
+  );
+}
+
+function KV({ rows }: { rows: [ReactNode, ReactNode][] }) {
   return (
     <div className="table-wrap">
       <table className="data-table">
         <tbody>
-          {rows.map(([k, v]) => (
-            <tr key={k}>
+          {rows.map(([k, v], i) => (
+            <tr key={i}>
               <td className="font-body" style={{ fontSize: 13, width: "40%" }}>{k}</td>
               <td>{v}</td>
             </tr>
@@ -85,7 +97,14 @@ function ConfigView({ r }: { r: ReserveView }) {
     <div className="grid-2">
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <h3 style={{ fontSize: 15, margin: 0 }}>Roles</h3>
-        <KV rows={[["Admin (Squads vault)", <Explorer key="a" value={c.roles.admin} full />], ["Operator", <Explorer key="o" value={c.roles.operator} full />], ["Pauser", <Explorer key="p" value={c.roles.pauser} full />], ["MUTAV capital wallet", <Explorer key="c" value={c.roles.mutavCapitalWallet} full />]]} />
+        <KV
+          rows={[
+            [<RoleKey key="a" label="Admin (Squads vault)" a={ACCOUNT_ROLES.admin} />, <Explorer key="a" value={c.roles.admin} full />],
+            [<RoleKey key="p" label="Pauser" a={ACCOUNT_ROLES.pauser} />, <Explorer key="p" value={c.roles.pauser} full />],
+            [<RoleKey key="o" label="Operator" a={ACCOUNT_ROLES.operator} />, <Explorer key="o" value={c.roles.operator} full />],
+            [<RoleKey key="c" label="MUTAV capital wallet" a={ACCOUNT_ROLES.capital} />, <Explorer key="c" value={c.roles.mutavCapitalWallet} full />],
+          ]}
+        />
         <h3 style={{ fontSize: 15, margin: "8px 0 0" }}>Accounts</h3>
         <KV rows={[["Treasury account", <Explorer key="t" value={c.accounts.treasuryAccount} full />], ["Payments account", <Explorer key="p" value={c.accounts.paymentsAccount} full />], ["BRS mint", <Explorer key="m" value={c.accounts.reserveMint} full />], ["Share mint", <Explorer key="s" value={c.accounts.shareMint} full />]]} />
         <h3 style={{ fontSize: 15, margin: "8px 0 0" }}>Parameters</h3>
@@ -230,7 +249,9 @@ function SquadsPanel({ sq, error, onDone }: { sq: SquadsResp | null; error: Erro
 function AdminAction({ title, children, mode, request, label, note }: { title: string; children?: ReactNode; mode: Mode; request: AdminTx | TxRequest | null | (() => Promise<AdminTx | null>); label: string; note?: ReactNode }) {
   return (
     <article style={{ border: "1px solid var(--color-border)", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 6 }}>
-      <h3 style={{ fontSize: 15, margin: 0 }}>{title}</h3>
+      <h3 style={{ fontSize: 15, margin: 0, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
+        {title} <RoleTag role="admin" />
+      </h3>
       {note && <Note>{note}</Note>}
       {children}
       {mode ? (
@@ -297,7 +318,7 @@ function Actions({ mode }: { mode: Mode }) {
           <TextField id="adm-tvl" label="Max reserve (BRS)" value={maxTvl} onChange={setTvl} numeric hint={`now ${fmtBrs(reserve.config.caps.maxTvl, 0)}`} />
         </Grid>
       </AdminAction>
-      <AdminAction title="Set allowlist root" label="set_allowlist_root" mode={mode} request={ownerList.length ? { kind: "set_allowlist_root", owners: ownerList } : null} note="Built with the client's Merkle builder; proofs for request_deposit come from the same list (ALLOWLIST on the server).">
+      <AdminAction title="Set allowlist root" label="set_allowlist_root" mode={mode} request={ownerList.length ? { kind: "set_allowlist_root", owners: ownerList } : null} note="Built with the client's Merkle builder; proofs for request_deposit and request_redeem come from the same list (ALLOWLIST on the server), checked on /investor.">
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <Label htmlFor="adm-owners" className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)" }}>Allowlisted wallets (one per line)</Label>
           <textarea id="adm-owners" value={owners} onChange={(e) => setOwners(e.target.value)} rows={3} className="font-mono" style={{ background: "transparent", border: "1px solid var(--color-border-input)", color: "var(--color-text)", fontSize: 12, padding: 8 }} />
@@ -309,7 +330,9 @@ function Actions({ mode }: { mode: Mode }) {
       <AdminAction title="Unpause" label="unpause" mode={mode} request={{ kind: "unpause" }} note={`The reserve is ${reserve.config.paused ? "paused" : "not paused"}. Pausing is the pauser's key (below), not a proposal.`} />
       <AdminAction title="Clear fulfil halt" label="clear_fulfil_halt" mode={mode} request={{ kind: "clear_fulfil_halt" }} note={`Fulfilment is ${reserve.state.fulfilHalted ? "HALTED by the NAV-move guard" : "not halted"}. Clearing resets the NAV baseline.`} />
       <article style={{ border: "1px solid var(--color-border)", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 6 }}>
-        <h3 style={{ fontSize: 15, margin: 0 }}>Pause (pauser)</h3>
+        <h3 style={{ fontSize: 15, margin: 0, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
+          Pause <RoleTag role="admin" prefix="pauser key or" />
+        </h3>
         <Note>Signed directly by the pauser key (or the admin): no time lock, so it can stop the reserve at once. Claim payments are never paused.</Note>
         <Action label="pause" request={{ kind: "pause" }} variant="destructive" />
       </article>
@@ -325,7 +348,7 @@ export function AdminPage() {
   return (
     <Page
       title="Admin console"
-      lede={<>For members of MUTAV&apos;s admin multisig. Every admin action is a Squads vault-transaction proposal: one member creates and approves it, others approve, and anyone executes it after the time lock. Wallets sign; this page holds no key.</>}
+      lede={<><span style={{ display: "block", marginBottom: 10 }}><RoleTag role="admin" bordered /></span>For members of MUTAV&apos;s admin multisig. Every admin action is a Squads vault-transaction proposal: one member creates and approves it, others approve, and anyone executes it after the time lock. Wallets sign; this page holds no key.</>}
     >
       {poll.error && !d && <ReadError error={poll.error} />}
       {d && (
@@ -336,14 +359,22 @@ export function AdminPage() {
               <Note>The configured admin is a plain local key, not a Squads vault. Actions are signed directly by that key. On devnet every admin action is a proposal.</Note>
             </div>
           )}
-          <Section id="config" title="VaultConfig" kicker="On-chain configuration">
+          <Section id="config" title="VaultConfig" kicker="On-chain configuration" roles={<RoleLine items={[{ role: "admin", prefix: "written only by" }]}>The Operator and Investor wallets are listed here; they cannot change it.</RoleLine>}>
             <ConfigView r={d.reserve} />
           </Section>
-          <Section id="proposals" title="Proposals" kicker="Squads v4">
+          <Section id="proposals" title="Proposals" kicker="Squads v4" roles={<RoleLine items={[{ role: "admin", prefix: "approved and executed by members of the" }]} />}>
             <SquadsPanel sq={sq.data} error={sq.error} onDone={() => void sq.refresh()} />
           </Section>
-          <Section id="actions" title="Actions" kicker={mode?.label ?? "Unavailable"}>
+          <Section id="actions" title="Actions" kicker={mode?.label ?? "Unavailable"} roles={<RoleLine items={[{ role: "admin", prefix: "every action here is signed by the" }]} />}>
             <Actions mode={mode} />
+            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+              <RoleLine items={[{ role: "operator", prefix: "not here:" }]}>
+                guarantees, guarantee fees and claims are on <Link href="/demo#panel" className="ext-link">/demo</Link>.
+              </RoleLine>
+              <RoleLine items={[{ role: "investor", prefix: "not here:" }]}>
+                deposit and redemption requests are on <Link href="/investor" className="ext-link">/investor</Link>.
+              </RoleLine>
+            </div>
           </Section>
         </LiveProvider>
       )}

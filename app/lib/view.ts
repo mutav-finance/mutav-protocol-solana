@@ -351,3 +351,70 @@ export function configSummary(c: VaultConfig) {
     allowlistRoot: bytesToHex(new Uint8Array(c.investorAllowlistRoot)),
   };
 }
+
+// ── Investor ────────────────────────────────────────────────────────────────
+
+export const REDEEM_STATUS = ["pending", "partially filled", "filled", "cancelled"] as const;
+
+/** One of the connected investor's queue entries, with the actions the program would accept now. */
+export type InvestorRequest = {
+  side: "deposit" | "redeem";
+  address: string;
+  seq: bigint;
+  status: string;
+  requestedAt: bigint;
+  /** BRS escrowed (deposit) or shares still waiting (redeem). */
+  waiting: bigint;
+  /** Deposit: shares to claim once fulfilled. Redeem: BRS filled and not yet claimed. */
+  claimable: bigint;
+  /** 1-based FIFO position among open requests on its side; null once nothing waits. */
+  position: number | null;
+  /** Instructions whose rules the request meets (spec §5.5); the program still decides. */
+  actions: ("cancel_deposit" | "claim_shares" | "cancel_redeem" | "claim_assets")[];
+};
+
+export function investorRequests(
+  owner: string | null,
+  state: Pick<VaultState, "depositHead" | "redeemHead">,
+  ledger: Pick<Ledger, "deposits" | "redeems">,
+): InvestorRequest[] {
+  if (!owner) return [];
+  const q = capitalQueue(state, ledger);
+  const depPos = new Map(q.deposits.map((x) => [x.address, x.position]));
+  const redPos = new Map(q.redeems.map((x) => [x.address, x.position]));
+  const deposits = ledger.deposits
+    .filter((d) => d.data.owner === owner)
+    .map((d): InvestorRequest => {
+      const pending = d.data.status === DEPOSIT_PENDING;
+      return {
+        side: "deposit",
+        address: d.address,
+        seq: d.data.seq,
+        status: pending ? "pending" : "fulfilled",
+        requestedAt: d.data.requestedAt,
+        waiting: pending ? d.data.assets : 0n,
+        claimable: pending ? 0n : d.data.sharesOut,
+        position: depPos.get(d.address) ?? null,
+        actions: pending ? ["cancel_deposit"] : ["claim_shares"],
+      };
+    });
+  const redeems = ledger.redeems
+    .filter((r) => r.data.owner === owner)
+    .map((r): InvestorRequest => {
+      const actions: InvestorRequest["actions"] = [];
+      if (r.data.sharesRemaining > 0n) actions.push("cancel_redeem");
+      if (r.data.assetsClaimable > 0n) actions.push("claim_assets");
+      return {
+        side: "redeem",
+        address: r.address,
+        seq: r.data.seq,
+        status: REDEEM_STATUS[r.data.status] ?? `status ${r.data.status}`,
+        requestedAt: r.data.requestedAt,
+        waiting: r.data.sharesRemaining,
+        claimable: r.data.assetsClaimable,
+        position: redPos.get(r.address) ?? null,
+        actions,
+      };
+    });
+  return [...deposits, ...redeems].sort((a, b) => Number(b.requestedAt - a.requestedAt) || (a.side < b.side ? -1 : 1));
+}
