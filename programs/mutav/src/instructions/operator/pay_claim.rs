@@ -219,6 +219,7 @@ pub fn handle_pay_claim(
     state.coverage_required = coverage_required(
         state.remaining_cover_total,
         ctx.accounts.config.coverage_ratio_bps,
+        state.provisions,
     )?;
     state.claim_period_paid = period_paid;
     state.claims_paid_total = state
