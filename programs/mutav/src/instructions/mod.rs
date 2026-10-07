@@ -7,3 +7,6 @@ pub mod public;
 pub mod reserve;
 
 pub use admin::*;
+pub use capital::*;
+pub use operator::*;
+pub use public::*;

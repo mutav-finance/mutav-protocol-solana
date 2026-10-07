@@ -9,10 +9,12 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "types": [
-      "node"
+      "node",
+      "bun"
     ]
   },
   "include": [
-    "src"
+    "src",
+    "test"
   ]
 }

@@ -1,0 +1,648 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+/* ─── MUTAV Brand Theme ───────────────────────────────────────────────────── */
+/* Source: brand repo, branding/mutav/identity/{palettes.json,typography.md}   */
+/* and patterns/STYLE.md, as already applied in mutav-pulse/frontend.          */
+/* Aesthetic: Precision Brutalism — no gradients, no shadows, no rounded corners */
+
+@theme {
+  /* ── Fonts (all self-hosted via @fontsource-variable; no network at build) ── */
+  --font-display: "Geist Variable", "Geist", "Inter Variable", system-ui, sans-serif;
+  --font-body:    "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono Variable", "JetBrains Mono", "Fira Code", monospace;
+
+  /* ── Amber scale (primary accent — scarce, <5% of pixels) ── */
+  --color-amber-50:  oklch(0.976 0.015 61.37);
+  --color-amber-100: oklch(0.949 0.031 61.13);
+  --color-amber-200: oklch(0.901 0.067 65.34);
+  --color-amber-300: oklch(0.858 0.104 68.94);
+  --color-amber-400: oklch(0.809 0.163 74.93);
+  --color-amber-500: oklch(0.758 0.152 74.86);
+  --color-amber-600: oklch(0.634 0.128 74.58);
+  --color-amber-700: oklch(0.513 0.103 75.08);
+  --color-amber-800: oklch(0.383 0.077 74.53);
+  --color-amber-900: oklch(0.261 0.053 74.88);
+  --color-amber-950: oklch(0.199 0.040 76.08);
+
+  /* ── Amber Light scale (light surface accent — #C47E10) ── */
+  --color-amber-light-50:  oklch(0.967 0.019 55.18);
+  --color-amber-light-100: oklch(0.934 0.040 56.34);
+  --color-amber-light-200: oklch(0.859 0.094 61.36);
+  --color-amber-light-300: oklch(0.794 0.164 69.69);
+  --color-amber-light-400: oklch(0.725 0.153 69.83);
+  --color-amber-light-500: oklch(0.651 0.137 69.81);
+  --color-amber-light-600: oklch(0.549 0.116 69.56);
+  --color-amber-light-700: oklch(0.444 0.094 70.26);
+  --color-amber-light-800: oklch(0.339 0.072 69.99);
+  --color-amber-light-900: oklch(0.245 0.052 68.95);
+  --color-amber-light-950: oklch(0.190 0.041 70.86);
+
+  /* ── Copper scale (terminal secondary accent — #B87010) ── */
+  --color-copper-50:  oklch(0.958 0.023 48.50);
+  --color-copper-100: oklch(0.925 0.041 50.60);
+  --color-copper-200: oklch(0.852 0.094 56.63);
+  --color-copper-300: oklch(0.768 0.166 65.33);
+  --color-copper-400: oklch(0.690 0.149 65.34);
+  --color-copper-500: oklch(0.610 0.132 65.34);
+  --color-copper-600: oklch(0.515 0.111 65.53);
+  --color-copper-700: oklch(0.420 0.091 65.34);
+  --color-copper-800: oklch(0.333 0.072 64.97);
+  --color-copper-900: oklch(0.234 0.051 64.89);
+  --color-copper-950: oklch(0.179 0.040 65.53);
+
+  /* ── Dark neutral scale (Investidor canvas — #0E0F11 = 950) ── */
+  --color-neutral-50:  oklch(0.913 0.004 271.52);
+  --color-neutral-100: oklch(0.836 0.009 271.38);
+  --color-neutral-200: oklch(0.673 0.017 266.24);
+  --color-neutral-300: oklch(0.510 0.014 264.46);
+  --color-neutral-400: oklch(0.337 0.009 268.41);
+  --color-neutral-500: oklch(0.210 0.010 265.00);
+  --color-neutral-600: oklch(0.175 0.010 265.00);
+  --color-neutral-700: oklch(0.162 0.008 265.00);
+  --color-neutral-800: oklch(0.149 0.007 270.00);
+  --color-neutral-900: oklch(0.130 0.005 270.00);
+  --color-neutral-950: oklch(0.104 0.005 271.00);
+
+  /* ── Warm light neutral scale (Imobiliárias canvas — #F7F6F3 = 500) ── */
+  --color-neutral-light-50:  oklch(1.000 0.000 0);
+  --color-neutral-light-100: oklch(0.991 0.001 106);
+  --color-neutral-light-200: oklch(0.985 0.003 91);
+  --color-neutral-light-300: oklch(0.982 0.003 84);
+  --color-neutral-light-400: oklch(0.978 0.004 90);
+  --color-neutral-light-500: oklch(0.973 0.004 91.28);
+  --color-neutral-light-600: oklch(0.940 0.006 88);
+  --color-neutral-light-700: oklch(0.872 0.008 85);
+  --color-neutral-light-800: oklch(0.810 0.016 94);
+  --color-neutral-light-900: oklch(0.637 0.012 90);
+  --color-neutral-light-950: oklch(0.480 0.010 91);
+
+  /* ── Success scale ── */
+  --color-success-500: oklch(0.664 0.132 156.97);
+  --color-success-600: oklch(0.555 0.110 157.29);
+
+  /* ── Error scale ── */
+  --color-error-500: oklch(0.569 0.174 24.54);
+  --color-error-600: oklch(0.483 0.147 24.48);
+
+  /* ── Border radius — always 0 (Precision Brutalism) ── */
+  --radius: 0px;
+
+  /* ── Shared full-bleed horizontal padding (layout token, front-agnostic) ── */
+  --page-pad: 32px;
+
+  /* NOTE: intentionally NO custom spacing scale override here. An earlier 8px-grid
+     override collided with Tailwind v4's numeric spacing utilities (h-10, gap-2,
+     px-3.5, size-9) used by the shadcn primitives in components/ui/* — heights
+     doubled and blew up button sizing. Tailwind's default 0.25rem multiplier
+     (so h-10 = 40px) is what those components expect, and nothing in this app
+     reads the spacing tokens directly. ── */
+
+  /* ── Type scale ── */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: 0.03em;
+
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-xs--letter-spacing: 0.01em;
+
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-sm--letter-spacing: 0.01em;
+
+  --text-base-sm: 0.875rem;
+  --text-base-sm--line-height: 1.25rem;
+  --text-base-sm--letter-spacing: 0em;
+
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-base--letter-spacing: 0em;
+
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-lg--letter-spacing: 0em;
+
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: 0em;
+
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-2xl--letter-spacing: -0.01em;
+
+  --text-3xl: 1.75rem;
+  --text-3xl--line-height: 2rem;
+  --text-3xl--letter-spacing: -0.01em;
+
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+  --text-4xl--letter-spacing: -0.02em;
+
+  --text-5xl: clamp(2.25rem, 1.544rem + 1.127vw, 3rem);
+  --text-5xl--line-height: 1.083;
+  --text-5xl--letter-spacing: -0.02em;
+
+  --text-6xl: clamp(3rem, 2.056rem + 1.502vw, 4rem);
+  --text-6xl--line-height: 1.0625;
+  --text-6xl--letter-spacing: -0.03em;
+}
+
+/* ─── Front-specific semantic tokens ─────────────────────────────────────── */
+
+/* Dashboard Investidor (dark, amber accent) — default front */
+:root,
+[data-front="investidor"] {
+  color-scheme: dark; /* native controls (number spinners, scrollbars) render dark */
+  --color-canvas:     #0E0F11;
+  --color-surface:    #16181C;
+  --color-surface-2:  #1E2126;
+  --color-surface-3:  #252830;
+  --color-copper:     oklch(0.610 0.132 65.34);
+  --color-copper-dim: oklch(0.420 0.091 65.34);
+  --color-border:     #2A2D33;
+  --color-border-input: #484D58; /* form-field boundary — ≥3:1 on canvas (WCAG 1.4.11) */
+  --color-text:       #F0F0EE;
+  --color-text-2:     #8A8F99;
+  --color-text-3:     #7C828D; /* dim label — raised to ≥4.5:1 on canvas (WCAG 1.4.3) */
+  --color-accent:     #E8A020;
+  --color-accent-dim: #9E6A10;
+  --color-success:    #3DAB72;
+  --color-error:      #D85555; /* ≥4.5:1 at body-text sizes on canvas (WCAG 1.4.3) */
+}
+
+/* Dashboard Imobiliárias (light, warm neutral) */
+[data-front="imobiliarias"] {
+  color-scheme: light; /* light front — keep native controls light */
+  --color-canvas:     #F7F6F3;
+  --color-surface:    #FFFFFF;
+  --color-surface-2:  #EEEDEA;
+  --color-border:     #D9D7D2;
+  --color-border-input: #B5B2AC; /* form-field boundary — ≥3:1 on light canvas (WCAG 1.4.11) */
+  --color-text:       #1A1A1A;
+  --color-text-2:     #6B6860;
+  --color-text-3:     #9E9C98;
+  --color-accent:     #C47E10;
+  --color-accent-dim: #FFF0D4;
+  --color-success:    #2E8B5A;
+  --color-error:      #B83232;
+}
+
+/* Terminal (dark, copper secondary) */
+[data-front="terminal"] {
+  color-scheme: dark; /* native controls (number spinners, scrollbars) render dark */
+  --color-canvas:     #0A0B0D;
+  --color-surface:    #111316;
+  --color-surface-2:  #181B1F;
+  --color-surface-3:  #1F2226;
+  --color-border:     #2A2D33;
+  --color-border-input: #484D58; /* form-field boundary — ≥3:1 on canvas (WCAG 1.4.11) */
+  --color-text:       #E8E4DC;
+  --color-text-2:     #908C82; /* raised to clear 4.5:1 and stay above text-3 (WCAG 1.4.3) */
+  --color-text-3:     #847F74; /* dim label — raised to ≥4.5:1 on the darker terminal canvas (WCAG 1.4.3) */
+  --color-accent:     #E8A020;
+  --color-accent-dim: #B87010;
+  /* copper = the terminal's primary OPS accent (#B87010) */
+  --color-copper:     oklch(0.610 0.132 65.34);
+  --color-copper-dim: oklch(0.420 0.091 65.34);
+  --color-success:    #3DAB72;
+  --color-error:      #D85555; /* ≥4.5:1 at body-text sizes on canvas (WCAG 1.4.3) */
+}
+
+/* ─── Base styles ─────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100%;
+  background-color: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* ── Typography hierarchy rules ── */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+/* ── Three-layer typography classes ── */
+
+/* Layer 1: Declaration — Geist Bold */
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* Layer 2: Explanation — Inter */
+.font-body {
+  font-family: var(--font-body);
+}
+
+/* Layer 3: Evidence — JetBrains Mono (tabular numerals mandatory) */
+.font-mono,
+.data,
+[data-mono] {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Investidor: no texture (architectural grid retired per brand update — flat canvas) ── */
+
+/* ── Terminal texture (scanlines — terminal canvas only) ── */
+.texture-terminal {
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0px, transparent 2px,
+      rgba(232, 228, 220, 0.025) 2px, rgba(232, 228, 220, 0.025) 3px
+    );
+  background-size: 100% 3px;
+}
+
+/* ── The pulse animation (only ambient animation in MUTAV) ── */
+@keyframes mutav-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: var(--color-accent);
+  animation: mutav-pulse 2s linear infinite;
+}
+
+/* ── Refresh spinner (state feedback only — stops when not loading) ── */
+@keyframes mtv-spin {
+  to { transform: rotate(360deg); }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+    opacity: 1;
+  }
+  [style*="mtv-spin"] {
+    animation: none !important;
+  }
+}
+
+/* ── Interaction transitions (only color/bg/border/opacity — never transform) ── */
+button,
+a,
+input,
+[role="button"] {
+  transition-property: color, background-color, border-color, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+button:active,
+[role="button"]:active {
+  opacity: 0.85;
+  transition-duration: 80ms;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"],
+input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Focus: a visible amber outline (offset so it reads even on amber-bordered
+   controls). Outline is not a ring/glow/box-shadow, so it honors the brand
+   constraint while satisfying WCAG 2.4.7 (the old `outline:none` left keyboard
+   focus invisible on the primary CTA). ── */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-color: var(--color-accent);
+}
+
+/* ── Skip-to-content link — off-screen until keyboard focus, then drops in ── */
+.skip-link {
+  position: fixed;
+  left: 8px;
+  top: -56px;
+  z-index: 200;
+  background-color: var(--color-canvas);
+  color: var(--color-text);
+  border: 1px solid var(--color-accent);
+  padding: 8px 14px;
+  font-size: 13px;
+  text-decoration: none;
+  transition: top 120ms ease-out;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* ── Connect CTA — amber outline at rest, fills amber on hover (intent only) ── */
+.connect-cta:not(:disabled):hover {
+  background-color: var(--color-accent);
+  color: var(--color-canvas);
+}
+
+/* ── Home sections: full-bleed border/background, content centered to ~1280px.
+   Used as the section's horizontal padding so the element stays width:100%
+   (border-bottoms bleed edge-to-edge) while content never sprawls on wide
+   displays. Collapses to --page-pad once the viewport drops below the max. ── */
+:root {
+  --section-pad-x: max(var(--page-pad), calc((100% - 1280px) / 2));
+}
+
+/* ── Inline-anchor CTAs — anchors miss the button:active rule, so add explicit
+   hover + press feedback. No new colors; radius stays 0. ── */
+.cta-fill {
+  transition: opacity 150ms ease-out;
+}
+.cta-fill:hover {
+  opacity: 0.88;
+}
+.cta-fill:active {
+  opacity: 0.8;
+}
+.cta-outline {
+  transition: color 150ms ease-out, border-color 150ms ease-out;
+}
+.cta-outline:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+.cta-outline:active {
+  opacity: 0.85;
+}
+
+/* ── Responsive nav: desktop links inline, collapse to a hamburger < 768px ── */
+.nav-links-desktop {
+  display: flex;
+}
+.nav-hamburger {
+  display: none;
+}
+/* Panel visibility is breakpoint-governed (like its siblings above), not just
+   render-state — so it can't linger if the menu is open while resizing past 768px. */
+.nav-mobile-panel {
+  display: none;
+}
+@media (max-width: 767px) {
+  .nav-links-desktop {
+    display: none;
+  }
+  .nav-hamburger {
+    display: inline-flex;
+  }
+  .nav-mobile-panel {
+    display: block;
+  }
+  :root {
+    --page-pad: 16px;
+  }
+  /* Decorative hero backdrop crowds the headline on phones — drop it below the
+     mobile breakpoint (it carries no information; alt="" / aria-hidden). */
+  .hero-backdrop {
+    display: none;
+  }
+}
+
+/* ── Scroll-fade affordance for clipped scroll containers ──────────────────
+   Signals "there's more" at the edge a table scrolls toward. The element must
+   set overflow-x/y:auto; the mask fades the last 16px so clipped columns/rows
+   read as scrollable rather than silently cut off (WCAG 1.4.10 reflow cue). */
+.scroll-fade-x {
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 16px), transparent 100%);
+          mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 16px), transparent 100%);
+}
+.scroll-fade-y {
+  /* bottom-only: a sticky header keeps its full opacity at the top */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 14px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 14px), transparent 100%);
+}
+
+/* ── ProtocolDiagram: the fixed-coordinate React Flow canvas scales sub-pixel
+   below ~768px, so swap it for a readable stacked flow on phones. ── */
+.diagram-mobile {
+  display: none;
+}
+@media (max-width: 767px) {
+  .diagram-canvas {
+    display: none;
+  }
+  .diagram-mobile {
+    display: flex;
+  }
+}
+
+/* ── Section tabs (protocol cockpit) — underline-style, copper active ── */
+.section-tab {
+  color: var(--color-text-2);
+  transition: color 150ms ease-out;
+}
+.section-tab:hover {
+  color: var(--color-text);
+}
+
+/* ── Number input: keep the spinner buttons always visible (not hover-only) ── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+/* ── Dark scrollbar — for fixed-height scroll containers (e.g. registry list) ── */
+.scroll-dark {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-3) transparent;
+}
+.scroll-dark::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scroll-dark::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+.scroll-dark::-webkit-scrollbar-thumb {
+  background: var(--color-surface-3);
+  border: 2px solid var(--color-surface);
+}
+.scroll-dark::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-3);
+}
+
+/* ─── shadcn/ui token bridge ──────────────────────────────────────────────────
+   shadcn's Radix primitives (components/ui/*) reference semantic utility tokens
+   (bg-primary, text-muted-foreground, border-input, …). We expose them here as
+   THIN ALIASES of the MUTAV brand tokens. Because this block is `@theme inline`,
+   Tailwind substitutes each value directly into the generated utility and does
+   NOT emit a competing `:root` custom property — so the brand tokens defined in
+   `:root`/`[data-front]` above (notably amber `--color-accent: #E8A020` and
+   `--color-border`) are never shadowed or cycled. The aliases resolve at the
+   use-site through the cascade, so the primitives re-theme automatically across
+   all three `[data-front]` surfaces with no duplicated palette.
+
+   Collision handling (see spec §3): we deliberately do NOT alias `--color-accent`
+   or `--color-border` here. shadcn's amber maps to `--color-primary`; shadcn's
+   neutral hover surface is served by `--color-secondary` (our `--color-surface-2`);
+   the default element border is set by the plain-CSS `*` reset below, which reads
+   the brand `--color-border` directly. This keeps amber and the brand border as
+   their single sources of truth. */
+@theme inline {
+  --color-background: var(--color-canvas);
+  --color-foreground: var(--color-text);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-text);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-text);
+  --color-primary: var(--color-accent);            /* shadcn "primary" = amber */
+  --color-primary-foreground: var(--color-canvas);
+  --color-secondary: var(--color-surface-2);
+  --color-secondary-foreground: var(--color-text);
+  --color-muted: var(--color-surface);
+  --color-muted-foreground: var(--color-text-2);
+  --color-destructive: var(--color-error);
+  --color-destructive-foreground: var(--color-canvas);
+  --color-input: var(--color-border-input);
+  --color-ring: var(--color-accent);               /* amber focus ring color */
+
+  /* Precision Brutalism: every radius utility collapses to 0 (no rounded corners). */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+}
+
+/* Default element border color = brand border (the shadcn base reset, written as
+   plain CSS so it reads `--color-border` directly with no theme-token alias). */
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+}
+/* ─── Pilot app ──────────────────────────────────────────────────────────── */
+
+/* Landing "two-nav swap": the full wordmark nav sits over the hero; past the
+   hero a compact pinned bar with a solid CTA slides in. Compositor-only:
+   translate + visibility, 300ms ease-out. Visibility is delayed on hide so the
+   bar finishes sliding out before it leaves the a11y tree and tab order. */
+.compact-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 110;
+  transform: translate3d(0, -100%, 0);
+  visibility: hidden;
+  transition: transform 300ms ease-out, visibility 0s linear 300ms;
+  will-change: transform;
+}
+.compact-bar[data-visible="true"] {
+  transform: translate3d(0, 0, 0);
+  visibility: visible;
+  transition: transform 300ms ease-out, visibility 0s linear 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .compact-bar,
+  .compact-bar[data-visible="true"] {
+    transition: none;
+  }
+}
+
+/* Generic responsive grids for metric and section layouts. */
+.grid-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+@media (max-width: 900px) {
+  .grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Data tables: hairline rows, mono numbers, horizontal scroll on phones. */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table th {
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-2);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+  white-space: nowrap;
+}
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+.data-table td.num,
+.data-table th.num {
+  text-align: right;
+}
+
+.ext-link {
+  color: var(--color-text-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-border);
+}
+.ext-link:hover {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+}
+
+.preview-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-copper);
+  border: 1px dashed var(--color-copper-dim);
+  padding: 2px 6px;
+}

@@ -36,4 +36,5 @@ Attributions are collected in [`NOTICE`](../NOTICE).
 | 2026-10-01 | Repository created; Anchor workspace scaffold | |
 | 2026-10-01 | Protocol spec, implementation plan, ADRs 0001–0006, repo docs | |
 | 2026-10-02 | Redemption liquidity design: partial fills at the queue head, phase-2 instant exit, upgrade readiness (spec §5.5, §13, §14; ADRs 0010, 0011) | |
+| 2026-10-06 | Task 1: core state (`VaultConfig`, `VaultState`), `initialize`, roles, pause, mint guard; account and authority skeleton adapted from `solana-foundation/vault` | |
 | | | |

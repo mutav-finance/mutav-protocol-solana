@@ -17,6 +17,8 @@ import {
   getConstantEncoder,
   getHiddenPrefixDecoder,
   getHiddenPrefixEncoder,
+  getI64Decoder,
+  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
   type Address,
@@ -37,23 +39,35 @@ export function getVaultInitializedEventDiscriminatorBytes(): ReadonlyUint8Array
 
 export type VaultInitializedEvent = {
   config: Address;
-  reserveMint: Address;
+  ts: bigint;
   admin: Address;
   operator: Address;
   pauser: Address;
+  reserveMint: Address;
+  shareMint: Address;
 };
 
-export type VaultInitializedEventArgs = VaultInitializedEvent;
+export type VaultInitializedEventArgs = {
+  config: Address;
+  ts: number | bigint;
+  admin: Address;
+  operator: Address;
+  pauser: Address;
+  reserveMint: Address;
+  shareMint: Address;
+};
 
 /** Gets the encoder for {@link VaultInitializedEventArgs} event data. */
 export function getVaultInitializedEventEncoder(): FixedSizeEncoder<VaultInitializedEventArgs> {
   return getHiddenPrefixEncoder(
     getStructEncoder([
       ["config", getAddressEncoder()],
-      ["reserveMint", getAddressEncoder()],
+      ["ts", getI64Encoder()],
       ["admin", getAddressEncoder()],
       ["operator", getAddressEncoder()],
       ["pauser", getAddressEncoder()],
+      ["reserveMint", getAddressEncoder()],
+      ["shareMint", getAddressEncoder()],
     ]),
     [getConstantEncoder(VAULT_INITIALIZED_EVENT_DISCRIMINATOR)],
   );
@@ -64,10 +78,12 @@ export function getVaultInitializedEventDecoder(): FixedSizeDecoder<VaultInitial
   return getHiddenPrefixDecoder(
     getStructDecoder([
       ["config", getAddressDecoder()],
-      ["reserveMint", getAddressDecoder()],
+      ["ts", getI64Decoder()],
       ["admin", getAddressDecoder()],
       ["operator", getAddressDecoder()],
       ["pauser", getAddressDecoder()],
+      ["reserveMint", getAddressDecoder()],
+      ["shareMint", getAddressDecoder()],
     ]),
     [getConstantDecoder(VAULT_INITIALIZED_EVENT_DISCRIMINATOR)],
   );
