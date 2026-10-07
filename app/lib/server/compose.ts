@@ -23,6 +23,10 @@ import {
 import {
   buildAllowlist,
   fetchGuarantee,
+  getCancelDepositInstruction,
+  getCancelRedeemInstruction,
+  getClaimAssetsInstruction,
+  getRequestRedeemInstruction,
   findClaimFilingPda,
   findDepositRequestPda,
   findFeeReceiptPda,
@@ -48,6 +52,7 @@ import {
   getSettlePayoutInstruction,
   getUnpauseInstruction,
 } from "@mutav-finance/mutav-protocol-solana";
+import { ALLOWLIST_TEXT, checkAllowlist } from "../allowlist";
 import { fromHex } from "../serde";
 import type { TxRequest } from "../tx-kinds";
 import { ADMIN_KINDS } from "../tx-kinds";
@@ -99,7 +104,7 @@ export type ComposeContext = {
   reserve: ReserveView;
   /** Needed for `refresh` (pending payouts) and for `request_deposit` (allowlist). */
   ledger?: Pick<Ledger, "payouts" | "guarantees">;
-  /** Allowlisted owners, to build the Merkle proof for `request_deposit`. */
+  /** Allowlisted owners, to build the Merkle proof for `request_deposit` / `request_redeem`. */
   allowlist?: string[];
   /** Server env for re-reads (defaults to process.env). */
   env?: ServerEnv;
@@ -265,15 +270,9 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       ];
     }
 
-    // ── investor (MUTAV capital wallet in the demo) ─────────────────────────
+    // ── investor (allowlisted owner; MUTAV's capital wallet in the pilot) ───
     case "request_deposit": {
-      const owners = (ctx.allowlist ?? []).map((x) => address(x));
-      if (!owners.includes(signerAddress)) throw new ComposeError("the connected wallet is not in ALLOWLIST, so no Merkle proof can be built");
-      const tree = await buildAllowlist(owners);
-      const onChain = new Uint8Array(r.config.investorAllowlistRoot);
-      if (!tree.root.every((x, i) => x === onChain[i])) {
-        throw new ComposeError("ALLOWLIST does not hash to the on-chain allowlist root; update ALLOWLIST or the root");
-      }
+      const proof = await allowlistProof(ctx, signerAddress);
       const seq = r.state.nextDepositSeq;
       return [
         getRequestDepositInstruction(
@@ -289,7 +288,84 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             tokenProgram,
             systemProgram: SYSTEM_PROGRAM,
             assets: req.assets,
-            proof: tree.proofs.get(signerAddress)!,
+            proof,
+          },
+          o,
+        ),
+      ];
+    }
+    case "cancel_deposit": {
+      return [
+        getCancelDepositInstruction(
+          {
+            ...common,
+            owner: signer,
+            state: a.state,
+            depositRequest: (await findDepositRequestPda({ config, seq: req.seq }, o))[0],
+            destination: await associatedTokenAddress(signerAddress, mint, tokenProgram),
+            pendingDeposits: a.pendingDeposits,
+            vaultAuthority: a.vaultAuthority,
+            reserveMint: mint,
+            tokenProgram,
+          },
+          o,
+        ),
+      ];
+    }
+    case "request_redeem": {
+      const proof = await allowlistProof(ctx, signerAddress);
+      const seq = r.state.nextRedeemSeq;
+      return [
+        getRequestRedeemInstruction(
+          {
+            ...common,
+            owner: signer,
+            state: a.state,
+            redeemRequest: (await findRedeemRequestPda({ config, seq }, o))[0],
+            ownerShares: await associatedTokenAddress(signerAddress, a.shareMint),
+            pendingRedemptions: a.pendingRedemptions,
+            shareMint: a.shareMint,
+            shareTokenProgram: TOKEN_PROGRAM,
+            systemProgram: SYSTEM_PROGRAM,
+            shares: req.shares,
+            proof,
+          },
+          o,
+        ),
+      ];
+    }
+    case "cancel_redeem": {
+      return [
+        getCancelRedeemInstruction(
+          {
+            ...common,
+            owner: signer,
+            state: a.state,
+            redeemRequest: (await findRedeemRequestPda({ config, seq: req.seq }, o))[0],
+            ownerShares: await associatedTokenAddress(signerAddress, a.shareMint),
+            pendingRedemptions: a.pendingRedemptions,
+            vaultAuthority: a.vaultAuthority,
+            shareMint: a.shareMint,
+            shareTokenProgram: TOKEN_PROGRAM,
+          },
+          o,
+        ),
+      ];
+    }
+    case "claim_assets": {
+      return [
+        await createAtaIdempotent(signerAddress, signerAddress, mint, tokenProgram),
+        getClaimAssetsInstruction(
+          {
+            ...common,
+            owner: signer,
+            state: a.state,
+            redeemRequest: (await findRedeemRequestPda({ config, seq: req.seq }, o))[0],
+            destination: await associatedTokenAddress(signerAddress, mint, tokenProgram),
+            claims: a.claims,
+            vaultAuthority: a.vaultAuthority,
+            reserveMint: mint,
+            tokenProgram,
           },
           o,
         ),
@@ -388,6 +464,19 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       return [getSetAllowlistRootInstruction({ ...common, admin: signer, root: tree.root }, o)];
     }
   }
+}
+
+/**
+ * The Merkle proof for `request_deposit` / `request_redeem`, built from
+ * ALLOWLIST and verified against the on-chain root. Refuses otherwise: the
+ * program would reject the request with `NotAllowlisted`.
+ */
+async function allowlistProof(ctx: ComposeContext, owner: Address): Promise<Uint8Array[]> {
+  const listed = ctx.allowlist ?? [];
+  const check = await checkAllowlist(ctx.reserve.config.investorAllowlistRoot, listed, owner);
+  if (check.state === "not-listed" || !listed.includes(owner)) throw new ComposeError("the connected wallet is not in ALLOWLIST, so no Merkle proof can be built");
+  if (!check.proof) throw new ComposeError(ALLOWLIST_TEXT[check.state]);
+  return check.proof;
 }
 
 /** Seqs from the head, skipping none, at most `count`. */

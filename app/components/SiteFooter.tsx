@@ -5,12 +5,13 @@ export function SiteFooter() {
     <footer style={{ borderTop: "1px solid var(--color-border)", padding: "28px var(--section-pad-x)", marginTop: "auto" }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 24, justifyContent: "space-between", alignItems: "flex-start" }}>
         <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)", margin: 0, maxWidth: 640, lineHeight: 1.6 }}>
-          The pilot reserve holds MUTAV&apos;s own capital. It is not open to outside investors and nothing here is an offer to invest. The program is unaudited
+          The pilot runs on MUTAV&apos;s own capital and is not open to public investment. Capital requests are gated by an allowlist (KYC off-chain), and nothing here is an offer to invest. The program is unaudited
           and runs on Solana devnet for the Colosseum Crypto World&apos;s Fair.
         </p>
         <nav aria-label="Footer" style={{ display: "flex", gap: 18 }}>
           {[
             ["/reserve", "Reserve"],
+            ["/investor", "Investor"],
             ["/demo", "Demo"],
             ["/admin", "Admin"],
           ].map(([href, label]) => (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClaimFiling, DepositRequest, FeeReceipt, Guarantee, Payout, RedeemRequest } from "@mutav-finance/mutav-protocol-solana";
-import { activeRemainingCover, agencyRows, capitalQueue, claimsTimeline, coverageRows, moneyFlows, type Row } from "../view";
+import { activeRemainingCover, agencyRows, capitalQueue, claimsTimeline, coverageRows, investorRequests, moneyFlows, type Row } from "../view";
 import { BRL } from "./fixtures";
 
 const b32 = (n: number) => new Uint8Array(32).fill(n);
@@ -100,5 +100,33 @@ describe("money flows and queue", () => {
     );
     expect(q.deposits.map((d) => [d.seq, d.position])).toEqual([[1n, 1], [3n, 2]]);
     expect(q.redeems.map((r) => r.seq)).toEqual([1n]);
+  });
+});
+
+describe("investor requests", () => {
+  const dep = (address: string, owner: string, seq: bigint, status: number) =>
+    ({ address, data: { owner, seq, assets: 5_000n * BRL, sharesOut: status ? 5_000n * BRL : 0n, requestedAt: 10n + seq, status } }) as unknown as Row<DepositRequest>;
+  const red = (address: string, owner: string, seq: bigint, over: Partial<RedeemRequest>) =>
+    ({ address, data: { owner, seq, sharesRemaining: 0n, assetsClaimable: 0n, requestedAt: 20n + seq, status: 0, ...over } }) as unknown as Row<RedeemRequest>;
+
+  it("lists only the owner's entries, with queue position and the actions the program would accept", () => {
+    const rows = investorRequests(
+      "ME",
+      { depositHead: 0n, redeemHead: 0n } as never,
+      {
+        deposits: [dep("D0", "OTHER", 0n, 0), dep("D1", "ME", 1n, 0), dep("D2", "ME", 2n, 1)],
+        redeems: [red("R0", "ME", 0n, { sharesRemaining: 3n, assetsClaimable: 7n, status: 1 }), red("R1", "ME", 1n, { assetsClaimable: 4n, status: 3 })],
+      },
+    );
+    const by = Object.fromEntries(rows.map((r) => [r.address, r]));
+    expect(Object.keys(by).sort()).toEqual(["D1", "D2", "R0", "R1"]);
+    expect(by.D1).toMatchObject({ status: "pending", position: 2, actions: ["cancel_deposit"] });
+    expect(by.D2).toMatchObject({ status: "fulfilled", position: null, claimable: 5_000n * BRL, actions: ["claim_shares"] });
+    expect(by.R0).toMatchObject({ status: "partially filled", position: 1, actions: ["cancel_redeem", "claim_assets"] });
+    expect(by.R1).toMatchObject({ status: "cancelled", position: null, actions: ["claim_assets"] });
+  });
+
+  it("is empty without a wallet", () => {
+    expect(investorRequests(null, { depositHead: 0n, redeemHead: 0n } as never, { deposits: [], redeems: [] })).toEqual([]);
   });
 });

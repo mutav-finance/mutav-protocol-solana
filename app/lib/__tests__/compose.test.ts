@@ -82,6 +82,28 @@ describe("compose", () => {
     await expect(composeInstructions({ kind: "request_deposit", assets: 1n }, WALLET, { reserve: r, allowlist: [] })).rejects.toThrow(/not in ALLOWLIST/);
   });
 
+  it("request_redeem carries a proof that verifies against the on-chain root", async () => {
+    const r = await reserve();
+    const { buildAllowlist } = await import("@mutav-finance/mutav-protocol-solana");
+    const tree = await buildAllowlist([WALLET, TREASURY]);
+    r.config = { ...r.config, investorAllowlistRoot: tree.root };
+    r.state = { ...r.state, nextRedeemSeq: 4n };
+    const [ix] = await composeInstructions({ kind: "request_redeem", shares: 2_000_000_000n }, WALLET, { reserve: r, allowlist: [WALLET, TREASURY] });
+    const d = describeInstructions([ix!])[0]!;
+    expect(d.accounts.filter((a) => a.signer).map((a) => a.address)).toEqual([WALLET]);
+    await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, PAYMENTS, { reserve: r, allowlist: [WALLET, TREASURY] })).rejects.toThrow(/not in ALLOWLIST/);
+    await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, WALLET, { reserve: r, allowlist: [WALLET] })).rejects.toThrow(/does not hash/);
+  });
+
+  it("cancels and claims are signed by the owner only, with no proof", async () => {
+    const r = await reserve();
+    for (const kind of ["cancel_deposit", "cancel_redeem", "claim_assets"] as const) {
+      const ixs = await composeInstructions({ kind, seq: 3n }, WALLET, { reserve: r });
+      const signers = describeInstructions(ixs).flatMap((d) => d.accounts.filter((a) => a.signer).map((a) => a.address));
+      expect(new Set(signers)).toEqual(new Set([WALLET]));
+    }
+  });
+
   it("composes an unsigned transaction that the relay refuses until signed", async () => {
     const r = await reserve();
     const ixs = await composeInstructions({ kind: "refresh" }, WALLET, { reserve: r });
