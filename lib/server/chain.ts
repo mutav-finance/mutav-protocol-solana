@@ -5,6 +5,7 @@
 import {
   createSolanaRpc,
   getBase58Decoder,
+  getBase58Encoder,
   getBase64Encoder,
   type Address,
   type ReadonlyUint8Array,
@@ -16,7 +17,9 @@ import {
   PAYOUT_DISCRIMINATOR,
   fetchAllMaybeDepositRequest,
   fetchAllMaybeRedeemRequest,
-  fetchGuaranteesForReserve,
+  GUARANTEE_DISCRIMINATOR,
+  findGuaranteePda,
+  getGuaranteeDecoder,
   fetchVaultConfig,
   fetchVaultState,
   findAgencyExposurePda,
@@ -29,9 +32,13 @@ import {
   getFeeReceiptDecoder,
   getPayoutDecoder,
   solvencyFromAccounts,
+  DEPOSITS_FULFILLED_EVENT_DISCRIMINATOR,
+  REDEEMS_FULFILLED_EVENT_DISCRIMINATOR,
+  getDepositsFulfilledEventDecoder,
+  getRedeemsFulfilledEventDecoder,
 } from "@mutav-finance/mutav-protocol-solana";
 import { fetchEncodedAccount, getAddressDecoder } from "@solana/kit";
-import type { Ledger, ReserveView, Row, TokenFacts } from "../view";
+import type { CapitalEvent, Ledger, ReserveView, Row, TokenFacts } from "../view";
 import { serverEnv, type ServerEnv } from "./env";
 
 export class NotConfiguredError extends Error {
@@ -44,13 +51,17 @@ export function rpcFor(env: ServerEnv) {
   return cached.rpc;
 }
 
+/** Reads see a transaction as soon as it confirms (the RPC default is finalized, ~13 s behind). */
+export const READ = { commitment: "confirmed" as const };
+
 const b58 = getBase58Decoder();
 const b64 = getBase64Encoder();
+const b58enc = getBase58Encoder();
 
 /** Cluster time: block time of the current slot, falling back to the wall clock. */
 async function clusterNow(env: ServerEnv): Promise<{ slot: bigint; now: bigint }> {
   const rpc = rpcFor(env);
-  const slot = await rpc.getSlot({ commitment: "confirmed" }).send();
+  const slot = await rpc.getSlot(READ).send();
   let t: bigint | null = null;
   try {
     t = (await rpc.getBlockTime(slot).send()) as unknown as bigint | null;
@@ -64,13 +75,13 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
   if (!env.configAddress) throw new NotConfiguredError("CONFIG_ADDRESS is not set");
   const rpc = rpcFor(env);
   const o = { programAddress: env.programId };
-  const config = await fetchVaultConfig(rpc, env.configAddress);
+  const config = await fetchVaultConfig(rpc, env.configAddress, READ);
   const addresses = await findReserveAddresses(config.data.reserveMint, o);
   if (addresses.config !== env.configAddress) {
     throw new Error(`CONFIG_ADDRESS ${env.configAddress} is not the config PDA of its reserve mint under ${env.programId}`);
   }
   const [state, clock, token] = await Promise.all([
-    fetchVaultState(rpc, addresses.state),
+    fetchVaultState(rpc, addresses.state, READ),
     clusterNow(env),
     readTokenFacts(env, config.data.reserveMint, addresses.reserve),
   ]);
@@ -96,7 +107,7 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
  */
 async function readTokenFacts(env: ServerEnv, mint: Address, reserve: Address): Promise<TokenFacts> {
   const rpc = rpcFor(env);
-  const [m, r] = await Promise.all([fetchEncodedAccount(rpc, mint), fetchEncodedAccount(rpc, reserve)]);
+  const [m, r] = await Promise.all([fetchEncodedAccount(rpc, mint, READ), fetchEncodedAccount(rpc, reserve, READ)]);
   const ad = getAddressDecoder();
   let freezeAuthority: string | null = null;
   let supply: bigint | null = null;
@@ -114,6 +125,7 @@ async function readTokenFacts(env: ServerEnv, mint: Address, reserve: Address): 
 async function scan<T>(env: ServerEnv, discriminator: ReadonlyUint8Array, decode: (b: Uint8Array) => T): Promise<Row<T>[]> {
   const rows = (await rpcFor(env)
     .getProgramAccounts(env.programId, {
+      ...READ,
       encoding: "base64",
       filters: [{ memcmp: { offset: 0n, bytes: b58.decode(discriminator), encoding: "base58" } }],
     } as never)
@@ -135,8 +147,8 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
   const o = { programAddress: env.programId };
   const config = r.addresses.config as Address;
 
-  const [guarantees, filingsAll, payoutsAll, exposuresAll, feesAll] = await Promise.all([
-    fetchGuaranteesForReserve(rpc, config, o),
+  const [guaranteesAll, filingsAll, payoutsAll, exposuresAll, feesAll] = await Promise.all([
+    scan(env, GUARANTEE_DISCRIMINATOR, (b) => getGuaranteeDecoder().decode(b)),
     scan(env, CLAIM_FILING_DISCRIMINATOR, (b) => getClaimFilingDecoder().decode(b)),
     scan(env, PAYOUT_DISCRIMINATOR, (b) => getPayoutDecoder().decode(b)),
     scan(env, AGENCY_EXPOSURE_DISCRIMINATOR, (b) => getAgencyExposureDecoder().decode(b)),
@@ -145,6 +157,8 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
 
   // Keep only accounts of this reserve: filings and payouts by guarantee, the
   // rest by re-deriving their PDA under this config.
+  const guaranteeOk = await Promise.all(guaranteesAll.map(async (g) => (await findGuaranteePda({ config, id: g.data.id }, o))[0] === g.address));
+  const guarantees = guaranteesAll.filter((_, i) => guaranteeOk[i]);
   const mine = new Set(guarantees.map((g) => g.address as string));
   const filings = filingsAll.filter((f) => mine.has(f.data.guarantee));
   const payouts = payoutsAll.filter((p) => mine.has(p.data.guarantee));
@@ -176,11 +190,14 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
     Promise.all(redSeqs.map(async (seq) => (await findRedeemRequestPda({ config, seq }, o))[0])),
   ]);
   const [depAccs, redAccs] = await Promise.all([
-    depAddrs.length ? fetchAllMaybeDepositRequest(rpc, depAddrs) : Promise.resolve([]),
-    redAddrs.length ? fetchAllMaybeRedeemRequest(rpc, redAddrs) : Promise.resolve([]),
+    depAddrs.length ? fetchAllMaybeDepositRequest(rpc, depAddrs, READ) : Promise.resolve([]),
+    redAddrs.length ? fetchAllMaybeRedeemRequest(rpc, redAddrs, READ) : Promise.resolve([]),
   ]);
 
+  const capitalEvents = await readCapitalEvents(env, r);
+
   return {
+    capitalEvents,
     guarantees: guarantees.map((g) => ({ address: g.address, data: g.data })),
     filings,
     payouts,
@@ -189,4 +206,63 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
     deposits: depAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),
     redeems: redAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),
   };
+}
+
+// ── Capital events (deposit / redemption fills) ─────────────────────────────
+//
+// `claim_shares` and `claim_assets` close their request accounts, so fills are
+// read from the program's events: Anchor `emit_cpi!` self-invocations, found
+// in the inner instructions of the transactions that touched the escrows.
+
+/** Anchor's EVENT_IX_TAG (`sha256("anchor:event")[..8]`, little-endian u64). */
+const EVENT_IX_TAG = new Uint8Array([0xe4, 0x45, 0xa5, 0x2e, 0x51, 0xcb, 0x9a, 0x1d]);
+const startsWith = (b: Uint8Array, p: ArrayLike<number>, at = 0) => Array.from(p).every((x, i) => b[at + i] === x);
+
+/** Confirmed transactions never change: decode each signature once per server process. */
+const eventCache = new Map<string, CapitalEvent[]>();
+
+type JsonTx = {
+  blockTime: bigint | null;
+  transaction: { message: { accountKeys: string[] } };
+  meta: { err: unknown; loadedAddresses?: { writable: string[]; readonly: string[] }; innerInstructions?: { instructions: { programIdIndex: number; data: string }[] }[] } | null;
+};
+
+async function eventsOf(env: ServerEnv, signature: string, config: string): Promise<CapitalEvent[]> {
+  const hit = eventCache.get(signature);
+  if (hit) return hit;
+  const tx = (await rpcFor(env)
+    .getTransaction(signature as never, { ...READ, encoding: "json", maxSupportedTransactionVersion: 0 } as never)
+    .send()) as unknown as JsonTx | null;
+  if (!tx) return [];
+  const keys = [...tx.transaction.message.accountKeys, ...(tx.meta?.loadedAddresses?.writable ?? []), ...(tx.meta?.loadedAddresses?.readonly ?? [])];
+  const out: CapitalEvent[] = [];
+  for (const group of tx.meta?.innerInstructions ?? []) {
+    for (const ix of group.instructions) {
+      if (keys[ix.programIdIndex] !== env.programId) continue;
+      const data = b58enc.encode(ix.data) as Uint8Array;
+      if (!startsWith(data, EVENT_IX_TAG)) continue;
+      const ev = data.subarray(8);
+      if (startsWith(ev, DEPOSITS_FULFILLED_EVENT_DISCRIMINATOR)) {
+        const e = getDepositsFulfilledEventDecoder().decode(ev);
+        if (e.config === config) out.push({ side: "deposit", signature, ts: e.ts, fromSeq: e.fromSeq, toSeq: e.toSeq, assets: e.assets, shares: e.shares, nav: e.nav });
+      } else if (startsWith(ev, REDEEMS_FULFILLED_EVENT_DISCRIMINATOR)) {
+        const e = getRedeemsFulfilledEventDecoder().decode(ev);
+        if (e.config === config) out.push({ side: "redemption", signature, ts: e.ts, fromSeq: e.fromSeq, toSeq: e.toSeq, assets: e.assets, shares: e.shares, nav: e.nav });
+      }
+    }
+  }
+  if (tx.meta && !tx.meta.err) eventCache.set(signature, out);
+  return out;
+}
+
+/** Fills from the last 100 transactions on each escrow. */
+export async function readCapitalEvents(env: ServerEnv, r: ReserveView): Promise<CapitalEvent[]> {
+  const rpc = rpcFor(env);
+  const sigs = new Set<string>();
+  for (const a of [r.addresses.pendingDeposits, r.addresses.pendingRedemptions]) {
+    const rows = await rpc.getSignaturesForAddress(a as Address, { ...READ, limit: 100 }).send();
+    for (const row of rows) if (!row.err) sigs.add(row.signature);
+  }
+  const all = (await Promise.all([...sigs].map((s) => eventsOf(env, s, r.addresses.config)))).flat();
+  return all.sort((a, b) => Number(b.ts - a.ts));
 }

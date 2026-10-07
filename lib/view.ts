@@ -16,11 +16,26 @@ import type {
   VaultState,
 } from "@mutav-finance/mutav-protocol-solana";
 import { bytesToHex } from "./serde";
+import { fmtShares } from "./format";
 
 export type Row<T> = { address: string; data: T };
 
+/** A `DepositsFulfilled` / `RedeemsFulfilled` event, read from transaction history. */
+export type CapitalEvent = {
+  side: "deposit" | "redemption";
+  signature: string;
+  ts: bigint;
+  fromSeq: bigint;
+  toSeq: bigint;
+  assets: bigint;
+  shares: bigint;
+  nav: bigint;
+};
+
 /** Everything /api/ledger returns besides the reserve snapshot. */
 export type Ledger = {
+  /** Fills of the capital queue, newest first (request accounts close when claimed). */
+  capitalEvents: CapitalEvent[];
   guarantees: Row<Guarantee>[];
   filings: Row<ClaimFiling>[];
   payouts: Row<Payout>[];
@@ -214,7 +229,9 @@ export type FlowKind = "fee" | "claim" | "deposit" | "redemption";
 
 export type FlowRow = {
   kind: FlowKind;
+  /** The account (fees, claims) or the transaction signature (fills, `isTx`). */
   account: string;
+  isTx?: boolean;
   /** Unix seconds, or null when only a slot is known. */
   at: bigint | null;
   /** Into the reserve (+) or out of it (−), in BRS base units. */
@@ -232,7 +249,7 @@ export type FlowTotals = {
   redemptionsOut: bigint;
 };
 
-export function moneyFlows(state: Pick<VaultState, "feesInTotal" | "feeTakeTotal" | "claimsPaidTotal">, ledger: Pick<Ledger, "fees" | "payouts" | "deposits" | "redeems">): {
+export function moneyFlows(state: Pick<VaultState, "feesInTotal" | "feeTakeTotal" | "claimsPaidTotal">, ledger: Pick<Ledger, "fees" | "payouts" | "capitalEvents">): {
   totals: FlowTotals;
   rows: FlowRow[];
 } {
@@ -244,16 +261,20 @@ export function moneyFlows(state: Pick<VaultState, "feesInTotal" | "feeTakeTotal
     rows.push({ kind: "claim", account: p.address, at: p.data.paidAt, reserveDelta: -p.data.amount, treasury: 0n, detail: legName(p.data.leg) });
   }
   let depositsIn = 0n;
-  for (const d of ledger.deposits) {
-    if (d.data.status !== DEPOSIT_FULFILLED) continue;
-    depositsIn += d.data.assets;
-    rows.push({ kind: "deposit", account: d.address, at: d.data.fulfilledAt, reserveDelta: d.data.assets, treasury: 0n, detail: `seq ${d.data.seq}` });
-  }
   let redemptionsOut = 0n;
-  for (const r of ledger.redeems) {
-    if (r.data.assetsFilled === 0n) continue;
-    redemptionsOut += r.data.assetsFilled;
-    rows.push({ kind: "redemption", account: r.address, at: r.data.lastFillAt, reserveDelta: -r.data.assetsFilled, treasury: 0n, detail: `seq ${r.data.seq}` });
+  for (const e of ledger.capitalEvents) {
+    const seqs = e.fromSeq === e.toSeq ? `seq ${e.fromSeq}` : `seqs ${e.fromSeq}–${e.toSeq}`;
+    if (e.side === "deposit") depositsIn += e.assets;
+    else redemptionsOut += e.assets;
+    rows.push({
+      kind: e.side,
+      account: e.signature,
+      isTx: true,
+      at: e.ts,
+      reserveDelta: e.side === "deposit" ? e.assets : -e.assets,
+      treasury: 0n,
+      detail: `${seqs} · ${e.side === "deposit" ? "minted" : "burned"} ${fmtShares(e.shares)} shares`,
+    });
   }
   rows.sort((a, b) => Number((b.at ?? 0n) - (a.at ?? 0n)));
   return {

@@ -191,7 +191,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
       {rows.length === 0 ? (
         <Empty>No money has moved yet.</Empty>
       ) : (
-        <Table label="Money flows" head={["Flow", "When", ["Reserve", "num"], ["Treasury", "num"], "Detail", "Account"]}>
+        <Table label="Money flows" head={["Flow", "When", ["Reserve", "num"], ["Treasury", "num"], "Detail", "Account / tx"]}>
           {rows.map((f) => (
             <tr key={`${f.kind}-${f.account}`}>
               <td><Mono>{FLOW_LABEL[f.kind]}</Mono></td>
@@ -199,7 +199,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
               <Num color={f.reserveDelta >= 0n ? "var(--color-success)" : "var(--color-text)"}>{f.reserveDelta >= 0n ? "+" : "−"}{fmtBrs(f.reserveDelta < 0n ? -f.reserveDelta : f.reserveDelta)}</Num>
               <Num>{f.treasury > 0n ? fmtBrs(f.treasury) : "—"}</Num>
               <td><Mono dim>{f.detail}</Mono></td>
-              <td><Explorer value={f.account} /></td>
+              <td><Explorer value={f.account} kind={f.isTx ? "tx" : "address"} /></td>
             </tr>
           ))}
         </Table>

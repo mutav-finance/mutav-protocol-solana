@@ -52,8 +52,8 @@ import { fromHex } from "../serde";
 import type { TxRequest } from "../tx-kinds";
 import { ADMIN_KINDS } from "../tx-kinds";
 import type { Ledger, ReserveView } from "../view";
-import { rpcFor } from "./chain";
-import { serverEnv } from "./env";
+import { READ, rpcFor } from "./chain";
+import { serverEnv, type ServerEnv } from "./env";
 
 export const SYSTEM_PROGRAM = address("11111111111111111111111111111111");
 export const TOKEN_PROGRAM = address("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -101,6 +101,8 @@ export type ComposeContext = {
   ledger?: Pick<Ledger, "payouts" | "guarantees">;
   /** Allowlisted owners, to build the Merkle proof for `request_deposit`. */
   allowlist?: string[];
+  /** Server env for re-reads (defaults to process.env). */
+  env?: ServerEnv;
 };
 
 export class ComposeError extends Error {
@@ -181,7 +183,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       ];
     }
     case "close_guarantee": {
-      const g = await guaranteeAccount(r, req.guarantee);
+      const g = await guaranteeAccount(ctx, req.guarantee);
       const [agencyExposure] = await findAgencyExposurePda({ config, agencyId: g.data.agencyId }, o);
       return [getCloseGuaranteeInstruction({ ...common, operator: signer, state: a.state, guarantee: g.address, agencyExposure, id: g.data.id }, o)];
     }
@@ -221,7 +223,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       ];
     }
     case "pay_claim": {
-      const g = await guaranteeAccount(r, req.guarantee);
+      const g = await guaranteeAccount(ctx, req.guarantee);
       const noticeRefHash = bytes32(req.noticeRefHash, "noticeRefHash");
       const [claimFiling] = await findClaimFilingPda({ guarantee: g.address, noticeRefHash }, o);
       const [payout] = await findPayoutPda({ guarantee: g.address, noticeRefHash }, o);
@@ -395,8 +397,8 @@ export function queueSeqs(head: bigint, next: bigint, count: number): bigint[] {
 }
 
 /** Re-read the guarantee so its id and agency come from the chain, not from the browser. */
-async function guaranteeAccount(_r: ReserveView, guarantee: string) {
-  return fetchGuarantee(rpcFor(serverEnv()), address(guarantee));
+async function guaranteeAccount(ctx: ComposeContext, guarantee: string) {
+  return fetchGuarantee(rpcFor(ctx.env ?? serverEnv()), address(guarantee), READ);
 }
 
 /** Is this kind an admin action (so it may be wrapped in a Squads proposal)? */

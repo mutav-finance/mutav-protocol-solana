@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const signer = address(body.signer);
     const reserve = await readReserve(env);
     const ledger = body.request.kind === "refresh" ? await readLedger(env, reserve) : undefined;
-    const ctx = { reserve, ledger, allowlist: env.allowlist };
+    const ctx = { reserve, ledger, allowlist: env.allowlist, env };
 
     if (isAdminKind(body.request) && (body.via ?? "squads") === "squads") {
       if (!env.squadsMultisig) throw new ComposeError("SQUADS_MULTISIG is not set: no Squads proposal can be built");

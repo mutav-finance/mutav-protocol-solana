@@ -81,14 +81,16 @@ describe("money flows and queue", () => {
     data: { owner: "W", seq, sharesRequested: remaining, sharesRemaining: remaining, sharesFilled: 0n, assetsFilled: filled, lastFillAt: filled ? 30n : 0n, requestedAt: 5n } as unknown as RedeemRequest,
   });
 
-  it("takes totals from VaultState and lists each flow", () => {
+  it("takes totals from VaultState and fills from events, and lists each flow", () => {
     const fee = { address: "F", blockTime: 40n, data: { gross: 1_000n, take: 200n, net: 800n, slot: 9n } as unknown as FeeReceipt };
+    const ev = (side: "deposit" | "redemption", ts: bigint, assets: bigint) => ({ side, signature: `S${ts}`, ts, fromSeq: 0n, toSeq: 0n, assets, shares: 1_000_000n, nav: 1_000_000_000n });
     const { totals, rows } = moneyFlows(
       { feesInTotal: 800n, feeTakeTotal: 200n, claimsPaidTotal: 0n },
-      { fees: [fee], payouts: [], deposits: [dep(0n, 1, 5_000n), dep(1n, 0, 7n)], redeems: [red(0n, 0n, 300n)] },
+      { fees: [fee], payouts: [], capitalEvents: [ev("redemption", 30n, 300n), ev("deposit", 20n, 5_000n)] },
     );
     expect(totals).toEqual({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, claimsPaid: 0n, depositsIn: 5_000n, redemptionsOut: 300n });
     expect(rows.map((r) => [r.kind, r.reserveDelta])).toEqual([["fee", 800n], ["redemption", -300n], ["deposit", 5_000n]]);
+    expect(rows[2]).toMatchObject({ isTx: true, account: "S20", detail: "seq 0 · minted 1.000000 shares" });
   });
 
   it("lists open requests in FIFO order from the heads", () => {
