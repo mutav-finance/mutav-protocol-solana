@@ -3,6 +3,8 @@ import {
   assetsFor,
   computeSolvency,
   conversionNav,
+  coverageRequired,
+  MIN_COVERAGE_RATIO_BPS,
   headStarved,
   MathOverflowError,
   mulDiv,
@@ -22,6 +24,20 @@ describe('constants match the program', () => {
     expect(NAV_SCALE.toString()).toBe(vectors.constants.navScale);
     expect(VIRTUAL_OFFSET.toString()).toBe(vectors.constants.virtualOffset);
     expect(INSTANT_EXIT.toString()).toBe(vectors.constants.instantExit);
+    expect(MIN_COVERAGE_RATIO_BPS).toBe(vectors.constants.minCoverageRatioBps);
+  });
+});
+
+describe('coverageRequired (ADR 0016)', () => {
+  test('c × remaining cover, rounded up, never below provisions', () => {
+    // c = 0.10 on 100,000 of cover.
+    expect(coverageRequired(100_000n, 1_000, 4_000n)).toBe(10_000n);
+    expect(coverageRequired(100_000n, 1_000, 25_000n)).toBe(25_000n);
+    // 11 × 0.1 = 1.1 → 2.
+    expect(coverageRequired(11n, MIN_COVERAGE_RATIO_BPS, 0n)).toBe(2n);
+    // At c ≥ 1 provisions ≤ cover never bind.
+    expect(coverageRequired(100_000n, 10_000, 100_000n)).toBe(100_000n);
+    expect(coverageRequired(100_000n, 15_000, 100_000n)).toBe(150_000n);
   });
 });
 
@@ -80,6 +96,12 @@ describe('solvency parity (earmark_eff, free_capital, liquid_budget, …)', () =
     const outs = vectors.solvency.filter((v: any) => v.output !== 'error');
     expect(outs.some((v: any) => v.output.earmarkEff !== '0')).toBe(true);
     expect(outs.some((v: any) => v.output.mode === 1)).toBe(true);
+    // c < 1 with the provisions term binding.
+    expect(
+      outs.some(
+        (v: any) => v.input.coverageRatioBps < 10_000 && v.output.coverageRequired === v.input.provisions && v.input.provisions !== '0',
+      ),
+    ).toBe(true);
     expect(outs.some((v: any) => v.input.headStarved && v.input.featureFlags !== '0')).toBe(true);
   });
 });
