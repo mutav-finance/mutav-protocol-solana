@@ -1,0 +1,1353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f7f5f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121110" media="(prefers-color-scheme: dark)">
+<title>MUTAV Reserve Simulator</title>
+<style>
+:root{
+  --bg:#f7f5f1; --surface:#ffffff; --surface-2:#f0ece4; --ink:#1b1916; --ink-2:#55504a; --ink-3:#8a837a;
+  --line:#e2dcd2; --accent:#b8740a; --accent-soft:#f6e6c8; --copper:#a4532e;
+  --ok:#2f7d4f; --ok-soft:#dcefe2; --warn:#a15c00; --warn-soft:#fbe9cf; --risk:#a33a2a; --risk-soft:#f7dcd6;
+  --code-bg:#f0ece4; --grid:#ece7de; --s2:#2f6aa8; --s3:#b8457a;
+  --src-c:#2f6aa8; --src-r:#2f7d4f; --src-e:#a15c00;
+  --radius:8px; --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121110; --surface:#1b1a18; --surface-2:#242220; --ink:#efebe5; --ink-2:#b9b2a8; --ink-3:#857e75;
+    --line:#312e2a; --accent:#e8a020; --accent-soft:#3a2c12; --copper:#d4845a;
+    --ok:#6cc08f; --ok-soft:#1c2e23; --warn:#e8a020; --warn-soft:#352812; --risk:#ec8a78; --risk-soft:#3a1f1a;
+    --code-bg:#242220; --grid:#2a2825; --s2:#5b90d0; --s3:#d4689a;
+    --src-c:#7fa9dc; --src-r:#6cc08f; --src-e:#e8a020; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121110; --surface:#1b1a18; --surface-2:#242220; --ink:#efebe5; --ink-2:#b9b2a8; --ink-3:#857e75;
+  --line:#312e2a; --accent:#e8a020; --accent-soft:#3a2c12; --copper:#d4845a;
+  --ok:#6cc08f; --ok-soft:#1c2e23; --warn:#e8a020; --warn-soft:#352812; --risk:#ec8a78; --risk-soft:#3a1f1a;
+  --code-bg:#242220; --grid:#2a2825; --s2:#5b90d0; --s3:#d4689a;
+  --src-c:#7fa9dc; --src-r:#6cc08f; --src-e:#e8a020; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:56px;scroll-padding-bottom:64px}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);padding-bottom:44px;touch-action:manipulation}
+button,input,select{touch-action:manipulation}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);padding:.1em .35em;border-radius:4px;overflow-wrap:anywhere}
+pre{font-family:var(--mono);font-size:12px;background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;overflow-x:auto;line-height:1.55;margin:8px 0}
+/* top bar */
+.bar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar .in{max-width:1440px;margin:0 auto;padding:8px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.bar h1{font-size:16px;margin:0;letter-spacing:-.005em;font-weight:650}
+.bar .sp{flex:1}
+.tbtn{font:600 12px var(--sans);background:none;border:1px solid var(--line);color:var(--ink-2);border-radius:6px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+.tbtn:hover{background:var(--surface-2);color:var(--ink)}
+.tbtn.done{border-color:var(--ok);color:var(--ok)}
+/* workspace */
+.app{max-width:1440px;margin:0 auto;padding:12px 16px;display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:start}
+.panel{position:sticky;top:52px;max-height:calc(100vh - 104px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px;scrollbar-width:thin}
+.out{min-width:0}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .panel{position:static;max-height:none;overflow:visible}
+}
+.scen label{display:block;font:600 10.5px var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:2px 2px 4px}
+.scen select{width:100%;font:600 13px var(--sans);color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;height:32px}
+.scen select:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.scen .desc{font-size:11.5px;color:var(--ink-2);margin:5px 2px 10px;line-height:1.4}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{font:600 11.5px var(--sans);background:var(--surface-2);border:0;border-right:1px solid var(--line);color:var(--ink-2);padding:6px 4px;cursor:pointer;line-height:1.2}
+.seg button:last-child{border-right:0}
+.seg button:hover{color:var(--ink)}
+.seg button:focus-visible{outline-offset:-2px}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+details.grp{border-top:1px solid var(--line)}
+details.grp summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 2px;font:650 13px var(--sans);color:var(--ink)}
+details.grp summary .sm{font:400 11px var(--sans);color:var(--ink-3);margin-left:6px}
+details.grp summary::-webkit-details-marker{display:none}
+details.grp summary::after{content:"+";font:600 14px var(--mono);color:var(--ink-3)}
+details.grp[open] summary::after{content:"−"}
+.grp .body{padding:0 2px 10px;display:grid;gap:6px}
+.sub{font:600 10.5px var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:6px 0 0}
+.sub:first-child{margin-top:0}
+.row[hidden]{display:none}
+.f{display:grid;grid-template-columns:minmax(0,1fr) 140px;align-items:center;gap:8px}
+.f > label,.lbl{font-size:12.5px;color:var(--ink-2);line-height:1.3}
+.inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);overflow:hidden;height:28px}
+.inp:focus-within{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.inp input{flex:1;min-width:0;width:100%;font:13px var(--sans);color:var(--ink);background:transparent;border:0;padding:0 6px;outline:none;font-variant-numeric:tabular-nums;text-align:right}
+.inp .u{font:10.5px var(--mono);color:var(--ink-3);padding:0 6px 0 2px;white-space:nowrap}
+.tg{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.tg input{appearance:none;-webkit-appearance:none;width:30px;height:17px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;flex:none;margin:0;transition:background-color .15s}
+.tg input::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--surface);transition:transform .15s}
+.tg input:checked{background:var(--accent)}
+.tg input:checked::after{transform:translateX(13px)}
+@media (prefers-reduced-motion: reduce){ .tg input,.tg input::after{transition:none} }
+.info{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--ink-3);color:var(--ink-3);font:600 9px/1 var(--sans);margin-left:4px;cursor:help;vertical-align:1px;flex:none;text-transform:none;letter-spacing:0}
+.info:hover{color:var(--ink);border-color:var(--ink)}
+.src{display:inline-block;font:600 9px/1 var(--sans);letter-spacing:.03em;text-transform:uppercase;padding:2px 4px;border-radius:3px;margin-left:5px;vertical-align:1px;border:1px solid currentColor}
+.src.c{color:var(--src-c)} .src.r{color:var(--src-r)} .src.e{color:var(--src-e)}
+.hint{font-size:11px;color:var(--ink-3);line-height:1.35}
+.seghint{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border-radius:6px;padding:6px 8px;line-height:1.4}
+.seghint.risk{background:var(--risk-soft)}
+.legendsrc{font-size:11px;color:var(--ink-3);margin:2px 2px 8px;line-height:1.5}
+.linkbtn{font:inherit;font-weight:600;background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer}
+/* view mode */
+.modeseg{display:inline-grid;min-width:150px}
+.modeseg button{padding:5px 10px;font-size:12px}
+body.simple .adv{display:none!important}
+body.simple .pane{display:none!important}
+body.simple .pane[data-pane="time"]{display:block!important}
+.kgrid5{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr))}
+/* at a glance */
+.glance{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px}
+.glance h2{font:650 13px var(--sans);margin:0 0 6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.glance h2 .muted{font-weight:400}
+.glance ol{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.glance li{display:grid;grid-template-columns:168px minmax(0,1fr);gap:4px 12px;padding:7px 0;border-top:1px solid var(--line);font-size:13px;line-height:1.5}
+.glance li:first-child{border-top:0}
+.glance .q{font:600 11.5px/1.4 var(--sans);color:var(--ink-2);padding-top:2px;display:flex;gap:6px;align-items:flex-start}
+.glance .q .dot{flex:none;width:8px;height:8px;border-radius:50%;margin-top:4px;background:var(--ink-3)}
+.glance li.ok .dot{background:var(--ok)} .glance li.risk .dot{background:var(--risk)}
+.glance p{margin:0;overflow-wrap:anywhere}
+.glance b{font-weight:650;font-variant-numeric:tabular-nums}
+@media (max-width:560px){ .glance li{grid-template-columns:1fr} }
+/* KPI strip */
+.kstrip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+@media (max-width:1180px){ .kstrip{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:560px){ .kstrip{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.k{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;min-width:0}
+.k .l{font-size:11px;color:var(--ink-2);font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0}
+.k .l span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.k .v{font:650 19px/1.25 var(--sans);letter-spacing:-.01em;font-variant-numeric:tabular-nums;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k .d{font-size:11px;color:var(--ink-3);line-height:1.35;margin-top:1px;font-variant-numeric:tabular-nums}
+.k.hero{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.tag{display:inline-block;font:600 10.5px/1 var(--sans);padding:3px 6px;border-radius:4px;white-space:nowrap;margin-right:4px}
+.tag.ok{background:var(--surface);color:var(--ok)} .tag.risk{background:var(--surface);color:var(--risk)}
+.tbl .tag.ok{background:var(--ok-soft)} .tbl .tag.risk{background:var(--risk-soft)}
+/* tabs */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:12px 0 10px;overflow-x:auto;scrollbar-width:none}
+.tabs button{font:600 12.5px var(--sans);background:none;border:0;border-bottom:2px solid transparent;color:var(--ink-2);padding:7px 10px;cursor:pointer;white-space:nowrap;margin-bottom:-1px}
+.tabs button:hover{color:var(--ink)}
+.tabs button:focus-visible{outline-offset:-2px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.pane[hidden]{display:none}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+h3{font-size:13px;margin:16px 0 6px;font-weight:650;text-wrap:balance}
+h3:first-child{margin-top:0}
+.muted{color:var(--ink-3);font-size:12px}
+.kgrid{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr))}
+/* chart */
+.chart{position:relative}
+.chart svg{display:block;width:100%}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 2px 0;font-size:11.5px;color:var(--ink-2)}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--accent);vertical-align:-1px;margin-right:5px}
+.legend .ln{display:inline-block;width:16px;border-top:2px solid var(--accent);vertical-align:middle;margin-right:5px}
+.legend .sw.s2{background:var(--s2)} .legend .ln.s2{border-color:var(--s2)} .legend .sw.s3{background:var(--s3)}
+.legend .ref{display:inline-block;width:16px;border-top:1.5px dashed var(--ink-2);vertical-align:middle;margin-right:5px}
+.legend .req{display:inline-block;width:16px;border-top:2px solid var(--ink);vertical-align:middle;margin-right:5px}
+.legend .blk{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--risk);vertical-align:middle;margin-right:5px}
+.c-grid{stroke:var(--grid);stroke-width:1}
+.c-base{stroke:var(--ink-3);stroke-width:1}
+.c-tick{fill:var(--ink-3);font:11px var(--sans);font-variant-numeric:tabular-nums}
+.c-ptitle{fill:var(--ink);font:600 12px var(--sans)}
+.c-pval{fill:var(--ink-2);font:11px var(--sans);font-variant-numeric:tabular-nums}
+.c-bar{fill:var(--accent)} .c-bar.s2{fill:var(--s2)} .c-bar.s3{fill:var(--s3)}
+.c-line.s2{stroke:var(--s2)} .c-dot.s2{fill:var(--s2)}
+.c-line{stroke:var(--accent);stroke-width:2;fill:none;stroke-linejoin:round;stroke-linecap:round}
+.c-req{stroke:var(--ink);stroke-width:2;fill:none;stroke-linejoin:round}
+.c-reqdot{fill:var(--ink);stroke:var(--surface);stroke-width:2}
+.c-area{fill:var(--accent);opacity:.1}
+.c-dot{fill:var(--accent);stroke:var(--surface);stroke-width:2}
+.c-ref{stroke:var(--ink-2);stroke-width:1.5;stroke-dasharray:5 4;fill:none}
+.c-blk{fill:var(--risk)}
+.c-hit{fill:transparent;cursor:crosshair}
+.c-hover{fill:var(--ink);opacity:.05}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;line-height:1.45;box-shadow:0 4px 16px rgba(0,0,0,.14);display:none;min-width:200px;z-index:3}
+.tip b{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:2px}
+.tip .r{display:flex;justify-content:space-between;gap:12px}
+.tip .r span:last-child{font-variant-numeric:tabular-nums;font-weight:600}
+.htip{position:fixed;z-index:50;display:none;max-width:min(300px,calc(100vw - 16px));background:var(--ink);color:var(--bg);font:12px/1.4 var(--sans);padding:6px 9px;border-radius:6px;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.18);text-transform:none;letter-spacing:0;font-weight:400;white-space:normal}
+/* tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th,.tbl td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:600;background:var(--surface-2)}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tfoot td{font-weight:650;background:var(--surface-2);border-bottom:none;border-top:1px solid var(--line)}
+.tbl td.neg{color:var(--risk)}
+.tbl tr.cur td{font-weight:650;background:var(--accent-soft)}
+.tbl td .sub2{display:block;font-size:11px;color:var(--ink-3);font-weight:400;white-space:normal;min-width:200px}
+.tbl input[type=radio]{accent-color:var(--accent);width:16px;height:16px;margin:0;cursor:pointer}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:7px 10px;border-radius:0 6px 6px 0;margin:8px 0;font-size:12.5px}
+.callout.risk{border-color:var(--risk);background:var(--risk-soft)}
+.method ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--ink-2)}
+.method li{margin:3px 0}
+.method p{font-size:12.5px;color:var(--ink-2);margin:4px 0}
+.disc-full{border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;font-size:12.5px;color:var(--ink-2);background:var(--surface-2)}
+.footbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-2);line-height:1.35}
+.footbar .in{max-width:1440px;margin:0 auto;padding:7px 16px}
+.footbar strong{color:var(--ink)}
+@media (max-width:560px){ .bar{position:static} html{scroll-padding-top:0} body{padding-bottom:64px} .bar h1{font-size:15px} .k .v{font-size:17px} }
+@media print{ .bar .tbtn,.tabs,.footbar,.htip{display:none} .panel{position:static;max-height:none} .pane[hidden]{display:block} body{background:#fff;padding:0} details.grp > .body{display:grid} }
+</style>
+</head>
+<body>
+
+<div class="bar"><div class="in">
+  <span class="brand" translate="no">MUTAV</span>
+  <h1>Reserve simulator</h1>
+  <span class="sp"></span>
+  <div class="seg modeseg" role="group" aria-label="View"><button type="button" data-mode="simple">Simple</button><button type="button" data-mode="advanced">Advanced</button></div>
+  <button class="tbtn" type="button" id="copyBtn" title="Copy a plain-text snapshot: the five answers, inputs and key results">Copy summary</button>
+  <button class="tbtn" type="button" id="csvBtn" title="Download the month-by-month table as CSV">Export CSV</button>
+  <button class="tbtn" type="button" id="resetBtn" title="Return every input to the 02 defaults">Reset</button>
+  <button class="tbtn" type="button" id="themeBtn" title="Toggle light/dark">Theme</button>
+</div></div>
+
+<div class="app">
+  <aside class="panel" id="panel" aria-label="Inputs">
+    <div class="scen">
+      <label for="scenSel">Scenario</label>
+      <select id="scenSel"></select>
+      <div class="desc" id="scenDesc"></div>
+    </div>
+    <div class="legendsrc adv">Assumption sources: <span class="src c">canonical</span> 02-parameters / 40-reserve · <span class="src r">research</span> notes in this folder · <span class="src e">estimate</span> prior until pilot data.</div>
+    <div id="groups"></div>
+  </aside>
+
+  <main class="out" id="main">
+    <section class="glance" aria-labelledby="glanceH">
+      <h2 id="glanceH">At a glance <span class="muted" id="glanceSub"></span></h2>
+      <ol id="glance" aria-live="polite"></ol>
+    </section>
+    <div class="kstrip" id="kstrip"></div>
+
+    <div class="tabs adv" role="tablist" id="tabs" aria-label="Detail views">
+      <button role="tab" type="button" id="tab-time" data-tab="time" aria-controls="pane-time" aria-selected="true">Reserve over time</button>
+      <button role="tab" type="button" id="tab-yield" data-tab="yield" aria-controls="pane-yield" aria-selected="false" tabindex="-1">Reserve yield</button>
+      <button role="tab" type="button" id="tab-months" data-tab="months" aria-controls="pane-months" aria-selected="false" tabindex="-1">Month by month</button>
+      <button role="tab" type="button" id="tab-mutav" data-tab="mutav" aria-controls="pane-mutav" aria-selected="false" tabindex="-1">What MUTAV earns</button>
+      <button role="tab" type="button" id="tab-sizing" data-tab="sizing" aria-controls="pane-sizing" aria-selected="false" tabindex="-1">Sizing &amp; protection</button>
+      <button role="tab" type="button" id="tab-method" data-tab="method" aria-controls="pane-method" aria-selected="false" tabindex="-1">Method</button>
+    </div>
+
+    <section class="pane" role="tabpanel" id="pane-time" aria-labelledby="tab-time" data-pane="time">
+      <div class="card chart" id="chartBox">
+        <div id="chart"></div>
+        <div class="legend">
+          <span><i class="sw"></i>Balance</span>
+          <span><i class="req"></i>Required reserve</span>
+          <span id="lgW"><i class="sw s3"></i>Withdrawals</span>
+          <span><i class="blk"></i>Growth blocked</span>
+          <span><i class="ln"></i>Cumulative reserve net gain</span>
+          <span><i class="ref"></i>Same capital at Selic</span>
+          <span class="adv"><i class="sw s2"></i>MUTAV take (monthly)</span>
+          <span class="adv"><i class="ln s2"></i>Cumulative take</span>
+          <span id="lgCost" class="adv" hidden><i class="ref"></i>Monthly operating cost</span>
+        </div>
+        <div class="tip" id="tip" role="status"></div>
+      </div>
+      <p class="muted" style="margin:6px 2px 0">Shared month axis, one scale per panel. Hover for values.</p>
+    </section>
+
+    <section class="pane" role="tabpanel" id="pane-yield" aria-labelledby="tab-yield" data-pane="yield" hidden>
+      <div class="kgrid" id="yieldKpis"></div>
+      <div class="card chart" id="yieldBox" style="margin-top:10px">
+        <div id="ychart"></div>
+        <div class="legend"><span><i class="sw"></i>Reserve net gain (monthly)</span><span><i class="ref"></i>Same balance at Selic (monthly)</span></div>
+        <div class="tip" id="ytip" role="status"></div>
+      </div>
+      <h3>Monthly yield</h3>
+      <div class="tbl-wrap"><table class="tbl" id="yieldTbl"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+      <p class="muted" style="margin:6px 2px 0">Yield = (net fees − claims + TESOURO) ÷ average opening balance, annualized (× 12 / months). Selic line = what the same opening balance earns at Selic.</p>
+    </section>
+
+    <section class="pane" role="tabpanel" id="pane-months" aria-labelledby="tab-months" data-pane="months" hidden>
+      <div class="tbl-wrap">
+        <table class="tbl" id="tbl"><thead></thead><tbody></tbody><tfoot></tfoot></table>
+      </div>
+      <p class="muted" style="margin:6px 2px 0">BRL. Balance is end of month, after withdrawals. MUTAV take goes to the treasury and is never counted in the reserve.</p>
+    </section>
+
+    <section class="pane" role="tabpanel" id="pane-mutav" aria-labelledby="tab-mutav" data-pane="mutav" hidden>
+      <h3>1 · Take on guarantee fees <span class="info" tabindex="0" data-tip="Take × guarantee fees, paid to the MUTAV treasury (ADR 0009). Gross revenue: before operating costs, PIX and offramp fees, and taxes.">i</span></h3>
+      <div class="kgrid" id="takeKpis"></div>
+      <div id="marginBox"></div>
+      <h3>Take rate sensitivity <span class="info" tabindex="0" data-tip="Re-runs the simulation at each take rate. A higher take leaves less guarantee fee for the reserve.">i</span></h3>
+      <div class="tbl-wrap"><table class="tbl" id="sensTbl"><thead></thead><tbody></tbody></table></div>
+      <h3>2 · MUTAV share of the reserve <span class="info" tabindex="0" data-tip="MUTAV's capital earns a pro-rata share of the reserve's net gain and of any withdrawals, the same way any investor's does.">i</span></h3>
+      <div class="kgrid" id="shareKpis"></div>
+      <h3>3 · Combined</h3>
+      <div class="kgrid" id="comboKpis"></div>
+      <p class="muted" style="margin:8px 2px 0">Take is gross revenue: before operating costs, PIX and offramp fees, and taxes. Set operating costs under Assumptions → MUTAV &amp; operations.</p>
+    </section>
+
+    <section class="pane" role="tabpanel" id="pane-sizing" aria-labelledby="tab-sizing" data-pane="sizing" hidden>
+      <h3>Compare sizing rules <span class="info" tabindex="0" data-tip="Each row re-runs the whole simulation with a different rule for the required reserve. The coverage policy is the live rule; the other two are for comparison.">i</span></h3>
+      <div class="tbl-wrap"><table class="tbl" id="ruleTbl"><thead></thead><tbody></tbody></table></div>
+      <p class="muted" style="margin:6px 2px 0" id="ruleNote2"></p>
+
+      <h3>Book size vs the ending balance <span class="info" tabindex="0" data-tip="Steady state: each book size held full for a year, backed by the simulated balance at the last month. Shows how far the same capital stretches.">i</span></h3>
+      <div class="tbl-wrap"><table class="tbl" id="sizeTbl"><thead></thead><tbody></tbody></table></div>
+      <p class="muted" style="margin:6px 2px 0">Full-year figures with the book complete; the ramp-up months earn less. TESOURO income needs a confirmed BRS↔TESOURO path. Delinquency, exit and eviction inputs are estimates until pilot data.</p>
+      <p class="muted" style="margin:4px 2px 0" id="sizeNote"></p>
+
+      <h3>Debts covered: A, B, C side by side <span class="info" tabindex="0" data-tip="Same inputs, with only the debts the fiança covers changed.">i</span></h3>
+      <div class="tbl-wrap"><table class="tbl" id="scopeTbl"><thead></thead><tbody></tbody></table></div>
+      <p class="muted" style="margin:6px 2px 0" id="scopeNote"></p>
+
+      <h3>Expected claims build-up (per lease per year, current inputs)</h3>
+      <div class="tbl-wrap"><table class="tbl" id="buildTbl"><thead></thead><tbody></tbody></table></div>
+    </section>
+
+    <section class="pane method" role="tabpanel" id="pane-method" aria-labelledby="tab-method" data-pane="method" hidden>
+      <h3>How this is computed</h3>
+      <p>Monthly steps <code>m = 1..N</code>. The reserve is a <strong>balance</strong> simulated month by month and checked against the <strong>required reserve</strong>. The solvency rule follows the reserve program (spec §4): only the surplus above the required reserve can back new guarantees or leave.</p>
+<pre>// capital
+capital_in(m)        = starting_capital                     if m = 1
+                     + monthly_raise                        if from ≤ m ≤ until (until 0 = N)
+
+// required reserve per lease
+coverage policy      = max(ceiling_share × cover_per_lease, max(1, bad_years) × tail_per_lease)
+                       cover_per_lease = rent × (arrears_ceiling + exit_ceiling)
+                       tail_per_lease  = expected_claims × bad_year_multiplier
+compare: full (c)    = c × cover_per_lease
+compare: exp.-loss   = tail_years × tail_per_lease
+required(m)          = active(m) × required_per_lease
+
+// solvency gate (register_guarantee is gated on free capital)
+opening(m)           = balance(m−1) + capital_in(m)
+new(m)               = min(new_per_month, floor((opening(m) − existing(m) × required_per_lease) / required_per_lease))
+                       blocked when new(m) &lt; new_per_month; the book holds, claims are still paid
+active(m)            = leases signed in the last lease_term months
+
+// flows
+guarantee_fees(m)    = active(m) × rent × fee × fee_periods_per_year / 12
+mutav_take(m)        = guarantee_fees(m) × take                 // treasury, never in the reserve
+net_fees(m)          = guarantee_fees(m) − mutav_take(m)
+claims_paid(m)       = active(m) × expected_claims / 12 × ramp(m)         ramp(m) = min(1, m/4) if on
+                     + active(m) × (tail_per_lease − expected_claims) / 12   in the 12 months from the bad-year month
+yield(m)             = opening(m) × tesouro_share × tesouro_rate / 12
+net_gain(m)          = net_fees(m) + yield(m) − claims_paid(m)
+
+balance(m)           = balance(m−1) + capital_in(m) + net_fees(m) + yield(m) − claims_paid(m) − withdrawals(m)
+surplus(m)           = max(0, balance before withdrawal − required(m))
+surplus_or_shortfall = balance(m) − required(m)
+
+// withdrawals (only ever from surplus, like strict FIFO redemptions)
+none                 = 0
+surplus above buffer = max(0, surplus(m) − buffer × required(m))
+share of net gain    = min(surplus(m), share × max(0, net_gain(m)))
+
+// expected claims per lease per year (event level)
+arrears_leg          = min(12 × delinquency, arrears_ceiling) × rent
+evictions            = eviction_rate × min(eviction_cost, exit_ceiling) × rent
+exit_debts           = A: other_exit_debts × rent · B: (other_exit_debts − penalty) × rent · C: 0
+claims_to_fees       = expected_claims / (rent × fee × fee_periods_per_year)
+
+// at-a-glance answers
+leases_balance_backs = floor(balance(N) / required_per_lease)
+new_leases_per_month_from_gain = net_gain(N) / required_per_lease
+raise_to_avoid_block = smallest monthly raise (R$1.000 steps, same window) with 0 blocked months
+capital_for_target   = growth_target × required_per_lease − balance(N)
+payback_month        = first m with Σ net_gain ≥ starting_capital (projected at month-N pace if beyond N)
+return_on_required   = (annual net fees − expected_claims) / required_per_lease + tesouro_share × tesouro_rate
+
+// reserve yield (simulated)
+avg_balance          = mean opening(m)
+reserve_yield        = Σ (net_fees − claims_paid) / avg_balance × 12/N  +  Σ tesouro_yield / avg_balance × 12/N
+return_on_capital    = Σ net_gain / capital_raised   (annualized × 12/N)
+selic_benchmark(m)   = opening(m) × selic / 12       // the same capital at Selic
+
+// Sizing &amp; protection (steady state, book full for a year, reserve = balance(N))
+normal_net_gain      = net fees − leases × expected_claims + reserve × tesouro_share × tesouro_rate
+bad_year_net_gain    = net fees − leases × tail_per_lease + reserve × tesouro_share × tesouro_rate</pre>
+
+      <h3>Sources and defaults</h3>
+      <ul>
+        <li><strong>Pilot parameters:</strong> <code>mutav/docs/operation/02-parameters.md</code> on <code>origin/main</code> (reviewed 2026-09-19, the single source of numbers): rent R$2.200, guarantee fee 10% (modelled value inside 9–15% by score), rent-arrears ceiling 12× rent (working value, under legal review), exit ceiling 6× as a separate sublimit, capitalized reserve R$300.000, ~6-month pilot, ~28 new contracts/month to a 170-lease book, reserve ~80% TESOURO. Fee charged 12× a year: agencies are billed one boleto a month (was 12,17 = 365 / 30).</li>
+        <li><strong>Coverage policy:</strong> <code>40-reserve.md</code> / open question 9w: the reserve must hold at least 10% of all active ceilings and 2,0 bad years of claims, with a hard floor of 1,0. At R$39.600 of ceilings per lease the 10% rule binds: R$300.000 supports about 75 leases, and 170 leases need about R$673.200.</li>
+        <li><strong>Delinquency:</strong> base 2,01% of annual rent = Superlógica IIL, RS apartments, average of the three latest prints (abr/jun/jul 2026), verified at source 2026-09-08. Stress 2,87% (IIL RS aggregate). Tail 5,93% (Loft IIA RS, 15-day threshold). Applied as an annual rate on annual rent: <code>12 × rate × rent</code>.</li>
+        <li><strong>Evictions:</strong> <code>12-eviction-cost-south.md</code>. While the fiança is live the art. 59 §1º IX liminar is unavailable, so a forced exit costs about 6× rent (capped at the exit ceiling). If the fiança extinguishes once the arrears ceiling is exhausted, the liminar becomes arguable: base 5,5×, low 2,5×. <strong>Eviction rate</strong>: <code>12-eviction-rate-south.md</code>, measured filings, adjusted (not MUTAV data). CNJ DataJud first-instance despejo filings (all 27 state courts, own query 2026-10-02) ÷ IBGE PNAD rented households give 0,5–0,7% of South leases facing a suit per year; about a third end in a court-ordered exit. Adjusted for an underwritten, agency-managed book: <strong>low 0,10% / base 0,25% / high 0,60%</strong> per year.</li>
+        <li><strong>Other exit debts:</strong> <code>12-exit-costs-non-eviction.md</code> §9, base case per lease-year: damage incl. painting 0,056×; accessory charges 0,024×; early-termination penalty 0,077×; abandonment 0,020×; alterations 0,010×; total ≈ 0,19×. All [inference].</li>
+        <li><strong>Bad-year multiplier 2,33:</strong> calibrated to <code>40-reserve</code>: R$1.894 per lease per year in scope B (R$321,9k / 170) against R$813 of expected claims.</li>
+        <li><strong>Debts covered:</strong> A = all tenant debts incl. the termination penalty; B = excluding the penalty (default); C = evictions and abandonment only. In C, abandonment is handled through the eviction event (despejo / imissão, art. 66).</li>
+        <li><strong>Take rate 20%:</strong> simulator default; the value is still open (06-business-model). <strong>Lease term 30 months:</strong> typical lease (06, PY:109). <strong>TESOURO 11,58%:</strong> Etherfuse on-chain accrual, unconfirmed. <strong>Selic 13,75%.</strong></li>
+        <li><strong>Changed vs earlier versions:</strong> delinquency 2,46% → 2,01%, rent R$2.000 → R$2.200, fee 12% → 10% per 30-day period, ceilings 3+6 → 12+6, eviction rate 2% prior → 0,25% measured-adjusted, single loss ratio → event-level claims (claims-to-fees ratio). The reserve is a simulated balance; "fixed capital" sizing is replaced by the coverage policy plus explicit capital inputs. 2026-10-02 clarity pass: answers first, sizing-rule switch moved into Sizing &amp; protection, the "fiança extinguishes" toggle removed (it only reset the eviction cost; set that directly).</li>
+      </ul>
+      <h3>Simplifications</h3>
+      <ul>
+        <li>Claims are paid as a smooth expected monthly flow; they do not reduce remaining cover. No subrogation recoveries, no TESOURO price moves, constant rates.</li>
+        <li>Yield accrues on the opening balance at <code>TESOURO share × rate / 12</code>; the liquid sleeve earns nothing.</li>
+        <li>The gate admits as many of the month's planned leases as the surplus allows; blocked leases are not carried over.</li>
+        <li>Selic is the opportunity cost of the same capital, not a target.</li>
+      </ul>
+      <h3>Disclaimer</h3>
+      <div class="disc-full"><strong>Model estimates, not a return promise.</strong> This is a reserve-planning tool. It is not investment advice and not an offer or solicitation to buy securities or any other financial product. Assumptions are simplified, and several inputs are priors until pilot data exists. MUTAV's reserve is operational infrastructure backing rental guarantees (fiança onerosa).</div>
+    </section>
+  </main>
+</div>
+
+<div class="htip" id="htip" role="tooltip"></div>
+<div class="footbar" role="note"><div class="in"><strong>Model estimates, not a return promise.</strong> Reserve planning only; not investment advice and not an offer of securities. Self-contained, works offline.</div></div>
+
+<script id="calc">
+/* Pure model. No DOM access, so it can be tested in node. Defaults: mutav/docs/operation/02-parameters.md (origin/main, reviewed 2026-09-19). */
+var MUTAV_DEFAULTS = {
+  months: 6, perMonth: 28, leaseTerm: 30,
+  rent: 2200, feePct: 10, periods: 12, defaultCover: 12, exitCover: 6,
+  scope: 'B', rhoPct: 2.01, evictRatePct: 0.25, evictMult: 6,
+  nonEvictX: 0.19, penaltyX: 0.077, ramp: true, stressOn: false, stressMonth: 3,
+  startCapital: 300000, monthlyRaise: 0, raiseFrom: 2, raiseUntil: 0,
+  sizing: 'policy', worstFloorPct: 10, tailFloor: 2, coverage: 1.0, tailYears: 1, tailMult: 2.33,
+  tesouroSharePct: 80, tesouroPct: 11.58, selicPct: 13.75,
+  withdraw: 'none', bufferPct: 25, sharePct: 50,
+  takePct: 20, mutavSharePct: 100, opCostPerLease: 0, opCostFixed: 0
+};
+
+function mutavPayouts(p, scope) {
+  var sc = scope || p.scope;
+  var defaultLeg = Math.min(12 * p.rhoPct / 100, Math.max(0, p.defaultCover)) * p.rent;
+  var evictions = (p.evictRatePct / 100) * Math.min(p.evictMult, Math.max(0, p.exitCover)) * p.rent;
+  var exitDebts = sc === 'A' ? p.nonEvictX * p.rent : sc === 'B' ? Math.max(0, p.nonEvictX - p.penaltyX) * p.rent : 0;
+  var total = defaultLeg + evictions + exitDebts;
+  var grossAnnual = p.rent * (p.feePct / 100) * p.periods;
+  return { scope: sc, defaultLeg: defaultLeg, evictions: evictions, exitDebts: exitDebts, total: total,
+    grossAnnual: grossAnnual, ratio: grossAnnual > 0 ? total / grossAnnual : 0 };
+}
+
+function mutavRequirement(p, pay) {
+  var cover = p.rent * (p.defaultCover + p.exitCover);
+  var tail = p.tailMult * pay.total;
+  var mode = p.sizing === 'full' || p.sizing === 'B' ? p.sizing : 'policy';
+  var perLease, binds;
+  if (mode === 'full') { perLease = p.coverage * cover; binds = 'c × ceilings'; }
+  else if (mode === 'B') { perLease = p.tailYears * tail; binds = 'tail years'; }
+  else {
+    var worst = p.worstFloorPct / 100 * cover, tailF = Math.max(1, p.tailFloor) * tail;
+    perLease = Math.max(worst, tailF); binds = worst >= tailF ? 'worst-case floor' : 'tail-year floor';
+  }
+  return { mode: mode, perLease: perLease, binds: binds, cover: cover, tail: tail };
+}
+
+function mutavCompute(p) {
+  var N = Math.max(1, Math.round(p.months));
+  var term = Math.max(1, Math.round(p.leaseTerm));
+  var fee = p.feePct / 100, take = p.takePct / 100;
+  var tShare = p.tesouroSharePct / 100, tRate = p.tesouroPct / 100;
+  var pay = mutavPayouts(p), req = mutavRequirement(p, pay), rpl = req.perLease;
+  var until = p.raiseUntil > 0 ? p.raiseUntil : N;
+  var cohorts = [], rows = [], balance = 0, capital = 0, cum = 0, cumW = 0, cumTake = 0;
+  var minHead = Infinity, minHeadMonth = 0, blocked = 0, firstBlocked = 0, below = 0, firstBelow = 0, selfFundMonth = 0;
+  var selic = p.selicPct / 100, sumOpening = 0, sumUW = 0, cumSelic = 0;
+  var tot = { gross: 0, take: 0, net: 0, claims: 0, tesouro: 0, gain: 0, withdrawals: 0 };
+  for (var m = 1; m <= N; m++) {
+    var deposit = (m === 1 ? p.startCapital : 0) + (p.monthlyRaise > 0 && m >= p.raiseFrom && m <= until ? p.monthlyRaise : 0);
+    capital += deposit;
+    var opening = balance + deposit;
+    var existing = 0;
+    for (var k = Math.max(1, m - term + 1); k < m; k++) existing += cohorts[k] || 0;
+    var free = opening - existing * rpl;
+    var allowed = rpl > 0 ? Math.max(0, Math.min(p.perMonth, Math.floor(free / rpl + 1e-9))) : p.perMonth;
+    var isBlocked = allowed < p.perMonth;
+    if (isBlocked) { blocked++; if (!firstBlocked) firstBlocked = m; }
+    cohorts[m] = allowed;
+    var active = existing + allowed;
+    var gross = active * p.rent * fee * p.periods / 12;
+    var takeAmt = gross * take, netFees = gross - takeAmt;
+    var ramp = p.ramp ? Math.min(1, m / 4) : 1;
+    var claims = active * pay.total / 12 * ramp;
+    var stress = p.stressOn && m >= p.stressMonth && m < p.stressMonth + 12 ? active * (req.tail - pay.total) / 12 : 0;
+    var claimsPaid = claims + stress;
+    var tesouro = Math.max(0, opening) * tShare * tRate / 12;
+    var gain = netFees + tesouro - claimsPaid;
+    var uw = netFees - claimsPaid, selicOpp = Math.max(0, opening) * selic / 12;
+    sumOpening += Math.max(0, opening); sumUW += uw; cumSelic += selicOpp;
+    var pre = opening + gain;
+    var required = active * rpl;
+    var surplus = Math.max(0, pre - required);
+    var w = 0;
+    if (p.withdraw === 'buffer') w = Math.max(0, surplus - (p.bufferPct / 100) * required);
+    else if (p.withdraw === 'share') w = Math.min(surplus, (p.sharePct / 100) * Math.max(0, gain));
+    balance = pre - w;
+    var headroom = balance - required;
+    if (headroom < minHead) { minHead = headroom; minHeadMonth = m; }
+    if (headroom < -1e-6) { below++; if (!firstBelow) firstBelow = m; }
+    cum += gain; cumW += w; cumTake += takeAmt;
+    if (!selfFundMonth && cum >= p.startCapital && p.startCapital > 0) selfFundMonth = m;
+    tot.gross += gross; tot.take += takeAmt; tot.net += netFees; tot.claims += claimsPaid; tot.tesouro += tesouro; tot.gain += gain; tot.withdrawals += w;
+    rows.push({ month: m, planned: p.perMonth, newLeases: allowed, blocked: isBlocked, active: active, deposit: deposit, opening: opening,
+      required: required, balance: balance, surplus: surplus, headroom: headroom, gross: gross, take: takeAmt, netFees: netFees,
+      claims: claimsPaid, stressClaims: stress, tesouro: tesouro, gain: gain, withdrawal: w, cumGain: cum, cumW: cumW, cumTake: cumTake,
+      uw: uw, selicOpp: selicOpp, cumSelic: cumSelic, yieldAnn: opening > 0 ? gain / opening * 12 : 0 });
+  }
+  var last = rows[N - 1];
+  var selfFundProjected = false;
+  if (!selfFundMonth) {
+    if (last.gain > 0 && p.startCapital > 0) { selfFundMonth = N + Math.ceil((p.startCapital - cum) / last.gain); selfFundProjected = true; }
+    else selfFundMonth = Infinity;
+  }
+  var plannedActive = p.perMonth * Math.min(N, term);
+  /* realized reserve yield over the horizon, on the average opening balance, annualized (simple) */
+  var avgOpening = sumOpening / N, annF = 12 / N;
+  var yUW = avgOpening > 0 ? sumUW / avgOpening * annF : 0, yTES = avgOpening > 0 ? tot.tesouro / avgOpening * annF : 0;
+  var yieldSim = { avgBalance: avgOpening, underwriting: yUW, tesouro: yTES, total: yUW + yTES, vsSelic: yUW + yTES - selic,
+    returnOnCapital: capital > 0 ? cum / capital : 0, returnOnCapitalAnn: capital > 0 ? cum / capital * annF : 0,
+    gain: cum, selicGain: cumSelic, beatsSelic: cum >= cumSelic };
+  var netFeesAnnual = pay.grossAnnual * (1 - take);
+  var underwriting = rpl > 0 ? (netFeesAnnual - pay.total) / rpl : 0;
+  var tesouroYield = tShare * tRate, steady = underwriting + tesouroYield;
+  /* MUTAV money flows (ADR 0009) */
+  var mShare = Math.min(1, Math.max(0, p.mutavSharePct / 100));
+  var costLease = p.opCostPerLease || 0, costFixed = p.opCostFixed || 0;
+  var takePerLease = p.rent * fee * p.periods / 12 * take, marginPerLease = takePerLease - costLease, opCostTotal = 0;
+  rows.forEach(function(x){ x.opCost = x.active * costLease + costFixed; opCostTotal += x.opCost; });
+  var mutav = {
+    share: mShare, takeFinalMonth: last.take, takeTotal: tot.take, takeRunRate: last.take * 12,
+    takePerLease: takePerLease, opCostTotal: opCostTotal, takeNetTotal: tot.take - opCostTotal,
+    marginPerLease: marginPerLease, marginPct: takePerLease > 0 ? marginPerLease / takePerLease : 0,
+    breakEvenLeases: marginPerLease > 0 ? Math.ceil(costFixed / marginPerLease) : Infinity,
+    reserveGain: cum * mShare, investorReserveGain: cum * (1 - mShare), distributions: cumW * mShare, investorDistributions: cumW * (1 - mShare),
+    capitalCommitted: capital * mShare,
+    economicResult: tot.take + cum * mShare, economicResultNet: tot.take - opCostTotal + cum * mShare
+  };
+  return {
+    mutav: mutav, payouts: pay, req: req, rows: rows, totals: tot, months: N, yieldSim: yieldSim,
+    endBalance: last.balance, endRequired: last.required, endSurplus: Math.max(0, last.balance - last.required),
+    minHeadroom: minHead, minHeadMonth: minHeadMonth, blockedMonths: blocked, firstBlocked: firstBlocked,
+    belowFloorMonths: below, firstBelow: firstBelow,
+    capitalRaised: capital, cumGain: cum, cumWithdrawals: cumW,
+    selfFundedLeases: rpl > 0 ? Math.floor(last.balance / rpl) : Infinity,
+    selfFundMonth: selfFundMonth, selfFundProjected: selfFundProjected,
+    finalActive: last.active, plannedActive: plannedActive, plannedRequired: plannedActive * rpl,
+    capacityAtStart: rpl > 0 ? Math.floor(p.startCapital / rpl) : Infinity,
+    steady: { underwriting: underwriting, tesouro: tesouroYield, total: steady },
+    selic: p.selicPct / 100, spreadVsSelic: steady - p.selicPct / 100,
+    tailPerLease: req.tail, coverPerLease: req.cover,
+    pctCeilings: last.active > 0 ? last.balance / (last.active * req.cover) : Infinity,
+    tailCover: last.active > 0 && req.tail > 0 ? last.balance / (last.active * req.tail) : Infinity
+  };
+}
+
+/* Steady state, book full for a year. claims / tail per lease per year. */
+function mutavSizingRow(p, leases, reserve, claims, tail) {
+  var cover = p.rent * (p.defaultCover + p.exitCover);
+  var gross = leases * p.rent * (p.feePct / 100) * p.periods;
+  var take = gross * p.takePct / 100, net = gross - take;
+  var tes = reserve * (p.tesouroSharePct / 100) * (p.tesouroPct / 100);
+  var normal = net - leases * claims + tes, bad = net - leases * tail + tes;
+  return { leases: leases, reserve: reserve, pctCeilings: reserve / (leases * cover), tailX: reserve / (leases * tail),
+    gross: gross, take: take, tesouro: tes, normal: normal, normalRet: normal / reserve, bad: bad, badRet: bad / reserve,
+    vsSelic: normal / reserve - p.selicPct / 100 };
+}
+function mutavSizingTable(p, r, pilotBook) {
+  r = r || mutavCompute(p);
+  var reserve = r.endBalance, rpl = r.req.perLease;
+  var policyMax = rpl > 0 ? Math.floor(reserve / rpl) : 0;
+  pilotBook = pilotBook || 60;
+  var sizes = [7, 15, 30, pilotBook, 60, 100, policyMax, r.finalActive].filter(function(n, i, a){ return n > 0 && a.indexOf(n) === i; }).sort(function(a, b){ return a - b; });
+  return { reserve: reserve, policyMax: policyMax, current: r.finalActive, claims: r.payouts.total, tail: r.tailPerLease,
+    rows: sizes.map(function(n){
+      var row = mutavSizingRow(p, n, reserve, r.payouts.total, r.tailPerLease);
+      row.meets = reserve >= n * rpl - 1e-6; row.isCurrent = n === r.finalActive; row.isMax = n === policyMax; row.isRec = n === pilotBook;
+      return row;
+    }) };
+}
+/* Smallest value of p[key] (a multiple of step, at least lo) at which the plan is never blocked. Infinity if no value up to 1e10 works
+   (e.g. a raise cannot fix a month-1 block). Used for the "what raise is needed" answer; does not change the model. */
+function mutavMinToAvoidBlocking(p, key, step, lo) {
+  step = step || 1000; lo = lo || 0;
+  function ok(v){ var q = {}; for (var k in p) q[k] = p[k]; q[key] = v; return mutavCompute(q).blockedMonths === 0; }
+  var a = Math.ceil(lo / step), b = a;
+  if (ok(a * step)) return a * step;
+  var hiCap = Math.ceil(1e10 / step);
+  b = Math.max(a + 1, 1);
+  while (!ok(b * step)) { a = b; b = b * 2; if (b > hiCap) return Infinity; }
+  while (b - a > 1) { var m = Math.floor((a + b) / 2); if (ok(m * step)) b = m; else a = m; }
+  return b * step;
+}
+if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute, mutavPayouts: mutavPayouts, mutavRequirement: mutavRequirement,
+  mutavSizingRow: mutavSizingRow, mutavSizingTable: mutavSizingTable, mutavMinToAvoidBlocking: mutavMinToAvoidBlocking, MUTAV_DEFAULTS: MUTAV_DEFAULTS };
+</script>
+
+<script>
+(function(){
+  var root = document.documentElement;
+  try { var th = localStorage.getItem('mutav-theme'); if (th === 'dark' || th === 'light') root.setAttribute('data-theme', th); } catch (e) {}
+  document.getElementById('themeBtn').addEventListener('click', function(){
+    var dark = false;
+    try { dark = window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) {}
+    var cur = root.getAttribute('data-theme') || (dark ? 'dark' : 'light');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('mutav-theme', next); } catch (e) {}
+  });
+
+  function ext(a, b){ var r = {}; var k; for (k in a) r[k] = a[k]; for (k in b) r[k] = b[k]; return r; }
+  function clone(o){ return ext(o, {}); }
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+  function infoI(t){ return t ? ' <span class="info" tabindex="0" role="button" aria-label="' + esc(t) + '" data-tip="' + esc(t) + '">i</span>' : ''; }
+  var SRC = { canonical: 'c', research: 'r', estimate: 'e' };
+  function srcTag(s){ return s ? '<span class="src ' + SRC[s] + '">' + s + '</span>' : ''; }
+
+  /* UI state = model inputs + the growth target used by the "what raise" answer (not a model input). */
+  var DEF = ext(MUTAV_DEFAULTS, { growthTarget: 170 });
+  var VALID = { scope: ['A','B','C'], withdraw: ['none','buffer','share'], sizing: ['policy','B','full'] };
+  var STORE = 'mutav-reserve-sim-v4';
+  var SEGS = {
+    scope: { l: 'Debts covered', i: 'Which tenant debts the fiança pays. Drives expected claims and the claims-to-fees ratio.', o: [['A','A · All debts'],['B','B · No penalty'],['C','C · Evictions']],
+      h: { A: 'All tenant debts, including the early-termination penalty.', B: 'All tenant debts except the early-termination penalty (base case).', C: 'Rent arrears, evictions and abandonment only.' } },
+    withdraw: { l: 'Withdrawal policy', i: 'Money taken out of the reserve. Only ever paid from surplus above the required reserve.', o: [['none','None'],['buffer','Above buffer'],['share','Share of gain']],
+      h: { none: 'Reinvest everything (pilot default).', buffer: 'Withdraw the surplus above a buffer kept on top of the required reserve.', share: 'Withdraw a share of each month’s positive net gain, capped at the surplus.' } }
+  };
+  function ruleName(k, s){ s = s || state; return k === 'policy' ? 'Coverage policy' : k === 'B' ? 'Expected-loss (' + decF.format(s.tailYears) + ' bad year' + (s.tailYears === 1 ? '' : 's') + ')' : 'Full backing (c = ' + decF.format(s.coverage) + ')'; }
+  function showRaise(s){ return s.monthlyRaise > 0; }
+  var GROUPS = [
+    { id: 'plan', t: 'Plan', sm: 'the levers you discuss', f: [
+      { sub: 'Book' },
+      { k: 'perMonth', l: 'New leases per month', u: 'leases', step: 1, min: 0, src: 'canonical', i: 'Planned new guarantees each month. 02: ~28 a month toward 170; pilot plan 10. The solvency gate may admit fewer.' },
+      { k: 'months', l: 'Months simulated', u: 'mo', step: 1, min: 1, max: 120, src: 'canonical', i: 'Simulation horizon. 02: ~6-month pilot.' },
+      { sub: 'Price' },
+      { k: 'rent', l: 'Average monthly rent', u: 'R$', step: 100, min: 0, src: 'canonical', i: '02: R$2.200 (Passo Fundo).' },
+      { k: 'feePct', l: 'Guarantee fee', u: '% rent', step: 0.5, min: 0, src: 'canonical', i: 'Percent of rent per 30-day period. 02: 9–15% by score, 10% modelled.' },
+      { sub: 'Capital' },
+      { k: 'startCapital', l: 'Starting capital', u: 'R$', step: 10000, min: 0, src: 'canonical', i: 'Deposited into the reserve in month 1. 02: R$300.000 capitalized reserve.' },
+      { k: 'monthlyRaise', l: 'Monthly raise', u: 'R$/mo', step: 5000, min: 0, i: 'New capital added to the reserve every month in the window below. 0 = no raise.' },
+      { k: 'raiseFrom', l: 'Raise from month', u: 'month', step: 1, min: 1, when: showRaise },
+      { k: 'raiseUntil', l: 'Raise until month', u: '0 = last', step: 1, min: 0, when: showRaise },
+      { k: 'growthTarget', adv: true, l: 'Growth target', u: 'leases', step: 10, min: 0, src: 'canonical', i: 'Book size used in answer 4 (what raise is needed). 02: 170 leases. Does not change the simulation.' },
+      { sub: 'Cover & payouts' },
+      { seg: 'scope' },
+      { seg: 'withdraw' },
+      { k: 'bufferPct', l: 'Keep a buffer of', u: '% req.', step: 5, min: 0, when: function(s){ return s.withdraw === 'buffer'; }, i: 'Percent of the required reserve kept on top of it before anything is withdrawn.' },
+      { k: 'sharePct', l: 'Share of net gain', u: '%', step: 5, min: 0, max: 100, when: function(s){ return s.withdraw === 'share'; }, i: 'Percent of each month’s positive net gain withdrawn, capped at the surplus.' }
+    ]},
+    { id: 'rule', t: 'Coverage rule', sm: 'sets the required reserve', note: true, f: [
+      { k: 'defaultCover', l: 'Rent-arrears ceiling', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'Most the fiança pays in unpaid rent per lease. 02: 12× (working value, under legal review).' },
+      { k: 'exitCover', l: 'Exit-cost ceiling', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'Separate sublimit for eviction and exit costs. 02: 6×.' },
+      { k: 'worstFloorPct', l: 'Reserve ≥ share of all ceilings', u: '%', step: 1, min: 0, src: 'canonical', i: 'Worst-case leg: the reserve holds at least this share of every active lease’s full ceilings. 40-reserve / 9w: 10%.' },
+      { k: 'tailFloor', l: 'Reserve ≥ bad years of claims', u: '× bad yr', step: 0.1, min: 1, src: 'canonical', i: 'Bad-year leg: the reserve holds this many years of bad-year claims. 40-reserve / 9w: 2,0; hard floor 1,0.' }
+    ]},
+    { id: 'assume', t: 'Assumptions', sm: 'advanced', closed: true, f: [
+      { sub: 'Claims' },
+      { k: 'rhoPct', l: 'Rent arrears (delinquency)', u: '%/yr', step: 0.01, min: 0, src: 'research', i: 'Share of annual rent that goes unpaid. Superlógica IIL RS apartments, 3-print avg 2,01%; stress 2,87%; tail 5,93%.' },
+      { k: 'evictRatePct', l: 'Eviction rate', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'CNJ DataJud despejo filings ÷ IBGE PNAD rented households, adjusted for outcomes and an underwritten book. Low 0,10% / base 0,25% / high 0,60%.' },
+      { k: 'evictMult', l: 'Eviction cost paid', u: '× rent', step: 0.5, min: 0, src: 'research', i: 'Per eviction, capped at the exit ceiling. Fiança live: ~6× (no liminar). If the fiança extinguishes at the ceiling: 5,5×. Low case 2,5×.' },
+      { k: 'nonEvictX', l: 'Other exit debts', u: '× rent/yr', step: 0.01, min: 0, src: 'estimate', i: 'Damage, charges, penalty, abandonment, alterations. Base ≈ 0,19× rent per lease-year [inference].' },
+      { k: 'penaltyX', l: '…of which termination penalty', u: '× rent/yr', step: 0.005, min: 0, src: 'estimate', i: 'Excluded in scope B. Base ≈ 0,077× [inference].' },
+      { k: 'ramp', l: 'Claims ramp up over 4 months', toggle: true, src: 'estimate', i: 'Defaults lag: month m pays expected claims × min(1, m/4).' },
+      { k: 'tailMult', l: 'Bad-year claims multiplier', u: '× claims', step: 0.01, min: 0, src: 'canonical', i: 'Bad (tail) year = expected claims × this. 2,33 calibrates to 40-reserve: R$1.894 per lease-year (scope B) vs R$813 expected.' },
+      { sub: 'Bad year' },
+      { k: 'stressOn', l: 'Run a bad year in the simulation', toggle: true, i: 'Adds bad-year claims (multiplier − 1) × expected over the 12 months from the start month. Answer 5 always tests this in the background.' },
+      { k: 'stressMonth', l: 'Bad year starts in month', u: 'month', step: 1, min: 1, src: 'estimate', when: function(s){ return s.stressOn; } },
+      { sub: 'Reserve yield' },
+      { k: 'tesouroSharePct', l: 'Reserve held in TESOURO', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: '02: ~80% TESOURO / 20% liquid sleeve. Pilot presets use 50%.' },
+      { k: 'tesouroPct', l: 'TESOURO yield', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'Etherfuse on-chain accrual, unconfirmed. Accrues monthly on the opening balance.' },
+      { k: 'selicPct', l: 'Selic (opportunity cost)', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'What the same capital would earn at Selic. Comparison only.' },
+      { sub: 'MUTAV & operations' },
+      { k: 'takePct', l: 'MUTAV take rate', u: '% fees', step: 1, min: 0, max: 100, src: 'estimate', i: 'Share of each guarantee fee kept by MUTAV (ADR 0009). 20% is the simulator default; the value is still open.' },
+      { k: 'mutavSharePct', l: 'MUTAV share of reserve capital', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: 'Stage 1 pilot: MUTAV funds 100% of the reserve.' },
+      { k: 'opCostPerLease', l: 'Operating cost per lease', u: 'R$/mo', step: 1, min: 0, src: 'estimate', i: 'Optional. Subtracted from the take in What MUTAV earns.' },
+      { k: 'opCostFixed', l: 'Fixed operating cost', u: 'R$/mo', step: 500, min: 0, src: 'estimate', i: 'Optional. Used for break-even leases.' },
+      { k: 'leaseTerm', l: 'Lease term', u: 'mo', step: 1, min: 1, src: 'research', i: 'A lease leaves the book after this many months. Typical lease 30 months (06, PY:109).' },
+      { k: 'periods', l: 'Fee charged per year', u: '×/yr', step: 0.01, min: 0, src: 'canonical', i: '12: agencies are billed one boleto a month.' }
+    ]}
+  ];
+  var FIELDS = [];
+  GROUPS.forEach(function(g){ g.f.forEach(function(f){ if (f.k) FIELDS.push(f); }); });
+  function fieldBy(k){ return FIELDS.filter(function(x){ return x.k === k; })[0]; }
+
+  var PILOT = { months: 6, perMonth: 10, rent: 2200, feePct: 10, periods: 12, takePct: 20, defaultCover: 12, exitCover: 6, scope: 'B',
+    evictRatePct: 0.25, sizing: 'policy', startCapital: 300000, monthlyRaise: 0, withdraw: 'none', tesouroSharePct: 50, tesouroPct: 11.58, selicPct: 13.75 };
+  var SCEN = [
+    { id: 'default', g: '', l: 'Default (02 parameters)', d: '02 inputs: 28 new leases a month for 6 months, 80% in TESOURO, R$300k start. Without a raise growth stalls at about 89 leases.', o: {} },
+    { id: 'pilotRec', g: 'Pilot', l: 'Pilot · recommended', d: '60 leases (10 a month × 6), R$2.200 rent, 10% fee, R$300k start, debts B, no withdrawals, 50% TESOURO.', o: PILOT },
+    { id: 'pilotCons', g: 'Pilot', l: 'Pilot · conservative', d: 'As recommended, with 30 leases (5 a month × 6).', o: ext(PILOT, { perMonth: 5 }) },
+    { id: 'scale170', g: 'Growth', l: 'Scale to 170', d: 'Pilot inputs at 28 a month on R$300k. Stalls near 87 leases without a raise; 170 leases need about R$673.200.', o: ext(PILOT, { perMonth: 28 }) },
+    { id: 'broad', g: 'What-if', l: 'Debts A (all debts)', d: 'Pilot recommended, fiança covers all tenant debts incl. the termination penalty.', o: ext(PILOT, { scope: 'A' }) },
+    { id: 'extreme', g: 'What-if', l: 'Debts C (evictions only)', d: 'Pilot recommended, fiança covers arrears, evictions and abandonment only.', o: ext(PILOT, { scope: 'C' }) },
+    { id: 'lean', g: 'What-if', l: 'Lean ceilings (3+3)', d: 'Pilot recommended with a 3× rent-arrears and 3× exit-cost ceiling.', o: ext(PILOT, { defaultCover: 3, exitCover: 3 }) },
+    { id: 'tesouro', g: 'What-if', l: 'All in TESOURO', d: 'Pilot recommended with 100% of the reserve in TESOURO.', o: ext(PILOT, { tesouroSharePct: 100 }) },
+    { id: 'stress', g: 'Stress', l: 'Stress', d: 'Pilot recommended with delinquency at 2× base (4,02%), evictions 0,60% a year at 6× rent, and a bad year from month 3.', o: ext(PILOT, { rhoPct: 4.02, evictRatePct: 0.6, evictMult: 6, stressOn: true, stressMonth: 3 }) }
+  ];
+  function scenById(id){ return SCEN.filter(function(s){ return s.id === id; })[0]; }
+  var TABS = ['time','yield','months','mutav','sizing','method'];
+  var PILOT_BOOK = PILOT.perMonth * Math.min(PILOT.months, MUTAV_DEFAULTS.leaseTerm);
+  var uiMode = 'simple';
+  try { var um = localStorage.getItem(STORE + '-mode'); if (um === 'advanced' || um === 'simple') uiMode = um; } catch (e) {}
+
+  var state = clone(DEF), activeScen = 'default', baseScen = 'default', curTab = 'time';
+
+  function coerce(k, v){
+    var d = DEF[k];
+    if (typeof d === 'boolean') return v === true || v === '1' || v === 'true' || v === 1;
+    if (VALID[k]) return VALID[k].indexOf(v) >= 0 ? v : d;
+    var n = parseFloat(v); return isFinite(n) ? n : d;
+  }
+  function loadHash(){
+    try {
+      var h = (location.hash || '').replace(/^#/, ''); if (!h) return false;
+      var kv = {}, got = false;
+      h.split('&').forEach(function(pair){ var a = pair.split('='); kv[decodeURIComponent(a[0] || '')] = decodeURIComponent(a[1] || ''); });
+      state = clone(DEF); activeScen = '';
+      if (kv.scen && scenById(kv.scen)) { activeScen = baseScen = kv.scen; state = ext(state, scenById(kv.scen).o); got = true; }
+      if (kv.from && scenById(kv.from)) baseScen = kv.from;
+      if (TABS.indexOf(kv.tab) >= 0) curTab = kv.tab;
+      if (kv.mode === 'advanced' || kv.mode === 'simple') uiMode = kv.mode;
+      for (var k in kv) if (k in DEF) { state[k] = coerce(k, kv[k]); got = true; }
+      return got || TABS.indexOf(kv.tab) >= 0;
+    } catch (e) { return false; }
+  }
+  function loadStore(){
+    try {
+      var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+      if (saved && saved.values) {
+        for (var k in DEF) if (k in saved.values) state[k] = coerce(k, saved.values[k]);
+        activeScen = saved.scen || ''; baseScen = saved.base || 'default';
+        if (activeScen && !scenById(activeScen)) activeScen = '';
+        if (TABS.indexOf(saved.tab) >= 0) curTab = saved.tab;
+      }
+    } catch (e) {}
+  }
+  if (!loadHash()) loadStore();
+  function persist(){
+    try { localStorage.setItem(STORE, JSON.stringify({ values: state, scen: activeScen, base: baseScen, tab: curTab })); localStorage.setItem(STORE + '-mode', uiMode); } catch (e) {}
+    try {
+      var parts = [];
+      for (var k in DEF) if (state[k] !== DEF[k]) parts.push(k + '=' + encodeURIComponent(typeof state[k] === 'boolean' ? (state[k] ? 1 : 0) : state[k]));
+      if (activeScen) parts.push('scen=' + activeScen); else if (baseScen) parts.push('from=' + baseScen);
+      if (curTab !== 'time') parts.push('tab=' + curTab);
+      if (uiMode === 'advanced') parts.push('mode=advanced');
+      history.replaceState(null, '', location.pathname + location.search + (parts.length ? '#' + parts.join('&') : ''));
+    } catch (e) {}
+  }
+
+  var brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0, minimumFractionDigits: 0 });
+  var brlC = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
+  var intF = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+  var decF = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
+  var dec1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
+  function R(x){ if (!isFinite(x)) return '∞'; var s = brl.format(Math.round(Math.abs(x))).replace(/ /g, ' '); return (Math.round(x) < 0 ? '−' : '') + s; }
+  function RC(x){ return (x < 0 ? '−' : '') + 'R$ ' + brlC.format(Math.abs(x)).replace(/ /g, ' '); }
+  function P(x, d){ if (!isFinite(x)) return '∞'; return (x < 0 ? '−' : '') + Math.abs(x * 100).toFixed(d == null ? 1 : d).replace('.', ',') + '%'; }
+  function PP(x){ return (x >= 0 ? '+' : '−') + Math.abs(x * 100).toFixed(1).replace('.', ',') + ' pp'; }
+  function X(x){ return isFinite(x) ? decF.format(Math.round(x * 10) / 10) + '×' : '∞'; }
+  function N0(x){ return isFinite(x) ? intF.format(x) : '∞'; }
+  function plural(n, one, many){ return N0(n) + ' ' + (n === 1 ? one : many); }
+
+  /* help tooltips: hover, focus and tap */
+  var htip = document.getElementById('htip'), tipOwner = null;
+  function showHelp(el){
+    tipOwner = el; htip.textContent = el.getAttribute('data-tip'); htip.style.display = 'block';
+    var r = el.getBoundingClientRect(), w = htip.offsetWidth, h = htip.offsetHeight;
+    var left = Math.min(window.innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)), top = r.top - h - 6;
+    if (top < 8) top = r.bottom + 6;
+    htip.style.left = left + 'px'; htip.style.top = top + 'px';
+  }
+  function hideHelp(){ htip.style.display = 'none'; tipOwner = null; }
+  function infoOf(t){ return t && t.closest ? t.closest('.info') : null; }
+  document.addEventListener('mouseover', function(e){ var el = infoOf(e.target); if (el) showHelp(el); });
+  document.addEventListener('mouseout', function(e){ if (infoOf(e.target) && !infoOf(e.relatedTarget)) hideHelp(); });
+  document.addEventListener('focusin', function(e){ var el = infoOf(e.target); if (el) showHelp(el); });
+  document.addEventListener('focusout', function(e){ if (infoOf(e.target)) hideHelp(); });
+  document.addEventListener('click', function(e){
+    var el = infoOf(e.target);
+    if (el) { e.preventDefault(); e.stopPropagation(); if (tipOwner === el) hideHelp(); else showHelp(el); }
+    else if (tipOwner) hideHelp();
+  }, true);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') hideHelp();
+    var el = infoOf(e.target); if (el && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); if (tipOwner === el) hideHelp(); else showHelp(el); }
+  });
+  window.addEventListener('scroll', hideHelp, true);
+
+  /* scenario select */
+  var sel = document.getElementById('scenSel');
+  (function(){
+    var h = '<option value="custom" id="optCustom" hidden>Custom</option>', curG = null;
+    SCEN.forEach(function(s){
+      if (s.g !== curG) { if (curG) h += '</optgroup>'; if (s.g) h += '<optgroup label="' + esc(s.g) + '">'; curG = s.g; }
+      h += '<option value="' + s.id + '">' + esc(s.l) + '</option>';
+    });
+    if (curG) h += '</optgroup>';
+    sel.innerHTML = h;
+  })();
+  function markScen(){
+    var opt = document.getElementById('optCustom'), desc = document.getElementById('scenDesc');
+    if (activeScen) {
+      opt.hidden = true; sel.value = activeScen;
+      desc.textContent = scenById(activeScen).d;
+    } else {
+      var b = scenById(baseScen) || scenById('default');
+      opt.hidden = false; opt.textContent = 'Custom (modified from ' + b.l + ')'; sel.value = 'custom';
+      desc.textContent = 'Inputs edited after choosing “' + b.l + '”. Pick a scenario or Reset to start over.';
+    }
+  }
+  function applyScen(id){
+    var s = scenById(id); if (!s) return;
+    state = ext(DEF, s.o);
+    activeScen = id; baseScen = id; syncInputs(); persist(); render();
+  }
+  sel.addEventListener('change', function(){ if (sel.value !== 'custom') applyScen(sel.value); });
+
+  /* build inputs */
+  var gh = '', mobile = false;
+  try { mobile = window.matchMedia('(max-width: 900px)').matches; } catch (e) {}
+  GROUPS.forEach(function(g){
+    var open = g.id === 'plan' ? true : g.closed ? false : !mobile;
+    gh += '<details class="grp' + (g.id === 'plan' ? '' : ' adv') + '" id="grp_' + g.id + '"' + (open ? ' open' : '') + '><summary><span>' + esc(g.t) + '<span class="sm">' + esc(g.sm) + '</span></span></summary><div class="body">';
+    g.f.forEach(function(f){
+      if (f.sub) { gh += '<div class="sub">' + esc(f.sub) + '</div>'; return; }
+      if (f.seg) {
+        var S = SEGS[f.seg];
+        gh += '<div class="lbl" id="lbl_' + f.seg + '">' + esc(S.l) + infoI(S.i) + '</div><div class="seg" role="group" aria-labelledby="lbl_' + f.seg + '">' + S.o.map(function(o){ return '<button type="button" data-segk="' + f.seg + '" data-v="' + o[0] + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>';
+        gh += '<div class="seghint" id="hint_' + f.seg + '"></div>';
+        return;
+      }
+      var lab = esc(f.l) + (g.id === 'plan' ? '' : srcTag(f.src)) + infoI(f.i);
+      gh += '<div class="row' + (f.adv ? ' adv' : '') + '" id="row_' + f.k + '">';
+      if (f.toggle) gh += '<label class="tg"><span>' + lab + '</span><input type="checkbox" id="in_' + f.k + '" name="' + f.k + '" data-k="' + f.k + '"></label>';
+      else gh += '<div class="f"><label for="in_' + f.k + '">' + lab + '</label><div class="inp"><input id="in_' + f.k + '" name="' + f.k + '" autocomplete="off" type="number" inputmode="decimal" step="' + f.step + '"' +
+        (f.min != null ? ' min="' + f.min + '"' : '') + (f.max != null ? ' max="' + f.max + '"' : '') + ' data-k="' + f.k + '"><span class="u">' + esc(f.u) + '</span></div></div>';
+      gh += '</div>';
+    });
+    if (g.note) gh += '<div class="seghint" id="ruleNote" aria-live="polite"></div>';
+    gh += '</div></details>';
+  });
+  var groupsEl = document.getElementById('groups');
+  groupsEl.innerHTML = gh;
+
+  function syncVisibility(){ FIELDS.forEach(function(f){ if (f.when) document.getElementById('row_' + f.k).hidden = !f.when(state); }); }
+  function syncInputs(){
+    FIELDS.forEach(function(f){ var el = document.getElementById('in_' + f.k); if (f.toggle) el.checked = !!state[f.k]; else el.value = state[f.k]; });
+    Object.keys(SEGS).forEach(function(k){
+      Array.prototype.forEach.call(document.querySelectorAll('[data-segk="' + k + '"]'), function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-v') === state[k] ? 'true' : 'false'); });
+      document.getElementById('hint_' + k).textContent = SEGS[k].h[state[k]];
+    });
+    syncVisibility(); markScen();
+  }
+  function edited(){ if (activeScen) baseScen = activeScen; activeScen = ''; markScen(); syncVisibility(); persist(); render(); }
+  groupsEl.addEventListener('input', function(e){
+    var el = e.target, k = el.dataset && el.dataset.k; if (!k) return;
+    var f = fieldBy(k);
+    if (f.toggle) state[k] = el.checked;
+    else {
+      var v = parseFloat(el.value); if (!isFinite(v)) return;
+      if (f.min != null) v = Math.max(f.min, v);
+      if (f.max != null) v = Math.min(f.max, v);
+      state[k] = v;
+    }
+    edited();
+  });
+  groupsEl.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-segk]'); if (!b) return;
+    state[b.getAttribute('data-segk')] = b.getAttribute('data-v'); syncInputs(); edited();
+  });
+  function setRule(v){ if (VALID.sizing.indexOf(v) < 0 || v === state.sizing) return; state.sizing = v; edited(); }
+  document.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-userule]'); if (b) setRule(b.getAttribute('data-userule')); });
+  document.getElementById('ruleTbl').addEventListener('change', function(e){ if (e.target.name === 'simRule') setRule(e.target.value); });
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    state = clone(DEF); activeScen = 'default'; baseScen = 'default'; syncInputs(); persist(); render();
+  });
+
+  /* Simple / Advanced */
+  function setMode(m, quiet){
+    uiMode = m === 'advanced' ? 'advanced' : 'simple';
+    document.body.classList.toggle('simple', uiMode === 'simple');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-mode') === uiMode ? 'true' : 'false'); });
+    if (uiMode === 'simple') { var gp = document.getElementById('grp_plan'); if (gp) gp.open = true; }
+    if (!quiet) { persist(); if (last) render(); }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function(b){ b.addEventListener('click', function(){ setMode(b.getAttribute('data-mode')); }); });
+
+  /* tabs (arrow keys move between tabs) */
+  var tabs = document.getElementById('tabs');
+  function showTab(id, focus){
+    curTab = id;
+    Array.prototype.forEach.call(tabs.querySelectorAll('[role=tab]'), function(b){
+      var on = b.getAttribute('data-tab') === id; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus();
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.pane'), function(p){ p.hidden = p.getAttribute('data-pane') !== id; });
+    persist();
+    if (id === 'time' && last) drawChart(last);
+    if (id === 'yield' && last) drawYield(last);
+  }
+  tabs.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-tab]'); if (b) showTab(b.getAttribute('data-tab')); });
+  tabs.addEventListener('keydown', function(e){
+    var fb = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-tab'); var i = TABS.indexOf(fb || curTab), n = TABS.length, j = -1;
+    if (e.key === 'ArrowRight') j = (i + 1) % n; else if (e.key === 'ArrowLeft') j = (i - 1 + n) % n; else if (e.key === 'Home') j = 0; else if (e.key === 'End') j = n - 1;
+    if (j >= 0) { e.preventDefault(); showTab(TABS[j], true); }
+  });
+
+  function tiles(id, list){
+    document.getElementById(id).innerHTML = list.map(function(k){
+      return '<div class="k' + (k.hero ? ' hero' : '') + '"><div class="l"><span title="' + esc(k.l) + '">' + esc(k.l) + '</span>' + infoI(k.t) + '</div><div class="v">' + esc(k.v) + '</div><div class="d">' + esc(k.d) + '</div></div>';
+    }).join('');
+  }
+  function thead(id, cols){
+    document.querySelector('#' + id + ' thead').innerHTML = '<tr>' + cols.map(function(c){ return '<th' + (c[2] ? ' id="' + c[2] + '"' : '') + '>' + esc(c[0]) + infoI(c[1]) + '</th>'; }).join('') + '</tr>';
+  }
+  thead('tbl', [
+    ['Month', 'Month of the simulation.'], ['New leases', 'Guarantees signed this month. Tagged “blocked” when the gate admitted fewer than planned.'],
+    ['Active', 'Leases on the book at month end.'], ['Capital in', 'Starting capital (month 1) plus any monthly raise.'],
+    ['Required reserve', 'Active leases × required reserve per lease (coverage rule).'], ['Balance', 'Reserve balance at month end, after withdrawals.'],
+    ['Surplus / shortfall', 'Balance − required reserve. Negative means the reserve is below what the rule requires.'], ['Guarantee fees', 'All guarantee fees paid this month, before MUTAV’s take.'],
+    ['MUTAV take', 'Take rate × guarantee fees, to the MUTAV treasury.'], ['Net fees', 'Guarantee fees − MUTAV take: what enters the reserve.'],
+    ['Claims paid', 'Expected claims this month (plus bad-year claims if the bad year is on).'], ['TESOURO yield', 'Opening balance × TESOURO share × TESOURO rate / 12.'],
+    ['Net gain', 'Net fees + TESOURO yield − claims paid.'], ['Withdrawal', 'Paid out of the surplus under the withdrawal policy.']
+  ]);
+  thead('sensTbl', [['Take rate', 'Share of each guarantee fee kept by MUTAV.'], ['Per lease / mo', 'MUTAV take per active lease per month.'],
+    ['Total', 'MUTAV take over the simulated months.', 'sensTotH'], ['Annual run-rate', 'Last-month take × 12.'], ['Reserve net gain', 'Reserve net gain over the simulated months at this take.']]);
+  thead('ruleTbl', [['Rule', 'How the required reserve per lease is set.'], ['Per lease', 'Required reserve for each active lease.'],
+    ['Starting capital backs', 'Leases the starting capital alone can back under this rule.'], ['Book reached', 'Active leases at the last month, after any blocking.'],
+    ['Blocked months', 'Months where the gate admitted fewer leases than planned.'], ['Balance', 'Reserve balance at the last month.'],
+    ['Surplus', 'Balance − required reserve at the last month.'], ['Simulate with', 'Choose which rule drives the whole page. Coverage policy is the live rule.']]);
+  thead('sizeTbl', [['Leases', 'Book size, held full for a year.'], ['Reserve % of ceilings', 'Balance ÷ every lease’s full ceilings. 100% means the reserve could pay every lease’s full ceiling at once.'],
+    ['Bad years held', 'Balance ÷ one bad year of claims for this book. The coverage rule asks for 2,0.'], ['Meets required reserve', 'Whether the balance covers the required reserve for this book under the active rule.'],
+    ['MUTAV take / yr', 'Take on a full year of guarantee fees.'], ['Net gain / yr, normal', 'Net fees − expected claims + TESOURO yield, in a normal year.'],
+    ['Return on balance', 'Normal-year net gain ÷ balance.'], ['Net gain / yr, bad year', 'Same, with bad-year claims.'], ['Return, bad year', 'Bad-year net gain ÷ balance.'], ['vs Selic', 'Normal return minus Selic, in percentage points.']]);
+  thead('scopeTbl', [['Debts covered', 'Which tenant debts the fiança pays.'], ['Expected claims / lease / yr', 'Arrears + evictions + other exit debts covered in this scope.'],
+    ['Claims-to-fees ratio', 'Expected claims ÷ guarantee fees per lease per year.'], ['Fees − claims', 'Return on required reserve from (net fees − expected claims) ÷ required reserve per lease.'],
+    ['+ TESOURO', 'Return on required reserve including TESOURO yield.'], ['vs Selic', 'Return on required reserve minus Selic.'],
+    ['Reserve yield (sim.)', 'Simulated reserve yield over the horizon, annualized, on the average balance.'],
+    ['Return on balance, normal', 'Book at the last month held a full year: net gain ÷ balance.'], ['Return, bad year', 'Same, with bad-year claims.'], ['Normal vs Selic', 'Normal-year return on balance minus Selic.'],
+    ['MUTAV take', 'MUTAV take over the simulated months.', 'scopeTakeH']]);
+  thead('yieldTbl', [['Month', ''], ['Opening balance', 'Balance after capital in, before the month’s flows.'], ['Net fees − claims', 'Underwriting result: guarantee fees after take minus claims paid.'],
+    ['TESOURO yield', 'Opening balance × TESOURO share × rate / 12.'], ['Net gain', 'Underwriting + TESOURO.'], ['Yield, annualized', 'Net gain ÷ opening balance × 12.'],
+    ['Selic on balance', 'Opening balance × Selic / 12.'], ['vs Selic', 'Net gain − Selic on the same balance.']]);
+  function renderYieldTable(r){
+    document.querySelector('#yieldTbl tbody').innerHTML = r.rows.map(function(x){
+      var d = x.gain - x.selicOpp;
+      return '<tr><td>' + x.month + '</td><td>' + R(x.opening) + '</td><td' + (x.uw < 0 ? ' class="neg"' : '') + '>' + R(x.uw) + '</td><td>' + R(x.tesouro) + '</td><td' + (x.gain < 0 ? ' class="neg"' : '') + '>' + R(x.gain) + '</td><td>' + P(x.yieldAnn) + '</td><td>' + R(x.selicOpp) + '</td><td' + (d < 0 ? ' class="neg"' : '') + '>' + R(d) + '</td></tr>';
+    }).join('');
+    var y = r.yieldSim, su = r.rows.reduce(function(a, x){ return a + x.uw; }, 0);
+    document.querySelector('#yieldTbl tfoot').innerHTML = '<tr><td>Total</td><td>avg ' + R(y.avgBalance) + '</td><td>' + R(su) + '</td><td>' + R(r.totals.tesouro) + '</td><td>' + R(r.cumGain) + '</td><td>' + P(y.total) + '</td><td>' + R(y.selicGain) + '</td><td>' + R(r.cumGain - y.selicGain) + '</td></tr>';
+  }
+  thead('buildTbl', [['Component', 'Part of expected claims.'], ['Formula', 'How it is computed from the inputs.'], ['R$ / lease / yr', 'Expected cost per lease per year.'], ['× rent', 'Same, in months of rent.']]);
+
+  /* the five answers, computed live */
+  function glance(r){
+    var N = r.months, rpl = r.req.perLease, m = r.mutav, n = r.finalActive, out = [];
+    var cover = r.req.cover, binds;
+    if (r.req.mode === 'policy') binds = r.req.binds === 'worst-case floor' ? 'the ' + P(state.worstFloorPct / 100, 0) + '-of-ceilings rule sets it' : 'the ' + decF.format(Math.max(1, state.tailFloor)) + '-bad-years rule sets it';
+    else binds = 'comparison rule: ' + ruleName(r.req.mode);
+    var safe = !r.blockedMonths && !r.belowFloorMonths;
+    var s1;
+    if (n === 0) s1 = 'No leases are on the book: the starting capital of <b>' + R(state.startCapital) + '</b> backs ' + N0(r.capacityAtStart) + ' leases at <b>' + R(rpl) + '</b> each.';
+    else if (!r.blockedMonths) s1 = 'The <b>' + R(state.startCapital) + '</b> starting reserve covers the ' + N0(n) + '-lease book. At month ' + N + ' the required reserve is <b>' + R(r.endRequired) + '</b> (' + esc(binds) + ') and the balance is <b>' + R(r.endBalance) + '</b>, a surplus of <b>' + R(r.endSurplus) + '</b>. Growth is never blocked' + (r.belowFloorMonths ? ', but the balance falls below the required reserve in ' + plural(r.belowFloorMonths, 'month', 'months') : '') + '.';
+    else s1 = 'The <b>' + R(state.startCapital) + '</b> starting reserve backs only <b>' + N0(r.capacityAtStart) + ' leases</b> at <b>' + R(rpl) + '</b> each (' + esc(binds) + '). Growth is blocked in ' + plural(r.blockedMonths, 'month', 'months') + ' from month ' + r.firstBlocked + ': the book reaches <b>' + N0(n) + ' of ' + N0(r.plannedActive) + '</b> planned leases. The month-' + N + ' balance is <b>' + R(r.endBalance) + '</b> against <b>' + R(r.endRequired) + '</b> required.';
+    out.push({ q: '1 · Reserve needed & safety', c: safe ? 'ok' : 'risk', s: s1 });
+
+    var s2 = 'MUTAV keeps <b>' + R(m.takeTotal) + '</b> of guarantee fees over ' + N + ' months (' + P(state.takePct / 100, 0) + ' take; <b>' + R(m.takeRunRate) + '</b> a year at the month-' + N + ' run-rate) and owns ' + P(m.share, 0) + ' of the reserve, whose net gain is <b>' + R(r.cumGain) + '</b>. Together: <b>' + R(m.economicResult) + '</b>';
+    s2 += (state.opCostPerLease > 0 || state.opCostFixed > 0) ? ', or <b>' + R(m.economicResultNet) + '</b> after operating costs, before PIX/offramp fees and taxes.' : ', before operating costs and taxes.';
+    out.push({ q: '2 · What MUTAV earns', c: '', s: s2 });
+
+    var t = r.totals, ann = r.capitalRaised > 0 ? r.cumGain / r.capitalRaised * 12 / N : 0;
+    var s3 = 'The reserve earned <b>' + R(r.cumGain) + '</b> net over ' + N + ' months (net fees ' + R(t.net) + ' + TESOURO ' + R(t.tesouro) + ' − claims ' + R(t.claims) + '), about <b>' + P(ann) + ' a year</b> on ' + R(r.capitalRaised) + ' raised while the book ramps up.';
+    if (n > 0) {
+      var sr = mutavSizingRow(state, n, r.endBalance, r.payouts.total, r.tailPerLease);
+      s3 += ' With the month-' + N + ' book held for a full year it would earn <b>' + R(sr.normal) + '</b>, <b>' + P(sr.normalRet) + '</b> on the balance vs Selic ' + P(r.selic, 2) + ' (' + PP(sr.vsSelic) + ').';
+    }
+    if (r.cumWithdrawals > 0) s3 += ' Withdrawals paid out: <b>' + R(r.cumWithdrawals) + '</b>.';
+    out.push({ q: '3 · What the reserve earns', c: '', s: s3 });
+
+    var T = Math.max(0, state.growthTarget || 0), needT = T * rpl, gapT = needT - r.endBalance, lastGain = r.rows[N - 1].gain;
+    var s4 = '';
+    if (r.blockedMonths) {
+      var minRaise = mutavMinToAvoidBlocking(state, 'monthlyRaise', 1000, 0);
+      var minStart = mutavMinToAvoidBlocking(state, 'startCapital', 10000, state.startCapital);
+      var from = state.raiseFrom, until = state.raiseUntil > 0 ? state.raiseUntil : N;
+      s4 = 'The plan outgrows its capital. To avoid blocking: about <b>' + (isFinite(minRaise) ? R(minRaise) + ' a month</b> from month ' + from + (until < N ? ' to ' + until : '') : 'no monthly raise</b> is enough (month 1 is already blocked)') + ', or <b>' + R(minStart) + '</b> of starting capital instead of ' + R(state.startCapital) + '. ';
+    } else {
+      var extra = r.selfFundedLeases - n;
+      s4 = 'With no new capital, the month-' + N + ' balance backs <b>' + N0(r.selfFundedLeases) + ' leases</b>' + (n > 0 ? ' (' + N0(Math.max(0, extra)) + ' more than the book)' : '') + '. ';
+      var perMo = rpl > 0 ? lastGain / rpl : 0;
+      s4 += lastGain > 0 ? 'Monthly net gain (' + R(lastGain) + ') funds about <b>' + dec1.format(Math.floor(perMo * 10) / 10) + ' new leases a month</b> on its own; faster growth draws down the surplus. ' : 'The reserve is not yet making a monthly net gain, so growth relies on surplus and new capital. ';
+    }
+    if (T > 0) s4 += T + ' leases need <b>' + R(needT) + '</b> of required reserve: ' + (gapT > 0 ? '<b>' + R(gapT) + '</b> more than the month-' + N + ' balance.' : 'the month-' + N + ' balance already covers it.');
+    out.push({ q: '4 · Funding growth', c: r.blockedMonths ? 'risk' : 'ok', s: s4 });
+
+    var s5;
+    if (n > 0) {
+      var sr5 = mutavSizingRow(state, n, r.endBalance, r.payouts.total, r.tailPerLease);
+      var stressed = state.stressOn ? r : mutavCompute(ext(state, { stressOn: true }));
+      var sm = state.stressMonth;
+      s5 = 'A bad year means claims at ' + decF.format(state.tailMult) + '× expected (<b>' + R(r.tailPerLease) + '</b> vs ' + R(r.payouts.total) + ' per lease a year). For the month-' + N + ' book of ' + N0(n) + ' leases the reserve’s net gain that year would be <b>' + R(sr5.bad) + '</b> (' + P(sr5.badRet) + ' on the balance) instead of ' + R(sr5.normal) + '; the balance holds <b>' + X(r.tailCover) + '</b> bad years of claims (the rule asks ' + Math.max(1, state.tailFloor).toFixed(1).replace('.', ',') + '×). ';
+      if (sm > N) s5 += 'The bad-year start month (' + sm + ') is after the horizon, so the simulation itself is unaffected.';
+      else if (stressed.belowFloorMonths) s5 += 'Simulated from month ' + sm + ', the balance falls below the required reserve in ' + plural(stressed.belowFloorMonths, 'month', 'months') + ' (lowest ' + R(stressed.minHeadroom) + '): claims are still paid, but new guarantees stop.';
+      else s5 += 'Simulated from month ' + sm + ', the balance stays above the required reserve (lowest surplus <b>' + R(stressed.minHeadroom) + '</b>)' + (stressed.blockedMonths > r.blockedMonths ? ', but growth is blocked in ' + plural(stressed.blockedMonths - r.blockedMonths, 'more month', 'more months') : '') + '.';
+      var bad5 = stressed.belowFloorMonths > 0 || r.tailCover < 1;
+      out.push({ q: '5 · A bad year', c: bad5 ? 'risk' : 'ok', s: s5 + (state.stressOn ? '' : ' <span class="muted">(Tested in the background; turn it on under Assumptions → Bad year to see it in the charts.)</span>') });
+    } else out.push({ q: '5 · A bad year', c: '', s: 'No leases, so no claims.' });
+    return out;
+  }
+
+  var last = null, lastGlance = [];
+  function render(){
+    var r = mutavCompute(state); last = r;
+    var N = r.months, m = r.mutav, rpl = r.req.perLease;
+    lastGlance = glance(r);
+    document.getElementById('glanceSub').textContent = (activeScen ? scenById(activeScen).l : 'Custom') + (state.sizing !== 'policy' ? ' · ' + ruleName(state.sizing) : '');
+    document.getElementById('glance').innerHTML = lastGlance.map(function(g){ return '<li class="' + g.c + '"><div class="q"><span class="dot" aria-hidden="true"></span>' + esc(g.q) + '</div><p>' + g.s + '</p></li>'; }).join('');
+
+    var sfm = isFinite(r.selfFundMonth) ? (r.selfFundProjected ? '≈ ' : '') + 'month ' + intF.format(r.selfFundMonth) : 'not at this pace';
+    var y = r.yieldSim;
+    var T = {
+      bal: { l: 'Reserve balance, month ' + N, v: R(r.endBalance), d: 'Required ' + R(r.endRequired) + ' · surplus ' + R(r.endSurplus), hero: true, t: 'Reserve balance at the last month, after withdrawals, against the required reserve for the book.' },
+      yld: { l: 'Reserve yield, annualized', v: P(y.total), d: P(y.underwriting) + ' fees − claims + ' + P(y.tesouro) + ' TESOURO', t: 'What the reserve earned over the horizon ÷ average balance, annualized. Split into underwriting (net fees − claims) and TESOURO.' },
+      sel: { l: 'vs Selic ' + P(r.selic, 2), v: PP(y.vsSelic), d: y.vsSelic >= 0 ? 'Beats the same capital at Selic' : 'Below the same capital at Selic', t: 'Reserve yield minus Selic, the opportunity cost of the same capital.' },
+      roc: { l: 'Return on capital', v: P(y.returnOnCapital), d: 'Over ' + N + ' mo · ' + P(y.returnOnCapitalAnn) + ' a year', t: 'Reserve net gain ÷ capital raised (starting capital + raises).' },
+      gain: { l: 'Reserve net gain, ' + N + ' mo', v: R(r.cumGain), d: 'Selic would earn ' + R(y.selicGain), t: 'Net fees + TESOURO − claims, in R$. Compared with the same opening balances at Selic.' },
+      head: { l: 'Lowest surplus', v: R(r.minHeadroom), d: 'Balance − required, month ' + r.minHeadMonth, t: 'The tightest month: balance minus required reserve. Negative means below the required reserve.' },
+      blk: { l: 'Blocked months', v: intF.format(r.blockedMonths), d: r.blockedMonths ? 'From month ' + r.firstBlocked + ' · ' + N0(r.finalActive) + ' of ' + N0(r.plannedActive) + ' leases' : 'Growth never blocked', t: 'Months where the solvency gate admitted fewer new leases than planned.' },
+      back: { l: 'Leases backed', v: N0(r.selfFundedLeases), d: 'Balance ÷ ' + R(rpl) + ' per lease', t: 'How many leases the ending balance could back with no new capital.' },
+      cap: { l: 'Capital raised', v: R(r.capitalRaised), d: R(state.startCapital) + ' start' + (state.monthlyRaise > 0 ? ' + ' + R(r.capitalRaised - state.startCapital) + ' raises' : ''), t: 'Starting capital plus all monthly raises.' },
+      take: { l: 'MUTAV take, ' + N + ' mo', v: R(m.takeTotal), d: R(m.takePerLease) + ' / lease / mo · gross', t: 'MUTAV’s share of guarantee fees, before costs and taxes. Never counted in the reserve.' }
+    };
+    tiles('kstrip', uiMode === 'simple' ? [T.bal, T.yld, T.sel, T.take, T.head, T.blk].filter(function(x){ return x !== T.sel; }).map(function(x){ return x === T.yld ? { l: 'Reserve yield vs Selic', v: P(y.total), d: PP(y.vsSelic) + ' vs Selic · ' + P(y.underwriting) + ' fees + ' + P(y.tesouro) + ' TES.', t: T.yld.t } : x; })
+      : [T.bal, T.yld, T.sel, T.roc, T.gain, T.head, T.blk, T.back, T.cap, T.take]);
+    tiles('yieldKpis', [T.yld, T.sel, T.roc, T.gain,
+      { l: 'Capital payback', v: sfm, d: 'Σ net gain ≥ ' + R(state.startCapital), t: 'Month when cumulative net gain equals the starting capital. ≈ means projected.' },
+      { l: 'Withdrawals', v: R(r.cumWithdrawals), d: state.withdraw === 'none' ? 'None: everything reinvested' : 'Paid from surplus', t: 'Total paid out of the reserve under the withdrawal policy.' },
+      { l: 'Claims-to-fees ratio', v: P(r.payouts.ratio), d: 'Debts ' + state.scope + ' · ' + R(r.payouts.total) + ' / lease / yr', t: 'Expected claims ÷ guarantee fees, per lease per year.' },
+      { l: 'Yield on required reserve', v: P(r.steady.total), d: 'Steady state · ' + PP(r.spreadVsSelic) + ' vs Selic', t: 'Full-year return per R$ of required reserve: (net fees − claims) ÷ required per lease + TESOURO share × rate.' }
+    ]);
+    renderYieldTable(r);
+
+    var legW = state.worstFloorPct / 100 * r.req.cover, legT = Math.max(1, state.tailFloor) * r.req.tail;
+    var rn = 'Required reserve per lease under the coverage policy: <b>' + R(Math.max(legW, legT)) + '</b>, the larger of ' + P(state.worstFloorPct / 100, 0) + ' × ' + R(r.req.cover) + ' ceilings (' + R(legW) + ') and ' + decF.format(Math.max(1, state.tailFloor)) + ' × ' + R(r.req.tail) + ' bad-year claims (' + R(legT) + ').';
+    if (state.sizing !== 'policy') rn = '<b>The simulation is using a comparison rule: ' + esc(ruleName(state.sizing)) + ', ' + R(rpl) + ' per lease.</b> <button type="button" class="linkbtn" data-userule="policy">Use the coverage policy</button><br>' + rn;
+    var rnEl = document.getElementById('ruleNote'); rnEl.innerHTML = rn; rnEl.className = 'seghint' + (state.sizing !== 'policy' ? ' risk' : '');
+
+    document.querySelector('#tbl tbody').innerHTML = r.rows.map(function(x){
+      return '<tr><td>' + x.month + '</td><td>' + intF.format(x.newLeases) + (x.blocked ? ' <span class="tag risk">blocked</span>' : '') + '</td><td>' + intF.format(x.active) + '</td><td>' + R(x.deposit) + '</td><td>' + R(x.required) + '</td><td>' + R(x.balance) +
+        '</td><td' + (x.headroom < 0 ? ' class="neg"' : '') + '>' + R(x.headroom) + '</td><td>' + R(x.gross) + '</td><td>' + R(x.take) + '</td><td>' + R(x.netFees) + '</td><td>' + R(x.claims) + '</td><td>' + R(x.tesouro) +
+        '</td><td' + (x.gain < 0 ? ' class="neg"' : '') + '>' + R(x.gain) + '</td><td>' + R(x.withdrawal) + '</td></tr>';
+    }).join('');
+    var t = r.totals;
+    document.querySelector('#tbl tfoot').innerHTML = '<tr><td>Total</td><td>' + intF.format(r.rows.reduce(function(a, x){ return a + x.newLeases; }, 0)) + '</td><td></td><td>' + R(r.capitalRaised) + '</td><td></td><td>' + R(r.endBalance) + '</td><td></td><td>' + R(t.gross) + '</td><td>' + R(t.take) + '</td><td>' + R(t.net) + '</td><td>' + R(t.claims) + '</td><td>' + R(t.tesouro) + '</td><td>' + R(t.gain) + '</td><td>' + R(t.withdrawals) + '</td></tr>';
+
+    renderMutav(r); renderRules(r); renderScopes(r); renderSizing(r);
+    if (uiMode === 'simple' || !document.querySelector('[data-pane="time"]').hidden) drawChart(r);
+    if (uiMode === 'advanced' && !document.querySelector('[data-pane="yield"]').hidden) drawYield(r);
+  }
+
+  function renderRules(r){
+    var legW = state.worstFloorPct / 100 * r.req.cover, legT = Math.max(1, state.tailFloor) * r.req.tail;
+    var rows = [
+      ['policy', 'Live rule: the larger of ' + P(state.worstFloorPct / 100, 0) + ' of ceilings (' + R(legW) + ') and ' + decF.format(Math.max(1, state.tailFloor)) + ' bad years (' + R(legT) + ').'],
+      ['B', 'Philosophy B: ' + decF.format(state.tailYears) + ' × bad-year claims per lease. Comparison only.'],
+      ['full', 'Every lease’s full ceilings × c. Spec invariant at c = 1. Comparison only.']
+    ];
+    document.querySelector('#ruleTbl tbody').innerHTML = rows.map(function(row){
+      var k = row[0], x = k === state.sizing ? r : mutavCompute(ext(state, { sizing: k })), cur = k === state.sizing;
+      return '<tr' + (cur ? ' class="cur"' : '') + '><td>' + esc(ruleName(k)) + '<span class="sub2">' + esc(row[1]) + '</span></td><td>' + R(x.req.perLease) + '</td><td>' + N0(x.capacityAtStart) + '</td><td>' + N0(x.finalActive) + ' of ' + N0(x.plannedActive) +
+        '</td><td>' + (x.blockedMonths ? '<span class="tag risk">' + x.blockedMonths + '</span>' : '<span class="tag ok">0</span>') + '</td><td>' + R(x.endBalance) + '</td><td>' + R(x.endSurplus) +
+        '</td><td><input type="radio" name="simRule" value="' + k + '"' + (cur ? ' checked' : '') + ' aria-label="Simulate with ' + esc(ruleName(k)) + '"></td></tr>';
+    }).join('');
+    document.getElementById('ruleNote2').textContent = 'Same inputs, different required reserve. Full backing at c = 1 is the strictest; expected-loss is the loosest. The bad-year multiplier (' + decF.format(state.tailMult) + '×) sets how large a bad year is; the coverage rule sets how many the reserve holds.';
+  }
+
+  function renderMutav(r){
+    var m = r.mutav, N = r.months;
+    tiles('takeKpis', [
+      { l: 'Take in month ' + N, v: R(m.takeFinalMonth), d: P(state.takePct / 100, 0) + ' of ' + R(r.rows[N - 1].gross) + ' guarantee fees', t: 'MUTAV take in the last simulated month.' },
+      { l: N + '-month take total', v: R(m.takeTotal), d: 'Gross revenue to the treasury', hero: true, t: 'Sum of MUTAV take over the simulated months.' },
+      { l: 'Annual run-rate at month ' + N, v: R(m.takeRunRate), d: 'Month ' + N + ' take × 12', t: 'Last month’s take, annualized.' },
+      { l: 'Take per lease per month', v: R(m.takePerLease), d: R(state.rent) + ' × ' + P(state.feePct / 100, 1) + ' × ' + decF.format(state.periods) + '/12 × ' + P(state.takePct / 100, 0), t: 'Rent × guarantee fee × fee periods / 12 × take rate.' }
+    ]);
+    var mb = '', costSet = state.opCostPerLease > 0 || state.opCostFixed > 0;
+    if (costSet) {
+      var be = isFinite(m.breakEvenLeases) ? intF.format(m.breakEvenLeases) + ' active leases' : 'never (cost per lease ≥ take per lease)';
+      if (!(state.opCostFixed > 0) && m.marginPerLease > 0) be = 'from the first lease (no fixed cost)';
+      mb = '<div class="callout' + (m.marginPerLease > 0 ? '' : ' risk') + '"><strong>Take net of operating cost: ' + esc(R(m.takeNetTotal)) + '</strong> over ' + N + ' months (' + esc(R(m.opCostTotal)) + ' cost). Margin ' + esc(R(m.marginPerLease)) + ' / lease / mo (' + esc(P(m.marginPct, 0)) + ' of take). Break-even: ' + esc(be) + '. Still before PIX and offramp fees and taxes.</div>';
+    }
+    document.getElementById('marginBox').innerHTML = mb;
+    document.getElementById('sensTotH').firstChild.textContent = N + '-month total';
+    document.querySelector('#sensTbl tbody').innerHTML = [10, 20, 30].map(function(tp){
+      var s2 = mutavCompute(ext(state, { takePct: tp })), cur = Math.abs(tp - state.takePct) < 1e-9;
+      return '<tr' + (cur ? ' class="cur"' : '') + '><td>' + tp + '%' + (cur ? ' (current)' : '') + '</td><td>' + R(s2.mutav.takePerLease) + '</td><td>' + R(s2.mutav.takeTotal) + '</td><td>' + R(s2.mutav.takeRunRate) + '</td><td>' + R(s2.cumGain) + '</td></tr>';
+    }).join('');
+    tiles('shareKpis', [
+      { l: 'MUTAV share of reserve net gain', v: R(m.reserveGain), d: P(m.share, 0) + ' of ' + R(r.cumGain) + ' over ' + N + ' months', t: 'MUTAV’s capital share × the reserve’s net gain.' },
+      { l: 'MUTAV withdrawals', v: R(m.distributions), d: P(m.share, 0) + ' of ' + R(r.cumWithdrawals) + ' withdrawn', t: 'MUTAV’s share of money withdrawn from the surplus.' },
+      { l: 'Investors’ share', v: R(m.investorReserveGain), d: P(1 - m.share, 0) + ' of capital · ' + R(m.investorDistributions) + ' withdrawn' + (m.share >= 1 ? ' (none in Stage 1)' : ''), t: 'Outside investors’ share of net gain and withdrawals.' }
+    ]);
+    var combo = [
+      { l: 'MUTAV total, ' + N + ' mo', v: R(m.economicResult), d: R(m.takeTotal) + ' take + ' + R(m.reserveGain) + ' reserve share', hero: true, t: 'Take plus MUTAV’s share of the reserve’s net gain, gross.' },
+      { l: 'Capital MUTAV committed', v: R(m.capitalCommitted), d: P(m.share, 0) + ' of ' + R(r.capitalRaised) + ' raised', t: 'MUTAV’s share of starting capital plus raises.' }
+    ];
+    if (costSet) combo.push({ l: 'Total net of operating cost', v: R(m.economicResultNet), d: 'Before PIX/offramp fees and taxes', t: 'MUTAV total minus operating costs.' });
+    tiles('comboKpis', combo);
+  }
+
+  function renderSizing(r){
+    var t = mutavSizingTable(state, r, PILOT_BOOK);
+    document.querySelector('#sizeTbl tbody').innerHTML = t.rows.map(function(x){
+      var tags = (x.isRec ? ' <span class="tag ok">pilot plan (' + PILOT_BOOK + ')</span>' : '') + (x.isMax ? ' <span class="tag ok">max backed</span>' : '') + (x.isCurrent ? ' <span class="tag ok">current book</span>' : '');
+      return '<tr' + (x.isCurrent ? ' class="cur"' : '') + '><td>' + intF.format(x.leases) + tags + '</td><td>' + P(x.pctCeilings) + '</td><td>' + X(x.tailX) + '</td><td>' + (x.meets ? '<span class="tag ok">yes</span>' : '<span class="tag risk">no</span>') + '</td><td>' + R(x.take) +
+        '</td><td' + (x.normal < 0 ? ' class="neg"' : '') + '>' + R(x.normal) + '</td><td>' + P(x.normalRet) + '</td><td' + (x.bad < 0 ? ' class="neg"' : '') + '>' + R(x.bad) + '</td><td>' + P(x.badRet) + '</td><td>' + PP(x.vsSelic) + '</td></tr>';
+    }).join('');
+    document.getElementById('sizeNote').textContent = 'Balance used for every row: ' + R(t.reserve) + ' (month ' + r.months + '). Max backed: ' + N0(t.policyMax) + ' leases at ' + R(r.req.perLease) + ' per lease (' + ruleName(r.req.mode) + '). Expected claims ' + R(t.claims) + ' and bad year ' + R(t.tail) + ' per lease (' + decF.format(state.tailMult) + '×), debts ' + state.scope + '. TESOURO ' + P(state.tesouroSharePct / 100, 0) + ' × ' + P(state.tesouroPct / 100, 2) + ' on the balance. “Pilot plan” marks the Pilot · recommended book (' + PILOT_BOOK + ' leases).';
+  }
+
+  function renderScopes(r){
+    document.getElementById('scopeTakeH').firstChild.textContent = 'MUTAV take, ' + r.months + ' mo';
+    document.querySelector('#scopeTbl tbody').innerHTML = ['A','B','C'].map(function(s){
+      var x = mutavCompute(ext(state, { scope: s })), cur = s === state.scope;
+      var sr = x.finalActive > 0 ? mutavSizingRow(ext(state, { scope: s }), x.finalActive, x.endBalance, x.payouts.total, x.tailPerLease) : null;
+      return '<tr' + (cur ? ' class="cur"' : '') + '><td>' + esc(SEGS.scope.o.filter(function(o){ return o[0] === s; })[0][1]) + (cur ? ' (current)' : '') + '</td><td>' + R(x.payouts.total) + '</td><td>' + P(x.payouts.ratio) + '</td><td>' + P(x.steady.underwriting) + '</td><td>' + P(x.steady.total) + '</td><td>' + PP(x.spreadVsSelic) +
+        '</td><td>' + P(x.yieldSim.total) + '</td><td>' + (sr ? P(sr.normalRet) : '–') + '</td><td>' + (sr ? P(sr.badRet) : '–') + '</td><td>' + (sr ? PP(sr.vsSelic) : '–') + '</td><td>' + R(x.mutav.takeTotal) + '</td></tr>';
+    }).join('');
+    document.getElementById('scopeNote').textContent = 'All other inputs as set: eviction rate ' + decF.format(state.evictRatePct) + '% a year at ' + decF.format(state.evictMult) + '× rent (range 0,10–0,60%), delinquency ' + decF.format(state.rhoPct) + '%. Returns here are on the required reserve per lease (steady state), not on the balance. MUTAV take changes across scopes only if the gate admits a different book.';
+    var p = r.payouts, rent = state.rent;
+    var rows = [
+      ['Rent arrears', 'min(12 × ' + decF.format(state.rhoPct) + '%, ' + decF.format(state.defaultCover) + '×) × rent', p.defaultLeg],
+      ['Evictions', decF.format(state.evictRatePct) + '% × min(' + decF.format(state.evictMult) + '×, ' + decF.format(state.exitCover) + '×) × rent', p.evictions],
+      ['Other exit debts', state.scope === 'A' ? decF.format(state.nonEvictX) + '× rent' : state.scope === 'B' ? '(' + decF.format(state.nonEvictX) + ' − ' + decF.format(state.penaltyX) + ')× rent' : 'not covered in scope C', p.exitDebts]
+    ];
+    document.querySelector('#buildTbl tbody').innerHTML = rows.map(function(x){
+      return '<tr><td>' + esc(x[0]) + '</td><td style="text-align:left">' + esc(x[1]) + '</td><td>' + R(x[2]) + '</td><td>' + decF.format(rent > 0 ? x[2] / rent : 0) + '</td></tr>';
+    }).join('') + '<tr class="cur"><td>Total expected claims</td><td style="text-align:left">vs ' + esc(R(p.grossAnnual)) + ' guarantee fees / yr · bad year ' + esc(R(r.tailPerLease)) + '</td><td>' + R(p.total) + '</td><td>' + decF.format(rent > 0 ? p.total / rent : 0) + '</td></tr>';
+  }
+
+  /* chart */
+  function niceMax(v){
+    if (!(v > 0)) return 1;
+    var e = Math.pow(10, Math.floor(Math.log10(v))), f = v / e;
+    var steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+    for (var i = 0; i < steps.length; i++) if (f <= steps[i] + 1e-9) return steps[i] * e;
+    return 10 * e;
+  }
+  var geo = null;
+  function drawChart(r){
+    var host = document.getElementById('chart');
+    var W = Math.max(280, Math.round(host.clientWidth || 640));
+    var narrow = W < 480;
+    var L = narrow ? 56 : 66, Rm = 8, head = 20, plot = narrow ? 100 : 124, plotS = narrow ? 80 : 96, gapP = 22;
+    var N = r.months, band = (W - L - Rm) / N;
+    var bw = Math.max(2, Math.min(24, band * 0.6));
+    var costSet = state.opCostPerLease > 0 || state.opCostFixed > 0;
+    var lastRow = r.rows[N - 1], s = '', yCursor = 2;
+    function cx(i){ return L + band * i + band / 2; }
+    function panel(h){ var t = yCursor + head; yCursor = t + h + gapP; return { t: t, b: t + h }; }
+    function scale(p, lo, hi){ return function(v){ return p.b - ((v - lo) / (hi - lo)) * (p.b - p.t); }; }
+    function axis(y, lo, hi, n, ticks){
+      ticks = ticks || [];
+      if (!ticks.length) for (var j = 0; j <= n; j++) ticks.push(lo + (hi - lo) * j / n);
+      for (var i = 0; i < ticks.length; i++) {
+        var v = ticks[i], yy = y(v);
+        s += '<line class="' + (Math.abs(v) < 1e-9 ? 'c-base' : 'c-grid') + '" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + yy + '" y2="' + yy + '"/>';
+        s += '<text class="c-tick" x="' + (L - 6) + '" y="' + (yy + 4) + '" text-anchor="end">' + esc(RC(v)) + '</text>';
+      }
+      if (lo < 0) s += '<line class="c-base" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + y(0) + '" y2="' + y(0) + '"/>';
+    }
+    function header(p, title, val){
+      s += '<text x="' + L + '" y="' + (p.t - head + 12) + '"><tspan class="c-ptitle">' + esc(title) + '</tspan>' + (val ? '<tspan class="c-pval" dx="8">' + esc(val) + '</tspan>' : '') + '</text>';
+    }
+    function bar(y, v, i, cls, w, off){
+      w = w || bw; off = off || 0;
+      var y0 = y(0), y1 = y(v), top = Math.min(y0, y1), h = Math.abs(y0 - y1), xl = cx(i) - w / 2 + off, rr = Math.min(4, h, w / 2);
+      if (h < 0.5) return;
+      if (v >= 0) s += '<path class="' + cls + '" d="M' + xl + ',' + y0 + 'V' + (top + rr) + 'Q' + xl + ',' + top + ' ' + (xl + rr) + ',' + top + 'H' + (xl + w - rr) + 'Q' + (xl + w) + ',' + top + ' ' + (xl + w) + ',' + (top + rr) + 'V' + y0 + 'Z"/>';
+      else { var bt = top + h; s += '<path class="' + cls + '" d="M' + xl + ',' + y0 + 'V' + (bt - rr) + 'Q' + xl + ',' + bt + ' ' + (xl + rr) + ',' + bt + 'H' + (xl + w - rr) + 'Q' + (xl + w) + ',' + bt + ' ' + (xl + w) + ',' + (bt - rr) + 'V' + y0 + 'Z"/>'; }
+    }
+    function line(y, vals, cls, area, dotCls){
+      var pts = vals.map(function(v, i){ return cx(i) + ',' + y(v); });
+      if (area) s += '<path class="c-area" d="M' + cx(0) + ',' + y(0) + 'L' + pts.join('L') + 'L' + cx(N - 1) + ',' + y(0) + 'Z"/>';
+      s += '<polyline class="' + cls + '" points="' + pts.join(' ') + '"/>';
+      s += '<circle class="' + (dotCls || 'c-dot') + '" cx="' + cx(N - 1) + '" cy="' + y(vals[N - 1]) + '" r="4.5"/>';
+    }
+    /* panel 1: balance vs required reserve, withdrawals, blocked */
+    var p1 = panel(plot);
+    var hasW = r.cumWithdrawals > 0;
+    var max1 = niceMax(Math.max.apply(null, r.rows.map(function(x){ return Math.max(x.balance, x.required); })) * 1.06);
+    var maxW = hasW ? Math.max.apply(null, r.rows.map(function(x){ return x.withdrawal; })) : 0;
+    var lo1 = hasW ? -Math.min(max1 * 0.3, niceMax(maxW * 1.1)) : 0;
+    var minBal = Math.min.apply(null, r.rows.map(function(x){ return x.balance; }));
+    if (minBal < lo1) lo1 = -niceMax(-minBal * 1.06);
+    var y1 = scale(p1, lo1, max1);
+    header(p1, 'Balance vs required reserve', R(lastRow.balance) + ' at M' + N + (narrow ? '' : ' · required ' + R(lastRow.required) + ' · surplus ' + R(Math.max(0, lastRow.balance - lastRow.required))));
+    axis(y1, 0, max1, 2, lo1 < 0 ? [lo1, 0, max1 / 2, max1] : null);
+    r.rows.forEach(function(x, i){ bar(y1, x.balance, i, 'c-bar'); if (x.withdrawal > 0) bar(y1, -x.withdrawal, i, 'c-bar s3', Math.max(2, bw * 0.6)); });
+    line(y1, r.rows.map(function(x){ return x.required; }), 'c-req', false, 'c-reqdot');
+    r.rows.forEach(function(x, i){ if (x.blocked) { var ty = p1.t + 2; s += '<path class="c-blk" d="M' + (cx(i) - 5) + ',' + ty + 'H' + (cx(i) + 5) + 'L' + cx(i) + ',' + (ty + 7) + 'Z"><title>Growth blocked in month ' + x.month + '</title></path>'; } });
+    document.getElementById('lgW').hidden = !hasW;
+    /* panel 2 */
+    var p2 = panel(plotS), gMin = 0, gMax = 0;
+    r.rows.forEach(function(x){ gMin = Math.min(gMin, x.cumGain); gMax = Math.max(gMax, x.cumGain, x.cumSelic); });
+    var gTop = gMax > 0 ? niceMax(gMax * 1.04) : 0, gBot = gMin < 0 ? -niceMax(-gMin * 1.04) : 0;
+    if (gTop === gBot) gTop = 1;
+    var y2 = scale(p2, gBot, gTop);
+    header(p2, narrow ? 'Net gain vs Selic' : 'Reserve net gain vs Selic (cumulative)', R(lastRow.cumGain) + ' · ' + P(r.yieldSim.total) + '/yr vs Selic ' + R(lastRow.cumSelic));
+    axis(y2, gBot, gTop, 2);
+    line(y2, r.rows.map(function(x){ return x.cumGain; }), 'c-line', true);
+    s += '<polyline class="c-ref" points="' + r.rows.map(function(x, i){ return cx(i) + ',' + y2(x.cumSelic); }).join(' ') + '"/>';
+    var simple = uiMode === 'simple', p3 = p2;
+    if (!simple) {
+    /* panel 3 */
+    p3 = panel(plotS); var costs = r.rows.map(function(x){ return x.opCost || 0; });
+    var max3 = niceMax(Math.max(lastRow.cumTake, costSet ? Math.max.apply(null, costs) : 0) * 1.04); var y3 = scale(p3, 0, max3);
+    header(p3, 'MUTAV take', R(lastRow.cumTake) + ' by M' + N);
+    axis(y3, 0, max3, 2);
+    r.rows.forEach(function(x, i){ bar(y3, x.take, i, 'c-bar s2'); });
+    line(y3, r.rows.map(function(x){ return x.cumTake; }), 'c-line s2', false, 'c-dot s2');
+    if (costSet) s += '<polyline class="c-ref" points="' + costs.map(function(c, i){ return cx(i) + ',' + y3(c); }).join(' ') + '"/>';
+    }
+    document.getElementById('lgCost').hidden = !costSet;
+    var every = Math.ceil(N / Math.max(4, Math.floor((W - L) / 44)));
+    r.rows.forEach(function(x, i){ if (i % every === 0 || i === N - 1) s += '<text class="c-tick" x="' + cx(i) + '" y="' + (p3.b + 15) + '" text-anchor="middle">M' + x.month + '</text>'; });
+    var H = p3.b + 22;
+    s += '<rect id="hov" class="c-hover" x="0" y="' + p1.t + '" width="' + band + '" height="' + (p3.b - p1.t) + '" style="display:none"/>';
+    r.rows.forEach(function(x, i){ s += '<rect class="c-hit" data-i="' + i + '" x="' + (L + band * i) + '" y="' + (p1.t - head) + '" width="' + band + '" height="' + (H - p1.t + head) + '"/>'; });
+    host.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reserve balance against the required reserve with withdrawals and blocked months, cumulative reserve net gain against the same capital at Selic, and MUTAV monthly take, by month. The Month by month tab has the same data as a table.">' + s + '</svg>';
+    geo = { L: L, band: band, costSet: costSet };
+  }
+  /* yield chart: monthly net gain (bars) vs the same opening balance at Selic (dashed), one axis */
+  function drawYield(r){
+    var host = document.getElementById('ychart');
+    var W = Math.max(280, Math.round(host.clientWidth || 640)), narrow = W < 480;
+    var L = narrow ? 56 : 66, Rm = 8, top = 22, plot = narrow ? 120 : 150, N = r.months, band = (W - L - Rm) / N;
+    var bw = Math.max(2, Math.min(24, band * 0.6)), s = '';
+    function cx(i){ return L + band * i + band / 2; }
+    var hi = 0, lo = 0;
+    r.rows.forEach(function(x){ hi = Math.max(hi, x.gain, x.selicOpp); lo = Math.min(lo, x.gain); });
+    hi = niceMax(hi * 1.06); lo = lo < 0 ? -niceMax(-lo * 1.06) : 0;
+    var b = top + plot; function y(v){ return b - (v - lo) / (hi - lo) * plot; }
+    s += '<text x="' + L + '" y="14"><tspan class="c-ptitle">Monthly reserve net gain vs Selic</tspan><tspan class="c-pval" dx="8">' + esc(P(r.yieldSim.total) + '/yr vs ' + P(r.selic, 2)) + '</tspan></text>';
+    [lo, 0, hi / 2, hi].filter(function(v, i, a){ return a.indexOf(v) === i; }).forEach(function(v){
+      s += '<line class="' + (v === 0 ? 'c-base' : 'c-grid') + '" x1="' + L + '" x2="' + (W - Rm) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text class="c-tick" x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + esc(RC(v)) + '</text>';
+    });
+    r.rows.forEach(function(x, i){
+      var y0 = y(0), y1 = y(x.gain), h = Math.abs(y0 - y1), xl = cx(i) - bw / 2, tp = Math.min(y0, y1), rr = Math.min(4, h, bw / 2);
+      if (h < 0.5) return;
+      if (x.gain >= 0) s += '<path class="c-bar" d="M' + xl + ',' + y0 + 'V' + (tp + rr) + 'Q' + xl + ',' + tp + ' ' + (xl + rr) + ',' + tp + 'H' + (xl + bw - rr) + 'Q' + (xl + bw) + ',' + tp + ' ' + (xl + bw) + ',' + (tp + rr) + 'V' + y0 + 'Z"/>';
+      else s += '<rect class="c-bar" x="' + xl + '" y="' + y0 + '" width="' + bw + '" height="' + h + '"/>';
+    });
+    s += '<polyline class="c-ref" points="' + r.rows.map(function(x, i){ return cx(i) + ',' + y(x.selicOpp); }).join(' ') + '"/>';
+    var every = Math.ceil(N / Math.max(4, Math.floor((W - L) / 44)));
+    r.rows.forEach(function(x, i){ if (i % every === 0 || i === N - 1) s += '<text class="c-tick" x="' + cx(i) + '" y="' + (b + 15) + '" text-anchor="middle">M' + x.month + '</text>'; });
+    var H = b + 22;
+    r.rows.forEach(function(x, i){ s += '<rect class="c-hit" data-i="' + i + '" x="' + (L + band * i) + '" y="' + top + '" width="' + band + '" height="' + plot + '"/>'; });
+    host.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Monthly reserve net gain against what the same balance earns at Selic. The Monthly yield table has the same data.">' + s + '</svg>';
+  }
+  (function(){
+    var yb = document.getElementById('yieldBox'), yt = document.getElementById('ytip');
+    yb.addEventListener('pointermove', function(e){
+      var el = e.target; if (!(el && el.classList && el.classList.contains('c-hit')) || !last) { yt.style.display = 'none'; return; }
+      var x = last.rows[+el.getAttribute('data-i')]; if (!x) return;
+      yt.innerHTML = '<b>Month ' + x.month + '</b><div class="r"><span>Net fees − claims</span><span>' + R(x.uw) + '</span></div><div class="r"><span>TESOURO</span><span>' + R(x.tesouro) + '</span></div><div class="r"><span>Net gain</span><span>' + R(x.gain) + '</span></div><div class="r"><span>Annualized</span><span>' + P(x.yieldAnn) + '</span></div><div class="r"><span>Selic on balance</span><span>' + R(x.selicOpp) + '</span></div>';
+      yt.style.display = 'block';
+      var b = yb.getBoundingClientRect(), px = e.clientX - b.left, py = e.clientY - b.top, tw = yt.offsetWidth, th = yt.offsetHeight;
+      var left = px + 14; if (left + tw > b.width - 4) left = px - tw - 14; if (left < 4) left = 4;
+      yt.style.left = left + 'px'; yt.style.top = Math.max(4, Math.min(py - th / 2, b.height - th - 4)) + 'px';
+    });
+    yb.addEventListener('pointerleave', function(){ yt.style.display = 'none'; });
+  })();
+
+  var box = document.getElementById('chartBox'), tip = document.getElementById('tip');
+  function showTip(i, evt){
+    if (!last || !geo) return;
+    var x = last.rows[i]; if (!x) return;
+    var hov = document.getElementById('hov'); hov.setAttribute('x', geo.L + geo.band * i); hov.style.display = '';
+    function rr(a, b){ return '<div class="r"><span>' + a + '</span><span>' + b + '</span></div>'; }
+    tip.innerHTML = '<b>Month ' + x.month + ' · ' + intF.format(x.active) + ' active · ' + intF.format(x.newLeases) + ' new' + (x.blocked ? ' (blocked)' : '') + '</b>' +
+      (x.deposit ? rr('Capital in', R(x.deposit)) : '') + rr('Balance', R(x.balance)) + rr('Required reserve', R(x.required)) + rr('Surplus / shortfall', R(x.headroom)) +
+      rr('Net fees', R(x.netFees)) + rr('Claims paid', '−' + R(x.claims)) + rr('TESOURO yield', R(x.tesouro)) + rr('Net gain', R(x.gain)) +
+      rr('Cumulative gain', R(x.cumGain)) + rr('Same capital at Selic', R(x.cumSelic)) +
+      (x.withdrawal ? rr('Withdrawal', '−' + R(x.withdrawal)) : '') + rr('MUTAV take', R(x.take)) + rr('Cumulative take', R(x.cumTake)) +
+      (geo.costSet ? rr('Operating cost', R(x.opCost)) : '');
+    tip.style.display = 'block';
+    var b = box.getBoundingClientRect(), px = evt.clientX - b.left, py = evt.clientY - b.top, tw = tip.offsetWidth, th = tip.offsetHeight;
+    var left = px + 14; if (left + tw > b.width - 4) left = px - tw - 14; if (left < 4) left = 4;
+    tip.style.left = left + 'px'; tip.style.top = Math.max(4, Math.min(py - th / 2, b.height - th - 4)) + 'px';
+  }
+  function hideTip(){ tip.style.display = 'none'; var h = document.getElementById('hov'); if (h) h.style.display = 'none'; }
+  box.addEventListener('pointermove', function(e){ var el = e.target; if (el && el.classList && el.classList.contains('c-hit')) showTip(+el.getAttribute('data-i'), e); else hideTip(); });
+  box.addEventListener('pointerleave', hideTip);
+  var rz = null, lastW = 0;
+  window.addEventListener('resize', function(){
+    clearTimeout(rz);
+    rz = setTimeout(function(){ var w = document.getElementById('chart').clientWidth || document.getElementById('ychart').clientWidth; if (last && w && w !== lastW) { lastW = w; drawChart(last); if (curTab === 'yield') drawYield(last); } }, 120);
+  });
+
+  /* tool affordances */
+  function flash(btn, txt){ var o = btn.textContent; btn.textContent = txt; btn.classList.add('done'); setTimeout(function(){ btn.textContent = o; btn.classList.remove('done'); }, 1400); }
+  function plain(h){ var d = document.createElement('div'); d.innerHTML = h; return (d.textContent || '').replace(/\s+/g, ' ').trim(); }
+  function summaryText(){
+    var r = last, N = r.months, lines = [];
+    var sc = activeScen ? scenById(activeScen).l : 'Custom (modified from ' + (scenById(baseScen) || scenById('default')).l + ')';
+    lines.push('MUTAV reserve simulator: snapshot (model estimates, not a return promise; not an offer of securities)');
+    lines.push('Scenario: ' + sc + (state.sizing !== 'policy' ? ' · required reserve by ' + ruleName(state.sizing) : ''));
+    lines.push('');
+    lines.push('At a glance');
+    lastGlance.forEach(function(g){ lines.push('  ' + g.q + ': ' + plain(g.s)); });
+    lines.push('');
+    lines.push('Inputs');
+    GROUPS.forEach(function(g){
+      g.f.forEach(function(f){
+        if (f.seg) { lines.push('  ' + SEGS[f.seg].l + ': ' + SEGS[f.seg].o.filter(function(o){ return o[0] === state[f.seg]; })[0][1]); return; }
+        if (!f.k || (f.when && !f.when(state))) return;
+        lines.push('  ' + f.l + ': ' + (f.toggle ? (state[f.k] ? 'on' : 'off') : decF.format(state[f.k]) + ' ' + f.u));
+      });
+    });
+    lines.push('');
+    lines.push('Results');
+    lines.push('  Balance at month ' + N + ': ' + R(r.endBalance) + ' (required reserve ' + R(r.endRequired) + ', surplus ' + R(r.endSurplus) + ')');
+    lines.push('  Leases: ' + N0(r.finalActive) + ' of ' + N0(r.plannedActive) + ' planned; blocked months: ' + r.blockedMonths + '; the balance backs ' + N0(r.selfFundedLeases));
+    lines.push('  Lowest surplus: ' + R(r.minHeadroom) + ' (month ' + r.minHeadMonth + ')');
+    lines.push('  Capital raised: ' + R(r.capitalRaised) + '; reserve net gain: ' + R(r.cumGain) + '; withdrawals: ' + R(r.cumWithdrawals));
+    lines.push('  Reserve yield, annualized: ' + P(r.yieldSim.total, 2) + ' (' + P(r.yieldSim.underwriting, 2) + ' fees − claims + ' + P(r.yieldSim.tesouro, 2) + ' TESOURO); vs Selic ' + PP(r.yieldSim.vsSelic) + '; return on capital ' + P(r.yieldSim.returnOnCapital, 2) + ' over ' + N + ' months (' + P(r.yieldSim.returnOnCapitalAnn, 2) + ' a year)');
+    lines.push('  Claims-to-fees ratio: ' + P(r.payouts.ratio, 1) + ' (' + R(r.payouts.total) + ' per lease per year)');
+    lines.push('  MUTAV take, ' + N + ' months: ' + R(r.mutav.takeTotal) + ' gross; run-rate ' + R(r.mutav.takeRunRate) + '/yr');
+    try { lines.push(''); lines.push('Scenario link: ' + location.href); } catch (e) {}
+    return lines.join('\n');
+  }
+  document.getElementById('copyBtn').addEventListener('click', function(){
+    var btn = this, txt = summaryText();
+    function fallback(){
+      try {
+        var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); var ok = document.execCommand('copy'); document.body.removeChild(ta);
+        flash(btn, ok ? 'Copied' : 'Copy failed');
+      } catch (e) { flash(btn, 'Copy failed'); }
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function(){ flash(btn, 'Copied'); }, fallback);
+      else fallback();
+    } catch (e) { fallback(); }
+  });
+  document.getElementById('csvBtn').addEventListener('click', function(){
+    var btn = this;
+    try {
+      var head = ['month','planned_new','new_leases','blocked','active_leases','capital_in','opening_balance','required_reserve','balance','surplus','surplus_or_shortfall','guarantee_fees','mutav_take','net_fees_to_reserve','claims_paid','tesouro_yield','net_gain','withdrawal','cumulative_net_gain','cumulative_withdrawals','cumulative_take','operating_cost','net_fees_minus_claims','yield_annualized','selic_on_balance','cumulative_selic'];
+      var lines = ['# starting_capital=' + state.startCapital + ' monthly_raise=' + state.monthlyRaise + ' raise_from=' + state.raiseFrom + ' raise_until=' + (state.raiseUntil > 0 ? state.raiseUntil : last.months) + ' rule=' + state.sizing, head.join(',')];
+      last.rows.forEach(function(x){
+        lines.push([x.month, x.planned, x.newLeases, x.blocked ? 1 : 0, x.active, x.deposit, x.opening, x.required, x.balance, x.surplus, x.headroom, x.gross, x.take, x.netFees, x.claims, x.tesouro, x.gain, x.withdrawal, x.cumGain, x.cumW, x.cumTake, x.opCost, x.uw, x.yieldAnn, x.selicOpp, x.cumSelic]
+          .map(function(v){ return (Math.round(v * 10000) / 10000).toString(); }).join(','));
+      });
+      var blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' });
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'mutav-reserve-monthly.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+      flash(btn, 'Downloaded');
+    } catch (e) { flash(btn, 'Export failed'); }
+  });
+  window.addEventListener("hashchange", function(){ if (loadHash()) { setMode(uiMode, true); syncInputs(); render(); showTab(curTab); } });
+
+  setMode(uiMode, true);
+  syncInputs();
+  render();
+  showTab(curTab);
+})();
+</script>
+</body>
+</html>
