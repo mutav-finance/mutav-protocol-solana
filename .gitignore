@@ -20,3 +20,4 @@ dist/
 .DS_Store
 
 # Cargo.lock and bun.lock are intentionally tracked.
+.claude/worktrees/
