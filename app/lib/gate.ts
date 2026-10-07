@@ -41,7 +41,7 @@ export type GatePreview = {
   freeCapitalBefore: bigint;
   stableAssets: bigint;
   coverageRequiredBefore: bigint;
-  /** `ceil(c × (remaining_cover_total + new_cover) / 10_000)`. */
+  /** `max(ceil(c × (remaining_cover_total + new_cover) / 10_000), provisions)` (ADR 0016). */
   coverageRequiredAfter: bigint;
   /** `coverage_required_after + earmark_eff_before`; must be ≤ `stable_assets`. */
   needed: bigint;
@@ -58,7 +58,7 @@ type StateView = Pick<
 export function previewRegisterGuarantee(config: ConfigView, state: StateView, g: GateInput): GatePreview {
   const before = solvencyFromAccounts(config, state);
   const newCover = g.defaultCover + g.exitCover;
-  const coverageRequiredAfter = coverageRequired(state.remainingCoverTotal + newCover, config.coverageRatioBps);
+  const coverageRequiredAfter = coverageRequired(state.remainingCoverTotal + newCover, config.coverageRatioBps, state.provisions);
   const needed = coverageRequiredAfter + before.earmarkEff;
   const base = {
     newCover,

@@ -74,7 +74,7 @@ export function Health({ r }: { r: ReserveView }) {
       </div>
       <div className="grid-metrics">
         <MetricCard label="Stable assets" value={fmtBrs(sol.stableAssets)} unit="BRS held by the reserve (brs_balance + TESOURO value)" tooltip="Internal accounting of the reserve token account. Excludes pending deposits and assets owed to filled redemptions." />
-        <MetricCard label="Coverage required" value={fmtBrs(sol.coverageRequired)} unit={`${fmtBps(r.config.coverageRatioBps)} of remaining cover`} tooltip="ceil(coverage ratio × remaining cover of every active guarantee)." />
+        <MetricCard label="Coverage required" value={fmtBrs(sol.coverageRequired)} unit={`${fmtBps(r.config.coverageRatioBps)} of remaining cover`} tooltip="The coverage ratio c is the share of remaining cover the reserve must hold in stable assets (at least 10%): coverage required is ceil(c × remaining cover of every active guarantee), and never less than the open claim provisions." />
         <MetricCard label="Surplus" value={fmtBrs(sol.surplus)} unit="stable assets − coverage required" />
         <MetricCard label="Free capital" value={fmtBrs(sol.freeCapital)} unit="what new guarantees and redemptions may use" tooltip="Surplus minus the instant-exit earmark, which is always zero in the pilot." />
         <MetricCard label="NAV per share" value={fmtNav(s.navPerShare)} unit={`published at last refresh · now ${fmtNav(navNow)}`} tooltip="Net assets (stable assets − open claim provisions) ÷ shares outstanding. The published value updates on refresh; 'now' recomputes it from the current accounts." />

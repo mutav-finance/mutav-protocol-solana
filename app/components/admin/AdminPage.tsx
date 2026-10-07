@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { address as toAddress } from "@solana/kit";
-import { buildAllowlist } from "@mutav-finance/mutav-protocol-solana";
+import { buildAllowlist, MIN_COVERAGE_RATIO_BPS } from "@mutav-finance/mutav-protocol-solana";
 import { Page, ReadError, Section } from "@/components/Section";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
@@ -310,9 +310,9 @@ function Actions({ mode }: { mode: Mode }) {
           <TextField id="adm-max" label="Max BRS (blank = no limit)" value={maxAssets} onChange={setMaxAssets} numeric />
         </Grid>
       </AdminAction>
-      <AdminAction title="Set config: coverage ratio and caps" label="set_config" mode={mode} request={Number.isInteger(ratioN) && ratioN >= 10_000 ? { kind: "set_config", coverageRatioBps: ratioN, caps } : null} note="Writes only the fields filled in; every other field is carried over as it is on-chain.">
+      <AdminAction title="Set config: coverage ratio and caps" label="set_config" mode={mode} request={Number.isInteger(ratioN) && ratioN >= MIN_COVERAGE_RATIO_BPS && ratioN <= 65_535 ? { kind: "set_config", coverageRatioBps: ratioN, caps } : null} note="Writes only the fields filled in; every other field is carried over as it is on-chain.">
         <Grid>
-          <TextField id="adm-ratio" label="Coverage ratio (bps, ≥ 10000)" value={ratio} onChange={setRatio} numeric hint={Number.isFinite(ratioN) ? fmtBps(ratioN) : ""} />
+          <TextField id="adm-ratio" label={`Coverage ratio (bps, ≥ ${MIN_COVERAGE_RATIO_BPS})`} value={ratio} onChange={setRatio} numeric hint={Number.isFinite(ratioN) ? fmtBps(ratioN) : ""} />
           <TextField id="adm-mcg" label="Max cover per guarantee (BRS)" value={maxCoverPerGuarantee} onChange={setMcg} numeric hint={`now ${fmtBrs(reserve.config.caps.maxCoverPerGuarantee, 0)}`} />
           <TextField id="adm-mca" label="Max cover per agency (BRS)" value={maxCoverPerAgency} onChange={setMca} numeric hint={`now ${fmtBrs(reserve.config.caps.maxCoverPerAgency, 0)}`} />
           <TextField id="adm-tvl" label="Max reserve (BRS)" value={maxTvl} onChange={setTvl} numeric hint={`now ${fmtBrs(reserve.config.caps.maxTvl, 0)}`} />
