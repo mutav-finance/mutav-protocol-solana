@@ -3,6 +3,7 @@ import { HeroWithSwap } from "@/components/landing/LandingNav";
 import { LiveStrip } from "@/components/landing/LiveStrip";
 import { ProtocolDiagram } from "@/components/landing/ProtocolDiagram";
 import { SiteFooter } from "@/components/SiteFooter";
+import { WhoDoesWhat } from "@/components/landing/WhoDoesWhat";
 
 const STEPS: [string, string, string][] = [
   [
@@ -66,13 +67,24 @@ export default function Landing() {
           </ol>
         </section>
 
+        <section aria-labelledby="roles-h" style={{ padding: "64px var(--section-pad-x)", borderBottom: "1px solid var(--color-border)" }}>
+          <h2 id="roles-h" style={{ fontSize: 28, margin: "0 0 10px", letterSpacing: "-0.02em" }}>
+            Who does what
+          </h2>
+          <p className="font-body" style={{ fontSize: 14, color: "var(--color-text-2)", margin: "0 0 28px", maxWidth: 720, lineHeight: 1.6 }}>
+            Three roles touch the program, each with its own key, and the program checks which one signed. The same marks tag every action and every number
+            across this site.
+          </p>
+          <WhoDoesWhat />
+        </section>
+
         <section aria-labelledby="diagram-h" style={{ padding: "64px var(--section-pad-x)", borderBottom: "1px solid var(--color-border)" }}>
           <h2 id="diagram-h" style={{ fontSize: 28, margin: "0 0 10px", letterSpacing: "-0.02em" }}>
             The program
           </h2>
           <p className="font-body" style={{ fontSize: 14, color: "var(--color-text-2)", margin: "0 0 28px", maxWidth: 720, lineHeight: 1.6 }}>
-            One Solana program holds the reserve. The operator runs guarantees and claims; the admin is a Squads multisig with a time lock; nobody holds a key
-            that can move reserve funds alone.
+            One Solana program holds the reserve. The Operator runs guarantees and claims; the Reserve Admin is a Squads multisig with a time lock; the
+            Investor enters and leaves through the FIFO queue. Nobody holds a key that can move reserve funds alone.
           </p>
           <ProtocolDiagram />
         </section>
@@ -82,8 +94,8 @@ export default function Landing() {
             Check it yourself
           </h2>
           <p className="font-body" style={{ fontSize: 14, color: "var(--color-text-2)", margin: "0 0 24px", maxWidth: 720, lineHeight: 1.6 }}>
-            The pilot reserve holds MUTAV&apos;s own capital and is not open to outside investors. What is open is the evidence: every account, every claim and
-            every payment, on Solana.
+            The pilot runs on MUTAV&apos;s own capital and is not open to public investment. Capital requests are gated by an on-chain allowlist (KYC off-chain); in the pilot the only allowlisted capital provider is MUTAV&apos;s capital
+            wallet. What is open to everyone is the evidence: every account, every claim and every payment, on Solana.
           </p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Link href="/reserve" className="font-body cta-fill" style={{ background: "var(--color-accent)", color: "var(--color-canvas)", fontSize: 15, fontWeight: 600, padding: "12px 20px", textDecoration: "none" }}>

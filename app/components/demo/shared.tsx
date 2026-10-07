@@ -47,7 +47,7 @@ export function rolesOf(address: string | null, r: ReserveView): Role[] {
     .map(([, role]) => role);
 }
 
-const ROLE_LABEL: Record<Role, string> = { operator: "operator", admin: "admin", pauser: "pauser", capital: "MUTAV capital wallet" };
+const ROLE_LABEL: Record<Role, string> = { operator: "Operator", admin: "Reserve Admin", pauser: "pauser", capital: "Investor (MUTAV capital wallet)" };
 
 /** The program checks signers; the UI only warns when the wallet isn't the configured role. */
 export function RoleWarning({ need }: { need: Role }) {
