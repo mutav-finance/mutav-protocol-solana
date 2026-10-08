@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ADMIN_SECTIONS, ALLOCATION_ALIAS, MAX_FEE_TAKE_BPS, capsError, generalConfigError, rolesError } from "../admin";
+import { ADMIN_SECTIONS, ALLOCATION_ALIAS, CONFIG_FIELD_HOME, MAX_FEE_TAKE_BPS, capsError, generalConfigError, rolesError } from "../admin";
 
 const PROGRAM = join(__dirname, "../../../programs/mutav/src");
 const A = "9b4N73CtqN6PWE9tvocRvGjJnSfiy94oev4wbR31xMeU";
@@ -12,6 +12,31 @@ describe("/admin sections", () => {
   it("are General, Money in & out, Allocation, in that order, with #reserve-assets kept as an alias", () => {
     expect(ADMIN_SECTIONS.map((s) => s.id)).toEqual(["general", "money", "allocation"]);
     expect(ALLOCATION_ALIAS).toBe("reserve-assets");
+  });
+});
+
+describe("set_config field homes", () => {
+  const ADMIN = join(__dirname, "../../components/admin");
+  const file = { general: "General.tsx", money: "Money.tsx", allocation: "Allocation.tsx" } as const;
+  const src = (f: string) => readFileSync(join(ADMIN, f), "utf8");
+  /** Fields a ConfigCard edits in a file: `brsField("key"`, `secsField("key"`, `bpsField("key"`. */
+  const cardFields = (f: string) => [...src(f).matchAll(/(?:brs|secs|bps)Field\("(\w+)"/g)].map((x) => x[1]!);
+
+  it("puts every per-flow field in exactly one card, in its home section", () => {
+    const all = Object.values(file).flatMap(cardFields);
+    expect(new Set(all).size).toBe(all.length);
+    for (const [field, home] of Object.entries(CONFIG_FIELD_HOME)) {
+      const f = file[home.split("-")[0] as keyof typeof file];
+      expect([field, src(f)]).toEqual([field, expect.stringContaining(`id="${home}"`)]);
+      if (all.includes(field)) expect([field, cardFields(f)]).toEqual([field, expect.arrayContaining([field])]);
+    }
+    expect(all.sort()).toEqual(Object.keys(CONFIG_FIELD_HOME).filter((k) => all.includes(k)).sort());
+  });
+
+  it("keeps the partial-fill floor with redemptions and the payout SLA with claim payments", () => {
+    expect(CONFIG_FIELD_HOME.minFillAssets).toBe("money-redemptions");
+    expect(CONFIG_FIELD_HOME.payoutSlaSecs).toBe("money-claims");
+    expect(cardFields("General.tsx")).not.toContain("payoutSlaSecs");
   });
 });
 

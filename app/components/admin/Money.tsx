@@ -65,15 +65,15 @@ function Deposits({ mode }: { mode: Mode }) {
         <ConfigCard
           title="Request sizes"
           mode={mode}
-          fields={[brsField("minRequest", "Min request (BRS)", c.caps.minRequest), brsField("maxRequest", "Max request (BRS)", c.caps.maxRequest), brsField("minFillAssets", "Partial-fill floor (BRS)", c.caps.minFillAssets)]}
+          fields={[brsField("minRequest", "Min request (BRS)", c.caps.minRequest), brsField("maxRequest", "Max request (BRS)", c.caps.maxRequest)]}
           build={(v) => {
             const caps: Record<string, bigint> = {};
-            for (const k of ["minRequest", "maxRequest", "minFillAssets"]) if (v[k] !== undefined) caps[k] = v[k] as bigint;
+            for (const k of ["minRequest", "maxRequest"]) if (v[k] !== undefined) caps[k] = v[k] as bigint;
             const bad = capsError({ ...c.caps, ...caps });
             return bad ?? { kind: "set_config", caps };
           }}
           bound="min request ≤ max request"
-          does="Bound every request_deposit and request_redeem. The partial-fill floor is the smallest piece fulfil_redeems may fill at the head of the queue."
+          does="Bound every request_deposit and request_redeem."
         />
       </Cards>
     </Sub>
@@ -171,6 +171,14 @@ function Redemptions({ mode }: { mode: Mode }) {
             <TextField id="adm-max" label="Max BRS (blank = no limit)" value={maxAssets} onChange={setMaxAssets} numeric />
           </Grid>
         </AdminAction>
+        <ConfigCard
+          title="Partial-fill floor"
+          mode={mode}
+          fields={[brsField("minFillAssets", "Partial-fill floor (BRS)", reserve.config.caps.minFillAssets)]}
+          build={(v) => ({ kind: "set_config", caps: { minFillAssets: v.minFillAssets as bigint } })}
+          bound="BRS amount"
+          does="The smallest piece fulfil_redeems may fill at the head of the queue when free capital cannot pay it whole (ADR 0010)."
+        />
       </Cards>
     </Sub>
   );
@@ -192,16 +200,16 @@ function Claims({ mode }: { mode: Mode }) {
       </Contexts>
       <Cards>
         <ConfigCard
-          title="Claim-payment caps"
+          title="Claim-payment caps and payout SLA"
           mode={mode}
-          fields={[brsField("maxClaimPerCall", "Max per call (BRS)", c.caps.maxClaimPerCall), brsField("maxClaimPerPeriod", "Max per period (BRS)", c.caps.maxClaimPerPeriod), secsField("claimPeriodSecs", "Period (seconds)", c.caps.claimPeriodSecs, 1n)]}
+          fields={[brsField("maxClaimPerCall", "Max per call (BRS)", c.caps.maxClaimPerCall), brsField("maxClaimPerPeriod", "Max per period (BRS)", c.caps.maxClaimPerPeriod), secsField("claimPeriodSecs", "Period (seconds)", c.caps.claimPeriodSecs, 1n), secsField("payoutSlaSecs", "Payout SLA (seconds)", c.payoutSlaSecs)]}
           build={(v) => {
             const caps: Record<string, bigint> = {};
             for (const k of ["maxClaimPerCall", "maxClaimPerPeriod", "claimPeriodSecs"]) if (v[k] !== undefined) caps[k] = v[k] as bigint;
-            return { kind: "set_config", caps };
+            return { kind: "set_config", caps, payoutSlaSecs: v.payoutSlaSecs as bigint | undefined };
           }}
-          bound="period > 0"
-          does="Bound what the operator key can pay: per pay_claim and per rolling window. They bound a compromised key, not MUTAV's liability; a payment above them is the admin path below."
+          bound="period > 0 · SLA ≥ 0"
+          does="Bound what the operator key can pay: per pay_claim and per rolling window. They bound a compromised key, not MUTAV's liability; a payment above them is the admin path below. The payout SLA is how long a paid claim may wait for its PIX settlement before refresh records it late."
         />
       </Cards>
       <DataTable label="Planned claim path" head={["Instruction", "Signer", "What it will do", "Status"]}>

@@ -90,11 +90,11 @@ For Squads members. A sticky in-page nav (General controls · Money in & out · 
 - **General controls** (`#general`), the cross-cutting settings:
   - **Emergency** strip: paused, fulfil halted, operator active or revoked; `pause` and `revoke_operator` (pauser key or admin, signed directly, no time lock), `unpause` and `clear_fulfil_halt` (Reserve Admin, through Squads).
   - **Roles & multisig:** the Squads status, time lock and proposal list, with the create → approve → execute flow explained once; the roles; `set_roles`.
-  - **Coverage & reserve limits:** coverage ratio c, `max_tvl`, `max_cover_per_guarantee`, `max_cover_per_agency`, payout SLA; one `set_config`.
+  - **Coverage & reserve limits:** coverage ratio c, `max_tvl`, `max_cover_per_guarantee`, `max_cover_per_agency`; one `set_config`.
   - **Allowlist & accounts:** allowlist root, treasury, payments, mints; `set_allowlist_root` (client Merkle builder), `set_payments_account`.
 - **Money in & out** (`#money`): each flow with its settings. Operator and Investor steps are one-line context rows (role tag, live total, link to `/operator`, `/investor` or `/reserve`); charts stay on `/reserve`.
-  - In: **deposits** (`fulfil_deposits`; request sizes and partial-fill floor), **guarantee fees** (`fee_take_bps`), **BRS issuer income** (Nora → inbox → `sweep_income`; inbox balance, swept total, last statements; `income_take_bps`, fail-closed cap 0 until spec §12 Q47).
-  - Out: **redemptions** (`fulfil_redeems`, gated by free capital), **claim payments** (`max_claim_per_call`, `max_claim_per_period`, `claim_period_secs`; `pay_claim_admin` shown as planned).
+  - In: **deposits** (`fulfil_deposits`; `min_request`, `max_request`), **guarantee fees** (`fee_take_bps`), **BRS issuer income** (Nora → inbox → `sweep_income`; inbox balance, swept total, last statements; `income_take_bps`, fail-closed cap 0 until spec §12 Q47).
+  - Out: **redemptions** (`fulfil_redeems`, gated by free capital; `min_fill_assets`), **claim payments** (`max_claim_per_call`, `max_claim_per_period`, `claim_period_secs`, `payout_sla_secs`; `pay_claim_admin` shown as planned).
 - **Allocation management** (`#allocation`, alias `#reserve-assets`): composition (BRS, TESOURO, the income inbox kept apart, the TESOURO share cap marker); the TESOURO share cap and price parameters; `VaultConfig.adapters`; `whitelist_adapter`, `remove_adapter`, `allocate`, `deallocate` as disabled planned rows with their gates, blocked on a BRS↔TESOURO path (Etherfuse mints against USDC).
 
 ## Seed scenario

@@ -17,12 +17,12 @@ import { Label } from "@/components/ui/label";
 import { RoleLine, RoleTag } from "@/components/RoleTag";
 import { Action, Grid, Note, TextField, useLive } from "@/components/demo/shared";
 import { AdminAction, Cards, Facts, KV, Meaning, PauserAction, Sub, WhatThis, type Mode } from "@/components/admin/shared";
-import { ConfigCard, brsField, bpsField, secsField } from "@/components/admin/ConfigCard";
+import { ConfigCard, brsField, bpsField } from "@/components/admin/ConfigCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UNSET_ADDRESS } from "@/lib/reserve-assets";
 import { SquadsPanel, type SquadsResp } from "@/components/admin/Squads";
 import { rolesError } from "@/lib/admin";
-import { fmtBps, fmtBrs, fmtDuration } from "@/lib/format";
+import { fmtBps, fmtBrs } from "@/lib/format";
 import { ACCOUNT_ROLES } from "@/lib/roles";
 import { bytesToHex } from "@/lib/serde";
 
@@ -103,15 +103,14 @@ function CoverageControl({ mode }: { mode: Mode }) {
         brsField("maxTvl", "Max reserve (BRS)", c.caps.maxTvl),
         brsField("maxCoverPerGuarantee", "Max cover per guarantee (BRS)", c.caps.maxCoverPerGuarantee),
         brsField("maxCoverPerAgency", "Max cover per agency (BRS)", c.caps.maxCoverPerAgency),
-        secsField("payoutSlaSecs", "Payout SLA (seconds)", c.payoutSlaSecs),
       ]}
       build={(v) => {
         const caps: Record<string, bigint> = {};
         for (const k of ["maxTvl", "maxCoverPerGuarantee", "maxCoverPerAgency"]) if (v[k] !== undefined) caps[k] = v[k] as bigint;
-        return { kind: "set_config", coverageRatioBps: v.coverageRatioBps as number | undefined, payoutSlaSecs: v.payoutSlaSecs as bigint | undefined, caps };
+        return { kind: "set_config", coverageRatioBps: v.coverageRatioBps as number | undefined, caps };
       }}
-      bound={`c ≥ ${fmtBps(MIN_COVERAGE_RATIO_BPS)} (ADR 0016) · SLA ≥ 0`}
-      does="c sizes the reserve against the book: coverage required = c × remaining cover (never below open provisions). The limits bound the reserve and each guarantee and agency; the SLA is how long a paid claim may wait for its PIX settlement."
+      bound={`c ≥ ${fmtBps(MIN_COVERAGE_RATIO_BPS)} (ADR 0016)`}
+      does="c sizes the reserve against the book: coverage required = c × remaining cover (never below open provisions). The limits bound the reserve and each guarantee and agency."
     />
   );
 }
@@ -126,7 +125,6 @@ function CoverageTable() {
         [<Meaning key="t" label="Max reserve (TVL)">fulfil_deposits stops at this size.</Meaning>, m(fmtBrs(c.caps.maxTvl, 0))],
         [<Meaning key="g" label="Max cover per guarantee">register_guarantee refuses a larger lease.</Meaning>, m(fmtBrs(c.caps.maxCoverPerGuarantee, 0))],
         [<Meaning key="a" label="Max cover per agency">register_guarantee refuses beyond it per agency.</Meaning>, m(fmtBrs(c.caps.maxCoverPerAgency, 0))],
-        [<Meaning key="s" label="Payout SLA">Time from a claim payment to its PIX settlement before it is recorded late.</Meaning>, m(fmtDuration(c.payoutSlaSecs))],
         ["Feature flags", m(`0x${c.featureFlags.toString(16)}${c.featureFlags === 0n ? " (none: pilot)" : ""}`)],
       ]}
     />

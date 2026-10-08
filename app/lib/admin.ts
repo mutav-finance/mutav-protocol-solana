@@ -16,6 +16,28 @@ export const ADMIN_SECTIONS = [
 ] as const;
 export const ALLOCATION_ALIAS = "reserve-assets";
 
+/**
+ * Where each `set_config` field is edited on /admin: every parameter lives
+ * with what it governs, in exactly one card.
+ */
+export const CONFIG_FIELD_HOME = {
+  coverageRatioBps: "general-coverage",
+  maxTvl: "general-coverage",
+  maxCoverPerGuarantee: "general-coverage",
+  maxCoverPerAgency: "general-coverage",
+  minRequest: "money-deposits",
+  maxRequest: "money-deposits",
+  feeTakeBps: "money-fees",
+  incomeTakeBps: "money-income",
+  minFillAssets: "money-redemptions",
+  maxClaimPerCall: "money-claims",
+  maxClaimPerPeriod: "money-claims",
+  claimPeriodSecs: "money-claims",
+  payoutSlaSecs: "money-claims",
+  maxTesouroShareBps: "allocation-controls",
+  price: "allocation-controls",
+} as const;
+
 // ── General controls ────────────────────────────────────────────────────────
 
 /** The bound `validate_roles` enforces: set, distinct from the admin and from each other. */
