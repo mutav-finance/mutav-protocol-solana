@@ -397,18 +397,18 @@ The reserve holds two kinds of asset ([spec §7](spec.md#7-price-safety)).
 
 **Issuer income** ([ADR 0017](decisions/0017-brs-income-intake.md), proposed). BRS bears no yield, but Nora pays partners a monthly revenue share in BRS under a commercial agreement, to an address the partner chooses. MUTAV names the reserve's *income inbox*: the vault authority's associated token account for BRS, created at `initialize`. Nothing in it counts toward NAV; each month the operator sweeps the amount on Nora's statement into the reserve with `sweep_income`, which books it once per statement and raises NAV for every holder. The NAV-move guard measures net of these inflows, so a monthly payment does not halt fulfilment. The income depends on one contract with one issuer, which can change its rate or end, so it is shown as issuer partnership revenue, separate from guarantee fees, and never counted in the coverage math. Its terms with Nora are **open**.
 
-**TESOURO** ([Etherfuse](https://etherfuse.com/products/stablebonds)) is tokenized exposure to Brazilian federal bonds: a Token-2022 mint that carries an on-chain `BondPrice` account. Its layout, update cadence and rate basis are being confirmed with the issuer. It is the first candidate for an adapter, not part of the pilot: the pilot reserve holds BRS only (ADR 0018), because BRS already earns near Selic through Nora's revenue share and Etherfuse has no BRS path yet. Once an adapter is live, the design caps TESOURO at 50% of the reserve, only through that capped adapter.
+**TESOURO** ([Etherfuse](https://etherfuse.com/products/stablebonds)) is tokenized exposure to Brazilian federal bonds: a Token-2022 mint that carries an on-chain `BondPrice` account. Its layout, update cadence and rate basis are being confirmed with the issuer. It is the first candidate for an adapter, not part of the pilot: the pilot reserve holds BRS only (ADR 0018), because BRS already earns near Selic through Nora's revenue share and Etherfuse has no BRS path yet. Once an adapter is live, it is held only through that capped adapter, and a floor keeps at least half the reserve in BRS, the settlement token.
 
 The **mint guard** rejects any Token-2022 mint with a PermanentDelegate, a TransferHook, a non-zero TransferFee, NonTransferable, or a default-frozen account state. Mints are allowlisted **by address, never by symbol**, because impostor BRL tokens exist.
 
-**Asset mix is open.** MUTAV's working business plan targets roughly 80% tokenized federal bonds with a 20% liquidity sleeve held in a USD stablecoin. The pilot holds BRS only (ADR 0018); once adapters are live, the design keeps at least half the reserve in BRS and caps TESOURO at 50%, so claim payments never wait on a bond redemption or carry FX risk between BRL claims and the reserve. Neither the mix nor the sleeve asset is decided. A USD sleeve would need its own valuation rule and mint-guard review before it could count toward `stable_assets`.
+**Asset mix is open.** MUTAV's working business plan targets roughly 80% tokenized federal bonds with a 20% liquidity sleeve held in a USD stablecoin. The pilot holds BRS only (ADR 0018); once adapters are live, a settlement floor (`min_settlement_bps`) keeps at least half the reserve in BRS, with per-adapter caps, so claim payments never wait on a bond redemption or carry FX risk between BRL claims and the reserve. Neither the mix nor the sleeve asset is decided. A USD sleeve would need its own valuation rule and mint-guard review before it could count toward `stable_assets`.
 
 **Table 6. Reserve assets** (the pilot holds BRS only, ADR 0018; the TESOURO row applies once an adapter is live)
 
 | Asset | Issuer | Token program | Valuation rule | Cap | Key risk |
 |---|---|---|---|---|---|
 | BRS | Nora Finance | Classic SPL, 6 dp | Par (1 BRS = R$1) | None; 100% of the pilot reserve | Issuer backing, freeze authority, thin market |
-| TESOURO | Etherfuse | Token-2022 | `min(BondPrice, accrual ceiling)`, with staleness and deviation bounds | 0% in the pilot (ADR 0018); ≤50% once an adapter is live (proposed; business plan ~80%), plus adapter cap | Price staleness, conversion path, issuer |
+| TESOURO | Etherfuse | Token-2022 | `min(BondPrice, accrual ceiling)`, with staleness and deviation bounds | 0% in the pilot (ADR 0018); once an adapter is live, its own cap and share limit, under a ≥50% BRS floor (proposed; business plan ~80% bonds) | Price staleness, conversion path, issuer |
 | BRZ (new mint) | Transfero | Token-2022 | — | **Not eligible** | Fails the mint guard (PermanentDelegate) |
 
 **The thin market is a design input.** No on-chain venue could absorb a forced sale, so the design keeps a BRS buffer, uses async exits and reserves liquidity for filed requests. Funding the pilot would mint many times today's on-chain BRS supply, a concentration risk; confirming issuance and off-ramp capacity is a start condition (§12).
@@ -625,7 +625,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 | `max_cover_per_agency` | `register_guarantee` | R$10M | Proposed; well above `max_tvl` / 0.10 plus fee growth, so it never binds while one reserve serves the agency |
 | `max_claim_per_call` | `pay_claim` (operator only) | R$10k | Proposed |
 | `max_claim_per_period` / `claim_period_secs` | `pay_claim` (operator only) | R$20k / 30 days | Proposed |
-| `max_tesouro_share_bps` | `allocate` | 0% in the pilot and on devnet (ADR 0018) | 50% proposed once a TESOURO adapter is live; business plan targets ~80% (open) |
+| `min_settlement_bps` (today `max_tesouro_share_bps`, its complement) | `allocate` | 100% BRS in the pilot and on devnet (ADR 0018) | 50% proposed once an adapter is live, plus per-adapter caps; business plan targets ~80% bonds (open) |
 | `min_request` / `max_request` | `request_*`, partial-fill remainder | R$1,000 / R$100,000 | Proposed |
 | `min_fill_assets` | `fulfil_redeems` | R$500 | Proposed |
 | `c` (`coverage_ratio_bps`) | All gates | 0.10 | Program floor 0.10 (ADR 0016); the two-tail-year check stays off-chain |
