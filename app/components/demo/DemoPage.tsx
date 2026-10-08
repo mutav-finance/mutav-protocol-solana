@@ -160,7 +160,7 @@ export function DemoPage() {
 
           <Section id="investor" title="Investor actions" kicker="Elsewhere" roles={<RoleTag role="investor" bordered />}>
             <Note>
-              Deposits, redemptions, cancels and claims, with the wallet&apos;s allowlist status and position, are on <Link href="/investor" className="ext-link">/investor</Link>. Requests need an allowlisted wallet; in the pilot, MUTAV&apos;s capital wallet.
+              Deposits, redemptions, cancels and claims, with the wallet&apos;s allowlist status and position, are on <Link href="/dashboard" className="ext-link">/dashboard</Link>. Requests need an allowlisted wallet; in the pilot, MUTAV&apos;s capital wallet.
             </Note>
           </Section>
 

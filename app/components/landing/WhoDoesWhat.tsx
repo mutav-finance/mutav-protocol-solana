@@ -16,7 +16,7 @@ const NOTE: Partial<Record<Role, string>> = {
 const PAGE: Partial<Record<Role, [string, string]>> = {
   admin: ["/admin", "Admin console"],
   operator: ["/operator", "Operator console"],
-  investor: ["/investor", "Investor view"],
+  investor: ["/dashboard", "Investor dashboard"],
 };
 
 export function WhoDoesWhat() {

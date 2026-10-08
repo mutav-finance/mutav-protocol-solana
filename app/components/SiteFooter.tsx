@@ -12,7 +12,7 @@ export function SiteFooter() {
           {[
             ["/reserve", "Reserve"],
             ["/operator", "Operator"],
-            ["/investor", "Investor"],
+            ["/dashboard", "Dashboard"],
             ["/demo", "Demo"],
             ["/admin", "Admin"],
           ].map(([href, label]) => (

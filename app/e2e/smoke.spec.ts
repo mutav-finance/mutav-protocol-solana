@@ -115,11 +115,13 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/investor — read-only without a wallet, gated on the on-chain allowlist", async ({ page, request }) => {
+  test("/dashboard — read-only without a wallet, gated on the on-chain allowlist", async ({ page, request }) => {
     await page.goto("/investor");
-    await expect(page.getByRole("heading", { name: "Investor", level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
     await expect(page.getByText("NO WALLET CONNECTED · READ-ONLY")).toBeVisible();
     await expect(page.getByRole("button", { name: "request_deposit" })).toBeDisabled();
+    await page.getByRole("tab", { name: "Redeem" }).click();
     await expect(page.getByRole("button", { name: "request_redeem" })).toBeDisabled();
     const seeded = await (await request.get("/api/reserve")).json();
     const capital = (await (await request.get(`/api/investor?owner=${seeded.config.mutavCapitalWallet}`)).json()).allowlist.state;
