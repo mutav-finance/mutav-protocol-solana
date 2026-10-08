@@ -149,7 +149,7 @@ describe("simulator defaults = the devnet config", () => {
     caps: {
       maxTvl: 300_000 * BRL,
       maxCoverPerGuarantee: 40_000 * BRL,
-      maxCoverPerAgency: 3_000_000 * BRL,
+      maxCoverPerAgency: 10_000_000 * BRL,
       maxClaimPerCall: 10_000 * BRL,
       maxClaimPerPeriod: 20_000 * BRL,
       maxTesouroShareBps: 0,
@@ -170,8 +170,8 @@ describe("simulator defaults = the devnet config", () => {
     expect((d.takePct as number) * 100).toBeLessThanOrEqual(devnet.feeTakeBpsMax);
   });
 
-  it("the per-agency cap is max_tvl ÷ c, so it never binds", () => {
-    expect(devnet.caps.maxCoverPerAgency).toBe((devnet.caps.maxTvl * 10_000) / devnet.coverageRatioBps);
+  it("the per-agency cap leaves room above max_tvl ÷ c for fee growth, so it never binds", () => {
+    expect(devnet.caps.maxCoverPerAgency).toBeGreaterThanOrEqual((3 * devnet.caps.maxTvl * 10_000) / devnet.coverageRatioBps);
   });
 });
 

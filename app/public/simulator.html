@@ -60,6 +60,22 @@ pre{font-family:var(--mono);font-size:12px;background:var(--code-bg);border:1px 
 .scen label{display:block;font:600 10.5px var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:2px 2px 4px}
 .scen select{width:100%;font:600 13px var(--sans);color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;height:32px}
 .scen select:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.scenbar{display:flex;align-items:center;gap:8px;margin-left:8px}
+.scenbar label{margin:0}
+.scenbar select{width:auto;min-width:220px;max-width:340px}
+.scendlg{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:18px 20px;max-width:min(640px,calc(100vw - 32px));width:100%}
+.scendlg::backdrop{background:rgba(0,0,0,.45)}
+.scendlg .dh{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.scendlg h2{font-size:17px;margin:0;font-weight:650}
+.scendlg h3{font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:14px 0 6px}
+.scendlg .desc{font-size:13.5px;line-height:1.55;color:var(--ink-2);margin:10px 0 0}
+.scendlg table{width:100%;border-collapse:collapse;font-size:12.5px}
+.scendlg th,.scendlg td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
+.scendlg td:nth-child(n+2),.scendlg th:nth-child(n+2){text-align:right;font-variant-numeric:tabular-nums}
+.scendlg tbody th{text-transform:none;letter-spacing:0;font:500 12.5px var(--sans);color:var(--ink)}
+.scendlg .note{font-size:11.5px;color:var(--ink-3);margin:10px 0 0}
+@media (max-width:900px){ .scenbar{order:5;width:100%;margin-left:0} .scenbar select{flex:1;max-width:none;min-width:0} }
+.glance-after{margin-top:18px}
 .scen .desc{font-size:11.5px;color:var(--ink-2);margin:5px 2px 10px;line-height:1.4}
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .seg button{font:600 11.5px var(--sans);background:var(--surface-2);border:0;border-right:1px solid var(--line);color:var(--ink-2);padding:6px 4px;cursor:pointer;line-height:1.2}
@@ -67,12 +83,13 @@ pre{font-family:var(--mono);font-size:12px;background:var(--code-bg);border:1px 
 .seg button:hover{color:var(--ink)}
 .seg button:focus-visible{outline-offset:-2px}
 .seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
-details.grp{border-top:1px solid var(--line)}
-details.grp summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 2px;font:650 13px var(--sans);color:var(--ink)}
-details.grp summary .sm{font:400 11px var(--sans);color:var(--ink-3);margin-left:6px}
-details.grp summary::-webkit-details-marker{display:none}
-details.grp summary::after{content:"+";font:600 14px var(--mono);color:var(--ink-3)}
-details.grp[open] summary::after{content:"−"}
+.grp{border-top:0}
+.ctabs{margin:4px 0 6px;flex-wrap:wrap;overflow-x:visible}
+.ctabs button{padding:7px 8px}
+.grp .gh{display:none!important}
+.grp[hidden]{display:none}
+.grp .gh{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 2px;font:650 13px var(--sans);color:var(--ink)}
+.grp .gh .sm{font:400 11px var(--sans);color:var(--ink-3);margin-left:6px}
 .grp .body{padding:0 2px 10px;display:grid;gap:6px}
 .sub{font:600 10.5px var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);margin:6px 0 0}
 .sub:first-child{margin-top:0}
@@ -196,7 +213,7 @@ h3:first-child{margin-top:0}
 .footbar .in{max-width:1440px;margin:0 auto;padding:7px 16px}
 .footbar strong{color:var(--ink)}
 @media (max-width:560px){ .bar{position:static} html{scroll-padding-top:0} body{padding-bottom:64px} .bar h1{font-size:15px} .k .v{font-size:17px} }
-@media print{ .bar .tbtn,.tabs,.footbar,.htip{display:none} .panel{position:static;max-height:none} .pane[hidden]{display:block} body{background:#fff;padding:0} details.grp > .body{display:grid} }
+@media print{ .bar .tbtn,.tabs,.footbar,.htip{display:none} .panel{position:static;max-height:none} .pane[hidden]{display:block} body{background:#fff;padding:0} .grp > .body{display:grid} }
 </style>
 </head>
 <body>
@@ -204,6 +221,11 @@ h3:first-child{margin-top:0}
 <div class="bar"><div class="in">
   <span class="brand" translate="no">MUTAV</span>
   <h1>Reserve simulator</h1>
+  <div class="scen scenbar">
+    <label for="scenSel">Scenario</label>
+    <select id="scenSel"></select>
+    <button class="tbtn" type="button" id="scenInfoBtn" aria-haspopup="dialog" aria-controls="scenDlg">About this scenario</button>
+  </div>
   <span class="sp"></span>
   <div class="seg modeseg" role="group" aria-label="View"><button type="button" data-mode="simple">Simple</button><button type="button" data-mode="advanced">Advanced</button></div>
   <button class="tbtn" type="button" id="copyBtn" title="Copy a plain-text snapshot: the five answers, inputs and key results">Copy summary</button>
@@ -212,22 +234,21 @@ h3:first-child{margin-top:0}
   <button class="tbtn" type="button" id="themeBtn" title="Toggle light/dark">Theme</button>
 </div></div>
 
+<dialog id="scenDlg" class="scendlg" aria-labelledby="scenDlgH">
+  <div class="dh"><h2 id="scenDlgH">Scenario</h2><button class="tbtn" type="button" id="scenDlgClose" aria-label="Close">Close</button></div>
+  <p class="desc" id="scenDesc"></p>
+  <h3>What it sets, against the defaults</h3>
+  <div class="tbl"><table id="scenDiff"><thead><tr><th scope="col">Input</th><th scope="col">Default</th><th scope="col">This scenario</th></tr></thead><tbody></tbody></table></div>
+  <p class="note" id="scenDlgNote">Every other input keeps its default. Change any input afterwards and the scenario becomes Custom.</p>
+</dialog>
+
 <div class="app">
   <aside class="panel" id="panel" aria-label="Inputs">
-    <div class="scen">
-      <label for="scenSel">Scenario</label>
-      <select id="scenSel"></select>
-      <div class="desc" id="scenDesc"></div>
-    </div>
     <div class="legendsrc adv">Assumption sources: <span class="src c">canonical</span> 02-parameters / 40-reserve · <span class="src p">protocol</span> on-chain config (devnet) · <span class="src r">research</span> notes in this folder · <span class="src e">estimate</span> prior until pilot data.</div>
     <div id="groups"></div>
   </aside>
 
   <main class="out" id="main">
-    <section class="glance" aria-labelledby="glanceH">
-      <h2 id="glanceH">At a glance <span class="muted" id="glanceSub"></span></h2>
-      <ol id="glance" aria-live="polite"></ol>
-    </section>
     <div class="kstrip" id="kstrip"></div>
 
     <div class="tabs adv" role="tablist" id="tabs" aria-label="Detail views">
@@ -379,7 +400,7 @@ bad_year_net_gain    = net fees − leases × bad_year_claims + stable × tesour
       <ul>
         <li><strong>Pilot parameters:</strong> <code>mutav/docs/operation/02-parameters.md</code> on <code>origin/main</code> (reviewed 2026-09-19, the single source of business numbers): rent R$2.200, guarantee fee 10% (modelled value inside 9–15% by score), default-leg cover 12× rent (working value, under legal review), exit-leg cover 6× as a separate sublimit, capitalized reserve R$300.000, ~6-month pilot, ~28 new contracts/month to a 170-lease book, reserve ~80% TESOURO once an adapter exists. Fee charged 12× a year: agencies are billed one boleto a month.</li>
         <li><strong>Coverage ratio (c):</strong> ADR 0016 and <code>40-reserve.md</code> 9w. The program holds <code>coverage_required = max(ceil(c × remaining cover), provisions)</code> with <code>c ≥ 0,10</code> (<code>MIN_COVERAGE_RATIO_BPS = 1_000</code>); devnet starts at 0,10. Filed claims stay fully covered at any c. At R$39.600 of cover per lease, R$300.000 backs about 75 leases at c = 0,10 and 7 at c = 1,0; 170 leases need about R$673.200.</li>
-        <li><strong>Caps (devnet config):</strong> <code>max_tvl</code> R$300k; <code>max_cover_per_guarantee</code> R$40k; <code>max_cover_per_agency</code> R$3M (= max_tvl ÷ 0,10, so it never binds: one reserve may serve a single agency); <code>max_claim_per_call</code> / <code>max_claim_per_period</code> R$10k / R$20k per 30 days; <code>max_tesouro_share_bps</code> 0 (no adapter on devnet, so TESOURO income is a what-if until the cap is raised); fee take ≤ 30% (<code>MAX_FEE_TAKE_BPS</code>). Request limits (R$1k–R$100k, R$500 minimum fill) do not affect this model.</li>
+        <li><strong>Caps (devnet config):</strong> <code>max_tvl</code> R$300k; <code>max_cover_per_guarantee</code> R$40k; <code>max_cover_per_agency</code> R$10M (well above max_tvl ÷ 0,10 plus fee growth, so it never binds: one reserve may serve a single agency); <code>max_claim_per_call</code> / <code>max_claim_per_period</code> R$10k / R$20k per 30 days; <code>max_tesouro_share_bps</code> 0 (no adapter on devnet, so TESOURO income is a what-if until the cap is raised); fee take ≤ 30% (<code>MAX_FEE_TAKE_BPS</code>). Request limits (R$1k–R$100k, R$500 minimum fill) do not affect this model.</li>
         <li><strong>Bad-year check:</strong> <code>40-reserve.md</code> 9w asks the reserve to grow to 2,0 bad years of claims and never hold fewer than 1,0. It is not enforced on-chain yet (a later ADR), so it is shown as an off-chain planning signal next to the coverage figures.</li>
         <li><strong>Delinquency:</strong> base 2,01% of annual rent = Superlógica IIL, RS apartments, average of the three latest prints (abr/jun/jul 2026), verified at source 2026-09-08. Stress 2,87% (IIL RS aggregate). Tail 5,93% (Loft IIA RS, 15-day threshold). Applied as an annual rate on annual rent: <code>12 × rate × rent</code>.</li>
         <li><strong>Evictions:</strong> <code>12-eviction-cost-south.md</code>. While the fiança is live the art. 59 §1º IX liminar is unavailable, so a forced exit costs about 6× rent (capped at the exit leg). If the fiança extinguishes once the default leg is exhausted, the liminar becomes arguable: base 5,5×, low 2,5×. <strong>Eviction rate</strong>: <code>12-eviction-rate-south.md</code>, measured filings, adjusted (not MUTAV data). CNJ DataJud first-instance despejo filings (all 27 state courts, own query 2026-10-02) ÷ IBGE PNAD rented households give 0,5–0,7% of South leases facing a suit per year; about a third end in a court-ordered exit. Adjusted for an underwritten, agency-managed book: <strong>low 0,10% / base 0,25% / high 0,60%</strong> per year.</li>
@@ -400,6 +421,11 @@ bad_year_net_gain    = net fees − leases × bad_year_claims + stable × tesour
       <h3>Disclaimer</h3>
       <div class="disc-full"><strong>Model estimates, not a return promise.</strong> This is a reserve-planning tool. It is not investment advice and not an offer or solicitation to buy securities or any other financial product. Assumptions are simplified, and several inputs are priors until pilot data exists. MUTAV's reserve is operational infrastructure backing rental guarantees (fiança onerosa).</div>
     </section>
+
+    <section class="glance glance-after" aria-labelledby="glanceH">
+      <h2 id="glanceH">At a glance <span class="muted" id="glanceSub"></span></h2>
+      <ol id="glance" aria-live="polite"></ol>
+    </section>
   </main>
 </div>
 
@@ -418,7 +444,7 @@ var MUTAV_DEFAULTS = {
   nonEvictX: 0.19, penaltyX: 0.077, ramp: true, stressOn: false, stressMonth: 3,
   startCapital: 300000, monthlyRaise: 0, raiseFrom: 2, raiseUntil: 0,
   coverageRatio: 0.10, tailMult: 2.33,
-  maxTvl: 300000, maxCoverPerGuarantee: 40000, maxCoverPerAgency: 3000000,
+  maxTvl: 300000, maxCoverPerGuarantee: 40000, maxCoverPerAgency: 10000000,
   maxClaimPerCall: 10000, maxClaimPerPeriod: 20000, maxTesouroSharePct: 0,
   tesouroSharePct: 80, tesouroPct: 11.58, selicPct: 13.75,
   withdraw: 'none', bufferPct: 25, sharePct: 50,
@@ -701,40 +727,50 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   function cName(c){ return 'c = ' + decF.format(c) + (c >= 1 ? ' (full backing)' : c <= MUTAV_PROTOCOL.MIN_COVERAGE_RATIO_BPS / MUTAV_PROTOCOL.BPS ? ' (program floor)' : ''); }
   function showRaise(s){ return s.monthlyRaise > 0; }
   var GROUPS = [
-    { id: 'plan', t: 'Plan', sm: 'the levers you discuss', f: [
-      { sub: 'Book' },
-      { k: 'perMonth', l: 'New leases per month', u: 'leases', step: 1, min: 0, src: 'canonical', i: 'Planned new guarantees each month. 02: ~28 a month toward 170; pilot plan 10. The solvency gate may admit fewer.' },
-      { k: 'months', l: 'Months simulated', u: 'mo', step: 1, min: 1, max: 120, src: 'canonical', i: 'Simulation horizon. 02: ~6-month pilot.' },
-      { sub: 'Price' },
-      { k: 'rent', l: 'Average monthly rent', u: 'R$', step: 100, min: 0, src: 'canonical', i: '02: R$2.200 (Passo Fundo).' },
-      { k: 'feePct', l: 'Guarantee fee', u: '% rent', step: 0.5, min: 0, src: 'canonical', i: 'Percent of rent per 30-day period. 02: 9–15% by score, 10% modelled.' },
-      { sub: 'Capital' },
-      { k: 'startCapital', l: 'Starting capital', u: 'R$', step: 10000, min: 0, src: 'canonical', i: 'Deposited into the reserve in month 1. 02: R$300.000 capitalized reserve.' },
-      { k: 'monthlyRaise', l: 'Monthly raise', u: 'R$/mo', step: 5000, min: 0, i: 'New capital added to the reserve every month in the window below. 0 = no raise.' },
-      { k: 'raiseFrom', l: 'Raise from month', u: 'month', step: 1, min: 1, when: showRaise },
-      { k: 'raiseUntil', l: 'Raise until month', u: '0 = last', step: 1, min: 0, when: showRaise },
-      { k: 'growthTarget', adv: true, l: 'Growth target', u: 'leases', step: 10, min: 0, src: 'canonical', i: 'Book size used in answer 4 (what raise is needed). 02: 170 leases. Does not change the simulation.' },
+    { id: 'specs', t: 'Contract specs', sm: 'on-chain VaultConfig', note: true, f: [
       { sub: 'Coverage' },
       { k: 'coverageRatio', l: 'Coverage ratio (c)', u: '× cover', step: 0.05, min: 0.1, max: 2, src: 'protocol', i: 'coverage_ratio_bps. The reserve must hold ceil(c × remaining cover), never less than open provisions. Program floor 0,10 (ADR 0016); devnet starts at 0,10. 1,0 is full backing.' },
-      { sub: 'Debts covered & redemptions' },
-      { seg: 'scope' },
-      { seg: 'withdraw' },
-      { k: 'bufferPct', l: 'Kept above coverage required', u: '% cov. req.', step: 5, min: 0, when: function(s){ return s.withdraw === 'buffer'; }, i: 'Percent of coverage required kept on top of it before anything is redeemed.' },
-      { k: 'sharePct', l: 'Share of net gain', u: '%', step: 5, min: 0, max: 100, when: function(s){ return s.withdraw === 'share'; }, i: 'Percent of each month’s positive net gain redeemed, capped at free capital.' }
-    ]},
-    { id: 'rule', t: 'Cover & caps', sm: 'per lease and on-chain', note: true, f: [
-      { sub: 'Cover per lease' },
-      { k: 'defaultCover', l: 'Default leg (rent arrears)', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'default_cover: most the fiança pays in unpaid rent per lease. 02: 12× (working value, under legal review).' },
-      { k: 'exitCover', l: 'Exit leg (eviction & exit costs)', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'exit_cover: separate sublimit for eviction and exit costs. 02: 6×.' },
+      { sub: 'Fee take' },
+      { k: 'takePct', l: 'MUTAV take rate', u: '% fees', step: 1, min: 0, max: 30, src: 'estimate', i: 'fee_take_bps: share of each guarantee fee kept by MUTAV (ADR 0009). The program caps it at 30%. 20% is the config placeholder; the value is still open.' },
       { sub: 'Caps (VaultConfig.caps)' },
       { k: 'maxTvl', l: 'max_tvl', u: 'R$', step: 10000, min: 0, src: 'protocol', i: 'fulfil_deposits refuses capital that would take stable assets above this. Devnet: R$300k. It also stops starting capital and raises.' },
       { k: 'maxCoverPerGuarantee', l: 'max_cover_per_guarantee', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'register_guarantee refuses a lease whose cover (default + exit leg) is above this. Devnet: R$40k.' },
-      { k: 'maxCoverPerAgency', l: 'max_cover_per_agency', u: 'R$', step: 100000, min: 0, src: 'protocol', i: 'Outstanding cover one agency may hold. The simulator assumes a single agency, so every lease counts. Devnet: R$3M = max_tvl ÷ 0,10, so it never binds.' },
+      { k: 'maxCoverPerAgency', l: 'max_cover_per_agency', u: 'R$', step: 100000, min: 0, src: 'protocol', i: 'Outstanding cover one agency may hold. The simulator assumes a single agency, so every lease counts. Devnet: R$10M, well above max_tvl ÷ 0,10 plus fee growth, so it never binds.' },
       { k: 'maxClaimPerCall', l: 'max_claim_per_call', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'Largest operator claim payment in one call. Above it, pay_claim_admin. Devnet: R$10k.' },
       { k: 'maxClaimPerPeriod', l: 'max_claim_per_period', u: 'R$/30 d', step: 1000, min: 0, src: 'protocol', i: 'Operator claim payments per 30 days. A month above it needs pay_claim_admin for the excess. Devnet: R$20k.' },
       { k: 'maxTesouroSharePct', l: 'max_tesouro_share_bps', u: '%', step: 5, min: 0, max: 100, src: 'protocol', i: 'Most of the stable assets allocate may move into TESOURO. Devnet: 0 (no adapter), so TESOURO income is a what-if until it is raised.' }
     ]},
-    { id: 'assume', t: 'Assumptions', sm: 'advanced', closed: true, f: [
+    { id: 'contracts', t: 'Guarantee contracts', sm: 'the leases you write', f: [
+      { sub: 'Book' },
+      { k: 'perMonth', l: 'New leases per month', u: 'leases', step: 1, min: 0, src: 'canonical', i: 'Planned new guarantees each month. 02: ~28 a month toward 170; pilot plan 10. The solvency gate may admit fewer.' },
+      { k: 'months', l: 'Months simulated', u: 'mo', step: 1, min: 1, max: 120, src: 'canonical', i: 'Simulation horizon. 02: ~6-month pilot.' },
+      { k: 'leaseTerm', l: 'Lease term', u: 'mo', step: 1, min: 1, src: 'research', i: 'A lease leaves the book after this many months. Typical lease 30 months (06, PY:109).' },
+      { sub: 'Price' },
+      { k: 'rent', l: 'Average monthly rent', u: 'R$', step: 100, min: 0, src: 'canonical', i: '02: R$2.200 (Passo Fundo).' },
+      { k: 'feePct', l: 'Guarantee fee', u: '% rent', step: 0.5, min: 0, src: 'canonical', i: 'Percent of rent per 30-day period. 02: 9–15% by score, 10% modelled.' },
+      { k: 'periods', l: 'Fee charged per year', u: '×/yr', step: 0.01, min: 0, src: 'canonical', i: '12: agencies are billed one boleto a month.' },
+      { sub: 'Cover per lease' },
+      { k: 'defaultCover', l: 'Default leg (rent arrears)', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'default_cover: most the fiança pays in unpaid rent per lease. 02: 12× (working value, under legal review).' },
+      { k: 'exitCover', l: 'Exit leg (eviction & exit costs)', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'exit_cover: separate sublimit for eviction and exit costs. 02: 6×.' },
+      { sub: 'Debts covered' },
+      { seg: 'scope' }
+    ]},
+    { id: 'capital', t: 'Capital', sm: 'what goes into the reserve', f: [
+      { sub: 'Deposits' },
+      { k: 'startCapital', l: 'Starting capital', u: 'R$', step: 10000, min: 0, src: 'canonical', i: 'Deposited into the reserve in month 1. 02: R$300.000 capitalized reserve.' },
+      { k: 'monthlyRaise', l: 'Monthly raise', u: 'R$/mo', step: 5000, min: 0, i: 'New capital added to the reserve every month in the window below. 0 = no raise.' },
+      { k: 'raiseFrom', l: 'Raise from month', u: 'month', step: 1, min: 1, when: showRaise },
+      { k: 'raiseUntil', l: 'Raise until month', u: '0 = last', step: 1, min: 0, when: showRaise },
+      { k: 'growthTarget', l: 'Growth target', u: 'leases', step: 10, min: 0, src: 'canonical', i: 'Book size used in answer 4 (what raise is needed). 02: 170 leases. Does not change the simulation.' },
+      { sub: 'Holdings' },
+      { k: 'mutavSharePct', l: 'MUTAV share of reserve capital', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: 'Stage 1 pilot: MUTAV funds 100% of the reserve.' },
+      { k: 'tesouroSharePct', l: 'Reserve held in TESOURO', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: '02: ~80% TESOURO / 20% liquid BRS. Pilot presets use 50%. Capped by max_tesouro_share_bps (0 on devnet).' },
+      { sub: 'Redemptions' },
+      { seg: 'withdraw' },
+      { k: 'bufferPct', l: 'Kept above coverage required', u: '% cov. req.', step: 5, min: 0, when: function(s){ return s.withdraw === 'buffer'; }, i: 'Percent of coverage required kept on top of it before anything is redeemed.' },
+      { k: 'sharePct', l: 'Share of net gain', u: '%', step: 5, min: 0, max: 100, when: function(s){ return s.withdraw === 'share'; }, i: 'Percent of each month’s positive net gain redeemed, capped at free capital.' }
+    ]},
+    { id: 'assume', t: 'Assumptions', sm: 'rates, costs and yields', f: [
       { sub: 'Claims' },
       { k: 'rhoPct', l: 'Rent arrears (delinquency)', u: '%/yr', step: 0.01, min: 0, src: 'research', i: 'Share of annual rent that goes unpaid. Superlógica IIL RS apartments, 3-print avg 2,01%; stress 2,87%; tail 5,93%.' },
       { k: 'evictRatePct', l: 'Eviction rate', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'CNJ DataJud despejo filings ÷ IBGE PNAD rented households, adjusted for outcomes and an underwritten book. Low 0,10% / base 0,25% / high 0,60%.' },
@@ -746,17 +782,12 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       { sub: 'Bad year' },
       { k: 'stressOn', l: 'Run a bad year in the simulation', toggle: true, i: 'Adds bad-year claims (multiplier − 1) × expected over the 12 months from the start month. Answer 5 always tests this in the background. The bad-year check is off-chain: it never changes coverage required.' },
       { k: 'stressMonth', l: 'Bad year starts in month', u: 'month', step: 1, min: 1, src: 'estimate', when: function(s){ return s.stressOn; } },
-      { sub: 'Reserve yield' },
-      { k: 'tesouroSharePct', l: 'Reserve held in TESOURO', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: '02: ~80% TESOURO / 20% liquid BRS. Pilot presets use 50%. Capped by max_tesouro_share_bps (0 on devnet).' },
+      { sub: 'Yields' },
       { k: 'tesouroPct', l: 'TESOURO yield', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'Etherfuse on-chain accrual, unconfirmed. Accrues monthly on the opening stable assets.' },
       { k: 'selicPct', l: 'Selic (opportunity cost)', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'What the same capital would earn at Selic. Comparison only.' },
-      { sub: 'MUTAV & operations' },
-      { k: 'takePct', l: 'MUTAV take rate', u: '% fees', step: 1, min: 0, max: 30, src: 'estimate', i: 'fee_take_bps: share of each guarantee fee kept by MUTAV (ADR 0009). The program caps it at 30%. 20% is the config placeholder; the value is still open.' },
-      { k: 'mutavSharePct', l: 'MUTAV share of reserve capital', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: 'Stage 1 pilot: MUTAV funds 100% of the reserve.' },
+      { sub: 'Operations' },
       { k: 'opCostPerLease', l: 'Operating cost per lease', u: 'R$/mo', step: 1, min: 0, src: 'estimate', i: 'Optional. Subtracted from the take in What MUTAV earns.' },
-      { k: 'opCostFixed', l: 'Fixed operating cost', u: 'R$/mo', step: 500, min: 0, src: 'estimate', i: 'Optional. Used for break-even leases.' },
-      { k: 'leaseTerm', l: 'Lease term', u: 'mo', step: 1, min: 1, src: 'research', i: 'A lease leaves the book after this many months. Typical lease 30 months (06, PY:109).' },
-      { k: 'periods', l: 'Fee charged per year', u: '×/yr', step: 0.01, min: 0, src: 'canonical', i: '12: agencies are billed one boleto a month.' }
+      { k: 'opCostFixed', l: 'Fixed operating cost', u: 'R$/mo', step: 500, min: 0, src: 'estimate', i: 'Optional. Used for break-even leases.' }
     ]}
   ];
   var FIELDS = [];
@@ -880,15 +911,43 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     if (curG) h += '</optgroup>';
     sel.innerHTML = h;
   })();
+  function scenVal(k, v){
+    if (k === 'scope' || k === 'withdraw') { var o = SEGS[k].o.filter(function(x){ return x[0] === v; })[0]; return o ? o[1] : String(v); }
+    if (typeof v === 'boolean') return v ? 'On' : 'Off';
+    var f = fieldBy(k); var n = typeof v === 'number' ? v.toLocaleString('pt-BR') : String(v);
+    return f && f.u ? (f.u === 'R$' ? 'R$' + n : n + ' ' + f.u) : n;
+  }
+  function fillScenDiff(o){
+    var rows = '', note = document.getElementById('scenDlgNote');
+    Object.keys(o).forEach(function(k){
+      if (!(k in DEF) || o[k] === DEF[k]) return;
+      var f = fieldBy(k), name = f ? f.l : (SEGS[k] ? SEGS[k].l : k);
+      rows += '<tr><th scope="row">' + esc(name) + '</th><td>' + esc(scenVal(k, DEF[k])) + '</td><td>' + esc(scenVal(k, o[k])) + '</td></tr>';
+    });
+    document.querySelector('#scenDiff tbody').innerHTML = rows || '<tr><td colspan="3">Same as the defaults: the 02 parameters on the devnet contract specs.</td></tr>';
+    note.hidden = !rows;
+  }
+  (function(){
+    var dlg = document.getElementById('scenDlg');
+    document.getElementById('scenInfoBtn').addEventListener('click', function(){ if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); });
+    document.getElementById('scenDlgClose').addEventListener('click', function(){ if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); });
+    dlg.addEventListener('click', function(e){ if (e.target === dlg && dlg.close) dlg.close(); });
+  })();
   function markScen(){
     var opt = document.getElementById('optCustom'), desc = document.getElementById('scenDesc');
+    var dlgH = document.getElementById('scenDlgH');
     if (activeScen) {
       opt.hidden = true; sel.value = activeScen;
       desc.textContent = scenById(activeScen).d;
+      dlgH.textContent = scenById(activeScen).l;
+      fillScenDiff(scenById(activeScen).o || {});
     } else {
       var b = scenById(baseScen) || scenById('default');
       opt.hidden = false; opt.textContent = 'Custom (modified from ' + b.l + ')'; sel.value = 'custom';
       desc.textContent = 'Inputs edited after choosing “' + b.l + '”. Pick a scenario or Reset to start over.';
+      dlgH.textContent = 'Custom (modified from ' + b.l + ')';
+      var cur = {}; FIELDS.forEach(function(f){ cur[f.k] = state[f.k]; }); ['scope','withdraw'].forEach(function(k){ cur[k] = state[k]; });
+      fillScenDiff(cur);
     }
   }
   function applyScen(id){
@@ -901,9 +960,9 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   /* build inputs */
   var gh = '', mobile = false;
   try { mobile = window.matchMedia('(max-width: 900px)').matches; } catch (e) {}
-  GROUPS.forEach(function(g){
-    var open = g.id === 'plan' ? true : g.closed ? false : !mobile;
-    gh += '<details class="grp' + (g.id === 'plan' ? '' : ' adv') + '" id="grp_' + g.id + '"' + (open ? ' open' : '') + '><summary><span>' + esc(g.t) + '<span class="sm">' + esc(g.sm) + '</span></span></summary><div class="body">';
+  gh += '<div class="tabs ctabs" role="tablist" aria-label="Controls">' + GROUPS.map(function(g, i){ return '<button type="button" role="tab" id="ctab_' + g.id + '" data-ctab="' + g.id + '" aria-controls="grp_' + g.id + '" aria-selected="' + (i === 0 ? 'true' : 'false') + '"' + (i === 0 ? '' : ' tabindex="-1"') + '>' + esc(g.t) + '</button>'; }).join('') + '</div>';
+  GROUPS.forEach(function(g, gi){
+    gh += '<section class="grp" role="tabpanel" id="grp_' + g.id + '" aria-labelledby="ctab_' + g.id + '"' + (gi === 0 ? '' : ' hidden') + '><div class="gh" id="gh_' + g.id + '"><span>' + esc(g.t) + '<span class="sm">' + esc(g.sm) + '</span></span></div><div class="body">';
     g.f.forEach(function(f){
       if (f.sub) { gh += '<div class="sub">' + esc(f.sub) + '</div>'; return; }
       if (f.seg) {
@@ -912,18 +971,31 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
         gh += '<div class="seghint" id="hint_' + f.seg + '"></div>';
         return;
       }
-      var lab = esc(f.l) + (g.id === 'plan' ? '' : srcTag(f.src)) + infoI(f.i);
-      gh += '<div class="row' + (f.adv ? ' adv' : '') + '" id="row_' + f.k + '">';
+      var lab = esc(f.l) + srcTag(f.src) + infoI(f.i);
+      gh += '<div class="row" id="row_' + f.k + '">';
       if (f.toggle) gh += '<label class="tg"><span>' + lab + '</span><input type="checkbox" id="in_' + f.k + '" name="' + f.k + '" data-k="' + f.k + '"></label>';
       else gh += '<div class="f"><label for="in_' + f.k + '">' + lab + '</label><div class="inp"><input id="in_' + f.k + '" name="' + f.k + '" autocomplete="off" type="number" inputmode="decimal" step="' + f.step + '"' +
         (f.min != null ? ' min="' + f.min + '"' : '') + (f.max != null ? ' max="' + f.max + '"' : '') + ' data-k="' + f.k + '"><span class="u">' + esc(f.u) + '</span></div></div>';
       gh += '</div>';
     });
     if (g.note) gh += '<div class="seghint" id="ruleNote" aria-live="polite"></div>';
-    gh += '</div></details>';
+    gh += '</div></section>';
   });
   var groupsEl = document.getElementById('groups');
   groupsEl.innerHTML = gh;
+  function showCtab(id){
+    Array.prototype.forEach.call(groupsEl.querySelectorAll('[data-ctab]'), function(b){ var on = b.getAttribute('data-ctab') === id; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
+    GROUPS.forEach(function(g){ document.getElementById('grp_' + g.id).hidden = g.id !== id; });
+    try { localStorage.setItem('mutav-reserve-sim-v5-ctab', id); } catch (e) {}
+  }
+  Array.prototype.forEach.call(groupsEl.querySelectorAll('[data-ctab]'), function(b, i, all){
+    b.addEventListener('click', function(){ showCtab(b.getAttribute('data-ctab')); });
+    b.addEventListener('keydown', function(e){
+      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0; if (!d) return;
+      var n = all[(i + d + all.length) % all.length]; n.focus(); showCtab(n.getAttribute('data-ctab')); e.preventDefault();
+    });
+  });
+  try { var savedCtab = localStorage.getItem('mutav-reserve-sim-v5-ctab'); if (savedCtab && document.getElementById('grp_' + savedCtab)) showCtab(savedCtab); } catch (e) {}
 
   function syncVisibility(){ FIELDS.forEach(function(f){ if (f.when) document.getElementById('row_' + f.k).hidden = !f.when(state); }); }
   function syncInputs(){
