@@ -488,7 +488,11 @@ fn a_large_fee_batch_above_the_bound_does_not_halt_fulfilment() {
     let (mut f, _, d, _) = guarded();
     let nav_before = f.state().nav_per_share;
     f.contribute(500 * BRL).0.unwrap();
-    assert_eq!(f.state().inflows_since_refresh, 400 * BRL);
+    // Per share: 400 on 30,000 shares, rounded up.
+    assert_eq!(
+        f.state().inflow_nav,
+        mutav::pricing::inflow_nav(400 * BRL, 30_000 * BRL)
+    );
     f.refresh().unwrap();
     let s = f.state();
     assert!(!s.fulfil_halted);
@@ -496,7 +500,7 @@ fn a_large_fee_batch_above_the_bound_does_not_halt_fulfilment() {
         s.nav_per_share > nav_before,
         "the published NAV includes the fee"
     );
-    assert_eq!(s.inflows_since_refresh, 0, "refresh starts a new window");
+    assert_eq!(s.inflow_nav, 0, "refresh starts a new window");
     f.fulfil_deposits(1, &[d]).expect("not halted");
 }
 
@@ -536,10 +540,103 @@ fn clearing_a_halt_resets_the_inflow_window() {
     assert!(f.state().fulfil_halted);
     f.contribute(500 * BRL).0.unwrap();
     f.clear_fulfil_halt().unwrap();
-    assert_eq!(f.state().inflows_since_refresh, 0);
+    assert_eq!(f.state().inflow_nav, 0);
     f.refresh().unwrap();
     assert!(
         !f.state().fulfil_halted,
         "no move since the reviewed baseline"
     );
+}
+
+// ---------------------------------------------------------------------------
+// The guard per share across fills (#29, ADR 0017 follow-up)
+// ---------------------------------------------------------------------------
+
+/// 30,000 shares at NAV 1.0 (investor `a`), a 27,000-share (90%) redemption
+/// waiting, `b` funded for a deposit, and a baseline refresh. No guarantees,
+/// so the whole reserve is free capital.
+fn fill_window() -> (Fixture, Allowlist, Investor, u64) {
+    let mut f = Fixture::new();
+    set_time(&mut f.svm, 1_760_000_000);
+    let a = f.investor(30_000 * BRL);
+    let b = f.investor(60_000 * BRL);
+    let list = f.allowlist(&[a.pubkey(), b.pubkey()]);
+    f.deposit(&a, &list, 30_000 * BRL);
+    let (r, redeem) = f.request_redeem(&a, &list, 27_000 * BRL);
+    r.unwrap();
+    f.refresh().unwrap();
+    assert_eq!(f.state().nav_per_share, NAV_SCALE);
+    (f, list, b, redeem)
+}
+
+#[test]
+fn a_redemption_fill_between_an_inflow_and_refresh_does_not_halt() {
+    // The #29 case: a 1.33% fee (400 net on 30,000), then 90% of the shares
+    // redeemed at the live NAV. Counted in BRS, the 400 would be 13% of what
+    // is left and read as a 12% fall; per share it is exactly the fee.
+    let (mut f, _, _, redeem) = fill_window();
+    f.contribute(500 * BRL).0.unwrap();
+    let added = f.state().inflow_nav;
+    assert_eq!(added, mutav::pricing::inflow_nav(400 * BRL, 30_000 * BRL));
+    f.fulfil_redeems(1, u64::MAX, &[redeem]).expect("fill");
+    let s = f.state();
+    assert_eq!(s.shares_outstanding, 3_000 * BRL);
+    assert_eq!(s.inflow_nav, added, "fills leave the per-share counter");
+    f.refresh().unwrap();
+    let s = f.state();
+    assert!(!s.fulfil_halted, "no false halt");
+    assert!(s.nav_per_share > NAV_SCALE, "the published NAV has the fee");
+    assert_eq!(s.inflow_nav, 0);
+}
+
+#[test]
+fn a_deposit_fill_between_an_inflow_and_refresh_does_not_halt() {
+    let (mut f, list, b, _) = fill_window();
+    let (r, d) = f.request_deposit(&b, &list, 30_000 * BRL);
+    r.unwrap();
+    f.contribute(500 * BRL).0.unwrap();
+    let added = f.state().inflow_nav;
+    f.fulfil_deposits(1, &[d]).expect("fill");
+    assert_eq!(f.state().inflow_nav, added);
+    f.refresh().unwrap();
+    assert!(!f.state().fulfil_halted);
+}
+
+#[test]
+fn a_real_shock_after_an_inflow_and_a_fill_still_halts() {
+    // Same window, plus a 100 BRS loss (3.3% of the 3,040 left) that no
+    // instruction booked: per share the fee is netted out, the loss is not.
+    let (mut f, _, _, redeem) = fill_window();
+    f.contribute(500 * BRL).0.unwrap();
+    f.fulfil_redeems(1, u64::MAX, &[redeem]).expect("fill");
+    let mut s = f.state();
+    s.brs_balance -= 100 * BRL;
+    f.write_state(&s);
+    f.refresh().unwrap();
+    assert!(f.state().fulfil_halted);
+}
+
+#[test]
+fn an_inflow_with_no_shares_outstanding_adds_nothing_and_fails_closed() {
+    // Every share redeemed, then a fee: there is no NAV per share to net out,
+    // so the counter stays 0. The next depositor receives the fee (few share
+    // units at a high NAV), and the next refresh measures that NAV in full
+    // against the 1.0 baseline: it halts.
+    let mut f = Fixture::new();
+    set_time(&mut f.svm, 1_760_000_000);
+    let a = f.investor(1_000 * BRL);
+    let b = f.investor(1_000 * BRL);
+    let list = f.allowlist(&[a.pubkey(), b.pubkey()]);
+    f.deposit(&a, &list, 1_000 * BRL);
+    f.refresh().unwrap();
+    assert_eq!(f.state().nav_per_share, NAV_SCALE);
+    let (r, redeem) = f.request_redeem(&a, &list, 1_000 * BRL);
+    r.unwrap();
+    f.fulfil_redeems(1, u64::MAX, &[redeem]).expect("fill");
+    assert_eq!(f.state().shares_outstanding, 0);
+    f.contribute(500 * BRL).0.unwrap();
+    assert_eq!(f.state().inflow_nav, 0);
+    f.deposit(&b, &list, 1_000 * BRL);
+    f.refresh().unwrap();
+    assert!(f.state().fulfil_halted, "fails closed");
 }

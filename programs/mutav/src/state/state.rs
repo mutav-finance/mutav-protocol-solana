@@ -52,10 +52,14 @@ pub struct VaultState {
     pub income_total: u64,
     /// Lifetime take from issuer income sent to the treasury.
     pub income_take_total: u64,
-    /// Net verified inflows (`contribute_fees`, `sweep_income`) since the last
-    /// `refresh`. The NAV-move guard measures net of them; `refresh` and
-    /// `clear_fulfil_halt` reset it to 0.
-    pub inflows_since_refresh: u64,
+    /// NAV per share (`NAV_SCALE`) added by verified inflows
+    /// (`contribute_fees`, `sweep_income`) since the last `refresh`: the sum
+    /// of `ceil(net × NAV_SCALE / shares_outstanding)` at each inflow
+    /// (`pricing::inflow_nav`; `0` while no shares are outstanding),
+    /// saturating. Per share, so fills in the window leave it exact. The
+    /// NAV-move guard measures net of it; `refresh` and `clear_fulfil_halt`
+    /// reset it to 0.
+    pub inflow_nav: u64,
     /// Zeroed. Phase 2 carves `InstantExitState` (88 bytes) from the front.
     pub _reserved: [u8; 232],
 }

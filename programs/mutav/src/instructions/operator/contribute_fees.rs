@@ -10,6 +10,7 @@ use crate::{
     errors::MutavError,
     events::FeesContributed,
     math::{mul_div, Rounding},
+    pricing::inflow_nav,
     state::{FeeReceipt, VaultConfig, VaultState},
 };
 
@@ -63,7 +64,7 @@ pub struct ContributeFees<'info> {
     #[account(address = config.reserve_mint @ MutavError::InvalidMint)]
     pub reserve_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    #[account(address = config.reserve_token_program @ MutavError::InvalidMint)]
+    #[account(address = config.reserve_token_program @ MutavError::InvalidTokenProgram)]
     pub token_program: Interface<'info, TokenInterface>,
 
     #[account(mut)]
@@ -112,11 +113,12 @@ pub fn handle_contribute_fees(
         .fee_take_total
         .checked_add(take)
         .ok_or(MutavError::MathOverflow)?;
-    // A verified inflow: the NAV-move guard measures net of it (ADR 0017).
-    state.inflows_since_refresh = state
-        .inflows_since_refresh
-        .checked_add(net)
-        .ok_or(MutavError::MathOverflow)?;
+    // A verified inflow: the NAV-move guard measures net of the NAV per
+    // share it adds (ADR 0017). Saturating, so an inflow is never refused;
+    // a saturated counter reads as a fall and halts (fail closed).
+    state.inflow_nav = state
+        .inflow_nav
+        .saturating_add(inflow_nav(net, state.shares_outstanding));
 
     let clock = Clock::get()?;
     let r = &mut ctx.accounts.fee_receipt;
