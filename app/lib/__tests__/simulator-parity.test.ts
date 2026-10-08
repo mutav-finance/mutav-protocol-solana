@@ -146,8 +146,8 @@ describe("simulator defaults = the devnet config", () => {
       maxCoverPerAgency: Number(cfg.caps.maxCoverPerAgency),
       maxClaimPerCall: Number(cfg.caps.maxClaimPerCall),
       maxClaimPerPeriod: Number(cfg.caps.maxClaimPerPeriod),
-      // the settlement-token floor (min_settlement_bps, ADR 0018) is stored on-chain as its complement
-      minSettlementBps: 10_000 - Number(cfg.caps.maxTesouroShareBps),
+      // the settlement-token floor (min_settlement_bps, ADR 0018), as the devnet config states it
+      minSettlementBps: Number(cfg.caps.minSettlementBps),
     },
     feeTakeBpsMax: 3_000,
   };

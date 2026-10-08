@@ -34,6 +34,7 @@ import {
   findReserveAddresses,
   getSetRolesInstruction,
   MUTAV_PROGRAM_ADDRESS,
+  TOKEN_PROGRAM_ADDRESS,
 } from "@mutav-finance/mutav-protocol-solana";
 import { readReserve } from "../lib/server/chain";
 import { composeInstructions } from "../lib/server/compose";
@@ -129,7 +130,7 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
       maxClaimPerCall: "10000000000",
       maxClaimPerPeriod: "20000000000",
       claimPeriodSecs: 2_592_000,
-      maxTesouroShareBps: 0,
+      minSettlementBps: 10_000,
       minRequest: "1000000000",
       maxRequest: "100000000000",
       minFillAssets: "500000000",
@@ -175,7 +176,8 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   console.log("\n== seed: one month of issuer income (ADR 0017)");
   // Nora pays the income inbox (here: the local mint authority mints into it).
   const reserveAddrs = await findReserveAddresses(mint);
-  const inbox = await findIncomeInboxAddress({ vaultAuthority: reserveAddrs.vaultAuthority, reserveMint: mint });
+  // The seeded reserve mint is classic SPL Token, so the inbox is derived under it.
+  const inbox = await findIncomeInboxAddress({ vaultAuthority: reserveAddrs.vaultAuthority, reserveMint: mint, tokenProgram: TOKEN_PROGRAM_ADDRESS });
   spl(["mint", mint, "1500", inbox]);
   log(`Nora pays R$1,500 into the income inbox ${inbox}`);
   await go("operator", { kind: "sweep_income", incomeRefHash: await REF.income("NORA-202609-01"), period: 202_609, amount: 1_200n * BRL }, "sweep_income R$1,200 (statement 2026-09); R$300 stays in the inbox");
