@@ -59,7 +59,7 @@ function Emergency({ mode }: { mode: Mode }) {
         <RoleTag role="admin" /> alone can <Mono>unpause</Mono> and <Mono>clear_fulfil_halt</Mono>, through a Squads proposal. Claim payments are never paused.
       </p>
       <Cards>
-        <PauserAction title="Pause" note="Stops capital flows, new guarantees and allocation. Fees, income sweeps and claim payments stay open.">
+        <PauserAction title="Pause" note="Stops capital flows and new guarantees. Fees, income sweeps and claim payments stay open.">
           <Action label="pause" request={{ kind: "pause" }} variant="destructive" disabled={paused} />
         </PauserAction>
         <AdminAction title="Unpause" label="unpause" mode={mode} request={paused ? { kind: "unpause" } : null} note={paused ? "Reopens what pause stopped." : "The reserve is not paused."} />
@@ -67,6 +67,14 @@ function Emergency({ mode }: { mode: Mode }) {
           <Action label="revoke_operator" request={{ kind: "revoke_operator" }} variant="destructive" disabled={revoked} />
         </PauserAction>
         <AdminAction title="Clear fulfil halt" label="clear_fulfil_halt" mode={mode} request={halted ? { kind: "clear_fulfil_halt" } : null} note={halted ? "The NAV-move guard halted both queues. Clearing resets the NAV baseline (ADR 0015)." : "Fulfilment is not halted."} />
+        <ConfigCard
+          title="NAV-move guard"
+          mode={mode}
+          fields={[bpsField("maxNavMoveBps", "Max NAV move per refresh (bps)", reserve.config.price.maxNavMoveBps, 10_000)]}
+          build={(v) => ({ kind: "set_config", price: { maxNavMoveBps: v.maxNavMoveBps as number } })}
+          bound="0–10000 bps"
+          does="If NAV per share moves more than this in one refresh (net of fees and swept income), refresh sets fulfil_halted and both capital queues stop until clear_fulfil_halt. Lower it for the real pilot; the devnet example uses 100%."
+        />
       </Cards>
     </div>
   );

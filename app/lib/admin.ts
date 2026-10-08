@@ -36,7 +36,31 @@ export const CONFIG_FIELD_HOME = {
   payoutSlaSecs: "money-claims",
   /** The settlement floor; TODO(rename) `min_settlement_bps`. */
   maxTesouroShareBps: "allocation-controls",
+  maxNavMoveBps: "general-emergency",
 } as const;
+
+/**
+ * set_config fields the pilot app deliberately does not edit, and why. With
+ * CONFIG_FIELD_HOME this covers every field set_config writes; a test derives
+ * that list from the program, so a field cannot drop out of /admin unnoticed.
+ */
+export const CONFIG_FIELD_NOT_EDITED: Record<string, string> = {
+  featureFlags: "SUPPORTED_FEATURES = 0 in the pilot binary: no feature can be switched on",
+  mutavCapitalWallet: "the allowlisted capital wallet; fixed for the pilot",
+  treasuryAccount: "fixed for the pilot; set_config carries the current one",
+  tesouroPriceAccount: "per-adapter price feed, with the first adapter (ADR 0018)",
+  p0: "per-adapter price feed, with the first adapter (ADR 0018)",
+  t0: "per-adapter price feed, with the first adapter (ADR 0018)",
+  yMaxBps: "per-adapter price feed, with the first adapter (ADR 0018)",
+  maxStalenessSecs: "per-adapter price feed, with the first adapter (ADR 0018)",
+  maxDeviationBps: "per-adapter price feed, with the first adapter (ADR 0018)",
+  ...Object.fromEntries(
+    [
+      "bufferTargetBps", "bufferHeadroomBps", "bufferReleaseAfterSecs", "curveVersion", "hMinBps", "hPegBps", "hMaxBps", "pressureEpochSecs",
+      "minInstantAssets", "maxInstantPerTx", "maxInstantPerWallet", "maxInstantPerPeriod", "instantPeriodSecs", "minHoldSecs", "maxPriceAgeSecs", "allowlistRoot", "barred",
+    ].map((k) => [k, "phase-2 instant exit (ExitParams), disabled in the pilot"]),
+  ),
+};
 
 // ── General controls ────────────────────────────────────────────────────────
 

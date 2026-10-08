@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ADMIN_SECTIONS, ALLOCATION_ALIAS, CONFIG_FIELD_HOME, MAX_FEE_TAKE_BPS, capsError, generalConfigError, rolesError } from "../admin";
+import { ADMIN_SECTIONS, ALLOCATION_ALIAS, CONFIG_FIELD_HOME, CONFIG_FIELD_NOT_EDITED, MAX_FEE_TAKE_BPS, capsError, generalConfigError, rolesError } from "../admin";
 
 const PROGRAM = join(__dirname, "../../../programs/mutav/src");
 const A = "9b4N73CtqN6PWE9tvocRvGjJnSfiy94oev4wbR31xMeU";
@@ -31,6 +31,23 @@ describe("set_config field homes", () => {
       if (all.includes(field)) expect([field, cardFields(f)]).toEqual([field, expect.arrayContaining([field])]);
     }
     expect(all.sort()).toEqual(Object.keys(CONFIG_FIELD_HOME).filter((k) => all.includes(k)).sort());
+  });
+
+  it("gives every field set_config writes a home on /admin or a stated reason, derived from the program", () => {
+    // set_config's own fields plus those its apply_caps / apply_price / apply_exit write (config.rs).
+    const ids = (f: string) => [...readFileSync(join(PROGRAM, f), "utf8").matchAll(/field::([A-Z0-9_]+)/g)].map((x) => x[1]!);
+    const written = new Set([...ids("instructions/admin/set_config.rs"), ...ids("state/config.rs")]);
+    const key = (id: string) =>
+      id === "EXIT_BARRED_0" ? "barred" : id.replace(/^(CAPS|PRICE|EXIT)_/, "").toLowerCase().replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+    const fields = [...written].map(key).sort();
+    expect(fields.length).toBeGreaterThan(30);
+    const covered = [...Object.keys(CONFIG_FIELD_HOME), ...Object.keys(CONFIG_FIELD_NOT_EDITED)];
+    expect(new Set(covered).size).toBe(covered.length);
+    expect(covered.sort()).toEqual(fields);
+  });
+
+  it("keeps the NAV-move guard next to clear_fulfil_halt in Emergency", () => {
+    expect(CONFIG_FIELD_HOME.maxNavMoveBps).toBe("general-emergency");
   });
 
   it("keeps the partial-fill floor with redemptions and the payout SLA with claim payments", () => {
