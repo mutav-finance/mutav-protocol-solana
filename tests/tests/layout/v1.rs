@@ -4,8 +4,10 @@
 //!
 //! Accounts added in later tasks (`Guarantee`, `AgencyExposure`,
 //! `ClaimFiling`, `Payout`, `DepositRequest`, `RedeemRequest`, `HolderState`,
-//! `FeeReceipt`, `ClaimNotice`) get their `…V1` copy and offset table here in
-//! the task that adds them.
+//! `FeeReceipt`, `ClaimNotice`, `IncomeReceipt`) get their `…V1` copy and
+//! offset table here in the task that adds them. The ADR 0017 fields of
+//! `VaultConfig` and `VaultState` were carved before the devnet layout
+//! freeze, so they are part of v1.
 
 use anchor_lang::prelude::*;
 
@@ -94,7 +96,9 @@ pub struct VaultConfigV1 {
     pub feature_flags: u64,
     pub mutav_capital_wallet: Pubkey,
     pub exit: ExitParamsV1,
-    pub _reserved: [u8; 512],
+    // ADR 0017, carved before the layout freeze.
+    pub income_take_bps: u16,
+    pub _reserved: [u8; 510],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -131,7 +135,11 @@ pub struct VaultStateV1 {
     pub fulfil_halted: bool,
     pub last_refresh_ts: i64,
     pub last_refresh_slot: u64,
-    pub _reserved: [u8; 256],
+    // ADR 0017, carved before the layout freeze.
+    pub income_total: u64,
+    pub income_take_total: u64,
+    pub inflows_since_refresh: u64,
+    pub _reserved: [u8; 232],
 }
 
 /// Golden field-offset tables: `(field, offset, size)`, offsets within the
@@ -172,7 +180,10 @@ pub const VAULT_STATE_V1: OffsetTable = &[
     ("fulfil_halted", 199, 1),
     ("last_refresh_ts", 200, 8),
     ("last_refresh_slot", 208, 8),
-    ("_reserved", 216, 256),
+    ("income_total", 216, 8),
+    ("income_take_total", 224, 8),
+    ("inflows_since_refresh", 232, 8),
+    ("_reserved", 240, 232),
 ];
 
 pub const VAULT_CONFIG_V1: OffsetTable = &[
@@ -203,7 +214,8 @@ pub const VAULT_CONFIG_V1: OffsetTable = &[
     ("mutav_capital_wallet", 1929, 32),
     ("exit.buffer_target_bps", 1961, 2),
     ("exit._reserved", 1961 + 243, 32),
-    ("_reserved", 2236, 512),
+    ("income_take_bps", 2236, 2),
+    ("_reserved", 2238, 510),
 ];
 
 pub const CAPS_V1: OffsetTable = &[
@@ -357,6 +369,35 @@ pub const FEE_RECEIPT_V1: OffsetTable = &[
     ("net", 50, 8),
     ("slot", 58, 8),
     ("_reserved", 66, 64),
+];
+
+// ---------------------------------------------------------------------------
+// Issuer income (ADR 0017)
+// ---------------------------------------------------------------------------
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct IncomeReceiptV1 {
+    pub version: u8,
+    pub bump: u8,
+    pub income_ref_hash: [u8; 32],
+    pub period: u32,
+    pub gross: u64,
+    pub take: u64,
+    pub net: u64,
+    pub slot: u64,
+    pub _reserved: [u8; 64],
+}
+
+pub const INCOME_RECEIPT_V1: OffsetTable = &[
+    ("version", 0, 1),
+    ("bump", 1, 1),
+    ("income_ref_hash", 2, 32),
+    ("period", 34, 4),
+    ("gross", 38, 8),
+    ("take", 46, 8),
+    ("net", 54, 8),
+    ("slot", 62, 8),
+    ("_reserved", 70, 64),
 ];
 
 // ---------------------------------------------------------------------------

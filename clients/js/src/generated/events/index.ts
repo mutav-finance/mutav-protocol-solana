@@ -24,6 +24,7 @@ export * from "./feesContributed";
 export * from "./fulfilHaltCleared";
 export * from "./guaranteeClosed";
 export * from "./guaranteeRegistered";
+export * from "./incomeSwept";
 export * from "./modeChanged";
 export * from "./operatorRevoked";
 export * from "./paused";

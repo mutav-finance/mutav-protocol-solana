@@ -14,7 +14,11 @@ import {
   AGENCY_EXPOSURE_DISCRIMINATOR,
   CLAIM_FILING_DISCRIMINATOR,
   FEE_RECEIPT_DISCRIMINATOR,
+  INCOME_RECEIPT_DISCRIMINATOR,
   PAYOUT_DISCRIMINATOR,
+  fetchIncomeInbox,
+  findIncomeReceiptPda,
+  getIncomeReceiptDecoder,
   fetchAllMaybeDepositRequest,
   fetchAllMaybeRedeemRequest,
   GUARANTEE_DISCRIMINATOR,
@@ -80,10 +84,16 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
   if (addresses.config !== env.configAddress) {
     throw new Error(`CONFIG_ADDRESS ${env.configAddress} is not the config PDA of its reserve mint under ${env.programId}`);
   }
-  const [state, clock, token] = await Promise.all([
+  const [state, clock, token, inbox] = await Promise.all([
     fetchVaultState(rpc, addresses.state, READ),
     clusterNow(env),
     readTokenFacts(env, config.data.reserveMint, addresses.reserve),
+    // ADR 0017: issuer income paid and not swept yet (never in NAV).
+    fetchIncomeInbox(rpc, {
+      vaultAuthority: addresses.vaultAuthority,
+      reserveMint: config.data.reserveMint,
+      tokenProgram: config.data.reserveTokenProgram,
+    }),
   ]);
   return {
     cluster: env.cluster,
@@ -96,6 +106,7 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
     now: clock.now,
     slot: clock.slot,
     token,
+    incomeInbox: { address: inbox.address, exists: inbox.exists, amount: inbox.amount },
   };
 }
 
@@ -147,12 +158,13 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
   const o = { programAddress: env.programId };
   const config = r.addresses.config as Address;
 
-  const [guaranteesAll, filingsAll, payoutsAll, exposuresAll, feesAll] = await Promise.all([
+  const [guaranteesAll, filingsAll, payoutsAll, exposuresAll, feesAll, incomeAll] = await Promise.all([
     scan(env, GUARANTEE_DISCRIMINATOR, (b) => getGuaranteeDecoder().decode(b)),
     scan(env, CLAIM_FILING_DISCRIMINATOR, (b) => getClaimFilingDecoder().decode(b)),
     scan(env, PAYOUT_DISCRIMINATOR, (b) => getPayoutDecoder().decode(b)),
     scan(env, AGENCY_EXPOSURE_DISCRIMINATOR, (b) => getAgencyExposureDecoder().decode(b)),
     scan(env, FEE_RECEIPT_DISCRIMINATOR, (b) => getFeeReceiptDecoder().decode(b)),
+    scan(env, INCOME_RECEIPT_DISCRIMINATOR, (b) => getIncomeReceiptDecoder().decode(b)),
   ]);
 
   // Keep only accounts of this reserve: filings and payouts by guarantee, the
@@ -168,20 +180,20 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
   const feeOk = await Promise.all(
     feesAll.map(async (f) => (await findFeeReceiptPda({ config, invoiceRefHash: f.data.invoiceRefHash }, o))[0] === f.address),
   );
-  const exposures = exposuresAll.filter((_, i) => exposureOk[i]);
-  const feeRows = feesAll.filter((_, i) => feeOk[i]);
-  const fees = await Promise.all(
-    feeRows.map(async (f) => {
-      let blockTime: bigint | null = null;
-      try {
-        const t = await rpc.getBlockTime(f.data.slot).send();
-        blockTime = t === null ? null : BigInt(t as unknown as number);
-      } catch {
-        blockTime = null;
-      }
-      return { ...f, blockTime };
-    }),
+  const incomeOk = await Promise.all(
+    incomeAll.map(async (i) => (await findIncomeReceiptPda({ config, incomeRefHash: i.data.incomeRefHash }, o))[0] === i.address),
   );
+  const exposures = exposuresAll.filter((_, i) => exposureOk[i]);
+  const blockTimeOf = async (slot: bigint): Promise<bigint | null> => {
+    try {
+      const t = await rpc.getBlockTime(slot).send();
+      return t === null ? null : BigInt(t as unknown as number);
+    } catch {
+      return null;
+    }
+  };
+  const fees = await Promise.all(feesAll.filter((_, i) => feeOk[i]).map(async (f) => ({ ...f, blockTime: await blockTimeOf(f.data.slot) })));
+  const income = await Promise.all(incomeAll.filter((_, i) => incomeOk[i]).map(async (r) => ({ ...r, blockTime: await blockTimeOf(r.data.slot) })));
 
   const depSeqs = seqRange(r.state.nextDepositSeq);
   const redSeqs = seqRange(r.state.nextRedeemSeq);
@@ -203,6 +215,7 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
     payouts,
     exposures,
     fees,
+    income,
     deposits: depAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),
     redeems: redAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),
   };

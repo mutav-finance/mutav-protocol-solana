@@ -45,7 +45,7 @@ Read-only, no wallet needed.
 - **Health:** `stable_assets`, `coverage_required`, surplus, `free_capital`, NAV per share, shares outstanding, `mode` (Normal / UnderCovered), `fulfil_halted`, paused, last refresh.
 - **Coverage:** remaining cover by guarantee (default and exit legs), active guarantee count, per-agency exposure.
 - **Claims timeline:** each claim with on-chain timestamps for filed → paid → settled, the PIX settlement hash, and late flags. This is the "proven speed" view.
-- **Money flows:** guarantee fees in (net to reserve, take to treasury), claim payments out, deposits and redemptions.
+- **Money flows:** guarantee fees in (net to reserve, take to treasury), issuer income in (Nora's revenue share, swept per statement by `sweep_income`, ADR 0017) and the untracked income-inbox balance, claim payments out, deposits and redemptions.
 - **Capital queue:** pending deposits and redemptions in FIFO order.
 - **Disclosures:** BRS is issued by Nora; its freeze authority is a single Nora wallet; a freeze stops outflows until thawed. Pilot capital is MUTAV's own. Built-later features (partial fills, claim notices, adapters).
 - A "Refresh" button that sends the permissionless `refresh` instruction from any connected wallet.
@@ -56,7 +56,7 @@ Read-only, no wallet needed.
 During the launch and the hackathon MUTAV's team operates the reserve by hand from this page with the operator wallet; later mutav-app's backend sends the same instructions with a KMS-held key. Anyone can read it; actions are enabled only when the connected wallet is `VaultConfig.operator` (localnet and devnet: the wallet signs).
 
 - **Limits now:** the claim-payment cap window (`claim_period_start`, `claim_period_paid` vs `max_claim_per_period`, `max_claim_per_call`), payouts against `payout_sla_secs`, free capital for new guarantees.
-- **Console:** a form per operator instruction (shared with `/demo`), each with its on-chain bound shown before signing and the gate preview where it applies.
+- **Console:** a form per operator instruction (shared with `/demo`), each with its on-chain bound shown before signing and the gate preview where it applies. `sweep_income` (ADR 0017) shows the income-inbox balance and previews the split; it sweeps exactly the amount on a Nora statement.
 - **Responsibilities:** each instruction, what is done by hand today and what will trigger it in the backend; undocumented triggers say "triggered by the MUTAV platform".
 - **Recent activity:** the operator key's last MUTAV transactions, and the last `set_roles` in VaultConfig's recent history, when the RPC keeps history.
 - **Safety:** what bounds a compromised operator key (caps, fixed payments account, `revoke_operator`, admin-only config).
@@ -94,7 +94,7 @@ For Squads members.
 
 ## Seed scenario
 
-A script (`scripts/seed.ts`, localnet and devnet) that drives the program into the demo's starting state: a funded reserve from the capital wallet, a few guarantees (at c = 0.10, as on devnet), one paid fee, and an under-coverage scenario for step 5. It reuses the protocol's devnet scripts and outputs unsigned transactions where admin authority is needed.
+A script (`scripts/seed.ts`, localnet and devnet) that drives the program into the demo's starting state: a funded reserve from the capital wallet, a few guarantees (at c = 0.10, as on devnet), one paid fee, one swept month of issuer income with a remainder left in the income inbox, and an under-coverage scenario for step 5. It reuses the protocol's devnet scripts and outputs unsigned transactions where admin authority is needed.
 
 ## Tests
 
@@ -103,4 +103,4 @@ A script (`scripts/seed.ts`, localnet and devnet) that drives the program into t
 
 ## Not in scope
 
-Agencies, tenants, PIX integration, Auth0, i18n, mainnet, income intake (ADR 0013, pending).
+Agencies, tenants, PIX integration, Auth0, i18n, mainnet.

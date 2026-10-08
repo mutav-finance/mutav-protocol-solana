@@ -9,6 +9,7 @@ import type {
   DepositRequest,
   FeeReceipt,
   Guarantee,
+  IncomeReceipt,
   Payout,
   RedeemRequest,
   Solvency,
@@ -41,6 +42,8 @@ export type Ledger = {
   payouts: Row<Payout>[];
   exposures: Row<AgencyExposure>[];
   fees: (Row<FeeReceipt> & { blockTime: bigint | null })[];
+  /** Swept issuer income statements (ADR 0017), one IncomeReceipt each. */
+  income: (Row<IncomeReceipt> & { blockTime: bigint | null })[];
   deposits: Row<DepositRequest>[];
   redeems: Row<RedeemRequest>[];
 };
@@ -80,6 +83,12 @@ export type ReserveView = {
   now: bigint;
   slot: bigint;
   token: TokenFacts;
+  /**
+   * The income inbox (ADR 0017): the vault authority's associated token
+   * account for BRS. Its balance is issuer income paid and not swept yet; it
+   * never counts toward NAV.
+   */
+  incomeInbox: { address: string; exists: boolean; amount: bigint };
 };
 
 export const LEG = { default: 0, exit: 1 } as const;
@@ -225,7 +234,7 @@ export function claimsTimeline(
 
 // ── Money flows ─────────────────────────────────────────────────────────────
 
-export type FlowKind = "fee" | "claim" | "deposit" | "redemption";
+export type FlowKind = "fee" | "income" | "claim" | "deposit" | "redemption";
 
 export type FlowRow = {
   kind: FlowKind;
@@ -236,7 +245,7 @@ export type FlowRow = {
   at: bigint | null;
   /** Into the reserve (+) or out of it (−), in BRS base units. */
   reserveDelta: bigint;
-  /** MUTAV's take to the treasury, for fees. */
+  /** MUTAV's take to the treasury, for fees and issuer income. */
   treasury: bigint;
   detail: string;
 };
@@ -244,18 +253,27 @@ export type FlowRow = {
 export type FlowTotals = {
   feesNetToReserve: bigint;
   feeTakeToTreasury: bigint;
+  /** Issuer income swept into the reserve, and its take (ADR 0017). */
+  incomeNetToReserve: bigint;
+  incomeTakeToTreasury: bigint;
   claimsPaid: bigint;
   depositsIn: bigint;
   redemptionsOut: bigint;
 };
 
-export function moneyFlows(state: Pick<VaultState, "feesInTotal" | "feeTakeTotal" | "claimsPaidTotal">, ledger: Pick<Ledger, "fees" | "payouts" | "capitalEvents">): {
+export function moneyFlows(
+  state: Pick<VaultState, "feesInTotal" | "feeTakeTotal" | "claimsPaidTotal" | "incomeTotal" | "incomeTakeTotal">,
+  ledger: Pick<Ledger, "fees" | "income" | "payouts" | "capitalEvents">,
+): {
   totals: FlowTotals;
   rows: FlowRow[];
 } {
   const rows: FlowRow[] = [];
   for (const f of ledger.fees) {
     rows.push({ kind: "fee", account: f.address, at: f.blockTime, reserveDelta: f.data.net, treasury: f.data.take, detail: `slot ${f.data.slot}` });
+  }
+  for (const i of ledger.income) {
+    rows.push({ kind: "income", account: i.address, at: i.blockTime, reserveDelta: i.data.net, treasury: i.data.take, detail: `statement ${fmtPeriod(i.data.period)}` });
   }
   for (const p of ledger.payouts) {
     rows.push({ kind: "claim", account: p.address, at: p.data.paidAt, reserveDelta: -p.data.amount, treasury: 0n, detail: legName(p.data.leg) });
@@ -281,6 +299,8 @@ export function moneyFlows(state: Pick<VaultState, "feesInTotal" | "feeTakeTotal
     totals: {
       feesNetToReserve: state.feesInTotal,
       feeTakeToTreasury: state.feeTakeTotal,
+      incomeNetToReserve: state.incomeTotal,
+      incomeTakeToTreasury: state.incomeTakeTotal,
       claimsPaid: state.claimsPaidTotal,
       depositsIn,
       redemptionsOut,
@@ -288,6 +308,9 @@ export function moneyFlows(state: Pick<VaultState, "feesInTotal" | "feeTakeTotal
     rows,
   };
 }
+
+/** A statement month `YYYYMM` as `YYYY-MM`. */
+export const fmtPeriod = (period: number) => `${Math.floor(period / 100)}-${String(period % 100).padStart(2, "0")}`;
 
 // ── Capital queue ───────────────────────────────────────────────────────────
 

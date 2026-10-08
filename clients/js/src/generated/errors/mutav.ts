@@ -96,6 +96,10 @@ export const MUTAV_ERROR__CLAIM_NOTICE_PENDING = 0x1796; // 6038
 export const MUTAV_ERROR__NOTICE_NOT_RESOLVED = 0x1797; // 6039
 /** UnsupportedVersion: Unsupported account version or status */
 export const MUTAV_ERROR__UNSUPPORTED_VERSION = 0x1798; // 6040
+/** InvalidIncomeSource: Income source is not the reserve's income inbox */
+export const MUTAV_ERROR__INVALID_INCOME_SOURCE = 0x1799; // 6041
+/** IncomeExceedsInbox: Amount exceeds the income inbox balance */
+export const MUTAV_ERROR__INCOME_EXCEEDS_INBOX = 0x179a; // 6042
 
 export type MutavError =
   | typeof MUTAV_ERROR__ADAPTER_CAP_EXCEEDED
@@ -110,8 +114,10 @@ export type MutavError =
   | typeof MUTAV_ERROR__FULFIL_HALTED
   | typeof MUTAV_ERROR__GUARANTEE_CAP_EXCEEDED
   | typeof MUTAV_ERROR__GUARANTEE_NOT_ACTIVE
+  | typeof MUTAV_ERROR__INCOME_EXCEEDS_INBOX
   | typeof MUTAV_ERROR__INSUFFICIENT_FREE_CAPITAL
   | typeof MUTAV_ERROR__INSUFFICIENT_LIQUID_BALANCE
+  | typeof MUTAV_ERROR__INVALID_INCOME_SOURCE
   | typeof MUTAV_ERROR__INVALID_MINT
   | typeof MUTAV_ERROR__INVALID_PARAMETER
   | typeof MUTAV_ERROR__INVALID_PAYMENTS_ACCOUNT
@@ -155,8 +161,10 @@ if (process.env["NODE_ENV"] !== "production") {
     [MUTAV_ERROR__FULFIL_HALTED]: `Fulfilment is halted by the NAV-move guard`,
     [MUTAV_ERROR__GUARANTEE_CAP_EXCEEDED]: `Per-guarantee cap exceeded`,
     [MUTAV_ERROR__GUARANTEE_NOT_ACTIVE]: `Guarantee is not active`,
+    [MUTAV_ERROR__INCOME_EXCEEDS_INBOX]: `Amount exceeds the income inbox balance`,
     [MUTAV_ERROR__INSUFFICIENT_FREE_CAPITAL]: `Insufficient free capital`,
     [MUTAV_ERROR__INSUFFICIENT_LIQUID_BALANCE]: `Insufficient liquid balance`,
+    [MUTAV_ERROR__INVALID_INCOME_SOURCE]: `Income source is not the reserve's income inbox`,
     [MUTAV_ERROR__INVALID_MINT]: `Invalid mint`,
     [MUTAV_ERROR__INVALID_PARAMETER]: `Invalid parameter`,
     [MUTAV_ERROR__INVALID_PAYMENTS_ACCOUNT]: `Invalid payments account`,

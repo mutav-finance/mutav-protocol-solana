@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ClaimFiling, DepositRequest, FeeReceipt, Guarantee, Payout, RedeemRequest } from "@mutav-finance/mutav-protocol-solana";
+import type { ClaimFiling, DepositRequest, FeeReceipt, IncomeReceipt, Guarantee, Payout, RedeemRequest } from "@mutav-finance/mutav-protocol-solana";
 import { activeRemainingCover, agencyRows, capitalQueue, claimsTimeline, coverageRows, investorRequests, moneyFlows, type Row } from "../view";
 import { BRL } from "./fixtures";
 
@@ -83,14 +83,16 @@ describe("money flows and queue", () => {
 
   it("takes totals from VaultState and fills from events, and lists each flow", () => {
     const fee = { address: "F", blockTime: 40n, data: { gross: 1_000n, take: 200n, net: 800n, slot: 9n } as unknown as FeeReceipt };
+    const income = { address: "I", blockTime: 50n, data: { period: 202_610, gross: 1_500n, take: 0n, net: 1_500n, slot: 11n } as unknown as IncomeReceipt };
     const ev = (side: "deposit" | "redemption", ts: bigint, assets: bigint) => ({ side, signature: `S${ts}`, ts, fromSeq: 0n, toSeq: 0n, assets, shares: 1_000_000n, nav: 1_000_000_000n });
     const { totals, rows } = moneyFlows(
-      { feesInTotal: 800n, feeTakeTotal: 200n, claimsPaidTotal: 0n },
-      { fees: [fee], payouts: [], capitalEvents: [ev("redemption", 30n, 300n), ev("deposit", 20n, 5_000n)] },
+      { feesInTotal: 800n, feeTakeTotal: 200n, claimsPaidTotal: 0n, incomeTotal: 1_500n, incomeTakeTotal: 0n },
+      { fees: [fee], income: [income], payouts: [], capitalEvents: [ev("redemption", 30n, 300n), ev("deposit", 20n, 5_000n)] },
     );
-    expect(totals).toEqual({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, claimsPaid: 0n, depositsIn: 5_000n, redemptionsOut: 300n });
-    expect(rows.map((r) => [r.kind, r.reserveDelta])).toEqual([["fee", 800n], ["redemption", -300n], ["deposit", 5_000n]]);
-    expect(rows[2]).toMatchObject({ isTx: true, account: "S20", detail: "seq 0 · minted 1.000000 shares" });
+    expect(totals).toEqual({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, incomeNetToReserve: 1_500n, incomeTakeToTreasury: 0n, claimsPaid: 0n, depositsIn: 5_000n, redemptionsOut: 300n });
+    expect(rows.map((r) => [r.kind, r.reserveDelta])).toEqual([["income", 1_500n], ["fee", 800n], ["redemption", -300n], ["deposit", 5_000n]]);
+    expect(rows[0]).toMatchObject({ account: "I", treasury: 0n, detail: "statement 2026-10" });
+    expect(rows[3]).toMatchObject({ isTx: true, account: "S20", detail: "seq 0 · minted 1.000000 shares" });
   });
 
   it("lists open requests in FIFO order from the heads", () => {

@@ -9,10 +9,10 @@ It **composes** instructions and **reads** accounts. It holds no keys and never 
 | Module | What |
 |---|---|
 | `generated/` | Codama output from the Anchor IDL: instruction builders, account decoders, events, errors, PDAs with IDL seeds. Do not edit; run `bun run generate:client` at the repo root after `anchor build`. |
-| `pdas.ts` | `findReserveAddresses(reserveMint)` (config, state, vault authority, share mint, the four token accounts, event authority) and the PDAs the IDL cannot describe: `findDepositRequestPda`, `findRedeemRequestPda` (seeded by queue `seq`), `findAgencyExposurePda`. |
-| `math.ts` | Mirror of the program's `math.rs` and `solvency.rs` (spec §4) in `bigint`: `mulDiv`, `sharesFor`, `assetsFor`, `conversionNav`, `earmarkEff`, `freeCapital`, `liquidBudget`, `netAssets`, `navPerShare`, `computeSolvency`. Same rounding; throws `MathOverflowError` where the program fails with `MathOverflow`. |
+| `pdas.ts` | `findReserveAddresses(reserveMint)` (config, state, vault authority, share mint, the four token accounts, event authority), the PDAs the IDL cannot describe: `findDepositRequestPda`, `findRedeemRequestPda` (seeded by queue `seq`), `findAgencyExposurePda`, and `findIncomeInboxAddress` (the vault authority's associated token account for BRS, where Nora pays issuer income; ADR 0017). |
+| `math.ts` | Mirror of the program's `math.rs` and `solvency.rs` (spec §4) in `bigint`: `mulDiv`, `sharesFor`, `assetsFor`, `conversionNav`, `earmarkEff`, `freeCapital`, `liquidBudget`, `netAssets`, `navPerShare`, `computeSolvency`; the take split of `contribute_fees` / `sweep_income` (`takeSplit`), `isValidIncomePeriod` and `MAX_INCOME_TAKE_BPS`. Same rounding; throws `MathOverflowError` where the program fails with `MathOverflow`. |
 | `preview.ts` | `solvencyFromAccounts`, `previewDepositFulfil`, `previewRedeemFulfil` (whole fills, as the pilot program). |
-| `reads.ts` | `fetchReserve`, `fetchGuaranteesForReserve`, `fetchPayoutsForGuarantee`, `fetchClaimFilingsForGuarantee`, `getRedeemQueuePosition`, `getDepositQueuePosition`. |
+| `reads.ts` | `fetchReserve`, `fetchGuaranteesForReserve`, `fetchPayoutsForGuarantee`, `fetchClaimFilingsForGuarantee`, `getRedeemQueuePosition`, `getDepositQueuePosition`, `fetchIncomeInbox` (the untracked inbox balance, never in NAV) and `fetchIncomeReceiptsForReserve` (one per swept statement). |
 
 Partial fills at the queue head (ADR 0010) are not built in the pilot program, so their sizing is not mirrored yet.
 

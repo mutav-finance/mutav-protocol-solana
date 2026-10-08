@@ -34,6 +34,20 @@ fn assert_covered(name: &str, meta: &litesvm::types::TransactionMetadata, moves:
             assert_eq!(e.take + e.net, e.gross, "{name}");
             assert!(moves.contains(&Transfer(e.net)), "{name}");
         }
+        "sweep_income" => {
+            // One event covering both transfers out of the inbox (take to
+            // the treasury, net to the reserve).
+            let ev = events::<IncomeSwept>(meta);
+            assert_eq!(ev.len(), 1, "{name}");
+            let e = &ev[0];
+            assert!(
+                only_transfers && moves.len() == 1 + (e.take > 0) as usize,
+                "{name}"
+            );
+            assert_eq!(transfers(moves), e.gross, "{name}");
+            assert_eq!(e.take + e.net, e.gross, "{name}");
+            assert!(moves.contains(&Transfer(e.net)), "{name}");
+        }
         "pay_claim" => {
             let ev = events::<ClaimPaid>(meta);
             assert_eq!(

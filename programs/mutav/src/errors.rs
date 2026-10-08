@@ -89,4 +89,8 @@ pub enum MutavError {
     NoticeNotResolved,
     #[msg("Unsupported account version or status")]
     UnsupportedVersion,
+    #[msg("Income source is not the reserve's income inbox")]
+    InvalidIncomeSource,
+    #[msg("Amount exceeds the income inbox balance")]
+    IncomeExceedsInbox,
 }

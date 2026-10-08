@@ -35,7 +35,7 @@ fn noise(seed: u64, n: usize) -> Vec<u8> {
 
 fn inject_noise(f: &mut Fixture, seed: u64) {
     let mut c = f.config();
-    c._reserved.copy_from_slice(&noise(seed, 512));
+    c._reserved.copy_from_slice(&noise(seed, 510));
     c.caps._reserved.copy_from_slice(&noise(seed + 1, 32));
     c.price._reserved.copy_from_slice(&noise(seed + 2, 32));
     c.exit._reserved.copy_from_slice(&noise(seed + 3, 32));
@@ -45,7 +45,7 @@ fn inject_noise(f: &mut Fixture, seed: u64) {
     }
     f.write_config(&c);
     let mut s = f.state();
-    s._reserved.copy_from_slice(&noise(seed + 100, 256));
+    s._reserved.copy_from_slice(&noise(seed + 100, 232));
     f.write_state(&s);
 }
 
@@ -57,7 +57,7 @@ fn init_leaves_padding_zero() {
         assert!(pad.iter().all(|b| *b == 0), "config padding region {i}");
     }
     assert_eq!(config_padding(&c).len(), 4 + MAX_ADAPTERS);
-    assert_eq!(f.state()._reserved, [0; 256]);
+    assert_eq!(f.state()._reserved, [0; 232]);
 
     // `VaultState` starts empty: after the discriminator, only `version` and
     // `bump` are non-zero.
@@ -91,15 +91,16 @@ fn padding_survives_every_instruction() {
 
 #[test]
 fn padding_bytes_are_where_the_layout_says() {
-    // Raw-byte check, independent of the struct decode: the last 512 bytes of
-    // `VaultConfig` and the last 256 of `VaultState` are the `_reserved`
-    // arrays, and the injected noise sits exactly there.
+    // Raw-byte check, independent of the struct decode: the last 510 bytes of
+    // `VaultConfig` and the last 232 of `VaultState` are the `_reserved`
+    // arrays (after the ADR 0017 carve), and the injected noise sits exactly
+    // there.
     let mut f = Fixture::new();
     inject_noise(&mut f, 42);
     let c = f.raw(&f.pdas.config);
-    assert_eq!(&c[c.len() - 512..], noise(42, 512).as_slice());
+    assert_eq!(&c[c.len() - 510..], noise(42, 510).as_slice());
     let s = f.raw(&f.pdas.state);
-    assert_eq!(&s[s.len() - 256..], noise(142, 256).as_slice());
+    assert_eq!(&s[s.len() - 232..], noise(142, 232).as_slice());
 }
 
 #[test]
@@ -144,4 +145,14 @@ fn request_and_holder_padding_is_zero_at_init_and_preserved() {
     f.fulfil_redeems(1, u64::MAX, &[seq]).unwrap();
     let raw = f.raw(&red);
     assert_eq!(&raw[raw.len() - 64..], noise(3, 64).as_slice());
+}
+
+#[test]
+fn income_receipt_padding_is_zero_at_init_and_never_written() {
+    let mut f = Fixture::new();
+    let r = f.pay_and_sweep(1_000 * BRL);
+    let raw = f.raw(&income_receipt_pda(&f.pdas.config, &r));
+    assert_eq!(raw.len(), mutav::constants::INCOME_RECEIPT_SIZE);
+    assert_eq!(&raw[raw.len() - 64..], &[0; 64]);
+    assert_eq!(f.income_receipt(&r)._reserved, [0; 64]);
 }

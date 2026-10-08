@@ -51,6 +51,7 @@
     "instantExit": "1",
     "maxAllowlistProofLen": 32,
     "maxFulfilBatch": 8,
+    "maxIncomeTakeBps": 0,
     "minCoverageRatioBps": 1000,
     "modeNormal": 0,
     "modeUnderCovered": 1,
@@ -2154,6 +2155,15 @@
       "args": {},
       "data": "485c000564d6bb27",
       "name": "clearFulfilHalt"
+    },
+    {
+      "args": {
+        "amount": "1234567890",
+        "incomeRefHash": "1717171717171717171717171717171717171717171717171717171717171717",
+        "period": 202610
+      },
+      "data": "e6ae4953aa582973171717171717171717171717171717171717171717171717171717171717171772170300d202964900000000",
+      "name": "sweepIncome"
     }
   ],
   "mulDiv": [
@@ -3632,6 +3642,8 @@
       "feeReceipt": "763kq4ZwsTJDdSKNcFGCmGN64YvwjA6mXLWcvEwkndDJ",
       "guarantee": "8ihapfWjSAQxFRDhDErj9Hyiuvm6Y9sLBP6Em9avKjPZ",
       "holderState": "EE8HGWKyuo4T8YR8ApDS7EX1u3kjj9uWaUYRkvh18Fq1",
+      "incomeInbox": "69fTuiwUSs3o9Vw4uoZzu2sCeUgauyn6VbLtrL7EF6jh",
+      "incomeReceipt": "ERSurZvdGRhahXtYDR7MWq12tPnXJ4cyjWktaY4vCFAj",
       "payout": "3StJJRVDpGbf4us5QeAKycXZtgTijMWHhXeaZV9PSW4r",
       "pendingDeposits": "9FGGZibuPcnzkKm3uJvUByAXx5QoKqwAN8YU1EmdHmak",
       "pendingRedemptions": "CVHPDW4vgisQQ6jh6M4V3NqfburUnkVJSP3J897sEs31",
@@ -3644,6 +3656,7 @@
     "inputs": {
       "agencyId": "35f6d7a7a1df26c341dc8605b46ba41ae7cbc864b3c91395656f8166d2261378",
       "guaranteeId": "349989bc13efd7c9dd0f714a886ca6c305d5c7aa71979778cd15192062a6b1e3",
+      "incomeRefHash": "1717171717171717171717171717171717171717171717171717171717171717",
       "invoiceRefHash": "be56cad14c6dbfc8e67040c07f8a2b49d03bc6cb2154b82b736c010a0e359053",
       "noticeRefHash": "8f1a202e20655f68eeddd2fae6856c633c28c41f54c29e6972892f6a44c25cd8",
       "owner": "EZF81pzNwewL8Cg7qt9B5WzbcXWqQrmspRngzNnyfL1V",

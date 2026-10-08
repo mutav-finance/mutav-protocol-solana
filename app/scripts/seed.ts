@@ -7,6 +7,9 @@
  *   - two guarantees (R$22,000 of cover against R$30,000; at c = 0.10 they
  *     need R$2,200 of coverage);
  *   - one paid guarantee fee (R$1,000 gross, 20% take to the treasury);
+ *   - one month of issuer income (ADR 0017): Nora's R$1,500 lands in the
+ *     income inbox, the operator sweeps R$1,200 of it per the statement and
+ *     R$300 stays untracked in the inbox, for the /operator form;
  *   - one settled claim (filed → paid → settled by PIX) for the timeline.
  *
  * The under-coverage scenario for demo step 5 is a toggle
@@ -27,6 +30,7 @@ import { address, createSolanaRpc, type Address, type KeyPairSigner } from "@sol
 import {
   buildAllowlist,
   findGuaranteePda,
+  findIncomeInboxAddress,
   findReserveAddresses,
   getSetRolesInstruction,
   MUTAV_PROGRAM_ADDRESS,
@@ -167,6 +171,14 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
 
   console.log("\n== seed: one guarantee fee");
   await go("operator", { kind: "contribute_fees", invoiceRefHash: await REF.invoice("INV-2026-0001"), amount: 1_000n * BRL }, "contribute_fees R$1,000 (20% take to the treasury)");
+
+  console.log("\n== seed: one month of issuer income (ADR 0017)");
+  // Nora pays the income inbox (here: the local mint authority mints into it).
+  const reserveAddrs = await findReserveAddresses(mint);
+  const inbox = await findIncomeInboxAddress({ vaultAuthority: reserveAddrs.vaultAuthority, reserveMint: mint });
+  spl(["mint", mint, "1500", inbox]);
+  log(`Nora pays R$1,500 into the income inbox ${inbox}`);
+  await go("operator", { kind: "sweep_income", incomeRefHash: await REF.income("NORA-202609-01"), period: 202_609, amount: 1_200n * BRL }, "sweep_income R$1,200 (statement 2026-09); R$300 stays in the inbox");
 
   console.log("\n== seed: one settled claim (timeline history)");
   const [guarantee] = await findGuaranteePda({ config, id: fromHex(await REF.guaranteeId("lease-sp-001")) });

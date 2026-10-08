@@ -23,7 +23,7 @@ custom-panic = []
 
 [dependencies]
 anchor-lang = { workspace = true, features = ["event-cpi", "init-if-needed"] }
-anchor-spl = { workspace = true, features = ["token_2022_extensions"] }
+anchor-spl = { workspace = true, features = ["token_2022_extensions", "associated_token"] }
 # SHA-256 for the investor allowlist Merkle proof (syscall on-chain; `sha2`
 # only affects host builds, e.g. the LiteSVM tests).
 solana-sha256-hasher = { version = "3.1.0", features = ["sha2"] }

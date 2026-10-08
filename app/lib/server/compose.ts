@@ -31,6 +31,9 @@ import {
   findDepositRequestPda,
   findFeeReceiptPda,
   findGuaranteePda,
+  findIncomeInboxAddress,
+  findIncomeReceiptPda,
+  isValidIncomePeriod,
   findHolderStatePda,
   findPayoutPda,
   findRedeemRequestPda,
@@ -50,6 +53,7 @@ import {
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
   getSettlePayoutInstruction,
+  getSweepIncomeInstruction,
   getUnpauseInstruction,
 } from "@mutav-finance/mutav-protocol-solana";
 import { ALLOWLIST_TEXT, checkAllowlist } from "../allowlist";
@@ -210,6 +214,35 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             payer: signer,
             systemProgram: SYSTEM_PROGRAM,
             invoiceRefHash,
+            amount: req.amount,
+          },
+          o,
+        ),
+      ];
+    }
+    case "sweep_income": {
+      // ADR 0017: the vault authority moves the statement's amount from the
+      // income inbox into the reserve; the operator signs the instruction.
+      if (!isValidIncomePeriod(req.period)) throw new ComposeError("period must be a YYYYMM month");
+      const incomeRefHash = bytes32(req.incomeRefHash, "incomeRefHash");
+      const [incomeReceipt] = await findIncomeReceiptPda({ config, incomeRefHash }, o);
+      return [
+        getSweepIncomeInstruction(
+          {
+            ...common,
+            operator: signer,
+            state: a.state,
+            incomeReceipt,
+            incomeInbox: await findIncomeInboxAddress({ vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram }),
+            reserve: a.reserve,
+            treasuryAccount: r.config.treasuryAccount,
+            vaultAuthority: a.vaultAuthority,
+            reserveMint: mint,
+            tokenProgram,
+            payer: signer,
+            systemProgram: SYSTEM_PROGRAM,
+            incomeRefHash,
+            period: req.period,
             amount: req.amount,
           },
           o,
@@ -454,6 +487,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             caps: { ...caps, ...(req.caps ?? {}) },
             price,
             exit,
+            // Never set from the app: capped at 0 until spec §12 Q47 (ADR 0017).
+            incomeTakeBps: c.incomeTakeBps,
           },
           o,
         ),

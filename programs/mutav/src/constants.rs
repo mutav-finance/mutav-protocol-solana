@@ -32,6 +32,9 @@ pub const AGENCY_SEED: &[u8] = b"agency";
 
 /// `FeeReceipt`: `["fee", config, invoice_ref_hash]` (spec §3.11).
 pub const FEE_SEED: &[u8] = b"fee";
+/// `IncomeReceipt`: `["income", config, income_ref_hash]` (spec §3.14,
+/// ADR 0017).
+pub const INCOME_SEED: &[u8] = b"income";
 
 /// `ClaimFiling`: `["claim", guarantee, notice_ref_hash]` (spec §3.6).
 pub const CLAIM_SEED: &[u8] = b"claim";
@@ -68,6 +71,13 @@ pub const MAX_FEE_TAKE_BPS: u16 = 3_000;
 
 /// Program minimum for `coverage_ratio_bps` (c ≥ 0.10; ADR 0016).
 pub const MIN_COVERAGE_RATIO_BPS: u16 = 1_000;
+
+/// Program maximum for `income_take_bps`: MUTAV's take from issuer income
+/// swept by `sweep_income` (ADR 0017).
+// TODO(spec: §12 Q47 — the cap on MUTAV's take from issuer income is not
+// decided). Fails closed at 0: every swept real goes to the reserve, the
+// pilot value. Raising it is a program upgrade.
+pub const MAX_INCOME_TAKE_BPS: u16 = 0;
 
 /// Share mint decimals (spec Conventions).
 pub const SHARE_DECIMALS: u8 = 6;
@@ -155,6 +165,7 @@ pub const PAYOUT_SIZE: usize = 229;
 pub const DEPOSIT_REQUEST_SIZE: usize = 155;
 pub const REDEEM_REQUEST_SIZE: usize = 181;
 pub const HOLDER_STATE_SIZE: usize = 114;
+pub const INCOME_RECEIPT_SIZE: usize = 142;
 
 // ---------------------------------------------------------------------------
 // `ConfigUpdated.field` ids (spec §9). Append-only. Top-level fields use
@@ -182,6 +193,7 @@ pub mod field {
     pub const PAUSED: u16 = 14;
     pub const FEATURE_FLAGS: u16 = 15;
     pub const MUTAV_CAPITAL_WALLET: u16 = 16;
+    pub const INCOME_TAKE_BPS: u16 = 17;
 
     pub const CAPS_MAX_TVL: u16 = 100;
     pub const CAPS_MAX_COVER_PER_GUARANTEE: u16 = 101;
@@ -268,6 +280,7 @@ pub const CONFIG_FIELDS: &[ConfigField] = &[
     f(field::PAUSED, "paused"),
     f(field::FEATURE_FLAGS, "feature_flags"),
     f(field::MUTAV_CAPITAL_WALLET, "mutav_capital_wallet"),
+    f(field::INCOME_TAKE_BPS, "income_take_bps"),
     f(field::CAPS_MAX_TVL, "caps.max_tvl"),
     f(
         field::CAPS_MAX_COVER_PER_GUARANTEE,
@@ -358,6 +371,8 @@ mod tests {
             DEPOSIT_SEED,
             REDEEM_SEED,
             HOLDER_SEED,
+            FEE_SEED,
+            INCOME_SEED,
         ];
         for seed in pilot {
             for reserved in RESERVED_SEED_PREFIXES {

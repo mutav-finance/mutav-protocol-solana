@@ -233,6 +233,20 @@ pub struct FeesContributed {
     pub net: u64,
 }
 
+/// Issuer income swept from the income inbox into the reserve (ADR 0017).
+/// `inbox_after` is what stays in the inbox, untracked and outside NAV.
+#[event]
+pub struct IncomeSwept {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub income_ref_hash: [u8; 32],
+    pub period: u32,
+    pub gross: u64,
+    pub take: u64,
+    pub net: u64,
+    pub inbox_after: u64,
+}
+
 #[event]
 pub struct ClaimFiled {
     pub config: Pubkey,

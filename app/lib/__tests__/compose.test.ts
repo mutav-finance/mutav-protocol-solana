@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { address, AccountRole } from "@solana/kit";
-import { findReserveAddresses, MUTAV_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
+import { findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, MUTAV_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
+import { fromHex } from "../serde";
 import { composeInstructions, describeInstructions, queueSeqs, unsignedTransaction } from "../server/compose";
 import { assertRelayable, invokedPrograms, isFullySigned, RelayRefusedError } from "../server/relay";
 import type { ReserveView } from "../view";
@@ -36,6 +37,7 @@ async function reserve(): Promise<ReserveView> {
     now: 0n,
     slot: 0n,
     token: { mint: MINT, mintOwner: null, freezeAuthority: null, supply: null, reserveFrozen: false },
+    incomeInbox: { address: await findIncomeInboxAddress({ vaultAuthority: addresses.vaultAuthority, reserveMint: MINT }), exists: true, amount: 0n },
   };
 }
 
@@ -75,6 +77,24 @@ describe("compose", () => {
     const [ix] = await composeInstructions({ kind: "set_config", coverageRatioBps: 15_000 }, WALLET, { reserve: r });
     expect(ix!.programAddress).toBe(MUTAV_PROGRAM_ADDRESS);
     expect(ix!.data!.length).toBeGreaterThan(8);
+  });
+
+  it("sweep_income moves the statement from the income inbox, signed by the operator only", async () => {
+    const r = await reserve();
+    const incomeRefHash = "17".repeat(32);
+    const [ix] = await composeInstructions({ kind: "sweep_income", incomeRefHash, period: 202_610, amount: 1_500_000_000n }, WALLET, { reserve: r });
+    const d = describeInstructions([ix!])[0]!;
+    // The operator signs (and pays rent for the receipt); nobody else does.
+    expect(new Set(d.accounts.filter((a) => a.signer).map((a) => a.address))).toEqual(new Set([WALLET]));
+    const addrs = d.accounts.map((a) => a.address);
+    const [receipt] = await findIncomeReceiptPda({ config: r.addresses.config as never, incomeRefHash: fromHex(incomeRefHash) });
+    expect(addrs).toContain(receipt);
+    expect(addrs).toContain(r.incomeInbox.address);
+    expect(addrs).toContain(r.addresses.reserve);
+    // Inbox and reserve are written; the vault authority signs the transfer by CPI, not here.
+    expect(d.accounts.find((a) => a.address === r.incomeInbox.address)).toMatchObject({ writable: true, signer: false });
+    expect(d.accounts.find((a) => a.address === r.addresses.vaultAuthority)).toMatchObject({ signer: false });
+    await expect(composeInstructions({ kind: "sweep_income", incomeRefHash, period: 202_613, amount: 1n }, WALLET, { reserve: r })).rejects.toThrow(/YYYYMM/);
   });
 
   it("request_deposit refuses a wallet outside the allowlist", async () => {

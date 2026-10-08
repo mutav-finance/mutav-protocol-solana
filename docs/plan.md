@@ -157,6 +157,12 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - **Carried from 2a:** `FeeReceiptV1` golden layout and padding zero at init; `contribute_fees` added to `Fixture::pilot_instructions()` (padding preserved, version guard, `buffer_earmark` neither read nor written).
 - **Done when:** tests pass; `FeesContributed` carries gross, take and net.
 
+## Task 4b — Issuer income (ADR 0017)
+
+- **Goal:** take Nora's monthly BRS revenue share into the reserve: the income inbox created at `initialize`, `sweep_income` (spec §5.3a), and the three changes the design review put before the devnet layout freeze (NAV-move guard net of inflows, mint guard for `ScaledUiAmount` / `InterestBearingConfig` / `Pausable`, income fields carved from padding; `reserve` stays a PDA).
+- **Files:** `instructions/operator/sweep_income.rs`, `instructions/admin/initialize.rs`, `state/income.rs`, `pricing.rs`, `token_guard.rs`; `tests/income.rs`, `tests/mint_guard.rs`, `tests/under_coverage.rs`, the layout and padding tests.
+- **Built (2026-10-07), before the layout freeze.** Happy path, every error, idempotency per statement, the inbox bound, operator-only, always open (paused, under-covered, notices, stale price), NAV and `stable_assets` rising only on the sweep, the solvency gate, freezes, the guard (a large fee batch or income payment no longer halts; a shock of the same size still does), an injected take, no drift between `reserve` and `brs_balance`, and the deposit-timing scenario. The `pay_claim` property test also fuzzes inbox income. **Built later:** the admin recovery path for untracked BRS and the phase-2 timing guard (§12 Q49).
+
 ## Task 5 — Claims and payouts (Oct 4)
 
 - **Goal:** `ClaimFiling`, `Payout`, `ClaimNotice`; `flag_claim_notice`, `close_claim_notice`, `file_claim`, `pay_claim`, `pay_claim_admin`, `settle_payout` (spec §5.4), with claim categories (spec §3.13), exhaustion, the backstop-reimbursement flag and the quitação at settlement (ADR 0012).

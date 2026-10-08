@@ -19,5 +19,7 @@ export const REF = {
   refsHash: (lease: string) => refHex(`mutav:refs:${lease}`),
   notice: (notice: string) => refHex(`mutav:notice:${notice}`),
   invoice: (invoice: string) => refHex(`mutav:invoice:${invoice}`),
+  /** An issuer income statement (ADR 0017). */
+  income: (statement: string) => refHex(`mutav:income:${statement}`),
   pixE2e: (e2eId: string) => refHex(`pix:e2e:${e2eId}`),
 };

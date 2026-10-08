@@ -191,7 +191,7 @@ export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
 
 // ── Money flows ─────────────────────────────────────────────────────────────
 
-const FLOW_LABEL = { fee: "Guarantee fee", claim: "Claim payment", deposit: "Deposit", redemption: "Redemption" } as const;
+const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit", redemption: "Redemption" } as const;
 
 export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
   const { totals, rows } = moneyFlows(r.state, l);
@@ -200,6 +200,8 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
       <div className="grid-metrics">
         <MetricCard dense label="Guarantee fees → reserve" value={fmtBrs(totals.feesNetToReserve)} unit="net, raises NAV for every holder" />
         <MetricCard dense label="Fee take → treasury" value={fmtBrs(totals.feeTakeToTreasury)} unit={`MUTAV operation · ${fmtBps(r.config.feeTakeBps)} of each fee`} />
+        <MetricCard dense label="Issuer income → reserve" value={fmtBrs(totals.incomeNetToReserve)} unit="Nora partnership revenue, swept per statement" />
+        <MetricCard dense label="Income inbox, not swept" value={fmtBrs(r.incomeInbox.amount)} unit="paid by Nora; outside NAV until swept" />
         <MetricCard dense label="Claim payments out" value={fmtBrs(totals.claimsPaid)} unit="to the payments account" />
         <MetricCard dense label="Deposits in" value={fmtBrs(totals.depositsIn)} unit="fulfilled requests" />
         <MetricCard dense label="Redemptions out" value={fmtBrs(totals.redemptionsOut)} unit="filled requests" />
@@ -333,6 +335,7 @@ export function Accounts({ r }: { r: ReserveView }) {
     ["Claims (filled redemptions)", r.addresses.claims, P],
     ["Share mint", r.addresses.shareMint, P],
     ["BRS mint", r.config.reserveMint, { role: null, note: "issued by Nora" }],
+    ["Income inbox (issuer income)", r.incomeInbox.address, ACCOUNT_ROLES.incomeInbox],
     ["Treasury account (fee take)", r.config.treasuryAccount, ACCOUNT_ROLES.treasury],
     ["Payments account (claim payments)", r.config.paymentsAccount, ACCOUNT_ROLES.payments],
     ["Admin (Squads vault)", r.config.admin, ACCOUNT_ROLES.admin],

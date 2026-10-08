@@ -184,7 +184,7 @@ A Codama-generated TypeScript client composes instructions and holds no keys; th
 | Role | Key custody | Instructions | Time-locked? |
 |---|---|---|---|
 | Admin | Squads v4 multisig vault; also the program upgrade authority | `set_config`, `set_roles`, accounts, allowlist, adapters, `unpause`, `fulfil_deposits`, `fulfil_redeems`, `allocate`, `deallocate`, `pay_claim_admin` | Yes, all of them |
-| Operator | Hot key held in KMS, used by the MUTAV platform | `register_guarantee`, `notify_exoneration`, `record_keys_returned`, `close_guarantee`, `contribute_fees`, `flag_claim_notice` / `close_claim_notice`, `file_claim`, `pay_claim`, `settle_payout` | No (bounded by caps) |
+| Operator | Hot key held in KMS, used by the MUTAV platform | `register_guarantee`, `notify_exoneration`, `record_keys_returned`, `close_guarantee`, `contribute_fees`, `sweep_income`, `flag_claim_notice` / `close_claim_notice`, `file_claim`, `pay_claim`, `settle_payout` | No (bounded by caps) |
 | Pauser | Separate key | `pause`, `revoke_operator` | No |
 | Capital provider | Own wallet, allowlisted by Merkle root (KYC off-chain) | `request_*`, `cancel_*`, `claim_shares`, `claim_assets` | No |
 | Anyone | — | `refresh`, `advance_queue_heads` | No |
@@ -297,7 +297,7 @@ NAV per share         = net_assets / shares_outstanding
 
 MUTAV chose the second, and the program now expresses it ([ADR 0016](decisions/0016-coverage-ratio-below-one.md)). `c` has a program floor of 0.10, the worst-case floor of the business rule that limits the book (grow only while the reserve holds at least 10% of total cover and at least two tail years). Devnet starts at that floor: R$300k backs about R$3M of cover, around 75 working-product leases. `coverage_required` is never below the open provisions, so filed payment requests stay fully covered at any `c`. At `c` < 1 a claim payment lowers surplus by `(1 − c)` times the amount (invariant 7) and can move the reserve into under-coverage; it is still never refused. The two-tail-year check stays off-chain for now; a per-lease tail floor is a later ADR. Which coverage figure MUTAV publishes before counsel's opinion is still open; any figure published will be shown both against maximum exposure and against a tail year, because either alone misleads.
 
-**What is gated** ([ADR 0005](decisions/0005-solvency-gate-scope.md)). Table 4 has the full matrix. In short: new guarantees and redemption fills must fit in the `free_capital` computed before them; nothing on the claim-payment path, nor fees, closes or `refresh`, is gated on solvency. Redemption fills are also capped by `liquid_budget`, so no capital exit or allocation can spend BRS a filed payment request needs. Fee receivables are not reserve assets: a missed agency payment lowers fee inflow, not coverage.
+**What is gated** ([ADR 0005](decisions/0005-solvency-gate-scope.md)). Table 4 has the full matrix. In short: new guarantees and redemption fills must fit in the `free_capital` computed before them; nothing on the claim-payment path, nor fees, issuer income, closes or `refresh`, is gated on solvency. Redemption fills are also capped by `liquid_budget`, so no capital exit or allocation can spend BRS a filed payment request needs. Fee receivables are not reserve assets: a missed agency payment lowers fee inflow, not coverage.
 
 **Under-coverage mode.** The program enters under-coverage when `stable_assets < coverage_required`, for example after a TESOURO mark-down or an issuer freeze. Registration, redemption fills and allocation freeze. Deallocation runs only if it doesn't worsen coverage, so de-risking TESOURO into BRS stays possible. Claim payments, fees, capital requests and deposit fills keep running, and deposits recapitalise at a NAV that already reflects the loss ([spec §6](spec.md#6-under-coverage-mode)). On public surfaces this mode reads "reserve below target; MUTAV backstop active", never "insolvent". The landlord's claim is against MUTAV's whole patrimony, not the reserve alone. MUTAV's backstop is disclosed on-chain as a separate layer (`backstop_amount`, `backstop_commitment_hash`, `backstop_reimbursed_total`) and never counts in `stable_assets` or NAV. Its amount is **open**; its disclosure is specified.
 
@@ -327,7 +327,7 @@ Small inset, right, titled "Same 170-lease book, two sizings (working parameters
 | **`pay_claim`**² | **✓** | **✓** | **✓** | **✓** | **✓** | **✓ never gated** |
 | **`pay_claim_admin`**² | **✓** | **✓** | **✓** | **✓** | **✓** | **✓ never gated** (time-locked) |
 | `file_claim`, `settle_payout` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `contribute_fees` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `contribute_fees`, `sweep_income` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `close_guarantee`, `notify_exoneration`, `record_keys_returned`, notices | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `request_*` | ✗ | ✓ (queued, not filled) | ✓ | ✓ | ✓ | ✓ |
 | `register_guarantee` | ✗ | ✗ | ✓ | ✗ | ✓ | *gated* |
@@ -381,10 +381,11 @@ Caption line: "Each part priced at the NAV of its own fill; rounding favours the
 | Guarantee fees, net of the take (monthly agency bill paid by boleto or PIX, converted to BRS) | `contribute_fees` | `reserve` | Never minted | 1 `FeeReceipt` per agency bill (`invoice_ref_hash`); `FeesContributed{gross, take, net}` |
 | MUTAV operation (the take, `fee_take_bps`, program max 30%) | Same call, separate transfer | Whitelisted `treasury_account` | None; never in the reserve or NAV | `fee_take_total` |
 | MUTAV as capital provider | `request_deposit` / `request_redeem` from the disclosed capital wallet | `pending_deposits` → `reserve` | At NAV, like any provider | Queue events filtered by `mutav_capital_wallet` |
+| Issuer income: Nora's monthly BRS revenue share, routed by MUTAV into the reserve ([ADR 0017](decisions/0017-brs-income-intake.md), proposed) | `sweep_income`, one per Nora statement, from the income inbox | `reserve` (take `income_take_bps` to the treasury: 0 in the pilot) | Never minted | 1 `IncomeReceipt` per statement (`income_ref_hash`); `IncomeSwept{gross, take, net, inbox_after}`; `income_total` |
 
 The treasury, payments account and capital wallet must be distinct, and there is no `withdraw_surplus`. **Every BRS in the reserve traces to a `FeeReceipt` or a `DepositRequest`,** and each `FeeReceipt` corresponds to one paid monthly agency bill, so a gap between bills paid and receipts recorded is visible. Because MUTAV also controls the operator key and the admin multisig, the notice gate is the program-level control against MUTAV exiting ahead of a loss it knows about.
 
-**Who provides capital (open).** MUTAV's working plan funds the reserve from its own balance sheet, capitalised by an equity round, with a working target of R$300k. The program also supports allowlisted, KYC'd third-party providers holding reserve shares. Counsel's review warns that outside capital pooled in a reserve that absorbs losses can make a *fiança* look like insurance or an unauthorised mutual scheme, so third-party providers stay disabled until counsel's written opinion, and the pilot may run on MUTAV capital only. The committed amount will be published before the mainnet pilot. Reserve shares absorb claim payments and receive net guarantee fees, so their value can fall or rise; MUTAV sets no return target and makes no return projection.
+**Who provides capital (open).** MUTAV's working plan funds the reserve from its own balance sheet, capitalised by an equity round, with a working target of R$300k. The program also supports allowlisted, KYC'd third-party providers holding reserve shares. Counsel's review warns that outside capital pooled in a reserve that absorbs losses can make a *fiança* look like insurance or an unauthorised mutual scheme, so third-party providers stay disabled until counsel's written opinion, and the pilot may run on MUTAV capital only. The committed amount will be published before the mainnet pilot. Reserve shares absorb claim payments and receive net guarantee fees and swept issuer income, so their value can fall or rise; MUTAV sets no return target and makes no return projection.
 
 ---
 
@@ -393,6 +394,8 @@ The treasury, payments account and capital wallet must be distinct, and there is
 The reserve holds two kinds of asset ([spec §7](spec.md#7-price-safety)).
 
 **BRS** ([Nora Finance](https://www.nora.finance/docs/integrate/core-concepts/brs-token)) is a 1:1 BRL stablecoin, a classic SPL token with 6 decimals, valued at par. We disclose the trust this places in the issuer: the mint has a freeze authority, and redemption into BRL runs off-chain. In our on-chain reads, about 2.9k BRS existed on Solana at the start of October 2026, with no DEX pool.
+
+**Issuer income** ([ADR 0017](decisions/0017-brs-income-intake.md), proposed). BRS bears no yield, but Nora pays partners a monthly revenue share in BRS under a commercial agreement, to an address the partner chooses. MUTAV names the reserve's *income inbox*: the vault authority's associated token account for BRS, created at `initialize`. Nothing in it counts toward NAV; each month the operator sweeps the amount on Nora's statement into the reserve with `sweep_income`, which books it once per statement and raises NAV for every holder. The NAV-move guard measures net of these inflows, so a monthly payment does not halt fulfilment. The income depends on one contract with one issuer, which can change its rate or end, so it is shown as issuer partnership revenue, separate from guarantee fees, and never counted in the coverage math. Its terms with Nora are **open**.
 
 **TESOURO** ([Etherfuse](https://etherfuse.com/products/stablebonds)) is tokenized exposure to Brazilian federal bonds: a Token-2022 mint that carries an on-chain `BondPrice` account. Its layout, update cadence and rate basis are being confirmed with the issuer. In this design the reserve can hold at most 50% of its value in TESOURO, only through a capped adapter; in the pilot that adapter is an interface and a mock.
 
@@ -420,7 +423,7 @@ The **mint guard** rejects any Token-2022 mint with a PermanentDelegate, a Trans
 
 **Governance can change hands without new code.** Because admin, operator, pauser and the investor allowlist are separate on-chain roles, the reserve's governance can move to an independent, regulated reserve vehicle (its directors holding the admin multisig and an independent pauser), and the reserve can open to outside investors, by rotating keys and updating the allowlist. No program change or account migration is needed.
 
-**Pauser.** A separate key; pausing needs no time lock. A pause stops capital flows, new guarantees and allocation, and leaves the claim-payment path, fees, closes and `refresh` open. `revoke_operator` takes effect immediately, while appointing a replacement is a time-locked admin action.
+**Pauser.** A separate key; pausing needs no time lock. A pause stops capital flows, new guarantees and allocation, and leaves the claim-payment path, fees, issuer income, closes and `refresh` open. `revoke_operator` takes effect immediately, while appointing a replacement is a time-locked admin action.
 
 **Operator blast radius.** Five controls bound the operator: the whitelisted destination, the per-call and per-period payment caps, the per-guarantee and per-agency cover caps, the public SLA flag, and immediate revocation (§13). **The caps limit the rate of loss, not what MUTAV owes.**
 

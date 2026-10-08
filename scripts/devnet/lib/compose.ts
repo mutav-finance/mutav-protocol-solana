@@ -13,6 +13,7 @@ import {
   type TransactionSigner,
 } from '@solana/kit';
 import {
+  findIncomeInboxAddress,
   findReserveAddresses,
   getInitializeInstruction,
   getSetAllowlistRootInstruction,
@@ -68,6 +69,12 @@ export async function composeInitialize(
       pendingDeposits: a.pendingDeposits,
       pendingRedemptions: a.pendingRedemptions,
       claims: a.claims,
+      // ADR 0017: the income inbox Nora pays, created idempotently.
+      incomeInbox: await findIncomeInboxAddress({
+        vaultAuthority: a.vaultAuthority,
+        reserveMint: cfg.reserveMint,
+        tokenProgram: cfg.reserveTokenProgram,
+      }),
       treasuryAccount: cfg.treasuryAccount,
       paymentsAccount: cfg.paymentsAccount,
       reserveTokenProgram: cfg.reserveTokenProgram,
@@ -108,7 +115,8 @@ export async function composeSetRoles(cfg: DeployConfig, admin: TransactionSigne
 /**
  * `set_config` writing the file's caps, price bounds, coverage ratio, take
  * rate and SLA, and keeping every other field as it is on-chain (`current`).
- * `feature_flags` and `exit` are carried over unchanged, never set here.
+ * `feature_flags`, `exit` and `income_take_bps` are carried over unchanged,
+ * never set here.
  */
 export async function composeSetCaps(
   cfg: DeployConfig,
@@ -133,6 +141,9 @@ export async function composeSetCaps(
       caps: cfg.caps,
       price: cfg.price,
       exit,
+      // Carried over: the take on issuer income is never set from the file
+      // (ADR 0017; the program caps it at 0 until §12 Q47 is decided).
+      incomeTakeBps: current.incomeTakeBps,
     },
     opts(cfg),
   );

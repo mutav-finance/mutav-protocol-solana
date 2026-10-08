@@ -119,7 +119,7 @@ export function claimSpeed(rows: ClaimRow[], slaSecs: bigint, now: bigint): { cl
 // ── Money flows ─────────────────────────────────────────────────────────────
 
 export type FlowBar = {
-  key: "deposits" | "fees" | "claims" | "redemptions" | "take";
+  key: "deposits" | "fees" | "income" | "claims" | "redemptions" | "take" | "income-take";
   label: string;
   /** Into the reserve (+) or out of it (−); the treasury take never touches the reserve. */
   amount: bigint;
@@ -131,7 +131,7 @@ export type FlowBar = {
 };
 
 /**
- * Totals by kind. Fee and claim totals are `VaultState` counters (complete);
+ * Totals by kind. Fee, issuer income and claim totals are `VaultState` counters (complete);
  * deposit and redemption totals sum the fill events found in recent escrow
  * history (see `readCapitalEvents`), so the chart says so.
  */
@@ -139,9 +139,14 @@ export function flowBars(t: FlowTotals): { bars: FlowBar[]; axis: bigint } {
   const bars: FlowBar[] = [
     { key: "deposits", label: "Deposits in", amount: t.depositsIn, direction: "in", ...FLOW_ROLES.deposit, source: "events" },
     { key: "fees", label: "Guarantee fees, net", amount: t.feesNetToReserve, direction: "in", ...FLOW_ROLES.fee, source: "state" },
+    { key: "income", label: "Issuer income, net", amount: t.incomeNetToReserve, direction: "in", ...FLOW_ROLES.income, source: "state" },
     { key: "claims", label: "Claim payments", amount: t.claimsPaid, direction: "out", ...FLOW_ROLES.claim, source: "state" },
     { key: "redemptions", label: "Redemptions out", amount: t.redemptionsOut, direction: "out", ...FLOW_ROLES.redemption, source: "events" },
     { key: "take", label: "Fee take → treasury", amount: t.feeTakeToTreasury, direction: "outside", ...FLOW_ROLES.fee, source: "state" },
+    // 0 in the pilot (`MAX_INCOME_TAKE_BPS = 0`), so shown only once it is not.
+    ...(t.incomeTakeToTreasury > 0n
+      ? [{ key: "income-take" as const, label: "Income take → treasury", amount: t.incomeTakeToTreasury, direction: "outside" as const, ...FLOW_ROLES.income, source: "state" as const }]
+      : []),
   ];
   return { bars, axis: max(bars.map((b) => b.amount)) };
 }

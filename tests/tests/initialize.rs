@@ -68,7 +68,9 @@ fn initialize_creates_the_reserve() {
         .adapters
         .iter()
         .all(|a| a.program_id == Pubkey::default() && !a.enabled && a._reserved == [0; 64]));
-    assert_eq!(c._reserved, [0; 512]);
+    // ADR 0017: no take from issuer income at launch.
+    assert_eq!(c.income_take_bps, 0);
+    assert_eq!(c._reserved, [0; 510]);
 
     // VaultState: empty.
     let acc = f.svm.get_account(&p.state).unwrap();
@@ -83,7 +85,11 @@ fn initialize_creates_the_reserve() {
     assert_eq!(s.pending_notices, 0);
     assert_eq!(s.next_redeem_seq, 0);
     assert!(!s.fulfil_halted);
-    assert_eq!(s._reserved, [0; 256]);
+    assert_eq!(
+        (s.income_total, s.income_take_total, s.inflows_since_refresh),
+        (0, 0, 0)
+    );
+    assert_eq!(s._reserved, [0; 232]);
 
     // Share mint: 6 dp, mint and freeze authority = vault authority, no supply.
     let m = mint_at(&f, &p.share_mint);
@@ -108,6 +114,15 @@ fn initialize_creates_the_reserve() {
         assert_eq!(t.mint, mint);
         assert_eq!(t.amount, 0);
     }
+    // The income inbox (ADR 0017): the vault authority's associated token
+    // account for BRS, empty, and not one of the reserve's PDA accounts.
+    let inbox = f.income_inbox();
+    let t = token_at(&f, &inbox);
+    assert_eq!(
+        (t.owner, t.mint, t.amount),
+        (p.authority, f.reserve_mint, 0)
+    );
+    assert_ne!(inbox, p.reserve);
     // The vault authority holds no data.
     assert!(f
         .svm
