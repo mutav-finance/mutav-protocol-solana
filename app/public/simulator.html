@@ -560,7 +560,7 @@ bad_year_net_gain    = net fees − leases × bad_year_claims + stable × (brs_s
       <ul>
         <li>Claims are paid as a smooth expected monthly flow in the month they arise, so open provisions are about 0 and <code>coverage_required</code> is the c term. No subrogation recoveries, no TESOURO price moves, constant rates.</li>
         <li>A single agency holds the whole book, so every lease counts against <code>max_cover_per_agency</code>.</li>
-        <li>Yield accrues on the opening stable assets: BRS income at <code>BRS share × BRS yield / 12</code> (the whole reserve in the pilot), and, as an adapter what-if, an adapter asset (e.g. TESOURO) at <code>min(adapter share, 1 − settlement floor) × rate / 12</code>, booked in the same month (the monthly <code>sweep_income</code>; the days between Nora's payment and the sweep are ignored).</li>
+        <li>Yield accrues on the opening stable assets: BRS income at <code>BRS share × issuer income rate / 12</code> (the whole reserve in the pilot), and, as an adapter what-if, an adapter asset (e.g. TESOURO) at <code>min(adapter share, 1 − settlement floor) × rate / 12</code>, booked in the same month (the monthly <code>sweep_income</code>; the days between Nora's payment and the sweep are ignored).</li>
         <li>The gate admits as many of the month's planned leases as the caps and free capital allow; refused leases are not carried over. A lease leaves the book at the end of its term (the claims tail is not modelled).</li>
         <li>Selic is the opportunity cost of the same capital, not a target.</li>
       </ul>
@@ -927,13 +927,13 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     ]},
     { id: 'ryield', t: 'Reserve yield', s: 'Yield', sm: 'BRS income, Selic, adapter what-ifs', f: [
       { sub: 'BRS income (swept monthly)' },
-      { k: 'brsYieldPct', l: 'BRS yield', u: '%/yr', step: 0.05, min: 0, src: 'estimate', i: 'Nora’s yield: below but near Selic; set from the agreement. Paid monthly in BRS to the reserve’s income inbox and booked by sweep_income. 12,75% = Selic − 1 pp until the terms are set.' },
+      { k: 'brsYieldPct', l: 'Issuer income (Nora, BRS)', u: '%/yr', step: 0.05, min: 0, max: 100, src: 'estimate', i: 'Nora’s issuer partnership revenue (ADR 0017): BRS itself bears no yield; the rate comes from a commercial agreement, not the chain. MUTAV expects it below but near Selic, pending Nora’s confirmation. Paid monthly in BRS to the reserve’s income inbox and booked by sweep_income. 12,75% = Selic − 1 pp until the terms are set.' },
       { sub: 'Comparison' },
-      { k: 'selicPct', l: 'Selic (opportunity cost)', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'What the same capital would earn at Selic. Comparison only.' },
+      { k: 'selicPct', l: 'Selic (opportunity cost)', u: '%/yr', step: 0.05, min: 0, max: 100, src: 'research', i: 'What the same capital would earn at Selic. Comparison only.' },
       { sub: 'Adapter asset (e.g. TESOURO), what-if' },
       { text: 'The pilot holds BRS only. Assets like TESOURO can be added through adapters; lower the settlement-token floor in Specs to model one.' },
       { k: 'tesouroSharePct', l: 'Adapter asset share wanted', u: '%', step: 5, min: 0, max: 100, src: 'estimate', i: 'What-if: share of the stable assets wanted in an adapter asset such as TESOURO. The pilot holds BRS only (0). Limited to 100% − the settlement-token floor (Specs; 100% BRS on devnet).' },
-      { k: 'tesouroPct', l: 'Adapter asset yield', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'Default 11,58%: TESOURO, Etherfuse on-chain accrual, unconfirmed. Accrues monthly on the adapter share of the opening stable assets, once an adapter exists.' },
+      { k: 'tesouroPct', l: 'Adapter asset yield', u: '%/yr', step: 0.05, min: 0, max: 100, src: 'research', i: 'Default 11,58%: TESOURO, Etherfuse on-chain accrual, unconfirmed. Accrues monthly on the adapter share of the opening stable assets, once an adapter exists.' },
       { note: 'splitNote' }
     ]},
     { id: 'assume', t: 'Assumptions', s: 'Assumptions', sm: 'claims, bad year and costs', f: [
@@ -983,7 +983,8 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var d = DEF[k];
     if (typeof d === 'boolean') return v === true || v === '1' || v === 'true' || v === 1;
     if (VALID[k]) return VALID[k].indexOf(v) >= 0 ? v : d;
-    var n = parseFloat(v); return isFinite(n) ? n : d;
+    var n = parseFloat(v); if (!isFinite(n)) return d;
+    var f = fieldBy(k); return f ? disp(f, clampF(f, disp(f, n))) : n;
   }
   function loadHash(){
     try {
@@ -1037,13 +1038,13 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   /* help tooltips: hover, focus and tap */
   var htip = document.getElementById('htip'), tipOwner = null;
   function showHelp(el){
-    tipOwner = el; htip.textContent = el.getAttribute('data-tip'); htip.style.display = 'block';
+    tipOwner = el; htip.textContent = el.getAttribute('data-tip'); htip.style.display = 'block'; el.setAttribute('aria-describedby', 'htip');
     var r = el.getBoundingClientRect(), w = htip.offsetWidth, h = htip.offsetHeight;
     var left = Math.min(window.innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)), top = r.top - h - 6;
     if (top < 8) top = r.bottom + 6;
     htip.style.left = left + 'px'; htip.style.top = top + 'px';
   }
-  function hideHelp(){ htip.style.display = 'none'; tipOwner = null; }
+  function hideHelp(){ if (tipOwner) tipOwner.removeAttribute('aria-describedby'); htip.style.display = 'none'; tipOwner = null; }
   function infoOf(t){ return t && t.closest ? t.closest('[data-tip]') : null; }
   document.addEventListener('mouseover', function(e){ var el = infoOf(e.target); if (el) showHelp(el); });
   document.addEventListener('mouseout', function(e){ if (infoOf(e.target) && !infoOf(e.relatedTarget)) hideHelp(); });
@@ -1153,7 +1154,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   function showCtab(id){
     Array.prototype.forEach.call(groupsEl.querySelectorAll('[data-ctab]'), function(b){ var on = b.getAttribute('data-ctab') === id; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
     GROUPS.forEach(function(g){ document.getElementById('grp_' + g.id).hidden = g.id !== id; });
-    try { localStorage.setItem('mutav-reserve-sim-v5-ctab', id); } catch (e) {}
+    try { localStorage.setItem(STORE + '-ctab', id); } catch (e) {}
   }
   Array.prototype.forEach.call(groupsEl.querySelectorAll('[data-ctab]'), function(b, i, all){
     b.addEventListener('click', function(){ showCtab(b.getAttribute('data-ctab')); });
@@ -1162,9 +1163,10 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       var n = all[(i + d + all.length) % all.length]; n.focus(); showCtab(n.getAttribute('data-ctab')); e.preventDefault();
     });
   });
-  try { var savedCtab = localStorage.getItem('mutav-reserve-sim-v5-ctab'); if (savedCtab && document.getElementById('grp_' + savedCtab)) showCtab(savedCtab); } catch (e) {}
+  try { var savedCtab = localStorage.getItem(STORE + '-ctab'); if (savedCtab && document.getElementById('grp_' + savedCtab)) showCtab(savedCtab); } catch (e) {}
 
-  /* inputs are formatted like outputs (pt-BR: 300.000, 0,1) and parse what people paste: 300.000, 300000, 300,000, R$ 300.000,50, 0.1 */
+  /* inputs are formatted like outputs (pt-BR: 300.000, 0,1) and parse what people paste: 300.000, 300000, R$ 300.000,50, 1,125, 0.1.
+     A lone comma is always the decimal mark (pt-BR), so the formatter's own output always parses back. */
   var inF = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 });
   function fmtIn(v){ return isFinite(v) ? inF.format(v).replace(/[\u00a0\u202f]/g, '') : ''; }
   function parseIn(str){
@@ -1174,8 +1176,8 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     if (lc >= 0 && ld >= 0) dec = lc > ld ? ',' : '.';                       // both: the last one is the decimal mark
     else if (lc >= 0 || ld >= 0) {
       var ch = lc >= 0 ? ',' : '.', parts = t.replace('-', '').split(ch);
-      // one mark followed by exactly three digits after a non-zero lead, or several marks: thousands separators
-      var grouped = parts.length > 2 || (/^[1-9]\d{0,2}$/.test(parts[0]) && parts[1].length === 3);
+      // several marks, or a lone dot + exactly three digits after a non-zero lead: thousands separators
+      var grouped = parts.length > 2 || (ch === '.' && /^[1-9]\d{0,2}$/.test(parts[0]) && parts[1].length === 3);
       dec = grouped ? '' : ch;
     }
     var thou = dec === ',' ? '.' : dec === '.' ? ',' : null;
@@ -1283,7 +1285,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     ['Free capital / shortfall', 'Stable assets − coverage required. Negative means the reserve is under-covered: new guarantees are refused, claims are still paid.'], ['Guarantee fees', 'All guarantee fees paid this month, before MUTAV’s take.'],
     ['MUTAV take', 'fee_take_bps × guarantee fees, to the MUTAV treasury.'], ['Net fees', 'Guarantee fees − MUTAV take: what enters the reserve.'],
     ['Claims paid', 'Expected claims this month (plus bad-year claims if the bad year is on). Flagged when above max_claim_per_period.'], ['Adapter yield', 'What-if: opening stable assets × min(adapter share, 1 − settlement floor) × adapter rate / 12 (an adapter asset such as TESOURO).'],
-    ['BRS income', 'Swept monthly: opening stable assets × BRS share × BRS yield / 12. Nora pays it to the income inbox; sweep_income books it into reserve.'],
+    ['BRS income', 'Swept monthly: opening stable assets × BRS share × issuer income rate / 12. Nora pays it to the income inbox; sweep_income books it into reserve.'],
     ['Net gain', 'Business view: BRS income + net fees − claims paid (+ adapter yield, what-if).'], ['Redemption', 'Paid out of free capital under the redemptions setting.']
   ]);
   thead('sensTbl', [['Take rate', 'Share of each guarantee fee kept by MUTAV.'], ['Per lease / mo', 'MUTAV take per active lease per month.'],
@@ -1304,7 +1306,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     ['Return on stable assets, normal', 'Book at the last month held a full year: net gain ÷ stable assets.'], ['Return, bad year', 'Same, with bad-year claims.'], ['Normal vs Selic', 'Normal-year return on stable assets minus Selic.'],
     ['MUTAV take', 'MUTAV take over the simulated months.', 'scopeTakeH']]);
   thead('yieldTbl', [['Month', ''], ['Opening stable assets', 'Stable assets after capital in, before the month’s flows.'], ['Net fees − claims', 'Underwriting result: guarantee fees after take minus claims paid.'],
-    ['Adapter yield', 'What-if: opening stable assets × min(adapter share, 1 − settlement floor) × rate / 12.'], ['BRS income', 'Opening stable assets × BRS share × BRS yield / 12, swept monthly.'], ['Net gain', 'BRS income + underwriting + adapter yield.'], ['Yield, annualized', 'Net gain ÷ opening stable assets × 12.'],
+    ['Adapter yield', 'What-if: opening stable assets × min(adapter share, 1 − settlement floor) × rate / 12.'], ['BRS income', 'Opening stable assets × BRS share × issuer income rate / 12, swept monthly.'], ['Net gain', 'BRS income + underwriting + adapter yield.'], ['Yield, annualized', 'Net gain ÷ opening stable assets × 12.'],
     ['Selic on capital', 'Opening stable assets × Selic / 12.'], ['vs Selic', 'Net gain − Selic on the same capital.']]);
   function renderYieldTable(r){
     document.querySelector('#yieldTbl tbody').innerHTML = r.rows.map(function(x){

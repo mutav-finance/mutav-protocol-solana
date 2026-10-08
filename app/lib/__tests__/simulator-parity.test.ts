@@ -272,3 +272,26 @@ describe("simulator BRS income (swept monthly)", () => {
   });
 });
 
+
+describe("simulator input parser (pt-BR)", () => {
+  const html = readFileSync(fileURLToPath(new URL("../../public/simulator.html", import.meta.url)), "utf8");
+  const src = html.match(/var inF = [\s\S]*?function parseIn[\s\S]*?\n {2}}\n/)?.[0];
+  const ctx: { inF?: unknown; fmtIn?: (v: number) => string; parseIn?: (s: string) => number } = {};
+  runInNewContext(`${src}\nthis.fmtIn = fmtIn; this.parseIn = parseIn;`, ctx);
+  const { fmtIn, parseIn } = ctx as Required<typeof ctx>;
+
+  it("parses its own formatted output back to the same value", () => {
+    for (const v of [1.125, 2.005, 1234.5, 0.077, 0.1, 12.75, 1000, 40_000, 300_000, 10_000_000]) {
+      expect(parseIn(fmtIn(v))).toBe(v);
+    }
+  });
+
+  it("accepts what people paste", () => {
+    expect(parseIn("300.000")).toBe(300_000);
+    expect(parseIn("300000")).toBe(300_000);
+    expect(parseIn("R$ 300.000,50")).toBe(300_000.5);
+    expect(parseIn("0.1")).toBe(0.1);
+    expect(parseIn("1,125")).toBe(1.125); // a lone comma is the decimal mark
+    expect(Number.isNaN(parseIn("abc"))).toBe(true);
+  });
+});
