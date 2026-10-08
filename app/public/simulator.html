@@ -92,7 +92,7 @@ details.grp[open] summary::after{content:"−"}
 .info{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--ink-3);color:var(--ink-3);font:600 9px/1 var(--sans);margin-left:4px;cursor:help;vertical-align:1px;flex:none;text-transform:none;letter-spacing:0}
 .info:hover{color:var(--ink);border-color:var(--ink)}
 .src{display:inline-block;font:600 9px/1 var(--sans);letter-spacing:.03em;text-transform:uppercase;padding:2px 4px;border-radius:3px;margin-left:5px;vertical-align:1px;border:1px solid currentColor}
-.src.c{color:var(--src-c)} .src.r{color:var(--src-r)} .src.e{color:var(--src-e)}
+.src.c{color:var(--src-c)} .src.r{color:var(--src-r)} .src.e{color:var(--src-e)} .src.p{color:var(--copper)}
 .hint{font-size:11px;color:var(--ink-3);line-height:1.35}
 .seghint{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border-radius:6px;padding:6px 8px;line-height:1.4}
 .seghint.risk{background:var(--risk-soft)}
@@ -208,7 +208,7 @@ h3:first-child{margin-top:0}
   <div class="seg modeseg" role="group" aria-label="View"><button type="button" data-mode="simple">Simple</button><button type="button" data-mode="advanced">Advanced</button></div>
   <button class="tbtn" type="button" id="copyBtn" title="Copy a plain-text snapshot: the five answers, inputs and key results">Copy summary</button>
   <button class="tbtn" type="button" id="csvBtn" title="Download the month-by-month table as CSV">Export CSV</button>
-  <button class="tbtn" type="button" id="resetBtn" title="Return every input to the 02 defaults">Reset</button>
+  <button class="tbtn" type="button" id="resetBtn" title="Return every input to the defaults (02 parameters, devnet caps)">Reset</button>
   <button class="tbtn" type="button" id="themeBtn" title="Toggle light/dark">Theme</button>
 </div></div>
 
@@ -219,7 +219,7 @@ h3:first-child{margin-top:0}
       <select id="scenSel"></select>
       <div class="desc" id="scenDesc"></div>
     </div>
-    <div class="legendsrc adv">Assumption sources: <span class="src c">canonical</span> 02-parameters / 40-reserve · <span class="src r">research</span> notes in this folder · <span class="src e">estimate</span> prior until pilot data.</div>
+    <div class="legendsrc adv">Assumption sources: <span class="src c">canonical</span> 02-parameters / 40-reserve · <span class="src p">protocol</span> on-chain config (devnet) · <span class="src r">research</span> notes in this folder · <span class="src e">estimate</span> prior until pilot data.</div>
     <div id="groups"></div>
   </aside>
 
@@ -235,7 +235,7 @@ h3:first-child{margin-top:0}
       <button role="tab" type="button" id="tab-yield" data-tab="yield" aria-controls="pane-yield" aria-selected="false" tabindex="-1">Reserve yield</button>
       <button role="tab" type="button" id="tab-months" data-tab="months" aria-controls="pane-months" aria-selected="false" tabindex="-1">Month by month</button>
       <button role="tab" type="button" id="tab-mutav" data-tab="mutav" aria-controls="pane-mutav" aria-selected="false" tabindex="-1">What MUTAV earns</button>
-      <button role="tab" type="button" id="tab-sizing" data-tab="sizing" aria-controls="pane-sizing" aria-selected="false" tabindex="-1">Sizing &amp; protection</button>
+      <button role="tab" type="button" id="tab-sizing" data-tab="sizing" aria-controls="pane-sizing" aria-selected="false" tabindex="-1">Compare c &amp; sizing</button>
       <button role="tab" type="button" id="tab-method" data-tab="method" aria-controls="pane-method" aria-selected="false" tabindex="-1">Method</button>
     </div>
 
@@ -243,11 +243,11 @@ h3:first-child{margin-top:0}
       <div class="card chart" id="chartBox">
         <div id="chart"></div>
         <div class="legend">
-          <span><i class="sw"></i>Balance</span>
-          <span><i class="req"></i>Required reserve</span>
-          <span id="lgW"><i class="sw s3"></i>Withdrawals</span>
-          <span><i class="blk"></i>Growth blocked</span>
-          <span><i class="ln"></i>Cumulative reserve net gain</span>
+          <span><i class="sw"></i>Stable assets</span>
+          <span><i class="req"></i>Coverage required</span>
+          <span id="lgW"><i class="sw s3"></i>Redemptions</span>
+          <span><i class="blk"></i>Registrations refused</span>
+          <span><i class="ln"></i>Cumulative reserve net gain (business view)</span>
           <span><i class="ref"></i>Same capital at Selic</span>
           <span class="adv"><i class="sw s2"></i>MUTAV take (monthly)</span>
           <span class="adv"><i class="ln s2"></i>Cumulative take</span>
@@ -255,35 +255,35 @@ h3:first-child{margin-top:0}
         </div>
         <div class="tip" id="tip" role="status"></div>
       </div>
-      <p class="muted" style="margin:6px 2px 0">Shared month axis, one scale per panel. Hover for values.</p>
+      <p class="muted" style="margin:6px 2px 0">Shared month axis, one scale per panel. Hover for values. Coverage required = ceil(c × remaining cover), as the program computes it; net gain, Selic and the take are the business view.</p>
     </section>
 
     <section class="pane" role="tabpanel" id="pane-yield" aria-labelledby="tab-yield" data-pane="yield" hidden>
       <div class="kgrid" id="yieldKpis"></div>
       <div class="card chart" id="yieldBox" style="margin-top:10px">
         <div id="ychart"></div>
-        <div class="legend"><span><i class="sw"></i>Reserve net gain (monthly)</span><span><i class="ref"></i>Same balance at Selic (monthly)</span></div>
+        <div class="legend"><span><i class="sw"></i>Reserve net gain (monthly)</span><span><i class="ref"></i>Same capital at Selic (monthly)</span></div>
         <div class="tip" id="ytip" role="status"></div>
       </div>
       <h3>Monthly yield</h3>
       <div class="tbl-wrap"><table class="tbl" id="yieldTbl"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
-      <p class="muted" style="margin:6px 2px 0">Yield = (net fees − claims + TESOURO) ÷ average opening balance, annualized (× 12 / months). Selic line = what the same opening balance earns at Selic.</p>
+      <p class="muted" style="margin:6px 2px 0">Business view, no on-chain equivalent. Yield = (net fees − claims + TESOURO) ÷ average opening stable assets, annualized (× 12 / months). Selic line = what the same capital earns at Selic. TESOURO income is capped by <code>max_tesouro_share_bps</code>.</p>
     </section>
 
     <section class="pane" role="tabpanel" id="pane-months" aria-labelledby="tab-months" data-pane="months" hidden>
       <div class="tbl-wrap">
         <table class="tbl" id="tbl"><thead></thead><tbody></tbody><tfoot></tfoot></table>
       </div>
-      <p class="muted" style="margin:6px 2px 0">BRL. Balance is end of month, after withdrawals. MUTAV take goes to the treasury and is never counted in the reserve.</p>
+      <p class="muted" style="margin:6px 2px 0">BRL. Stable assets are end of month, after redemptions. Remaining cover falls as claims are paid. MUTAV take goes to the treasury and is never counted in the reserve.</p>
     </section>
 
     <section class="pane" role="tabpanel" id="pane-mutav" aria-labelledby="tab-mutav" data-pane="mutav" hidden>
-      <h3>1 · Take on guarantee fees <span class="info" tabindex="0" data-tip="Take × guarantee fees, paid to the MUTAV treasury (ADR 0009). Gross revenue: before operating costs, PIX and offramp fees, and taxes.">i</span></h3>
+      <h3>1 · Take on guarantee fees <span class="info" tabindex="0" data-tip="fee_take_bps × guarantee fees, paid to the MUTAV treasury by contribute_fees (ADR 0009); the program caps it at 30%. Business view: gross revenue before operating costs, PIX and offramp fees, and taxes.">i</span></h3>
       <div class="kgrid" id="takeKpis"></div>
       <div id="marginBox"></div>
-      <h3>Take rate sensitivity <span class="info" tabindex="0" data-tip="Re-runs the simulation at each take rate. A higher take leaves less guarantee fee for the reserve.">i</span></h3>
+      <h3>Take rate sensitivity <span class="info" tabindex="0" data-tip="Re-runs the simulation at each take rate, up to the 30% program cap. A higher take leaves less guarantee fee for the reserve.">i</span></h3>
       <div class="tbl-wrap"><table class="tbl" id="sensTbl"><thead></thead><tbody></tbody></table></div>
-      <h3>2 · MUTAV share of the reserve <span class="info" tabindex="0" data-tip="MUTAV's capital earns a pro-rata share of the reserve's net gain and of any withdrawals, the same way any investor's does.">i</span></h3>
+      <h3>2 · MUTAV share of the reserve <span class="info" tabindex="0" data-tip="Business view. MUTAV's capital earns a pro-rata share of the reserve's net gain and of any redemptions, through NAV per share like any other holder.">i</span></h3>
       <div class="kgrid" id="shareKpis"></div>
       <h3>3 · Combined</h3>
       <div class="kgrid" id="comboKpis"></div>
@@ -291,13 +291,13 @@ h3:first-child{margin-top:0}
     </section>
 
     <section class="pane" role="tabpanel" id="pane-sizing" aria-labelledby="tab-sizing" data-pane="sizing" hidden>
-      <h3>Compare sizing rules <span class="info" tabindex="0" data-tip="Each row re-runs the whole simulation with a different rule for the required reserve. The coverage policy is the live rule; the other two are for comparison.">i</span></h3>
+      <h3>Compare c <span class="info" tabindex="0" data-tip="Each row re-runs the whole simulation with a different coverage ratio c. The program floor is 0,10; 1,0 is full backing.">i</span></h3>
       <div class="tbl-wrap"><table class="tbl" id="ruleTbl"><thead></thead><tbody></tbody></table></div>
       <p class="muted" style="margin:6px 2px 0" id="ruleNote2"></p>
 
-      <h3>Book size vs the ending balance <span class="info" tabindex="0" data-tip="Steady state: each book size held full for a year, backed by the simulated balance at the last month. Shows how far the same capital stretches.">i</span></h3>
+      <h3>Book size vs the ending stable assets <span class="info" tabindex="0" data-tip="Steady state: each book size held full for a year, backed by the simulated stable assets at the last month. Shows how far the same capital stretches.">i</span></h3>
       <div class="tbl-wrap"><table class="tbl" id="sizeTbl"><thead></thead><tbody></tbody></table></div>
-      <p class="muted" style="margin:6px 2px 0">Full-year figures with the book complete; the ramp-up months earn less. TESOURO income needs a confirmed BRS↔TESOURO path. Delinquency, exit and eviction inputs are estimates until pilot data.</p>
+      <p class="muted" style="margin:6px 2px 0">Full-year figures with the book complete; the ramp-up months earn less. TESOURO income needs a confirmed BRS↔TESOURO path and a raised <code>max_tesouro_share_bps</code> (0 on devnet). Delinquency, exit and eviction inputs are estimates until pilot data.</p>
       <p class="muted" style="margin:4px 2px 0" id="sizeNote"></p>
 
       <h3>Debts covered: A, B, C side by side <span class="info" tabindex="0" data-tip="Same inputs, with only the debts the fiança covers changed.">i</span></h3>
@@ -310,84 +310,91 @@ h3:first-child{margin-top:0}
 
     <section class="pane method" role="tabpanel" id="pane-method" aria-labelledby="tab-method" data-pane="method" hidden>
       <h3>How this is computed</h3>
-      <p>Monthly steps <code>m = 1..N</code>. The reserve is a <strong>balance</strong> simulated month by month and checked against the <strong>required reserve</strong>. The solvency rule follows the reserve program (spec §4): only the surplus above the required reserve can back new guarantees or leave.</p>
-<pre>// capital
-capital_in(m)        = starting_capital                     if m = 1
-                     + monthly_raise                        if from ≤ m ≤ until (until 0 = N)
+      <p>Monthly steps <code>m = 1..N</code>. The reserve's <strong>stable assets</strong> are simulated month by month and checked against <strong>coverage required</strong>, computed the way the program computes it (spec §4, ADR 0016, mirrored from <code>clients/js/src/math.ts</code> in base units). Only <strong>free capital</strong>, the stable assets above coverage required, can back new guarantees or pay redemptions. Figures with no on-chain equivalent (net gain, yield vs Selic, MUTAV take economics) are the <strong>business view</strong>.</p>
+<pre>// capital: fulfil_deposits enforces max_tvl
+capital_in(m)        = min(starting_capital [m = 1] + monthly_raise [from ≤ m ≤ until, until 0 = N],
+                           max_tvl − stable_assets(m−1))         // the rest is refused
 
-// required reserve per lease
-coverage policy      = max(ceiling_share × cover_per_lease, max(1, bad_years) × tail_per_lease)
-                       cover_per_lease = rent × (arrears_ceiling + exit_ceiling)
-                       tail_per_lease  = expected_claims × bad_year_multiplier
-compare: full (c)    = c × cover_per_lease
-compare: exp.-loss   = tail_years × tail_per_lease
-required(m)          = active(m) × required_per_lease
+// coverage (on-chain)
+cover_per_lease      = rent × (default_leg + exit_leg)              // default_cover + exit_cover
+remaining_cover(m)   = Σ over active leases (cover_per_lease − claims paid on that lease)
+coverage_required(m) = max(ceil(c × remaining_cover(m) / 10_000), provisions)   // c in bps, c ≥ 1_000
+                       provisions ≈ 0 here: claims are paid in the month they arise
+free_capital(m)      = max(0, stable_assets − coverage_required)
 
-// solvency gate (register_guarantee is gated on free capital)
-opening(m)           = balance(m−1) + capital_in(m)
-new(m)               = min(new_per_month, floor((opening(m) − existing(m) × required_per_lease) / required_per_lease))
-                       blocked when new(m) &lt; new_per_month; the book holds, claims are still paid
-active(m)            = leases signed in the last lease_term months
+// register_guarantee, in the program's order (one agency holds the whole book)
+refused if           cover_per_lease &gt; max_cover_per_guarantee                       // GuaranteeCapExceeded
+                     remaining_cover + new_cover &gt; max_cover_per_agency              // AgencyCapExceeded
+                     ceil(c × (remaining_cover + new_cover)) &gt; stable_assets         // InsufficientFreeCapital
+new(m)               = most of new_per_month that pass, one after another; refused leases are not carried over
+active(m)            = leases signed in the last lease_term months with cover left
 
 // flows
 guarantee_fees(m)    = active(m) × rent × fee × fee_periods_per_year / 12
-mutav_take(m)        = guarantee_fees(m) × take                 // treasury, never in the reserve
+mutav_take(m)        = guarantee_fees(m) × min(take, 30%)            // fee_take_bps ≤ MAX_FEE_TAKE_BPS
 net_fees(m)          = guarantee_fees(m) − mutav_take(m)
-claims_paid(m)       = active(m) × expected_claims / 12 × ramp(m)         ramp(m) = min(1, m/4) if on
-                     + active(m) × (tail_per_lease − expected_claims) / 12   in the 12 months from the bad-year month
-yield(m)             = opening(m) × tesouro_share × tesouro_rate / 12
-net_gain(m)          = net_fees(m) + yield(m) − claims_paid(m)
+claims_paid(m)       = active(m) × expected_claims / 12 × ramp(m)    ramp(m) = min(1, m/4) if on
+                     + active(m) × (bad_year_claims − expected_claims) / 12   in the 12 months from the bad-year month
+                       each lease's payment is capped at its remaining cover; a lease at 0 is exhausted and leaves the book
+tesouro(m)           = opening(m) × min(tesouro_share, max_tesouro_share) × tesouro_rate / 12
+net_gain(m)          = net_fees(m) + tesouro(m) − claims_paid(m)
+stable_assets(m)     = stable_assets(m−1) + capital_in(m) + net_gain(m) − redemptions(m)
 
-balance(m)           = balance(m−1) + capital_in(m) + net_fees(m) + yield(m) − claims_paid(m) − withdrawals(m)
-surplus(m)           = max(0, balance before withdrawal − required(m))
-surplus_or_shortfall = balance(m) − required(m)
-
-// withdrawals (only ever from surplus, like strict FIFO redemptions)
+// redemptions (only ever from free capital, like strict FIFO fills)
 none                 = 0
-surplus above buffer = max(0, surplus(m) − buffer × required(m))
-share of net gain    = min(surplus(m), share × max(0, net_gain(m)))
+kept above coverage  = max(0, free_capital(m) − buffer × coverage_required(m))
+share of net gain    = min(free_capital(m), share × max(0, net_gain(m)))
+
+// claim caps (pay_claim)
+flag month m         if claims_paid(m) &gt; max_claim_per_period   → the excess goes through pay_claim_admin
+flag                 if one eviction (min(eviction_cost, exit_leg) × rent) &gt; max_claim_per_call
+
+// bad-year check (off-chain planning signal; never changes coverage required)
+bad_year_claims      = expected_claims × bad_year_multiplier
+bad_years_covered    = stable_assets(N) / (active(N) × bad_year_claims)    study: grow ≥ 2,0×, never &lt; 1,0×
 
 // expected claims per lease per year (event level)
-arrears_leg          = min(12 × delinquency, arrears_ceiling) × rent
-evictions            = eviction_rate × min(eviction_cost, exit_ceiling) × rent
+default_leg          = min(12 × delinquency, default_leg_cover) × rent
+evictions            = eviction_rate × min(eviction_cost, exit_leg_cover) × rent
 exit_debts           = A: other_exit_debts × rent · B: (other_exit_debts − penalty) × rent · C: 0
 claims_to_fees       = expected_claims / (rent × fee × fee_periods_per_year)
 
 // at-a-glance answers
-leases_balance_backs = floor(balance(N) / required_per_lease)
-new_leases_per_month_from_gain = net_gain(N) / required_per_lease
-raise_to_avoid_block = smallest monthly raise (R$1.000 steps, same window) with 0 blocked months
-capital_for_target   = growth_target × required_per_lease − balance(N)
+leases_backed        = most leases at full cover with ceil(c × k × cover_per_lease) ≤ stable_assets(N)
+new_leases_from_gain = net_gain(N) / (c × cover_per_lease)
+raise_to_avoid_refusals = smallest monthly raise (R$1.000 steps, same window) with 0 refused months, max_tvl lifted
 payback_month        = first m with Σ net_gain ≥ starting_capital (projected at month-N pace if beyond N)
-return_on_required   = (annual net fees − expected_claims) / required_per_lease + tesouro_share × tesouro_rate
 
-// reserve yield (simulated)
-avg_balance          = mean opening(m)
-reserve_yield        = Σ (net_fees − claims_paid) / avg_balance × 12/N  +  Σ tesouro_yield / avg_balance × 12/N
-return_on_capital    = Σ net_gain / capital_raised   (annualized × 12/N)
+// reserve yield (business view)
+avg_stable_assets    = mean opening(m)
+reserve_yield        = Σ (net_fees − claims_paid) / avg × 12/N  +  Σ tesouro / avg × 12/N
+return_on_capital    = Σ net_gain / capital_in   (annualized × 12/N)
 selic_benchmark(m)   = opening(m) × selic / 12       // the same capital at Selic
 
-// Sizing &amp; protection (steady state, book full for a year, reserve = balance(N))
-normal_net_gain      = net fees − leases × expected_claims + reserve × tesouro_share × tesouro_rate
-bad_year_net_gain    = net fees − leases × tail_per_lease + reserve × tesouro_share × tesouro_rate</pre>
+// Compare c &amp; sizing (steady state, book full for a year, stable assets = stable_assets(N))
+normal_net_gain      = net fees − leases × expected_claims + stable × tesouro_share × tesouro_rate
+bad_year_net_gain    = net fees − leases × bad_year_claims + stable × tesouro_share × tesouro_rate</pre>
 
       <h3>Sources and defaults</h3>
       <ul>
-        <li><strong>Pilot parameters:</strong> <code>mutav/docs/operation/02-parameters.md</code> on <code>origin/main</code> (reviewed 2026-09-19, the single source of numbers): rent R$2.200, guarantee fee 10% (modelled value inside 9–15% by score), rent-arrears ceiling 12× rent (working value, under legal review), exit ceiling 6× as a separate sublimit, capitalized reserve R$300.000, ~6-month pilot, ~28 new contracts/month to a 170-lease book, reserve ~80% TESOURO. Fee charged 12× a year: agencies are billed one boleto a month (was 12,17 = 365 / 30).</li>
-        <li><strong>Coverage policy:</strong> <code>40-reserve.md</code> / open question 9w: the reserve must hold at least 10% of all active ceilings and 2,0 bad years of claims, with a hard floor of 1,0. At R$39.600 of ceilings per lease the 10% rule binds: R$300.000 supports about 75 leases, and 170 leases need about R$673.200.</li>
+        <li><strong>Pilot parameters:</strong> <code>mutav/docs/operation/02-parameters.md</code> on <code>origin/main</code> (reviewed 2026-09-19, the single source of business numbers): rent R$2.200, guarantee fee 10% (modelled value inside 9–15% by score), default-leg cover 12× rent (working value, under legal review), exit-leg cover 6× as a separate sublimit, capitalized reserve R$300.000, ~6-month pilot, ~28 new contracts/month to a 170-lease book, reserve ~80% TESOURO once an adapter exists. Fee charged 12× a year: agencies are billed one boleto a month.</li>
+        <li><strong>Coverage ratio (c):</strong> ADR 0016 and <code>40-reserve.md</code> 9w. The program holds <code>coverage_required = max(ceil(c × remaining cover), provisions)</code> with <code>c ≥ 0,10</code> (<code>MIN_COVERAGE_RATIO_BPS = 1_000</code>); devnet starts at 0,10. Filed claims stay fully covered at any c. At R$39.600 of cover per lease, R$300.000 backs about 75 leases at c = 0,10 and 7 at c = 1,0; 170 leases need about R$673.200.</li>
+        <li><strong>Caps (devnet config):</strong> <code>max_tvl</code> R$300k; <code>max_cover_per_guarantee</code> R$40k; <code>max_cover_per_agency</code> R$3M (= max_tvl ÷ 0,10, so it never binds: one reserve may serve a single agency); <code>max_claim_per_call</code> / <code>max_claim_per_period</code> R$10k / R$20k per 30 days; <code>max_tesouro_share_bps</code> 0 (no adapter on devnet, so TESOURO income is a what-if until the cap is raised); fee take ≤ 30% (<code>MAX_FEE_TAKE_BPS</code>). Request limits (R$1k–R$100k, R$500 minimum fill) do not affect this model.</li>
+        <li><strong>Bad-year check:</strong> <code>40-reserve.md</code> 9w asks the reserve to grow to 2,0 bad years of claims and never hold fewer than 1,0. It is not enforced on-chain yet (a later ADR), so it is shown as an off-chain planning signal next to the coverage figures.</li>
         <li><strong>Delinquency:</strong> base 2,01% of annual rent = Superlógica IIL, RS apartments, average of the three latest prints (abr/jun/jul 2026), verified at source 2026-09-08. Stress 2,87% (IIL RS aggregate). Tail 5,93% (Loft IIA RS, 15-day threshold). Applied as an annual rate on annual rent: <code>12 × rate × rent</code>.</li>
-        <li><strong>Evictions:</strong> <code>12-eviction-cost-south.md</code>. While the fiança is live the art. 59 §1º IX liminar is unavailable, so a forced exit costs about 6× rent (capped at the exit ceiling). If the fiança extinguishes once the arrears ceiling is exhausted, the liminar becomes arguable: base 5,5×, low 2,5×. <strong>Eviction rate</strong>: <code>12-eviction-rate-south.md</code>, measured filings, adjusted (not MUTAV data). CNJ DataJud first-instance despejo filings (all 27 state courts, own query 2026-10-02) ÷ IBGE PNAD rented households give 0,5–0,7% of South leases facing a suit per year; about a third end in a court-ordered exit. Adjusted for an underwritten, agency-managed book: <strong>low 0,10% / base 0,25% / high 0,60%</strong> per year.</li>
+        <li><strong>Evictions:</strong> <code>12-eviction-cost-south.md</code>. While the fiança is live the art. 59 §1º IX liminar is unavailable, so a forced exit costs about 6× rent (capped at the exit leg). If the fiança extinguishes once the default leg is exhausted, the liminar becomes arguable: base 5,5×, low 2,5×. <strong>Eviction rate</strong>: <code>12-eviction-rate-south.md</code>, measured filings, adjusted (not MUTAV data). CNJ DataJud first-instance despejo filings (all 27 state courts, own query 2026-10-02) ÷ IBGE PNAD rented households give 0,5–0,7% of South leases facing a suit per year; about a third end in a court-ordered exit. Adjusted for an underwritten, agency-managed book: <strong>low 0,10% / base 0,25% / high 0,60%</strong> per year.</li>
         <li><strong>Other exit debts:</strong> <code>12-exit-costs-non-eviction.md</code> §9, base case per lease-year: damage incl. painting 0,056×; accessory charges 0,024×; early-termination penalty 0,077×; abandonment 0,020×; alterations 0,010×; total ≈ 0,19×. All [inference].</li>
         <li><strong>Bad-year multiplier 2,33:</strong> calibrated to <code>40-reserve</code>: R$1.894 per lease per year in scope B (R$321,9k / 170) against R$813 of expected claims.</li>
         <li><strong>Debts covered:</strong> A = all tenant debts incl. the termination penalty; B = excluding the penalty (default); C = evictions and abandonment only. In C, abandonment is handled through the eviction event (despejo / imissão, art. 66).</li>
-        <li><strong>Take rate 20%:</strong> simulator default; the value is still open (06-business-model). <strong>Lease term 30 months:</strong> typical lease (06, PY:109). <strong>TESOURO 11,58%:</strong> Etherfuse on-chain accrual, unconfirmed. <strong>Selic 13,75%.</strong></li>
-        <li><strong>Changed vs earlier versions:</strong> delinquency 2,46% → 2,01%, rent R$2.000 → R$2.200, fee 12% → 10% per 30-day period, ceilings 3+6 → 12+6, eviction rate 2% prior → 0,25% measured-adjusted, single loss ratio → event-level claims (claims-to-fees ratio). The reserve is a simulated balance; "fixed capital" sizing is replaced by the coverage policy plus explicit capital inputs. 2026-10-02 clarity pass: answers first, sizing-rule switch moved into Sizing &amp; protection, the "fiança extinguishes" toggle removed (it only reset the eviction cost; set that directly).</li>
+        <li><strong>Take rate 20%:</strong> simulator default (the config placeholder; the value is still open, 06-business-model). <strong>Lease term 30 months:</strong> typical lease (06, PY:109). <strong>TESOURO 11,58%:</strong> Etherfuse on-chain accrual, unconfirmed. <strong>Selic 13,75%.</strong></li>
+        <li><strong>Changed vs earlier versions:</strong> 2026-10-07: the simulator now computes what the program enforces. Coverage required is <code>ceil(c × remaining cover)</code>, and paid claims reduce remaining cover; the gate and the caps (<code>max_tvl</code>, per guarantee, per agency, TESOURO share, fee take, claim caps) are inputs, enforced as on-chain; the bad-year floor became an off-chain check; the sizing-rule switch became “Compare c”; labels use the program's terms. Saved inputs from earlier versions are not reused. Earlier: delinquency 2,46% → 2,01%, rent R$2.000 → R$2.200, fee 12% → 10% per 30-day period, cover 3+6 → 12+6, eviction rate 2% prior → 0,25% measured-adjusted, single loss ratio → event-level claims.</li>
       </ul>
       <h3>Simplifications</h3>
       <ul>
-        <li>Claims are paid as a smooth expected monthly flow; they do not reduce remaining cover. No subrogation recoveries, no TESOURO price moves, constant rates.</li>
-        <li>Yield accrues on the opening balance at <code>TESOURO share × rate / 12</code>; the liquid sleeve earns nothing.</li>
-        <li>The gate admits as many of the month's planned leases as the surplus allows; blocked leases are not carried over.</li>
+        <li>Claims are paid as a smooth expected monthly flow in the month they arise, so open provisions are about 0 and <code>coverage_required</code> is the c term. No subrogation recoveries, no TESOURO price moves, constant rates.</li>
+        <li>A single agency holds the whole book, so every lease counts against <code>max_cover_per_agency</code>.</li>
+        <li>Yield accrues on the opening stable assets at <code>min(TESOURO share, cap) × rate / 12</code>; the liquid BRS earns nothing.</li>
+        <li>The gate admits as many of the month's planned leases as the caps and free capital allow; refused leases are not carried over. A lease leaves the book at the end of its term (the claims tail is not modelled).</li>
         <li>Selic is the opportunity cost of the same capital, not a target.</li>
       </ul>
       <h3>Disclaimer</h3>
@@ -400,18 +407,63 @@ bad_year_net_gain    = net fees − leases × tail_per_lease + reserve × tesour
 <div class="footbar" role="note"><div class="in"><strong>Model estimates, not a return promise.</strong> Reserve planning only; not investment advice and not an offer of securities. Self-contained, works offline.</div></div>
 
 <script id="calc">
-/* Pure model. No DOM access, so it can be tested in node. Defaults: mutav/docs/operation/02-parameters.md (origin/main, reviewed 2026-09-19). */
+/* Pure model. No DOM access, so it can be tested in node (app/lib/__tests__/simulator-parity.test.ts).
+   Business inputs: mutav/docs/operation/02-parameters.md (origin/main, reviewed 2026-09-19).
+   Protocol terms and caps: docs/spec.md §4 / §5.2 / §8 and ADR 0016 (c below 1,0 with a 0,10 floor); devnet values from
+   scripts/devnet/devnet.example.json. The coverage maths mirrors clients/js/src/math.ts (coverageRequired) in base units. */
 var MUTAV_DEFAULTS = {
   months: 6, perMonth: 28, leaseTerm: 30,
   rent: 2200, feePct: 10, periods: 12, defaultCover: 12, exitCover: 6,
   scope: 'B', rhoPct: 2.01, evictRatePct: 0.25, evictMult: 6,
   nonEvictX: 0.19, penaltyX: 0.077, ramp: true, stressOn: false, stressMonth: 3,
   startCapital: 300000, monthlyRaise: 0, raiseFrom: 2, raiseUntil: 0,
-  sizing: 'policy', worstFloorPct: 10, tailFloor: 2, coverage: 1.0, tailYears: 1, tailMult: 2.33,
+  coverageRatio: 0.10, tailMult: 2.33,
+  maxTvl: 300000, maxCoverPerGuarantee: 40000, maxCoverPerAgency: 3000000,
+  maxClaimPerCall: 10000, maxClaimPerPeriod: 20000, maxTesouroSharePct: 0,
   tesouroSharePct: 80, tesouroPct: 11.58, selicPct: 13.75,
   withdraw: 'none', bufferPct: 25, sharePct: 50,
   takePct: 20, mutavSharePct: 100, opCostPerLease: 0, opCostFixed: 0
 };
+/* Program constants the simulator enforces, and the off-chain bad-year study thresholds (40-reserve 9w). */
+var MUTAV_PROTOCOL = { BPS: 10000, MIN_COVERAGE_RATIO_BPS: 1000, MAX_FEE_TAKE_BPS: 3000, UNITS_PER_BRL: 1000000,
+  BAD_YEARS_TARGET: 2.0, BAD_YEARS_FLOOR: 1.0 };
+
+/* ---- on-chain coverage maths, in base units (BRS, 6 decimals). Inputs are integers (Number or BigInt); outputs are Numbers. ---- */
+function mutavBig(x){ return typeof x === 'bigint' ? x : BigInt(Math.round(x)); }
+/* coverage_required = max(ceil(c × remaining_cover_total / 10_000), provisions)  (spec §4, ADR 0016) */
+function mutavCoverageRequired(remainingCover, coverageRatioBps, provisions) {
+  var prod = mutavBig(remainingCover) * mutavBig(coverageRatioBps), d = BigInt(MUTAV_PROTOCOL.BPS);
+  var q = prod / d; if (prod % d !== BigInt(0)) q = q + BigInt(1);
+  var pv = mutavBig(provisions || 0);
+  return Number(q > pv ? q : pv);
+}
+/* free_capital = max(0, stable_assets − coverage_required)  (pilot: earmark_eff = 0) */
+function mutavFreeCapital(stableAssets, remainingCover, coverageRatioBps, provisions) {
+  return Math.max(0, Number(mutavBig(stableAssets) - mutavBig(mutavCoverageRequired(remainingCover, coverageRatioBps, provisions))));
+}
+/* register_guarantee rule 5: coverage_required_after + earmark_eff_before ≤ stable_assets */
+function mutavGateAdmits(stableAssets, remainingCover, newCover, coverageRatioBps, provisions) {
+  var after = mutavCoverageRequired(mutavBig(remainingCover) + mutavBig(newCover), coverageRatioBps, provisions);
+  return mutavBig(after) <= mutavBig(stableAssets);
+}
+/* How many identical guarantees of `cover` (base units) the gate admits one after another, at most `max`. */
+function mutavGateCount(stableAssets, remainingCover, cover, coverageRatioBps, provisions, max) {
+  if (!(cover > 0) || !(max > 0)) return 0;
+  var est = Math.floor((stableAssets - remainingCover * coverageRatioBps / MUTAV_PROTOCOL.BPS) / (cover * coverageRatioBps / MUTAV_PROTOCOL.BPS));
+  var k = Math.max(0, Math.min(max, isFinite(est) ? est : 0));
+  while (k > 0 && !mutavGateAdmits(stableAssets, remainingCover, k * cover, coverageRatioBps, provisions)) k--;
+  while (k < max && mutavGateAdmits(stableAssets, remainingCover, (k + 1) * cover, coverageRatioBps, provisions)) k++;
+  return k;
+}
+function mutavUnits(brl){ return Math.round(brl * MUTAV_PROTOCOL.UNITS_PER_BRL); }
+function mutavBrl(units){ return units / MUTAV_PROTOCOL.UNITS_PER_BRL; }
+/* c in bps from the decimal input, never below the program floor. */
+function mutavCoverageBps(c){ return Math.max(MUTAV_PROTOCOL.MIN_COVERAGE_RATIO_BPS, Math.round((+c || 0) * MUTAV_PROTOCOL.BPS)); }
+/* Leases a stable-asset amount (R$) backs at full cover, on an empty book. */
+function mutavLeasesBacked(stableBrl, coverBrl, coverageRatioBps) {
+  var cu = mutavUnits(coverBrl);
+  return cu > 0 ? mutavGateCount(mutavUnits(Math.max(0, stableBrl)), 0, cu, coverageRatioBps, 0, 1e9) : Infinity;
+}
 
 function mutavPayouts(p, scope) {
   var sc = scope || p.scope;
@@ -424,56 +476,84 @@ function mutavPayouts(p, scope) {
     grossAnnual: grossAnnual, ratio: grossAnnual > 0 ? total / grossAnnual : 0 };
 }
 
+/* Coverage required per lease at full cover, and the per-guarantee cap check. */
 function mutavRequirement(p, pay) {
   var cover = p.rent * (p.defaultCover + p.exitCover);
+  var cBps = mutavCoverageBps(p.coverageRatio);
   var tail = p.tailMult * pay.total;
-  var mode = p.sizing === 'full' || p.sizing === 'B' ? p.sizing : 'policy';
-  var perLease, binds;
-  if (mode === 'full') { perLease = p.coverage * cover; binds = 'c × ceilings'; }
-  else if (mode === 'B') { perLease = p.tailYears * tail; binds = 'tail years'; }
-  else {
-    var worst = p.worstFloorPct / 100 * cover, tailF = Math.max(1, p.tailFloor) * tail;
-    perLease = Math.max(worst, tailF); binds = worst >= tailF ? 'worst-case floor' : 'tail-year floor';
-  }
-  return { mode: mode, perLease: perLease, binds: binds, cover: cover, tail: tail };
+  return { cBps: cBps, c: cBps / MUTAV_PROTOCOL.BPS, cover: cover, perLease: cBps / MUTAV_PROTOCOL.BPS * cover, tail: tail,
+    overGuaranteeCap: cover > p.maxCoverPerGuarantee + 1e-9 };
 }
 
 function mutavCompute(p) {
   var N = Math.max(1, Math.round(p.months));
   var term = Math.max(1, Math.round(p.leaseTerm));
-  var fee = p.feePct / 100, take = p.takePct / 100;
-  var tShare = p.tesouroSharePct / 100, tRate = p.tesouroPct / 100;
-  var pay = mutavPayouts(p), req = mutavRequirement(p, pay), rpl = req.perLease;
+  var planned = Math.max(0, Math.round(p.perMonth));
+  var fee = p.feePct / 100;
+  var takeBps = Math.max(0, Math.min(MUTAV_PROTOCOL.MAX_FEE_TAKE_BPS, Math.round(p.takePct * 100))), take = takeBps / MUTAV_PROTOCOL.BPS;
+  var tWanted = Math.max(0, Math.min(1, p.tesouroSharePct / 100)), tCap = Math.max(0, Math.min(1, p.maxTesouroSharePct / 100));
+  var tShare = Math.min(tWanted, tCap), tRate = p.tesouroPct / 100;
+  var pay = mutavPayouts(p), req = mutavRequirement(p, pay), cBps = req.cBps, cover = req.cover, coverU = mutavUnits(cover);
   var until = p.raiseUntil > 0 ? p.raiseUntil : N;
-  var cohorts = [], rows = [], balance = 0, capital = 0, cum = 0, cumW = 0, cumTake = 0;
+  var cohorts = [], remPer = [], rows = [], balance = 0, capital = 0, cum = 0, cumW = 0, cumTake = 0, tvlRefused = 0;
   var minHead = Infinity, minHeadMonth = 0, blocked = 0, firstBlocked = 0, below = 0, firstBelow = 0, selfFundMonth = 0;
+  var refusals = { 'guarantee-cap': 0, 'agency-cap': 0, 'free-capital': 0, 'under-covered': 0 }, firstRefusal = null;
+  var claimCapMonths = 0, firstClaimCap = 0, exhaustedLeases = 0;
   var selic = p.selicPct / 100, sumOpening = 0, sumUW = 0, cumSelic = 0;
   var tot = { gross: 0, take: 0, net: 0, claims: 0, tesouro: 0, gain: 0, withdrawals: 0 };
   for (var m = 1; m <= N; m++) {
-    var deposit = (m === 1 ? p.startCapital : 0) + (p.monthlyRaise > 0 && m >= p.raiseFrom && m <= until ? p.monthlyRaise : 0);
+    /* fulfil_deposits: stable_assets + deposit ≤ max_tvl */
+    var want = (m === 1 ? p.startCapital : 0) + (p.monthlyRaise > 0 && m >= p.raiseFrom && m <= until ? p.monthlyRaise : 0);
+    var deposit = Math.max(0, Math.min(want, p.maxTvl - balance));
+    tvlRefused += want - deposit;
     capital += deposit;
     var opening = balance + deposit;
-    var existing = 0;
-    for (var k = Math.max(1, m - term + 1); k < m; k++) existing += cohorts[k] || 0;
-    var free = opening - existing * rpl;
-    var allowed = rpl > 0 ? Math.max(0, Math.min(p.perMonth, Math.floor(free / rpl + 1e-9))) : p.perMonth;
-    var isBlocked = allowed < p.perMonth;
-    if (isBlocked) { blocked++; if (!firstBlocked) firstBlocked = m; }
-    cohorts[m] = allowed;
+    /* the book: cohorts inside the lease term with cover left */
+    var existing = 0, remBefore = 0;
+    for (var k = Math.max(1, m - term + 1); k < m; k++) if (cohorts[k] && remPer[k] > 0) { existing += cohorts[k]; remBefore += cohorts[k] * remPer[k]; }
+    /* register_guarantee, in the program's order: per-guarantee cap, per-agency cap (one agency), solvency */
+    var allowed = planned, refusal = null;
+    if (planned > 0) {
+      var openU = mutavUnits(opening), remU = mutavUnits(remBefore);
+      if (mutavCoverageRequired(remU, cBps, 0) > openU) { allowed = 0; refusal = 'under-covered'; }
+      else if (req.overGuaranteeCap) { allowed = 0; refusal = 'guarantee-cap'; }
+      else {
+        var byAgency = cover > 0 ? Math.max(0, Math.floor((p.maxCoverPerAgency - remBefore) / cover + 1e-9)) : planned;
+        if (byAgency < allowed) { allowed = byAgency; refusal = 'agency-cap'; }
+        var byGate = mutavGateCount(openU, remU, coverU, cBps, 0, allowed);
+        if (byGate < allowed) { allowed = byGate; refusal = 'free-capital'; }
+      }
+    }
+    var isBlocked = allowed < planned;
+    if (isBlocked) { blocked++; if (!firstBlocked) firstBlocked = m; refusals[refusal]++; if (!firstRefusal) firstRefusal = refusal; }
+    cohorts[m] = allowed; remPer[m] = cover;
     var active = existing + allowed;
     var gross = active * p.rent * fee * p.periods / 12;
     var takeAmt = gross * take, netFees = gross - takeAmt;
+    /* claims arise and are paid in the same month (provisions ≈ 0); each payment reduces the lease's remaining cover */
     var ramp = p.ramp ? Math.min(1, m / 4) : 1;
-    var claims = active * pay.total / 12 * ramp;
-    var stress = p.stressOn && m >= p.stressMonth && m < p.stressMonth + 12 ? active * (req.tail - pay.total) / 12 : 0;
+    var perLease = pay.total / 12 * ramp;
+    var stressPer = p.stressOn && m >= p.stressMonth && m < p.stressMonth + 12 ? (req.tail - pay.total) / 12 : 0;
+    var claims = 0, stress = 0, remAfter = 0;
+    for (var j = Math.max(1, m - term + 1); j <= m; j++) {
+      if (!cohorts[j] || !(remPer[j] > 0)) continue;
+      var due = perLease + stressPer, paid = Math.min(remPer[j], due), share = due > 0 ? paid / due : 0;
+      claims += cohorts[j] * perLease * share; stress += cohorts[j] * stressPer * share;
+      remPer[j] -= paid;
+      if (remPer[j] <= 1e-9) { remPer[j] = 0; exhaustedLeases += cohorts[j]; }
+      remAfter += cohorts[j] * remPer[j];
+    }
     var claimsPaid = claims + stress;
+    var overClaimCap = claimsPaid > p.maxClaimPerPeriod + 1e-6;
+    if (overClaimCap) { claimCapMonths++; if (!firstClaimCap) firstClaimCap = m; }
     var tesouro = Math.max(0, opening) * tShare * tRate / 12;
     var gain = netFees + tesouro - claimsPaid;
     var uw = netFees - claimsPaid, selicOpp = Math.max(0, opening) * selic / 12;
     sumOpening += Math.max(0, opening); sumUW += uw; cumSelic += selicOpp;
     var pre = opening + gain;
-    var required = active * rpl;
+    var required = mutavBrl(mutavCoverageRequired(mutavUnits(remAfter), cBps, 0));
     var surplus = Math.max(0, pre - required);
+    /* redemptions are paid only out of free capital */
     var w = 0;
     if (p.withdraw === 'buffer') w = Math.max(0, surplus - (p.bufferPct / 100) * required);
     else if (p.withdraw === 'share') w = Math.min(surplus, (p.sharePct / 100) * Math.max(0, gain));
@@ -484,9 +564,10 @@ function mutavCompute(p) {
     cum += gain; cumW += w; cumTake += takeAmt;
     if (!selfFundMonth && cum >= p.startCapital && p.startCapital > 0) selfFundMonth = m;
     tot.gross += gross; tot.take += takeAmt; tot.net += netFees; tot.claims += claimsPaid; tot.tesouro += tesouro; tot.gain += gain; tot.withdrawals += w;
-    rows.push({ month: m, planned: p.perMonth, newLeases: allowed, blocked: isBlocked, active: active, deposit: deposit, opening: opening,
+    rows.push({ month: m, planned: planned, newLeases: allowed, blocked: isBlocked, refusal: isBlocked ? refusal : null, active: active,
+      deposit: deposit, depositRefused: want - deposit, opening: opening, remaining: remAfter,
       required: required, balance: balance, surplus: surplus, headroom: headroom, gross: gross, take: takeAmt, netFees: netFees,
-      claims: claimsPaid, stressClaims: stress, tesouro: tesouro, gain: gain, withdrawal: w, cumGain: cum, cumW: cumW, cumTake: cumTake,
+      claims: claimsPaid, stressClaims: stress, overClaimCap: overClaimCap, tesouro: tesouro, gain: gain, withdrawal: w, cumGain: cum, cumW: cumW, cumTake: cumTake,
       uw: uw, selicOpp: selicOpp, cumSelic: cumSelic, yieldAnn: opening > 0 ? gain / opening * 12 : 0 });
   }
   var last = rows[N - 1];
@@ -495,8 +576,9 @@ function mutavCompute(p) {
     if (last.gain > 0 && p.startCapital > 0) { selfFundMonth = N + Math.ceil((p.startCapital - cum) / last.gain); selfFundProjected = true; }
     else selfFundMonth = Infinity;
   }
-  var plannedActive = p.perMonth * Math.min(N, term);
-  /* realized reserve yield over the horizon, on the average opening balance, annualized (simple) */
+  var plannedActive = planned * Math.min(N, term);
+  var rpl = req.perLease;
+  /* realized reserve yield over the horizon, on the average opening stable assets, annualized (simple) */
   var avgOpening = sumOpening / N, annF = 12 / N;
   var yUW = avgOpening > 0 ? sumUW / avgOpening * annF : 0, yTES = avgOpening > 0 ? tot.tesouro / avgOpening * annF : 0;
   var yieldSim = { avgBalance: avgOpening, underwriting: yUW, tesouro: yTES, total: yUW + yTES, vsSelic: yUW + yTES - selic,
@@ -519,20 +601,24 @@ function mutavCompute(p) {
     capitalCommitted: capital * mShare,
     economicResult: tot.take + cum * mShare, economicResultNet: tot.take - opCostTotal + cum * mShare
   };
+  var largestEvent = Math.min(p.evictMult, Math.max(0, p.exitCover)) * p.rent;
   return {
     mutav: mutav, payouts: pay, req: req, rows: rows, totals: tot, months: N, yieldSim: yieldSim,
-    endBalance: last.balance, endRequired: last.required, endSurplus: Math.max(0, last.balance - last.required),
+    endBalance: last.balance, endRequired: last.required, endSurplus: Math.max(0, last.balance - last.required), endRemaining: last.remaining,
     minHeadroom: minHead, minHeadMonth: minHeadMonth, blockedMonths: blocked, firstBlocked: firstBlocked,
-    belowFloorMonths: below, firstBelow: firstBelow,
-    capitalRaised: capital, cumGain: cum, cumWithdrawals: cumW,
-    selfFundedLeases: rpl > 0 ? Math.floor(last.balance / rpl) : Infinity,
+    refusals: refusals, firstRefusal: firstRefusal, belowFloorMonths: below, firstBelow: firstBelow,
+    capitalRaised: capital, tvlRefused: tvlRefused, cumGain: cum, cumWithdrawals: cumW,
+    selfFundedLeases: req.overGuaranteeCap ? 0 : mutavLeasesBacked(last.balance, cover, cBps),
     selfFundMonth: selfFundMonth, selfFundProjected: selfFundProjected,
     finalActive: last.active, plannedActive: plannedActive, plannedRequired: plannedActive * rpl,
-    capacityAtStart: rpl > 0 ? Math.floor(p.startCapital / rpl) : Infinity,
+    capacityAtStart: req.overGuaranteeCap ? 0 : mutavLeasesBacked(Math.min(p.startCapital, p.maxTvl), cover, cBps),
     steady: { underwriting: underwriting, tesouro: tesouroYield, total: steady },
     selic: p.selicPct / 100, spreadVsSelic: steady - p.selicPct / 100,
-    tailPerLease: req.tail, coverPerLease: req.cover,
-    pctCeilings: last.active > 0 ? last.balance / (last.active * req.cover) : Infinity,
+    take: take, tesouroShare: tShare, tesouroShareWanted: tWanted, tesouroCapped: tWanted > tCap + 1e-9,
+    claimCapMonths: claimCapMonths, firstClaimCap: firstClaimCap, largestEvent: largestEvent, overCallCap: largestEvent > p.maxClaimPerCall + 1e-6,
+    exhaustedLeases: exhaustedLeases,
+    tailPerLease: req.tail, coverPerLease: cover,
+    pctCover: last.remaining > 0 ? last.balance / last.remaining : Infinity,
     tailCover: last.active > 0 && req.tail > 0 ? last.balance / (last.active * req.tail) : Infinity
   };
 }
@@ -541,28 +627,30 @@ function mutavCompute(p) {
 function mutavSizingRow(p, leases, reserve, claims, tail) {
   var cover = p.rent * (p.defaultCover + p.exitCover);
   var gross = leases * p.rent * (p.feePct / 100) * p.periods;
-  var take = gross * p.takePct / 100, net = gross - take;
-  var tes = reserve * (p.tesouroSharePct / 100) * (p.tesouroPct / 100);
+  var takeBps = Math.max(0, Math.min(MUTAV_PROTOCOL.MAX_FEE_TAKE_BPS, Math.round(p.takePct * 100)));
+  var take = gross * takeBps / MUTAV_PROTOCOL.BPS, net = gross - take;
+  var tShare = Math.min(Math.max(0, p.tesouroSharePct / 100), Math.max(0, p.maxTesouroSharePct / 100));
+  var tes = reserve * tShare * (p.tesouroPct / 100);
   var normal = net - leases * claims + tes, bad = net - leases * tail + tes;
-  return { leases: leases, reserve: reserve, pctCeilings: reserve / (leases * cover), tailX: reserve / (leases * tail),
+  return { leases: leases, reserve: reserve, pctCover: reserve / (leases * cover), tailX: reserve / (leases * tail),
     gross: gross, take: take, tesouro: tes, normal: normal, normalRet: normal / reserve, bad: bad, badRet: bad / reserve,
     vsSelic: normal / reserve - p.selicPct / 100 };
 }
 function mutavSizingTable(p, r, pilotBook) {
   r = r || mutavCompute(p);
   var reserve = r.endBalance, rpl = r.req.perLease;
-  var policyMax = rpl > 0 ? Math.floor(reserve / rpl) : 0;
+  var maxBacked = r.selfFundedLeases;
   pilotBook = pilotBook || 60;
-  var sizes = [7, 15, 30, pilotBook, 60, 100, policyMax, r.finalActive].filter(function(n, i, a){ return n > 0 && a.indexOf(n) === i; }).sort(function(a, b){ return a - b; });
-  return { reserve: reserve, policyMax: policyMax, current: r.finalActive, claims: r.payouts.total, tail: r.tailPerLease,
+  var sizes = [7, 15, 30, pilotBook, 60, 100, maxBacked, r.finalActive].filter(function(n, i, a){ return n > 0 && isFinite(n) && a.indexOf(n) === i; }).sort(function(a, b){ return a - b; });
+  return { reserve: reserve, maxBacked: maxBacked, current: r.finalActive, claims: r.payouts.total, tail: r.tailPerLease,
     rows: sizes.map(function(n){
       var row = mutavSizingRow(p, n, reserve, r.payouts.total, r.tailPerLease);
-      row.meets = reserve >= n * rpl - 1e-6; row.isCurrent = n === r.finalActive; row.isMax = n === policyMax; row.isRec = n === pilotBook;
+      row.meets = !r.req.overGuaranteeCap && n <= maxBacked; row.isCurrent = n === r.finalActive; row.isMax = n === maxBacked; row.isRec = n === pilotBook;
       return row;
     }) };
 }
-/* Smallest value of p[key] (a multiple of step, at least lo) at which the plan is never blocked. Infinity if no value up to 1e10 works
-   (e.g. a raise cannot fix a month-1 block). Used for the "what raise is needed" answer; does not change the model. */
+/* Smallest value of p[key] (a multiple of step, at least lo) at which no registration is refused. Infinity if no value up to 1e10 works
+   (e.g. a raise cannot fix a month-1 refusal). Used for the "what raise is needed" answer; does not change the model. */
 function mutavMinToAvoidBlocking(p, key, step, lo) {
   step = step || 1000; lo = lo || 0;
   function ok(v){ var q = {}; for (var k in p) q[k] = p[k]; q[key] = v; return mutavCompute(q).blockedMonths === 0; }
@@ -575,7 +663,9 @@ function mutavMinToAvoidBlocking(p, key, step, lo) {
   return b * step;
 }
 if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute, mutavPayouts: mutavPayouts, mutavRequirement: mutavRequirement,
-  mutavSizingRow: mutavSizingRow, mutavSizingTable: mutavSizingTable, mutavMinToAvoidBlocking: mutavMinToAvoidBlocking, MUTAV_DEFAULTS: MUTAV_DEFAULTS };
+  mutavSizingRow: mutavSizingRow, mutavSizingTable: mutavSizingTable, mutavMinToAvoidBlocking: mutavMinToAvoidBlocking,
+  mutavCoverageRequired: mutavCoverageRequired, mutavFreeCapital: mutavFreeCapital, mutavGateAdmits: mutavGateAdmits, mutavGateCount: mutavGateCount,
+  mutavCoverageBps: mutavCoverageBps, mutavLeasesBacked: mutavLeasesBacked, MUTAV_DEFAULTS: MUTAV_DEFAULTS, MUTAV_PROTOCOL: MUTAV_PROTOCOL };
 </script>
 
 <script>
@@ -595,20 +685,20 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   function clone(o){ return ext(o, {}); }
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
   function infoI(t){ return t ? ' <span class="info" tabindex="0" role="button" aria-label="' + esc(t) + '" data-tip="' + esc(t) + '">i</span>' : ''; }
-  var SRC = { canonical: 'c', research: 'r', estimate: 'e' };
+  var SRC = { canonical: 'c', protocol: 'p', research: 'r', estimate: 'e' };
   function srcTag(s){ return s ? '<span class="src ' + SRC[s] + '">' + s + '</span>' : ''; }
 
   /* UI state = model inputs + the growth target used by the "what raise" answer (not a model input). */
   var DEF = ext(MUTAV_DEFAULTS, { growthTarget: 170 });
-  var VALID = { scope: ['A','B','C'], withdraw: ['none','buffer','share'], sizing: ['policy','B','full'] };
-  var STORE = 'mutav-reserve-sim-v4';
+  var VALID = { scope: ['A','B','C'], withdraw: ['none','buffer','share'] };
+  var STORE = 'mutav-reserve-sim-v5';
   var SEGS = {
     scope: { l: 'Debts covered', i: 'Which tenant debts the fiança pays. Drives expected claims and the claims-to-fees ratio.', o: [['A','A · All debts'],['B','B · No penalty'],['C','C · Evictions']],
       h: { A: 'All tenant debts, including the early-termination penalty.', B: 'All tenant debts except the early-termination penalty (base case).', C: 'Rent arrears, evictions and abandonment only.' } },
-    withdraw: { l: 'Withdrawal policy', i: 'Money taken out of the reserve. Only ever paid from surplus above the required reserve.', o: [['none','None'],['buffer','Above buffer'],['share','Share of gain']],
-      h: { none: 'Reinvest everything (pilot default).', buffer: 'Withdraw the surplus above a buffer kept on top of the required reserve.', share: 'Withdraw a share of each month’s positive net gain, capped at the surplus.' } }
+    withdraw: { l: 'Redemptions', i: 'Capital redeemed out of the reserve. fulfil_redeems pays only out of free capital, the stable assets above coverage required.', o: [['none','None'],['buffer','Above a buffer'],['share','Share of gain']],
+      h: { none: 'Reinvest everything (pilot default).', buffer: 'Redeem the free capital above an amount kept on top of coverage required.', share: 'Redeem a share of each month’s positive net gain, capped at free capital.' } }
   };
-  function ruleName(k, s){ s = s || state; return k === 'policy' ? 'Coverage policy' : k === 'B' ? 'Expected-loss (' + decF.format(s.tailYears) + ' bad year' + (s.tailYears === 1 ? '' : 's') + ')' : 'Full backing (c = ' + decF.format(s.coverage) + ')'; }
+  function cName(c){ return 'c = ' + decF.format(c) + (c >= 1 ? ' (full backing)' : c <= MUTAV_PROTOCOL.MIN_COVERAGE_RATIO_BPS / MUTAV_PROTOCOL.BPS ? ' (program floor)' : ''); }
   function showRaise(s){ return s.monthlyRaise > 0; }
   var GROUPS = [
     { id: 'plan', t: 'Plan', sm: 'the levers you discuss', f: [
@@ -624,36 +714,44 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       { k: 'raiseFrom', l: 'Raise from month', u: 'month', step: 1, min: 1, when: showRaise },
       { k: 'raiseUntil', l: 'Raise until month', u: '0 = last', step: 1, min: 0, when: showRaise },
       { k: 'growthTarget', adv: true, l: 'Growth target', u: 'leases', step: 10, min: 0, src: 'canonical', i: 'Book size used in answer 4 (what raise is needed). 02: 170 leases. Does not change the simulation.' },
-      { sub: 'Cover & payouts' },
+      { sub: 'Coverage' },
+      { k: 'coverageRatio', l: 'Coverage ratio (c)', u: '× cover', step: 0.05, min: 0.1, max: 2, src: 'protocol', i: 'coverage_ratio_bps. The reserve must hold ceil(c × remaining cover), never less than open provisions. Program floor 0,10 (ADR 0016); devnet starts at 0,10. 1,0 is full backing.' },
+      { sub: 'Debts covered & redemptions' },
       { seg: 'scope' },
       { seg: 'withdraw' },
-      { k: 'bufferPct', l: 'Keep a buffer of', u: '% req.', step: 5, min: 0, when: function(s){ return s.withdraw === 'buffer'; }, i: 'Percent of the required reserve kept on top of it before anything is withdrawn.' },
-      { k: 'sharePct', l: 'Share of net gain', u: '%', step: 5, min: 0, max: 100, when: function(s){ return s.withdraw === 'share'; }, i: 'Percent of each month’s positive net gain withdrawn, capped at the surplus.' }
+      { k: 'bufferPct', l: 'Kept above coverage required', u: '% cov. req.', step: 5, min: 0, when: function(s){ return s.withdraw === 'buffer'; }, i: 'Percent of coverage required kept on top of it before anything is redeemed.' },
+      { k: 'sharePct', l: 'Share of net gain', u: '%', step: 5, min: 0, max: 100, when: function(s){ return s.withdraw === 'share'; }, i: 'Percent of each month’s positive net gain redeemed, capped at free capital.' }
     ]},
-    { id: 'rule', t: 'Coverage rule', sm: 'sets the required reserve', note: true, f: [
-      { k: 'defaultCover', l: 'Rent-arrears ceiling', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'Most the fiança pays in unpaid rent per lease. 02: 12× (working value, under legal review).' },
-      { k: 'exitCover', l: 'Exit-cost ceiling', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'Separate sublimit for eviction and exit costs. 02: 6×.' },
-      { k: 'worstFloorPct', l: 'Reserve ≥ share of all ceilings', u: '%', step: 1, min: 0, src: 'canonical', i: 'Worst-case leg: the reserve holds at least this share of every active lease’s full ceilings. 40-reserve / 9w: 10%.' },
-      { k: 'tailFloor', l: 'Reserve ≥ bad years of claims', u: '× bad yr', step: 0.1, min: 1, src: 'canonical', i: 'Bad-year leg: the reserve holds this many years of bad-year claims. 40-reserve / 9w: 2,0; hard floor 1,0.' }
+    { id: 'rule', t: 'Cover & caps', sm: 'per lease and on-chain', note: true, f: [
+      { sub: 'Cover per lease' },
+      { k: 'defaultCover', l: 'Default leg (rent arrears)', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'default_cover: most the fiança pays in unpaid rent per lease. 02: 12× (working value, under legal review).' },
+      { k: 'exitCover', l: 'Exit leg (eviction & exit costs)', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'exit_cover: separate sublimit for eviction and exit costs. 02: 6×.' },
+      { sub: 'Caps (VaultConfig.caps)' },
+      { k: 'maxTvl', l: 'max_tvl', u: 'R$', step: 10000, min: 0, src: 'protocol', i: 'fulfil_deposits refuses capital that would take stable assets above this. Devnet: R$300k. It also stops starting capital and raises.' },
+      { k: 'maxCoverPerGuarantee', l: 'max_cover_per_guarantee', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'register_guarantee refuses a lease whose cover (default + exit leg) is above this. Devnet: R$40k.' },
+      { k: 'maxCoverPerAgency', l: 'max_cover_per_agency', u: 'R$', step: 100000, min: 0, src: 'protocol', i: 'Outstanding cover one agency may hold. The simulator assumes a single agency, so every lease counts. Devnet: R$3M = max_tvl ÷ 0,10, so it never binds.' },
+      { k: 'maxClaimPerCall', l: 'max_claim_per_call', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'Largest operator claim payment in one call. Above it, pay_claim_admin. Devnet: R$10k.' },
+      { k: 'maxClaimPerPeriod', l: 'max_claim_per_period', u: 'R$/30 d', step: 1000, min: 0, src: 'protocol', i: 'Operator claim payments per 30 days. A month above it needs pay_claim_admin for the excess. Devnet: R$20k.' },
+      { k: 'maxTesouroSharePct', l: 'max_tesouro_share_bps', u: '%', step: 5, min: 0, max: 100, src: 'protocol', i: 'Most of the stable assets allocate may move into TESOURO. Devnet: 0 (no adapter), so TESOURO income is a what-if until it is raised.' }
     ]},
     { id: 'assume', t: 'Assumptions', sm: 'advanced', closed: true, f: [
       { sub: 'Claims' },
       { k: 'rhoPct', l: 'Rent arrears (delinquency)', u: '%/yr', step: 0.01, min: 0, src: 'research', i: 'Share of annual rent that goes unpaid. Superlógica IIL RS apartments, 3-print avg 2,01%; stress 2,87%; tail 5,93%.' },
       { k: 'evictRatePct', l: 'Eviction rate', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'CNJ DataJud despejo filings ÷ IBGE PNAD rented households, adjusted for outcomes and an underwritten book. Low 0,10% / base 0,25% / high 0,60%.' },
-      { k: 'evictMult', l: 'Eviction cost paid', u: '× rent', step: 0.5, min: 0, src: 'research', i: 'Per eviction, capped at the exit ceiling. Fiança live: ~6× (no liminar). If the fiança extinguishes at the ceiling: 5,5×. Low case 2,5×.' },
+      { k: 'evictMult', l: 'Eviction cost paid', u: '× rent', step: 0.5, min: 0, src: 'research', i: 'Per eviction, capped at the exit leg. Fiança live: ~6× (no liminar). If the fiança extinguishes at the default-leg limit: 5,5×. Low case 2,5×.' },
       { k: 'nonEvictX', l: 'Other exit debts', u: '× rent/yr', step: 0.01, min: 0, src: 'estimate', i: 'Damage, charges, penalty, abandonment, alterations. Base ≈ 0,19× rent per lease-year [inference].' },
       { k: 'penaltyX', l: '…of which termination penalty', u: '× rent/yr', step: 0.005, min: 0, src: 'estimate', i: 'Excluded in scope B. Base ≈ 0,077× [inference].' },
       { k: 'ramp', l: 'Claims ramp up over 4 months', toggle: true, src: 'estimate', i: 'Defaults lag: month m pays expected claims × min(1, m/4).' },
       { k: 'tailMult', l: 'Bad-year claims multiplier', u: '× claims', step: 0.01, min: 0, src: 'canonical', i: 'Bad (tail) year = expected claims × this. 2,33 calibrates to 40-reserve: R$1.894 per lease-year (scope B) vs R$813 expected.' },
       { sub: 'Bad year' },
-      { k: 'stressOn', l: 'Run a bad year in the simulation', toggle: true, i: 'Adds bad-year claims (multiplier − 1) × expected over the 12 months from the start month. Answer 5 always tests this in the background.' },
+      { k: 'stressOn', l: 'Run a bad year in the simulation', toggle: true, i: 'Adds bad-year claims (multiplier − 1) × expected over the 12 months from the start month. Answer 5 always tests this in the background. The bad-year check is off-chain: it never changes coverage required.' },
       { k: 'stressMonth', l: 'Bad year starts in month', u: 'month', step: 1, min: 1, src: 'estimate', when: function(s){ return s.stressOn; } },
       { sub: 'Reserve yield' },
-      { k: 'tesouroSharePct', l: 'Reserve held in TESOURO', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: '02: ~80% TESOURO / 20% liquid sleeve. Pilot presets use 50%.' },
-      { k: 'tesouroPct', l: 'TESOURO yield', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'Etherfuse on-chain accrual, unconfirmed. Accrues monthly on the opening balance.' },
+      { k: 'tesouroSharePct', l: 'Reserve held in TESOURO', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: '02: ~80% TESOURO / 20% liquid BRS. Pilot presets use 50%. Capped by max_tesouro_share_bps (0 on devnet).' },
+      { k: 'tesouroPct', l: 'TESOURO yield', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'Etherfuse on-chain accrual, unconfirmed. Accrues monthly on the opening stable assets.' },
       { k: 'selicPct', l: 'Selic (opportunity cost)', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'What the same capital would earn at Selic. Comparison only.' },
       { sub: 'MUTAV & operations' },
-      { k: 'takePct', l: 'MUTAV take rate', u: '% fees', step: 1, min: 0, max: 100, src: 'estimate', i: 'Share of each guarantee fee kept by MUTAV (ADR 0009). 20% is the simulator default; the value is still open.' },
+      { k: 'takePct', l: 'MUTAV take rate', u: '% fees', step: 1, min: 0, max: 30, src: 'estimate', i: 'fee_take_bps: share of each guarantee fee kept by MUTAV (ADR 0009). The program caps it at 30%. 20% is the config placeholder; the value is still open.' },
       { k: 'mutavSharePct', l: 'MUTAV share of reserve capital', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: 'Stage 1 pilot: MUTAV funds 100% of the reserve.' },
       { k: 'opCostPerLease', l: 'Operating cost per lease', u: 'R$/mo', step: 1, min: 0, src: 'estimate', i: 'Optional. Subtracted from the take in What MUTAV earns.' },
       { k: 'opCostFixed', l: 'Fixed operating cost', u: 'R$/mo', step: 500, min: 0, src: 'estimate', i: 'Optional. Used for break-even leases.' },
@@ -666,16 +764,18 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   function fieldBy(k){ return FIELDS.filter(function(x){ return x.k === k; })[0]; }
 
   var PILOT = { months: 6, perMonth: 10, rent: 2200, feePct: 10, periods: 12, takePct: 20, defaultCover: 12, exitCover: 6, scope: 'B',
-    evictRatePct: 0.25, sizing: 'policy', startCapital: 300000, monthlyRaise: 0, withdraw: 'none', tesouroSharePct: 50, tesouroPct: 11.58, selicPct: 13.75 };
+    evictRatePct: 0.25, coverageRatio: 0.10, startCapital: 300000, monthlyRaise: 0, withdraw: 'none', tesouroSharePct: 50, tesouroPct: 11.58, selicPct: 13.75 };
   var SCEN = [
-    { id: 'default', g: '', l: 'Default (02 parameters)', d: '02 inputs: 28 new leases a month for 6 months, 80% in TESOURO, R$300k start. Without a raise growth stalls at about 89 leases.', o: {} },
-    { id: 'pilotRec', g: 'Pilot', l: 'Pilot · recommended', d: '60 leases (10 a month × 6), R$2.200 rent, 10% fee, R$300k start, debts B, no withdrawals, 50% TESOURO.', o: PILOT },
+    { id: 'default', g: '', l: 'Default (02 parameters)', d: '02 inputs on the devnet config: 28 new leases a month for 6 months, R$300k start, c = 0,10, TESOURO capped at 0. The book stalls at about 76 leases (insufficient free capital); max_tvl refuses any raise.', o: {} },
+    { id: 'pilotRec', g: 'Pilot', l: 'Pilot · recommended', d: '60 leases (10 a month × 6), R$2.200 rent, 10% fee, R$300k start, c = 0,10, debts B, no redemptions, 50% TESOURO wanted (capped at 0 on devnet).', o: PILOT },
     { id: 'pilotCons', g: 'Pilot', l: 'Pilot · conservative', d: 'As recommended, with 30 leases (5 a month × 6).', o: ext(PILOT, { perMonth: 5 }) },
-    { id: 'scale170', g: 'Growth', l: 'Scale to 170', d: 'Pilot inputs at 28 a month on R$300k. Stalls near 87 leases without a raise; 170 leases need about R$673.200.', o: ext(PILOT, { perMonth: 28 }) },
+    { id: 'scale170', g: 'Growth', l: 'Scale to 170', d: 'Pilot inputs at 28 a month on R$300k. Stalls near 76 leases without new capital; 170 leases need about R$673.200 of coverage required, so max_tvl must rise too.', o: ext(PILOT, { perMonth: 28 }) },
+    { id: 'fullBacking', g: 'What-if', l: 'Full backing (c = 1,0)', d: 'Pilot recommended at c = 1,0: every lease’s full cover held in stable assets. R$300k backs about 7 leases.', o: ext(PILOT, { coverageRatio: 1 }) },
     { id: 'broad', g: 'What-if', l: 'Debts A (all debts)', d: 'Pilot recommended, fiança covers all tenant debts incl. the termination penalty.', o: ext(PILOT, { scope: 'A' }) },
     { id: 'extreme', g: 'What-if', l: 'Debts C (evictions only)', d: 'Pilot recommended, fiança covers arrears, evictions and abandonment only.', o: ext(PILOT, { scope: 'C' }) },
-    { id: 'lean', g: 'What-if', l: 'Lean ceilings (3+3)', d: 'Pilot recommended with a 3× rent-arrears and 3× exit-cost ceiling.', o: ext(PILOT, { defaultCover: 3, exitCover: 3 }) },
-    { id: 'tesouro', g: 'What-if', l: 'All in TESOURO', d: 'Pilot recommended with 100% of the reserve in TESOURO.', o: ext(PILOT, { tesouroSharePct: 100 }) },
+    { id: 'lean', g: 'What-if', l: 'Lean cover (3+3)', d: 'Pilot recommended with a 3× rent default leg and a 3× exit leg.', o: ext(PILOT, { defaultCover: 3, exitCover: 3 }) },
+    { id: 'tesouroCap', g: 'What-if', l: 'TESOURO cap raised to 50%', d: 'Pilot recommended once an adapter exists and max_tesouro_share_bps is raised to 50%: half the stable assets earn TESOURO.', o: ext(PILOT, { maxTesouroSharePct: 50 }) },
+    { id: 'tesouro', g: 'What-if', l: 'All in TESOURO (cap raised)', d: 'Pilot recommended with 100% of the reserve in TESOURO and max_tesouro_share_bps raised to 100%.', o: ext(PILOT, { tesouroSharePct: 100, maxTesouroSharePct: 100 }) },
     { id: 'stress', g: 'Stress', l: 'Stress', d: 'Pilot recommended with delinquency at 2× base (4,02%), evictions 0,60% a year at 6× rent, and a bad year from month 3.', o: ext(PILOT, { rhoPct: 4.02, evictRatePct: 0.6, evictMult: 6, stressOn: true, stressMonth: 3 }) }
   ];
   function scenById(id){ return SCEN.filter(function(s){ return s.id === id; })[0]; }
@@ -851,9 +951,8 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var b = e.target.closest && e.target.closest('[data-segk]'); if (!b) return;
     state[b.getAttribute('data-segk')] = b.getAttribute('data-v'); syncInputs(); edited();
   });
-  function setRule(v){ if (VALID.sizing.indexOf(v) < 0 || v === state.sizing) return; state.sizing = v; edited(); }
-  document.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('[data-userule]'); if (b) setRule(b.getAttribute('data-userule')); });
-  document.getElementById('ruleTbl').addEventListener('change', function(e){ if (e.target.name === 'simRule') setRule(e.target.value); });
+  function setC(v){ v = parseFloat(v); if (!isFinite(v) || Math.abs(v - state.coverageRatio) < 1e-9) return; state.coverageRatio = Math.max(0.1, Math.min(2, v)); syncInputs(); edited(); }
+  document.getElementById('ruleTbl').addEventListener('change', function(e){ if (e.target.name === 'simC') setC(e.target.value); });
   document.getElementById('resetBtn').addEventListener('click', function(){
     state = clone(DEF); activeScen = 'default'; baseScen = 'default'; syncInputs(); persist(); render();
   });
@@ -896,33 +995,35 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     document.querySelector('#' + id + ' thead').innerHTML = '<tr>' + cols.map(function(c){ return '<th' + (c[2] ? ' id="' + c[2] + '"' : '') + '>' + esc(c[0]) + infoI(c[1]) + '</th>'; }).join('') + '</tr>';
   }
   thead('tbl', [
-    ['Month', 'Month of the simulation.'], ['New leases', 'Guarantees signed this month. Tagged “blocked” when the gate admitted fewer than planned.'],
-    ['Active', 'Leases on the book at month end.'], ['Capital in', 'Starting capital (month 1) plus any monthly raise.'],
-    ['Required reserve', 'Active leases × required reserve per lease (coverage rule).'], ['Balance', 'Reserve balance at month end, after withdrawals.'],
-    ['Surplus / shortfall', 'Balance − required reserve. Negative means the reserve is below what the rule requires.'], ['Guarantee fees', 'All guarantee fees paid this month, before MUTAV’s take.'],
-    ['MUTAV take', 'Take rate × guarantee fees, to the MUTAV treasury.'], ['Net fees', 'Guarantee fees − MUTAV take: what enters the reserve.'],
-    ['Claims paid', 'Expected claims this month (plus bad-year claims if the bad year is on).'], ['TESOURO yield', 'Opening balance × TESOURO share × TESOURO rate / 12.'],
-    ['Net gain', 'Net fees + TESOURO yield − claims paid.'], ['Withdrawal', 'Paid out of the surplus under the withdrawal policy.']
+    ['Month', 'Month of the simulation.'], ['Registered', 'Guarantees registered this month. Tagged “refused” when register_guarantee refused some of the planned leases, with the reason.'],
+    ['Active', 'Leases on the book at month end.'], ['Capital in', 'Starting capital (month 1) plus any monthly raise, after max_tvl.'],
+    ['Remaining cover', 'remaining_cover_total: every active lease’s cover minus the claims already paid on it.'],
+    ['Coverage required', 'ceil(c × remaining cover), never below open provisions (≈ 0 here).'], ['Stable assets', 'Reserve stable assets at month end, after redemptions.'],
+    ['Free capital / shortfall', 'Stable assets − coverage required. Negative means the reserve is under-covered: new guarantees are refused, claims are still paid.'], ['Guarantee fees', 'All guarantee fees paid this month, before MUTAV’s take.'],
+    ['MUTAV take', 'fee_take_bps × guarantee fees, to the MUTAV treasury.'], ['Net fees', 'Guarantee fees − MUTAV take: what enters the reserve.'],
+    ['Claims paid', 'Expected claims this month (plus bad-year claims if the bad year is on). Flagged when above max_claim_per_period.'], ['TESOURO yield', 'Opening stable assets × min(TESOURO share, cap) × TESOURO rate / 12.'],
+    ['Net gain', 'Business view: net fees + TESOURO yield − claims paid.'], ['Redemption', 'Paid out of free capital under the redemptions setting.']
   ]);
   thead('sensTbl', [['Take rate', 'Share of each guarantee fee kept by MUTAV.'], ['Per lease / mo', 'MUTAV take per active lease per month.'],
     ['Total', 'MUTAV take over the simulated months.', 'sensTotH'], ['Annual run-rate', 'Last-month take × 12.'], ['Reserve net gain', 'Reserve net gain over the simulated months at this take.']]);
-  thead('ruleTbl', [['Rule', 'How the required reserve per lease is set.'], ['Per lease', 'Required reserve for each active lease.'],
-    ['Starting capital backs', 'Leases the starting capital alone can back under this rule.'], ['Book reached', 'Active leases at the last month, after any blocking.'],
-    ['Blocked months', 'Months where the gate admitted fewer leases than planned.'], ['Balance', 'Reserve balance at the last month.'],
-    ['Surplus', 'Balance − required reserve at the last month.'], ['Simulate with', 'Choose which rule drives the whole page. Coverage policy is the live rule.']]);
-  thead('sizeTbl', [['Leases', 'Book size, held full for a year.'], ['Reserve % of ceilings', 'Balance ÷ every lease’s full ceilings. 100% means the reserve could pay every lease’s full ceiling at once.'],
-    ['Bad years held', 'Balance ÷ one bad year of claims for this book. The coverage rule asks for 2,0.'], ['Meets required reserve', 'Whether the balance covers the required reserve for this book under the active rule.'],
+  thead('ruleTbl', [['Coverage ratio', 'coverage_ratio_bps as a decimal. 0,10 is the program floor; 1,0 is full backing.'], ['Per lease', 'Coverage required for each lease at full cover: c × cover.'],
+    ['Starting capital backs', 'Leases the starting capital alone can back at this c.'], ['Book reached', 'Active leases at the last month, after any refusals.'],
+    ['Refused months', 'Months where register_guarantee refused some of the planned leases.'], ['Stable assets', 'Reserve stable assets at the last month.'],
+    ['Free capital', 'Stable assets − coverage required at the last month.'], ['Reserve yield', 'Business view: simulated reserve yield, annualized.'],
+    ['Bad years covered', 'Off-chain check: stable assets ÷ one bad year of claims for the book. Study: grow ≥ 2,0×, never < 1,0×.'], ['Simulate with', 'Choose which c drives the whole page.']]);
+  thead('sizeTbl', [['Leases', 'Book size, held full for a year.'], ['Stable assets % of cover', 'Stable assets ÷ every lease’s full cover. 100% means the reserve could pay every lease’s full cover at once (c = 1,0).'],
+    ['Bad years covered', 'Off-chain check: stable assets ÷ one bad year of claims for this book. Study: grow ≥ 2,0×, never < 1,0×.'], ['Gate admits', 'Whether register_guarantee would admit this book on the stable assets: ceil(c × cover) ≤ stable assets, within the per-guarantee cap.'],
     ['MUTAV take / yr', 'Take on a full year of guarantee fees.'], ['Net gain / yr, normal', 'Net fees − expected claims + TESOURO yield, in a normal year.'],
-    ['Return on balance', 'Normal-year net gain ÷ balance.'], ['Net gain / yr, bad year', 'Same, with bad-year claims.'], ['Return, bad year', 'Bad-year net gain ÷ balance.'], ['vs Selic', 'Normal return minus Selic, in percentage points.']]);
+    ['Return on stable assets', 'Business view: normal-year net gain ÷ stable assets.'], ['Net gain / yr, bad year', 'Same, with bad-year claims.'], ['Return, bad year', 'Bad-year net gain ÷ stable assets.'], ['vs Selic', 'Normal return minus Selic, in percentage points.']]);
   thead('scopeTbl', [['Debts covered', 'Which tenant debts the fiança pays.'], ['Expected claims / lease / yr', 'Arrears + evictions + other exit debts covered in this scope.'],
-    ['Claims-to-fees ratio', 'Expected claims ÷ guarantee fees per lease per year.'], ['Fees − claims', 'Return on required reserve from (net fees − expected claims) ÷ required reserve per lease.'],
-    ['+ TESOURO', 'Return on required reserve including TESOURO yield.'], ['vs Selic', 'Return on required reserve minus Selic.'],
-    ['Reserve yield (sim.)', 'Simulated reserve yield over the horizon, annualized, on the average balance.'],
-    ['Return on balance, normal', 'Book at the last month held a full year: net gain ÷ balance.'], ['Return, bad year', 'Same, with bad-year claims.'], ['Normal vs Selic', 'Normal-year return on balance minus Selic.'],
+    ['Claims-to-fees ratio', 'Expected claims ÷ guarantee fees per lease per year.'], ['Fees − claims', 'Return on coverage required: (net fees − expected claims) ÷ coverage required per lease.'],
+    ['+ TESOURO', 'Return on coverage required including TESOURO yield (within the cap).'], ['vs Selic', 'Return on coverage required minus Selic.'],
+    ['Reserve yield (sim.)', 'Simulated reserve yield over the horizon, annualized, on the average stable assets.'],
+    ['Return on stable assets, normal', 'Book at the last month held a full year: net gain ÷ stable assets.'], ['Return, bad year', 'Same, with bad-year claims.'], ['Normal vs Selic', 'Normal-year return on stable assets minus Selic.'],
     ['MUTAV take', 'MUTAV take over the simulated months.', 'scopeTakeH']]);
-  thead('yieldTbl', [['Month', ''], ['Opening balance', 'Balance after capital in, before the month’s flows.'], ['Net fees − claims', 'Underwriting result: guarantee fees after take minus claims paid.'],
-    ['TESOURO yield', 'Opening balance × TESOURO share × rate / 12.'], ['Net gain', 'Underwriting + TESOURO.'], ['Yield, annualized', 'Net gain ÷ opening balance × 12.'],
-    ['Selic on balance', 'Opening balance × Selic / 12.'], ['vs Selic', 'Net gain − Selic on the same balance.']]);
+  thead('yieldTbl', [['Month', ''], ['Opening stable assets', 'Stable assets after capital in, before the month’s flows.'], ['Net fees − claims', 'Underwriting result: guarantee fees after take minus claims paid.'],
+    ['TESOURO yield', 'Opening stable assets × min(TESOURO share, cap) × rate / 12.'], ['Net gain', 'Underwriting + TESOURO.'], ['Yield, annualized', 'Net gain ÷ opening stable assets × 12.'],
+    ['Selic on capital', 'Opening stable assets × Selic / 12.'], ['vs Selic', 'Net gain − Selic on the same capital.']]);
   function renderYieldTable(r){
     document.querySelector('#yieldTbl tbody').innerHTML = r.rows.map(function(x){
       var d = x.gain - x.selicOpp;
@@ -934,45 +1035,62 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   thead('buildTbl', [['Component', 'Part of expected claims.'], ['Formula', 'How it is computed from the inputs.'], ['R$ / lease / yr', 'Expected cost per lease per year.'], ['× rent', 'Same, in months of rent.']]);
 
   /* the five answers, computed live */
+  var REFUSAL = { 'guarantee-cap': 'cover above max_cover_per_guarantee', 'agency-cap': 'agency cap reached', 'free-capital': 'insufficient free capital', 'under-covered': 'under-covered' };
+  function badYears(x){ return 'bad years covered: <b>' + X(x) + '</b> <span class="muted">(off-chain check; study: grow ≥ 2,0×, never &lt; 1,0×)</span>'; }
+  function badYearsPlain(x){ return 'bad years covered ' + X(x) + ' (off-chain check; study: grow ≥ 2,0×, never < 1,0×)'; }
+  function cWhy(r){ return 'c = ' + decF.format(r.req.c) + ' × ' + R(r.req.cover) + ' cover'; }
+  function tesouroWhatIf(){ return mutavCompute(ext(state, { maxTesouroSharePct: Math.max(state.maxTesouroSharePct, state.tesouroSharePct) })); }
   function glance(r){
     var N = r.months, rpl = r.req.perLease, m = r.mutav, n = r.finalActive, out = [];
-    var cover = r.req.cover, binds;
-    if (r.req.mode === 'policy') binds = r.req.binds === 'worst-case floor' ? 'the ' + P(state.worstFloorPct / 100, 0) + '-of-ceilings rule sets it' : 'the ' + decF.format(Math.max(1, state.tailFloor)) + '-bad-years rule sets it';
-    else binds = 'comparison rule: ' + ruleName(r.req.mode);
-    var safe = !r.blockedMonths && !r.belowFloorMonths;
+    var safe = !r.blockedMonths && !r.belowFloorMonths && !(n > 0 && r.tailCover < MUTAV_PROTOCOL.BAD_YEARS_FLOOR);
     var s1;
-    if (n === 0) s1 = 'No leases are on the book: the starting capital of <b>' + R(state.startCapital) + '</b> backs ' + N0(r.capacityAtStart) + ' leases at <b>' + R(rpl) + '</b> each.';
-    else if (!r.blockedMonths) s1 = 'The <b>' + R(state.startCapital) + '</b> starting reserve covers the ' + N0(n) + '-lease book. At month ' + N + ' the required reserve is <b>' + R(r.endRequired) + '</b> (' + esc(binds) + ') and the balance is <b>' + R(r.endBalance) + '</b>, a surplus of <b>' + R(r.endSurplus) + '</b>. Growth is never blocked' + (r.belowFloorMonths ? ', but the balance falls below the required reserve in ' + plural(r.belowFloorMonths, 'month', 'months') : '') + '.';
-    else s1 = 'The <b>' + R(state.startCapital) + '</b> starting reserve backs only <b>' + N0(r.capacityAtStart) + ' leases</b> at <b>' + R(rpl) + '</b> each (' + esc(binds) + '). Growth is blocked in ' + plural(r.blockedMonths, 'month', 'months') + ' from month ' + r.firstBlocked + ': the book reaches <b>' + N0(n) + ' of ' + N0(r.plannedActive) + '</b> planned leases. The month-' + N + ' balance is <b>' + R(r.endBalance) + '</b> against <b>' + R(r.endRequired) + '</b> required.';
-    out.push({ q: '1 · Reserve needed & safety', c: safe ? 'ok' : 'risk', s: s1 });
+    if (r.req.overGuaranteeCap) s1 = '<b>Refused: cover above the per-guarantee cap.</b> Each lease carries <b>' + R(r.req.cover) + '</b> of cover (' + decF.format(state.defaultCover) + ' + ' + decF.format(state.exitCover) + ' × ' + R(state.rent) + ' rent), above max_cover_per_guarantee of <b>' + R(state.maxCoverPerGuarantee) + '</b>, so register_guarantee refuses every lease. Lower the cover per lease or raise the cap.';
+    else if (n === 0) s1 = 'No leases are on the book: the starting capital of <b>' + R(state.startCapital) + '</b> backs ' + N0(r.capacityAtStart) + ' leases at <b>' + R(rpl) + '</b> of coverage required each (' + cWhy(r) + ').';
+    else if (!r.blockedMonths) s1 = 'The <b>' + R(state.startCapital) + '</b> starting reserve covers the ' + N0(n) + '-lease book. At month ' + N + ' coverage required is <b>' + R(r.endRequired) + '</b> (c = ' + decF.format(r.req.c) + ' × ' + R(r.endRemaining) + ' remaining cover) and stable assets are <b>' + R(r.endBalance) + '</b>, free capital <b>' + R(r.endSurplus) + '</b>. No registration is refused' + (r.belowFloorMonths ? ', but the reserve is under-covered in ' + plural(r.belowFloorMonths, 'month', 'months') : '') + '; ' + badYears(r.tailCover) + '.';
+    else s1 = 'The <b>' + R(Math.min(state.startCapital, state.maxTvl)) + '</b> starting reserve backs <b>' + N0(r.capacityAtStart) + ' leases</b> at <b>' + R(rpl) + '</b> each (' + cWhy(r) + '). <b>Refused: ' + esc(REFUSAL[r.firstRefusal]) + '</b> in ' + plural(r.blockedMonths, 'month', 'months') + ' from month ' + r.firstBlocked + ': the book reaches <b>' + N0(n) + ' of ' + N0(r.plannedActive) + '</b> planned leases. Month-' + N + ' stable assets are <b>' + R(r.endBalance) + '</b> against <b>' + R(r.endRequired) + '</b> coverage required; ' + badYears(r.tailCover) + '.';
+    if (r.tvlRefused > 0) s1 += ' max_tvl (' + R(state.maxTvl) + ') refused <b>' + R(r.tvlRefused) + '</b> of new capital.';
+    if (r.claimCapMonths) s1 += ' Claims exceed max_claim_per_period (' + R(state.maxClaimPerPeriod) + ') in ' + plural(r.claimCapMonths, 'month', 'months') + ' from month ' + r.firstClaimCap + ': the excess goes through pay_claim_admin.';
+    out.push({ q: '1 · Coverage & safety', c: safe ? 'ok' : 'risk', s: s1 });
 
-    var s2 = 'MUTAV keeps <b>' + R(m.takeTotal) + '</b> of guarantee fees over ' + N + ' months (' + P(state.takePct / 100, 0) + ' take; <b>' + R(m.takeRunRate) + '</b> a year at the month-' + N + ' run-rate) and owns ' + P(m.share, 0) + ' of the reserve, whose net gain is <b>' + R(r.cumGain) + '</b>. Together: <b>' + R(m.economicResult) + '</b>';
+    var s2 = 'MUTAV keeps <b>' + R(m.takeTotal) + '</b> of guarantee fees over ' + N + ' months (' + P(r.take, 0) + ' take; <b>' + R(m.takeRunRate) + '</b> a year at the month-' + N + ' run-rate) and owns ' + P(m.share, 0) + ' of the reserve, whose net gain is <b>' + R(r.cumGain) + '</b>. Together: <b>' + R(m.economicResult) + '</b>';
     s2 += (state.opCostPerLease > 0 || state.opCostFixed > 0) ? ', or <b>' + R(m.economicResultNet) + '</b> after operating costs, before PIX/offramp fees and taxes.' : ', before operating costs and taxes.';
+    if (state.takePct > 30) s2 += ' The take is capped at the program’s 30%.';
     out.push({ q: '2 · What MUTAV earns', c: '', s: s2 });
 
     var t = r.totals, ann = r.capitalRaised > 0 ? r.cumGain / r.capitalRaised * 12 / N : 0;
-    var s3 = 'The reserve earned <b>' + R(r.cumGain) + '</b> net over ' + N + ' months (net fees ' + R(t.net) + ' + TESOURO ' + R(t.tesouro) + ' − claims ' + R(t.claims) + '), about <b>' + P(ann) + ' a year</b> on ' + R(r.capitalRaised) + ' raised while the book ramps up.';
+    var s3 = 'The reserve earned <b>' + R(r.cumGain) + '</b> net over ' + N + ' months (net fees ' + R(t.net) + ' + TESOURO ' + R(t.tesouro) + ' − claims ' + R(t.claims) + '), about <b>' + P(ann) + ' a year</b> on ' + R(r.capitalRaised) + ' of capital while the book ramps up.';
     if (n > 0) {
       var sr = mutavSizingRow(state, n, r.endBalance, r.payouts.total, r.tailPerLease);
-      s3 += ' With the month-' + N + ' book held for a full year it would earn <b>' + R(sr.normal) + '</b>, <b>' + P(sr.normalRet) + '</b> on the balance vs Selic ' + P(r.selic, 2) + ' (' + PP(sr.vsSelic) + ').';
+      s3 += ' With the month-' + N + ' book held for a full year it would earn <b>' + R(sr.normal) + '</b>, <b>' + P(sr.normalRet) + '</b> on stable assets vs Selic ' + P(r.selic, 2) + ' (' + PP(sr.vsSelic) + ').';
     }
-    if (r.cumWithdrawals > 0) s3 += ' Withdrawals paid out: <b>' + R(r.cumWithdrawals) + '</b>.';
-    out.push({ q: '3 · What the reserve earns', c: '', s: s3 });
+    if (r.tesouroCapped) {
+      var wi = tesouroWhatIf();
+      s3 += ' TESOURO is held to ' + P(r.tesouroShare, 0) + ' by max_tesouro_share_bps' + (state.maxTesouroSharePct <= 0 ? ' (no adapter on devnet)' : '') + '. What-if, with the cap raised to the ' + P(r.tesouroShareWanted, 0) + ' wanted: <b>' + P(wi.yieldSim.total) + ' a year</b> (' + PP(wi.yieldSim.vsSelic) + ' vs Selic), ' + R(wi.cumGain) + ' net.';
+    }
+    if (r.cumWithdrawals > 0) s3 += ' Redemptions paid out: <b>' + R(r.cumWithdrawals) + '</b>.';
+    out.push({ q: '3 · What the reserve earns (business view)', c: '', s: s3 });
 
     var T = Math.max(0, state.growthTarget || 0), needT = T * rpl, gapT = needT - r.endBalance, lastGain = r.rows[N - 1].gain;
     var s4 = '';
-    if (r.blockedMonths) {
-      var minRaise = mutavMinToAvoidBlocking(state, 'monthlyRaise', 1000, 0);
-      var minStart = mutavMinToAvoidBlocking(state, 'startCapital', 10000, state.startCapital);
+    if (r.blockedMonths && (r.firstRefusal === 'guarantee-cap' || r.firstRefusal === 'agency-cap')) {
+      s4 = 'New capital does not help: ' + (r.firstRefusal === 'guarantee-cap' ? 'each lease’s cover is above max_cover_per_guarantee. Lower the cover per lease or raise the cap. ' : 'the book reaches max_cover_per_agency (' + R(state.maxCoverPerAgency) + '). Raise the cap; one agency holds the whole book here. ');
+    } else if (r.blockedMonths) {
+      var lifted = ext(state, { maxTvl: 1e13 });
+      var minRaise = mutavMinToAvoidBlocking(lifted, 'monthlyRaise', 1000, 0);
+      var minStart = mutavMinToAvoidBlocking(lifted, 'startCapital', 10000, state.startCapital);
       var from = state.raiseFrom, until = state.raiseUntil > 0 ? state.raiseUntil : N;
-      s4 = 'The plan outgrows its capital. To avoid blocking: about <b>' + (isFinite(minRaise) ? R(minRaise) + ' a month</b> from month ' + from + (until < N ? ' to ' + until : '') : 'no monthly raise</b> is enough (month 1 is already blocked)') + ', or <b>' + R(minStart) + '</b> of starting capital instead of ' + R(state.startCapital) + '. ';
+      s4 = 'The plan outgrows its capital. To avoid refusals: about <b>' + (isFinite(minRaise) ? R(minRaise) + ' a month</b> from month ' + from + (until < N ? ' to ' + until : '') : 'no monthly raise</b> is enough (month 1 is already refused)') + ', or <b>' + R(minStart) + '</b> of starting capital instead of ' + R(state.startCapital) + '. ';
+      var tvlNeed = 0;
+      if (isFinite(minRaise)) mutavCompute(ext(lifted, { monthlyRaise: minRaise })).rows.forEach(function(x){ tvlNeed = Math.max(tvlNeed, x.opening); });
+      if (isFinite(minStart)) tvlNeed = isFinite(minRaise) ? Math.min(tvlNeed, minStart) : minStart;
+      if (tvlNeed > state.maxTvl + 1) s4 += 'max_tvl must also rise from ' + R(state.maxTvl) + ' to at least <b>' + R(tvlNeed) + '</b>. ';
     } else {
       var extra = r.selfFundedLeases - n;
-      s4 = 'With no new capital, the month-' + N + ' balance backs <b>' + N0(r.selfFundedLeases) + ' leases</b>' + (n > 0 ? ' (' + N0(Math.max(0, extra)) + ' more than the book)' : '') + '. ';
+      s4 = 'With no new capital, the month-' + N + ' stable assets back <b>' + N0(r.selfFundedLeases) + ' leases</b>' + (n > 0 ? ' (' + N0(Math.max(0, extra)) + ' more than the book)' : '') + '. ';
       var perMo = rpl > 0 ? lastGain / rpl : 0;
-      s4 += lastGain > 0 ? 'Monthly net gain (' + R(lastGain) + ') funds about <b>' + dec1.format(Math.floor(perMo * 10) / 10) + ' new leases a month</b> on its own; faster growth draws down the surplus. ' : 'The reserve is not yet making a monthly net gain, so growth relies on surplus and new capital. ';
+      s4 += lastGain > 0 ? 'Monthly net gain (' + R(lastGain) + ') funds about <b>' + dec1.format(Math.floor(perMo * 10) / 10) + ' new leases a month</b> on its own; faster growth draws down free capital. ' : 'The reserve is not yet making a monthly net gain, so growth relies on free capital and new capital. ';
     }
-    if (T > 0) s4 += T + ' leases need <b>' + R(needT) + '</b> of required reserve: ' + (gapT > 0 ? '<b>' + R(gapT) + '</b> more than the month-' + N + ' balance.' : 'the month-' + N + ' balance already covers it.');
+    if (T > 0) s4 += T + ' leases need <b>' + R(needT) + '</b> of coverage required at c = ' + decF.format(r.req.c) + ': ' + (gapT > 0 ? '<b>' + R(gapT) + '</b> more than the month-' + N + ' stable assets' : 'the month-' + N + ' stable assets already cover it') + (needT > state.maxTvl ? ', above max_tvl (' + R(state.maxTvl) + ').' : '.');
     out.push({ q: '4 · Funding growth', c: r.blockedMonths ? 'risk' : 'ok', s: s4 });
 
     var s5;
@@ -980,11 +1098,11 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       var sr5 = mutavSizingRow(state, n, r.endBalance, r.payouts.total, r.tailPerLease);
       var stressed = state.stressOn ? r : mutavCompute(ext(state, { stressOn: true }));
       var sm = state.stressMonth;
-      s5 = 'A bad year means claims at ' + decF.format(state.tailMult) + '× expected (<b>' + R(r.tailPerLease) + '</b> vs ' + R(r.payouts.total) + ' per lease a year). For the month-' + N + ' book of ' + N0(n) + ' leases the reserve’s net gain that year would be <b>' + R(sr5.bad) + '</b> (' + P(sr5.badRet) + ' on the balance) instead of ' + R(sr5.normal) + '; the balance holds <b>' + X(r.tailCover) + '</b> bad years of claims (the rule asks ' + Math.max(1, state.tailFloor).toFixed(1).replace('.', ',') + '×). ';
+      s5 = 'A bad year means claims at ' + decF.format(state.tailMult) + '× expected (<b>' + R(r.tailPerLease) + '</b> vs ' + R(r.payouts.total) + ' per lease a year). For the month-' + N + ' book of ' + N0(n) + ' leases the reserve’s net gain that year would be <b>' + R(sr5.bad) + '</b> (' + P(sr5.badRet) + ' on stable assets) instead of ' + R(sr5.normal) + '; ' + badYears(r.tailCover) + '. It never changes coverage required. ';
       if (sm > N) s5 += 'The bad-year start month (' + sm + ') is after the horizon, so the simulation itself is unaffected.';
-      else if (stressed.belowFloorMonths) s5 += 'Simulated from month ' + sm + ', the balance falls below the required reserve in ' + plural(stressed.belowFloorMonths, 'month', 'months') + ' (lowest ' + R(stressed.minHeadroom) + '): claims are still paid, but new guarantees stop.';
-      else s5 += 'Simulated from month ' + sm + ', the balance stays above the required reserve (lowest surplus <b>' + R(stressed.minHeadroom) + '</b>)' + (stressed.blockedMonths > r.blockedMonths ? ', but growth is blocked in ' + plural(stressed.blockedMonths - r.blockedMonths, 'more month', 'more months') : '') + '.';
-      var bad5 = stressed.belowFloorMonths > 0 || r.tailCover < 1;
+      else if (stressed.belowFloorMonths) s5 += 'Simulated from month ' + sm + ', stable assets fall below coverage required (under-covered) in ' + plural(stressed.belowFloorMonths, 'month', 'months') + ' (lowest ' + R(stressed.minHeadroom) + '): claims are still paid, but new guarantees are refused.';
+      else s5 += 'Simulated from month ' + sm + ', stable assets stay above coverage required (lowest free capital <b>' + R(stressed.minHeadroom) + '</b>)' + (stressed.blockedMonths > r.blockedMonths ? ', but registrations are refused in ' + plural(stressed.blockedMonths - r.blockedMonths, 'more month', 'more months') : '') + '.';
+      var bad5 = stressed.belowFloorMonths > 0 || r.tailCover < MUTAV_PROTOCOL.BAD_YEARS_FLOOR;
       out.push({ q: '5 · A bad year', c: bad5 ? 'risk' : 'ok', s: s5 + (state.stressOn ? '' : ' <span class="muted">(Tested in the background; turn it on under Assumptions → Bad year to see it in the charts.)</span>') });
     } else out.push({ q: '5 · A bad year', c: '', s: 'No leases, so no claims.' });
     return out;
@@ -995,74 +1113,85 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var r = mutavCompute(state); last = r;
     var N = r.months, m = r.mutav, rpl = r.req.perLease;
     lastGlance = glance(r);
-    document.getElementById('glanceSub').textContent = (activeScen ? scenById(activeScen).l : 'Custom') + (state.sizing !== 'policy' ? ' · ' + ruleName(state.sizing) : '');
+    document.getElementById('glanceSub').textContent = (activeScen ? scenById(activeScen).l : 'Custom') + ' · ' + cName(r.req.c);
     document.getElementById('glance').innerHTML = lastGlance.map(function(g){ return '<li class="' + g.c + '"><div class="q"><span class="dot" aria-hidden="true"></span>' + esc(g.q) + '</div><p>' + g.s + '</p></li>'; }).join('');
 
     var sfm = isFinite(r.selfFundMonth) ? (r.selfFundProjected ? '≈ ' : '') + 'month ' + intF.format(r.selfFundMonth) : 'not at this pace';
-    var y = r.yieldSim;
+    var y = r.yieldSim, tesCap = r.tesouroCapped ? ' (cap ' + P(r.tesouroShare, 0) + ')' : '';
     var T = {
-      bal: { l: 'Reserve balance, month ' + N, v: R(r.endBalance), d: 'Required ' + R(r.endRequired) + ' · surplus ' + R(r.endSurplus), hero: true, t: 'Reserve balance at the last month, after withdrawals, against the required reserve for the book.' },
-      yld: { l: 'Reserve yield, annualized', v: P(y.total), d: P(y.underwriting) + ' fees − claims + ' + P(y.tesouro) + ' TESOURO', t: 'What the reserve earned over the horizon ÷ average balance, annualized. Split into underwriting (net fees − claims) and TESOURO.' },
-      sel: { l: 'vs Selic ' + P(r.selic, 2), v: PP(y.vsSelic), d: y.vsSelic >= 0 ? 'Beats the same capital at Selic' : 'Below the same capital at Selic', t: 'Reserve yield minus Selic, the opportunity cost of the same capital.' },
-      roc: { l: 'Return on capital', v: P(y.returnOnCapital), d: 'Over ' + N + ' mo · ' + P(y.returnOnCapitalAnn) + ' a year', t: 'Reserve net gain ÷ capital raised (starting capital + raises).' },
-      gain: { l: 'Reserve net gain, ' + N + ' mo', v: R(r.cumGain), d: 'Selic would earn ' + R(y.selicGain), t: 'Net fees + TESOURO − claims, in R$. Compared with the same opening balances at Selic.' },
-      head: { l: 'Lowest surplus', v: R(r.minHeadroom), d: 'Balance − required, month ' + r.minHeadMonth, t: 'The tightest month: balance minus required reserve. Negative means below the required reserve.' },
-      blk: { l: 'Blocked months', v: intF.format(r.blockedMonths), d: r.blockedMonths ? 'From month ' + r.firstBlocked + ' · ' + N0(r.finalActive) + ' of ' + N0(r.plannedActive) + ' leases' : 'Growth never blocked', t: 'Months where the solvency gate admitted fewer new leases than planned.' },
-      back: { l: 'Leases backed', v: N0(r.selfFundedLeases), d: 'Balance ÷ ' + R(rpl) + ' per lease', t: 'How many leases the ending balance could back with no new capital.' },
-      cap: { l: 'Capital raised', v: R(r.capitalRaised), d: R(state.startCapital) + ' start' + (state.monthlyRaise > 0 ? ' + ' + R(r.capitalRaised - state.startCapital) + ' raises' : ''), t: 'Starting capital plus all monthly raises.' },
-      take: { l: 'MUTAV take, ' + N + ' mo', v: R(m.takeTotal), d: R(m.takePerLease) + ' / lease / mo · gross', t: 'MUTAV’s share of guarantee fees, before costs and taxes. Never counted in the reserve.' }
+      bal: { l: 'Stable assets, month ' + N, v: R(r.endBalance), d: 'Coverage required ' + R(r.endRequired) + ' · free capital ' + R(r.endSurplus), hero: true, t: 'Reserve stable assets at the last month, after redemptions, against coverage required = ceil(c × remaining cover).' },
+      yld: { l: 'Reserve yield, annualized', v: P(y.total), d: P(y.underwriting) + ' fees − claims + ' + P(y.tesouro) + ' TESOURO' + tesCap, t: 'Business view: what the reserve earned over the horizon ÷ average stable assets, annualized. Split into underwriting (net fees − claims) and TESOURO, which max_tesouro_share_bps caps.' },
+      sel: { l: 'vs Selic ' + P(r.selic, 2), v: PP(y.vsSelic), d: y.vsSelic >= 0 ? 'Beats the same capital at Selic' : 'Below the same capital at Selic', t: 'Business view: reserve yield minus Selic, the opportunity cost of the same capital.' },
+      roc: { l: 'Return on capital', v: P(y.returnOnCapital), d: 'Over ' + N + ' mo · ' + P(y.returnOnCapitalAnn) + ' a year', t: 'Business view: reserve net gain ÷ capital in (starting capital + raises).' },
+      gain: { l: 'Reserve net gain, ' + N + ' mo', v: R(r.cumGain), d: 'Selic would earn ' + R(y.selicGain), t: 'Business view: net fees + TESOURO − claims, in R$. Compared with the same capital at Selic.' },
+      head: { l: 'Lowest free capital', v: R(r.minHeadroom), d: 'Stable − coverage required, month ' + r.minHeadMonth, t: 'The tightest month: stable assets minus coverage required. Negative means under-covered: new guarantees are refused, claims are still paid.' },
+      blk: { l: 'Refused months', v: intF.format(r.blockedMonths), d: r.blockedMonths ? 'From month ' + r.firstBlocked + ' · ' + REFUSAL[r.firstRefusal] + ' · ' + N0(r.finalActive) + ' of ' + N0(r.plannedActive) : 'No registration refused', t: 'Months where register_guarantee refused some of the planned leases: per-guarantee cap, per-agency cap or insufficient free capital.' },
+      back: { l: 'Leases backed', v: N0(r.selfFundedLeases), d: 'Stable assets ÷ ' + R(rpl) + ' per lease', t: 'How many leases the ending stable assets could back at full cover with no new capital: the most k with ceil(c × k × cover) ≤ stable assets.' },
+      bad: { l: 'Bad years covered', v: r.finalActive > 0 ? X(r.tailCover) : '–', d: 'Off-chain check · study ≥ 2,0×, never < 1,0×', t: 'Stable assets ÷ one bad year of claims for the book. A planning signal from 40-reserve 9w; not enforced on-chain and never changes coverage required.' },
+      cap: { l: 'Capital in', v: R(r.capitalRaised), d: R(Math.min(state.startCapital, state.maxTvl)) + ' start' + (r.capitalRaised - Math.min(state.startCapital, state.maxTvl) > 0 ? ' + ' + R(r.capitalRaised - Math.min(state.startCapital, state.maxTvl)) + ' raises' : '') + (r.tvlRefused > 0 ? ' · ' + R(r.tvlRefused) + ' refused by max_tvl' : ''), t: 'Starting capital plus monthly raises that fulfil_deposits accepted under max_tvl.' },
+      take: { l: 'MUTAV take, ' + N + ' mo', v: R(m.takeTotal), d: R(m.takePerLease) + ' / lease / mo · gross', t: 'MUTAV’s share of guarantee fees (fee_take_bps, at most 30%), before costs and taxes. Never counted in the reserve.' }
     };
-    tiles('kstrip', uiMode === 'simple' ? [T.bal, T.yld, T.sel, T.take, T.head, T.blk].filter(function(x){ return x !== T.sel; }).map(function(x){ return x === T.yld ? { l: 'Reserve yield vs Selic', v: P(y.total), d: PP(y.vsSelic) + ' vs Selic · ' + P(y.underwriting) + ' fees + ' + P(y.tesouro) + ' TES.', t: T.yld.t } : x; })
-      : [T.bal, T.yld, T.sel, T.roc, T.gain, T.head, T.blk, T.back, T.cap, T.take]);
-    tiles('yieldKpis', [T.yld, T.sel, T.roc, T.gain,
+    tiles('kstrip', uiMode === 'simple' ? [T.bal, T.yld, T.sel, T.take, T.head, T.blk].filter(function(x){ return x !== T.sel; }).map(function(x){ return x === T.yld ? { l: 'Reserve yield vs Selic', v: P(y.total), d: PP(y.vsSelic) + ' vs Selic · ' + P(y.underwriting) + ' fees + ' + P(y.tesouro) + ' TES.' + tesCap, t: T.yld.t } : x; })
+      : [T.bal, T.yld, T.sel, T.roc, T.gain, T.head, T.blk, T.back, T.bad, T.cap, T.take]);
+    var yk = [T.yld, T.sel, T.roc, T.gain,
       { l: 'Capital payback', v: sfm, d: 'Σ net gain ≥ ' + R(state.startCapital), t: 'Month when cumulative net gain equals the starting capital. ≈ means projected.' },
-      { l: 'Withdrawals', v: R(r.cumWithdrawals), d: state.withdraw === 'none' ? 'None: everything reinvested' : 'Paid from surplus', t: 'Total paid out of the reserve under the withdrawal policy.' },
+      { l: 'Redemptions', v: R(r.cumWithdrawals), d: state.withdraw === 'none' ? 'None: everything reinvested' : 'Paid from free capital', t: 'Total redeemed out of the reserve, only ever from free capital.' },
       { l: 'Claims-to-fees ratio', v: P(r.payouts.ratio), d: 'Debts ' + state.scope + ' · ' + R(r.payouts.total) + ' / lease / yr', t: 'Expected claims ÷ guarantee fees, per lease per year.' },
-      { l: 'Yield on required reserve', v: P(r.steady.total), d: 'Steady state · ' + PP(r.spreadVsSelic) + ' vs Selic', t: 'Full-year return per R$ of required reserve: (net fees − claims) ÷ required per lease + TESOURO share × rate.' }
-    ]);
+      { l: 'Yield on coverage required', v: P(r.steady.total), d: 'Steady state · ' + PP(r.spreadVsSelic) + ' vs Selic', t: 'Full-year return per R$ of coverage required: (net fees − claims) ÷ coverage required per lease + TESOURO share (within the cap) × rate.' }
+    ];
+    if (r.tesouroCapped) {
+      var wi = tesouroWhatIf();
+      yk.splice(2, 0, { l: 'What-if: TESOURO cap raised', v: P(wi.yieldSim.total), d: P(r.tesouroShareWanted, 0) + ' in TESOURO · ' + PP(wi.yieldSim.vsSelic) + ' vs Selic', t: 'Same inputs with max_tesouro_share_bps raised to the TESOURO share wanted. Not possible on devnet (no adapter, cap 0).' });
+    }
+    tiles('yieldKpis', yk);
     renderYieldTable(r);
 
-    var legW = state.worstFloorPct / 100 * r.req.cover, legT = Math.max(1, state.tailFloor) * r.req.tail;
-    var rn = 'Required reserve per lease under the coverage policy: <b>' + R(Math.max(legW, legT)) + '</b>, the larger of ' + P(state.worstFloorPct / 100, 0) + ' × ' + R(r.req.cover) + ' ceilings (' + R(legW) + ') and ' + decF.format(Math.max(1, state.tailFloor)) + ' × ' + R(r.req.tail) + ' bad-year claims (' + R(legT) + ').';
-    if (state.sizing !== 'policy') rn = '<b>The simulation is using a comparison rule: ' + esc(ruleName(state.sizing)) + ', ' + R(rpl) + ' per lease.</b> <button type="button" class="linkbtn" data-userule="policy">Use the coverage policy</button><br>' + rn;
-    var rnEl = document.getElementById('ruleNote'); rnEl.innerHTML = rn; rnEl.className = 'seghint' + (state.sizing !== 'policy' ? ' risk' : '');
+    var tcCount = r.req.cover > 0 ? Math.floor(state.maxCoverPerAgency / r.req.cover + 1e-9) : Infinity;
+    var maxClaimMonth = r.rows.reduce(function(a, x){ return Math.max(a, x.claims); }, 0);
+    var rn = 'Cover per lease <b>' + R(r.req.cover) + '</b> (' + decF.format(state.defaultCover) + ' + ' + decF.format(state.exitCover) + ' × rent). Coverage required per lease at ' + esc(cName(r.req.c)) + ': <b>' + R(rpl) + '</b>.';
+    rn += r.req.overGuaranteeCap ? '<br><b>Refused: cover above max_cover_per_guarantee (' + R(state.maxCoverPerGuarantee) + ').</b> Every registration fails.' : '<br>Per guarantee: within ' + R(state.maxCoverPerGuarantee) + '.';
+    rn += ' Per agency (one agency): ' + R(state.maxCoverPerAgency) + ' fits ' + N0(tcCount) + ' leases' + (r.refusals['agency-cap'] ? ', <b>binding</b>.' : ', not binding.');
+    rn += ' max_tvl ' + R(state.maxTvl) + (r.tvlRefused > 0 ? ': <b>' + R(r.tvlRefused) + ' refused</b>.' : '.');
+    rn += '<br>Claims: largest month ' + R(maxClaimMonth) + ' vs ' + R(state.maxClaimPerPeriod) + ' per 30 days' + (r.claimCapMonths ? ', <b>over in ' + plural(r.claimCapMonths, 'month', 'months') + '</b> (pay_claim_admin)' : '') + '. One eviction ' + R(r.largestEvent) + (r.overCallCap ? ' is above max_claim_per_call (' + R(state.maxClaimPerCall) + '): pay_claim_admin.' : ' fits max_claim_per_call (' + R(state.maxClaimPerCall) + ').');
+    rn += ' TESOURO: ' + P(r.tesouroShareWanted, 0) + ' wanted, cap ' + P(Math.max(0, state.maxTesouroSharePct) / 100, 0) + ' → ' + P(r.tesouroShare, 0) + '. Fee take ' + P(r.take, 0) + (state.takePct > 30 ? ' (capped at 30%)' : '') + '.';
+    if (r.finalActive > 0) rn += '<br>' + badYears(r.tailCover) + '.';
+    var rnEl = document.getElementById('ruleNote'); rnEl.innerHTML = rn; rnEl.className = 'seghint' + (r.req.overGuaranteeCap || r.refusals['agency-cap'] ? ' risk' : '');
 
     document.querySelector('#tbl tbody').innerHTML = r.rows.map(function(x){
-      return '<tr><td>' + x.month + '</td><td>' + intF.format(x.newLeases) + (x.blocked ? ' <span class="tag risk">blocked</span>' : '') + '</td><td>' + intF.format(x.active) + '</td><td>' + R(x.deposit) + '</td><td>' + R(x.required) + '</td><td>' + R(x.balance) +
-        '</td><td' + (x.headroom < 0 ? ' class="neg"' : '') + '>' + R(x.headroom) + '</td><td>' + R(x.gross) + '</td><td>' + R(x.take) + '</td><td>' + R(x.netFees) + '</td><td>' + R(x.claims) + '</td><td>' + R(x.tesouro) +
+      return '<tr><td>' + x.month + '</td><td>' + intF.format(x.newLeases) + (x.blocked ? ' <span class="tag risk" title="Refused: ' + esc(REFUSAL[x.refusal]) + '">refused · ' + esc(REFUSAL[x.refusal]) + '</span>' : '') + '</td><td>' + intF.format(x.active) + '</td><td>' + R(x.deposit) + (x.depositRefused > 0 ? ' <span class="tag risk">' + esc(RC(x.depositRefused)) + ' over max_tvl</span>' : '') + '</td><td>' + R(x.remaining) + '</td><td>' + R(x.required) + '</td><td>' + R(x.balance) +
+        '</td><td' + (x.headroom < 0 ? ' class="neg"' : '') + '>' + R(x.headroom) + '</td><td>' + R(x.gross) + '</td><td>' + R(x.take) + '</td><td>' + R(x.netFees) + '</td><td>' + (x.overClaimCap ? '<span class="tag risk">over period cap</span> ' : '') + R(x.claims) + '</td><td>' + R(x.tesouro) +
         '</td><td' + (x.gain < 0 ? ' class="neg"' : '') + '>' + R(x.gain) + '</td><td>' + R(x.withdrawal) + '</td></tr>';
     }).join('');
     var t = r.totals;
-    document.querySelector('#tbl tfoot').innerHTML = '<tr><td>Total</td><td>' + intF.format(r.rows.reduce(function(a, x){ return a + x.newLeases; }, 0)) + '</td><td></td><td>' + R(r.capitalRaised) + '</td><td></td><td>' + R(r.endBalance) + '</td><td></td><td>' + R(t.gross) + '</td><td>' + R(t.take) + '</td><td>' + R(t.net) + '</td><td>' + R(t.claims) + '</td><td>' + R(t.tesouro) + '</td><td>' + R(t.gain) + '</td><td>' + R(t.withdrawals) + '</td></tr>';
+    document.querySelector('#tbl tfoot').innerHTML = '<tr><td>Total</td><td>' + intF.format(r.rows.reduce(function(a, x){ return a + x.newLeases; }, 0)) + '</td><td></td><td>' + R(r.capitalRaised) + '</td><td></td><td></td><td>' + R(r.endBalance) + '</td><td></td><td>' + R(t.gross) + '</td><td>' + R(t.take) + '</td><td>' + R(t.net) + '</td><td>' + R(t.claims) + '</td><td>' + R(t.tesouro) + '</td><td>' + R(t.gain) + '</td><td>' + R(t.withdrawals) + '</td></tr>';
 
     renderMutav(r); renderRules(r); renderScopes(r); renderSizing(r);
     if (uiMode === 'simple' || !document.querySelector('[data-pane="time"]').hidden) drawChart(r);
     if (uiMode === 'advanced' && !document.querySelector('[data-pane="yield"]').hidden) drawYield(r);
   }
 
+  var C_ROWS = [[0.10, 'Program floor and the devnet start (ADR 0016); the 40-reserve 9w worst-case floor.'], [0.25, 'A quarter of every lease’s remaining cover.'], [1.0, 'Every lease’s full remaining cover held in stable assets.']];
   function renderRules(r){
-    var legW = state.worstFloorPct / 100 * r.req.cover, legT = Math.max(1, state.tailFloor) * r.req.tail;
-    var rows = [
-      ['policy', 'Live rule: the larger of ' + P(state.worstFloorPct / 100, 0) + ' of ceilings (' + R(legW) + ') and ' + decF.format(Math.max(1, state.tailFloor)) + ' bad years (' + R(legT) + ').'],
-      ['B', 'Philosophy B: ' + decF.format(state.tailYears) + ' × bad-year claims per lease. Comparison only.'],
-      ['full', 'Every lease’s full ceilings × c. Spec invariant at c = 1. Comparison only.']
-    ];
+    var rows = C_ROWS.slice(), cur = r.req.c;
+    if (!rows.some(function(x){ return Math.abs(x[0] - cur) < 1e-9; })) rows.push([cur, 'Current input.']);
+    rows.sort(function(a, b){ return a[0] - b[0]; });
     document.querySelector('#ruleTbl tbody').innerHTML = rows.map(function(row){
-      var k = row[0], x = k === state.sizing ? r : mutavCompute(ext(state, { sizing: k })), cur = k === state.sizing;
-      return '<tr' + (cur ? ' class="cur"' : '') + '><td>' + esc(ruleName(k)) + '<span class="sub2">' + esc(row[1]) + '</span></td><td>' + R(x.req.perLease) + '</td><td>' + N0(x.capacityAtStart) + '</td><td>' + N0(x.finalActive) + ' of ' + N0(x.plannedActive) +
+      var c = row[0], isCur = Math.abs(c - cur) < 1e-9, x = isCur ? r : mutavCompute(ext(state, { coverageRatio: c }));
+      return '<tr' + (isCur ? ' class="cur"' : '') + '><td>' + esc(cName(c)) + '<span class="sub2">' + esc(row[1]) + '</span></td><td>' + R(x.req.perLease) + '</td><td>' + N0(x.capacityAtStart) + '</td><td>' + N0(x.finalActive) + ' of ' + N0(x.plannedActive) +
         '</td><td>' + (x.blockedMonths ? '<span class="tag risk">' + x.blockedMonths + '</span>' : '<span class="tag ok">0</span>') + '</td><td>' + R(x.endBalance) + '</td><td>' + R(x.endSurplus) +
-        '</td><td><input type="radio" name="simRule" value="' + k + '"' + (cur ? ' checked' : '') + ' aria-label="Simulate with ' + esc(ruleName(k)) + '"></td></tr>';
+        '</td><td>' + P(x.yieldSim.total) + '</td><td>' + (x.finalActive > 0 ? X(x.tailCover) : '–') +
+        '</td><td><input type="radio" name="simC" value="' + c + '"' + (isCur ? ' checked' : '') + ' aria-label="Simulate with ' + esc(cName(c)) + '"></td></tr>';
     }).join('');
-    document.getElementById('ruleNote2').textContent = 'Same inputs, different required reserve. Full backing at c = 1 is the strictest; expected-loss is the loosest. The bad-year multiplier (' + decF.format(state.tailMult) + '×) sets how large a bad year is; the coverage rule sets how many the reserve holds.';
+    document.getElementById('ruleNote2').textContent = 'Same inputs, different c. Coverage required = ceil(c × remaining cover), never below open provisions. A lower c backs more leases per real of capital; the bad-year check (off-chain; study: grow ≥ 2,0×, never < 1,0×) shows what each c leaves for a bad year. The bad-year multiplier (' + decF.format(state.tailMult) + '×) sets how large a bad year is.';
   }
 
   function renderMutav(r){
     var m = r.mutav, N = r.months;
     tiles('takeKpis', [
-      { l: 'Take in month ' + N, v: R(m.takeFinalMonth), d: P(state.takePct / 100, 0) + ' of ' + R(r.rows[N - 1].gross) + ' guarantee fees', t: 'MUTAV take in the last simulated month.' },
+      { l: 'Take in month ' + N, v: R(m.takeFinalMonth), d: P(r.take, 0) + ' of ' + R(r.rows[N - 1].gross) + ' guarantee fees', t: 'MUTAV take in the last simulated month.' },
       { l: N + '-month take total', v: R(m.takeTotal), d: 'Gross revenue to the treasury', hero: true, t: 'Sum of MUTAV take over the simulated months.' },
       { l: 'Annual run-rate at month ' + N, v: R(m.takeRunRate), d: 'Month ' + N + ' take × 12', t: 'Last month’s take, annualized.' },
-      { l: 'Take per lease per month', v: R(m.takePerLease), d: R(state.rent) + ' × ' + P(state.feePct / 100, 1) + ' × ' + decF.format(state.periods) + '/12 × ' + P(state.takePct / 100, 0), t: 'Rent × guarantee fee × fee periods / 12 × take rate.' }
+      { l: 'Take per lease per month', v: R(m.takePerLease), d: R(state.rent) + ' × ' + P(state.feePct / 100, 1) + ' × ' + decF.format(state.periods) + '/12 × ' + P(r.take, 0), t: 'Rent × guarantee fee × fee periods / 12 × take rate (at most 30%).' }
     ]);
     var mb = '', costSet = state.opCostPerLease > 0 || state.opCostFixed > 0;
     if (costSet) {
@@ -1078,12 +1207,12 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     }).join('');
     tiles('shareKpis', [
       { l: 'MUTAV share of reserve net gain', v: R(m.reserveGain), d: P(m.share, 0) + ' of ' + R(r.cumGain) + ' over ' + N + ' months', t: 'MUTAV’s capital share × the reserve’s net gain.' },
-      { l: 'MUTAV withdrawals', v: R(m.distributions), d: P(m.share, 0) + ' of ' + R(r.cumWithdrawals) + ' withdrawn', t: 'MUTAV’s share of money withdrawn from the surplus.' },
-      { l: 'Investors’ share', v: R(m.investorReserveGain), d: P(1 - m.share, 0) + ' of capital · ' + R(m.investorDistributions) + ' withdrawn' + (m.share >= 1 ? ' (none in Stage 1)' : ''), t: 'Outside investors’ share of net gain and withdrawals.' }
+      { l: 'MUTAV redemptions', v: R(m.distributions), d: P(m.share, 0) + ' of ' + R(r.cumWithdrawals) + ' redeemed', t: 'MUTAV’s share of capital redeemed out of free capital.' },
+      { l: 'Investors’ share', v: R(m.investorReserveGain), d: P(1 - m.share, 0) + ' of capital · ' + R(m.investorDistributions) + ' redeemed' + (m.share >= 1 ? ' (none in Stage 1)' : ''), t: 'Outside investors’ share of net gain and redemptions.' }
     ]);
     var combo = [
-      { l: 'MUTAV total, ' + N + ' mo', v: R(m.economicResult), d: R(m.takeTotal) + ' take + ' + R(m.reserveGain) + ' reserve share', hero: true, t: 'Take plus MUTAV’s share of the reserve’s net gain, gross.' },
-      { l: 'Capital MUTAV committed', v: R(m.capitalCommitted), d: P(m.share, 0) + ' of ' + R(r.capitalRaised) + ' raised', t: 'MUTAV’s share of starting capital plus raises.' }
+      { l: 'MUTAV total, ' + N + ' mo', v: R(m.economicResult), d: R(m.takeTotal) + ' take + ' + R(m.reserveGain) + ' reserve share', hero: true, t: 'Business view: take plus MUTAV’s share of the reserve’s net gain, gross.' },
+      { l: 'Capital MUTAV committed', v: R(m.capitalCommitted), d: P(m.share, 0) + ' of ' + R(r.capitalRaised) + ' raised', t: 'MUTAV’s share of the capital accepted under max_tvl.' }
     ];
     if (costSet) combo.push({ l: 'Total net of operating cost', v: R(m.economicResultNet), d: 'Before PIX/offramp fees and taxes', t: 'MUTAV total minus operating costs.' });
     tiles('comboKpis', combo);
@@ -1093,10 +1222,10 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var t = mutavSizingTable(state, r, PILOT_BOOK);
     document.querySelector('#sizeTbl tbody').innerHTML = t.rows.map(function(x){
       var tags = (x.isRec ? ' <span class="tag ok">pilot plan (' + PILOT_BOOK + ')</span>' : '') + (x.isMax ? ' <span class="tag ok">max backed</span>' : '') + (x.isCurrent ? ' <span class="tag ok">current book</span>' : '');
-      return '<tr' + (x.isCurrent ? ' class="cur"' : '') + '><td>' + intF.format(x.leases) + tags + '</td><td>' + P(x.pctCeilings) + '</td><td>' + X(x.tailX) + '</td><td>' + (x.meets ? '<span class="tag ok">yes</span>' : '<span class="tag risk">no</span>') + '</td><td>' + R(x.take) +
+      return '<tr' + (x.isCurrent ? ' class="cur"' : '') + '><td>' + intF.format(x.leases) + tags + '</td><td>' + P(x.pctCover) + '</td><td>' + X(x.tailX) + '</td><td>' + (x.meets ? '<span class="tag ok">yes</span>' : '<span class="tag risk">refused</span>') + '</td><td>' + R(x.take) +
         '</td><td' + (x.normal < 0 ? ' class="neg"' : '') + '>' + R(x.normal) + '</td><td>' + P(x.normalRet) + '</td><td' + (x.bad < 0 ? ' class="neg"' : '') + '>' + R(x.bad) + '</td><td>' + P(x.badRet) + '</td><td>' + PP(x.vsSelic) + '</td></tr>';
     }).join('');
-    document.getElementById('sizeNote').textContent = 'Balance used for every row: ' + R(t.reserve) + ' (month ' + r.months + '). Max backed: ' + N0(t.policyMax) + ' leases at ' + R(r.req.perLease) + ' per lease (' + ruleName(r.req.mode) + '). Expected claims ' + R(t.claims) + ' and bad year ' + R(t.tail) + ' per lease (' + decF.format(state.tailMult) + '×), debts ' + state.scope + '. TESOURO ' + P(state.tesouroSharePct / 100, 0) + ' × ' + P(state.tesouroPct / 100, 2) + ' on the balance. “Pilot plan” marks the Pilot · recommended book (' + PILOT_BOOK + ' leases).';
+    document.getElementById('sizeNote').textContent = 'Stable assets used for every row: ' + R(t.reserve) + ' (month ' + r.months + '). Max backed: ' + N0(t.maxBacked) + ' leases at ' + R(r.req.perLease) + ' of coverage required per lease (' + cName(r.req.c) + '). Expected claims ' + R(t.claims) + ' and bad year ' + R(t.tail) + ' per lease (' + decF.format(state.tailMult) + '×), debts ' + state.scope + '. TESOURO ' + P(r.tesouroShare, 0) + (r.tesouroCapped ? ' (capped from ' + P(r.tesouroShareWanted, 0) + ')' : '') + ' × ' + P(state.tesouroPct / 100, 2) + ' on stable assets. “Pilot plan” marks the Pilot · recommended book (' + PILOT_BOOK + ' leases).';
   }
 
   function renderScopes(r){
@@ -1107,10 +1236,10 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       return '<tr' + (cur ? ' class="cur"' : '') + '><td>' + esc(SEGS.scope.o.filter(function(o){ return o[0] === s; })[0][1]) + (cur ? ' (current)' : '') + '</td><td>' + R(x.payouts.total) + '</td><td>' + P(x.payouts.ratio) + '</td><td>' + P(x.steady.underwriting) + '</td><td>' + P(x.steady.total) + '</td><td>' + PP(x.spreadVsSelic) +
         '</td><td>' + P(x.yieldSim.total) + '</td><td>' + (sr ? P(sr.normalRet) : '–') + '</td><td>' + (sr ? P(sr.badRet) : '–') + '</td><td>' + (sr ? PP(sr.vsSelic) : '–') + '</td><td>' + R(x.mutav.takeTotal) + '</td></tr>';
     }).join('');
-    document.getElementById('scopeNote').textContent = 'All other inputs as set: eviction rate ' + decF.format(state.evictRatePct) + '% a year at ' + decF.format(state.evictMult) + '× rent (range 0,10–0,60%), delinquency ' + decF.format(state.rhoPct) + '%. Returns here are on the required reserve per lease (steady state), not on the balance. MUTAV take changes across scopes only if the gate admits a different book.';
+    document.getElementById('scopeNote').textContent = 'All other inputs as set: eviction rate ' + decF.format(state.evictRatePct) + '% a year at ' + decF.format(state.evictMult) + '× rent (range 0,10–0,60%), delinquency ' + decF.format(state.rhoPct) + '%. Returns here are on coverage required per lease (steady state), not on stable assets. MUTAV take changes across scopes only if the gate admits a different book.';
     var p = r.payouts, rent = state.rent;
     var rows = [
-      ['Rent arrears', 'min(12 × ' + decF.format(state.rhoPct) + '%, ' + decF.format(state.defaultCover) + '×) × rent', p.defaultLeg],
+      ['Default leg (rent arrears)', 'min(12 × ' + decF.format(state.rhoPct) + '%, ' + decF.format(state.defaultCover) + '×) × rent', p.defaultLeg],
       ['Evictions', decF.format(state.evictRatePct) + '% × min(' + decF.format(state.evictMult) + '×, ' + decF.format(state.exitCover) + '×) × rent', p.evictions],
       ['Other exit debts', state.scope === 'A' ? decF.format(state.nonEvictX) + '× rent' : state.scope === 'B' ? '(' + decF.format(state.nonEvictX) + ' − ' + decF.format(state.penaltyX) + ')× rent' : 'not covered in scope C', p.exitDebts]
     ];
@@ -1166,7 +1295,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       s += '<polyline class="' + cls + '" points="' + pts.join(' ') + '"/>';
       s += '<circle class="' + (dotCls || 'c-dot') + '" cx="' + cx(N - 1) + '" cy="' + y(vals[N - 1]) + '" r="4.5"/>';
     }
-    /* panel 1: balance vs required reserve, withdrawals, blocked */
+    /* panel 1: stable assets vs coverage required, redemptions, refused registrations */
     var p1 = panel(plot);
     var hasW = r.cumWithdrawals > 0;
     var max1 = niceMax(Math.max.apply(null, r.rows.map(function(x){ return Math.max(x.balance, x.required); })) * 1.06);
@@ -1175,11 +1304,11 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var minBal = Math.min.apply(null, r.rows.map(function(x){ return x.balance; }));
     if (minBal < lo1) lo1 = -niceMax(-minBal * 1.06);
     var y1 = scale(p1, lo1, max1);
-    header(p1, 'Balance vs required reserve', R(lastRow.balance) + ' at M' + N + (narrow ? '' : ' · required ' + R(lastRow.required) + ' · surplus ' + R(Math.max(0, lastRow.balance - lastRow.required))));
+    header(p1, narrow ? 'Stable assets vs coverage req.' : 'Stable assets vs coverage required', R(lastRow.balance) + ' at M' + N + (narrow ? '' : ' · required ' + R(lastRow.required) + ' · free capital ' + R(Math.max(0, lastRow.balance - lastRow.required))));
     axis(y1, 0, max1, 2, lo1 < 0 ? [lo1, 0, max1 / 2, max1] : null);
     r.rows.forEach(function(x, i){ bar(y1, x.balance, i, 'c-bar'); if (x.withdrawal > 0) bar(y1, -x.withdrawal, i, 'c-bar s3', Math.max(2, bw * 0.6)); });
     line(y1, r.rows.map(function(x){ return x.required; }), 'c-req', false, 'c-reqdot');
-    r.rows.forEach(function(x, i){ if (x.blocked) { var ty = p1.t + 2; s += '<path class="c-blk" d="M' + (cx(i) - 5) + ',' + ty + 'H' + (cx(i) + 5) + 'L' + cx(i) + ',' + (ty + 7) + 'Z"><title>Growth blocked in month ' + x.month + '</title></path>'; } });
+    r.rows.forEach(function(x, i){ if (x.blocked) { var ty = p1.t + 2; s += '<path class="c-blk" d="M' + (cx(i) - 5) + ',' + ty + 'H' + (cx(i) + 5) + 'L' + cx(i) + ',' + (ty + 7) + 'Z"><title>Registrations refused in month ' + x.month + ': ' + esc(REFUSAL[x.refusal]) + '</title></path>'; } });
     document.getElementById('lgW').hidden = !hasW;
     /* panel 2 */
     var p2 = panel(plotS), gMin = 0, gMax = 0;
@@ -1187,7 +1316,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var gTop = gMax > 0 ? niceMax(gMax * 1.04) : 0, gBot = gMin < 0 ? -niceMax(-gMin * 1.04) : 0;
     if (gTop === gBot) gTop = 1;
     var y2 = scale(p2, gBot, gTop);
-    header(p2, narrow ? 'Net gain vs Selic' : 'Reserve net gain vs Selic (cumulative)', R(lastRow.cumGain) + ' · ' + P(r.yieldSim.total) + '/yr vs Selic ' + R(lastRow.cumSelic));
+    header(p2, narrow ? 'Net gain vs Selic' : 'Reserve net gain vs Selic (cumulative, business view)', R(lastRow.cumGain) + ' · ' + P(r.yieldSim.total) + '/yr vs Selic ' + R(lastRow.cumSelic));
     axis(y2, gBot, gTop, 2);
     line(y2, r.rows.map(function(x){ return x.cumGain; }), 'c-line', true);
     s += '<polyline class="c-ref" points="' + r.rows.map(function(x, i){ return cx(i) + ',' + y2(x.cumSelic); }).join(' ') + '"/>';
@@ -1208,10 +1337,10 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var H = p3.b + 22;
     s += '<rect id="hov" class="c-hover" x="0" y="' + p1.t + '" width="' + band + '" height="' + (p3.b - p1.t) + '" style="display:none"/>';
     r.rows.forEach(function(x, i){ s += '<rect class="c-hit" data-i="' + i + '" x="' + (L + band * i) + '" y="' + (p1.t - head) + '" width="' + band + '" height="' + (H - p1.t + head) + '"/>'; });
-    host.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reserve balance against the required reserve with withdrawals and blocked months, cumulative reserve net gain against the same capital at Selic, and MUTAV monthly take, by month. The Month by month tab has the same data as a table.">' + s + '</svg>';
+    host.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reserve stable assets against coverage required with redemptions and months with refused registrations, cumulative reserve net gain against the same capital at Selic, and MUTAV monthly take, by month. The Month by month tab has the same data as a table.">' + s + '</svg>';
     geo = { L: L, band: band, costSet: costSet };
   }
-  /* yield chart: monthly net gain (bars) vs the same opening balance at Selic (dashed), one axis */
+  /* yield chart: monthly net gain (bars) vs the same capital at Selic (dashed), one axis */
   function drawYield(r){
     var host = document.getElementById('ychart');
     var W = Math.max(280, Math.round(host.clientWidth || 640)), narrow = W < 480;
@@ -1237,14 +1366,14 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     r.rows.forEach(function(x, i){ if (i % every === 0 || i === N - 1) s += '<text class="c-tick" x="' + cx(i) + '" y="' + (b + 15) + '" text-anchor="middle">M' + x.month + '</text>'; });
     var H = b + 22;
     r.rows.forEach(function(x, i){ s += '<rect class="c-hit" data-i="' + i + '" x="' + (L + band * i) + '" y="' + top + '" width="' + band + '" height="' + plot + '"/>'; });
-    host.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Monthly reserve net gain against what the same balance earns at Selic. The Monthly yield table has the same data.">' + s + '</svg>';
+    host.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Monthly reserve net gain against what the same capital earns at Selic. The Monthly yield table has the same data.">' + s + '</svg>';
   }
   (function(){
     var yb = document.getElementById('yieldBox'), yt = document.getElementById('ytip');
     yb.addEventListener('pointermove', function(e){
       var el = e.target; if (!(el && el.classList && el.classList.contains('c-hit')) || !last) { yt.style.display = 'none'; return; }
       var x = last.rows[+el.getAttribute('data-i')]; if (!x) return;
-      yt.innerHTML = '<b>Month ' + x.month + '</b><div class="r"><span>Net fees − claims</span><span>' + R(x.uw) + '</span></div><div class="r"><span>TESOURO</span><span>' + R(x.tesouro) + '</span></div><div class="r"><span>Net gain</span><span>' + R(x.gain) + '</span></div><div class="r"><span>Annualized</span><span>' + P(x.yieldAnn) + '</span></div><div class="r"><span>Selic on balance</span><span>' + R(x.selicOpp) + '</span></div>';
+      yt.innerHTML = '<b>Month ' + x.month + '</b><div class="r"><span>Net fees − claims</span><span>' + R(x.uw) + '</span></div><div class="r"><span>TESOURO</span><span>' + R(x.tesouro) + '</span></div><div class="r"><span>Net gain</span><span>' + R(x.gain) + '</span></div><div class="r"><span>Annualized</span><span>' + P(x.yieldAnn) + '</span></div><div class="r"><span>Selic on capital</span><span>' + R(x.selicOpp) + '</span></div>';
       yt.style.display = 'block';
       var b = yb.getBoundingClientRect(), px = e.clientX - b.left, py = e.clientY - b.top, tw = yt.offsetWidth, th = yt.offsetHeight;
       var left = px + 14; if (left + tw > b.width - 4) left = px - tw - 14; if (left < 4) left = 4;
@@ -1259,11 +1388,11 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var x = last.rows[i]; if (!x) return;
     var hov = document.getElementById('hov'); hov.setAttribute('x', geo.L + geo.band * i); hov.style.display = '';
     function rr(a, b){ return '<div class="r"><span>' + a + '</span><span>' + b + '</span></div>'; }
-    tip.innerHTML = '<b>Month ' + x.month + ' · ' + intF.format(x.active) + ' active · ' + intF.format(x.newLeases) + ' new' + (x.blocked ? ' (blocked)' : '') + '</b>' +
-      (x.deposit ? rr('Capital in', R(x.deposit)) : '') + rr('Balance', R(x.balance)) + rr('Required reserve', R(x.required)) + rr('Surplus / shortfall', R(x.headroom)) +
+    tip.innerHTML = '<b>Month ' + x.month + ' · ' + intF.format(x.active) + ' active · ' + intF.format(x.newLeases) + ' registered' + (x.blocked ? ' (refused: ' + esc(REFUSAL[x.refusal]) + ')' : '') + '</b>' +
+      (x.deposit ? rr('Capital in', R(x.deposit)) : '') + (x.depositRefused ? rr('Refused by max_tvl', R(x.depositRefused)) : '') + rr('Stable assets', R(x.balance)) + rr('Remaining cover', R(x.remaining)) + rr('Coverage required', R(x.required)) + rr('Free capital / shortfall', R(x.headroom)) +
       rr('Net fees', R(x.netFees)) + rr('Claims paid', '−' + R(x.claims)) + rr('TESOURO yield', R(x.tesouro)) + rr('Net gain', R(x.gain)) +
       rr('Cumulative gain', R(x.cumGain)) + rr('Same capital at Selic', R(x.cumSelic)) +
-      (x.withdrawal ? rr('Withdrawal', '−' + R(x.withdrawal)) : '') + rr('MUTAV take', R(x.take)) + rr('Cumulative take', R(x.cumTake)) +
+      (x.withdrawal ? rr('Redemption', '−' + R(x.withdrawal)) : '') + rr('MUTAV take', R(x.take)) + rr('Cumulative take', R(x.cumTake)) +
       (geo.costSet ? rr('Operating cost', R(x.opCost)) : '');
     tip.style.display = 'block';
     var b = box.getBoundingClientRect(), px = evt.clientX - b.left, py = evt.clientY - b.top, tw = tip.offsetWidth, th = tip.offsetHeight;
@@ -1286,7 +1415,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var r = last, N = r.months, lines = [];
     var sc = activeScen ? scenById(activeScen).l : 'Custom (modified from ' + (scenById(baseScen) || scenById('default')).l + ')';
     lines.push('MUTAV reserve simulator: snapshot (model estimates, not a return promise; not an offer of securities)');
-    lines.push('Scenario: ' + sc + (state.sizing !== 'policy' ? ' · required reserve by ' + ruleName(state.sizing) : ''));
+    lines.push('Scenario: ' + sc + ' · coverage ratio ' + cName(r.req.c));
     lines.push('');
     lines.push('At a glance');
     lastGlance.forEach(function(g){ lines.push('  ' + g.q + ': ' + plain(g.s)); });
@@ -1301,11 +1430,11 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     });
     lines.push('');
     lines.push('Results');
-    lines.push('  Balance at month ' + N + ': ' + R(r.endBalance) + ' (required reserve ' + R(r.endRequired) + ', surplus ' + R(r.endSurplus) + ')');
-    lines.push('  Leases: ' + N0(r.finalActive) + ' of ' + N0(r.plannedActive) + ' planned; blocked months: ' + r.blockedMonths + '; the balance backs ' + N0(r.selfFundedLeases));
-    lines.push('  Lowest surplus: ' + R(r.minHeadroom) + ' (month ' + r.minHeadMonth + ')');
-    lines.push('  Capital raised: ' + R(r.capitalRaised) + '; reserve net gain: ' + R(r.cumGain) + '; withdrawals: ' + R(r.cumWithdrawals));
-    lines.push('  Reserve yield, annualized: ' + P(r.yieldSim.total, 2) + ' (' + P(r.yieldSim.underwriting, 2) + ' fees − claims + ' + P(r.yieldSim.tesouro, 2) + ' TESOURO); vs Selic ' + PP(r.yieldSim.vsSelic) + '; return on capital ' + P(r.yieldSim.returnOnCapital, 2) + ' over ' + N + ' months (' + P(r.yieldSim.returnOnCapitalAnn, 2) + ' a year)');
+    lines.push('  Stable assets at month ' + N + ': ' + R(r.endBalance) + ' (coverage required ' + R(r.endRequired) + ' on ' + R(r.endRemaining) + ' remaining cover, free capital ' + R(r.endSurplus) + ')');
+    lines.push('  Leases: ' + N0(r.finalActive) + ' of ' + N0(r.plannedActive) + ' planned; refused months: ' + r.blockedMonths + (r.blockedMonths ? ' (' + REFUSAL[r.firstRefusal] + ')' : '') + '; the stable assets back ' + N0(r.selfFundedLeases));
+    lines.push('  Lowest free capital: ' + R(r.minHeadroom) + ' (month ' + r.minHeadMonth + '); ' + (r.finalActive > 0 ? badYearsPlain(r.tailCover) : 'no book'));
+    lines.push('  Capital in: ' + R(r.capitalRaised) + (r.tvlRefused > 0 ? ' (' + R(r.tvlRefused) + ' refused by max_tvl)' : '') + '; reserve net gain: ' + R(r.cumGain) + '; redemptions: ' + R(r.cumWithdrawals));
+    lines.push('  Reserve yield, annualized (business view): ' + P(r.yieldSim.total, 2) + ' (' + P(r.yieldSim.underwriting, 2) + ' fees − claims + ' + P(r.yieldSim.tesouro, 2) + ' TESOURO); vs Selic ' + PP(r.yieldSim.vsSelic) + '; return on capital ' + P(r.yieldSim.returnOnCapital, 2) + ' over ' + N + ' months (' + P(r.yieldSim.returnOnCapitalAnn, 2) + ' a year)');
     lines.push('  Claims-to-fees ratio: ' + P(r.payouts.ratio, 1) + ' (' + R(r.payouts.total) + ' per lease per year)');
     lines.push('  MUTAV take, ' + N + ' months: ' + R(r.mutav.takeTotal) + ' gross; run-rate ' + R(r.mutav.takeRunRate) + '/yr');
     try { lines.push(''); lines.push('Scenario link: ' + location.href); } catch (e) {}
@@ -1328,11 +1457,12 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   document.getElementById('csvBtn').addEventListener('click', function(){
     var btn = this;
     try {
-      var head = ['month','planned_new','new_leases','blocked','active_leases','capital_in','opening_balance','required_reserve','balance','surplus','surplus_or_shortfall','guarantee_fees','mutav_take','net_fees_to_reserve','claims_paid','tesouro_yield','net_gain','withdrawal','cumulative_net_gain','cumulative_withdrawals','cumulative_take','operating_cost','net_fees_minus_claims','yield_annualized','selic_on_balance','cumulative_selic'];
-      var lines = ['# starting_capital=' + state.startCapital + ' monthly_raise=' + state.monthlyRaise + ' raise_from=' + state.raiseFrom + ' raise_until=' + (state.raiseUntil > 0 ? state.raiseUntil : last.months) + ' rule=' + state.sizing, head.join(',')];
+      var head = ['month','planned_new','guarantees_registered','registrations_refused','refusal','active_guarantees','capital_in','capital_refused_max_tvl','opening_stable_assets','remaining_cover_total','coverage_required','stable_assets','free_capital','stable_minus_coverage_required','guarantee_fees','fee_take','net_fees_to_reserve','claims_paid','claims_over_period_cap','tesouro_yield','net_gain','redemptions','cumulative_net_gain','cumulative_redemptions','cumulative_fee_take','operating_cost','net_fees_minus_claims','yield_annualized','selic_on_capital','cumulative_selic'];
+      var lines = ['# coverage_ratio_bps=' + last.req.cBps + ' starting_capital=' + state.startCapital + ' monthly_raise=' + state.monthlyRaise + ' raise_from=' + state.raiseFrom + ' raise_until=' + (state.raiseUntil > 0 ? state.raiseUntil : last.months) +
+        ' max_tvl=' + state.maxTvl + ' max_cover_per_guarantee=' + state.maxCoverPerGuarantee + ' max_cover_per_agency=' + state.maxCoverPerAgency + ' max_claim_per_call=' + state.maxClaimPerCall + ' max_claim_per_period=' + state.maxClaimPerPeriod + ' max_tesouro_share_bps=' + Math.round(state.maxTesouroSharePct * 100) + ' fee_take_bps=' + Math.round(last.take * 10000), head.join(',')];
+      function num(v){ return (Math.round(v * 10000) / 10000).toString(); }
       last.rows.forEach(function(x){
-        lines.push([x.month, x.planned, x.newLeases, x.blocked ? 1 : 0, x.active, x.deposit, x.opening, x.required, x.balance, x.surplus, x.headroom, x.gross, x.take, x.netFees, x.claims, x.tesouro, x.gain, x.withdrawal, x.cumGain, x.cumW, x.cumTake, x.opCost, x.uw, x.yieldAnn, x.selicOpp, x.cumSelic]
-          .map(function(v){ return (Math.round(v * 10000) / 10000).toString(); }).join(','));
+        lines.push([num(x.month), num(x.planned), num(x.newLeases), x.blocked ? 1 : 0, x.refusal || '', num(x.active), num(x.deposit), num(x.depositRefused), num(x.opening), num(x.remaining), num(x.required), num(x.balance), num(x.surplus), num(x.headroom), num(x.gross), num(x.take), num(x.netFees), num(x.claims), x.overClaimCap ? 1 : 0, num(x.tesouro), num(x.gain), num(x.withdrawal), num(x.cumGain), num(x.cumW), num(x.cumTake), num(x.opCost), num(x.uw), num(x.yieldAnn), num(x.selicOpp), num(x.cumSelic)].join(','));
       });
       var blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' });
       var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'mutav-reserve-monthly.csv';
