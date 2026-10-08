@@ -23,7 +23,7 @@
     "_comment": "BRS base units (6 dp). Sized for c = 0.10 (ADR 0016): R$300k reserve, R$40k per guarantee, R$3M per agency (= maxTvl / 0.10, so it never binds while MUTAV's operator allocates every lease to this reserve), R$10k / R$20k claim payments per call / per 30 days, TESOURO 0% (no adapter on devnet), requests R$1k–R$100k, partial-fill floor R$500.",
     "maxTvl": 300000000000,
     "maxCoverPerGuarantee": 40000000000,
-    "maxCoverPerAgency": 3000000000000,
+    "maxCoverPerAgency": 10000000000000,
     "maxClaimPerCall": 10000000000,
     "maxClaimPerPeriod": 20000000000,
     "claimPeriodSecs": 2592000,

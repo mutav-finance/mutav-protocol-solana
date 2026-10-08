@@ -56,8 +56,9 @@ describe('devnet.example.json', () => {
     expect(c.coverageRatioBps).toBe(1_000);
     expect(c.caps.maxTvl).toBe(300_000n * BRL);
     expect(c.caps.maxCoverPerGuarantee).toBe(40_000n * BRL);
-    // max_tvl / 0.10: the per-agency cap never binds.
-    expect(c.caps.maxCoverPerAgency).toBe((c.caps.maxTvl * 10_000n) / BigInt(c.coverageRatioBps));
+    // Per-agency cap never binds: at least 3x the cover max_tvl backs at c (fees grow stable assets above max_tvl).
+    expect(c.caps.maxCoverPerAgency).toBe(10_000_000n * BRL);
+    expect(c.caps.maxCoverPerAgency >= (3n * c.caps.maxTvl * 10_000n) / BigInt(c.coverageRatioBps)).toBe(true);
     expect([c.caps.maxClaimPerCall, c.caps.maxClaimPerPeriod]).toEqual([10_000n * BRL, 20_000n * BRL]);
     expect([c.caps.minRequest, c.caps.maxRequest]).toEqual([1_000n * BRL, 100_000n * BRL]);
     expect(c.caps.minFillAssets).toBe(500n * BRL);

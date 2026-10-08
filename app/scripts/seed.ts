@@ -121,7 +121,7 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     caps: {
       maxTvl: "300000000000",
       maxCoverPerGuarantee: "40000000000",
-      maxCoverPerAgency: "3000000000000",
+      maxCoverPerAgency: "10000000000000",
       maxClaimPerCall: "10000000000",
       maxClaimPerPeriod: "20000000000",
       claimPeriodSecs: 2_592_000,

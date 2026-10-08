@@ -619,7 +619,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 |---|---|---|---|
 | `max_tvl` | `fulfil_deposits` | R$300k | Proposed; the working reserve target |
 | `max_cover_per_guarantee` | `register_guarantee` | R$40k | Proposed; fits the R$39,600 working product |
-| `max_cover_per_agency` | `register_guarantee` | R$3M | Proposed; `max_tvl` / 0.10, so it never binds while one reserve serves the agency |
+| `max_cover_per_agency` | `register_guarantee` | R$10M | Proposed; well above `max_tvl` / 0.10 plus fee growth, so it never binds while one reserve serves the agency |
 | `max_claim_per_call` | `pay_claim` (operator only) | R$10k | Proposed |
 | `max_claim_per_period` / `claim_period_secs` | `pay_claim` (operator only) | R$20k / 30 days | Proposed |
 | `max_tesouro_share_bps` | `allocate` | 50% (0% on devnet) | Proposed; business plan targets ~80% (open) |

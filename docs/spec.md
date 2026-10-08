@@ -870,7 +870,7 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). Valu
 |---|---|---|---|
 | `max_tvl` | `u64` | `fulfil_deposits` | R$300k |
 | `max_cover_per_guarantee` | `u64` | `register_guarantee` | R$40k |
-| `max_cover_per_agency` | `u64` | `register_guarantee` | R$3M (`max_tvl / c`: never binds while one reserve serves the agency; ADR 0016) |
+| `max_cover_per_agency` | `u64` | `register_guarantee` | R$10M (well above `max_tvl / c` plus fee growth: never binds while one reserve serves the agency; ADR 0016) |
 | `max_claim_per_call` | `u64` | `pay_claim` | R$10k |
 | `max_claim_per_period` | `u64` | `pay_claim` | R$20k |
 | `claim_period_secs` | `i64` | `pay_claim` | 30 days |
