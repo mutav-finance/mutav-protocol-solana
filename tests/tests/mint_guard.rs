@@ -1,5 +1,5 @@
-//! Mint guard (spec §5.1, PC-19): Token-2022 reserve mints with unsafe
-//! extensions are rejected at `initialize`.
+//! Mint guard (spec §5.1, PC-19, ADR 0017): Token-2022 reserve mints with
+//! unsafe extensions are rejected at `initialize`.
 
 use anchor_spl::token_2022::spl_token_2022::state::AccountState;
 use mutav::errors::MutavError;
@@ -32,6 +32,9 @@ fn assert_accepted(exts: &[Ext]) {
     let c = f.config();
     assert_eq!(c.reserve_token_program, TOKEN_2022_PROGRAM);
     assert_eq!(c.reserve_mint, f.reserve_mint);
+    // The income inbox is a Token-2022 associated token account too.
+    let inbox = f.svm.get_account(&f.income_inbox()).expect("income inbox");
+    assert_eq!(inbox.owner, TOKEN_2022_PROGRAM);
 }
 
 #[test]
@@ -57,6 +60,25 @@ fn rejects_non_transferable() {
 #[test]
 fn rejects_default_account_state_frozen() {
     assert_rejected(&[Ext::DefaultState(AccountState::Frozen)]);
+}
+
+// ADR 0017: yield delivered as a balance multiplier never changes the raw
+// `u64` balances the program tracks, and a pausable mint can stop every
+// reserve transfer, claim payments included.
+
+#[test]
+fn rejects_scaled_ui_amount() {
+    assert_rejected(&[Ext::ScaledUiAmount]);
+}
+
+#[test]
+fn rejects_interest_bearing_config() {
+    assert_rejected(&[Ext::InterestBearing]);
+}
+
+#[test]
+fn rejects_pausable() {
+    assert_rejected(&[Ext::Pausable]);
 }
 
 #[test]
