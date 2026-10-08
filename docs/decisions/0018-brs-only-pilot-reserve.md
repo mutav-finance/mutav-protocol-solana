@@ -1,12 +1,12 @@
 # 0018 — BRS-only pilot reserve; assets expand through adapters
 
-- **Status:** Accepted by Julia, 2026-10-07. Narrows how ADR 0002 applies in the pilot and generalises its single-asset limits to per-reserve and per-adapter ones. No program change in this PR; a follow-up PR replaces `max_tesouro_share_bps` with `min_settlement_bps`.
+- **Status:** Accepted for the pilot (Julia, 2026-10-07); builds on ADR 0017, which is still proposed. Narrows how ADR 0002 applies in the pilot and generalises its single-asset limits to per-reserve and per-adapter ones. No program change in this PR; a follow-up PR replaces `max_tesouro_share_bps` with `min_settlement_bps`.
 
 ## Context
 
 The design lets the reserve hold BRS and, through capped adapters, other assets, with Etherfuse TESOURO as the first one (ADR 0002, spec §5.7, §7, §8). Three facts make TESOURO a poor fit for the pilot:
 
-- **BRS already earns close to the benchmark.** Through Nora's revenue share on BRS, booked as issuer income (ADR 0017), the reserve earns a yield below but near Selic. TESOURO would add a little yield at the cost of a second issuer, a price feed and a mark-to-market.
+- **The reserve already has an income source.** BRS bears no yield; the reserve receives Nora's issuer partnership revenue in BRS (ADR 0017). The rate is set by a commercial agreement and is not on-chain; MUTAV expects it below but near Selic, pending Nora's confirmation. TESOURO would add a little yield at the cost of a second issuer, a price feed and a mark-to-market.
 - **There is no BRS↔TESOURO path.** Etherfuse mints and redeems TESOURO against USDC, not BRS (spec §12 Q6). Holding TESOURO would mean a BRS → BRL/USDC → TESOURO round trip off-chain or through other venues, each with its own fees, delays and counterparties.
 - **An adapter costs a build and an audit.** A real adapter (spec §5.7) adds a CPI path at the maximum invoke depth, a sub-authority, a price account whose layout Etherfuse has not confirmed (§12 Q2) and possibly an async conversion state (PC-18). All of it would need building, testing and a security review before any value moved through it.
 
@@ -43,13 +43,13 @@ The design lets the reserve hold BRS and, through capped adapters, other assets,
 
 ## How a new asset is added
 
-Each step is a Squads proposal under the time lock; the first needs a program upgrade.
+Step 1 is a program upgrade (the Squads multisig is the upgrade authority); steps 2–4 are Squads proposals under the time lock; step 5 is permissionless. The app's "Expand with adapters" block lists the same five steps.
 
 1. **Upgrade** the program with the adapter instructions (`whitelist_adapter`, `remove_adapter`, `allocate`, `deallocate`, spec §5.1, §5.7) and deploy the asset's adapter program, after its own review.
-2. **Whitelist the adapter** with its per-adapter cap (`AdapterEntry.cap`, the most BRS-equivalent value it may hold).
-3. **Set the adapter's price feed and share limit** (its `AdapterState`: price account, accrual ceiling, staleness and deviation bounds; `AdapterEntry.max_share_bps`).
-4. **Lower `min_settlement_bps`** below 100% through `set_config`: the room above it is what all adapters together may use.
-5. **Allocate** within every gate: the settlement floor (`brs_balance ≥ min_settlement_bps × stable_assets` after the move), the adapter's `cap` and `max_share_bps`, the solvency gate (`mode == Normal`, stable assets after ≥ coverage required) and the liquidity check (BRS left ≥ provisions + earmark). `deallocate` brings it back; under coverage stress it is allowed only if it does not worsen coverage.
+2. **Whitelist the adapter** with its limits: its `cap` (the most BRS-equivalent value it may hold), its share limit (`AdapterEntry.max_share_bps`) and its own price feed (`AdapterState`: price account, accrual ceiling, staleness and deviation bounds).
+3. **Lower `min_settlement_bps`** below 100% through `set_config`: the share above the floor is what all adapters together may use.
+4. **Allocate** within every gate: the settlement floor (`brs_balance ≥ min_settlement_bps × stable_assets` after the move), the adapter's `cap` and `max_share_bps`, the solvency gate (`mode == Normal`, stable assets after ≥ coverage required) and the liquidity check (BRS left ≥ provisions + earmark). `deallocate` brings it back; under coverage stress it is allowed only if it does not worsen coverage.
+5. **Refresh** (anyone) re-values the reserve at each adapter's bounded price: stable assets, NAV and the mode follow.
 
 ## Consequences
 
