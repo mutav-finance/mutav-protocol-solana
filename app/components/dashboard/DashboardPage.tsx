@@ -61,34 +61,29 @@ function Panel({ title, info, aside, children, flush = false }: { title: string;
   );
 }
 
-/** The summary strip: one cell per figure, hairlines between them. */
-function Strip({ r, inv, pending, owner }: { r: ReserveView; inv: InvestorView | null; pending: { deposits: bigint; redeemShares: bigint }; owner: string | null }) {
-  if (!owner)
-    return (
-      <div className="bg-(--color-surface) border px-6 py-5">
-        <Note>Connect a wallet to see its position.</Note>
-      </div>
-    );
+/** The position, inline in the page header: label over figure, no boxes. */
+function HeaderStats({ r, inv, pending, owner }: { r: ReserveView; inv: InvestorView | null; pending: { deposits: bigint; redeemShares: bigint }; owner: string | null }) {
+  if (!owner) return <Note>Connect a wallet to see its position.</Note>;
   const s = r.state;
   const shares = inv?.shares.amount ?? 0n;
   const value = assetsFor(shares, s.sharesOutstanding, r.solvency.netAssets);
   const ownBps = s.sharesOutstanding === 0n ? 0n : (shares * 10_000n) / s.sharesOutstanding;
-  const cell = (k: string, v: ReactNode, note: ReactNode, tip?: ReactNode, lead = false) => (
-    <div className="bg-(--color-surface) flex min-w-0 flex-col gap-2 px-6 py-5">
-      <span className={`${label} flex items-center gap-2`} style={tracking}>
+  const stat = (k: string, v: ReactNode, note: ReactNode, tip?: ReactNode) => (
+    <div className="flex min-w-0 max-w-[200px] flex-col gap-1">
+      <span className="font-body text-(--color-text-2) flex items-center gap-2 text-xs">
         {k}
         {tip && <InfoTooltip label={`About ${k}`}>{tip}</InfoTooltip>}
       </span>
-      <Mono style={{ fontSize: lead ? "clamp(24px, 3vw, 32px)" : 20, fontWeight: 700, lineHeight: 1.1, color: "var(--color-text)", whiteSpace: "nowrap" }}>{v}</Mono>
+      <Mono style={{ fontSize: "clamp(17px, 4.6vw, 22px)", fontWeight: 700, lineHeight: 1.1, color: "var(--color-text)", whiteSpace: "nowrap" }}>{v}</Mono>
       <span className="font-mono text-(--color-text-3) text-2xs">{note}</span>
     </div>
   );
   return (
-    <div className="grid grid-cols-1 gap-px border sm:grid-cols-2 lg:grid-cols-4" style={{ background: "var(--color-border)" }}>
-      {cell("Value at NAV now", inv ? fmtBrs(value) : "—", "PREVIEW · math mirror", "The client's math mirror of the program's assets_for(shares), on the current accounts. A redemption is priced at the NAV of its fill, not now.", true)}
-      {cell("Reserve shares held", inv ? fmtShares(shares) : "—", inv?.shares.amount === null ? "no share account yet" : `${fmtBps(ownBps)} of shares outstanding`)}
-      {cell("BRS in wallet", inv && inv.brs.amount !== null ? fmtBrs(inv.brs.amount) : "—", inv?.brs.amount === null ? "no BRS account yet" : "associated token account")}
-      {cell("Waiting in the queue", fmtBrs(pending.deposits), `deposits · ${fmtShares(pending.redeemShares)} sh to redeem`, "Escrowed and not yet fulfilled (deposits) or filled (redemptions).")}
+    <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:flex sm:flex-wrap sm:gap-x-8">
+      {stat("Value at NAV now", inv ? fmtBrs(value) : "—", "PREVIEW · math mirror", "The client's math mirror of the program's assets_for(shares), on the current accounts. A redemption is priced at the NAV of its fill, not now.")}
+      {stat("Reserve shares held", inv ? fmtShares(shares) : "—", inv?.shares.amount === null ? "no share account yet" : `${fmtBps(ownBps)} of shares outstanding`)}
+      {stat("BRS in wallet", inv && inv.brs.amount !== null ? fmtBrs(inv.brs.amount) : "—", inv?.brs.amount === null ? "no BRS account yet" : "associated token account")}
+      {stat("Waiting in the queue", fmtBrs(pending.deposits), `deposits · ${fmtShares(pending.redeemShares)} sh to redeem`, "Escrowed and not yet fulfilled (deposits) or filled (redemptions).")}
     </div>
   );
 }
@@ -258,33 +253,39 @@ export function DashboardPage() {
     redeemShares: mine.filter((x) => x.side === "redeem").reduce((s, x) => s + x.waiting, 0n),
   };
   const state = owner && invData ? invData.allowlist.state : null;
+  const pad = { paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" };
   return (
-    <main className="flex w-full flex-1 flex-col gap-6 py-6 md:py-8" style={{ paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" }}>
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 className="font-display text-(--color-text) m-0 text-3xl font-bold tracking-tight">Dashboard</h1>
-          <RoleTag role="investor" bordered />
-          {state ? (
-            <StatusBadge color={STATE_BADGE[state].color} label={STATE_BADGE[state].label} />
-          ) : (
-            <StatusBadge color="var(--color-text-3)" label={owner ? "CHECKING THE ALLOWLIST…" : "NO WALLET CONNECTED · READ-ONLY"} />
-          )}
-          {owner && <Explorer value={owner} />}
-          {previewOwner && <span className="font-mono text-(--color-copper) text-2xs uppercase">mock · viewing as MUTAV&apos;s capital wallet</span>}
+    <div className="flex w-full flex-1 flex-col">
+      <header className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6 border-b py-8" style={pad}>
+        <div className="flex min-w-0 max-w-[400px] flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-display text-(--color-text) m-0 text-3xl font-bold tracking-tight">Dashboard</h1>
+            <RoleTag role="investor" bordered />
+          </div>
+          <p className="font-body text-(--color-text-2) m-0 text-sm">
+            The pilot runs on MUTAV&apos;s own capital and is not open to public investment. Nothing here is an offer to invest.{" "}
+            <InfoTooltip label="About this dashboard">
+              The capital provider&apos;s side of the reserve: allowlist status, position, queue entries and requests. Anyone can read it; only a wallet on the on-chain
+              allowlist (KYC done off-chain) can send requests, and in the pilot that is MUTAV&apos;s capital wallet.
+            </InfoTooltip>
+          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {state ? (
+              <StatusBadge color={STATE_BADGE[state].color} label={STATE_BADGE[state].label} />
+            ) : (
+              <StatusBadge color="var(--color-text-3)" label={owner ? "CHECKING THE ALLOWLIST…" : "NO WALLET CONNECTED · READ-ONLY"} />
+            )}
+            {owner && <Explorer value={owner} />}
+            {previewOwner && <span className="font-mono text-(--color-copper) text-2xs uppercase">mock · viewing as MUTAV&apos;s capital wallet</span>}
+          </div>
         </div>
-        <p className="font-body text-(--color-text) m-0 flex flex-wrap items-center gap-2 text-sm font-medium">
-          The pilot runs on MUTAV&apos;s own capital and is not open to public investment. Nothing here is an offer to invest.
-          <InfoTooltip label="About this dashboard">
-            The capital provider&apos;s side of the reserve: allowlist status, position, queue entries and requests. Anyone can read it; only a wallet on the on-chain
-            allowlist (KYC done off-chain) can send requests, and in the pilot that is MUTAV&apos;s capital wallet.
-          </InfoTooltip>
-        </p>
+        {d && (inv.error && !inv.data ? <ReadError error={inv.error} /> : <HeaderStats r={d.reserve} inv={invData} pending={pending} owner={owner} />)}
       </header>
+      <main className="flex w-full flex-1 flex-col gap-6 py-6 md:py-8" style={pad}>
       {poll.error && !d && <ReadError error={poll.error} />}
       {!d && !poll.error && <p className="font-mono text-(--color-text-3) text-xs">Reading the chain…</p>}
       {d && (
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh: async () => { await Promise.all([poll.refresh(), inv.refresh()]); } }}>
-          {inv.error && !inv.data ? <ReadError error={inv.error} /> : <Strip r={d.reserve} inv={invData} pending={pending} owner={owner} />}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <div className="flex min-w-0 flex-col lg:col-span-7">
               <ActionCard allowed={allowed} inv={invData} />
@@ -308,6 +309,7 @@ export function DashboardPage() {
           </div>
         </LiveProvider>
       )}
-    </main>
+      </main>
+    </div>
   );
 }
