@@ -115,6 +115,46 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
+  test("/simulator — static reserve simulator in protocol terms, one full view", async ({ page }) => {
+    await page.goto("/simulator");
+    await expect(page.getByRole("heading", { name: "Reserve simulator", level: 1 })).toBeVisible();
+    await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0,1");
+    await expect(page.locator("#glance")).toContainText("Coverage & safety");
+    await expect(page.locator("#chart")).toContainText("Stable assets vs coverage required");
+    await expect(page.locator("#kstrip")).toContainText("What the reserve earns");
+    await expect(page.locator("#kstrip")).toContainText("vs Selic");
+    await expect(page.locator("#kstrip")).toContainText("MUTAV take");
+
+    // inputs read like outputs (pt-BR) and accept pasted values with or without separators
+    await page.getByRole("tab", { name: "Capital" }).click();
+    const start = page.getByLabel(/Starting capital/);
+    await expect(start).toHaveValue("300.000");
+    await start.fill("250000");
+    await start.blur();
+    await expect(start).toHaveValue("250.000");
+    await expect(page.locator("#scenSel")).toHaveValue("custom");
+
+    // Export menu: keyboard operable, closes on Escape
+    await page.getByRole("button", { name: "Export" }).click();
+    await expect(page.getByRole("menuitem", { name: /Copy summary/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menuitem", { name: /Copy summary/ })).toBeHidden();
+    await page.getByRole("button", { name: "Reset" }).click();
+    await noBannedWords(page);
+
+    await expect(page.getByRole("button", { name: "Advanced" })).toHaveCount(0);
+    await page.getByRole("tab", { name: "Compare c & sizing" }).click();
+    await expect(page.locator("#ruleTbl tbody tr")).toHaveCount(3);
+    await page.getByRole("tab", { name: "Reserve yield" }).click();
+    await expect(page.locator("#ychart svg")).toBeVisible();
+    await page.getByRole("tab", { name: "What MUTAV earns" }).click();
+    await expect(page.locator("#takeKpis")).toContainText("take total");
+    await noBannedWords(page);
+    await page.getByRole("tab", { name: "Method" }).click();
+    await expect(page.locator("#pane-method")).toContainText("coverage_required");
+    await noBannedWords(page);
+  });
+
   test("API refuses to relay an unsigned or foreign transaction", async ({ request }) => {
     const res = await request.post("/api/tx/send", { data: { tx: "AA==" } });
     expect(res.status()).toBeGreaterThanOrEqual(400);
