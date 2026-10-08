@@ -119,7 +119,7 @@ Seeds: `["config", reserve_mint]`. One per reserve. Written only by admin instru
 | `reserve_token_program` | `Pubkey` | Token program owning `reserve_mint`. Immutable |
 | `reserve_decimals` | `u8` | Immutable |
 | `share_mint` | `Pubkey` | Share mint (authority = vault authority PDA) |
-| `coverage_ratio_bps` | `u16` | `c`. Starts at `10_000` (1.0). Lower bound **TBD** (see PC-14) |
+| `coverage_ratio_bps` | `u16` | `c`. Program floor `MIN_COVERAGE_RATIO_BPS = 1_000` (0.10; ADR 0016). Starts at `1_000` on devnet |
 | `fee_take_bps` | `u16` | MUTAV's take from each guarantee fee. `≤ MAX_FEE_TAKE_BPS = 3_000`. Value **TBD** |
 | `payments_account` | `Pubkey` | The whitelisted MUTAV payments token account (BRS) |
 | `treasury_account` | `Pubkey` | The whitelisted MUTAV treasury token account (BRS) that receives MUTAV's take. Changed only by the admin through the timelock |
@@ -155,7 +155,7 @@ Seeds: `["state", config]`. Internal accounting. Written by every state-changing
 | `tesouro_price_ts` | `i64` | Publish time of the price source used |
 | `stable_assets` | `u64` | Last computed `stable_assets` ([§4](#4-invariants-and-formulas)) |
 | `remaining_cover_total` | `u64` | `Σ` remaining cover of every guarantee that is not `CLOSED` (before applying `c`; §4 invariant 18) |
-| `coverage_required` | `u64` | `c × remaining_cover_total`, rounded up |
+| `coverage_required` | `u64` | `max(c × remaining_cover_total rounded up, provisions)` (§4, ADR 0016) |
 | `provisions` | `u64` | `Σ` open claim provisions |
 | `shares_outstanding` | `u64` | Minted shares plus shares owed on fulfilled, unclaimed deposits |
 | `nav_per_share` | `u64` | Last published NAV per share (scaled by `NAV_SCALE`). `0` exactly when no shares are outstanding; otherwise floored at `1`, so `0` is never a real NAV ([§7](#7-price-safety)) |
@@ -427,7 +427,7 @@ stable_assets      = brs_balance + tesouro_value                                
                      // excludes pending_deposits_total and claimable_assets_total
 remaining_cover(g) = (g.default_cover − g.default_paid) + (g.exit_cover − g.exit_paid)
 remaining_cover_total = Σ_{g.status != CLOSED} remaining_cover(g)                 // ADR 0012: every open state
-coverage_required  = ceil(c × remaining_cover_total / 10_000)                      // c = coverage_ratio_bps
+coverage_required  = max(ceil(c × remaining_cover_total / 10_000), provisions)     // c = coverage_ratio_bps; ADR 0016
 surplus            = max(0, stable_assets − coverage_required)                     // capital above required coverage
 earmark_eff        = see below                                                     // 0 in the pilot
 free_capital       = surplus − earmark_eff                                         // = max(0, stable_assets − coverage_required − earmark_eff)
@@ -468,8 +468,8 @@ assets_for(shares) = floor(shares × (net_assets + 1) / (shares_outstanding + V)
 3. `remaining_cover_total = Σ remaining_cover(g)` over guarantees that are not `CLOSED`; `provisions = Σ` open `ClaimFiling.provision`.
 4. Token-account balances are at least the tracked amounts: `reserve ≥ brs_balance`, `pending_deposits ≥ pending_deposits_total`, `claims ≥ claimable_assets_total`, `pending_redemptions ≥ pending_redeem_shares`.
 5. `share_mint.supply + Σ shares_out of fulfilled, unclaimed deposits = shares_outstanding`. Shares escrowed in `pending_redemptions` are still minted, so they stay in `shares_outstanding` until a fill burns them (see §12, NAV denominator).
-6. A provision reduces NAV only. It never reduces `stable_assets`, so nothing is counted twice against coverage: a filed-but-unpaid claim is already inside `remaining_cover_total`.
-7. Paying a claim reduces `stable_assets` and `remaining_cover_total` by the same amount. At `c = 1.0` it leaves `surplus` unchanged.
+6. A provision reduces NAV only. It never reduces `stable_assets`, so nothing is counted twice against coverage: a filed-but-unpaid claim is already inside `remaining_cover_total`. `coverage_required` is never below `provisions` (ADR 0016): at `c ≥ 1` this always holds through the ratio term; below 1 the provisions term keeps filed claims fully covered.
+7. Paying a claim reduces `stable_assets` and `remaining_cover_total` by the same amount `a`, and releases its provision. While the ratio term binds, `surplus` changes by `(c − 1) × a` (up to rounding): unchanged at `c = 1.0`, higher above it, and lower below it. Below 1 a claim payment can therefore move the reserve into under-coverage; it is still never refused (§5.4 rule 7), and the next `refresh` records the mode (ADR 0016).
 
 **Redemption-queue invariants** (ADR 0010):
 
@@ -519,7 +519,7 @@ Common account rules:
 - **Signer:** the program's upgrade authority (checked against `ProgramData`), so no one can front-run initialization. `params.admin` is the Squads vault.
 - **Accounts:** `config` (init), `state` (init), `ProgramData` of this program, vault authority, `reserve_mint`, `share_mint` (init, §3.3), the four token accounts of §3.3 (init), the treasury and payments token accounts, token programs, system program.
 - **Arguments:** `admin`, `operator`, `pauser`, `mutav_capital_wallet`, `coverage_ratio_bps`, `fee_take_bps`, `payout_sla_secs`, `caps`, `price`. The allowlist root starts at zero (nobody allowlisted) and is set with `set_allowlist_root`; `feature_flags`, `exit` and `adapters` start at zero.
-- **Rules:** `reserve_mint` passes the mint guard: if Token-2022, reject `PermanentDelegate`, `TransferHook`, a non-zero `TransferFee` in either epoch configuration, `NonTransferable`, `DefaultAccountState = Frozen` (PC-19). `fee_take_bps ≤ 3_000`. Roles set and distinct. Caps within program bounds: bps fields `≤ 10_000`, `min_request ≤ max_request`, `claim_period_secs > 0`, durations `≥ 0`, and `coverage_ratio_bps ≥ 10_000` until its floor is decided (§12 Q17; fails closed). Treasury and payments accounts as in `set_config` (§2.1).
+- **Rules:** `reserve_mint` passes the mint guard: if Token-2022, reject `PermanentDelegate`, `TransferHook`, a non-zero `TransferFee` in either epoch configuration, `NonTransferable`, `DefaultAccountState = Frozen` (PC-19). `fee_take_bps ≤ 3_000`. Roles set and distinct. Caps within program bounds: bps fields `≤ 10_000`, `min_request ≤ max_request`, `claim_period_secs > 0`, durations `≥ 0`, and `coverage_ratio_bps ≥ MIN_COVERAGE_RATIO_BPS` (`1_000`, c ≥ 0.10; §12 Q17, ADR 0016). Treasury and payments accounts as in `set_config` (§2.1).
 - **Effects:** writes `VaultConfig` and an empty `VaultState`. Whether a seed deposit is minted to a dead address at init is **TBD**.
 - **Errors:** `Unauthorized`, `UnsupportedMintExtension`, `InvalidParameter`, `RolesNotDistinct`.
 - **Event:** `VaultInitialized`.
@@ -578,7 +578,7 @@ Proposed in [ADR 0015](decisions/0015-admin-clear-fulfil-halt.md), pending found
   2. `default_cover + exit_cover > 0`; `rent > 0`; `contract_cap_hash != [0; 32]`; `landlord_mandate_hash != [0; 32]`.
   3. `default_cover + exit_cover ≤ caps.max_cover_per_guarantee`.
   4. `agency.outstanding_cover + default_cover + exit_cover ≤ caps.max_cover_per_agency`.
-  5. **Solvency post-condition:** `coverage_required_after + earmark_eff_before ≤ stable_assets`, where `coverage_required_after = ceil(c × (remaining_cover_total + new_cover) / 10_000)` and `earmark_eff_before` is computed before the registration (§4). Equivalently, the added coverage fits in the `free_capital` computed before the registration, so a funded earmark is never consumed by new guarantees (invariant 16). In the pilot `earmark_eff_before = 0`.
+  5. **Solvency post-condition:** `coverage_required_after + earmark_eff_before ≤ stable_assets`, where `coverage_required_after = max(ceil(c × (remaining_cover_total + new_cover) / 10_000), provisions)` and `earmark_eff_before` is computed before the registration (§4). Equivalently, the added coverage fits in the `free_capital` computed before the registration, so a funded earmark is never consumed by new guarantees (invariant 16). In the pilot `earmark_eff_before = 0`.
 - **Effects:** creates `Guarantee { status: Active }` and stores `default_cover` and `exit_cover` as the absolute **valor afiançado** of this lease's limited fiança and its leg sub-limits (ADR 0012), together with `contract_cap_hash` and `landlord_mandate_hash`. The lifecycle fields start at `0`. `remaining_cover_total += new_cover`; recompute `coverage_required`; `active_guarantees += 1`; agency `outstanding_cover += new_cover`, `active_guarantees += 1`.
 - **Off-chain precondition:** mutav-app registers only when the arguments equal the signed instrument's cap schedule, which is the preimage of `contract_cap_hash` (§2.2). The program cannot check this; the hash makes any mismatch provable later.
 - **Errors:** `Paused`, `UnderCovered`, `InvalidParameter`, `GuaranteeCapExceeded`, `AgencyCapExceeded`, `InsufficientFreeCapital`, `StalePrice`; account-already-in-use on a duplicate `id`.
@@ -836,7 +836,7 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
 
 ## 6. Under-coverage mode
 
-- **Trigger:** `stable_assets < coverage_required`, for example after a TESOURO mark-down or an issuer freeze. Set by `refresh`, and checked inline by every gated instruction.
+- **Trigger:** `stable_assets < coverage_required`, for example after a TESOURO mark-down, an issuer freeze or, at `c < 1`, claim payments (invariant 7). Set by `refresh`, and checked inline by every gated instruction.
 - **Frozen automatically:** `register_guarantee`, `fulfil_redeems`, `allocate`; in phase 2 also `instant_redeem` and `fund_exit_buffer`. Because `surplus = 0`, `earmark_eff = 0` and the ratchet releases any stored earmark.
 - **Restricted:** `deallocate` only if it does not worsen coverage ([§5.7](#57-reserve-allocation-admin-through-adapters)).
 - **Keeps working:** `pay_claim`, `pay_claim_admin`, `file_claim`, `settle_payout`, `contribute_fees`, `fulfil_deposits` (ADR 0008; still subject to the claim-notice gate), `notify_exoneration`, `record_keys_returned`, `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, `refresh`, `advance_queue_heads`, investor `cancel_*` and `claim_*`, `request_*` (queued, not fulfilled).
@@ -868,16 +868,16 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). Valu
 
 | Field | Type | Enforced in | Proposed |
 |---|---|---|---|
-| `max_tvl` | `u64` | `fulfil_deposits` | R$100k |
-| `max_cover_per_guarantee` | `u64` | `register_guarantee` | R$30k |
-| `max_cover_per_agency` | `u64` | `register_guarantee` | R$60k |
+| `max_tvl` | `u64` | `fulfil_deposits` | R$300k |
+| `max_cover_per_guarantee` | `u64` | `register_guarantee` | R$40k |
+| `max_cover_per_agency` | `u64` | `register_guarantee` | R$3M (`max_tvl / c`: never binds while one reserve serves the agency; ADR 0016) |
 | `max_claim_per_call` | `u64` | `pay_claim` | R$10k |
 | `max_claim_per_period` | `u64` | `pay_claim` | R$20k |
 | `claim_period_secs` | `i64` | `pay_claim` | 30 days |
-| `max_tesouro_share_bps` | `u16` | `allocate` | 5_000 (min BRS buffer 50%) |
-| `min_request`, `max_request` | `u64`, `u64` | `request_deposit`, `request_redeem`; `min_request` also bounds a partial fill's remainder | TBD; proposed R$1,000 / R$30,000 |
+| `max_tesouro_share_bps` | `u16` | `allocate` | 5_000 (min BRS buffer 50%); 0 on devnet (no adapter) |
+| `min_request`, `max_request` | `u64`, `u64` | `request_deposit`, `request_redeem`; `min_request` also bounds a partial fill's remainder | TBD; proposed R$1,000 / R$100,000 |
 | `min_fill_assets` | `u64` | `fulfil_redeems` (smallest partial fill) | TBD; proposed R$500 |
-| `coverage_ratio_bps` (`c`) | `u16` | all gates | 10_000 |
+| `coverage_ratio_bps` (`c`) | `u16` | all gates | 1_000 (0.10, the program floor; ADR 0016) |
 | `fee_take_bps` | `u16` | `contribute_fees` | TBD, program max 3_000 |
 | `payout_sla_secs` | `i64` | `refresh`, `settle_payout` | 10 days |
 | `claims_tail_secs` (`VaultConfig`) | `i64` | `notify_exoneration`, `record_keys_returned` (fixes `claims_tail_until_ts`); `0` blocks both | TBD (§12 Q35); never longer than the 3-year prescription of rent claims (CC 206 §3º I) |
@@ -886,7 +886,7 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). Valu
 
 `Caps` ends with `_reserved: [u8; 32]`, so later caps (PC-43: `max_guarantees`, concentration, new coverage per period) are carved inside it.
 
-Program constants: `MAX_FEE_TAKE_BPS = 3_000`, `EXONERATION_NOTICE_SECS = 120 × 86_400` (LI 40 X), `MAX_CLAIMS_TAIL_SECS = 3 × 365 × 86_400`, `SUPPORTED_OPTIONAL_CATEGORIES = 0b1`, the claim-category and `Payout.flags` constants of §3.7 and §3.13, `MAX_ADAPTERS = 8` (§12 Q33, decided 2026-10-06; it sizes `VaultConfig`), `PRICE_SCALE = 10^9` and `NAV_SCALE = 10^9` (decided 2026-10-06; `NAV_SCALE` is NAV 1.0), `VIRTUAL_OFFSET = 10^0 = 1` (§12 Q20, decided 2026-10-06), `INSTANT_EXIT = 1 << 0`, `SUPPORTED_FEATURES` (pilot `0`), `PROGRAM_LAYOUT_VERSION` (pilot `1`), `MAX_FULFIL_BATCH` (pinned from a Mollusk benchmark of `fulfil_redeems` through a Squads vault transaction, with three CPIs and one `emit_cpi!` per fill and the boxed `VaultConfig` decode).
+Program constants: `MAX_FEE_TAKE_BPS = 3_000`, `MIN_COVERAGE_RATIO_BPS = 1_000` (c ≥ 0.10; ADR 0016), `EXONERATION_NOTICE_SECS = 120 × 86_400` (LI 40 X), `MAX_CLAIMS_TAIL_SECS = 3 × 365 × 86_400`, `SUPPORTED_OPTIONAL_CATEGORIES = 0b1`, the claim-category and `Payout.flags` constants of §3.7 and §3.13, `MAX_ADAPTERS = 8` (§12 Q33, decided 2026-10-06; it sizes `VaultConfig`), `PRICE_SCALE = 10^9` and `NAV_SCALE = 10^9` (decided 2026-10-06; `NAV_SCALE` is NAV 1.0), `VIRTUAL_OFFSET = 10^0 = 1` (§12 Q20, decided 2026-10-06), `INSTANT_EXIT = 1 << 0`, `SUPPORTED_FEATURES` (pilot `0`), `PROGRAM_LAYOUT_VERSION` (pilot `1`), `MAX_FULFIL_BATCH` (pinned from a Mollusk benchmark of `fulfil_redeems` through a Squads vault transaction, with three CPIs and one `emit_cpi!` per fill and the boxed `VaultConfig` decode).
 
 The operator claim caps (`max_claim_per_call`, `max_claim_per_period`) bound what a compromised operator key can take. They do **not** bound MUTAV's legal liability, which the valor afiançado sets. Payments above them go through `pay_claim_admin` (ADR 0012). Size the per-period cap to the worst plausible month of approved claims, so the admin path stays the exception.
 
@@ -959,7 +959,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 | PC-11 | Under-coverage mode | Adopted | §6 |
 | PC-12 | Provision booked at filing | Partial: provision = filed amount; full-leg and expected-exit terms TBD | §5.4 |
 | PC-13 | Payouts senior to redemptions for the liquid buffer | Partial: redemption fills and allocations leave `provisions` (filed claims) in liquid BRS (`liquid_budget`, ADR 0011); while a claim notice is open (missed rent known, not yet provisioned) both queues are closed; unfiled exposure is not reserved | §4, §5.4, §5.5, §5.7, §12 |
-| PC-14 | Coverage ratio floor of 1.0 as a program constant | Not decided (`c` starts at 1.0, configurable) | §3.1, §12 |
+| PC-14 | Coverage ratio floor as a program constant | *Resolved (ADR 0016):* `MIN_COVERAGE_RATIO_BPS = 1_000` (0.10); `coverage_required` never below provisions | §3.1, §12 |
 | PC-15 | Fees streamed into NAV over 30 days | Not adopted (fees raise NAV on receipt) | §5.3, §12 |
 | PC-16 | Explicit TESOURO coverage weight | Not adopted: TESOURO counts toward coverage at its bounded price, capped at 50% of the reserve | §4, §8, §12 |
 | PC-17 | Bounded TESOURO price (accrual ceiling, staleness, deviation) | Adopted; stale-haircut behaviour TBD | §7 |
@@ -1009,7 +1009,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 14. **Filing window on-chain.** Enforce the 15-day filing window in the program (PC-2) or only in the platform.
 15. **Program-level time lock and multisig split.** Rely on the Squads time lock only, or also delay privilege increases on-chain. The Squads v4 time lock applies to the **whole** multisig and counts from approval, so with one multisig every `fulfil_redeems` waits as long as a program upgrade. Options: (a) one multisig with a moderate time lock (e.g. 24 h; fills are priced at NAV at execution, so the delay only postpones them), or (b) an `upgrade` multisig as upgrade authority (72 h–7 d) and a separate `admin` multisig as `VaultConfig.admin` with a shorter time lock ([§14.5](#145-upgrade-runbook)). Needs an ADR.
 16. **Pauser powers.** Can the pauser appoint the replacement operator, or only revoke? Can it unpause?
-17. **`coverage_ratio_bps` floor.** Configurable from 1.0, or a program constant floor of 1.0 (PC-14).
+17. **`coverage_ratio_bps` floor.** *Resolved (ADR 0016):* a program constant floor of 0.10 (`MIN_COVERAGE_RATIO_BPS = 1_000`, the worst-case floor of business rule 9w), with `coverage_required = max(ceil(c × remaining_cover_total), provisions)`. Devnet starts at 0.10. A per-lease tail floor is a later ADR.
 18. **Allocation gate.** Must the allocated amount itself fit in `free_capital`, or is the solvency post-condition plus the TESOURO share cap enough?
 19. **Per-invoice idempotency for fees.** *Resolved (ADR 0009):* a `FeeReceipt` PDA seeded by `invoice_ref_hash`.
 20. **Virtual offset and seed deposit.** *Resolved (2026-10-06):* `k = 0`, so `V = 1`: one share is worth 1 BRS at launch with the 6-decimal share mint. No seed deposit is minted at `initialize`. Rationale: NAV ignores direct transfers (internal accounting, invariant 1), and deposits are allowlisted and fulfilled by the admin, so a larger offset is not needed against first-depositor inflation. `PRICE_SCALE = NAV_SCALE = 10^9` (§8).
