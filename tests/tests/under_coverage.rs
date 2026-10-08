@@ -481,15 +481,65 @@ fn clearing_needs_a_halt() {
 }
 
 #[test]
-fn a_large_fee_batch_above_the_bound_halts_fulfilment() {
-    // TODO(adr 0013: inflow-adjusted NAV guard) — the spec measures the move
-    // gross, so a guarantee-fee batch worth more than `max_nav_move_bps` of
-    // NAV (here 400 net on 30,000: 133 bps) halts fulfilment, as specced.
-    // ADR 0013 proposes measuring the move net of inflows; when it lands, this
-    // test changes.
+fn a_large_fee_batch_above_the_bound_does_not_halt_fulfilment() {
+    // ADR 0017: the guard measures the move net of verified inflows. A
+    // guarantee-fee batch worth more than `max_nav_move_bps` of NAV (here 400
+    // net on 30,000: 133 bps) raises the published NAV but is not a shock.
     let (mut f, _, d, _) = guarded();
+    let nav_before = f.state().nav_per_share;
     f.contribute(500 * BRL).0.unwrap();
+    assert_eq!(f.state().inflows_since_refresh, 400 * BRL);
+    f.refresh().unwrap();
+    let s = f.state();
+    assert!(!s.fulfil_halted);
+    assert!(
+        s.nav_per_share > nav_before,
+        "the published NAV includes the fee"
+    );
+    assert_eq!(s.inflows_since_refresh, 0, "refresh starts a new window");
+    f.fulfil_deposits(1, &[d]).expect("not halted");
+}
+
+#[test]
+fn an_accounting_shock_of_the_same_size_still_halts() {
+    // The same 400 move, but not booked by an inflow instruction (an
+    // injected balance, standing in for a price or accounting shock): the
+    // guard trips.
+    let (mut f, _, d, _) = guarded();
+    let mut s = f.state();
+    s.brs_balance += 400 * BRL;
+    f.write_state(&s);
     f.refresh().unwrap();
     assert!(f.state().fulfil_halted);
     assert_mutav_err(f.fulfil_deposits(1, &[d]), MutavError::FulfilHalted);
+}
+
+#[test]
+fn a_shock_hidden_behind_an_inflow_is_still_measured() {
+    // A 400 fee and a 400 loss in the same window: the published NAV is
+    // back where it was, but net of the inflow it fell 133 bps, which trips.
+    let (mut f, g, d, _) = guarded();
+    f.contribute(500 * BRL).0.unwrap();
+    f.file_claim(Claim::on(&g, 400 * BRL)).unwrap();
+    f.refresh().unwrap();
+    assert!(f.state().fulfil_halted);
+    assert_mutav_err(f.fulfil_deposits(1, &[d]), MutavError::FulfilHalted);
+}
+
+#[test]
+fn clearing_a_halt_resets_the_inflow_window() {
+    // After a halt, `clear_fulfil_halt` sets the baseline to the NAV of now,
+    // which already includes the inflows, so they are not subtracted again.
+    let (mut f, g, _, _) = guarded();
+    f.file_claim(Claim::on(&g, 400 * BRL)).unwrap();
+    f.refresh().unwrap();
+    assert!(f.state().fulfil_halted);
+    f.contribute(500 * BRL).0.unwrap();
+    f.clear_fulfil_halt().unwrap();
+    assert_eq!(f.state().inflows_since_refresh, 0);
+    f.refresh().unwrap();
+    assert!(
+        !f.state().fulfil_halted,
+        "no move since the reviewed baseline"
+    );
 }

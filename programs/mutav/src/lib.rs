@@ -27,7 +27,8 @@ pub mod mutav {
     use super::*;
 
     /// Create the reserve: `VaultConfig`, an empty `VaultState`, the vault
-    /// authority, the share mint and the four reserve token accounts.
+    /// authority, the share mint, the four reserve token accounts and the
+    /// income inbox (ADR 0017).
     /// Upgrade authority only.
     pub fn initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Result<()> {
         instructions::admin::initialize::handle_initialize(ctx, args)
@@ -100,6 +101,23 @@ pub mod mutav {
         instructions::operator::contribute_fees::handle_contribute_fees(
             ctx,
             invoice_ref_hash,
+            amount,
+        )
+    }
+
+    /// Sweep one issuer income statement from the income inbox into the
+    /// reserve and book it (ADR 0017): NAV rises, never shares. Never paused,
+    /// never solvency-gated. Operator.
+    pub fn sweep_income(
+        ctx: Context<SweepIncome>,
+        income_ref_hash: [u8; 32],
+        period: u32,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::operator::sweep_income::handle_sweep_income(
+            ctx,
+            income_ref_hash,
+            period,
             amount,
         )
     }

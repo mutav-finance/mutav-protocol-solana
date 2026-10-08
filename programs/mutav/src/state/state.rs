@@ -47,8 +47,17 @@ pub struct VaultState {
     pub fulfil_halted: bool,
     pub last_refresh_ts: i64,
     pub last_refresh_slot: u64,
+    // -- carved from `_reserved` by ADR 0017 (24 bytes) --
+    /// Lifetime net issuer income swept into `reserve` (`sweep_income`).
+    pub income_total: u64,
+    /// Lifetime take from issuer income sent to the treasury.
+    pub income_take_total: u64,
+    /// Net verified inflows (`contribute_fees`, `sweep_income`) since the last
+    /// `refresh`. The NAV-move guard measures net of them; `refresh` and
+    /// `clear_fulfil_halt` reset it to 0.
+    pub inflows_since_refresh: u64,
     /// Zeroed. Phase 2 carves `InstantExitState` (88 bytes) from the front.
-    pub _reserved: [u8; 256],
+    pub _reserved: [u8; 232],
 }
 
 const _: () = assert!(8 + VaultState::INIT_SPACE == VAULT_STATE_SIZE);

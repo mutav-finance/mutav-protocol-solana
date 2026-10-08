@@ -64,8 +64,13 @@ pub struct VaultConfig {
     pub mutav_capital_wallet: Pubkey,
     /// Phase-2 instant-exit parameters. All zero in the pilot.
     pub exit: ExitParams,
+    // -- carved from `_reserved` by ADR 0017 (2 bytes) --
+    /// MUTAV's take from issuer income swept by `sweep_income`,
+    /// `<= MAX_INCOME_TAKE_BPS`. `0` in the pilot: all income builds the
+    /// reserve.
+    pub income_take_bps: u16,
     /// Zeroed. Never read or written by logic.
-    pub _reserved: [u8; 512],
+    pub _reserved: [u8; 510],
 }
 
 const _: () = assert!(8 + VaultConfig::INIT_SPACE == VAULT_CONFIG_SIZE);
