@@ -9,7 +9,7 @@
  * `minSettlementBps = 10_000 − maxAllocatedBps`. Pure functions; nothing
  * here signs.
  */
-import type { Caps, CapsInputArgs, VaultConfig } from './generated';
+import type { Caps, CapsInput, VaultConfig } from './generated';
 
 const BPS = 10_000;
 
@@ -27,7 +27,7 @@ export function minSettlementBps(config: Pick<VaultConfig, 'caps'>): number {
  * complement back to `minSettlementBps`, so spreading a read config into a
  * request never sends the wrong field.
  */
-export function capsInputFromConfig(caps: Caps, overrides: Partial<CapsInputArgs> = {}): CapsInputArgs {
+export function capsInputFromConfig(caps: Caps, overrides: Partial<CapsInput> = {}): CapsInput {
   const { reserved: _reserved, maxAllocatedBps: _stored, ...rest } = caps;
   void _reserved;
   void _stored;
