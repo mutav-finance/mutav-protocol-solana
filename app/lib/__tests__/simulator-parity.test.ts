@@ -13,7 +13,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { computeSolvency, coverageRequired } from "@mutav-finance/mutav-protocol-solana";
 
-type Row = { refusal: string | null; newLeases: number; remaining: number; required: number; balance: number; active: number };
+type Row = { refusal: string | null; newLeases: number; remaining: number; required: number; balance: number; active: number; opening: number; gain: number; brsIncome: number };
 type Result = {
   finalActive: number;
   plannedActive: number;
@@ -22,6 +22,7 @@ type Result = {
   capacityAtStart: number;
   endRemaining: number;
   endRequired: number;
+  endBalance: number;
   tesouroShare: number;
   tvlRefused: number;
   take: number;
@@ -219,6 +220,46 @@ describe("simulator on the pilot", () => {
   it("max_tvl refuses capital above the cap", () => {
     const r = pilot({ monthlyRaise: 50_000 });
     expect(r.tvlRefused).toBeGreaterThan(0);
+  });
+});
+
+describe("simulator BRS income (swept monthly)", () => {
+  const run = (o: Params = {}) => sim.mutavCompute({ ...sim.MUTAV_DEFAULTS, months: 6, perMonth: 10, tesouroSharePct: 50, ...o });
+  /** Every result except the new BRS fields, which are 0 at a 0% BRS yield. */
+  const strip = (r: Result) => JSON.parse(JSON.stringify(r, (k, v) => (k === "brsIncome" || k === "brs" ? undefined : v)));
+
+  it("defaults to a 0% BRS yield", () => {
+    expect(sim.MUTAV_DEFAULTS.brsYieldPct).toBe(0);
+  });
+
+  it("a 0% BRS yield leaves every result unchanged", () => {
+    const cases: Params[] = [{}, { maxTesouroSharePct: 50 }, { stressOn: true }, { withdraw: "share" }, { coverageRatio: 1 }, { monthlyRaise: 50_000 }];
+    for (const o of cases) {
+      const without: Params = { ...sim.MUTAV_DEFAULTS, months: 6, perMonth: 10, tesouroSharePct: 50, ...o };
+      delete without.brsYieldPct;
+      const a = run({ ...o, brsYieldPct: 0 });
+      expect(strip(a)).toEqual(strip(sim.mutavCompute(without)));
+      expect(a.rows.every((x) => x.brsIncome === 0)).toBe(true);
+    }
+  });
+
+  it("with TESOURO at 0, month 1 books stable × y / 12 and counts it in net gain and stable assets", () => {
+    const y = 8;
+    const base = run({ maxTesouroSharePct: 0 });
+    const withBrs = run({ maxTesouroSharePct: 0, brsYieldPct: y });
+    const m1 = withBrs.rows[0];
+    const b1 = base.rows[0];
+    expect(m1.brsIncome).toBeCloseTo((m1.opening * y) / 100 / 12, 6);
+    expect(m1.gain - b1.gain).toBeCloseTo(m1.brsIncome, 6);
+    expect(withBrs.rows[0].balance - base.rows[0].balance).toBeCloseTo(m1.brsIncome, 6);
+    expect(withBrs.endBalance).toBeGreaterThan(base.endBalance);
+  });
+
+  it("accrues only on the BRS share left by the effective TESOURO split", () => {
+    const r = run({ maxTesouroSharePct: 50, brsYieldPct: 8 });
+    const m1 = r.rows[0];
+    expect(r.tesouroShare).toBe(0.5);
+    expect(m1.brsIncome).toBeCloseTo((m1.opening * 0.5 * 0.08) / 12, 6);
   });
 });
 
