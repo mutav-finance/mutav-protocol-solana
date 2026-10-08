@@ -111,7 +111,8 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0.1");
     await expect(page.locator("#glance")).toContainText("Coverage & safety");
     await expect(page.locator("#chart")).toContainText("Stable assets vs coverage required");
-    await expect(page.locator("#kstrip")).toContainText("Reserve yield vs Selic");
+    await expect(page.locator("#kstrip")).toContainText("Reserve yield, annualized");
+    await expect(page.locator("#kstrip")).toContainText("vs Selic");
     await noBannedWords(page);
 
     await expect(page.getByRole("button", { name: "Advanced" })).toHaveCount(0);

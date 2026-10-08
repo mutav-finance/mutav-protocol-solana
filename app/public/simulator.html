@@ -144,7 +144,7 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;background:var(--surface-3);border:1px solid var(--line);color:var(--ink-2);font:500 10px/1 var(--sans);margin-left:var(--sp1);cursor:help;vertical-align:-3px;flex:none;text-transform:none;letter-spacing:0}
 .info:hover{color:var(--ink);border-color:var(--ink-3)}
 /* source tags: the RoleTag look — mono caps, shape marker, no box */
-.src{display:inline-flex;align-items:center;gap:4px;font:500 9.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-left:6px;vertical-align:1px;color:var(--ink-3);white-space:nowrap}
+.src{display:inline-flex;align-items:center;gap:4px;font:500 9.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-left:0;margin-top:4px;vertical-align:1px;color:var(--ink-3);white-space:nowrap}
 .src::before{content:"";width:7px;height:7px;flex:none;background:currentColor}
 .src.c::before{background:transparent;border:1.5px solid var(--src-c)}
 .src.p::before{background:var(--src-p)}
@@ -156,6 +156,11 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .seghint.risk{background:var(--risk-soft);border-left-color:var(--risk)}
 .legendsrc{font-size:var(--fs-help);color:var(--ink-3);margin:0;line-height:1.7}
 .legendsrc .src{margin-left:2px}
+.srcline{display:inline-flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
+.srcline .src{margin-top:0}
+.nw{white-space:nowrap}
+.src.mark{gap:0}
+.fcode{font:400 10px/1 var(--mono);color:var(--ink-3);letter-spacing:0;text-transform:none}
 .linkbtn{font:inherit;font-weight:500;background:none;border:0;padding:0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px;cursor:pointer}
 /* view mode */
 .kgrid5{display:grid;gap:var(--sp3);grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr))}
@@ -174,9 +179,25 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .glance .muted{font-size:var(--fs-help)}
 @media (max-width:560px){ .glance li{grid-template-columns:1fr;padding:var(--sp4)} }
 /* KPI strip */
-.kstrip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--sp3)}
-@media (max-width:1180px){ .kstrip{grid-template-columns:repeat(3,minmax(0,1fr))} }
-@media (max-width:560px){ .kstrip{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp2)} }
+.kgroups{display:grid;gap:var(--sp5)}
+.kgrp .kh{font:500 11px/1.2 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin:0 0 var(--sp2)}
+.kgrp .kh span{text-transform:none;letter-spacing:0;font-family:var(--sans);color:var(--ink-3);margin-left:var(--sp2)}
+.kstrip{display:grid;gap:var(--sp3)}
+.kstrip > .k{min-width:0}
+#kstripA{grid-template-columns:repeat(6,minmax(0,1fr))}
+#kstripB{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:1320px){
+  #kstripA{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #kstripB{grid-template-columns:repeat(6,minmax(0,1fr))}
+  #kstripB > .k{grid-column:span 2}
+  #kstripB > .k:nth-child(-n+2){grid-column:span 3}
+}
+@media (max-width:560px){
+  .kstrip{gap:var(--sp2)}
+  #kstripA,#kstripB{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #kstripB > .k{grid-column:auto}
+  #kstripB > .k:first-child{grid-column:1 / -1}
+}
 .k{background:var(--surface);border:1px solid var(--line);padding:var(--sp3) var(--sp4) var(--sp4);min-width:0;display:flex;flex-direction:column;gap:var(--sp2);container-type:inline-size}
 .k .l{font:500 var(--fs-kicker)/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);display:flex;align-items:center;justify-content:space-between;gap:var(--sp1);min-width:0}
 .k .l{align-items:flex-start;min-height:2.6em;letter-spacing:.06em}
@@ -316,7 +337,10 @@ h3:first-child{margin-top:0}
   </aside>
 
   <main class="out" id="main">
-    <div class="kstrip" id="kstrip"></div>
+    <div class="kgroups" id="kstrip">
+      <section class="kgrp" aria-labelledby="kgA"><h2 class="kh" id="kgA">Coverage &amp; capital <span>on-chain model</span></h2><div class="kstrip" id="kstripA"></div></section>
+      <section class="kgrp" aria-labelledby="kgB"><h2 class="kh" id="kgB">Returns <span>business view</span></h2><div class="kstrip" id="kstripB"></div></section>
+    </div>
 
     <div class="tabs adv" role="tablist" id="tabs" aria-label="Detail views">
       <button role="tab" type="button" id="tab-time" data-tab="time" aria-controls="pane-time" aria-selected="true">Reserve over time</button>
@@ -804,16 +828,16 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   var GROUPS = [
     { id: 'specs', t: 'Contract specs', sm: 'on-chain VaultConfig', note: true, f: [
       { sub: 'Coverage' },
-      { k: 'coverageRatio', l: 'Coverage ratio (c)', u: '× cover', step: 0.05, min: 0.1, max: 2, src: 'protocol', i: 'coverage_ratio_bps. The reserve must hold ceil(c × remaining cover), never less than open provisions. Program floor 0,10 (ADR 0016); devnet starts at 0,10. 1,0 is full backing.' },
+      { k: 'coverageRatio', l: 'Coverage ratio (c)', code: 'coverage_ratio_bps', u: '× cover', step: 0.05, min: 0.1, max: 2, src: 'protocol', i: 'coverage_ratio_bps. The reserve must hold ceil(c × remaining cover), never less than open provisions. Program floor 0,10 (ADR 0016); devnet starts at 0,10. 1,0 is full backing.' },
       { sub: 'Fee take' },
-      { k: 'takePct', l: 'MUTAV take rate', u: '% fees', step: 1, min: 0, max: 30, src: 'estimate', i: 'fee_take_bps: share of each guarantee fee kept by MUTAV (ADR 0009). The program caps it at 30%. 20% is the config placeholder; the value is still open.' },
+      { k: 'takePct', l: 'MUTAV take rate', code: 'fee_take_bps', u: '% fees', step: 1, min: 0, max: 30, src: 'estimate', i: 'fee_take_bps: share of each guarantee fee kept by MUTAV (ADR 0009). The program caps it at 30%. 20% is the config placeholder; the value is still open.' },
       { sub: 'Caps (VaultConfig.caps)' },
-      { k: 'maxTvl', l: 'max_tvl', u: 'R$', step: 10000, min: 0, src: 'protocol', i: 'fulfil_deposits refuses capital that would take stable assets above this. Devnet: R$300k. It also stops starting capital and raises.' },
-      { k: 'maxCoverPerGuarantee', l: 'max_cover_per_guarantee', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'register_guarantee refuses a lease whose cover (default + exit leg) is above this. Devnet: R$40k.' },
-      { k: 'maxCoverPerAgency', l: 'max_cover_per_agency', u: 'R$', step: 100000, min: 0, src: 'protocol', i: 'Outstanding cover one agency may hold. The simulator assumes a single agency, so every lease counts. Devnet: R$10M, well above max_tvl ÷ 0,10 plus fee growth, so it never binds.' },
-      { k: 'maxClaimPerCall', l: 'max_claim_per_call', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'Largest operator claim payment in one call. Above it, pay_claim_admin. Devnet: R$10k.' },
-      { k: 'maxClaimPerPeriod', l: 'max_claim_per_period', u: 'R$/30 d', step: 1000, min: 0, src: 'protocol', i: 'Operator claim payments per 30 days. A month above it needs pay_claim_admin for the excess. Devnet: R$20k.' },
-      { k: 'maxTesouroSharePct', l: 'max_tesouro_share_bps', u: '%', step: 5, min: 0, max: 100, src: 'protocol', i: 'Most of the stable assets allocate may move into TESOURO. Devnet: 0 (no adapter), so TESOURO income is a what-if until it is raised.' }
+      { k: 'maxTvl', l: 'Max reserve size', code: 'max_tvl', u: 'R$', step: 10000, min: 0, src: 'protocol', i: 'fulfil_deposits refuses capital that would take stable assets above this. Devnet: R$300k. It also stops starting capital and raises.' },
+      { k: 'maxCoverPerGuarantee', l: 'Max cover per guarantee', code: 'max_cover_per_guarantee', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'register_guarantee refuses a lease whose cover (default + exit leg) is above this. Devnet: R$40k.' },
+      { k: 'maxCoverPerAgency', l: 'Max cover per agency', code: 'max_cover_per_agency', u: 'R$', step: 100000, min: 0, src: 'protocol', i: 'Outstanding cover one agency may hold. The simulator assumes a single agency, so every lease counts. Devnet: R$10M, well above max_tvl ÷ 0,10 plus fee growth, so it never binds.' },
+      { k: 'maxClaimPerCall', l: 'Max claim per call', code: 'max_claim_per_call', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'Largest operator claim payment in one call. Above it, pay_claim_admin. Devnet: R$10k.' },
+      { k: 'maxClaimPerPeriod', l: 'Max claims per 30 days', code: 'max_claim_per_period', u: 'R$/30 d', step: 1000, min: 0, src: 'protocol', i: 'Operator claim payments per 30 days. A month above it needs pay_claim_admin for the excess. Devnet: R$20k.' },
+      { k: 'maxTesouroSharePct', l: 'Max TESOURO share', code: 'max_tesouro_share_bps', u: '%', step: 5, min: 0, max: 100, src: 'protocol', i: 'Most of the stable assets allocate may move into TESOURO. Devnet: 0 (no adapter), so TESOURO income is a what-if until it is raised.' }
     ]},
     { id: 'contracts', t: 'Guarantee contracts', sm: 'the leases you write', f: [
       { sub: 'Book' },
@@ -1051,7 +1075,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
         gh += '<div class="seghint" id="hint_' + f.seg + '"></div>';
         return;
       }
-      var lab = esc(f.l) + infoI(f.i) + srcTag(f.src);
+      var sp = f.l.lastIndexOf(' '), lab = (sp > 0 ? esc(f.l.slice(0, sp + 1)) : '') + '<span class="nw">' + esc(f.l.slice(sp + 1)) + infoI(f.i) + '</span>' + (f.src || f.code ? '<br><span class="srcline">' + (f.code ? '<span class="src ' + SRC[f.src] + ' mark" title="' + esc(f.src) + '" aria-label="' + esc(f.src) + '"></span><code class="fcode">' + esc(f.code) + '</code>' : srcTag(f.src)) + '</span>' : '');
       gh += '<div class="row" id="row_' + f.k + '">';
       if (f.toggle) gh += '<label class="tg"><span>' + lab + '</span><input type="checkbox" id="in_' + f.k + '" name="' + f.k + '" data-k="' + f.k + '"></label>';
       else gh += '<div class="f"><label for="in_' + f.k + '">' + lab + '</label><div class="inp"><input id="in_' + f.k + '" name="' + f.k + '" autocomplete="off" type="number" inputmode="decimal" step="' + f.step + '"' +
@@ -1283,8 +1307,8 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       cap: { l: 'Capital in', v: R(r.capitalRaised), d: R(Math.min(state.startCapital, state.maxTvl)) + ' start' + (r.capitalRaised - Math.min(state.startCapital, state.maxTvl) > 0 ? ' + ' + R(r.capitalRaised - Math.min(state.startCapital, state.maxTvl)) + ' raises' : '') + (r.tvlRefused > 0 ? ' · ' + R(r.tvlRefused) + ' refused by max_tvl' : ''), t: 'Starting capital plus monthly raises that fulfil_deposits accepted under max_tvl.' },
       take: { l: 'MUTAV take, ' + N + ' mo', v: R(m.takeTotal), d: R(m.takePerLease) + ' / lease / mo · gross', t: 'MUTAV’s share of guarantee fees (fee_take_bps, at most 30%), before costs and taxes. Never counted in the reserve.' }
     };
-    tiles('kstrip', uiMode === 'simple' ? [T.bal, T.yld, T.sel, T.take, T.head, T.blk].filter(function(x){ return x !== T.sel; }).map(function(x){ return x === T.yld ? { l: 'Reserve yield vs Selic', v: P(y.total), d: PP(y.vsSelic) + ' vs Selic · ' + P(y.underwriting) + ' fees + ' + P(y.tesouro) + ' TES.' + tesCap + ' + ' + P(y.brs) + ' BRS', t: T.yld.t } : x; })
-      : [T.bal, T.yld, T.sel, T.roc, T.gain, T.head, T.blk, T.back, T.bad, T.cap, T.take]);
+    tiles('kstripA', [T.bal, T.head, T.blk, T.back, T.bad, T.cap]);
+    tiles('kstripB', [T.yld, T.sel, T.roc, T.gain, T.take]);
     var yk = [T.yld, T.sel, T.roc, T.gain,
       { l: 'Capital payback', v: sfm, d: 'Σ net gain ≥ ' + R(state.startCapital), t: 'Month when cumulative net gain equals the starting capital. ≈ means projected.' },
       { l: 'Redemptions', v: R(r.cumWithdrawals), d: state.withdraw === 'none' ? 'None: everything reinvested' : 'Paid from free capital', t: 'Total redeemed out of the reserve, only ever from free capital.' },
