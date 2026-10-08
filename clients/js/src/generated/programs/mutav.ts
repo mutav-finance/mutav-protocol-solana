@@ -90,7 +90,7 @@ import {
   getRequestRedeemInstructionAsync,
   getRevokeOperatorInstruction,
   getSetAllowlistRootInstruction,
-  getSetConfigInstruction,
+  getSetConfigInstructionAsync,
   getSetPaymentsAccountInstruction,
   getSetRolesInstruction,
   getSettlePayoutInstructionAsync,
@@ -168,7 +168,7 @@ import {
   type RequestRedeemAsyncInput,
   type RevokeOperatorInput,
   type SetAllowlistRootInput,
-  type SetConfigInput,
+  type SetConfigAsyncInput,
   type SetPaymentsAccountInput,
   type SetRolesInput,
   type SettlePayoutAsyncInput,
@@ -1500,8 +1500,9 @@ export type MutavPluginInstructions = {
   ) => ReturnType<typeof getSetAllowlistRootInstruction> &
     SelfPlanAndSendFunctions;
   setConfig: (
-    input: SetConfigInput,
-  ) => ReturnType<typeof getSetConfigInstruction> & SelfPlanAndSendFunctions;
+    input: SetConfigAsyncInput,
+  ) => ReturnType<typeof getSetConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
   setPaymentsAccount: (
     input: SetPaymentsAccountInput,
   ) => ReturnType<typeof getSetPaymentsAccountInstruction> &
@@ -1685,7 +1686,10 @@ export function mutavProgram() {
               getSetAllowlistRootInstruction(input),
             ),
           setConfig: (input) =>
-            addSelfPlanAndSendFunctions(client, getSetConfigInstruction(input)),
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetConfigInstructionAsync(input),
+            ),
           setPaymentsAccount: (input) =>
             addSelfPlanAndSendFunctions(
               client,

@@ -28,7 +28,11 @@ export type CapsInput = {
   maxClaimPerCall: bigint;
   maxClaimPerPeriod: bigint;
   claimPeriodSecs: bigint;
-  maxTesouroShareBps: number;
+  /**
+   * The settlement floor (ADR 0018), `<= 10_000`. Stored as its complement
+   * `Caps::max_allocated_bps`.
+   */
+  minSettlementBps: number;
   minRequest: bigint;
   maxRequest: bigint;
   minFillAssets: bigint;
@@ -41,7 +45,11 @@ export type CapsInputArgs = {
   maxClaimPerCall: number | bigint;
   maxClaimPerPeriod: number | bigint;
   claimPeriodSecs: number | bigint;
-  maxTesouroShareBps: number;
+  /**
+   * The settlement floor (ADR 0018), `<= 10_000`. Stored as its complement
+   * `Caps::max_allocated_bps`.
+   */
+  minSettlementBps: number;
   minRequest: number | bigint;
   maxRequest: number | bigint;
   minFillAssets: number | bigint;
@@ -55,7 +63,7 @@ export function getCapsInputEncoder(): FixedSizeEncoder<CapsInputArgs> {
     ["maxClaimPerCall", getU64Encoder()],
     ["maxClaimPerPeriod", getU64Encoder()],
     ["claimPeriodSecs", getI64Encoder()],
-    ["maxTesouroShareBps", getU16Encoder()],
+    ["minSettlementBps", getU16Encoder()],
     ["minRequest", getU64Encoder()],
     ["maxRequest", getU64Encoder()],
     ["minFillAssets", getU64Encoder()],
@@ -70,7 +78,7 @@ export function getCapsInputDecoder(): FixedSizeDecoder<CapsInput> {
     ["maxClaimPerCall", getU64Decoder()],
     ["maxClaimPerPeriod", getU64Decoder()],
     ["claimPeriodSecs", getI64Decoder()],
-    ["maxTesouroShareBps", getU16Decoder()],
+    ["minSettlementBps", getU16Decoder()],
     ["minRequest", getU64Decoder()],
     ["maxRequest", getU64Decoder()],
     ["minFillAssets", getU64Decoder()],

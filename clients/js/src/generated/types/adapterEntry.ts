@@ -18,6 +18,8 @@ import {
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU16Decoder,
+  getU16Encoder,
   getU64Decoder,
   getU64Encoder,
   type Address,
@@ -42,8 +44,18 @@ export type AdapterEntry = {
   allocated: bigint;
   enabled: boolean;
   /**
+   * The most of `stable_assets` this adapter's value may be, in bps
+   * (`adapter value ≤ max_share_bps × stable_assets / 10_000`, ADR 0018).
+   * Zero (an entry never configured) means nothing may be allocated.
+   * Written by `whitelist_adapter` and read by `allocate`, both built with
+   * the first adapter upgrade.
+   */
+  maxShareBps: number;
+  /**
    * Zeroed. Room for adapter pinning (PC-27: deployed slot `u64` and
-   * upgrade authority `Pubkey`, 40 bytes) without a migration.
+   * upgrade authority `Pubkey`, 40 bytes) without a migration. The price
+   * feed, its bounds and the position live in the `AdapterState` PDA
+   * (`["adapter_state", config, program_id]`, spec §3.9).
    */
   reserved: ReadonlyUint8Array;
 };
@@ -59,8 +71,18 @@ export type AdapterEntryArgs = {
   allocated: number | bigint;
   enabled: boolean;
   /**
+   * The most of `stable_assets` this adapter's value may be, in bps
+   * (`adapter value ≤ max_share_bps × stable_assets / 10_000`, ADR 0018).
+   * Zero (an entry never configured) means nothing may be allocated.
+   * Written by `whitelist_adapter` and read by `allocate`, both built with
+   * the first adapter upgrade.
+   */
+  maxShareBps: number;
+  /**
    * Zeroed. Room for adapter pinning (PC-27: deployed slot `u64` and
-   * upgrade authority `Pubkey`, 40 bytes) without a migration.
+   * upgrade authority `Pubkey`, 40 bytes) without a migration. The price
+   * feed, its bounds and the position live in the `AdapterState` PDA
+   * (`["adapter_state", config, program_id]`, spec §3.9).
    */
   reserved: ReadonlyUint8Array;
 };
@@ -73,7 +95,8 @@ export function getAdapterEntryEncoder(): FixedSizeEncoder<AdapterEntryArgs> {
     ["cap", getU64Encoder()],
     ["allocated", getU64Encoder()],
     ["enabled", getBooleanEncoder()],
-    ["reserved", fixEncoderSize(getBytesEncoder(), 64)],
+    ["maxShareBps", getU16Encoder()],
+    ["reserved", fixEncoderSize(getBytesEncoder(), 62)],
   ]);
 }
 
@@ -85,7 +108,8 @@ export function getAdapterEntryDecoder(): FixedSizeDecoder<AdapterEntry> {
     ["cap", getU64Decoder()],
     ["allocated", getU64Decoder()],
     ["enabled", getBooleanDecoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 64)],
+    ["maxShareBps", getU16Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 62)],
   ]);
 }
 

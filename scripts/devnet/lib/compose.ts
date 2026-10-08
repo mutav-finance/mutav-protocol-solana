@@ -129,6 +129,7 @@ export async function composeSetCaps(
     {
       admin,
       config: a.config,
+      state: a.state,
       treasuryAccount: current.treasuryAccount,
       paymentsAccount: current.paymentsAccount,
       eventAuthority: a.eventAuthority,

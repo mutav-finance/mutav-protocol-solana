@@ -110,7 +110,7 @@ export function parseConfig(raw: any): DeployConfig {
       maxClaimPerCall: big(raw.caps?.maxClaimPerCall, 'caps.maxClaimPerCall'),
       maxClaimPerPeriod: big(raw.caps?.maxClaimPerPeriod, 'caps.maxClaimPerPeriod'),
       claimPeriodSecs: big(raw.caps?.claimPeriodSecs, 'caps.claimPeriodSecs'),
-      maxTesouroShareBps: bps(raw.caps?.maxTesouroShareBps, 'caps.maxTesouroShareBps'),
+      minSettlementBps: bps(raw.caps?.minSettlementBps, 'caps.minSettlementBps'),
       minRequest: big(raw.caps?.minRequest, 'caps.minRequest'),
       maxRequest: big(raw.caps?.maxRequest, 'caps.maxRequest'),
       minFillAssets: big(raw.caps?.minFillAssets, 'caps.minFillAssets'),

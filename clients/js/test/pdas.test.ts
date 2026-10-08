@@ -13,6 +13,7 @@ import {
   findRedeemRequestPda,
   findReserveAddresses,
   MUTAV_PROGRAM_ADDRESS,
+  TOKEN_PROGRAM_ADDRESS,
 } from '../src';
 import { unhex, vectors } from './vectors';
 
@@ -70,6 +71,7 @@ describe('PDA derivation matches the program', () => {
       await findIncomeInboxAddress({
         vaultAuthority: address(expected.vaultAuthority),
         reserveMint: address(inputs.reserveMint),
+        tokenProgram: TOKEN_PROGRAM_ADDRESS,
       }),
     ).toBe(expected.incomeInbox);
   });
