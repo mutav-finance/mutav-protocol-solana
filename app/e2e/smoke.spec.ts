@@ -31,26 +31,50 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/reserve — health, coverage, claims timeline, flows, queue, disclosures, accounts", async ({ page }) => {
+  test("/reserve — overview: promises, health, a summary card per tab", async ({ page }) => {
     await page.goto("/reserve");
+    const views = page.getByRole("navigation", { name: "Reserve views" });
+    for (const tab of ["Overview", "Coverage", "Claims", "Flows", "Queue", "Risks", "Accounts"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
+    await expect(page.getByText("Claim payments are never blocked by solvency.")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
     await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();
-    await expect(page.getByText("2 active · Σ remaining cover R$ 19,500.00 = remaining_cover_total")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Refresh on-chain" })).toBeVisible();
+    await expect(page.getByText("The pilot runs on MUTAV's own capital and is not open to public investment")).toBeVisible();
+    await noBannedWords(page);
+  });
+
+  test("/reserve tabs — coverage, claims, flows, queue, risks, accounts", async ({ page }) => {
+    await page.goto("/reserve/coverage");
+    await expect(page.getByText("2 active guarantees")).toBeVisible();
+    await expect(page.getByText("✓ matches VaultState")).toBeVisible();
     await expect(page.getByRole("table", { name: "Remaining cover by guarantee" }).locator("tbody tr")).toHaveCount(2);
     await expect(page.getByRole("table", { name: "Per-agency exposure" }).locator("tbody tr")).toHaveCount(2);
+    await noBannedWords(page);
+
+    await page.goto("/reserve/claims");
     const claims = page.getByRole("table", { name: "Claims timeline" });
     await expect(claims.locator("tbody tr")).toHaveCount(1);
     await expect(claims).toContainText("on time");
+    await expect(page.getByText("The Reserve Admin cannot block a claim payment.")).toBeVisible();
+    await noBannedWords(page);
+
+    await page.goto("/reserve/flows");
     const flows = page.getByRole("table", { name: "Money flows" });
     await expect(flows).toContainText("Guarantee fee");
     await expect(flows).toContainText("Claim payment");
     await expect(flows).toContainText("Deposit");
+    await noBannedWords(page);
+
+    await page.goto("/reserve/queue");
+    await expect(page.getByRole("heading", { name: "Capital queue" })).toBeVisible();
+    await noBannedWords(page);
+
+    await page.goto("/reserve/disclosures");
     await expect(page.getByText("BRS is issued by Nora, and Nora can freeze it")).toBeVisible();
-    await expect(page.getByRole("table", { name: "Accounts" })).toContainText("8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9");
-    await expect(page.getByRole("button", { name: "Refresh on-chain" })).toBeVisible();
-    await expect(page.getByRole("figure", { name: "Coverage against the reserve" })).toBeVisible();
-    await expect(page.getByRole("figure", { name: "Claim speed, from on-chain timestamps" })).toBeVisible();
-    await expect(page.getByText("The pilot runs on MUTAV's own capital and is not open to public investment")).toBeVisible();
+    await noBannedWords(page);
+
+    await page.goto("/reserve/accounts");
+    await expect(page.getByText("8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9")).toBeVisible();
     await noBannedWords(page);
   });
 

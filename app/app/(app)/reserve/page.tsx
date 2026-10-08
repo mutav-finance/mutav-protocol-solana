@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ReservePage } from "@/components/reserve/ReservePage";
+import { Overview } from "@/components/reserve/Overview";
 
 export const metadata: Metadata = {
   title: "Reserve",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <ReservePage />;
+  return <Overview />;
 }

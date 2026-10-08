@@ -78,7 +78,7 @@ function Who({ r, history }: { r: ReserveView; history: OperatorHistory | null }
 
 function Bound({ children }: { children: ReactNode }) {
   return (
-    <div style={{ border: "1px dashed var(--color-border-input)", padding: "10px 12px", margin: "12px 0 4px", display: "flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ border: "1px solid var(--color-border-input)", padding: "10px 12px", margin: "12px 0 4px", display: "flex", flexDirection: "column", gap: 4 }}>
       <span className="font-mono" style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-3)" }}>Bound before you sign · on-chain</span>
       <div className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)", lineHeight: 1.6 }}>{children}</div>
     </div>
@@ -227,7 +227,7 @@ function Limits({ r, l }: { r: ReserveView; l: Ledger }) {
           <SolvencyChart s={r.solvency} ratioBps={r.config.coverageRatioBps} compact />
         </div>
       </div>
-      {open.length > 0 ? <ClaimSpeedChart rows={open} slaSecs={r.config.payoutSlaSecs} now={r.now} /> : <Note>No claim is waiting for the operator. Settled claims are on <Link href="/reserve#claims" className="ext-link">/reserve</Link>.</Note>}
+      {open.length > 0 ? <ClaimSpeedChart rows={open} slaSecs={r.config.payoutSlaSecs} now={r.now} /> : <Note>No claim is waiting for the operator. Settled claims are on <Link href="/reserve/claims" className="ext-link">/reserve/claims</Link>.</Note>}
     </div>
   );
 }

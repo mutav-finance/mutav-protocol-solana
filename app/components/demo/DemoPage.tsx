@@ -147,7 +147,7 @@ export function DemoPage() {
 
               <Step n={6} title="Settle by PIX" instruction="settle_payout" roles={["operator"]} why={<>MUTAV offramps the BRS and pays the agency by PIX, then records the hash of the PIX end-to-end id on-chain. The claims timeline on /reserve now shows filed → paid → settled, each with its on-chain timestamp, and flags any settlement past the SLA.</>}>
                 <SettleList />
-                <Note><Link href="/reserve#claims" className="ext-link">Open the claims timeline →</Link></Note>
+                <Note><Link href="/reserve/claims" className="ext-link">Open the claims timeline →</Link></Note>
               </Step>
             </div>
           </Section>

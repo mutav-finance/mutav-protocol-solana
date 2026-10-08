@@ -85,7 +85,7 @@ const ACTION_LABEL = { cancel_deposit: "Cancel deposit", claim_shares: "Claim sh
 function Requests({ owner }: { owner: string | null }) {
   const { reserve, ledger } = useLive();
   const rows = investorRequests(owner, reserve.state, ledger);
-  if (!owner) return <Note>Connect a wallet to see its requests. The whole queue is public on <Link href="/reserve#queue" className="ext-link">/reserve</Link>.</Note>;
+  if (!owner) return <Note>Connect a wallet to see its requests. The whole queue is public on <Link href="/reserve/queue" className="ext-link">/reserve/queue</Link>.</Note>;
   if (rows.length === 0) return <Note>This wallet has no open request.</Note>;
   return (
     <div className="table-wrap">

@@ -194,7 +194,7 @@ function Claims({ mode }: { mode: Mode }) {
         <Context who="operator" figure={m(`−${fmtBrs(reserve.state.claimsPaidTotal, 0)} · ${fmtBrs(cap.paid, 0)} this window`)} href="/operator">
           pay_claim sends BRS to the payments account within the claim caps (claims_paid_total); never blocked by solvency or pause.
         </Context>
-        <Context who="anyone" href="/reserve#claims" linkLabel="/reserve">
+        <Context who="anyone" href="/reserve/claims" linkLabel="/reserve/claims">
           The claims timeline (filed → paid → settled) is public.
         </Context>
       </Contexts>
@@ -238,7 +238,7 @@ export function Money({ mode }: { mode: Mode }) {
       title="Money in & out"
       roles={<RoleLine items={[{ role: "admin", prefix: "queue filled and settings set by the" }, { role: "operator", prefix: "fees, income and claims by the" }, { role: "investor", prefix: "requests by the" }]} />}
     >
-      <WhatThis>Each flow into and out of the reserve, with the settings that govern it. Steps signed by the Operator or an Investor are context, linked to where they happen; full charts are on <Link href="/reserve#flows" className="ext-link">/reserve</Link>.</WhatThis>
+      <WhatThis>Each flow into and out of the reserve, with the settings that govern it. Steps signed by the Operator or an Investor are context, linked to where they happen; full charts are on <Link href="/reserve/flows" className="ext-link">/reserve/flows</Link>.</WhatThis>
       <Divider>In</Divider>
       <Deposits mode={mode} />
       <Fees mode={mode} />
