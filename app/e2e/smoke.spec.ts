@@ -105,7 +105,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/simulator — static reserve simulator in protocol terms, Simple and Advanced", async ({ page }) => {
+  test("/simulator — static reserve simulator in protocol terms, one full view", async ({ page }) => {
     await page.goto("/simulator");
     await expect(page.getByRole("heading", { name: "Reserve simulator", level: 1 })).toBeVisible();
     await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0.1");
@@ -114,7 +114,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.locator("#kstrip")).toContainText("Reserve yield vs Selic");
     await noBannedWords(page);
 
-    await page.getByRole("button", { name: "Advanced" }).click();
+    await expect(page.getByRole("button", { name: "Advanced" })).toHaveCount(0);
     await page.getByRole("tab", { name: "Compare c & sizing" }).click();
     await expect(page.locator("#ruleTbl tbody tr")).toHaveCount(3);
     await page.getByRole("tab", { name: "Reserve yield" }).click();

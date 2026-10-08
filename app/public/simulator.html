@@ -158,11 +158,6 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .legendsrc .src{margin-left:2px}
 .linkbtn{font:inherit;font-weight:500;background:none;border:0;padding:0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px;cursor:pointer}
 /* view mode */
-.modeseg{display:inline-grid;min-width:160px}
-.modeseg button{padding:0 var(--sp3);font-size:var(--fs-body);height:30px;min-height:0}
-body.simple .adv{display:none!important}
-body.simple .pane{display:none!important}
-body.simple .pane[data-pane="time"]{display:block!important}
 .kgrid5{display:grid;gap:var(--sp3);grid-template-columns:repeat(auto-fit,minmax(min(170px,100%),1fr))}
 /* at a glance */
 .glance{background:transparent;border-top:1px solid var(--line);padding:var(--sp8) 0 0}
@@ -199,7 +194,6 @@ body.simple .pane[data-pane="time"]{display:block!important}
 .tabs button:focus-visible{outline-offset:-2px}
 .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 .pane[hidden]{display:none}
-body.simple .pane[data-pane="time"]{margin-top:var(--sp6)}
 .card{background:var(--surface);border:1px solid var(--line);padding:var(--sp5) var(--sp5) var(--sp4)}
 h3{font-size:var(--fs-h3);line-height:1.3;margin:var(--sp8) 0 var(--sp3);letter-spacing:-.005em}
 h3:first-child{margin-top:0}
@@ -279,7 +273,6 @@ h3:first-child{margin-top:0}
   .ttl{flex:1 1 100%}
   .bar .sp{display:none}
   .bgrp.view{width:100%}
-  .bgrp.view .modeseg{flex:1}
   .bgrp.act{width:100%;order:6}
   .bgrp.act .tbtn{flex:1;justify-content:center;padding:0 var(--sp2)}
   .k{padding:var(--sp3)}
@@ -300,7 +293,6 @@ h3:first-child{margin-top:0}
   </div>
   <span class="sp"></span>
   <div class="bgrp view">
-    <div class="seg modeseg" role="group" aria-label="View"><button type="button" data-mode="simple">Simple</button><button type="button" data-mode="advanced">Advanced</button></div>
     <button class="tbtn" type="button" id="themeBtn" title="Toggle light/dark">Theme</button>
   </div>
   <div class="bgrp act">
@@ -902,8 +894,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   function scenById(id){ return SCEN.filter(function(s){ return s.id === id; })[0]; }
   var TABS = ['time','yield','months','mutav','sizing','method'];
   var PILOT_BOOK = PILOT.perMonth * Math.min(PILOT.months, MUTAV_DEFAULTS.leaseTerm);
-  var uiMode = 'simple';
-  try { var um = localStorage.getItem(STORE + '-mode'); if (um === 'advanced' || um === 'simple') uiMode = um; } catch (e) {}
+  var uiMode = 'advanced'; // single full view (the Simple view was removed)
 
   var state = clone(DEF), activeScen = 'default', baseScen = 'default', curTab = 'time';
 
@@ -922,7 +913,6 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       if (kv.scen && scenById(kv.scen)) { activeScen = baseScen = kv.scen; state = ext(state, scenById(kv.scen).o); got = true; }
       if (kv.from && scenById(kv.from)) baseScen = kv.from;
       if (TABS.indexOf(kv.tab) >= 0) curTab = kv.tab;
-      if (kv.mode === 'advanced' || kv.mode === 'simple') uiMode = kv.mode;
       for (var k in kv) if (k in DEF) { state[k] = coerce(k, kv[k]); got = true; }
       return got || TABS.indexOf(kv.tab) >= 0;
     } catch (e) { return false; }
@@ -940,13 +930,12 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   }
   if (!loadHash()) loadStore();
   function persist(){
-    try { localStorage.setItem(STORE, JSON.stringify({ values: state, scen: activeScen, base: baseScen, tab: curTab })); localStorage.setItem(STORE + '-mode', uiMode); } catch (e) {}
+    try { localStorage.setItem(STORE, JSON.stringify({ values: state, scen: activeScen, base: baseScen, tab: curTab })); } catch (e) {}
     try {
       var parts = [];
       for (var k in DEF) if (state[k] !== DEF[k]) parts.push(k + '=' + encodeURIComponent(typeof state[k] === 'boolean' ? (state[k] ? 1 : 0) : state[k]));
       if (activeScen) parts.push('scen=' + activeScen); else if (baseScen) parts.push('from=' + baseScen);
       if (curTab !== 'time') parts.push('tab=' + curTab);
-      if (uiMode === 'advanced') parts.push('mode=advanced');
       history.replaceState(null, '', location.pathname + location.search + (parts.length ? '#' + parts.join('&') : ''));
     } catch (e) {}
   }
@@ -1122,13 +1111,12 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
 
   /* Simple / Advanced */
   function setMode(m, quiet){
-    uiMode = m === 'advanced' ? 'advanced' : 'simple';
+    uiMode = 'advanced';
     document.body.classList.toggle('simple', uiMode === 'simple');
     Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-mode') === uiMode ? 'true' : 'false'); });
     if (uiMode === 'simple') { var gp = document.getElementById('grp_plan'); if (gp) gp.open = true; }
     if (!quiet) { persist(); if (last) render(); }
   }
-  Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function(b){ b.addEventListener('click', function(){ setMode(b.getAttribute('data-mode')); }); });
 
   /* tabs (arrow keys move between tabs) */
   var tabs = document.getElementById('tabs');
