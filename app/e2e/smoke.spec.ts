@@ -108,11 +108,28 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   test("/simulator — static reserve simulator in protocol terms, one full view", async ({ page }) => {
     await page.goto("/simulator");
     await expect(page.getByRole("heading", { name: "Reserve simulator", level: 1 })).toBeVisible();
-    await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0.1");
+    await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0,1");
     await expect(page.locator("#glance")).toContainText("Coverage & safety");
     await expect(page.locator("#chart")).toContainText("Stable assets vs coverage required");
-    await expect(page.locator("#kstrip")).toContainText("Reserve yield, annualized");
+    await expect(page.locator("#kstrip")).toContainText("What the reserve earns");
     await expect(page.locator("#kstrip")).toContainText("vs Selic");
+    await expect(page.locator("#kstrip")).toContainText("MUTAV take");
+
+    // inputs read like outputs (pt-BR) and accept pasted values with or without separators
+    await page.getByRole("tab", { name: "Capital" }).click();
+    const start = page.getByLabel(/Starting capital/);
+    await expect(start).toHaveValue("300.000");
+    await start.fill("250000");
+    await start.blur();
+    await expect(start).toHaveValue("250.000");
+    await expect(page.locator("#scenSel")).toHaveValue("custom");
+
+    // Export menu: keyboard operable, closes on Escape
+    await page.getByRole("button", { name: "Export" }).click();
+    await expect(page.getByRole("menuitem", { name: /Copy summary/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menuitem", { name: /Copy summary/ })).toBeHidden();
+    await page.getByRole("button", { name: "Reset" }).click();
     await noBannedWords(page);
 
     await expect(page.getByRole("button", { name: "Advanced" })).toHaveCount(0);

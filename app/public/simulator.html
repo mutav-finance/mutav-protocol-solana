@@ -27,6 +27,8 @@
   --fs-title:18px; --fs-h2:16px; --fs-h3:14px; --fs-body:13px; --fs-label:13px; --fs-value:22px; --fs-help:12px; --fs-kicker:11px;
   /* spacing scale (×4) */
   --sp1:4px; --sp2:8px; --sp3:12px; --sp4:16px; --sp5:20px; --sp6:24px; --sp8:32px;
+  /* fixed chrome: sticky top bar and fixed footer */
+  --bar-h:56px; --foot-h:40px;
   color-scheme:dark;
 }
 @media (prefers-color-scheme: light){
@@ -49,8 +51,7 @@
 }
 *{box-sizing:border-box;border-radius:0}
 html{-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;scroll-padding-top:64px;scroll-padding-bottom:64px}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 var(--fs-body)/1.5 var(--sans);padding-bottom:48px;touch-action:manipulation}
-@media (min-width:901px) and (max-width:1500px){ body{padding-bottom:76px} }
+body{margin:0;background:var(--bg);color:var(--ink);font:400 var(--fs-body)/1.5 var(--sans);padding-bottom:calc(var(--foot-h) + var(--sp4));touch-action:manipulation}
 h1,h2,h3{font-family:var(--display);font-weight:700;text-wrap:balance}
 p{text-wrap:pretty}
 button,input,select{touch-action:manipulation;font-family:inherit}
@@ -64,10 +65,25 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 
 /* top bar: brand/title · scenario · view · actions */
 .bar{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
-.bar .in{max-width:1440px;margin:0 auto;padding:var(--sp2) var(--sp6);min-height:56px;display:flex;align-items:center;gap:var(--sp2) var(--sp4);flex-wrap:wrap}
-@media (max-width:1360px){ .bar .scenbar label{display:none} }
-@media (max-width:1380px){ .bgrp.act{order:6;width:100%;justify-content:flex-end;padding-left:0!important;border-left:0!important} }
-.ttl{display:flex;align-items:baseline;gap:var(--sp3);min-width:0}
+.bar .in{max-width:1440px;margin:0 auto;padding:var(--sp2) var(--sp6);min-height:var(--bar-h);display:flex;align-items:center;gap:var(--sp2) var(--sp4);flex-wrap:wrap}
+@media (min-width:901px){ .bar .in{height:var(--bar-h);flex-wrap:nowrap;padding-top:0;padding-bottom:0} .bar .scenbar{flex:0 1 auto} }
+.ttl{display:flex;align-items:baseline;gap:var(--sp3);min-width:0;flex:none}
+.tbtn.ibtn{width:32px;padding:0;justify-content:center;flex:none}
+.ibtn svg{display:block;flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5}
+.tbtn .car{margin-left:6px;font-size:10px;color:var(--ink-3)}
+/* Export menu and Sources popover: one pattern, keyboard operable */
+.mwrap{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 4px);z-index:40;min-width:200px;background:var(--surface);border:1px solid var(--line-input);padding:var(--sp1) 0;display:grid}
+.menu[hidden]{display:none}
+.menu button{font:500 var(--fs-body)/1.2 var(--sans);text-align:left;background:transparent;border:0;border-left:2px solid transparent;color:var(--ink);padding:var(--sp2) var(--sp3);cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.menu button small{font:400 var(--fs-help)/1.3 var(--sans);color:var(--ink-3)}
+.menu button:hover,.menu button:focus-visible{background:var(--surface-2);outline:0}
+.menu button:focus-visible{border-left-color:var(--accent)}
+.pop{position:absolute;right:0;bottom:calc(100% + 6px);z-index:40;width:max-content;max-width:min(560px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line-input);padding:var(--sp3) var(--sp4)}
+.pop[hidden]{display:none}
+.pop h2{font:500 var(--fs-kicker)/1.3 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin:0 0 var(--sp2)}
+.pop ul{list-style:none;margin:0;padding:0;display:grid;gap:var(--sp1);font-size:var(--fs-help);color:var(--ink-2);line-height:1.5}
+.pop li .src{margin:0 var(--sp1) 0 0;vertical-align:0}
 .brand{font:500 var(--fs-kicker)/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .bar h1{font-size:var(--fs-title);line-height:1.2;margin:0;letter-spacing:-.01em;white-space:nowrap}
 .bar .sp{flex:1}
@@ -78,7 +94,7 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .tbtn.done{border-color:var(--ok);color:var(--ok)}
 /* workspace */
 .app{max-width:1440px;margin:0 auto;padding:var(--sp6);display:grid;grid-template-columns:360px minmax(0,1fr);gap:var(--sp6);align-items:start}
-.panel{position:sticky;top:80px;max-height:calc(100vh - 136px);overflow:auto;background:var(--surface);border:1px solid var(--line);padding:var(--sp4);scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent}
+.panel{position:sticky;top:calc(var(--bar-h) + var(--sp4));max-height:calc(100vh - var(--bar-h) - var(--foot-h) - var(--sp4) * 2);max-height:calc(100dvh - var(--bar-h) - var(--foot-h) - var(--sp4) * 2);overflow:auto;overscroll-behavior:contain;background:var(--surface);border:1px solid var(--line);padding:var(--sp4);scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent}
 .out{min-width:0}
 @media (max-width:900px){
   .app{grid-template-columns:1fr;padding:var(--sp4);gap:var(--sp4)}
@@ -87,8 +103,8 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .scen label{display:block;font:500 var(--fs-kicker)/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3)}
 .scen select{font:500 var(--fs-body) var(--sans);color:var(--ink);background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0h10L5 6z' fill='%238A8F99'/%3E%3C/svg%3E") no-repeat right 10px center;border:1px solid var(--line-input);padding:0 30px 0 10px;height:32px;-webkit-appearance:none;appearance:none;cursor:pointer;text-overflow:ellipsis}
 .scen select:hover{border-color:var(--ink-3)}
-.scenbar{display:flex;align-items:center;gap:var(--sp2)}
-.scenbar select{width:220px;min-width:0}
+.scenbar{display:flex;align-items:center;gap:var(--sp2);min-width:0}
+.scenbar select{width:320px;max-width:100%;min-width:0;white-space:nowrap;overflow:hidden}
 .scendlg{border:1px solid var(--line-input);background:var(--surface);color:var(--ink);padding:var(--sp6);max-width:min(640px,calc(100vw - 32px));width:100%}
 .scendlg::backdrop{background:rgba(0,0,0,.6)}
 .scendlg .dh{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp4)}
@@ -104,7 +120,7 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .scendlg thead th:nth-child(n+2){font-family:var(--sans)}
 .scendlg tbody th{font:400 var(--fs-body)/1.4 var(--sans);color:var(--ink);text-transform:none;letter-spacing:0;background:transparent}
 .scendlg .note{font-size:var(--fs-help);color:var(--ink-3);margin:var(--sp3) 0 0}
-@media (max-width:900px){ .scenbar{order:5;width:100%} .scenbar select{flex:1;max-width:none;min-width:0} }
+@media (max-width:900px){ .scenbar{order:5;width:100%} .scenbar select{flex:1;width:auto;max-width:none;min-width:0} }
 .glance-after{margin-top:var(--sp8)}
 /* segmented controls */
 .seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line-input)}
@@ -113,17 +129,20 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .seg button:hover{color:var(--ink);background:var(--surface-2)}
 .seg button:focus-visible{outline-offset:-2px}
 .seg button[aria-pressed="true"]{background:var(--surface-3);color:var(--ink);border-bottom-color:var(--accent)}
-/* control tabs: a tab grid, hairline cells, amber underline on the active one */
+/* control tabs: the same underline tabs as the result tabs, one row, short labels */
 .grp{border-top:0}
-.tabs.ctabs{display:flex;flex-wrap:wrap;gap:0;margin:0 0 var(--sp4);border:0;overflow:visible}
-.tabs.ctabs button{flex:1 1 auto;font:500 var(--fs-help)/1.2 var(--sans);background:transparent;border:1px solid var(--line);margin:0 -1px -1px 0;border-bottom:2px solid var(--line);color:var(--ink-2);padding:var(--sp2) var(--sp3) 6px;cursor:pointer;white-space:nowrap}
-.tabs.ctabs button:hover{color:var(--ink);background:var(--surface-2)}
-.tabs.ctabs button[aria-selected="true"]{color:var(--ink);background:var(--surface-2);border-bottom-color:var(--accent);position:relative;z-index:1}
-.grp .gh{display:none!important}
+.tabs.ctabs{margin:0 0 var(--sp3);gap:0;justify-content:space-between}
+.tabs.ctabs button{padding:var(--sp2) var(--sp2) 10px}
+.grp .gh{margin:0 0 var(--sp3);font:600 var(--fs-h3)/1.3 var(--display);color:var(--ink);display:flex;align-items:baseline;gap:var(--sp2);flex-wrap:wrap}
+.grp .gh .sm{font:400 var(--fs-help)/1.3 var(--sans);color:var(--ink-3)}
 .grp[hidden]{display:none}
 .grp .body{display:grid;gap:var(--sp2)}
 .sub{font:500 var(--fs-kicker)/1.3 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin:var(--sp4) 0 0;padding-top:var(--sp3);border-top:1px solid var(--line)}
 .sub:first-child{margin-top:0;padding-top:0;border-top:0}
+.lbl.sep{margin-top:var(--sp4);padding-top:var(--sp3);border-top:1px solid var(--line)}
+.inp .u.pre{padding:0 0 0 var(--sp2)}
+.inp input[aria-invalid="true"]{color:var(--risk)}
+.inp:has(input[aria-invalid="true"]){border-color:var(--risk)}
 .row[hidden]{display:none}
 .f{display:grid;grid-template-columns:minmax(0,1fr) 148px;align-items:center;gap:var(--sp3);min-height:32px}
 .f > label,.lbl{font-size:var(--fs-label);color:var(--ink);line-height:1.35}
@@ -159,6 +178,7 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .srcline{display:inline-flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
 .srcline .src{margin-top:0}
 .nw{white-space:nowrap}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .src.mark{gap:0}
 .fcode{font:400 10px/1 var(--mono);color:var(--ink-3);letter-spacing:0;text-transform:none}
 .linkbtn{font:inherit;font-weight:500;background:none;border:0;padding:0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px;cursor:pointer}
@@ -178,38 +198,59 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .glance b{font-weight:600;color:var(--ink);font-family:var(--mono);font-size:.93em;font-variant-numeric:tabular-nums}
 .glance .muted{font-size:var(--fs-help)}
 @media (max-width:560px){ .glance li{grid-template-columns:1fr;padding:var(--sp4)} }
-/* KPI strip */
-.kgroups{display:grid;gap:var(--sp5)}
-.kgrp .kh{font:500 11px/1.2 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin:0 0 var(--sp2)}
+/* KPI area: three hero cards (amber, the only amber in the area), then one compact secondary row.
+   Two groups: Coverage & capital (on-chain model) and Returns (business view). */
+.kgroups{display:grid;gap:var(--sp3)}
+.khero{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp3)}
+.kgrp{display:grid;gap:var(--sp2);min-width:0;align-content:start}
+.kgrp.ret{grid-column:span 2;grid-template-columns:repeat(2,minmax(0,1fr))}
+.kgrp.ret .kh{grid-column:1 / -1}
+.kgrp .kh{font:500 11px/1.2 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin:0}
 .kgrp .kh span{text-transform:none;letter-spacing:0;font-family:var(--sans);color:var(--ink-3);margin-left:var(--sp2)}
-.kstrip{display:grid;gap:var(--sp3)}
-.kstrip > .k{min-width:0}
-#kstripA{grid-template-columns:repeat(6,minmax(0,1fr))}
-#kstripB{grid-template-columns:repeat(5,minmax(0,1fr))}
-@media (max-width:1320px){
-  #kstripA{grid-template-columns:repeat(3,minmax(0,1fr))}
-  #kstripB{grid-template-columns:repeat(6,minmax(0,1fr))}
-  #kstripB > .k{grid-column:span 2}
-  #kstripB > .k:nth-child(-n+2){grid-column:span 3}
+.k2{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);background:var(--surface)}
+.k2 .s{padding:var(--sp2) var(--sp3);border-left:1px solid var(--line);min-width:0;display:flex;flex-direction:column;gap:2px}
+.k2 .s:first-child{border-left:0}
+.k2 .s.ret{border-left:1px solid var(--line-input)}
+.k2 .sl{font:500 var(--fs-kicker)/1.3 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-self:flex-start;max-width:100%}
+.k2 .sv{font:600 15px/1.25 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k2 .sv.neg{color:var(--risk)}
+@media (max-width:1100px){
+  .khero{grid-template-columns:minmax(0,1fr)}
+  .kgrp.ret{grid-column:auto}
+  .k2{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .k2 .s:nth-child(4){border-left:0}
+  .k2 .s:nth-child(n+4){border-top:1px solid var(--line)}
 }
 @media (max-width:560px){
-  .kstrip{gap:var(--sp2)}
-  #kstripA,#kstripB{grid-template-columns:repeat(2,minmax(0,1fr))}
-  #kstripB > .k{grid-column:auto}
-  #kstripB > .k:first-child{grid-column:1 / -1}
+  .kgrp.ret{grid-template-columns:minmax(0,1fr)}
+  .k2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .k2 .s:nth-child(n){border-left:0;border-top:1px solid var(--line)}
+  .k2 .s:nth-child(-n+2){border-top:0}
+  .k2 .s:nth-child(2n){border-left:1px solid var(--line)}
 }
+/* a label that carries its definition: dotted underline, tooltip on hover, focus and tap */
+.tl{cursor:help;text-decoration:underline dotted var(--ink-3);text-underline-offset:3px}
+.tl:hover{color:var(--ink)}
+.hk .hv{font:600 26px/1.1 var(--mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hk .hv small{font:400 var(--fs-body) var(--sans);letter-spacing:0;color:var(--ink-3);margin-left:var(--sp1)}
+.hk .hd{font-size:var(--fs-help);color:var(--ink-2);line-height:1.45;font-variant-numeric:tabular-nums}
+.hk .hd b{font:600 var(--fs-help) var(--mono);color:var(--ink)}
+.hk .hd .muted{color:var(--ink-3)}
+.hk .l .tag{margin:0}
+.khero .k .l{min-height:0;align-items:center}
+.k2 dt,.k2 dd{margin:0}
 .k{background:var(--surface);border:1px solid var(--line);padding:var(--sp3) var(--sp4) var(--sp4);min-width:0;display:flex;flex-direction:column;gap:var(--sp2);container-type:inline-size}
 .k .l{font:500 var(--fs-kicker)/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);display:flex;align-items:center;justify-content:space-between;gap:var(--sp1);min-width:0}
 .k .l{align-items:flex-start;min-height:2.6em;letter-spacing:.06em}
 .k .l span:first-child{min-width:0;overflow-wrap:anywhere}
 .k .v{font:600 clamp(16px,13.5cqi,var(--fs-value))/1.1 var(--mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .k .d{font-size:var(--fs-help);color:var(--ink-3);line-height:1.45;font-variant-numeric:tabular-nums}
-.k.hero{border-top:2px solid var(--accent);padding-top:11px}
+.khero .k{border-top:2px solid var(--accent);padding-top:11px}
 .tag{display:inline-block;font:500 10px/1 var(--mono);letter-spacing:.04em;text-transform:uppercase;padding:3px 6px;white-space:nowrap;margin-right:var(--sp1);border:1px solid currentColor;vertical-align:1px}
 .tag.ok{color:var(--ok)} .tag.risk{color:var(--risk)}
 .tbl .tag.ok{background:var(--ok-soft)} .tbl .tag.risk{background:var(--risk-soft)}
 /* detail tabs: underline, amber active (site TabsTrigger) */
-.tabs{display:flex;gap:var(--sp1);border-bottom:1px solid var(--line);margin:var(--sp8) 0 var(--sp4);overflow-x:auto;scrollbar-width:none}
+.tabs{display:flex;gap:var(--sp1);border-bottom:1px solid var(--line);margin:var(--sp5) 0 var(--sp3);overflow-x:auto;scrollbar-width:none}
 .tabs button{font:500 var(--fs-body) var(--sans);background:none;border:0;border-bottom:2px solid transparent;color:var(--ink-2);padding:var(--sp2) var(--sp3) 10px;cursor:pointer;white-space:nowrap;margin-bottom:-1px}
 .tabs button:hover{color:var(--ink)}
 .tabs button:focus-visible{outline-offset:-2px}
@@ -280,22 +321,27 @@ h3:first-child{margin-top:0}
 .method p{font-size:var(--fs-body);color:var(--ink-2);margin:var(--sp2) 0;line-height:1.6;max-width:820px}
 .disc-full{border:1px solid var(--line);padding:var(--sp3) var(--sp4);font-size:var(--fs-body);color:var(--ink-2);background:var(--surface)}
 .footbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1px solid var(--line);font-size:var(--fs-help);color:var(--ink-2);line-height:1.4}
-.footbar .in{max-width:1440px;margin:0 auto;padding:var(--sp2) var(--sp6);display:flex;align-items:center;justify-content:space-between;gap:var(--sp2) var(--sp6);flex-wrap:wrap}
-@media (max-width:900px){ .footbar .legendsrc{display:none} }
+.footbar .in{max-width:1440px;margin:0 auto;padding:0 var(--sp6);min-height:var(--foot-h);display:flex;align-items:center;justify-content:space-between;gap:var(--sp4)}
+.footbar .disc{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.footbar .disc .short{display:none}
+.srcbtn{height:24px;font-size:var(--fs-help);flex:none}
+.srcbtn .src{margin:0 0 0 var(--sp2);gap:2px}
+.srcbtn .src::before{width:6px;height:6px}
 .footbar strong{color:var(--ink);font-weight:600}
 @media (max-width:900px){
   .bar .in{padding:var(--sp3) var(--sp4)}
   .bgrp + .bgrp{padding-left:0;border-left:0}
-  .footbar .in{padding:var(--sp2) var(--sp4)}
+  .footbar .in{padding:0 var(--sp4)}
 }
 @media (max-width:560px){
-  .bar{position:static} html{scroll-padding-top:0} body{padding-bottom:72px}
+  .bar{position:static} html{scroll-padding-top:0}
   .bar h1{font-size:16px}
-  .ttl{flex:1 1 100%}
-  .bar .sp{display:none}
-  .bgrp.view{width:100%}
-  .bgrp.act{width:100%;order:6}
-  .bgrp.act .tbtn{flex:1;justify-content:center;padding:0 var(--sp2)}
+  .ttl{flex:1 1 auto}
+  .bgrp.act{order:6;width:100%}
+  .bgrp.act > .mwrap{flex:1}
+  .bgrp.act > .mwrap > .tbtn,.bgrp.act > #resetBtn{width:100%;flex:1;justify-content:center}
+  .bgrp.act > #resetBtn{width:auto}
+  .footbar .disc .full{display:none} .footbar .disc .short{display:inline} .srcbtn .src{display:none}
   .k{padding:var(--sp3)}
   .card{padding:var(--sp4) var(--sp3) var(--sp3)}
   .f{grid-template-columns:minmax(0,1fr) 148px}
@@ -308,18 +354,20 @@ h3:first-child{margin-top:0}
 <div class="bar"><div class="in">
   <div class="ttl"><span class="brand" translate="no">MUTAV</span><h1>Reserve simulator</h1></div>
   <div class="scen scenbar">
-    <label for="scenSel">Scenario</label>
-    <select id="scenSel"></select>
-    <button class="tbtn" type="button" id="scenInfoBtn" aria-haspopup="dialog" aria-controls="scenDlg">About this scenario</button>
+    <select id="scenSel" aria-label="Scenario"></select>
+    <button class="tbtn ibtn" type="button" id="scenInfoBtn" aria-haspopup="dialog" aria-controls="scenDlg" aria-label="About this scenario" title="About this scenario"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13"/><path d="M8 7v4.5M8 4.5v1"/></svg></button>
   </div>
   <span class="sp"></span>
-  <div class="bgrp view">
-    <button class="tbtn" type="button" id="themeBtn" title="Toggle light/dark">Theme</button>
-  </div>
   <div class="bgrp act">
-    <button class="tbtn" type="button" id="copyBtn" title="Copy a plain-text snapshot: the five answers, inputs and key results">Copy summary</button>
-    <button class="tbtn" type="button" id="csvBtn" title="Download the month-by-month table as CSV">Export CSV</button>
+    <div class="mwrap" id="expWrap">
+      <button class="tbtn" type="button" id="expBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="expMenu"><span class="bl">Export</span><span class="car" aria-hidden="true">▾</span></button>
+      <div class="menu" id="expMenu" role="menu" aria-labelledby="expBtn" hidden>
+        <button type="button" role="menuitem" tabindex="-1" id="copyBtn">Copy summary<small>Plain text: the five answers, inputs and key results</small></button>
+        <button type="button" role="menuitem" tabindex="-1" id="csvBtn">Export CSV<small>The month-by-month table</small></button>
+      </div>
+    </div>
     <button class="tbtn" type="button" id="resetBtn" title="Return every input to the defaults (02 parameters, devnet caps)">Reset</button>
+    <button class="tbtn ibtn" type="button" id="themeBtn" aria-label="Switch theme" title="Switch theme"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12"/><path d="M8 2v12" /><path d="M8 2h6v12H8z" fill="currentColor" stroke="none"/></svg></button>
   </div>
 </div></div>
 
@@ -338,8 +386,11 @@ h3:first-child{margin-top:0}
 
   <main class="out" id="main">
     <div class="kgroups" id="kstrip">
-      <section class="kgrp" aria-labelledby="kgA"><h2 class="kh" id="kgA">Coverage &amp; capital <span>on-chain model</span></h2><div class="kstrip" id="kstripA"></div></section>
-      <section class="kgrp" aria-labelledby="kgB"><h2 class="kh" id="kgB">Returns <span>business view</span></h2><div class="kstrip" id="kstripB"></div></section>
+      <div class="khero">
+        <section class="kgrp" aria-labelledby="kgA" id="kstripA"><h2 class="kh" id="kgA">Coverage &amp; capital <span>on-chain model</span></h2></section>
+        <section class="kgrp ret" aria-labelledby="kgB" id="kstripB"><h2 class="kh" id="kgB">Returns <span>business view</span></h2></section>
+      </div>
+      <dl class="k2" id="kstrip2" aria-label="More results"></dl>
     </div>
 
     <div class="tabs adv" role="tablist" id="tabs" aria-label="Detail views">
@@ -379,7 +430,7 @@ h3:first-child{margin-top:0}
       </div>
       <h3>Monthly yield</h3>
       <div class="tbl-wrap"><table class="tbl" id="yieldTbl"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
-      <p class="muted below">Business view, no on-chain equivalent. Yield = (net fees − claims + TESOURO + BRS income) ÷ average opening stable assets, annualized (× 12 / months). Selic line = what the same capital earns at Selic. TESOURO income is capped by <code>max_tesouro_share_bps</code>; BRS income accrues on the rest and is booked monthly by <code>sweep_income</code>. Set both under Reserve yield.</p>
+      <p class="muted below">Business view, no on-chain equivalent. Yield = (net fees − claims + TESOURO + BRS income) ÷ average opening stable assets, annualized (× 12 / months). Selic line = what the same capital earns at Selic. TESOURO income is capped by <code>max_tesouro_share_bps</code>; BRS income accrues on the rest and is booked monthly by <code>sweep_income</code>. Set both in the Yield inputs tab.</p>
     </section>
 
     <section class="pane" role="tabpanel" id="pane-months" aria-labelledby="tab-months" data-pane="months" hidden>
@@ -399,7 +450,7 @@ h3:first-child{margin-top:0}
       <div class="kgrid" id="shareKpis"></div>
       <h3>3 · Combined</h3>
       <div class="kgrid" id="comboKpis"></div>
-      <p class="muted below">Take is gross revenue: before operating costs, PIX and offramp fees, and taxes. Set operating costs under Assumptions → MUTAV &amp; operations.</p>
+      <p class="muted below">Take is gross revenue: before operating costs, PIX and offramp fees, and taxes. Set operating costs under Assumptions → Operations.</p>
     </section>
 
     <section class="pane" role="tabpanel" id="pane-sizing" aria-labelledby="tab-sizing" data-pane="sizing" hidden>
@@ -524,7 +575,7 @@ bad_year_net_gain    = net fees − leases × bad_year_claims + stable × (tesou
 </div>
 
 <div class="htip" id="htip" role="tooltip"></div>
-<div class="footbar" role="note"><div class="in"><span class="disc"><strong>Model estimates, not a return promise.</strong> Reserve planning only; not investment advice and not an offer of securities. Self-contained, works offline.</span><div class="legendsrc">Assumption sources: <span class="src c">canonical</span> 02-parameters / 40-reserve · <span class="src p">protocol</span> on-chain config (devnet) · <span class="src r">research</span> notes in this folder · <span class="src e">estimate</span> prior until pilot data.</div></div></div>
+<footer class="footbar"><div class="in"><span class="disc" title="Model estimates, not a return promise. Reserve planning only; not investment advice and not an offer of securities. Self-contained, works offline."><strong>Model estimates, not a return promise.</strong><span class="full"> Reserve planning only; not investment advice and not an offer of securities. Self-contained, works offline.</span><span class="short"> Not an offer of securities.</span></span><div class="mwrap" id="srcWrap"><button class="tbtn srcbtn" type="button" id="srcBtn" aria-expanded="false" aria-controls="srcPop">Sources<span class="src c" aria-hidden="true"></span><span class="src p" aria-hidden="true"></span><span class="src r" aria-hidden="true"></span><span class="src e" aria-hidden="true"></span></button><div class="pop" id="srcPop" role="dialog" aria-labelledby="srcPopH" hidden><h2 id="srcPopH">Assumption sources</h2><ul class="legendsrc"><li><span class="src c">canonical</span> 02-parameters / 40-reserve</li><li><span class="src p">protocol</span> on-chain config (devnet)</li><li><span class="src r">research</span> notes in this folder</li><li><span class="src e">estimate</span> prior until pilot data</li></ul></div></div></div></footer></div>
 
 <script id="calc">
 /* Pure model. No DOM access, so it can be tested in node (app/lib/__tests__/simulator-parity.test.ts).
@@ -797,14 +848,20 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
 (function(){
   var root = document.documentElement;
   try { var th = localStorage.getItem('mutav-theme'); if (th === 'dark' || th === 'light') root.setAttribute('data-theme', th); } catch (e) {}
-  document.getElementById('themeBtn').addEventListener('click', function(){
+  var themeBtn = document.getElementById('themeBtn');
+  function curTheme(){
     var dark = false;
     try { dark = window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) {}
-    var cur = root.getAttribute('data-theme') || (dark ? 'dark' : 'light');
-    var next = cur === 'dark' ? 'light' : 'dark';
+    return root.getAttribute('data-theme') || (dark ? 'dark' : 'light');
+  }
+  function labelTheme(){ var t = 'Switch to ' + (curTheme() === 'dark' ? 'light' : 'dark') + ' theme'; themeBtn.setAttribute('aria-label', t); themeBtn.title = t; }
+  themeBtn.addEventListener('click', function(){
+    var next = curTheme() === 'dark' ? 'light' : 'dark';
     root.setAttribute('data-theme', next);
     try { localStorage.setItem('mutav-theme', next); } catch (e) {}
+    labelTheme();
   });
+  labelTheme();
 
   function ext(a, b){ var r = {}; var k; for (k in a) r[k] = a[k]; for (k in b) r[k] = b[k]; return r; }
   function clone(o){ return ext(o, {}); }
@@ -826,7 +883,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   function cName(c){ return 'c = ' + decF.format(c) + (c >= 1 ? ' (full backing)' : c <= MUTAV_PROTOCOL.MIN_COVERAGE_RATIO_BPS / MUTAV_PROTOCOL.BPS ? ' (program floor)' : ''); }
   function showRaise(s){ return s.monthlyRaise > 0; }
   var GROUPS = [
-    { id: 'specs', t: 'Contract specs', sm: 'on-chain VaultConfig', note: true, f: [
+    { id: 'specs', t: 'Contract specs', s: 'Specs', sm: 'on-chain VaultConfig', note: true, f: [
       { sub: 'Coverage' },
       { k: 'coverageRatio', l: 'Coverage ratio (c)', code: 'coverage_ratio_bps', u: '× cover', step: 0.05, min: 0.1, max: 2, src: 'protocol', i: 'coverage_ratio_bps. The reserve must hold ceil(c × remaining cover), never less than open provisions. Program floor 0,10 (ADR 0016); devnet starts at 0,10. 1,0 is full backing.' },
       { sub: 'Fee take' },
@@ -839,7 +896,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       { k: 'maxClaimPerPeriod', l: 'Max claims per 30 days', code: 'max_claim_per_period', u: 'R$/30 d', step: 1000, min: 0, src: 'protocol', i: 'Operator claim payments per 30 days. A month above it needs pay_claim_admin for the excess. Devnet: R$20k.' },
       { k: 'maxTesouroSharePct', l: 'Max TESOURO share', code: 'max_tesouro_share_bps', u: '%', step: 5, min: 0, max: 100, src: 'protocol', i: 'Most of the stable assets allocate may move into TESOURO. Devnet: 0 (no adapter), so TESOURO income is a what-if until it is raised.' }
     ]},
-    { id: 'contracts', t: 'Guarantee contracts', sm: 'the leases you write', f: [
+    { id: 'contracts', t: 'Guarantee contracts', s: 'Contracts', sm: 'the leases you write', f: [
       { sub: 'Book' },
       { k: 'perMonth', l: 'New leases per month', u: 'leases', step: 1, min: 0, src: 'canonical', i: 'Planned new guarantees each month. 02: ~28 a month toward 170; pilot plan 10. The solvency gate may admit fewer.' },
       { k: 'months', l: 'Months simulated', u: 'mo', step: 1, min: 1, max: 120, src: 'canonical', i: 'Simulation horizon. 02: ~6-month pilot.' },
@@ -851,10 +908,9 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       { sub: 'Cover per lease' },
       { k: 'defaultCover', l: 'Default leg (rent arrears)', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'default_cover: most the fiança pays in unpaid rent per lease. 02: 12× (working value, under legal review).' },
       { k: 'exitCover', l: 'Exit leg (eviction & exit costs)', u: '× rent', step: 0.5, min: 0, src: 'canonical', i: 'exit_cover: separate sublimit for eviction and exit costs. 02: 6×.' },
-      { sub: 'Debts covered' },
       { seg: 'scope' }
     ]},
-    { id: 'capital', t: 'Capital', sm: 'what goes into the reserve', f: [
+    { id: 'capital', t: 'Capital', s: 'Capital', sm: 'what goes into the reserve', f: [
       { sub: 'Deposits' },
       { k: 'startCapital', l: 'Starting capital', u: 'R$', step: 10000, min: 0, src: 'canonical', i: 'Deposited into the reserve in month 1. 02: R$300.000 capitalized reserve.' },
       { k: 'monthlyRaise', l: 'Monthly raise', u: 'R$/mo', step: 5000, min: 0, i: 'New capital added to the reserve every month in the window below. 0 = no raise.' },
@@ -863,12 +919,11 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       { k: 'growthTarget', l: 'Growth target', u: 'leases', step: 10, min: 0, src: 'canonical', i: 'Book size used in answer 4 (what raise is needed). 02: 170 leases. Does not change the simulation.' },
       { sub: 'Holdings' },
       { k: 'mutavSharePct', l: 'MUTAV share of reserve capital', u: '%', step: 5, min: 0, max: 100, src: 'canonical', i: 'Stage 1 pilot: MUTAV funds 100% of the reserve.' },
-      { sub: 'Redemptions' },
       { seg: 'withdraw' },
       { k: 'bufferPct', l: 'Kept above coverage required', u: '% cov. req.', step: 5, min: 0, when: function(s){ return s.withdraw === 'buffer'; }, i: 'Percent of coverage required kept on top of it before anything is redeemed.' },
       { k: 'sharePct', l: 'Share of net gain', u: '%', step: 5, min: 0, max: 100, when: function(s){ return s.withdraw === 'share'; }, i: 'Percent of each month’s positive net gain redeemed, capped at free capital.' }
     ]},
-    { id: 'ryield', t: 'Reserve yield', sm: 'BRS income, TESOURO, Selic', f: [
+    { id: 'ryield', t: 'Reserve yield', s: 'Yield', sm: 'BRS income, TESOURO, Selic', f: [
       { sub: 'BRS income (swept monthly)' },
       { k: 'brsYieldPct', l: 'BRS yield', u: '%/yr', step: 0.05, min: 0, src: 'estimate', i: 'Set from Nora’s terms: paid monthly in BRS to the reserve’s income inbox and booked by sweep_income. Accrues on the BRS share of the opening stable assets. 0 until the terms are set.' },
       { sub: 'BRS / TESOURO split' },
@@ -879,7 +934,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       { sub: 'Comparison' },
       { k: 'selicPct', l: 'Selic (opportunity cost)', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'What the same capital would earn at Selic. Comparison only.' }
     ]},
-    { id: 'assume', t: 'Assumptions', sm: 'claims, bad year and costs', f: [
+    { id: 'assume', t: 'Assumptions', s: 'Assumptions', sm: 'claims, bad year and costs', f: [
       { sub: 'Claims' },
       { k: 'rhoPct', l: 'Rent arrears (delinquency)', u: '%/yr', step: 0.01, min: 0, src: 'research', i: 'Share of annual rent that goes unpaid. Superlógica IIL RS apartments, 3-print avg 2,01%; stress 2,87%; tail 5,93%.' },
       { k: 'evictRatePct', l: 'Eviction rate', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'CNJ DataJud despejo filings ÷ IBGE PNAD rented households, adjusted for outcomes and an underwritten book. Low 0,10% / base 0,25% / high 0,60%.' },
@@ -987,7 +1042,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     htip.style.left = left + 'px'; htip.style.top = top + 'px';
   }
   function hideHelp(){ htip.style.display = 'none'; tipOwner = null; }
-  function infoOf(t){ return t && t.closest ? t.closest('.info') : null; }
+  function infoOf(t){ return t && t.closest ? t.closest('[data-tip]') : null; }
   document.addEventListener('mouseover', function(e){ var el = infoOf(e.target); if (el) showHelp(el); });
   document.addEventListener('mouseout', function(e){ if (infoOf(e.target) && !infoOf(e.relatedTarget)) hideHelp(); });
   document.addEventListener('focusin', function(e){ var el = infoOf(e.target); if (el) showHelp(el); });
@@ -1052,6 +1107,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       var cur = {}; FIELDS.forEach(function(f){ cur[f.k] = state[f.k]; }); ['scope','withdraw'].forEach(function(k){ cur[k] = state[k]; });
       fillScenDiff(cur);
     }
+    var o = sel.options[sel.selectedIndex]; sel.title = o ? o.textContent : '';
   }
   function applyScen(id){
     var s = scenById(id); if (!s) return;
@@ -1063,23 +1119,27 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   /* build inputs */
   var gh = '', mobile = false;
   try { mobile = window.matchMedia('(max-width: 900px)').matches; } catch (e) {}
-  gh += '<div class="tabs ctabs" role="tablist" aria-label="Controls">' + GROUPS.map(function(g, i){ return '<button type="button" role="tab" id="ctab_' + g.id + '" data-ctab="' + g.id + '" aria-controls="grp_' + g.id + '" aria-selected="' + (i === 0 ? 'true' : 'false') + '"' + (i === 0 ? '' : ' tabindex="-1"') + '>' + esc(g.t) + '</button>'; }).join('') + '</div>';
+  gh += '<div class="tabs ctabs" role="tablist" aria-label="Controls">' + GROUPS.map(function(g, i){ return '<button type="button" role="tab" id="ctab_' + g.id + '" data-ctab="' + g.id + '" aria-controls="grp_' + g.id + '" aria-selected="' + (i === 0 ? 'true' : 'false') + '"' + (i === 0 ? '' : ' tabindex="-1"') + ' title="' + esc(g.t) + '">' + esc(g.s) + '</button>'; }).join('') + '</div>';
   GROUPS.forEach(function(g, gi){
-    gh += '<section class="grp" role="tabpanel" id="grp_' + g.id + '" aria-labelledby="ctab_' + g.id + '"' + (gi === 0 ? '' : ' hidden') + '><div class="gh" id="gh_' + g.id + '"><span>' + esc(g.t) + '<span class="sm">' + esc(g.sm) + '</span></span></div><div class="body">';
-    g.f.forEach(function(f){
+    gh += '<section class="grp" role="tabpanel" id="grp_' + g.id + '" aria-labelledby="ctab_' + g.id + '"' + (gi === 0 ? '' : ' hidden') + '><h2 class="gh" id="gh_' + g.id + '">' + esc(g.t) + ' <span class="sm">' + esc(g.sm) + '</span></h2><div class="body">';
+    g.f.forEach(function(f, fi){
       if (f.sub) { gh += '<div class="sub">' + esc(f.sub) + '</div>'; return; }
       if (f.note) { gh += '<div class="seghint" id="' + f.note + '" aria-live="polite"></div>'; return; }
       if (f.seg) {
         var S = SEGS[f.seg];
-        gh += '<div class="lbl" id="lbl_' + f.seg + '">' + esc(S.l) + infoI(S.i) + '</div><div class="seg" role="group" aria-labelledby="lbl_' + f.seg + '">' + S.o.map(function(o){ return '<button type="button" data-segk="' + f.seg + '" data-v="' + o[0] + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>';
+        gh += '<div class="lbl' + (fi > 0 ? ' sep' : '') + '" id="lbl_' + f.seg + '">' + esc(S.l) + infoI(S.i) + '</div><div class="seg" role="group" aria-labelledby="lbl_' + f.seg + '">' + S.o.map(function(o){ return '<button type="button" data-segk="' + f.seg + '" data-v="' + o[0] + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>';
         gh += '<div class="seghint" id="hint_' + f.seg + '"></div>';
         return;
       }
       var sp = f.l.lastIndexOf(' '), lab = (sp > 0 ? esc(f.l.slice(0, sp + 1)) : '') + '<span class="nw">' + esc(f.l.slice(sp + 1)) + infoI(f.i) + '</span>' + (f.src || f.code ? '<br><span class="srcline">' + (f.code ? '<span class="src ' + SRC[f.src] + ' mark" title="' + esc(f.src) + '" aria-label="' + esc(f.src) + '"></span><code class="fcode">' + esc(f.code) + '</code>' : srcTag(f.src)) + '</span>' : '');
       gh += '<div class="row" id="row_' + f.k + '">';
       if (f.toggle) gh += '<label class="tg"><span>' + lab + '</span><input type="checkbox" id="in_' + f.k + '" name="' + f.k + '" data-k="' + f.k + '"></label>';
-      else gh += '<div class="f"><label for="in_' + f.k + '">' + lab + '</label><div class="inp"><input id="in_' + f.k + '" name="' + f.k + '" autocomplete="off" type="number" inputmode="decimal" step="' + f.step + '"' +
-        (f.min != null ? ' min="' + f.min + '"' : '') + (f.max != null ? ' max="' + f.max + '"' : '') + ' data-k="' + f.k + '"><span class="u">' + esc(f.u) + '</span></div></div>';
+      else {
+        var pre = /^R\$/.test(f.u) ? 'R$' : '', suf = pre ? f.u.slice(2) : f.u;
+        gh += '<div class="f"><label for="in_' + f.k + '">' + lab + '</label><div class="inp">' + (pre ? '<span class="u pre" aria-hidden="true">' + pre + '</span>' : '') +
+          '<input id="in_' + f.k + '" name="' + f.k + '" autocomplete="off" type="text" inputmode="decimal" spellcheck="false" aria-describedby="u_' + f.k + '"' +
+          ' data-k="' + f.k + '"><span class="' + (suf ? 'u' : 'vh') + '" id="u_' + f.k + '">' + (pre ? '<span class="vh">R$ </span>' : '') + esc(suf) + '</span></div></div>';
+      }
       gh += '</div>';
     });
     if (g.note === true) gh += '<div class="seghint" id="ruleNote" aria-live="polite"></div>';
@@ -1101,9 +1161,31 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   });
   try { var savedCtab = localStorage.getItem('mutav-reserve-sim-v5-ctab'); if (savedCtab && document.getElementById('grp_' + savedCtab)) showCtab(savedCtab); } catch (e) {}
 
+  /* inputs are formatted like outputs (pt-BR: 300.000, 0,1) and parse what people paste: 300.000, 300000, 300,000, R$ 300.000,50, 0.1 */
+  var inF = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 });
+  function fmtIn(v){ return isFinite(v) ? inF.format(v).replace(/[\u00a0\u202f]/g, '') : ''; }
+  function parseIn(str){
+    var t = String(str).replace(/\u2212/g, '-').replace(/[^\d.,-]/g, '');
+    if (!/\d/.test(t) || /-/.test(t.slice(1))) return NaN;
+    var lc = t.lastIndexOf(','), ld = t.lastIndexOf('.'), dec = '';
+    if (lc >= 0 && ld >= 0) dec = lc > ld ? ',' : '.';                       // both: the last one is the decimal mark
+    else if (lc >= 0 || ld >= 0) {
+      var ch = lc >= 0 ? ',' : '.', parts = t.replace('-', '').split(ch);
+      // one mark followed by exactly three digits after a non-zero lead, or several marks: thousands separators
+      var grouped = parts.length > 2 || (/^[1-9]\d{0,2}$/.test(parts[0]) && parts[1].length === 3);
+      dec = grouped ? '' : ch;
+    }
+    var thou = dec === ',' ? '.' : dec === '.' ? ',' : null;
+    if (thou) t = t.split(thou).join('');
+    if (dec === ',') t = t.replace(',', '.');
+    if (!dec) t = t.replace(/[.,]/g, '');
+    var n = Number(t);
+    return isFinite(n) ? n : NaN;
+  }
+  function clampF(f, v){ if (f.min != null) v = Math.max(f.min, v); if (f.max != null) v = Math.min(f.max, v); return v; }
   function syncVisibility(){ FIELDS.forEach(function(f){ if (f.when) document.getElementById('row_' + f.k).hidden = !f.when(state); }); }
   function syncInputs(){
-    FIELDS.forEach(function(f){ var el = document.getElementById('in_' + f.k); if (f.toggle) el.checked = !!state[f.k]; else el.value = state[f.k]; });
+    FIELDS.forEach(function(f){ var el = document.getElementById('in_' + f.k); if (f.toggle) el.checked = !!state[f.k]; else { el.value = fmtIn(state[f.k]); el.removeAttribute('aria-invalid'); } });
     Object.keys(SEGS).forEach(function(k){
       Array.prototype.forEach.call(document.querySelectorAll('[data-segk="' + k + '"]'), function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-v') === state[k] ? 'true' : 'false'); });
       document.getElementById('hint_' + k).textContent = SEGS[k].h[state[k]];
@@ -1116,12 +1198,27 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var f = fieldBy(k);
     if (f.toggle) state[k] = el.checked;
     else {
-      var v = parseFloat(el.value); if (!isFinite(v)) return;
-      if (f.min != null) v = Math.max(f.min, v);
-      if (f.max != null) v = Math.min(f.max, v);
-      state[k] = v;
+      var v = parseIn(el.value);
+      if (!isFinite(v)) { if (el.value.trim()) el.setAttribute('aria-invalid', 'true'); return; }
+      el.removeAttribute('aria-invalid');
+      state[k] = clampF(f, v);
     }
     edited();
+  });
+  /* on leaving a field, show the value the model uses (clamped, formatted); arrow keys step by the field's step */
+  groupsEl.addEventListener('focusout', function(e){
+    var el = e.target, k = el.dataset && el.dataset.k, f = k && fieldBy(k); if (!f || f.toggle) return;
+    el.value = fmtIn(state[k]); el.removeAttribute('aria-invalid');
+  });
+  groupsEl.addEventListener('keydown', function(e){
+    var el = e.target, k = el.dataset && el.dataset.k, f = k && fieldBy(k); if (!f || f.toggle) return;
+    if (e.key === 'Enter') { el.value = fmtIn(state[k]); el.removeAttribute('aria-invalid'); return; }
+    var d = e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : 0; if (!d) return;
+    e.preventDefault();
+    var cur = parseIn(el.value); if (!isFinite(cur)) cur = state[k];
+    var st = f.step || 1, v = clampF(f, Math.round((cur + d * st) / st) * st);
+    v = Math.round(v * 1e6) / 1e6;
+    state[k] = v; el.value = fmtIn(v); el.removeAttribute('aria-invalid'); edited();
   });
   groupsEl.addEventListener('click', function(e){
     var b = e.target.closest && e.target.closest('[data-segk]'); if (!b) return;
@@ -1161,9 +1258,12 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     if (j >= 0) { e.preventDefault(); showTab(TABS[j], true); }
   });
 
+  /* a label that carries its definition (tooltip on hover, focus and tap) instead of a separate "?" mark */
+  function tl(label, tip){ return tip ? '<span class="tl" tabindex="0" role="button" data-tip="' + esc(tip) + '">' + esc(label) + '</span>' : '<span>' + esc(label) + '</span>'; }
+  function heroCard(k){ return '<div class="k hk"><div class="l">' + tl(k.l, k.t) + (k.tag || '') + '</div><div class="hv">' + k.v + '</div><div class="hd">' + k.d + '</div></div>'; }
   function tiles(id, list){
     document.getElementById(id).innerHTML = list.map(function(k){
-      return '<div class="k' + (k.hero ? ' hero' : '') + '"><div class="l"><span title="' + esc(k.l) + '">' + esc(k.l) + '</span>' + infoI(k.t) + '</div><div class="v">' + esc(k.v) + '</div><div class="d">' + esc(k.d) + '</div></div>';
+      return '<div class="k"><div class="l">' + tl(k.l, k.t) + '</div><div class="v">' + esc(k.v) + '</div><div class="d">' + esc(k.d) + '</div></div>';
     }).join('');
   }
   function thead(id, cols){
@@ -1304,11 +1404,36 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       blk: { l: 'Refused months', v: intF.format(r.blockedMonths), d: r.blockedMonths ? 'From month ' + r.firstBlocked + ' · ' + REFUSAL[r.firstRefusal] + ' · ' + N0(r.finalActive) + ' of ' + N0(r.plannedActive) : 'No registration refused', t: 'Months where register_guarantee refused some of the planned leases: per-guarantee cap, per-agency cap or insufficient free capital.' },
       back: { l: 'Leases backed', v: N0(r.selfFundedLeases), d: 'Stable assets ÷ ' + R(rpl) + ' per lease', t: 'How many leases the ending stable assets could back at full cover with no new capital: the most k with ceil(c × k × cover) ≤ stable assets.' },
       bad: { l: 'Bad years covered', v: r.finalActive > 0 ? X(r.tailCover) : '–', d: 'Off-chain check · study ≥ 2,0×, never < 1,0×', t: 'Stable assets ÷ one bad year of claims for the book. A planning signal from 40-reserve 9w; not enforced on-chain and never changes coverage required.' },
-      cap: { l: 'Capital in', v: R(r.capitalRaised), d: R(Math.min(state.startCapital, state.maxTvl)) + ' start' + (r.capitalRaised - Math.min(state.startCapital, state.maxTvl) > 0 ? ' + ' + R(r.capitalRaised - Math.min(state.startCapital, state.maxTvl)) + ' raises' : '') + (r.tvlRefused > 0 ? ' · ' + R(r.tvlRefused) + ' refused by max_tvl' : ''), t: 'Starting capital plus monthly raises that fulfil_deposits accepted under max_tvl.' },
       take: { l: 'MUTAV take, ' + N + ' mo', v: R(m.takeTotal), d: R(m.takePerLease) + ' / lease / mo · gross', t: 'MUTAV’s share of guarantee fees (fee_take_bps, at most 30%), before costs and taxes. Never counted in the reserve.' }
     };
-    tiles('kstripA', [T.bal, T.head, T.blk, T.back, T.bad, T.cap]);
-    tiles('kstripB', [T.yld, T.sel, T.roc, T.gain, T.take]);
+    /* hero row: Covered? · What the reserve earns (with vs Selic) · MUTAV take */
+    var startIn = Math.min(state.startCapital, state.maxTvl), raisedIn = r.capitalRaised - startIn;
+    var capTxt = 'Capital in ' + R(r.capitalRaised) + ': ' + R(startIn) + ' start' + (raisedIn > 0 ? ' + ' + R(raisedIn) + ' raises' : '') + (r.tvlRefused > 0 ? ', ' + R(r.tvlRefused) + ' refused by max_tvl' : '') + '.';
+    var covered = r.endBalance >= r.endRequired;
+    document.getElementById('kstripA').innerHTML = '<h2 class="kh" id="kgA">Coverage &amp; capital <span>on-chain model</span></h2>' + heroCard({
+      l: 'Covered?', t: 'Stable assets at month ' + N + ', after redemptions, against coverage required = ceil(c × remaining cover), as the program computes it. Free capital is the part above coverage required: only it can back new guarantees or pay redemptions.',
+      tag: covered ? '<span class="tag ok">Covered</span>' : '<span class="tag risk">Under-covered</span>',
+      v: R(r.endBalance),
+      d: 'Stable assets, month ' + N + ', vs <b>' + R(r.endRequired) + '</b> coverage required · free capital <b>' + R(r.endSurplus) + '</b>'
+    });
+    document.getElementById('kstripB').innerHTML = '<h2 class="kh" id="kgB">Returns <span>business view</span></h2>' + heroCard({
+      l: 'What the reserve earns', t: T.yld.t + ' Split: ' + P(y.underwriting) + ' fees − claims, ' + P(y.tesouro) + ' TESOURO' + tesCap + ', ' + P(y.brs) + ' BRS income. Reserve net gain over ' + N + ' months: ' + R(r.cumGain) + '; the same capital at Selic would earn ' + R(y.selicGain) + '.',
+      v: P(y.total) + '<small>a year</small>',
+      d: '<b>' + PP(y.vsSelic) + '</b> vs Selic ' + P(r.selic, 2) + ' <span class="muted">· reserve yield, annualized</span>'
+    }) + heroCard({
+      l: 'MUTAV take', t: T.take.t + ' Take rate ' + P(r.take, 0) + ' of guarantee fees; annual run-rate ' + R(m.takeRunRate) + '.',
+      v: R(m.takeTotal) + '<small>over ' + N + ' mo</small>',
+      d: '<b>' + R(m.takePerLease) + '</b> / lease / mo · ' + P(r.take, 0) + ' of fees <span class="muted">· gross</span>'
+    });
+    /* secondary row: label + value, details in the tooltip */
+    var sec = [
+      { l: T.head.l, v: T.head.v, t: T.head.d + '. ' + T.head.t, neg: r.minHeadroom < 0 },
+      { l: T.blk.l, v: T.blk.v, t: T.blk.d + '. ' + T.blk.t, neg: r.blockedMonths > 0 },
+      { l: T.back.l, v: T.back.v, t: T.back.d + '. ' + T.back.t },
+      { l: T.bad.l, v: T.bad.v, t: T.bad.d + '. ' + T.bad.t, neg: r.finalActive > 0 && r.tailCover < MUTAV_PROTOCOL.BAD_YEARS_FLOOR },
+      { l: T.roc.l, v: T.roc.v, t: T.roc.t + ' ' + T.roc.d + '. ' + capTxt, ret: true }
+    ];
+    document.getElementById('kstrip2').innerHTML = sec.map(function(k){ return '<div class="s' + (k.ret ? ' ret' : '') + '"><dt class="sl">' + tl(k.l, k.t) + '</dt><dd class="sv' + (k.neg ? ' neg' : '') + '">' + esc(k.v) + '</dd></div>'; }).join('');
     var yk = [T.yld, T.sel, T.roc, T.gain,
       { l: 'Capital payback', v: sfm, d: 'Σ net gain ≥ ' + R(state.startCapital), t: 'Month when cumulative net gain equals the starting capital. ≈ means projected.' },
       { l: 'Redemptions', v: R(r.cumWithdrawals), d: state.withdraw === 'none' ? 'None: everything reinvested' : 'Paid from free capital', t: 'Total redeemed out of the reserve, only ever from free capital.' },
@@ -1589,7 +1714,39 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   });
 
   /* tool affordances */
-  function flash(btn, txt){ var o = btn.textContent; btn.textContent = txt; btn.classList.add('done'); setTimeout(function(){ btn.textContent = o; btn.classList.remove('done'); }, 1400); }
+  var expBtn = document.getElementById('expBtn'), expMenu = document.getElementById('expMenu');
+  /* feedback shows on the Export button, since the menu closes on choice */
+  function flash(btn, txt){ var lb = expBtn.querySelector('.bl'); lb.textContent = txt; expBtn.classList.add('done'); setTimeout(function(){ lb.textContent = 'Export'; expBtn.classList.remove('done'); }, 1400); }
+  /* Export menu and Sources popover: open on click, Escape and outside click close, focus returns to the trigger */
+  function popup(btn, panel, isMenu){
+    var items = function(){ return Array.prototype.slice.call(panel.querySelectorAll('[role=menuitem]')); };
+    function open(focusIdx){
+      closeAll(panel); panel.hidden = false; btn.setAttribute('aria-expanded', 'true');
+      if (isMenu) { var it = items(); if (it.length) it[(focusIdx + it.length) % it.length].focus(); }
+    }
+    function close(refocus){ if (panel.hidden) return; panel.hidden = true; btn.setAttribute('aria-expanded', 'false'); if (refocus) btn.focus(); }
+    btn.addEventListener('click', function(){ if (panel.hidden) open(0); else close(false); });
+    btn.addEventListener('keydown', function(e){
+      if (isMenu && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); open(e.key === 'ArrowDown' ? 0 : -1); }
+    });
+    panel.addEventListener('keydown', function(e){
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(true); return; }
+      if (e.key === 'Tab') { close(false); return; }
+      if (!isMenu) return;
+      var it = items(), i = it.indexOf(document.activeElement), j = -1;
+      if (e.key === 'ArrowDown') j = (i + 1) % it.length; else if (e.key === 'ArrowUp') j = (i - 1 + it.length) % it.length;
+      else if (e.key === 'Home') j = 0; else if (e.key === 'End') j = it.length - 1;
+      if (j >= 0) { e.preventDefault(); it[j].focus(); }
+    });
+    if (isMenu) panel.addEventListener('click', function(e){ if (e.target.closest && e.target.closest('[role=menuitem]')) close(true); });
+    POPS.push({ btn: btn, panel: panel, close: close });
+  }
+  var POPS = [];
+  function closeAll(except){ POPS.forEach(function(p){ if (p.panel !== except) p.close(false); }); }
+  document.addEventListener('pointerdown', function(e){ POPS.forEach(function(p){ if (!p.panel.hidden && !p.panel.contains(e.target) && !p.btn.contains(e.target)) p.close(false); }); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') POPS.forEach(function(p){ if (!p.panel.hidden) p.close(p.panel.contains(document.activeElement) || p.btn === document.activeElement); }); });
+  popup(expBtn, expMenu, true);
+  popup(document.getElementById('srcBtn'), document.getElementById('srcPop'), false);
   function plain(h){ var d = document.createElement('div'); d.innerHTML = h; return (d.textContent || '').replace(/\s+/g, ' ').trim(); }
   function summaryText(){
     var r = last, N = r.months, lines = [];
