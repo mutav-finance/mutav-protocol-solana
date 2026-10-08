@@ -59,10 +59,14 @@ import {
   getSettlePayoutInstruction,
   getSweepIncomeInstruction,
   getUnpauseInstruction,
+  identifyMutavInstruction,
+  MutavInstruction,
+  type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
 import { ALLOWLIST_TEXT, checkAllowlist } from "../allowlist";
 import { reserveConfigError } from "../reserve-assets";
 import { capsError, generalConfigError, rolesError } from "../admin";
+import { pendingSetConfig, pendingSetConfigText, setConfigChanges, type ConfigChange } from "../config-diff";
 import { fromHex } from "../serde";
 import type { TxRequest } from "../tx-kinds";
 import { ADMIN_KINDS } from "../tx-kinds";
@@ -564,13 +568,31 @@ export function unsignedTransaction(feePayer: Address, ixs: Instruction[], lifet
 }
 
 /** For the UI: which accounts an instruction touches, and how. */
-export function describeInstructions(ixs: Instruction[]) {
-  return ixs.map((ix) => ({
-    program: ix.programAddress as string,
-    accounts: (ix.accounts ?? []).map((m) => ({
+export function describeInstructions(ixs: Instruction[], config?: VaultConfig) {
+  return ixs.map((ix) => {
+    const accounts = (ix.accounts ?? []).map((m) => ({
       address: m.address as string,
       writable: m.role === AccountRole.WRITABLE || m.role === AccountRole.WRITABLE_SIGNER,
       signer: m.role === AccountRole.READONLY_SIGNER || m.role === AccountRole.WRITABLE_SIGNER,
-    })),
-  }));
+    }));
+    let changes: ConfigChange[] | undefined;
+    // Callers pass only MUTAV instructions with a config (the build route's composed set).
+    if (config && ix.data && ix.data.length >= 8) {
+      try {
+        if (identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig) changes = setConfigChanges(new Uint8Array(ix.data), config, accounts[2]?.address);
+      } catch {
+        changes = undefined;
+      }
+    }
+    return { program: ix.programAddress as string, accounts, ...(changes ? { changes } : {}) };
+  });
+}
+
+/**
+ * Refuses a second set_config while one is live in the multisig: set_config
+ * writes every field, so the later one would undo the earlier when both run.
+ */
+export function refuseOverlappingSetConfig(proposals: Parameters<typeof pendingSetConfig>[0]) {
+  const pending = pendingSetConfig(proposals);
+  if (pending !== null) throw new ComposeError(pendingSetConfigText(pending));
 }

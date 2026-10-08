@@ -16,6 +16,7 @@ import { Note } from "@/components/demo/shared";
 import { postJson } from "@/lib/client/api";
 import { useTx } from "@/lib/client/use-tx";
 import { fmtDuration, fmtTime } from "@/lib/format";
+import type { ConfigChange } from "@/lib/config-diff";
 
 export type ProposalView = {
   index: bigint;
@@ -28,6 +29,8 @@ export type ProposalView = {
   executable: boolean;
   executableAt: bigint | null;
   instructions: string[];
+  /** For a set_config inside: the fields it changes against on-chain config now. */
+  changes?: ConfigChange[];
 };
 export type SquadsResp =
   | { configured: false; admin: string; cluster: string }
@@ -59,7 +62,14 @@ function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold
   return (
     <tr>
       <td className="num"><Mono>#{p.index.toString()}</Mono></td>
-      <td><Mono style={{ fontSize: 12 }}>{p.instructions.join(", ") || "—"}</Mono></td>
+      <td style={{ whiteSpace: "normal" }}>
+        <Mono style={{ fontSize: 12 }}>{p.instructions.join(", ") || "—"}</Mono>
+        {p.changes && (
+          <ul aria-label={`set_config changes in proposal ${p.index}`} className="font-mono" style={{ margin: "4px 0 0", paddingLeft: 14, fontSize: 11, color: "var(--color-text-2)", listStyle: "square" }}>
+            {p.changes.length === 0 ? <li>no field differs from on-chain now</li> : p.changes.map((c) => <li key={c.field}>{c.field}: {c.from} → {c.to}</li>)}
+          </ul>
+        )}
+      </td>
       <td><Mono style={{ color: status === "Executed" ? "var(--color-success)" : status === "Executable" ? "var(--color-accent)" : "var(--color-text-2)" }}>{status}</Mono></td>
       <td className="num"><Mono>{p.approvals.length}/{threshold}</Mono></td>
       <td><Mono dim>{left === null ? "—" : left > 0n ? `${fmtDuration(left)} left` : `since ${fmtTime(p.executableAt!)}`}</Mono></td>

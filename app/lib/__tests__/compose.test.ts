@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { address, AccountRole } from "@solana/kit";
 import { findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getSetConfigInstructionDataDecoder, MUTAV_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
 import { fromHex } from "../serde";
-import { composeInstructions, describeInstructions, queueSeqs, unsignedTransaction } from "../server/compose";
+import { composeInstructions, describeInstructions, queueSeqs, refuseOverlappingSetConfig, unsignedTransaction } from "../server/compose";
 import { assertRelayable, invokedPrograms, isFullySigned, RelayRefusedError } from "../server/relay";
 import type { ReserveView } from "../view";
 import { config, state } from "./fixtures";
@@ -29,6 +29,7 @@ async function reserve(): Promise<ReserveView> {
       paymentsAccount: PAYMENTS,
       mutavCapitalWallet: WALLET,
       investorAllowlistRoot: new Uint8Array(32),
+      incomeTakeBps: 0,
       price: { tesouroPriceAccount: address("11111111111111111111111111111111"), p0: 1n, t0: 0n, yMaxBps: 0, maxStalenessSecs: 0n, maxDeviationBps: 0, maxNavMoveBps: 10_000, reserved: new Uint8Array(32) },
       exit: { bufferTargetBps: 0, bufferHeadroomBps: 0, bufferReleaseAfterSecs: 0n, curveVersion: 0, hMinBps: 0, hPegBps: 0, hMaxBps: 0, pressureEpochSecs: 0n, minInstantAssets: 0n, maxInstantPerTx: 0n, maxInstantPerWallet: 0n, maxInstantPerPeriod: 0n, instantPeriodSecs: 0n, minHoldSecs: 0n, maxPriceAgeSecs: 0n, allowlistRoot: new Uint8Array(32), barred: Array(4).fill(address("11111111111111111111111111111111")), reserved: new Uint8Array(32) },
     } as never,
@@ -120,6 +121,24 @@ describe("compose", () => {
     expect([d.feeTakeBps, d.payoutSlaSecs, d.caps.claimPeriodSecs, d.caps.maxClaimPerCall]).toEqual([1_500, 3_600n, 86_400n, r.config.caps.maxClaimPerCall]);
     await expect(composeInstructions({ kind: "set_config", feeTakeBps: 3_001 }, WALLET, { reserve: r })).rejects.toThrow(/fee_take_bps/);
     await expect(composeInstructions({ kind: "set_config", caps: { minRequest: r.config.caps.maxRequest + 1n } }, WALLET, { reserve: r })).rejects.toThrow(/min_request/);
+  });
+
+  it("set_config shows approvers exactly which fields differ from on-chain", async () => {
+    const r = await reserve();
+    const ixs = await composeInstructions({ kind: "set_config", caps: { maxTvl: r.config.caps.maxTvl + 1n } }, WALLET, { reserve: r });
+    const [d] = describeInstructions(ixs, r.config);
+    expect(d!.changes).toEqual([{ field: "caps.max_tvl", from: String(r.config.caps.maxTvl), to: String(r.config.caps.maxTvl + 1n) }]);
+    const [same] = describeInstructions(await composeInstructions({ kind: "set_config" }, WALLET, { reserve: r }), r.config);
+    expect(same!.changes).toEqual([]);
+    // Other instructions carry no diff.
+    expect(describeInstructions(await composeInstructions({ kind: "unpause" }, WALLET, { reserve: r }), r.config)[0]!.changes).toBeUndefined();
+  });
+
+  it("refuses a second set_config while one is live in the multisig", () => {
+    const p = (index: bigint, status: string, instructions: string[]) => ({ index, status, instructions });
+    expect(() => refuseOverlappingSetConfig([p(4n, "Executed", ["SetConfig"]), p(3n, "Active", ["SetConfig"])])).toThrow(/execute or cancel proposal #3 first/);
+    expect(() => refuseOverlappingSetConfig([p(5n, "Approved", ["Unpause", "SetConfig"])])).toThrow(/#5/);
+    expect(() => refuseOverlappingSetConfig([p(3n, "Executed", ["SetConfig"]), p(2n, "Cancelled", ["SetConfig"]), p(1n, "Active", ["FulfilDeposits"])])).not.toThrow();
   });
 
   it("sweep_income moves the statement from the income inbox, signed by the operator only", async () => {

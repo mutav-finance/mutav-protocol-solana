@@ -1,7 +1,8 @@
 "use client";
 
 /** Building blocks shared by the /admin sections: proposal-builder cards, tables, sub-area headings. */
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
+import { pendingSetConfigText } from "@/lib/config-diff";
 import { RoleTag } from "@/components/RoleTag";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Action, Note } from "@/components/demo/shared";
@@ -11,7 +12,15 @@ import type { AdminTx, TxRequest } from "@/lib/tx-kinds";
 export type Mode = { via: "squads" | "direct"; label: string } | null;
 
 /** One admin action: a Squads proposal builder (or direct signing on localnet). */
+/**
+ * The index of a live Squads proposal that already writes set_config, or null.
+ * set_config writes every field, so a second proposal would undo the first.
+ */
+export const PendingSetConfig = createContext<bigint | null>(null);
+
 export function AdminAction({ title, children, mode, request, label, note }: { title: string; children?: ReactNode; mode: Mode; request: AdminTx | TxRequest | null | (() => Promise<AdminTx | null>); label: string; note?: ReactNode }) {
+  const pending = useContext(PendingSetConfig);
+  const blocked = pending !== null && mode?.via === "squads" && request !== null && typeof request !== "function" && request.kind === "set_config";
   return (
     <article style={{ border: "1px solid var(--color-border)", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 6 }}>
       <h3 style={{ fontSize: 15, margin: 0, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
@@ -19,8 +28,9 @@ export function AdminAction({ title, children, mode, request, label, note }: { t
       </h3>
       {note && <Note>{note}</Note>}
       {children}
+      {blocked && <Note tone="warn">{pendingSetConfigText(pending!)}.</Note>}
       {mode ? (
-        <Action label={mode.via === "squads" ? `Propose: ${label}` : `Sign directly: ${label}`} request={request} via={mode.via} variant={mode.via === "direct" ? "outline" : "default"} />
+        <Action label={mode.via === "squads" ? `Propose: ${label}` : `Sign directly: ${label}`} request={blocked ? null : request} via={mode.via} variant={mode.via === "direct" ? "outline" : "default"} />
       ) : (
         <Note tone="warn">No Squads multisig configured, and direct signing is localnet-only.</Note>
       )}

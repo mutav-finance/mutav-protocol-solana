@@ -13,7 +13,8 @@ import { Page, ReadError } from "@/components/Section";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RoleTag } from "@/components/RoleTag";
 import { LiveProvider, Note } from "@/components/demo/shared";
-import { type Mode } from "@/components/admin/shared";
+import { PendingSetConfig, type Mode } from "@/components/admin/shared";
+import { pendingSetConfig } from "@/lib/config-diff";
 import type { SquadsResp } from "@/components/admin/Squads";
 import { General } from "@/components/admin/General";
 import { Money } from "@/components/admin/Money";
@@ -55,6 +56,7 @@ export function AdminPage() {
       {poll.error && !d && <ReadError error={poll.error} />}
       {d && (
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh: async () => { await Promise.all([poll.refresh(), sq.refresh()]); } }}>
+          <PendingSetConfig.Provider value={sq.data?.configured ? pendingSetConfig(sq.data.multisig.proposals) : null}>
           <SectionNav />
           {mode?.via === "direct" && (
             <div role="note" style={{ border: "1px solid var(--color-copper)", padding: "10px 14px", marginBottom: 8 }}>
@@ -65,6 +67,7 @@ export function AdminPage() {
           <General mode={mode} sq={sq.data} sqError={sq.error} onSquadsDone={() => void sq.refresh()} />
           <Money mode={mode} />
           <Allocation mode={mode} />
+          </PendingSetConfig.Provider>
         </LiveProvider>
       )}
     </Page>

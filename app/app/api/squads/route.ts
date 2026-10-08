@@ -14,7 +14,7 @@ export async function GET() {
       return jsonResponse({ configured: false, admin: reserve.config.admin, cluster: env.cluster });
     }
     const vault = vaultAddress(env.squadsMultisig);
-    const ms = await readMultisig(env, reserve.now);
+    const ms = await readMultisig(env, reserve.now, 10, reserve.config);
     return jsonResponse({ configured: true, adminIsVault: reserve.config.admin === vault, multisig: ms, now: reserve.now });
   } catch (e) {
     return errorResponse(e);
