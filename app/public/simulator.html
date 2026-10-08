@@ -65,7 +65,7 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .bar{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line)}
 .bar .in{max-width:1440px;margin:0 auto;padding:var(--sp2) var(--sp6);min-height:56px;display:flex;align-items:center;gap:var(--sp2) var(--sp4);flex-wrap:wrap}
 @media (max-width:1360px){ .bar .scenbar label{display:none} }
-@media (max-width:1240px){ .bgrp.act{order:6;width:100%;justify-content:flex-end;padding-left:0!important;border-left:0!important} }
+@media (max-width:1380px){ .bgrp.act{order:6;width:100%;justify-content:flex-end;padding-left:0!important;border-left:0!important} }
 .ttl{display:flex;align-items:baseline;gap:var(--sp3);min-width:0}
 .brand{font:500 var(--fs-kicker)/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
 .bar h1{font-size:var(--fs-title);line-height:1.2;margin:0;letter-spacing:-.01em;white-space:nowrap}
@@ -131,7 +131,8 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .inp:hover{border-color:var(--ink-3)}
 .inp:focus-within{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px}
 .inp input{flex:1;min-width:0;width:100%;font:400 var(--fs-body) var(--mono);color:var(--ink);background:transparent;border:0;padding:0 var(--sp2);outline:none;font-variant-numeric:tabular-nums;text-align:right}
-.inp input::-webkit-inner-spin-button,.inp input::-webkit-outer-spin-button{opacity:1}
+.inp input::-webkit-inner-spin-button,.inp input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.inp input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .inp .u{font:400 10.5px var(--mono);color:var(--ink-3);padding:0 var(--sp2) 0 2px;white-space:nowrap}
 .tg{display:flex;align-items:center;justify-content:space-between;gap:var(--sp3);font-size:var(--fs-label);color:var(--ink);cursor:pointer;min-height:32px}
 .tg input{appearance:none;-webkit-appearance:none;width:32px;height:16px;background:var(--surface-3);border:1px solid var(--line-input);position:relative;cursor:pointer;flex:none;margin:0}
