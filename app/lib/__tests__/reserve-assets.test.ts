@@ -7,7 +7,8 @@ import {
   incomeTakeRequest,
   PLANNED_RESERVE_INSTRUCTIONS,
   priceRequest,
-  RESERVE_ASSET_DUTIES,
+  ADAPTER_CANDIDATES,
+  EXPANSION_STEPS,
   reserveComposition,
   reserveConfigError,
   tesouroCapRequest,
@@ -34,7 +35,7 @@ function view({ brs, tesouro = 0n, inbox = 0n, capBps = 0, adapters = slots() }:
 }
 
 describe("reserve composition", () => {
-  it("is 100% BRS on devnet, with the reason TESOURO is 0", () => {
+  it("is 100% BRS in the pilot (ADR 0018), with the reason", () => {
     const c = reserveComposition(view({ brs: 300_000n * BRL, inbox: 1_250n * BRL }));
     expect(c.stableAssets).toBe(300_000n * BRL);
     expect(c.brsShareBps).toBe(10_000n);
@@ -44,7 +45,8 @@ describe("reserve composition", () => {
     expect(c.capUsedBps).toBeNull();
     expect(c.overCap).toBe(false);
     expect(c.adapters).toEqual([]);
-    expect(c.tesouroZeroReason).toBe("No TESOURO adapter is whitelisted, the TESOURO share cap is 0%, allocate is not in this program binary.");
+    expect(c.brsOnly).toBe(true);
+    expect(c.tesouroZeroReason).toBe("The pilot reserve holds BRS only (ADR 0018); no adapter is whitelisted; the TESOURO share cap is 0%.");
   });
 
   it("does not count the income inbox toward stable assets or the shares", () => {
@@ -64,6 +66,7 @@ describe("reserve composition", () => {
     expect(c.capRoom).toBe(100n * BRL);
     expect(c.capUsedBps).toBe(5_000n);
     expect(c.tesouroZeroReason).toBeNull();
+    expect(c.brsOnly).toBe(false);
     expect(c.adapters).toEqual([{ slot: 0, programId: ADAPTER, assetMint: MINT, cap: 200n * BRL, allocated: 100n * BRL, enabled: true }]);
   });
 
@@ -151,11 +154,17 @@ describe("planned reserve-allocation instructions", () => {
     }
   });
 
-  it("names the signer of every live duty as the program checks it", () => {
-    for (const d of RESERVE_ASSET_DUTIES) {
-      if (d.ix === null) expect(d.actor).toBe("external");
-      else if (d.live) expect([d.ix, INSTRUCTION_ROLE[d.ix as keyof typeof INSTRUCTION_ROLE]]).toEqual([d.ix, d.actor]);
-      else expect(PLANNED_RESERVE_INSTRUCTIONS.map((p) => p.ix)).toContain(d.ix);
+  it("lists expansion steps whose live signers match the program and whose planned ones are in the spec", () => {
+    const planned = PLANNED_RESERVE_INSTRUCTIONS.map((p) => p.ix);
+    for (const st of EXPANSION_STEPS) {
+      if (st.ix === null) expect(st.live).toBe(false);
+      else if (st.live) expect([st.ix, INSTRUCTION_ROLE[st.ix as keyof typeof INSTRUCTION_ROLE]]).toEqual([st.ix, st.actor]);
+      else expect(planned).toContain(st.ix);
     }
+  });
+
+  it("names TESOURO as the first candidate, with its blocker", () => {
+    expect(ADAPTER_CANDIDATES.map((a) => a.asset)).toEqual(["TESOURO"]);
+    expect(ADAPTER_CANDIDATES[0]!.blocker).toMatch(/BRS↔TESOURO/);
   });
 });

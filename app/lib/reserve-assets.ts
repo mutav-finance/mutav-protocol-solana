@@ -69,7 +69,12 @@ export type Composition = {
   adapters: AdapterRow[];
   /** Why TESOURO is 0 today, in plain words; null when the reserve holds TESOURO. */
   tesouroZeroReason: string | null;
+  /** Nothing is held through an adapter: the pilot's BRS-only reserve (ADR 0018). */
+  brsOnly: boolean;
 };
+
+/** No adapter holds anything allocated. */
+const nothingAllocated = (adapters: AdapterRow[]) => adapters.every((a) => a.allocated === 0n);
 
 const shareBps = (part: bigint, whole: bigint) => (whole === 0n ? null : (part * 10_000n) / whole);
 
@@ -81,13 +86,13 @@ export function reserveComposition(r: Pick<ReserveView, "state" | "config" | "so
   const capValue = (BigInt(capBps) * stableAssets) / 10_000n;
   const adapters = adapterRows(r.config.adapters);
   const enabled = adapters.filter((a) => a.enabled);
+  // BRS only while nothing is held through an adapter (ADR 0018); the reason names what keeps it so.
   let tesouroZeroReason: string | null = null;
   if (tesouroValue === 0n) {
-    const why: string[] = [];
-    if (enabled.length === 0) why.push("no TESOURO adapter is whitelisted");
+    const why = ["the pilot reserve holds BRS only (ADR 0018)"];
+    if (enabled.length === 0) why.push("no adapter is whitelisted");
     if (capBps === 0) why.push("the TESOURO share cap is 0%");
-    why.push("allocate is not in this program binary");
-    tesouroZeroReason = `${why.join(", ")}.`.replace(/^./, (c) => c.toUpperCase());
+    tesouroZeroReason = `${why.join("; ")}.`.replace(/^./, (c) => c.toUpperCase());
   }
   return {
     brs,
@@ -104,29 +109,47 @@ export function reserveComposition(r: Pick<ReserveView, "state" | "config" | "so
     overCap: tesouroValue > capValue,
     adapters,
     tesouroZeroReason,
+    brsOnly: tesouroValue === 0n && nothingAllocated(adapters),
   };
 }
 
-// ── Who does what ───────────────────────────────────────────────────────────
+// ── Expanding with adapters ─────────────────────────────────────────────────
 
-/** "external": Nora, the BRS issuer, outside the program's roles. */
+/** "external": an issuer outside the program's roles. */
 export type Actor = Role | "external";
 
-export type Duty = {
+export type ExpansionStep = {
   actor: Actor;
-  /** The instruction it signs, if any; null for a plain transfer. */
+  /** The instruction it takes, or null for a deploy outside the program. */
   ix: string | null;
   action: string;
   /** In this program binary (true), or spec only (false). */
   live: boolean;
-  href?: string;
 };
 
-/** Who acts on where the reserve's assets sit. Income flows are under Money in & out. */
-export const RESERVE_ASSET_DUTIES: readonly Duty[] = [
-  { actor: "admin", ix: "set_config", live: true, href: "#allocation-controls", action: "Sets the TESOURO share cap and the TESOURO price account and its bounds. Squads proposal, time-locked." },
-  { actor: "admin", ix: "allocate", live: false, href: "#allocation-planned", action: "Whitelists TESOURO adapters, allocates BRS to TESOURO and deallocates back. Planned: not in this program binary." },
-  { actor: "anyone", ix: "refresh", live: true, action: "Re-values the reserve: reads and bounds the TESOURO price, recomputes stable assets, NAV and the mode." },
+/**
+ * How a new asset joins the reserve (ADR 0018): every step a Squads proposal
+ * under the time lock, the first a program upgrade. A test checks each live
+ * step's signer against the program and each planned one against the spec.
+ */
+export const EXPANSION_STEPS: readonly ExpansionStep[] = [
+  { actor: "admin", ix: null, live: false, action: "Upgrade the program with the adapter instructions and deploy the asset's adapter program, after its own security review." },
+  { actor: "admin", ix: "whitelist_adapter", live: false, action: "Whitelist the adapter with its cap: the most BRS-equivalent value it may ever hold." },
+  { actor: "admin", ix: "set_config", live: true, action: "Set the asset's price feed (price account, accrual ceiling, staleness, deviation) and raise its share cap from 0%." },
+  { actor: "admin", ix: "allocate", live: false, action: "Allocate BRS into the asset within the share cap, the adapter cap, the solvency gate and the liquidity check; deallocate brings it back." },
+  { actor: "anyone", ix: "refresh", live: true, action: "Re-value the reserve at the bounded price on every refresh: stable assets, NAV and the mode follow." },
+];
+
+export type AdapterCandidate = { asset: string; issuer: string; what: string; blocker: string };
+
+/** Assets an adapter could add. A candidate, not a commitment (ADR 0018). */
+export const ADAPTER_CANDIDATES: readonly AdapterCandidate[] = [
+  {
+    asset: "TESOURO",
+    issuer: "Etherfuse",
+    what: "Tokenized Brazilian federal bonds (Token-2022, on-chain BondPrice account).",
+    blocker: "No BRS↔TESOURO path: Etherfuse mints and redeems against USDC. Its price-account layout is also unconfirmed (spec §12 Q2, Q6).",
+  },
 ];
 
 // ── Planned (spec only) ─────────────────────────────────────────────────────
@@ -191,7 +214,7 @@ export const PLANNED_RESERVE_INSTRUCTIONS: readonly PlannedInstruction[] = [
 ];
 
 export const PLANNED_BLOCKER =
-  "There is no BRS↔TESOURO path on Solana yet: Etherfuse mints and redeems TESOURO against USDC, not BRS. Until a venue exists, the adapter and these four instructions ship in a later program upgrade. Today the reserve is 100% BRS.";
+  "Every step is a Squads proposal under the time lock. The four planned instructions ship in the program upgrade that adds the first adapter (ADR 0018).";
 
 // ── Admin controls (set_config) ─────────────────────────────────────────────
 

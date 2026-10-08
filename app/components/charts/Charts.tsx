@@ -350,18 +350,54 @@ export function ClaimCapChart({ cap }: { cap: ClaimCap }) {
   );
 }
 
-// ── Reserve composition (BRS, TESOURO, income inbox) ────────────────────────
+// ── Reserve composition (BRS, adapter assets, income inbox) ────────────────
 
 /**
- * What the reserve holds, on one axis: TESOURO (left) and BRS make up stable
- * assets, with the TESOURO share cap as a dashed marker (TESOURO must stay
- * left of it); the income inbox is drawn outlined on its own row, because it
- * counts toward nothing until the operator sweeps it.
+ * What the reserve holds, on one axis. In the pilot that is BRS only (ADR
+ * 0018), with the income inbox drawn outlined on its own row because it counts
+ * toward nothing until the operator sweeps it. Once an adapter holds TESOURO,
+ * TESOURO (left) and BRS stack into stable assets and the TESOURO share cap
+ * is a dashed marker (TESOURO must stay left of it).
  */
 export function CompositionChart({ c }: { c: Composition }) {
   const axis = c.stableAssets + c.inbox;
-  const capAt = frac(c.capValue, axis);
   const share = (bps: bigint | null) => (bps === null ? "—" : fmtBps(bps));
+  const inbox = (
+    <Row
+      label={<RowLabel sub={<RoleTag role="operator" prefix="swept by the" />}>Income inbox</RowLabel>}
+      value={fmtBrs(c.inbox, 0)}
+      summary={`Income inbox ${fmtBrs(c.inbox)}: paid by Nora, not yet counted, swept by the Operator.`}
+      labelWidth={190}
+    >
+      <Track segs={[{ f: frac(c.inbox, axis), color: C.mid, outline: true }]} />
+    </Row>
+  );
+  if (c.brsOnly) {
+    return (
+      <ChartFrame
+        title="Reserve composition"
+        legend={
+          <Legend>
+            <Swatch color={C.ink} label="BRS in reserve" />
+            <Swatch color={C.mid} label="income inbox, not yet counted" outline />
+          </Legend>
+        }
+        caption={<>The pilot reserve holds BRS only (ADR 0018): stable assets = brs_balance, from VaultState. The inbox is the vault authority&apos;s BRS account. More assets can be added through adapters; none is whitelisted.</>}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Row
+            label={<RowLabel sub={<Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>100% BRS (pilot)</Mono>}>BRS in reserve</RowLabel>}
+            value={fmtBrs(c.stableAssets, 0)}
+            summary={`Stable assets ${fmtBrs(c.stableAssets)}, all BRS.`}
+            labelWidth={190}
+          >
+            <Track segs={[{ f: frac(c.brs, axis), color: C.ink }]} />
+          </Row>
+          {inbox}
+        </div>
+      </ChartFrame>
+    );
+  }
   return (
     <ChartFrame
       title="Reserve composition, by asset"
@@ -375,7 +411,7 @@ export function CompositionChart({ c }: { c: Composition }) {
       caption={
         <>
           Stable assets = brs_balance + TESOURO value (tesouro_units at the bounded price), from VaultState; the inbox is the vault authority&apos;s BRS account. The dashed
-          line is the TESOURO share cap ({fmtBps(c.capBps)} of stable assets = {fmtBrs(c.capValue, 0)}, set by the Reserve Admin){c.capBps === 0 ? ": at 0% it sits at the left edge, so no TESOURO is allowed" : ""}.
+          line is the TESOURO share cap ({fmtBps(c.capBps)} of stable assets = {fmtBrs(c.capValue, 0)}, set by the Reserve Admin).
         </>
       }
     >
@@ -386,16 +422,9 @@ export function CompositionChart({ c }: { c: Composition }) {
           summary={`Stable assets ${fmtBrs(c.stableAssets)}: TESOURO ${fmtBrs(c.tesouroValue)} (${share(c.tesouroShareBps)}), BRS ${fmtBrs(c.brs)} (${share(c.brsShareBps)}). TESOURO share cap ${fmtBps(c.capBps)}.`}
           labelWidth={190}
         >
-          <Track segs={[{ f: frac(c.tesouroValue, axis), color: c.overCap ? C.bad : C.mid }, { f: frac(c.brs, axis), color: C.ink }]} marker={{ f: capAt, label: `TESOURO cap ${fmtBps(c.capBps)}` }} />
+          <Track segs={[{ f: frac(c.tesouroValue, axis), color: c.overCap ? C.bad : C.mid }, { f: frac(c.brs, axis), color: C.ink }]} marker={{ f: frac(c.capValue, axis), label: `TESOURO cap ${fmtBps(c.capBps)}` }} />
         </Row>
-        <Row
-          label={<RowLabel sub={<RoleTag role="operator" prefix="swept by the" />}>Income inbox</RowLabel>}
-          value={fmtBrs(c.inbox, 0)}
-          summary={`Income inbox ${fmtBrs(c.inbox)}: paid by Nora, not yet counted, swept by the Operator.`}
-          labelWidth={190}
-        >
-          <Track segs={[{ f: frac(c.inbox, axis), color: C.mid, outline: true }]} />
-        </Row>
+        {inbox}
       </div>
     </ChartFrame>
   );
