@@ -35,6 +35,10 @@ use serde_json::{json, Value};
 
 const MAX: u64 = u64::MAX;
 
+/// A fixed income statement reference (ADR 0017). Fixed rather than drawn
+/// from the generator, so adding it moved no other vector.
+const INCOME_REF_HASH: [u8; 32] = [0x17; 32];
+
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/client/vectors.json")
 }
@@ -231,6 +235,17 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
             provisions: 58_000,
             ..base
         },
+        // c at the 0.10 floor (ADR 0016): the ratio term binds, then the
+        // provisions term binds.
+        SolvencyInputs {
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            ..base
+        },
+        SolvencyInputs {
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            provisions: 30_000,
+            ..base
+        },
         // Overflow paths.
         SolvencyInputs {
             brs_balance: MAX,
@@ -318,6 +333,7 @@ fn pda_vectors(rng: &mut Rng) -> Value {
             "invoiceRefHash": hex(&invoice),
             "noticeRefHash": hex(&notice),
             "seq": s(seq),
+            "incomeRefHash": hex(&INCOME_REF_HASH),
         },
         "expected": {
             "config": config.to_string(),
@@ -337,6 +353,15 @@ fn pda_vectors(rng: &mut Rng) -> Value {
             "depositRequest": pda(&[DEPOSIT_SEED, c, &seq.to_le_bytes()]).to_string(),
             "redeemRequest": pda(&[REDEEM_SEED, c, &seq.to_le_bytes()]).to_string(),
             "holderState": pda(&[HOLDER_SEED, c, owner.as_ref()]).to_string(),
+            "incomeReceipt": pda(&[INCOME_SEED, c, &INCOME_REF_HASH]).to_string(),
+            // ADR 0017: the vault authority's associated token account for
+            // the reserve mint, under the classic SPL Token program.
+            "incomeInbox": anchor_spl::associated_token::get_associated_token_address_with_program_id(
+                &pda(&[AUTHORITY_SEED, c]),
+                &reserve_mint,
+                &anchor_spl::token::ID,
+            )
+            .to_string(),
         },
     })
 }
@@ -551,6 +576,20 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
             json!({}),
             mutav::instruction::ClearFulfilHalt {}.data(),
         ),
+        ix(
+            "sweepIncome",
+            json!({
+                "incomeRefHash": hex(&INCOME_REF_HASH),
+                "period": 202_610,
+                "amount": s(1_234_567_890),
+            }),
+            mutav::instruction::SweepIncome {
+                income_ref_hash: INCOME_REF_HASH,
+                period: 202_610,
+                amount: 1_234_567_890,
+            }
+            .data(),
+        ),
     ])
 }
 
@@ -563,6 +602,8 @@ fn build() -> Value {
             "navScale": s(NAV_SCALE),
             "virtualOffset": s(VIRTUAL_OFFSET),
             "bpsDenominator": BPS_DENOMINATOR,
+            "minCoverageRatioBps": MIN_COVERAGE_RATIO_BPS,
+            "maxIncomeTakeBps": MAX_INCOME_TAKE_BPS,
             "instantExit": s(INSTANT_EXIT),
             "modeNormal": MODE_NORMAL,
             "modeUnderCovered": MODE_UNDER_COVERED,

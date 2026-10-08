@@ -10,7 +10,7 @@
 import type { VaultConfig, VaultState } from "@mutav-finance/mutav-protocol-solana";
 import type { ClaimRow } from "./view";
 
-export type OperatorInstruction = "register_guarantee" | "close_guarantee" | "contribute_fees" | "file_claim" | "pay_claim" | "settle_payout";
+export type OperatorInstruction = "register_guarantee" | "close_guarantee" | "contribute_fees" | "sweep_income" | "file_claim" | "pay_claim" | "settle_payout";
 
 export type Duty = {
   ix: OperatorInstruction;
@@ -40,6 +40,12 @@ export const DUTIES: Duty[] = [
     today: "Record a guarantee fee invoice once its PIX is received and minted to BRS in the operator's account.",
     later: "Triggered per invoice once the fee arrives (PIX → BRS); mutav-app reconciles each FeeReceipt against its invoices.",
     bound: "Each invoice is recorded once (FeeReceipt). The take goes to the treasury, the rest to the reserve. Never paused, never gated.",
+  },
+  {
+    ix: "sweep_income",
+    today: "Each month, sweep the amount on Nora's statement from the income inbox into the reserve, with the statement's reference and month.",
+    later: "Triggered by Nora's monthly statement once the payment is in the income inbox (ADR 0017).",
+    bound: "Amount ≤ the inbox balance; each statement reference is recorded once (IncomeReceipt); the inbox must be the vault authority's associated token account. The whole amount goes to the reserve (income take 0). Never paused, never gated; never mints shares.",
   },
   {
     ix: "file_claim",

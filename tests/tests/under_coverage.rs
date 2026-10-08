@@ -116,6 +116,58 @@ fn a_shortfall_switches_mode_and_freezes_the_gated_instructions() {
     }
 }
 
+/// c < 1 (ADR 0016): a claim payment of `a` lowers `stable_assets` by `a`
+/// but `coverage_required` only by `c × a`, so it can tip the reserve into
+/// under-coverage. The payment is never refused; the next `refresh` records
+/// the mode.
+#[test]
+fn below_one_a_claim_payment_tips_into_under_coverage_and_is_not_refused() {
+    let mut f = Fixture::new();
+    set_coverage_ratio(&mut f, MIN_COVERAGE_RATIO_BPS);
+    f.fund_reserve(10_000 * BRL);
+    let g = guarantee_args(unique_hash(), 30_000 * BRL, 0);
+    f.register(g.clone()).unwrap();
+    for _ in 0..2 {
+        f.register(guarantee_args(unique_hash(), 30_000 * BRL, 0))
+            .unwrap();
+    }
+    // R$90k of cover at c = 0.10: coverage R$9k, free capital R$1k.
+    let sol = solvency(&f.config(), &f.state());
+    assert_eq!(
+        (sol.coverage_required, sol.free_capital),
+        (9_000 * BRL, 1_000 * BRL)
+    );
+
+    let c = Claim::on(&g, 5_000 * BRL);
+    f.file_claim(c).unwrap();
+    let meta = f
+        .pay_claim(c)
+        .expect("pay_claim is never refused for solvency");
+    assert!(
+        events::<ModeChanged>(&meta).is_empty(),
+        "pay_claim does not switch mode"
+    );
+    // stable 5k < coverage max(0.10 × 85k, 0) = 8.5k.
+    let s = f.state();
+    assert_eq!(s.coverage_required, 8_500 * BRL);
+    assert_eq!(s.mode, MODE_NORMAL, "not refreshed yet");
+    assert!(solvency(&f.config(), &s).under_covered());
+
+    let meta = f.refresh().unwrap();
+    assert_eq!(f.state().mode, MODE_UNDER_COVERED);
+    let ev = events::<ModeChanged>(&meta);
+    assert_eq!(
+        (ev[0].from, ev[0].to, ev[0].deficit),
+        (MODE_NORMAL, MODE_UNDER_COVERED, 3_500 * BRL)
+    );
+
+    // Under-covered: further claim payments still go through.
+    let c2 = Claim::on(&g, 1_000 * BRL);
+    f.file_claim(c2).unwrap();
+    f.pay_claim(c2)
+        .expect("pay_claim is never blocked while under-covered");
+}
+
 #[test]
 fn recovery_returns_mode_to_normal() {
     let Book {
@@ -429,15 +481,65 @@ fn clearing_needs_a_halt() {
 }
 
 #[test]
-fn a_large_fee_batch_above_the_bound_halts_fulfilment() {
-    // TODO(adr 0013: inflow-adjusted NAV guard) — the spec measures the move
-    // gross, so a guarantee-fee batch worth more than `max_nav_move_bps` of
-    // NAV (here 400 net on 30,000: 133 bps) halts fulfilment, as specced.
-    // ADR 0013 proposes measuring the move net of inflows; when it lands, this
-    // test changes.
+fn a_large_fee_batch_above_the_bound_does_not_halt_fulfilment() {
+    // ADR 0017: the guard measures the move net of verified inflows. A
+    // guarantee-fee batch worth more than `max_nav_move_bps` of NAV (here 400
+    // net on 30,000: 133 bps) raises the published NAV but is not a shock.
     let (mut f, _, d, _) = guarded();
+    let nav_before = f.state().nav_per_share;
     f.contribute(500 * BRL).0.unwrap();
+    assert_eq!(f.state().inflows_since_refresh, 400 * BRL);
+    f.refresh().unwrap();
+    let s = f.state();
+    assert!(!s.fulfil_halted);
+    assert!(
+        s.nav_per_share > nav_before,
+        "the published NAV includes the fee"
+    );
+    assert_eq!(s.inflows_since_refresh, 0, "refresh starts a new window");
+    f.fulfil_deposits(1, &[d]).expect("not halted");
+}
+
+#[test]
+fn an_accounting_shock_of_the_same_size_still_halts() {
+    // The same 400 move, but not booked by an inflow instruction (an
+    // injected balance, standing in for a price or accounting shock): the
+    // guard trips.
+    let (mut f, _, d, _) = guarded();
+    let mut s = f.state();
+    s.brs_balance += 400 * BRL;
+    f.write_state(&s);
     f.refresh().unwrap();
     assert!(f.state().fulfil_halted);
     assert_mutav_err(f.fulfil_deposits(1, &[d]), MutavError::FulfilHalted);
+}
+
+#[test]
+fn a_shock_hidden_behind_an_inflow_is_still_measured() {
+    // A 400 fee and a 400 loss in the same window: the published NAV is
+    // back where it was, but net of the inflow it fell 133 bps, which trips.
+    let (mut f, g, d, _) = guarded();
+    f.contribute(500 * BRL).0.unwrap();
+    f.file_claim(Claim::on(&g, 400 * BRL)).unwrap();
+    f.refresh().unwrap();
+    assert!(f.state().fulfil_halted);
+    assert_mutav_err(f.fulfil_deposits(1, &[d]), MutavError::FulfilHalted);
+}
+
+#[test]
+fn clearing_a_halt_resets_the_inflow_window() {
+    // After a halt, `clear_fulfil_halt` sets the baseline to the NAV of now,
+    // which already includes the inflows, so they are not subtracted again.
+    let (mut f, g, _, _) = guarded();
+    f.file_claim(Claim::on(&g, 400 * BRL)).unwrap();
+    f.refresh().unwrap();
+    assert!(f.state().fulfil_halted);
+    f.contribute(500 * BRL).0.unwrap();
+    f.clear_fulfil_halt().unwrap();
+    assert_eq!(f.state().inflows_since_refresh, 0);
+    f.refresh().unwrap();
+    assert!(
+        !f.state().fulfil_halted,
+        "no move since the reviewed baseline"
+    );
 }

@@ -20,7 +20,7 @@ solana-signer = "3"
 solana-message = "4"
 solana-transaction = "4"
 solana-program-pack = "3"
-anchor-spl = { workspace = true, features = ["token_2022_extensions"] }
+anchor-spl = { workspace = true, features = ["token_2022_extensions", "associated_token"] }
 solana-system-interface = { version = "3", features = ["bincode"] }
 solana-transaction-error = "3"
 solana-instruction = "3"

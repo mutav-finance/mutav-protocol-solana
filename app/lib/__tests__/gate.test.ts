@@ -36,9 +36,33 @@ describe("register_guarantee gate preview", () => {
     const c = config({ coverageRatioBps: 12_000 });
     const s = state({ brsBalance: 12n, remainingCoverTotal: 0n });
     // ceil(1.2 × 10) = 12 fits; ceil(1.2 × 11) = 14 does not.
-    expect(coverageRequired(11n, 12_000)).toBe(14n);
+    expect(coverageRequired(11n, 12_000, 0n)).toBe(14n);
     expect(previewRegisterGuarantee(c, s, { rent: 1n, defaultCover: 10n, exitCover: 0n, agencyOutstanding: 0n }).fits).toBe(true);
     expect(previewRegisterGuarantee(c, s, { rent: 1n, defaultCover: 11n, exitCover: 0n, agencyOutstanding: 0n }).refusal).toBe("InsufficientFreeCapital");
+  });
+
+  it("below c = 1, sizes coverage at c × cover (c = 10%, ADR 0016)", () => {
+    const c = config({ coverageRatioBps: 1_000 });
+    // R$10k backs R$100k of cover: R$40k already, so R$60k more fits exactly.
+    const s = state({ brsBalance: 10_000n * BRL, remainingCoverTotal: 40_000n * BRL });
+    const fits = previewRegisterGuarantee(c, s, g(30_000n * BRL));
+    expect(fits).toMatchObject({ fits: true, coverageRequiredBefore: 4_000n * BRL, coverageRequiredAfter: 7_000n * BRL });
+    expect(fits.freeCapitalBefore).toBe(6_000n * BRL);
+    const full = state({ brsBalance: 10_000n * BRL, remainingCoverTotal: 90_000n * BRL });
+    expect(previewRegisterGuarantee(c, full, g(10_000n * BRL)).fits).toBe(true);
+    // ceil(0.1 × (100k + 1 base unit)) = 10k + 1 base unit > 10k.
+    expect(previewRegisterGuarantee(c, full, g(10_000n * BRL + 1n)).refusal).toBe("InsufficientFreeCapital");
+  });
+
+  it("below c = 1, coverage is never below the open provisions", () => {
+    const c = config({ coverageRatioBps: 1_000 });
+    // 60k cover, 9k filed: coverage max(6k, 9k) = 9k, free capital 1k.
+    const s = state({ brsBalance: 10_000n * BRL, remainingCoverTotal: 60_000n * BRL, provisions: 9_000n * BRL });
+    const p = previewRegisterGuarantee(c, s, g(30_000n * BRL));
+    expect(p).toMatchObject({ fits: true, coverageRequiredBefore: 9_000n * BRL, coverageRequiredAfter: 9_000n * BRL, freeCapitalBefore: 1_000n * BRL });
+    // Provisions above stable assets: under-covered, though c × cover alone would fit.
+    const over = state({ ...s, provisions: 11_000n * BRL });
+    expect(previewRegisterGuarantee(c, over, g(1_000n * BRL)).refusal).toBe("UnderCovered");
   });
 
   it("checks caps before solvency, in program order", () => {

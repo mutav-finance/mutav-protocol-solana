@@ -30,9 +30,10 @@ pub fn published_nav(net_assets: u64, shares_outstanding: u64) -> Result<u64> {
 /// outstanding: then there is no NAV to protect and the move is not measured.
 /// With shares outstanding on both sides, every move is measured, including
 /// one to or from the floor of `1`.
-// TODO(adr 0013: inflow-adjusted NAV guard) — the move is measured gross, as
-// the spec says today, so a large guarantee-fee batch also trips it. Measuring
-// it net of inflows is pending an ADR.
+///
+/// `refresh` passes as `next` the NAV net of verified inflows
+/// ([`guard_nav`], ADR 0017), so guarantee fees and swept income never trip
+/// the guard; price and accounting shocks still do.
 pub fn nav_move_exceeds(prev: u64, next: u64, max_nav_move_bps: u16) -> bool {
     if prev == 0 || next == 0 {
         return false;
@@ -42,9 +43,28 @@ pub fn nav_move_exceeds(prev: u64, next: u64, max_nav_move_bps: u16) -> bool {
     moved * BPS_DENOMINATOR as u128 > max_nav_move_bps as u128 * prev as u128
 }
 
+/// The NAV per share the guard compares (ADR 0017): the published NAV of
+/// `net_assets − inflows` (saturating at 0), where `inflows` are the net
+/// verified inflows (`contribute_fees`, `sweep_income`) since the last
+/// `refresh`. Inflows are booked at the instruction that moved them, so they
+/// are not a price or accounting shock.
+pub fn guard_nav(net_assets: u64, inflows: u64, shares_outstanding: u64) -> Result<u64> {
+    published_nav(net_assets.saturating_sub(inflows), shares_outstanding)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn guard_nav_is_net_of_inflows() {
+        // 10,000 net assets, 500 of them a fee since the last refresh.
+        assert_eq!(guard_nav(10_000, 500, 9_500).unwrap(), 1_000_000_000);
+        assert_eq!(guard_nav(10_000, 0, 10_000).unwrap(), 1_000_000_000);
+        // Inflows above net assets (a claim paid after the inflow) saturate.
+        assert_eq!(guard_nav(100, 500, 1_000).unwrap(), 1);
+        assert_eq!(guard_nav(100, 500, 0).unwrap(), 0);
+    }
 
     #[test]
     fn strictly_more_than_the_bound_in_either_direction() {

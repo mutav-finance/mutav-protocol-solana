@@ -1,6 +1,7 @@
 /**
- * Read helpers: the reserve snapshot, guarantees, claim filings, payouts and
- * queue positions. Read-only RPC calls; nothing here signs or sends.
+ * Read helpers: the reserve snapshot, guarantees, claim filings, payouts,
+ * queue positions and issuer income (the inbox and its receipts). Read-only
+ * RPC calls; nothing here signs or sends.
  */
 import {
   getAddressEncoder,
@@ -21,6 +22,9 @@ import {
   fetchVaultState,
   CLAIM_FILING_DISCRIMINATOR,
   GUARANTEE_DISCRIMINATOR,
+  INCOME_RECEIPT_DISCRIMINATOR,
+  getIncomeReceiptDecoder,
+  type IncomeReceipt,
   PAYOUT_DISCRIMINATOR,
   getClaimFilingDecoder,
   getGuaranteeDecoder,
@@ -32,10 +36,17 @@ import {
   type VaultState,
 } from './generated/accounts';
 import { findGuaranteePda } from './generated/pdas/guarantee';
+import { findIncomeReceiptPda } from './generated/pdas/incomeReceipt';
 import { findStatePda } from './generated/pdas/state';
 import { MUTAV_PROGRAM_ADDRESS } from './generated/programs/mutav';
 import type { Solvency } from './math';
-import { findDepositRequestPda, findRedeemRequestPda, findReserveAddresses, type ReserveAddresses } from './pdas';
+import {
+  findDepositRequestPda,
+  findIncomeInboxAddress,
+  findRedeemRequestPda,
+  findReserveAddresses,
+  type ReserveAddresses,
+} from './pdas';
 import { solvencyFromAccounts } from './preview';
 
 export type ReadRpc = Rpc<GetAccountInfoApi & GetMultipleAccountsApi>;
@@ -185,3 +196,47 @@ export async function getDepositQueuePosition(rpc: ReadRpc, config: Address, seq
 }
 
 const stateOf = async (config: Address, o: ProgramOpt) => (await findStatePda({ config }, o))[0];
+
+/** SPL token account layout: `amount` is the `u64` at byte 64. */
+const TOKEN_AMOUNT_OFFSET = 64;
+
+/**
+ * The income inbox of a reserve (ADR 0017) and its untracked balance: what
+ * Nora has paid and the operator has not swept yet. `exists: false` before
+ * `initialize`. This balance never counts toward NAV.
+ */
+export async function fetchIncomeInbox(
+  rpc: ReadRpc,
+  r: { vaultAuthority: Address; reserveMint: Address; tokenProgram?: Address },
+): Promise<{ address: Address; exists: boolean; amount: bigint }> {
+  const address = await findIncomeInboxAddress(r);
+  const { value } = (await rpc.getAccountInfo(address, { encoding: 'base64' }).send()) as unknown as {
+    value: { data: [string, string] } | null;
+  };
+  if (!value) return { address, exists: false, amount: 0n };
+  const data = b64.encode(value.data[0]) as Uint8Array;
+  if (data.length < TOKEN_AMOUNT_OFFSET + 8) throw new RangeError(`${address} is not a token account`);
+  const amount = new DataView(data.buffer, data.byteOffset).getBigUint64(TOKEN_AMOUNT_OFFSET, true);
+  return { address, exists: true, amount };
+}
+
+/**
+ * Every `IncomeReceipt` of one reserve: one per swept issuer statement
+ * (ADR 0017), newest slot first. `IncomeReceipt` does not store its config,
+ * so each account is kept only if it is the PDA of `(config, income_ref_hash)`.
+ */
+export async function fetchIncomeReceiptsForReserve(rpc: ScanRpc, config: Address, o: ProgramOpt = {}) {
+  const all = await scan<IncomeReceipt>(
+    rpc,
+    INCOME_RECEIPT_DISCRIMINATOR,
+    (b) => getIncomeReceiptDecoder().decode(b),
+    null,
+    o,
+  );
+  const mine = await Promise.all(
+    all.map(
+      async (r) => (await findIncomeReceiptPda({ config, incomeRefHash: r.data.incomeRefHash }, o))[0] === r.address,
+    ),
+  );
+  return all.filter((_, i) => mine[i]).sort((a, b) => (a.data.slot < b.data.slot ? 1 : a.data.slot > b.data.slot ? -1 : 0));
+}

@@ -33,6 +33,7 @@ fn value_bytes(c: &VaultConfig, id: u16) -> [u8; 32] {
         PAUSED => c.paused.field_bytes(),
         FEATURE_FLAGS => c.feature_flags.field_bytes(),
         MUTAV_CAPITAL_WALLET => c.mutav_capital_wallet.field_bytes(),
+        INCOME_TAKE_BPS => c.income_take_bps.field_bytes(),
         CAPS_MAX_TVL => c.caps.max_tvl.field_bytes(),
         CAPS_MAX_COVER_PER_GUARANTEE => c.caps.max_cover_per_guarantee.field_bytes(),
         CAPS_MAX_COVER_PER_AGENCY => c.caps.max_cover_per_agency.field_bytes(),
@@ -186,6 +187,14 @@ fn change_field(f: &mut Fixture, id: u16) -> litesvm::types::TransactionMetadata
             args.feature_flags = 0;
             f.set_config(args)
         }
+        // `MAX_INCOME_TAKE_BPS` is 0 in this binary (ADR 0017, cap TBD), so
+        // the only value `set_config` accepts is 0: inject a take as a later
+        // binary could have set it, then clear it.
+        field::INCOME_TAKE_BPS => {
+            let mut args = set_config_args(&f.config());
+            args.income_take_bps = 0;
+            f.set_config(args)
+        }
         id => {
             let mut args = set_config_args(&f.config());
             assert!(
@@ -211,6 +220,11 @@ fn every_mutable_config_field_emits_config_updated() {
     for row in CONFIG_FIELDS {
         if row.id == field::FEATURE_FLAGS {
             inject_feature_flags(&mut f, INSTANT_EXIT);
+        }
+        if row.id == field::INCOME_TAKE_BPS {
+            let mut c = f.config();
+            c.income_take_bps = 500;
+            f.write_config(&c);
         }
         let before = f.config();
         // Every row maps to a value (catches a table entry with no field).

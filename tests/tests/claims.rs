@@ -548,8 +548,9 @@ proptest! {
     /// principle 4, §5.4 rule 7), and neither reads nor writes
     /// `buffer_earmark` (invariant 14): fuzz `stable_assets` far below
     /// `coverage_required`, the stored mode, a non-zero earmark with
-    /// `INSTANT_EXIT` set, a stale TESOURO position, other provisions and the
-    /// pause flag.
+    /// `INSTANT_EXIT` set, a stale TESOURO position, other provisions, the
+    /// pause flag, any coverage ratio in `[0.10, 2.0]` (ADR 0016) and issuer
+    /// income, partly swept and partly still in the inbox (ADR 0017).
     #[test]
     fn pay_claim_is_never_refused_for_solvency(
         cover in 1u64..=10_000,
@@ -563,6 +564,8 @@ proptest! {
         flag: bool,
         paused: bool,
         drain in 0u64..=100,
+        coverage_ratio_bps in MIN_COVERAGE_RATIO_BPS..=20_000,
+        income in 0u64..=10_000,
     ) {
         let cover = cover * BRL;
         let (mut f, g) = book(cover, cover, 0);
@@ -570,12 +573,22 @@ proptest! {
         let amount = (cover * pay_frac / 100).max(1);
         let c = Claim::on(&g, filed);
         f.file_claim(c).unwrap();
+        // Issuer income: half swept into the reserve, the rest left in the
+        // inbox, where `pay_claim` never reaches.
+        let income = income * BRL;
+        f.pay_income(income);
+        if income / 2 > 0 {
+            f.sweep(income / 2).0.unwrap();
+        }
+        let inbox = f.balance(&f.income_inbox());
         if paused {
             let pauser = f.pauser.insecure_clone();
             f.send(f.pause_ix(&pauser.pubkey()), &pauser).unwrap();
         }
         let mut cfg = f.config();
         cfg.feature_flags = if flag { INSTANT_EXIT } else { 0 };
+        // Any c the program accepts, below and above 1.0 (ADR 0016).
+        cfg.coverage_ratio_bps = coverage_ratio_bps;
         f.write_config(&cfg);
         let mut s = f.state();
         s.mode = if under_covered { MODE_UNDER_COVERED } else { MODE_NORMAL };
@@ -594,6 +607,7 @@ proptest! {
         prop_assert_eq!(after.mode, s.mode);
         prop_assert_eq!(after.brs_balance, s.brs_balance - amount);
         prop_assert_eq!(after.provisions, s.provisions - filed);
+        prop_assert_eq!(f.balance(&f.income_inbox()), inbox);
     }
 }
 

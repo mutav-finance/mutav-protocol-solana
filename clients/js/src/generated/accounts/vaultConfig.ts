@@ -124,6 +124,12 @@ export type VaultConfig = {
   mutavCapitalWallet: Address;
   /** Phase-2 instant-exit parameters. All zero in the pilot. */
   exit: ExitParams;
+  /**
+   * MUTAV's take from issuer income swept by `sweep_income`,
+   * `<= MAX_INCOME_TAKE_BPS`. `0` in the pilot: all income builds the
+   * reserve.
+   */
+  incomeTakeBps: number;
   /** Zeroed. Never read or written by logic. */
   reserved: ReadonlyUint8Array;
 };
@@ -176,6 +182,12 @@ export type VaultConfigArgs = {
   mutavCapitalWallet: Address;
   /** Phase-2 instant-exit parameters. All zero in the pilot. */
   exit: ExitParamsArgs;
+  /**
+   * MUTAV's take from issuer income swept by `sweep_income`,
+   * `<= MAX_INCOME_TAKE_BPS`. `0` in the pilot: all income builds the
+   * reserve.
+   */
+  incomeTakeBps: number;
   /** Zeroed. Never read or written by logic. */
   reserved: ReadonlyUint8Array;
 };
@@ -208,7 +220,8 @@ export function getVaultConfigEncoder(): FixedSizeEncoder<VaultConfigArgs> {
       ["featureFlags", getU64Encoder()],
       ["mutavCapitalWallet", getAddressEncoder()],
       ["exit", getExitParamsEncoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 512)],
+      ["incomeTakeBps", getU16Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 510)],
     ]),
     (value) => ({ ...value, discriminator: VAULT_CONFIG_DISCRIMINATOR }),
   );
@@ -241,7 +254,8 @@ export function getVaultConfigDecoder(): FixedSizeDecoder<VaultConfig> {
     ["featureFlags", getU64Decoder()],
     ["mutavCapitalWallet", getAddressDecoder()],
     ["exit", getExitParamsDecoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 512)],
+    ["incomeTakeBps", getU16Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 510)],
   ]);
 }
 

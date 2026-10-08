@@ -3,8 +3,8 @@
 //! The mint guard is adapted from `solana-foundation/vault`
 //! (`programs/async_vault/src/utils.rs`, `validate_asset_mint_extensions_from_acct_info`,
 //! commit c359962), MIT License, Copyright (c) 2026 Solana Foundation. See `NOTICE`.
-//! Changes: rejects every extension listed in spec §5.1 (PC-19), and a transfer
-//! fee in either the older or the newer epoch configuration.
+//! Changes: rejects every extension listed in spec §5.1 (PC-19, ADR 0017), and
+//! a transfer fee in either the older or the newer epoch configuration.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::spl_token_2022::{
@@ -18,8 +18,13 @@ use anchor_spl::token_2022::spl_token_2022::{
 use crate::errors::MutavError;
 
 /// Rejects a Token-2022 reserve mint with `PermanentDelegate`, `TransferHook`,
-/// a non-zero `TransferFee`, `NonTransferable` or `DefaultAccountState = Frozen`
-/// (spec §5.1, PC-19). Classic SPL Token mints pass.
+/// a non-zero `TransferFee`, `NonTransferable`, `DefaultAccountState = Frozen`
+/// (spec §5.1, PC-19), `ScaledUiAmount`, `InterestBearingConfig` or `Pausable`
+/// (ADR 0017). Classic SPL Token mints pass.
+///
+/// The last three change what a balance means, or whether it can move,
+/// without changing the raw `u64` amounts the program tracks: yield paid as a
+/// balance multiplier would never reach NAV and would break valuation at par.
 pub fn check_reserve_mint(mint: &AccountInfo) -> Result<()> {
     if *mint.owner != anchor_spl::token_2022::ID {
         return Ok(());
@@ -30,7 +35,10 @@ pub fn check_reserve_mint(mint: &AccountInfo) -> Result<()> {
         match ext {
             ExtensionType::PermanentDelegate
             | ExtensionType::TransferHook
-            | ExtensionType::NonTransferable => {
+            | ExtensionType::NonTransferable
+            | ExtensionType::ScaledUiAmount
+            | ExtensionType::InterestBearingConfig
+            | ExtensionType::Pausable => {
                 return err!(MutavError::UnsupportedMintExtension);
             }
             ExtensionType::TransferFeeConfig => {

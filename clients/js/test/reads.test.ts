@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import { address, type Address } from '@solana/kit';
 import {
+  fetchIncomeInbox,
+  fetchIncomeReceiptsForReserve,
+  findIncomeInboxAddress,
+  findIncomeReceiptPda,
+  getIncomeReceiptEncoder,
+  getIncomeReceiptDecoder,
+  getIncomeReceiptSize,
+  INCOME_RECEIPT_DISCRIMINATOR,
+  TOKEN_PROGRAM_ADDRESS,
   fetchGuaranteesForReserve,
   fetchPayoutsForGuarantee,
   fetchReserve,
@@ -168,5 +177,50 @@ describe('queue positions', () => {
     }
     const p = await getDepositQueuePosition(rpc as never, a.config, 2n);
     expect(p).toEqual({ seq: 2n, head: 1n, isHead: false, requestsAhead: 1, amountAhead: 700n, open: true });
+  });
+});
+
+describe('issuer income (ADR 0017)', () => {
+  test('reads the inbox balance, and reports a missing inbox', async () => {
+    const { rpc, a } = await setup();
+    const r = { vaultAuthority: a.vaultAuthority, reserveMint: MINT };
+    expect(await fetchIncomeInbox(rpc as never, r)).toEqual({
+      address: await findIncomeInboxAddress(r),
+      exists: false,
+      amount: 0n,
+    });
+    // An SPL token account (165 bytes) holding 1,234.5 BRS.
+    const acc = new Uint8Array(165);
+    new DataView(acc.buffer).setBigUint64(64, 1_234_500_000n, true);
+    rpc.set(await findIncomeInboxAddress(r), acc, TOKEN_PROGRAM_ADDRESS);
+    const inbox = await fetchIncomeInbox(rpc as never, r);
+    expect(inbox.exists).toBe(true);
+    expect(inbox.amount).toBe(1_234_500_000n);
+  });
+
+  test('lists only this reserve’s income receipts, newest first', async () => {
+    const { rpc, a } = await setup();
+    const mk = (fill: number, slot: bigint) => ({
+      ...blank(getIncomeReceiptSize(), INCOME_RECEIPT_DISCRIMINATOR as Uint8Array, (b) =>
+        getIncomeReceiptDecoder().decode(b),
+      ),
+      version: 1,
+      incomeRefHash: new Uint8Array(32).fill(fill),
+      period: 202_610,
+      gross: 1_000n,
+      net: 1_000n,
+      slot,
+    });
+    const [r1] = await findIncomeReceiptPda({ config: a.config, incomeRefHash: new Uint8Array(32).fill(1) });
+    const [r2] = await findIncomeReceiptPda({ config: a.config, incomeRefHash: new Uint8Array(32).fill(2) });
+    rpc.set(r1, getIncomeReceiptEncoder().encode(mk(1, 5n)) as Uint8Array);
+    rpc.set(r2, getIncomeReceiptEncoder().encode(mk(2, 9n)) as Uint8Array);
+    const other = await findReserveAddresses(address('11111111111111111111111111111112'));
+    const [r3] = await findIncomeReceiptPda({ config: other.config, incomeRefHash: new Uint8Array(32).fill(3) });
+    rpc.set(r3, getIncomeReceiptEncoder().encode(mk(3, 7n)) as Uint8Array);
+
+    const rs = await fetchIncomeReceiptsForReserve(rpc as never, a.config);
+    expect(rs.map((r) => r.address)).toEqual([r2, r1]);
+    expect(rs[0]!.data.period).toBe(202_610);
   });
 });

@@ -68,7 +68,9 @@ fn initialize_creates_the_reserve() {
         .adapters
         .iter()
         .all(|a| a.program_id == Pubkey::default() && !a.enabled && a._reserved == [0; 64]));
-    assert_eq!(c._reserved, [0; 512]);
+    // ADR 0017: no take from issuer income at launch.
+    assert_eq!(c.income_take_bps, 0);
+    assert_eq!(c._reserved, [0; 510]);
 
     // VaultState: empty.
     let acc = f.svm.get_account(&p.state).unwrap();
@@ -83,7 +85,11 @@ fn initialize_creates_the_reserve() {
     assert_eq!(s.pending_notices, 0);
     assert_eq!(s.next_redeem_seq, 0);
     assert!(!s.fulfil_halted);
-    assert_eq!(s._reserved, [0; 256]);
+    assert_eq!(
+        (s.income_total, s.income_take_total, s.inflows_since_refresh),
+        (0, 0, 0)
+    );
+    assert_eq!(s._reserved, [0; 232]);
 
     // Share mint: 6 dp, mint and freeze authority = vault authority, no supply.
     let m = mint_at(&f, &p.share_mint);
@@ -108,6 +114,15 @@ fn initialize_creates_the_reserve() {
         assert_eq!(t.mint, mint);
         assert_eq!(t.amount, 0);
     }
+    // The income inbox (ADR 0017): the vault authority's associated token
+    // account for BRS, empty, and not one of the reserve's PDA accounts.
+    let inbox = f.income_inbox();
+    let t = token_at(&f, &inbox);
+    assert_eq!(
+        (t.owner, t.mint, t.amount),
+        (p.authority, f.reserve_mint, 0)
+    );
+    assert_ne!(inbox, p.reserve);
     // The vault authority holds no data.
     assert!(f
         .svm
@@ -171,6 +186,24 @@ fn fee_take_bounded_by_program_max() {
 }
 
 #[test]
+fn coverage_ratio_bounded_by_program_min() {
+    // ADR 0016: c ≥ 0.10, so 999 is refused and 1_000 is the floor.
+    assert_eq!(MIN_COVERAGE_RATIO_BPS, 1_000);
+    let mut f = Fixture::uninitialized();
+    let mut args = f.init_args();
+    args.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1;
+    assert_mutav_err(f.initialize(args), MutavError::InvalidParameter);
+
+    for c in [MIN_COVERAGE_RATIO_BPS, 5_000] {
+        let mut f = Fixture::uninitialized();
+        let mut args = f.init_args();
+        args.coverage_ratio_bps = c;
+        f.initialize(args).expect("c at or above the floor");
+        assert_eq!(f.config().coverage_ratio_bps, c);
+    }
+}
+
+#[test]
 fn roles_must_be_distinct_and_set() {
     let mut f = Fixture::uninitialized();
     let base = f.init_args();
@@ -203,8 +236,9 @@ fn params_out_of_program_bounds_rejected() {
     let mut f = Fixture::uninitialized();
     let base = f.init_args();
     let cases: Vec<Box<dyn Fn(&mut mutav::InitializeArgs)>> = vec![
-        // Coverage ratio below 1.0 (floor TBD, fails closed).
-        Box::new(|a| a.coverage_ratio_bps = 9_999),
+        // Coverage ratio below the 0.10 floor (ADR 0016).
+        Box::new(|a| a.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1),
+        Box::new(|a| a.coverage_ratio_bps = 0),
         Box::new(|a| a.caps.max_tesouro_share_bps = 10_001),
         Box::new(|a| a.price.max_deviation_bps = 10_001),
         Box::new(|a| a.price.max_nav_move_bps = 10_001),

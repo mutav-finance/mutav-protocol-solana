@@ -129,7 +129,7 @@ export function parseConfig(raw: any): DeployConfig {
 
   // Program bounds (validate_params, validate_roles).
   if (c.feeTakeBps > 3_000) throw new Error('feeTakeBps must be <= 3000 (program maximum, 30%)');
-  if (c.coverageRatioBps < 10_000) throw new Error('coverageRatioBps must be >= 10000 until spec §12 Q17 sets a floor');
+  if (c.coverageRatioBps < 1_000) throw new Error('coverageRatioBps must be >= 1000 (program minimum, c = 0.10; ADR 0016)');
   if (c.caps.minRequest > c.caps.maxRequest) throw new Error('caps.minRequest must be <= caps.maxRequest');
   if (c.caps.claimPeriodSecs <= 0n) throw new Error('caps.claimPeriodSecs must be > 0');
   if (c.payoutSlaSecs < 0n || c.price.maxStalenessSecs < 0n) throw new Error('durations must be >= 0');

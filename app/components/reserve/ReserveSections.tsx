@@ -5,6 +5,7 @@
  * nothing is computed here beyond sums and differences of account fields.
  */
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { MetricCard } from "@/components/MetricCard";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
@@ -73,8 +74,8 @@ export function Health({ r }: { r: ReserveView }) {
         <NavBasisChart s={sol} navNow={fmtNav(navNow)} />
       </div>
       <div className="grid-metrics">
-        <MetricCard label="Stable assets" value={fmtBrs(sol.stableAssets)} unit="BRS held by the reserve (brs_balance + TESOURO value)" tooltip="Internal accounting of the reserve token account. Excludes pending deposits and assets owed to filled redemptions." />
-        <MetricCard label="Coverage required" value={fmtBrs(sol.coverageRequired)} unit={`${fmtBps(r.config.coverageRatioBps)} of remaining cover`} tooltip="ceil(coverage ratio × remaining cover of every active guarantee)." />
+        <MetricCard label="Stable assets" value={fmtBrs(sol.stableAssets)} unit="BRS held by the reserve (brs_balance; BRS only in the pilot)" tooltip="Internal accounting of the reserve token account. Excludes pending deposits and assets owed to filled redemptions." />
+        <MetricCard label="Coverage required" value={fmtBrs(sol.coverageRequired)} unit={`${fmtBps(r.config.coverageRatioBps)} of remaining cover`} tooltip="The coverage ratio c is the share of remaining cover the reserve must hold in stable assets (at least 10%): coverage required is ceil(c × remaining cover of every active guarantee), and never less than the open claim provisions." />
         <MetricCard label="Surplus" value={fmtBrs(sol.surplus)} unit="stable assets − coverage required" />
         <MetricCard label="Free capital" value={fmtBrs(sol.freeCapital)} unit="what new guarantees and redemptions may use" tooltip="Surplus minus the instant-exit earmark, which is always zero in the pilot." />
         <MetricCard label="NAV per share" value={fmtNav(s.navPerShare)} unit={`published at last refresh · now ${fmtNav(navNow)}`} tooltip="Net assets (stable assets − open claim provisions) ÷ shares outstanding. The published value updates on refresh; 'now' recomputes it from the current accounts." />
@@ -82,6 +83,10 @@ export function Health({ r }: { r: ReserveView }) {
         <MetricCard label="Open provisions" value={fmtBrs(s.provisions)} unit="filed, unpaid claims (lower NAV now)" />
         <MetricCard label="Active guarantees" value={String(s.activeGuarantees)} unit={`${fmtBrs(s.remainingCoverTotal)} remaining cover`} />
       </div>
+      <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-3)", margin: 0 }}>
+        Assets: BRS {fmtBrs(s.brsBalance, 0)}{sol.tesouroValue > 0n ? <> · through adapters {fmtBrs(sol.tesouroValue, 0)}</> : " (100% BRS, pilot)"} · income inbox {fmtBrs(r.incomeInbox.amount, 0)}, not yet counted. The reserve holds BRS, expandable through adapters.{" "}
+        <Link href="/admin#allocation" className="ext-link">How assets are managed and added →</Link>
+      </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
         <StatusBadge bordered color={underCovered ? "var(--color-error)" : "var(--color-success)"} label={`MODE ${MODE_LABEL(s.mode).toUpperCase()}`} ariaLabel={`Mode: ${MODE_LABEL(s.mode)}`} />
         <StatusBadge bordered color={s.fulfilHalted ? "var(--color-error)" : "var(--color-text-3)"} label={s.fulfilHalted ? "FULFIL HALTED" : "FULFIL OPEN"} />
@@ -191,7 +196,7 @@ export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
 
 // ── Money flows ─────────────────────────────────────────────────────────────
 
-const FLOW_LABEL = { fee: "Guarantee fee", claim: "Claim payment", deposit: "Deposit", redemption: "Redemption" } as const;
+const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit", redemption: "Redemption" } as const;
 
 export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
   const { totals, rows } = moneyFlows(r.state, l);
@@ -200,6 +205,8 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
       <div className="grid-metrics">
         <MetricCard dense label="Guarantee fees → reserve" value={fmtBrs(totals.feesNetToReserve)} unit="net, raises NAV for every holder" />
         <MetricCard dense label="Fee take → treasury" value={fmtBrs(totals.feeTakeToTreasury)} unit={`MUTAV operation · ${fmtBps(r.config.feeTakeBps)} of each fee`} />
+        <MetricCard dense label="Issuer income → reserve" value={fmtBrs(totals.incomeNetToReserve)} unit="Nora partnership revenue, swept per statement" />
+        <MetricCard dense label="Income inbox, not swept" value={fmtBrs(r.incomeInbox.amount)} unit="paid by Nora; outside NAV until swept" />
         <MetricCard dense label="Claim payments out" value={fmtBrs(totals.claimsPaid)} unit="to the payments account" />
         <MetricCard dense label="Deposits in" value={fmtBrs(totals.depositsIn)} unit="fulfilled requests" />
         <MetricCard dense label="Redemptions out" value={fmtBrs(totals.redemptionsOut)} unit="filled requests" />
@@ -288,7 +295,7 @@ export function Disclosures({ r }: { r: ReserveView }) {
       {item(
         "BRS is issued by Nora, and Nora can freeze it",
         <>
-          The reserve holds BRS (mint <Explorer value={r.token.mint} />). Its freeze authority is{" "}
+          The pilot reserve holds BRS only (mint <Explorer value={r.token.mint} />); more assets can be added later through capped adapters. Its freeze authority is{" "}
           {r.token.freezeAuthority ? <Explorer value={r.token.freezeAuthority} /> : <Mono>none</Mono>}
           {r.cluster === "localnet" ? " (on localnet, a test mint created by the seed script)" : ", a single Nora wallet"}. A freeze of the reserve token account
           stops every outflow, claim payments included, until it is thawed; <Mono>refresh</Mono> detects it and frozen balances stop counting as stable assets.
@@ -312,7 +319,7 @@ export function Disclosures({ r }: { r: ReserveView }) {
       )}
       {item(
         "Built later",
-        <>Partial redemption fills at the queue head, on-chain claim notices, and reserve allocation through adapters (TESOURO) are designed but not part of this pilot binary.</>,
+        <>Partial redemption fills at the queue head, on-chain claim notices, and more reserve assets through capped adapters (TESOURO is the first candidate, pending an Etherfuse BRS path) are designed but not part of this pilot binary.</>,
       )}
     </ul>
   );
@@ -333,6 +340,7 @@ export function Accounts({ r }: { r: ReserveView }) {
     ["Claims (filled redemptions)", r.addresses.claims, P],
     ["Share mint", r.addresses.shareMint, P],
     ["BRS mint", r.config.reserveMint, { role: null, note: "issued by Nora" }],
+    ["Income inbox (issuer income)", r.incomeInbox.address, ACCOUNT_ROLES.incomeInbox],
     ["Treasury account (fee take)", r.config.treasuryAccount, ACCOUNT_ROLES.treasury],
     ["Payments account (claim payments)", r.config.paymentsAccount, ACCOUNT_ROLES.payments],
     ["Admin (Squads vault)", r.config.admin, ACCOUNT_ROLES.admin],

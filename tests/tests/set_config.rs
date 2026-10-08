@@ -62,8 +62,19 @@ fn same_bounds_as_initialize() {
     a.fee_take_bps = 0;
     f.set_config(a).expect("0 bps allowed");
 
+    let mut a = base.clone();
+    a.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1;
+    assert_mutav_err(f.set_config(a), MutavError::InvalidParameter);
+    for c in [MIN_COVERAGE_RATIO_BPS, 5_000] {
+        let mut a = base.clone();
+        a.coverage_ratio_bps = c;
+        f.set_config(a).expect("c at or above the 0.10 floor");
+        assert_eq!(f.config().coverage_ratio_bps, c);
+    }
+
     let cases: Vec<Box<dyn Fn(&mut mutav::SetConfigArgs)>> = vec![
-        Box::new(|a| a.coverage_ratio_bps = 9_999),
+        Box::new(|a| a.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1),
+        Box::new(|a| a.coverage_ratio_bps = 0),
         Box::new(|a| a.caps.max_tesouro_share_bps = 10_001),
         Box::new(|a| a.price.max_deviation_bps = 10_001),
         Box::new(|a| a.price.max_nav_move_bps = 10_001),

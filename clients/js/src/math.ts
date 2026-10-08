@@ -17,6 +17,14 @@ const I64_MAX = (1n << 63n) - 1n;
 
 /** Basis-point denominator (`10_000` = 100%). */
 export const BPS_DENOMINATOR = 10_000n;
+/** Program minimum for `coverage_ratio_bps`: c ≥ 0.10 (ADR 0016). */
+export const MIN_COVERAGE_RATIO_BPS = 1_000;
+/**
+ * Program cap on `income_take_bps` (ADR 0017). Its value is TBD (spec §12
+ * Q47), so the program fails closed at 0: all issuer income builds the
+ * reserve.
+ */
+export const MAX_INCOME_TAKE_BPS = 0;
 /** Scale of TESOURO prices: BRS base units per TESOURO base unit × 10^9. */
 export const PRICE_SCALE = 1_000_000_000n;
 /** Scale of NAV per share: `NAV_SCALE` is NAV 1.0. */
@@ -123,9 +131,20 @@ export function stableAssets(brsBalance: bigint, tesouroValue: bigint): bigint {
   return toU64(u64(brsBalance) + u64(tesouroValue));
 }
 
-/** `ceil(c × remaining_cover_total / 10_000)`. */
-export const coverageRequired = (remainingCoverTotal: bigint, coverageRatioBps: number | bigint) =>
-  mulDiv(remainingCoverTotal, BigInt(coverageRatioBps), BPS_DENOMINATOR, 'up');
+/**
+ * `max(ceil(c × remaining_cover_total / 10_000), provisions)` (ADR 0016).
+ * Filed claims stay fully covered when `c < 1`; at `c ≥ 1` the provisions
+ * term never binds.
+ */
+export function coverageRequired(
+  remainingCoverTotal: bigint,
+  coverageRatioBps: number | bigint,
+  provisions: bigint,
+): bigint {
+  const byRatio = mulDiv(remainingCoverTotal, BigInt(coverageRatioBps), BPS_DENOMINATOR, 'up');
+  const p = u64(provisions, 'provisions');
+  return byRatio > p ? byRatio : p;
+}
 
 /** `max(0, stable_assets − coverage_required)`. */
 export const surplus = (stableAssets: bigint, coverageRequired: bigint) =>
@@ -208,7 +227,7 @@ export type Solvency = {
 export function computeSolvency(i: SolvencyInputs): Solvency {
   const tv = tesouroValue(i.tesouroUnits, i.tesouroPrice);
   const stable = stableAssets(i.brsBalance, tv);
-  const required = coverageRequired(i.remainingCoverTotal, i.coverageRatioBps);
+  const required = coverageRequired(i.remainingCoverTotal, i.coverageRatioBps, i.provisions);
   const sur = surplus(stable, required);
   const earmark = earmarkEff({
     featureFlags: i.featureFlags,
@@ -232,4 +251,19 @@ export function computeSolvency(i: SolvencyInputs): Solvency {
     underCovered,
     deficit: satSub(required, stable),
   };
+}
+
+/**
+ * The split `sweep_income` (and `contribute_fees`) applies: `take =
+ * floor(amount × takeBps / 10_000)` to the treasury, `net = amount − take`
+ * into the reserve, rounded in the reserve's favour (ADR 0017).
+ */
+export function takeSplit(amount: bigint, takeBps: number): { take: bigint; net: bigint } {
+  const take = mulDiv(amount, BigInt(takeBps), BPS_DENOMINATOR, 'down');
+  return { take, net: amount - take };
+}
+
+/** `true` for a well-formed `YYYYMM` statement month, as `sweep_income` checks. */
+export function isValidIncomePeriod(period: number): boolean {
+  return Number.isInteger(period) && period >= 200_001 && period <= 999_912 && period % 100 >= 1 && period % 100 <= 12;
 }

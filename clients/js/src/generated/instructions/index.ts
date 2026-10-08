@@ -30,4 +30,5 @@ export * from "./setConfig";
 export * from "./setPaymentsAccount";
 export * from "./setRoles";
 export * from "./settlePayout";
+export * from "./sweepIncome";
 export * from "./unpause";
