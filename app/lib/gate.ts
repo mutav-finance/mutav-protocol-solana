@@ -86,7 +86,7 @@ export function previewRegisterGuarantee(config: ConfigView, state: StateView, g
 export const REFUSAL_TEXT: Record<GateRefusal, string> = {
   Paused: "The reserve is paused.",
   UnderCovered: "The reserve is under-covered: new guarantees are frozen until coverage is restored.",
-  StalePrice: "The reserve holds TESOURO and its price is stale.",
+  StalePrice: "The reserve holds an adapter asset (TESOURO) and its price is stale.",
   InvalidParameter: "Rent and cover must both be above zero.",
   GuaranteeCapExceeded: "The cover is above the per-guarantee cap.",
   AgencyCapExceeded: "This agency would go over its per-agency cap.",

@@ -85,12 +85,17 @@ Also usable outside the script: a free-form operator panel for each operator ins
 
 ### `/admin` Admin console
 
-For Squads members.
+For Squads members. A sticky in-page nav (General controls · Money in & out · Allocation) over three sections; every parameter lives with the thing it governs, and each control lives in exactly one place. Every admin change is a **Squads vault-transaction proposal** that members approve and execute from their wallets; `set_config` controls write only their own fields and carry the rest over from on-chain. If the configured admin is not a Squads vault (localnet only), direct signing is allowed, clearly labelled.
 
-- Shows `VaultConfig`: roles, caps, price params, take rate, feature flags, the treasury and payments accounts, the allowlist root.
-- Actions, each built as a **Squads vault-transaction proposal** that members approve and execute from their wallets: `fulfil_deposits`, `fulfil_redeems`, `pause` / `unpause`, `clear_fulfil_halt`, `set_config` (caps), `set_allowlist_root` (with the client's Merkle builder).
-- Proposal list with status (pending, approved, executable, executed) and the time-lock countdown.
-- If the configured admin is not a Squads vault (localnet only), allow direct signing, clearly labelled.
+- **General controls** (`#general`), the cross-cutting settings:
+  - **Emergency** strip: paused, fulfil halted, operator active or revoked; `pause` and `revoke_operator` (pauser key or admin, signed directly, no time lock), `unpause` and `clear_fulfil_halt` (Reserve Admin, through Squads).
+  - **Roles & multisig:** the Squads status, time lock and proposal list, with the create → approve → execute flow explained once; the roles; `set_roles`.
+  - **Coverage & reserve limits:** coverage ratio c, `max_tvl`, `max_cover_per_guarantee`, `max_cover_per_agency`; one `set_config`.
+  - **Allowlist & accounts:** allowlist root, treasury, payments, mints; `set_allowlist_root` (client Merkle builder), `set_payments_account`.
+- **Money in & out** (`#money`): each flow with its settings. Operator and Investor steps are one-line context rows (role tag, live total, link to `/operator`, `/investor` or `/reserve`); charts stay on `/reserve`.
+  - In: **deposits** (`fulfil_deposits`; `min_request`, `max_request`), **guarantee fees** (`fee_take_bps`), **BRS issuer income** (Nora → inbox → `sweep_income`; inbox balance, swept total, last statements; `income_take_bps`, fail-closed cap 0 until spec §12 Q47).
+  - Out: **redemptions** (`fulfil_redeems`, gated by free capital; `min_fill_assets`), **claim payments** (`max_claim_per_call`, `max_claim_per_period`, `claim_period_secs`, `payout_sla_secs`; `pay_claim_admin` shown as planned).
+- **Allocation** (`#allocation`, alias `#reserve-assets`): "BRS today, more assets through adapters" (ADR 0018). Composition shows BRS plus the income inbox kept apart, "100% BRS (pilot)", with the settlement floor as a marker ("Min in BRS (settlement token): 100%"). **Expand with adapters** explains how a new asset is added (upgrade with the adapter instructions; whitelist an adapter with its cap, share limit and own price feed; lower the settlement floor; allocate and deallocate within the gates), lists TESOURO as the first candidate with its blocker (no Etherfuse BRS path), and shows the per-adapter table (`VaultConfig.adapters`: cap, share limit, price feed, allocated) and the planned instructions. Controls: "Min held in the settlement token" (`min_settlement_bps`; composed as `max_tesouro_share_bps = 10_000 − V` until the rename, `TODO(rename)`), and the per-adapter price feed shown as planned.
 
 ## Seed scenario
 

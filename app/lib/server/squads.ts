@@ -15,8 +15,9 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { AccountRole, type Address, type Instruction } from "@solana/kit";
-import { identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
+import { identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, type VaultConfig } from "@mutav-finance/mutav-protocol-solana";
 import type { ServerEnv } from "./env";
+import { setConfigChanges, type ConfigChange } from "../config-diff";
 
 export type ProposalStatus = "None" | "Draft" | "Active" | "Rejected" | "Approved" | "Executing" | "Executed" | "Cancelled";
 
@@ -35,6 +36,8 @@ export type ProposalView = {
   executableAt: bigint | null;
   /** MUTAV instructions inside the vault transaction, by name. */
   instructions: string[];
+  /** For a set_config inside: the fields it changes against on-chain config now, so approvers see the diff. */
+  changes?: ConfigChange[];
 };
 
 export type MultisigView = {
@@ -60,6 +63,24 @@ const MUTAV_NAMES = Object.fromEntries(
   Object.entries(MutavInstruction).filter(([, v]) => typeof v === "number").map(([k, v]) => [v as number, k]),
 ) as Record<number, string>;
 
+/** The set_config inside a vault transaction, as a diff against `config`. */
+function setConfigDiff(tx: multisig.generated.VaultTransaction, programId: string, config: VaultConfig): ConfigChange[] | undefined {
+  const keys = tx.message.accountKeys.map((k) => k.toBase58());
+  for (const ix of tx.message.instructions) {
+    if (keys[ix.programIdIndex] !== programId) continue;
+    const data = new Uint8Array(ix.data);
+    try {
+      if (identifyMutavInstruction(data) !== MutavInstruction.SetConfig) continue;
+      // SetConfig accounts: admin, config, treasury_account, payments_account, …
+      const treasuryIdx = ix.accountIndexes[2];
+      return setConfigChanges(data, config, treasuryIdx === undefined ? undefined : keys[treasuryIdx]);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 function instructionNames(tx: multisig.generated.VaultTransaction, programId: string): string[] {
   const keys = tx.message.accountKeys.map((k) => k.toBase58());
   return tx.message.instructions.map((ix) => {
@@ -76,7 +97,7 @@ function instructionNames(tx: multisig.generated.VaultTransaction, programId: st
 const statusAt = (s: multisig.generated.ProposalStatus): bigint | null =>
   "timestamp" in s && s.timestamp !== undefined ? BigInt(s.timestamp.toString()) : null;
 
-export async function readMultisig(env: ServerEnv, now: bigint, depth = 10): Promise<MultisigView> {
+export async function readMultisig(env: ServerEnv, now: bigint, depth = 10, config?: VaultConfig): Promise<MultisigView> {
   if (!env.squadsMultisig) throw new Error("SQUADS_MULTISIG is not set");
   const c = conn(env);
   const msPda = pk(env.squadsMultisig);
@@ -89,10 +110,12 @@ export async function readMultisig(env: ServerEnv, now: bigint, depth = 10): Pro
     const [propPda] = multisig.getProposalPda({ multisigPda: msPda, transactionIndex: i });
     const [txInfo, propInfo] = await c.getMultipleAccountsInfo([txPda, propPda]);
     let names: string[] = [];
+    let changes: ConfigChange[] | undefined;
     if (txInfo) {
       try {
         const [vt] = multisig.accounts.VaultTransaction.fromAccountInfo(txInfo);
         names = instructionNames(vt, env.programId);
+        if (config) changes = setConfigDiff(vt, env.programId, config);
       } catch {
         names = ["(not a vault transaction)"];
       }
@@ -118,7 +141,7 @@ export async function readMultisig(env: ServerEnv, now: bigint, depth = 10): Pro
         executableAt,
       };
     }
-    proposals.push({ index: i, transaction: txPda.toBase58(), proposal: propPda.toBase58(), instructions: names, ...view });
+    proposals.push({ index: i, transaction: txPda.toBase58(), proposal: propPda.toBase58(), instructions: names, ...(changes ? { changes } : {}), ...view });
   }
   return {
     address: env.squadsMultisig,

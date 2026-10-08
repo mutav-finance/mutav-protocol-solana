@@ -5,6 +5,7 @@
  * nothing is computed here beyond sums and differences of account fields.
  */
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { MetricCard } from "@/components/MetricCard";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
@@ -73,7 +74,7 @@ export function Health({ r }: { r: ReserveView }) {
         <NavBasisChart s={sol} navNow={fmtNav(navNow)} />
       </div>
       <div className="grid-metrics">
-        <MetricCard label="Stable assets" value={fmtBrs(sol.stableAssets)} unit="BRS held by the reserve (brs_balance + TESOURO value)" tooltip="Internal accounting of the reserve token account. Excludes pending deposits and assets owed to filled redemptions." />
+        <MetricCard label="Stable assets" value={fmtBrs(sol.stableAssets)} unit="BRS held by the reserve (brs_balance; BRS only in the pilot)" tooltip="Internal accounting of the reserve token account. Excludes pending deposits and assets owed to filled redemptions." />
         <MetricCard label="Coverage required" value={fmtBrs(sol.coverageRequired)} unit={`${fmtBps(r.config.coverageRatioBps)} of remaining cover`} tooltip="The coverage ratio c is the share of remaining cover the reserve must hold in stable assets (at least 10%): coverage required is ceil(c × remaining cover of every active guarantee), and never less than the open claim provisions." />
         <MetricCard label="Surplus" value={fmtBrs(sol.surplus)} unit="stable assets − coverage required" />
         <MetricCard label="Free capital" value={fmtBrs(sol.freeCapital)} unit="what new guarantees and redemptions may use" tooltip="Surplus minus the instant-exit earmark, which is always zero in the pilot." />
@@ -82,6 +83,10 @@ export function Health({ r }: { r: ReserveView }) {
         <MetricCard label="Open provisions" value={fmtBrs(s.provisions)} unit="filed, unpaid claims (lower NAV now)" />
         <MetricCard label="Active guarantees" value={String(s.activeGuarantees)} unit={`${fmtBrs(s.remainingCoverTotal)} remaining cover`} />
       </div>
+      <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-3)", margin: 0 }}>
+        Assets: BRS {fmtBrs(s.brsBalance, 0)}{sol.tesouroValue > 0n ? <> · through adapters {fmtBrs(sol.tesouroValue, 0)}</> : " (100% BRS, pilot)"} · income inbox {fmtBrs(r.incomeInbox.amount, 0)}, not yet counted. The reserve holds BRS, expandable through adapters.{" "}
+        <Link href="/admin#allocation" className="ext-link">How assets are managed and added →</Link>
+      </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
         <StatusBadge bordered color={underCovered ? "var(--color-error)" : "var(--color-success)"} label={`MODE ${MODE_LABEL(s.mode).toUpperCase()}`} ariaLabel={`Mode: ${MODE_LABEL(s.mode)}`} />
         <StatusBadge bordered color={s.fulfilHalted ? "var(--color-error)" : "var(--color-text-3)"} label={s.fulfilHalted ? "FULFIL HALTED" : "FULFIL OPEN"} />
@@ -290,7 +295,7 @@ export function Disclosures({ r }: { r: ReserveView }) {
       {item(
         "BRS is issued by Nora, and Nora can freeze it",
         <>
-          The reserve holds BRS (mint <Explorer value={r.token.mint} />). Its freeze authority is{" "}
+          The pilot reserve holds BRS only (mint <Explorer value={r.token.mint} />); more assets can be added later through capped adapters. Its freeze authority is{" "}
           {r.token.freezeAuthority ? <Explorer value={r.token.freezeAuthority} /> : <Mono>none</Mono>}
           {r.cluster === "localnet" ? " (on localnet, a test mint created by the seed script)" : ", a single Nora wallet"}. A freeze of the reserve token account
           stops every outflow, claim payments included, until it is thawed; <Mono>refresh</Mono> detects it and frozen balances stop counting as stable assets.
@@ -314,7 +319,7 @@ export function Disclosures({ r }: { r: ReserveView }) {
       )}
       {item(
         "Built later",
-        <>Partial redemption fills at the queue head, on-chain claim notices, and reserve allocation through adapters (TESOURO) are designed but not part of this pilot binary.</>,
+        <>Partial redemption fills at the queue head, on-chain claim notices, and more reserve assets through capped adapters (TESOURO is the first candidate, pending an Etherfuse BRS path) are designed but not part of this pilot binary.</>,
       )}
     </ul>
   );

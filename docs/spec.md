@@ -1,6 +1,8 @@
 # MUTAV reserve program — specification
 
-*Status: draft for the pilot build, 2026-10-01; revised 2026-10-02 for partial fills at the queue head ([ADR 0010](decisions/0010-partial-fills-at-queue-head.md)), the earmark-aware solvency formula, the phase-2 instant exit and upgrade readiness ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)), and the alignment with a limited fiança onerosa, Lei 8.245/91 art. 37 II ([ADR 0012](decisions/0012-fianca-aligned-guarantee-lifecycle.md)); revised 2026-10-07 for the BRS income intake ([ADR 0017](decisions/0017-brs-income-intake.md)). Derived from the MUTAV project document (§2–§7), the adversarial review and the mutav-app operations review. This file is the source of truth for the program's business rules. Any change to economic behaviour needs an ADR in [`decisions/`](decisions/).*
+*Status: draft for the pilot build, 2026-10-01; revised 2026-10-02 for partial fills at the queue head ([ADR 0010](decisions/0010-partial-fills-at-queue-head.md)), the earmark-aware solvency formula, the phase-2 instant exit and upgrade readiness ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)), and the alignment with a limited fiança onerosa, Lei 8.245/91 art. 37 II ([ADR 0012](decisions/0012-fianca-aligned-guarantee-lifecycle.md)); revised 2026-10-07 for the BRS income intake ([ADR 0017](decisions/0017-brs-income-intake.md)) and the BRS-only pilot reserve ([ADR 0018](decisions/0018-brs-only-pilot-reserve.md)). Derived from the MUTAV project document (§2–§7), the adversarial review and the mutav-app operations review. This file is the source of truth for the program's business rules. Any change to economic behaviour needs an ADR in [`decisions/`](decisions/).*
+
+**Pilot assets.** The pilot reserve holds BRS only; more assets can be added through adapters (TESOURO is the first candidate, pending an Etherfuse BRS path; ADR 0018). The TESOURO fields, pricing (§7) and allocation instructions (§5.7) below define that first adapter; with no adapter whitelisted and the settlement floor at 100%, `tesouro_units` stays 0 and no price is read. **Allocation limits (design, ADR 0018):** a floor on the settlement token, `min_settlement_bps` (the minimum share of stable assets held in `reserve_mint`; pilot `10_000`), replaces `max_tesouro_share_bps` (equivalent to `10_000 − min_settlement_bps`; renamed in a follow-up PR). Each adapter has its own `cap`, `max_share_bps` and price feed, which ship with the first adapter upgrade. Derived from the MUTAV project document (§2–§7), the adversarial review and the mutav-app operations review. This file is the source of truth for the program's business rules. Any change to economic behaviour needs an ADR in [`decisions/`](decisions/).*
 
 Where a value or behaviour is not yet decided, this spec says **TBD** and lists it under [§12 Open questions](#12-open-questions). Items marked *(derived)* are not named in the project document but follow from a rule it states; they are the minimum the program needs to enforce that rule.
 
@@ -44,7 +46,7 @@ Where a value or behaviour is not yet decided, this spec says **TBD** and lists 
    - Off-chain items (fees in transit, recoveries, BRL at MUTAV's bank) count only once they settle on-chain.
    - Losses are recognized early: a filed claim is provisioned immediately.
    - The program's accounting is internal: it tracks the amounts it moved, not raw token-account balances, so a direct transfer into a reserve account does not move NAV. Issuer income enters NAV only when `sweep_income` books a statement (ADR 0017).
-   - The remaining trust in issuer backing (Nora for BRS, Etherfuse for TESOURO) is disclosed, not hidden.
+   - The remaining trust in issuer backing (Nora for BRS; Etherfuse for TESOURO, once an adapter adds it) is disclosed, not hidden.
 3. **MUTAV operates every chain touchpoint.** Agencies, tenants and landlords never sign on-chain. The operator key is the only writer for guarantees and claims. It pays claims within its caps; a payment above them goes through the admin (`pay_claim_admin`, ADR 0012).
 4. **The solvency gate protects the reserve. It never stops a claim payment.** It gates capital moving in and out, allocations, and new guarantees. `pay_claim` is never solvency-gated.
 5. **No arbitrary outflows.** Reserve funds leave only to (a) investor claim escrows on fulfilled redemptions, (b) the whitelisted MUTAV payments account, (c) a whitelisted adapter's capped sub-authority, or (d) in phase 2 only, an instant redemption paid from the earmarked buffer to the redeeming holder ([§13](#13-phase-2--instant-exit-designed-disabled-in-the-pilot)). The income inbox (§3.3) is not reserve money; its only exits are `reserve` and, with a non-zero `income_take_bps`, the whitelisted treasury (ADR 0017).
@@ -369,6 +371,8 @@ Stored inline in `VaultConfig.adapters`.
 | `_reserved` | `[u8; 64]` | Fixed per entry, because `MAX_ADAPTERS × entry` is part of the `VaultConfig` layout. Sized so adapter pinning (PC-27: deployed slot `u64` plus upgrade authority `Pubkey`, 40 bytes) can be carved later without a migration; whether to pin is still open |
 
 Entry size: 177 bytes.
+
+**With the first adapter upgrade (ADR 0018, design).** `max_share_bps: u16` is carved from the front of `_reserved` (zero = nothing may be allocated), leaving 62 bytes for PC-27 pinning. The per-adapter price feed and position do not fit inline (86 bytes: price account, staleness and deviation bounds, accrual ceiling, units, last price and its time), so they live in a per-adapter PDA `AdapterState` at `["adapter_state", config, program_id]`, created by `whitelist_adapter` and closed by `remove_adapter`. It replaces the global TESOURO-named `PriceParams` price fields and `VaultState.tesouro_*`; `stable_assets = brs_balance + Σ adapter value`. `max_nav_move_bps` stays global.
 
 ### 3.10 `HolderState`
 
@@ -834,6 +838,8 @@ MUTAV contributes and withdraws capital through the **same async flow as every i
 
 ### 5.7 Reserve allocation (admin, through adapters)
 
+*Not in the pilot binary (ADR 0018).* This is how the reserve expands beyond BRS: a program upgrade adds these instructions, then Squads proposals whitelist an adapter with its cap and share limit, set its price feed, and lower the settlement floor below 100%. TESOURO is the first candidate.
+
 The core never passes the vault authority or the share-mint authority into a CPI. Each adapter acts only through its own capped sub-authority PDA, which owns only that adapter's staging account.
 
 **CPI depth.** Admin instructions run inside Squads `vault_transaction_execute`, so `allocate` is already Squads (1) → mutav (2) → adapter (3) → venue (4) → token program (5), the maximum invoke stack height. Adapter rule: an adapter makes at most one level of CPI into its venue, the venue path must not exceed one further CPI, and the adapter emits no events by self-CPI (the core emits them). Plan Tasks 13–14 test `allocate` / `deallocate` executed through a real Squads v4 vault transaction, not only `fulfil_redeems`.
@@ -841,7 +847,7 @@ The core never passes the vault authority or the share-mint authority into a CPI
 #### `allocate(adapter_program, amount)`
 
 - **Signer:** admin.
-- **Rules:** not paused; `mode == Normal`; adapter whitelisted and enabled; `allocated + amount ≤ adapter.cap`; price fresh; after the move, `tesouro_value ≤ caps.max_tesouro_share_bps × stable_assets / 10_000`; **solvency post-condition** `stable_assets_after ≥ coverage_required`, with `stable_assets_after` valued at the bounded price; **liquidity post-condition** `brs_balance_after ≥ provisions + earmark_eff_before`, with `earmark_eff_before` computed before the transfer (a value recomputed afterwards would be clamped by the same liquidity and make the check vacuous), so an allocation into TESOURO cannot spend BRS that filed claims or the buffer earmark rely on (ADR 0011). The ratchet is applied only after the check passes; a failing allocation leaves `buffer_earmark` unchanged. Whether `amount` itself must also fit in `free_capital` is **TBD**.
+- **Rules:** not paused; `mode == Normal`; adapter whitelisted and enabled; `allocated + amount ≤ adapter.cap`; price fresh; after the move, the **settlement floor** `brs_balance ≥ min_settlement_bps × stable_assets / 10_000` (today's field: `Σ adapter value ≤ caps.max_tesouro_share_bps × stable_assets / 10_000`, ADR 0018) and the adapter's **share limit** `adapter value ≤ adapter.max_share_bps × stable_assets / 10_000` (with the first adapter upgrade); **solvency post-condition** `stable_assets_after ≥ coverage_required`, with `stable_assets_after` valued at the bounded price; **liquidity post-condition** `brs_balance_after ≥ provisions + earmark_eff_before`, with `earmark_eff_before` computed before the transfer (a value recomputed afterwards would be clamped by the same liquidity and make the check vacuous), so an allocation into TESOURO cannot spend BRS that filed claims or the buffer earmark rely on (ADR 0011). The ratchet is applied only after the check passes; a failing allocation leaves `buffer_earmark` unchanged. Whether `amount` itself must also fit in `free_capital` is **TBD**.
 - **Effects:** core transfers `amount` BRS `reserve` → adapter staging (vault-authority signed); CPI `adapter.deposit` signed by the sub-authority only; reload accounts; record the received `tesouro_units`; update `brs_balance`, `tesouro_units`, `adapter.allocated`. **Post-CPI checks:** every vault token account and the share supply are unchanged except for the expected deltas.
 - **Errors:** `AdapterNotWhitelisted`, `AdapterCapExceeded`, `TesouroShareCapExceeded`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `UnderCovered`, `PostCpiCheckFailed`, `StalePrice`.
 - **Event:** `Allocated { adapter, brs_out, tesouro_in }`.
@@ -889,7 +895,7 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
 
 ## 6. Under-coverage mode
 
-- **Trigger:** `stable_assets < coverage_required`, for example after a TESOURO mark-down, an issuer freeze or, at `c < 1`, claim payments (invariant 7). Set by `refresh`, and checked inline by every gated instruction.
+- **Trigger:** `stable_assets < coverage_required`, for example after an adapter-asset mark-down, an issuer freeze or, at `c < 1`, claim payments (invariant 7) or filed provisions above stable assets (`coverage_required` is never below provisions, ADR 0016). Set by `refresh`, and checked inline by every gated instruction.
 - **Frozen automatically:** `register_guarantee`, `fulfil_redeems`, `allocate`; in phase 2 also `instant_redeem` and `fund_exit_buffer`. Because `surplus = 0`, `earmark_eff = 0` and the ratchet releases any stored earmark.
 - **Restricted:** `deallocate` only if it does not worsen coverage ([§5.7](#57-reserve-allocation-admin-through-adapters)).
 - **Keeps working:** `pay_claim`, `pay_claim_admin`, `file_claim`, `settle_payout`, `contribute_fees`, `sweep_income`, `fulfil_deposits` (ADR 0008; still subject to the claim-notice gate), `notify_exoneration`, `record_keys_returned`, `close_guarantee`, `flag_claim_notice`, `close_claim_notice`, `refresh`, `advance_queue_heads`, investor `cancel_*` and `claim_*`, `request_*` (queued, not fulfilled).
@@ -927,7 +933,7 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). Valu
 | `max_claim_per_call` | `u64` | `pay_claim` | R$10k |
 | `max_claim_per_period` | `u64` | `pay_claim` | R$20k |
 | `claim_period_secs` | `i64` | `pay_claim` | 30 days |
-| `max_tesouro_share_bps` | `u16` | `allocate` | 5_000 (min BRS buffer 50%); 0 on devnet (no adapter) |
+| `min_settlement_bps` (today `max_tesouro_share_bps = 10_000 − min_settlement_bps`) | `u16` | `allocate` | `10_000` in the pilot and on devnet: BRS only (ADR 0018). Proposed 5_000 (at least 50% in BRS) once an adapter is live. Per adapter: `cap` and `max_share_bps` |
 | `min_request`, `max_request` | `u64`, `u64` | `request_deposit`, `request_redeem`; `min_request` also bounds a partial fill's remainder | TBD; proposed R$1,000 / R$100,000 |
 | `min_fill_assets` | `u64` | `fulfil_redeems` (smallest partial fill) | TBD; proposed R$500 |
 | `coverage_ratio_bps` (`c`) | `u16` | all gates | 1_000 (0.10, the program floor; ADR 0016) |
@@ -1014,7 +1020,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 | PC-11 | Under-coverage mode | Adopted | §6 |
 | PC-12 | Provision booked at filing | Partial: provision = filed amount; full-leg and expected-exit terms TBD | §5.4 |
 | PC-13 | Payouts senior to redemptions for the liquid buffer | Partial: redemption fills and allocations leave `provisions` (filed claims) in liquid BRS (`liquid_budget`, ADR 0011); while a claim notice is open (missed rent known, not yet provisioned) both queues are closed; unfiled exposure is not reserved | §4, §5.4, §5.5, §5.7, §12 |
-| PC-14 | Coverage ratio floor as a program constant | *Resolved (ADR 0016):* `MIN_COVERAGE_RATIO_BPS = 1_000` (0.10); `coverage_required` never below provisions | §3.1, §12 |
+| PC-14 | Coverage ratio floor as a program constant | *Proposed in ADR 0016, pending founder confirmation:* `MIN_COVERAGE_RATIO_BPS = 1_000` (0.10); `coverage_required` never below provisions | §3.1, §12 |
 | PC-15 | Fees streamed into NAV over 30 days | Not adopted (fees raise NAV on receipt) | §5.3, §12 |
 | PC-16 | Explicit TESOURO coverage weight | Not adopted: TESOURO counts toward coverage at its bounded price, capped at 50% of the reserve | §4, §8, §12 |
 | PC-17 | Bounded TESOURO price (accrual ceiling, staleness, deviation) | Adopted; stale-haircut behaviour TBD | §7 |
@@ -1039,7 +1045,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 | PC-38 | Agency loss-ratio gate | Not adopted (pricing tiers stay off-chain) | §12 |
 | PC-40 | Public claims ledger with an SLA clock | Partial: `Payout` timestamps, SLA flag, per-agency `claims_paid_total`; other counters TBD | §3.4, §3.7, §5.8 |
 | PC-42 | Only hashes and amounts on-chain | Adopted | Conventions, §3 |
-| PC-43 | Hard on-chain caps | Partial: TVL, per-guarantee, per-agency, per-call, per-period and TESOURO share adopted; `max_guarantees`, concentration and new-coverage-per-period caps TBD | §8 |
+| PC-43 | Hard on-chain caps | Partial: TVL, per-guarantee, per-agency, per-call, per-period and the allocation limit (now the settlement floor, ADR 0018) adopted; `max_guarantees`, concentration and new-coverage-per-period caps TBD | §8 |
 
 ## 12. Open questions
 
@@ -1050,7 +1056,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 3. **Cap values.** Final values for every cap in §8, including `min_request` / `max_request`.
 4. **Take rate.** The value of `fee_take_bps` (program maximum 30%).
 5. **Recoveries.** Whether recoveries flow back to the reserve (would add a `record_recovery` instruction, PC-3).
-6. **BRS↔TESOURO path.** No direct path exists on Solana today (Etherfuse mints and redeems against USDC). `allocate`/`deallocate` against a real venue may need an async conversion state (PC-18).
+6. **BRS↔TESOURO path.** No direct path exists on Solana today (Etherfuse mints and redeems against USDC). `allocate`/`deallocate` against a real venue may need an async conversion state (PC-18). Until a path exists the pilot reserve is BRS only (ADR 0018).
 
 **Raised while writing this spec:**
 
@@ -1064,8 +1070,8 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 14. **Filing window on-chain.** Enforce the 15-day filing window in the program (PC-2) or only in the platform.
 15. **Program-level time lock and multisig split.** Rely on the Squads time lock only, or also delay privilege increases on-chain. The Squads v4 time lock applies to the **whole** multisig and counts from approval, so with one multisig every `fulfil_redeems` waits as long as a program upgrade. Options: (a) one multisig with a moderate time lock (e.g. 24 h; fills are priced at NAV at execution, so the delay only postpones them), or (b) an `upgrade` multisig as upgrade authority (72 h–7 d) and a separate `admin` multisig as `VaultConfig.admin` with a shorter time lock ([§14.5](#145-upgrade-runbook)). Needs an ADR.
 16. **Pauser powers.** Can the pauser appoint the replacement operator, or only revoke? Can it unpause?
-17. **`coverage_ratio_bps` floor.** *Resolved (ADR 0016):* a program constant floor of 0.10 (`MIN_COVERAGE_RATIO_BPS = 1_000`, the worst-case floor of business rule 9w), with `coverage_required = max(ceil(c × remaining_cover_total), provisions)`. Devnet starts at 0.10. A per-lease tail floor is a later ADR.
-18. **Allocation gate.** Must the allocated amount itself fit in `free_capital`, or is the solvency post-condition plus the TESOURO share cap enough?
+17. **`coverage_ratio_bps` floor.** *Proposed in ADR 0016, pending founder confirmation:* a program constant floor of 0.10 (`MIN_COVERAGE_RATIO_BPS = 1_000`, the worst-case floor of business rule 9w), with `coverage_required = max(ceil(c × remaining_cover_total), provisions)`. Devnet starts at 0.10. A per-lease tail floor is a later ADR.
+18. **Allocation gate.** Must the allocated amount itself fit in `free_capital`, or is the solvency post-condition plus the settlement floor and the per-adapter limits enough?
 19. **Per-invoice idempotency for fees.** *Resolved (ADR 0009):* a `FeeReceipt` PDA seeded by `invoice_ref_hash`.
 20. **Virtual offset and seed deposit.** *Resolved (2026-10-06):* `k = 0`, so `V = 1`: one share is worth 1 BRS at launch with the 6-decimal share mint. No seed deposit is minted at `initialize`. Rationale: NAV ignores direct transfers (internal accounting, invariant 1), and deposits are allowlisted and fulfilled by the admin, so a larger offset is not needed against first-depositor inflation. `PRICE_SCALE = NAV_SCALE = 10^9` (§8).
 21. **NAV-move threshold X**, staleness window, deviation bound and stale-price behaviour (fail vs haircut). The clearing path for `fulfil_halted` is proposed in ADR 0015: an admin `clear_fulfil_halt` that also resets the guard's baseline (pending founder confirmation). ADR 0017 proposes measuring the move net of verified inflows, so fees and swept income no longer trip it.
@@ -1344,7 +1350,7 @@ Anchor 1.2 decodes `#[account]` structs with Borsh and ignores trailing bytes. S
 | `HolderState` | 64 | — | `[u8; 64]` | Per-wallet exit counters, 16 bytes |
 | `AgencyExposure`, `FeeReceipt`, `ClaimNotice`, `IncomeReceipt` | 64 | — | `[u8; 64]` | None planned |
 | `Caps`, `PriceParams`, `ExitParams` (nested in config) | 32 each | — | `[u8; 32]` each | Later caps (PC-43), stale-price haircut (Q21), later exit parameters |
-| `AdapterEntry` (inline in config) | 64 per entry | — | `[u8; 64]` per entry | PC-27 adapter pinning (deployed slot and upgrade authority, 40 bytes), if adopted |
+| `AdapterEntry` (inline in config) | 64 per entry | — | `[u8; 64]` per entry | `max_share_bps` (2, ADR 0018) and PC-27 adapter pinning (deployed slot and upgrade authority, 40 bytes), if adopted. The per-adapter price feed and position (86 bytes) do not fit: they go in the `AdapterState` PDA (§3.9) |
 
 **ADR 0017 carve rules.** Each field is safe at zero: `income_take_bps = 0` sends all income to the reserve; `income_total = income_take_total = 0` means no income swept yet; `inflows_since_refresh = 0` is the state after every `refresh`, so a guard reading it on an account written before ADR 0017 measures gross, exactly as before.
 
@@ -1356,7 +1362,7 @@ Anchor 1.2 decodes `#[account]` structs with Borsh and ignores trailing bytes. S
 
 **Layout freeze** (checked in plan Tasks 1 and 12, before the first devnet deploy): `MAX_ADAPTERS` pinned (8); `Caps`, `PriceParams`, `ExitParams` carry their tails; every status is a `u8` constant (including the five `Guarantee` states, the claim categories and `Payout.flags`); every account has `version`, `bump` and `_reserved`; the event set (including `ConfigUpdated`'s final form) and the error list are final for append-only use.
 
-**Reserved seed prefixes** — no pilot PDA may use them: `"exit_buffer"`, `"exit_limit"`, `"instant_exit"`. (`"notice"` is used by the pilot `ClaimNotice`, and `"income"` by the pilot `IncomeReceipt`, ADR 0017.) If padding ever runs out, new state goes in a new PDA (`["instant_exit", config]`), loaded as optional by code that runs before it exists.
+**Reserved seed prefixes** — no pilot PDA may use them: `"exit_buffer"`, `"exit_limit"`, `"instant_exit"`, `"adapter_state"` (per-adapter price feed and position, ADR 0018). (`"notice"` is used by the pilot `ClaimNotice`, and `"income"` by the pilot `IncomeReceipt`, ADR 0017.) If padding ever runs out, new state goes in a new PDA (`["instant_exit", config]`), loaded as optional by code that runs before it exists.
 
 **Realloc** (Anchor `realloc`, `Migration<From, To>`) is an emergency fallback for the singletons only. It cannot reach per-user accounts that are live at upgrade time, such as pending `RedeemRequest`s.
 
