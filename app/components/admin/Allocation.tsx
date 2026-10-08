@@ -5,8 +5,8 @@
  * Composition shows the pilot's BRS-only reserve with the income inbox kept
  * apart; "Expand with adapters" explains how a new asset is added, lists
  * TESOURO as the first candidate with its blocker, reads VaultConfig.adapters,
- * shows the planned allocation instructions as disabled rows, and holds the
- * TESOURO share-cap and price-feed proposals used once an adapter is live.
+ * shows the planned allocation instructions as disabled rows, the settlement
+ * floor control (min held in BRS) and the per-adapter price feed as planned.
  * Every number is read from the chain; nothing here offers an action the
  * program binary does not have. `#reserve-assets` is an alias of `#allocation`.
  */
@@ -19,9 +19,9 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { RoleLine, RoleTag } from "@/components/RoleTag";
 import { CompositionChart } from "@/components/charts/Charts";
 import { Grid, Note, TextField, useLive } from "@/components/demo/shared";
-import { AdminAction, Cards, DataTable, ExternalTag, Facts, LIVE, Sub, WhatThis, type Mode } from "@/components/admin/shared";
+import { AdminAction, Cards, DataTable, ExternalTag, Facts, LIVE, PLANNED, Sub, WhatThis, type Mode } from "@/components/admin/shared";
 import { ALLOCATION_ALIAS } from "@/lib/admin";
-import { fmtBps, fmtBrs, fmtDuration, fmtTime } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtPct } from "@/lib/format";
 import {
   ADAPTER_CANDIDATES,
   ADAPTER_SLOTS,
@@ -29,14 +29,9 @@ import {
   EXPANSION_STEPS,
   PLANNED_BLOCKER,
   PLANNED_RESERVE_INSTRUCTIONS,
-  PRICE_FIELDS,
-  PRICE_PARAM_INFO,
-  UNSET_ADDRESS,
-  priceRequest,
   reserveComposition,
-  tesouroCapRequest,
+  settlementFloorRequest,
   type Composition,
-  type PriceFields,
 } from "@/lib/reserve-assets";
 
 const m = (x: ReactNode) => <Mono style={{ fontSize: 12 }}>{x}</Mono>;
@@ -52,11 +47,12 @@ function CompositionNow({ c }: { c: Composition }) {
       <CompositionChart c={c} />
       <div className="grid-metrics" style={{ alignContent: "start" }}>
         <MetricCard dense label="BRS in reserve" value={fmtBrs(c.brs)} unit={c.brsOnly ? "brs_balance · 100% BRS (pilot)" : `brs_balance · ${share(c.brsShareBps)} of stable assets`} />
+        <MetricCard dense label="Min in BRS (settlement token)" value={fmtPct(c.floorBps)} unit={c.floorBps === BPS_MAX ? "the pilot floor: nothing may be allocated" : `${fmtBrs(c.floorValue, 0)} now · ${fmtBrs(c.roomAboveFloor, 0)} above it`} />
         <MetricCard dense label="Income inbox" value={fmtBrs(c.inbox)} unit="not yet counted: swept by the Operator" />
         <MetricCard dense label="Adapters" value={`${used} of ${ADAPTER_SLOTS}`} unit={used === 0 ? "none whitelisted: no other asset can be held" : "whitelisted in VaultConfig.adapters"} />
-        {!c.brsOnly && <MetricCard dense label="Through adapters" value={fmtBrs(c.tesouroValue)} unit={`TESOURO at the bounded price · ${share(c.tesouroShareBps)}`} />}
+        {!c.brsOnly && <MetricCard dense label="Through adapters" value={fmtBrs(c.adapterValue)} unit={`at the bounded price · ${share(c.adapterShareBps)}`} />}
       </div>
-      {c.overCap && <Note tone="error">TESOURO is above the share cap: a price move or a cap cut put it there. allocate would refuse; deallocate brings it back.</Note>}
+      {c.belowFloor && <Note tone="error">BRS is below the settlement floor: a price move or a floor raise put it there. allocate would refuse; deallocate brings BRS back.</Note>}
     </div>
   );
 }
@@ -101,11 +97,11 @@ function Candidates() {
 
 function Adapters({ c }: { c: Composition }) {
   return (
-    <DataTable label="Whitelisted adapters" head={["Slot", "Adapter program", "Asset mint", "Cap (BRS-equivalent)", "Allocated", "Enabled"]}>
+    <DataTable label="Adapters" head={["Slot", "Adapter program", "Asset mint", "Cap (BRS-equivalent)", "Share limit", "Price feed", "Allocated", "Enabled"]}>
       {c.adapters.length === 0 ? (
         <tr>
-          <td colSpan={6}>
-            <span className="font-body" style={{ fontSize: 13, color: "var(--color-text-3)" }}>No adapter whitelisted: 0 of {ADAPTER_SLOTS} slots in VaultConfig.adapters are used.</span>
+          <td colSpan={8}>
+            <span className="font-body" style={{ fontSize: 13, color: "var(--color-text-3)" }}>No adapter whitelisted: 0 of {ADAPTER_SLOTS} slots in VaultConfig.adapters are used. Share limit and price feed are per adapter, with the first adapter upgrade.</span>
           </td>
         </tr>
       ) : (
@@ -115,6 +111,8 @@ function Adapters({ c }: { c: Composition }) {
             <td><Explorer value={a.programId} /></td>
             <td><Explorer value={a.assetMint} /></td>
             <td className="num">{m(fmtBrs(a.cap, 0))}</td>
+            <td>{m("with the upgrade")}</td>
+            <td>{m("per adapter, with the upgrade")}</td>
             <td className="num">{m(fmtBrs(a.allocated, 0))}</td>
             <td>{m(a.enabled ? "yes" : "no")}</td>
           </tr>
@@ -145,72 +143,38 @@ function PlannedInstructions() {
   );
 }
 
-function LaterControls({ mode, c }: { mode: Mode; c: Composition }) {
-  const { reserve } = useLive();
-  const cfg = reserve.config;
-  const [cap, setCap] = useState(String(cfg.caps.maxTesouroShareBps));
-  const [price, setPrice] = useState<Partial<PriceFields>>({});
-  const capReq = tesouroCapRequest(cap);
-  const capPreview = capReq ? (BigInt(capReq.maxTesouroShareBps) * c.stableAssets) / 10_000n : null;
-  const pr = priceRequest(price);
-  const p = cfg.price;
-  const nowPrice: Record<keyof PriceFields, string> = {
-    tesouroPriceAccount: p.tesouroPriceAccount === UNSET_ADDRESS ? "unset" : p.tesouroPriceAccount,
-    p0: p.p0.toString(),
-    t0: p.t0 === 0n ? "0" : `${p.t0} (${fmtTime(p.t0)})`,
-    yMaxBps: fmtBps(p.yMaxBps),
-    maxStalenessSecs: fmtDuration(p.maxStalenessSecs),
-    maxDeviationBps: fmtBps(p.maxDeviationBps),
-    maxNavMoveBps: fmtBps(p.maxNavMoveBps),
-  };
+function FloorControl({ mode, c }: { mode: Mode; c: Composition }) {
+  const [floor, setFloor] = useState(String(c.floorBps));
+  const req = settlementFloorRequest(floor);
+  const v = req ? BPS_MAX - req.maxTesouroShareBps : null;
+  const preview = v === null ? null : (BigInt(v) * c.stableAssets + 9_999n) / 10_000n;
   return (
-    <Cards>
-      <AdminAction title="TESOURO share cap" label="set_config (max_tesouro_share_bps)" mode={mode} request={capReq}>
-        <Facts
-          now={m(`${fmtBps(cfg.caps.maxTesouroShareBps)} (caps.max_tesouro_share_bps)`)}
-          bound={m(`0 – ${BPS_MAX} bps (validate_params)`)}
-          does="The most of stable assets that allocate may put in TESOURO; the rest stays BRS, liquid for claim payments and redemptions. 0% in the pilot (ADR 0018). It binds only once allocate exists."
-        />
-        <Grid>
-          <TextField
-            id="adm-tesouro-cap"
-            label="New cap (bps)"
-            value={cap}
-            onChange={setCap}
-            numeric
-            hint={capReq ? `${fmtBps(capReq.maxTesouroShareBps)} · preview: up to ${fmtBrs(capPreview!, 0)} at today's stable assets` : `0 – ${BPS_MAX} bps`}
-          />
-        </Grid>
-      </AdminAction>
+    <AdminAction title="Min held in the settlement token" label="set_config" mode={mode} request={req}>
+      <Facts
+        now={m(`${fmtPct(c.floorBps)} in BRS (read as 10000 − max_tesouro_share_bps until the rename)`)}
+        bound={m(`0 – ${BPS_MAX} bps · pilot ${BPS_MAX} (100%)`)}
+        does="The minimum share of stable assets held in BRS, the token guarantee fees come in and claim payments go out in. All adapters together may use only the share above it. 100% in the pilot (ADR 0018); it binds once allocate exists."
+      />
+      <Grid>
+        <TextField id="adm-settlement-floor" label="New floor (bps)" value={floor} onChange={setFloor} numeric hint={v !== null ? `${fmtPct(v)} · preview: at least ${fmtBrs(preview!, 0)} in BRS at today's stable assets` : `0 – ${BPS_MAX} bps`} />
+      </Grid>
+    </AdminAction>
+  );
+}
 
-      <AdminAction
-        title="TESOURO price feed"
-        label="set_config (price)"
-        mode={mode}
-        request={pr.request}
-        note="Blank fields keep their on-chain value. refresh values TESOURO at min(on-chain price, accrual curve), and gated instructions refuse a stale or deviating price."
-      >
-        <Facts
-          now={m(`last accepted price ${reserve.state.tesouroPrice.toString()} at ${reserve.state.tesouroPriceTs === 0n ? "never" : fmtTime(reserve.state.tesouroPriceTs)}`)}
-          bound={m("bps fields 0 – 10000; staleness ≥ 0; p0 u64; t0 i64")}
-          does="Points refresh at the TESOURO price account and bounds what it accepts. With no adapter and 0 TESOURO units, it values nothing in the pilot."
-        />
-        <Grid>
-          {PRICE_FIELDS.map((k) => (
-            <TextField
-              key={k}
-              id={`adm-price-${k}`}
-              label={`${PRICE_PARAM_INFO[k].label}`}
-              value={price[k] ?? ""}
-              onChange={(v) => setPrice((s) => ({ ...s, [k]: v }))}
-              numeric={k !== "tesouroPriceAccount"}
-              hint={pr.errors.includes(k) ? `out of bound: ${PRICE_PARAM_INFO[k].bound}` : `now ${nowPrice[k]} · ${PRICE_PARAM_INFO[k].bound}`}
-            />
-          ))}
-        </Grid>
-      </AdminAction>
-
-    </Cards>
+function PriceFeedPlanned() {
+  return (
+    <article style={{ border: "1px dashed var(--color-border)", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 6, opacity: 0.75 }}>
+      <h3 style={{ fontSize: 15, margin: 0, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
+        Per-adapter price feed (with the adapter) <RoleTag role="admin" />
+      </h3>
+      <Facts
+        now={m("none: no adapter, no price read")}
+        bound={m("per adapter: price account, accrual ceiling, staleness and deviation bounds")}
+        does="Each adapter brings its own price feed in its AdapterState account, set when it is whitelisted. refresh values that adapter's asset at min(on-chain price, accrual ceiling); a stale or deviating price stops the gated instructions. Not in this binary."
+      />
+      {PLANNED}
+    </article>
   );
 }
 
@@ -224,7 +188,7 @@ export function Allocation({ mode }: { mode: Mode }) {
       id="allocation"
       kicker="Assets"
       title="Allocation: BRS today, more assets through adapters"
-      roles={<RoleLine items={[{ role: "admin", prefix: "adapters, caps and price feeds set by the" }, { role: "anyone", prefix: "re-valued by" }]} />}
+      roles={<RoleLine items={[{ role: "admin", prefix: "settlement floor and adapters set by the" }, { role: "anyone", prefix: "re-valued by" }]} />}
     >
       {/* Alias for links to the earlier #reserve-assets anchor. */}
       <span id={ALLOCATION_ALIAS} aria-hidden="true" style={{ position: "relative", top: -112, display: "block", height: 0 }} />
@@ -240,7 +204,7 @@ export function Allocation({ mode }: { mode: Mode }) {
         <Steps />
         <H>Candidates</H>
         <Candidates />
-        <H>Adapters on-chain</H>
+        <H>Adapters</H>
         <Adapters c={c} />
         <H>Planned instructions</H>
         <PlannedInstructions />
@@ -248,9 +212,12 @@ export function Allocation({ mode }: { mode: Mode }) {
           No button here sends any of these: the program would reject an instruction it does not have.
         </p>
         <div id="allocation-controls" style={{ display: "flex", flexDirection: "column", gap: 12, scrollMarginTop: 112 }}>
-          <H>Used once an adapter is live</H>
-          <Note>Valid Squads proposals today, but not part of the pilot&apos;s day-to-day: with no adapter, the share cap stays 0% and the price feed values nothing.</Note>
-          <LaterControls mode={mode} c={c} />
+          <H>Limits</H>
+          <Note>The floor is a valid Squads proposal today, but not part of the pilot&apos;s day-to-day: it stays 100% until an adapter is live.</Note>
+          <Cards>
+            <FloorControl mode={mode} c={c} />
+            <PriceFeedPlanned />
+          </Cards>
         </div>
       </Sub>
     </Section>

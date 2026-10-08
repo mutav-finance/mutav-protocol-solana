@@ -11,7 +11,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { RoleTag } from "@/components/RoleTag";
 import { agencyCapUse, claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "@/lib/charts";
-import { fmtBps, fmtBrs, fmtDuration, fmtTime } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtDuration, fmtPct, fmtTime } from "@/lib/format";
 import type { ClaimCap } from "@/lib/operator";
 import type { Composition } from "@/lib/reserve-assets";
 import type { AgencyRow, ClaimRow, CoverageRow, FlowTotals } from "@/lib/view";
@@ -353,78 +353,52 @@ export function ClaimCapChart({ cap }: { cap: ClaimCap }) {
 // ── Reserve composition (BRS, adapter assets, income inbox) ────────────────
 
 /**
- * What the reserve holds, on one axis. In the pilot that is BRS only (ADR
- * 0018), with the income inbox drawn outlined on its own row because it counts
- * toward nothing until the operator sweeps it. Once an adapter holds TESOURO,
- * TESOURO (left) and BRS stack into stable assets and the TESOURO share cap
- * is a dashed marker (TESOURO must stay left of it).
+ * What the reserve holds, on one axis: BRS (the settlement token, left) and
+ * any adapter assets (right) make up stable assets; the dashed marker is the
+ * settlement floor (ADR 0018), and BRS must reach past it. In the pilot that
+ * is BRS only with a 100% floor. The income inbox is drawn outlined on its own
+ * row because it counts toward nothing until the operator sweeps it.
  */
 export function CompositionChart({ c }: { c: Composition }) {
   const axis = c.stableAssets + c.inbox;
   const share = (bps: bigint | null) => (bps === null ? "—" : fmtBps(bps));
-  const inbox = (
-    <Row
-      label={<RowLabel sub={<RoleTag role="operator" prefix="swept by the" />}>Income inbox</RowLabel>}
-      value={fmtBrs(c.inbox, 0)}
-      summary={`Income inbox ${fmtBrs(c.inbox)}: paid by Nora, not yet counted, swept by the Operator.`}
-      labelWidth={190}
-    >
-      <Track segs={[{ f: frac(c.inbox, axis), color: C.mid, outline: true }]} />
-    </Row>
-  );
-  if (c.brsOnly) {
-    return (
-      <ChartFrame
-        title="Reserve composition"
-        legend={
-          <Legend>
-            <Swatch color={C.ink} label="BRS in reserve" />
-            <Swatch color={C.mid} label="income inbox, not yet counted" outline />
-          </Legend>
-        }
-        caption={<>The pilot reserve holds BRS only (ADR 0018): stable assets = brs_balance, from VaultState. The inbox is the vault authority&apos;s BRS account. More assets can be added through adapters; none is whitelisted.</>}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <Row
-            label={<RowLabel sub={<Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>100% BRS (pilot)</Mono>}>BRS in reserve</RowLabel>}
-            value={fmtBrs(c.stableAssets, 0)}
-            summary={`Stable assets ${fmtBrs(c.stableAssets)}, all BRS.`}
-            labelWidth={190}
-          >
-            <Track segs={[{ f: frac(c.brs, axis), color: C.ink }]} />
-          </Row>
-          {inbox}
-        </div>
-      </ChartFrame>
-    );
-  }
+  const floor = `Min in BRS (settlement token): ${fmtPct(c.floorBps)}`;
   return (
     <ChartFrame
-      title="Reserve composition, by asset"
+      title="Reserve composition"
       legend={
         <Legend>
-          <Swatch color={C.mid} label="TESOURO (through adapters)" />
           <Swatch color={C.ink} label="BRS in reserve" />
+          {!c.brsOnly && <Swatch color={C.mid} label="through adapters" />}
           <Swatch color={C.mid} label="income inbox, not yet counted" outline />
         </Legend>
       }
       caption={
         <>
-          Stable assets = brs_balance + TESOURO value (tesouro_units at the bounded price), from VaultState; the inbox is the vault authority&apos;s BRS account. The dashed
-          line is the TESOURO share cap ({fmtBps(c.capBps)} of stable assets = {fmtBrs(c.capValue, 0)}, set by the Reserve Admin).
+          Stable assets = brs_balance{c.brsOnly ? "" : " + adapter value at the bounded price"}, from VaultState; {c.brsOnly ? "the pilot reserve holds BRS only (ADR 0018). " : ""}The dashed line is the settlement floor, the minimum held in BRS ({fmtPct(c.floorBps)} = {fmtBrs(c.floorValue, 0)}, set by the Reserve Admin); adapters may use only the share above it. The inbox is the vault authority&apos;s BRS account.
         </>
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Row
-          label={<RowLabel sub={<Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>BRS {share(c.brsShareBps)} · TESOURO {share(c.tesouroShareBps)}</Mono>}>Counted (stable assets)</RowLabel>}
+          label={<RowLabel sub={<Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>{c.brsOnly ? "100% BRS (pilot)" : `BRS ${share(c.brsShareBps)} · adapters ${share(c.adapterShareBps)}`}</Mono>}>{c.brsOnly ? "BRS in reserve" : "Counted (stable assets)"}</RowLabel>}
           value={fmtBrs(c.stableAssets, 0)}
-          summary={`Stable assets ${fmtBrs(c.stableAssets)}: TESOURO ${fmtBrs(c.tesouroValue)} (${share(c.tesouroShareBps)}), BRS ${fmtBrs(c.brs)} (${share(c.brsShareBps)}). TESOURO share cap ${fmtBps(c.capBps)}.`}
+          summary={`Stable assets ${fmtBrs(c.stableAssets)}: BRS ${fmtBrs(c.brs)}${c.brsOnly ? "" : `, through adapters ${fmtBrs(c.adapterValue)}`}. ${floor}.`}
           labelWidth={190}
         >
-          <Track segs={[{ f: frac(c.tesouroValue, axis), color: c.overCap ? C.bad : C.mid }, { f: frac(c.brs, axis), color: C.ink }]} marker={{ f: frac(c.capValue, axis), label: `TESOURO cap ${fmtBps(c.capBps)}` }} />
+          <Track segs={[{ f: frac(c.brs, axis), color: c.belowFloor ? C.bad : C.ink }, { f: frac(c.adapterValue, axis), color: C.mid }]} marker={{ f: frac(c.floorValue, axis), label: floor }} />
         </Row>
-        {inbox}
+        <Mono style={{ fontSize: 11, color: c.belowFloor ? "var(--color-error)" : "var(--color-text-3)", alignSelf: "flex-end" }}>
+          ┆ {floor}{c.belowFloor ? " · BRS is below it" : ""}
+        </Mono>
+        <Row
+          label={<RowLabel sub={<RoleTag role="operator" prefix="swept by the" />}>Income inbox</RowLabel>}
+          value={fmtBrs(c.inbox, 0)}
+          summary={`Income inbox ${fmtBrs(c.inbox)}: paid by Nora, not yet counted, swept by the Operator.`}
+          labelWidth={190}
+        >
+          <Track segs={[{ f: frac(c.inbox, axis), color: C.mid, outline: true }]} />
+        </Row>
       </div>
     </ChartFrame>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtBps, fmtBrs, fmtDuration, fmtNav, fmtRatio, fmtShares, fmtTime, fmtUnits, parseBrs, shortAddr } from "../format";
+import { fmtBps, fmtBrs, fmtDuration, fmtNav, fmtPct, fmtRatio, fmtShares, fmtTime, fmtUnits, parseBrs, shortAddr } from "../format";
 
 describe("format", () => {
   it("formats BRS with grouping and truncation", () => {
@@ -36,5 +36,11 @@ describe("format", () => {
     expect(parseBrs("0")).toBeNull();
     expect(parseBrs("-1")).toBeNull();
     expect(parseBrs("")).toBeNull();
+  });
+});
+
+describe("fmtPct", () => {
+  it("prints whole and fractional percentages without trailing zeros", () => {
+    expect([fmtPct(10_000), fmtPct(5_000), fmtPct(2_550), fmtPct(0)]).toEqual(["100%", "50%", "25.5%", "0%"]);
   });
 });

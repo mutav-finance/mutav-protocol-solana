@@ -59,7 +59,11 @@ export type AdminTx =
       caps?: Partial<Record<"maxTvl" | "maxCoverPerGuarantee" | "maxCoverPerAgency" | "maxClaimPerCall" | "maxClaimPerPeriod" | "minRequest" | "maxRequest" | "minFillAssets" | "claimPeriodSecs", bigint>>;
       /** `payout_sla_secs`: payment → PIX settlement before a payout is late (≥ 0). */
       payoutSlaSecs?: bigint;
-      /** `caps.max_tesouro_share_bps`: the most of stable assets `allocate` may put in TESOURO. */
+      /**
+       * `caps.max_tesouro_share_bps`, the complement of the settlement floor
+       * (ADR 0018). TODO(rename): becomes `min_settlement_bps`; the app sends
+       * `10_000 − V` for a floor of V until the program field is replaced.
+       */
       maxTesouroShareBps?: number;
       /** TESOURO price parameters (spec §7); blank fields carry over. */
       price?: PriceDraft;

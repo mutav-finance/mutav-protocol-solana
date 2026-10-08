@@ -90,3 +90,6 @@ export function fmtRatio(a: bigint, b: bigint): string {
   const tenths = (a * 1000n) / b;
   return `${group((tenths / 10n).toString())}.${(tenths % 10n).toString()}%`;
 }
+
+/** Basis points as a percentage with at most two decimals and no trailing zeros: 10_000 → "100%", 2_550 → "25.5%". */
+export const fmtPct = (bps: number | bigint) => `${Number(bps) / 100}%`;

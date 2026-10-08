@@ -34,8 +34,8 @@ export const CONFIG_FIELD_HOME = {
   maxClaimPerPeriod: "money-claims",
   claimPeriodSecs: "money-claims",
   payoutSlaSecs: "money-claims",
+  /** The settlement floor; TODO(rename) `min_settlement_bps`. */
   maxTesouroShareBps: "allocation-controls",
-  price: "allocation-controls",
 } as const;
 
 // ── General controls ────────────────────────────────────────────────────────

@@ -6,12 +6,11 @@ import {
   incomeSummary,
   incomeTakeRequest,
   PLANNED_RESERVE_INSTRUCTIONS,
-  priceRequest,
   ADAPTER_CANDIDATES,
   EXPANSION_STEPS,
   reserveComposition,
   reserveConfigError,
-  tesouroCapRequest,
+  settlementFloorRequest,
   UNSET_ADDRESS,
 } from "../reserve-assets";
 import { INSTRUCTION_ROLE } from "../roles";
@@ -35,18 +34,20 @@ function view({ brs, tesouro = 0n, inbox = 0n, capBps = 0, adapters = slots() }:
 }
 
 describe("reserve composition", () => {
-  it("is 100% BRS in the pilot (ADR 0018), with the reason", () => {
+  it("is 100% BRS in the pilot (ADR 0018): a 100% settlement floor, with the reason", () => {
     const c = reserveComposition(view({ brs: 300_000n * BRL, inbox: 1_250n * BRL }));
     expect(c.stableAssets).toBe(300_000n * BRL);
     expect(c.brsShareBps).toBe(10_000n);
-    expect(c.tesouroShareBps).toBe(0n);
+    expect(c.adapterShareBps).toBe(0n);
     expect(c.inbox).toBe(1_250n * BRL);
-    expect(c.capValue).toBe(0n);
-    expect(c.capUsedBps).toBeNull();
-    expect(c.overCap).toBe(false);
+    // TODO(rename): max_tesouro_share_bps = 0 reads as min_settlement_bps = 10_000.
+    expect(c.floorBps).toBe(10_000);
+    expect(c.floorValue).toBe(300_000n * BRL);
+    expect(c.roomAboveFloor).toBe(0n);
+    expect(c.belowFloor).toBe(false);
     expect(c.adapters).toEqual([]);
     expect(c.brsOnly).toBe(true);
-    expect(c.tesouroZeroReason).toBe("The pilot reserve holds BRS only (ADR 0018); no adapter is whitelisted; the TESOURO share cap is 0%.");
+    expect(c.brsOnlyReason).toBe("The pilot reserve holds BRS only (ADR 0018); no adapter is whitelisted; the settlement floor is 100%.");
   });
 
   it("does not count the income inbox toward stable assets or the shares", () => {
@@ -56,30 +57,32 @@ describe("reserve composition", () => {
     expect(b.brsShareBps).toBe(a.brsShareBps);
   });
 
-  it("measures TESOURO against the share cap", () => {
+  it("measures BRS against the settlement floor once an adapter holds value", () => {
     const adapters = slots({ programId: ADAPTER, assetMint: MINT, cap: 200n * BRL, allocated: 100n * BRL, enabled: true });
+    // max_tesouro_share_bps 5_000 = a 50% floor.
     const c = reserveComposition(view({ brs: 300n * BRL, tesouro: 100n * BRL, capBps: 5_000, adapters }));
     expect(c.stableAssets).toBe(400n * BRL);
-    expect(c.tesouroShareBps).toBe(2_500n);
+    expect(c.adapterShareBps).toBe(2_500n);
     expect(c.brsShareBps).toBe(7_500n);
-    expect(c.capValue).toBe(200n * BRL);
-    expect(c.capRoom).toBe(100n * BRL);
-    expect(c.capUsedBps).toBe(5_000n);
-    expect(c.tesouroZeroReason).toBeNull();
+    expect(c.floorBps).toBe(5_000);
+    expect(c.floorValue).toBe(200n * BRL);
+    expect(c.roomAboveFloor).toBe(100n * BRL);
+    expect(c.brsOnlyReason).toBeNull();
     expect(c.brsOnly).toBe(false);
     expect(c.adapters).toEqual([{ slot: 0, programId: ADAPTER, assetMint: MINT, cap: 200n * BRL, allocated: 100n * BRL, enabled: true }]);
   });
 
-  it("flags TESOURO above the cap (after a cap cut or a price move)", () => {
+  it("flags BRS below the floor (after a price move or a floor raise)", () => {
     const c = reserveComposition(view({ brs: 100n * BRL, tesouro: 100n * BRL, capBps: 2_000 }));
-    expect(c.overCap).toBe(true);
-    expect(c.capRoom).toBe(0n);
+    expect(c.floorBps).toBe(8_000);
+    expect(c.belowFloor).toBe(true);
+    expect(c.roomAboveFloor).toBe(0n);
   });
 
   it("has no shares while the reserve holds nothing", () => {
     const c = reserveComposition(view({ brs: 0n }));
     expect(c.brsShareBps).toBeNull();
-    expect(c.tesouroShareBps).toBeNull();
+    expect(c.adapterShareBps).toBeNull();
   });
 
   it("lists only used adapter slots", () => {
@@ -88,13 +91,15 @@ describe("reserve composition", () => {
 });
 
 describe("set_config controls", () => {
-  it("bounds the TESOURO share cap to 0–10000 bps", () => {
-    expect(tesouroCapRequest("5000")).toEqual({ kind: "set_config", maxTesouroShareBps: 5_000 });
-    expect(tesouroCapRequest("0")).toEqual({ kind: "set_config", maxTesouroShareBps: 0 });
-    expect(tesouroCapRequest("10001")).toBeNull();
-    expect(tesouroCapRequest("-1")).toBeNull();
-    expect(tesouroCapRequest("50.5")).toBeNull();
-    expect(tesouroCapRequest("")).toBeNull();
+  it("composes the settlement floor as its complement on today's field (TODO(rename))", () => {
+    expect(settlementFloorRequest("10000")).toEqual({ kind: "set_config", maxTesouroShareBps: 0 });
+    expect(settlementFloorRequest("5000")).toEqual({ kind: "set_config", maxTesouroShareBps: 5_000 });
+    expect(settlementFloorRequest("0")).toEqual({ kind: "set_config", maxTesouroShareBps: 10_000 });
+    expect(settlementFloorRequest("10001")).toBeNull();
+    expect(settlementFloorRequest("-1")).toBeNull();
+    expect(settlementFloorRequest("50.5")).toBeNull();
+    expect(settlementFloorRequest("")).toBeNull();
+    expect(reserveConfigError({ maxTesouroShareBps: 10_001 })).toMatch(/settlement floor/);
   });
 
   it("accepts only a zero income take while MAX_INCOME_TAKE_BPS is 0 (spec §12 Q47)", () => {
@@ -105,15 +110,9 @@ describe("set_config controls", () => {
     expect(reserveConfigError({ incomeTakeBps: 0 })).toBeNull();
   });
 
-  it("builds price parameters from the filled fields only, within the program's bounds", () => {
-    expect(priceRequest({})).toEqual({ request: null, errors: [] });
-    expect(priceRequest({ maxStalenessSecs: "3600", maxDeviationBps: "300" })).toEqual({ request: { kind: "set_config", price: { maxStalenessSecs: 3_600n, maxDeviationBps: 300 } }, errors: [] });
-    expect(priceRequest({ tesouroPriceAccount: ADAPTER, t0: "-5", p0: "1000000000" }).request).toEqual({ kind: "set_config", price: { tesouroPriceAccount: ADAPTER, t0: -5n, p0: 1_000_000_000n } });
-    const bad = priceRequest({ yMaxBps: "10001", maxStalenessSecs: "-1", tesouroPriceAccount: "nope", p0: "1" });
-    expect(bad.request).toBeNull();
-    expect(bad.errors.sort()).toEqual(["maxStalenessSecs", "tesouroPriceAccount", "yMaxBps"]);
+  it("still bounds price fields the composer accepts", () => {
     expect(reserveConfigError({ price: { maxNavMoveBps: 10_001 } })).toMatch(/0–10000/);
-    expect(reserveConfigError({ maxTesouroShareBps: 10_001 })).toMatch(/max_tesouro_share_bps/);
+    expect(reserveConfigError({ price: { tesouroPriceAccount: "nope" } })).toMatch(/not an address/);
   });
 });
 

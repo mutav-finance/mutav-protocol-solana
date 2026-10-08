@@ -85,6 +85,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.locator("#general-coverage")).toContainText("10.00%");
     await expect(page.locator("#money").getByRole("button", { name: "Sign directly: fulfil_deposits" })).toBeVisible();
     await expect(page.locator("#allocation-composition")).toContainText("100% BRS (pilot)");
+    await expect(page.locator("#allocation-composition")).toContainText("Min in BRS (settlement token): 100%");
     await expect(page.locator("#allocation-expand").getByRole("table", { name: "Planned reserve-allocation instructions" }).locator("tbody tr")).toHaveCount(4);
     await expect(page.locator("#allocation-expand").getByRole("table", { name: "Adapter candidates" })).toContainText("TESOURO");
     await noBannedWords(page);

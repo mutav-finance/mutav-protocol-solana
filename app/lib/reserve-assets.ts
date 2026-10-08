@@ -1,7 +1,8 @@
 /**
- * Reserve assets on /admin: what the reserve holds (BRS and TESOURO), the
- * issuer income waiting in the inbox, who manages each, and what the
- * Reserve Admin can change today versus what is only in the spec.
+ * Reserve assets on /admin: what the reserve holds (BRS in the pilot; more
+ * assets through adapters later, ADR 0018), the settlement floor, the issuer
+ * income waiting in the inbox, and what the Reserve Admin can change today
+ * versus what is only in the spec.
  *
  * Pure functions over the decoded accounts (`ReserveView`, `Ledger`). Every
  * amount is an on-chain field or a sum of them; shares are layout and display
@@ -21,8 +22,6 @@ export const BPS_MAX = 10_000;
 export const ADAPTER_SLOTS = 8;
 /** The default `Pubkey` (all zeros): an unset address field. */
 export const UNSET_ADDRESS = "11111111111111111111111111111111";
-const I64_MIN = -(1n << 63n);
-const I64_MAX = (1n << 63n) - 1n;
 
 // ── Composition ─────────────────────────────────────────────────────────────
 
@@ -45,71 +44,75 @@ export function adapterRows(adapters: readonly AdapterEntry[]): AdapterRow[] {
 }
 
 export type Composition = {
-  /** `VaultState.brs_balance`: BRS the program tracks in `reserve`. */
+  /** `VaultState.brs_balance`: BRS, the settlement token, tracked in `reserve`. */
   brs: bigint;
-  /** `tesouro_units` valued at the bounded price (client math mirror of `refresh`). */
-  tesouroValue: bigint;
-  tesouroUnits: bigint;
-  /** `brs + tesouroValue`: what counts toward NAV and coverage. */
+  /** Value held through adapters at the bounded price (client math mirror of `refresh`). Today the single field `tesouro_units`. */
+  adapterValue: bigint;
+  adapterUnits: bigint;
+  /** `brs + adapterValue`: what counts toward NAV and coverage. */
   stableAssets: bigint;
   /** Issuer income in the inbox: paid by Nora, not swept, counted nowhere. */
   inbox: bigint;
   /** Share of stable assets, in bps; null while the reserve holds nothing. */
   brsShareBps: bigint | null;
-  tesouroShareBps: bigint | null;
-  /** `caps.max_tesouro_share_bps`. */
-  capBps: number;
-  /** The most TESOURO value the cap allows at today's stable assets. */
-  capValue: bigint;
-  /** How much more TESOURO value the cap would allow now (≥ 0). */
-  capRoom: bigint;
-  /** TESOURO value ÷ the cap's value, in bps; null when the cap allows nothing. */
-  capUsedBps: bigint | null;
-  overCap: boolean;
+  adapterShareBps: bigint | null;
+  /**
+   * The settlement floor, `min_settlement_bps` (ADR 0018): the minimum share of
+   * stable assets held in BRS. TODO(rename): read as `10_000 − caps.max_tesouro_share_bps`
+   * until the program field is replaced by `min_settlement_bps`.
+   */
+  floorBps: number;
+  /** The BRS the floor requires at today's stable assets. */
+  floorValue: bigint;
+  /** BRS above the floor: what all adapters together could still use. */
+  roomAboveFloor: bigint;
+  /** BRS below the floor (after a price move or a floor raise). */
+  belowFloor: boolean;
   adapters: AdapterRow[];
-  /** Why TESOURO is 0 today, in plain words; null when the reserve holds TESOURO. */
-  tesouroZeroReason: string | null;
+  /** Why nothing is held through adapters, in plain words; null when something is. */
+  brsOnlyReason: string | null;
   /** Nothing is held through an adapter: the pilot's BRS-only reserve (ADR 0018). */
   brsOnly: boolean;
 };
 
+const shareBps = (part: bigint, whole: bigint) => (whole === 0n ? null : (part * 10_000n) / whole);
+
 /** No adapter holds anything allocated. */
 const nothingAllocated = (adapters: AdapterRow[]) => adapters.every((a) => a.allocated === 0n);
 
-const shareBps = (part: bigint, whole: bigint) => (whole === 0n ? null : (part * 10_000n) / whole);
+/** TODO(rename): `min_settlement_bps` from today's `caps.max_tesouro_share_bps` (its complement). */
+export const settlementFloorBps = (maxTesouroShareBps: number) => BPS_MAX - maxTesouroShareBps;
 
 export function reserveComposition(r: Pick<ReserveView, "state" | "config" | "solvency" | "incomeInbox">): Composition {
   const brs = r.state.brsBalance;
-  const tesouroValue = r.solvency.tesouroValue;
-  const stableAssets = brs + tesouroValue;
-  const capBps = r.config.caps.maxTesouroShareBps;
-  const capValue = (BigInt(capBps) * stableAssets) / 10_000n;
+  const adapterValue = r.solvency.tesouroValue;
+  const stableAssets = brs + adapterValue;
+  const floorBps = settlementFloorBps(r.config.caps.maxTesouroShareBps);
+  const floorValue = (BigInt(floorBps) * stableAssets + 9_999n) / 10_000n;
   const adapters = adapterRows(r.config.adapters);
   const enabled = adapters.filter((a) => a.enabled);
-  // BRS only while nothing is held through an adapter (ADR 0018); the reason names what keeps it so.
-  let tesouroZeroReason: string | null = null;
-  if (tesouroValue === 0n) {
+  let brsOnlyReason: string | null = null;
+  if (adapterValue === 0n) {
     const why = ["the pilot reserve holds BRS only (ADR 0018)"];
     if (enabled.length === 0) why.push("no adapter is whitelisted");
-    if (capBps === 0) why.push("the TESOURO share cap is 0%");
-    tesouroZeroReason = `${why.join("; ")}.`.replace(/^./, (c) => c.toUpperCase());
+    if (floorBps === BPS_MAX) why.push("the settlement floor is 100%");
+    brsOnlyReason = `${why.join("; ")}.`.replace(/^./, (c) => c.toUpperCase());
   }
   return {
     brs,
-    tesouroValue,
-    tesouroUnits: r.state.tesouroUnits,
+    adapterValue,
+    adapterUnits: r.state.tesouroUnits,
     stableAssets,
     inbox: r.incomeInbox.amount,
     brsShareBps: shareBps(brs, stableAssets),
-    tesouroShareBps: shareBps(tesouroValue, stableAssets),
-    capBps,
-    capValue,
-    capRoom: capValue > tesouroValue ? capValue - tesouroValue : 0n,
-    capUsedBps: capValue === 0n ? null : (tesouroValue * 10_000n) / capValue,
-    overCap: tesouroValue > capValue,
+    adapterShareBps: shareBps(adapterValue, stableAssets),
+    floorBps,
+    floorValue,
+    roomAboveFloor: brs > floorValue ? brs - floorValue : 0n,
+    belowFloor: brs < floorValue,
     adapters,
-    tesouroZeroReason,
-    brsOnly: tesouroValue === 0n && nothingAllocated(adapters),
+    brsOnlyReason,
+    brsOnly: adapterValue === 0n && nothingAllocated(adapters),
   };
 }
 
@@ -134,9 +137,9 @@ export type ExpansionStep = {
  */
 export const EXPANSION_STEPS: readonly ExpansionStep[] = [
   { actor: "admin", ix: null, live: false, action: "Upgrade the program with the adapter instructions and deploy the asset's adapter program, after its own security review." },
-  { actor: "admin", ix: "whitelist_adapter", live: false, action: "Whitelist the adapter with its cap: the most BRS-equivalent value it may ever hold." },
-  { actor: "admin", ix: "set_config", live: true, action: "Set the asset's price feed (price account, accrual ceiling, staleness, deviation) and raise its share cap from 0%." },
-  { actor: "admin", ix: "allocate", live: false, action: "Allocate BRS into the asset within the share cap, the adapter cap, the solvency gate and the liquidity check; deallocate brings it back." },
+  { actor: "admin", ix: "whitelist_adapter", live: false, action: "Whitelist the adapter with its limits: its cap (the most BRS-equivalent value it may hold), its share limit of stable assets, and its own price feed with staleness and deviation bounds." },
+  { actor: "admin", ix: "set_config", live: true, action: "Lower the minimum held in the settlement token (BRS) below 100%: the share above the floor is what all adapters together may use." },
+  { actor: "admin", ix: "allocate", live: false, action: "Allocate BRS into the asset above the settlement floor, within the adapter's cap and share limit, the solvency gate and the liquidity check; deallocate brings it back." },
   { actor: "anyone", ix: "refresh", live: true, action: "Re-value the reserve at the bounded price on every refresh: stable assets, NAV and the mode follow." },
 ];
 
@@ -173,7 +176,7 @@ export const PLANNED_RESERVE_INSTRUCTIONS: readonly PlannedInstruction[] = [
     ix: "whitelist_adapter",
     args: "program_id, asset_mint, cap",
     role: "admin",
-    what: "Adds a TESOURO adapter to VaultConfig.adapters, with its cap: the most BRS-equivalent value it may ever hold.",
+    what: "Adds an adapter to VaultConfig.adapters with its cap; with the first adapter upgrade, also its share limit and its own price feed (AdapterState).",
     gatedBy: ["Squads time lock", `at most ${ADAPTER_SLOTS} adapters`],
     spec: "§5.1",
   },
@@ -189,13 +192,13 @@ export const PLANNED_RESERVE_INSTRUCTIONS: readonly PlannedInstruction[] = [
     ix: "allocate",
     args: "adapter_program, amount",
     role: "admin",
-    what: "Moves BRS from the reserve into TESOURO through a whitelisted adapter.",
+    what: "Moves BRS from the reserve into an adapter's asset (TESOURO first).",
     gatedBy: [
-      "TESOURO share cap: TESOURO value after ≤ max_tesouro_share_bps × stable assets",
-      "adapter cap: allocated + amount ≤ the adapter's cap",
+      "settlement floor: BRS after ≥ min_settlement_bps × stable assets",
+      "adapter limits: allocated + amount ≤ its cap; its value ≤ its share limit",
       "solvency gate: mode Normal, stable assets after ≥ coverage required",
       "liquidity: BRS left ≥ open provisions (+ earmark)",
-      "fresh TESOURO price; not paused",
+      "fresh price from the adapter's feed; not paused",
     ],
     spec: "§5.7",
   },
@@ -203,11 +206,11 @@ export const PLANNED_RESERVE_INSTRUCTIONS: readonly PlannedInstruction[] = [
     ix: "deallocate",
     args: "adapter_program, tesouro_units",
     role: "admin",
-    what: "Brings TESOURO back into BRS in the reserve: the de-risking move.",
+    what: "Brings an adapter's asset back into BRS in the reserve: the de-risking move.",
     gatedBy: [
       "solvency gate: any value lost must fit in free capital",
       "under-coverage: allowed only if it does not worsen coverage",
-      "fresh TESOURO price; not paused",
+      "fresh price from the adapter's feed; not paused",
     ],
     spec: "§5.7",
   },
@@ -232,10 +235,14 @@ export const parseBps = (input: string, max = BPS_MAX): number | null => {
   return v === null ? null : Number(v);
 };
 
-/** The TESOURO share cap control: 0–10_000 bps (`validate_params`). */
-export const tesouroCapRequest = (input: string) => {
+/**
+ * The settlement-floor control: "min held in the settlement token", 0–10_000
+ * bps. TODO(rename): composed on today's field as `max_tesouro_share_bps =
+ * 10_000 − V` until the program field becomes `min_settlement_bps`.
+ */
+export const settlementFloorRequest = (input: string) => {
   const v = parseBps(input);
-  return v === null ? null : ({ kind: "set_config", maxTesouroShareBps: v } as const);
+  return v === null ? null : ({ kind: "set_config", maxTesouroShareBps: BPS_MAX - v } as const);
 };
 
 /** The income-take control: `≤ MAX_INCOME_TAKE_BPS`, which is 0 until spec §12 Q47 is decided. */
@@ -244,60 +251,13 @@ export const incomeTakeRequest = (input: string) => {
   return v === null ? null : ({ kind: "set_config", incomeTakeBps: v } as const);
 };
 
-/** What each TESOURO price parameter does and the bound `validate_params` enforces (spec §7). */
-export const PRICE_PARAM_INFO: Record<keyof PriceDraft, { field: string; label: string; meaning: string; bound: string }> = {
-  tesouroPriceAccount: { field: "price.tesouro_price_account", label: "TESOURO price account", meaning: "Etherfuse's on-chain price account that refresh reads for TESOURO.", bound: "any address (unset = 1111…1111)" },
-  p0: { field: "price.p0", label: "Reference price p0", meaning: "Start of the accrual curve that caps the price: BRS base units per TESOURO base unit × 10⁹.", bound: "u64" },
-  t0: { field: "price.t0", label: "Reference time t0", meaning: "When p0 was observed (unix seconds).", bound: "i64" },
-  yMaxBps: { field: "price.y_max_bps", label: "Max annual yield y max", meaning: "Slope of the accrual curve: TESOURO is valued at min(on-chain price, p0 × (1 + y max)^years).", bound: "0–10000 bps" },
-  maxStalenessSecs: { field: "price.max_staleness_secs", label: "Max staleness", meaning: "A price older than this is stale: gated instructions refuse to run on it.", bound: "≥ 0 s" },
-  maxDeviationBps: { field: "price.max_deviation_bps", label: "Max deviation", meaning: "A price that moved more than this against the last accepted one is rejected until admin review.", bound: "0–10000 bps" },
-  maxNavMoveBps: { field: "price.max_nav_move_bps", label: "Max NAV move per refresh", meaning: "A larger move of NAV per share (net of fees and swept income) halts the capital queue until clear_fulfil_halt.", bound: "0–10000 bps" },
-};
-
-export type PriceFields = Record<keyof PriceDraft, string>;
-export const PRICE_FIELDS: readonly (keyof PriceDraft)[] = ["tesouroPriceAccount", "p0", "t0", "yMaxBps", "maxStalenessSecs", "maxDeviationBps", "maxNavMoveBps"];
-
-/**
- * The price-parameter control. Blank fields carry over; a filled field must
- * be in the program's bound. Returns the fields in error, and a request only
- * when at least one field is filled and none is in error.
- */
-export function priceRequest(f: Partial<PriceFields>): { request: { kind: "set_config"; price: PriceDraft } | null; errors: (keyof PriceDraft)[] } {
-  const price: PriceDraft = {};
-  const errors: (keyof PriceDraft)[] = [];
-  const filled = (k: keyof PriceDraft) => (f[k] ?? "").trim() !== "";
-  if (filled("tesouroPriceAccount")) {
-    const a = f.tesouroPriceAccount!.trim();
-    if (isAddress(a)) price.tesouroPriceAccount = a;
-    else errors.push("tesouroPriceAccount");
-  }
-  const int = (k: "p0" | "t0" | "maxStalenessSecs", min: bigint, max: bigint) => {
-    if (!filled(k)) return;
-    const v = parseIntIn(f[k]!, min, max);
-    if (v === null) errors.push(k);
-    else price[k] = v;
-  };
-  int("p0", 0n, U64_MAX);
-  int("t0", I64_MIN, I64_MAX);
-  int("maxStalenessSecs", 0n, I64_MAX);
-  for (const k of ["yMaxBps", "maxDeviationBps", "maxNavMoveBps"] as const) {
-    if (!filled(k)) continue;
-    const v = parseBps(f[k]!);
-    if (v === null) errors.push(k);
-    else price[k] = v;
-  }
-  const any = Object.keys(price).length > 0;
-  return { request: any && errors.length === 0 ? { kind: "set_config", price } : null, errors };
-}
-
 /**
  * The program's bound on each reserve-asset field of `set_config`, checked
  * again by the server before composing (the program checks it last).
  */
 export function reserveConfigError(req: { maxTesouroShareBps?: number; incomeTakeBps?: number; price?: PriceDraft }): string | null {
   const bps = (v: number | undefined, max: number) => v !== undefined && (!Number.isInteger(v) || v < 0 || v > max);
-  if (bps(req.maxTesouroShareBps, BPS_MAX)) return "max_tesouro_share_bps must be 0–10000";
+  if (bps(req.maxTesouroShareBps, BPS_MAX)) return "the settlement floor must be 0–10000 bps";
   if (bps(req.incomeTakeBps, MAX_INCOME_TAKE_BPS))
     return `income_take_bps must be ≤ MAX_INCOME_TAKE_BPS (${MAX_INCOME_TAKE_BPS}): the cap is undecided (spec §12 Q47), so the program refuses any non-zero take`;
   const p = req.price ?? {};

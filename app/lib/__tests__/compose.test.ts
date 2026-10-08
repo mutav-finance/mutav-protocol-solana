@@ -93,7 +93,7 @@ describe("compose", () => {
     expect(d.incomeTakeBps).toBe(0);
     // The income-take cap is 0 until spec §12 Q47: a non-zero take never composes.
     await expect(composeInstructions({ kind: "set_config", incomeTakeBps: 100 }, WALLET, { reserve: r })).rejects.toThrow(/MAX_INCOME_TAKE_BPS/);
-    await expect(composeInstructions({ kind: "set_config", maxTesouroShareBps: 10_001 }, WALLET, { reserve: r })).rejects.toThrow(/max_tesouro_share_bps/);
+    await expect(composeInstructions({ kind: "set_config", maxTesouroShareBps: 10_001 }, WALLET, { reserve: r })).rejects.toThrow(/settlement floor/);
   });
 
   it("composes the general admin instructions, each signed by the right key", async () => {
