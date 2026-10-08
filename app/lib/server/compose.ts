@@ -57,6 +57,7 @@ import {
   getUnpauseInstruction,
 } from "@mutav-finance/mutav-protocol-solana";
 import { ALLOWLIST_TEXT, checkAllowlist } from "../allowlist";
+import { reserveConfigError } from "../reserve-assets";
 import { fromHex } from "../serde";
 import type { TxRequest } from "../tx-kinds";
 import { ADMIN_KINDS } from "../tx-kinds";
@@ -472,6 +473,9 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       void _c;
       void _p;
       void _e;
+      const bad = reserveConfigError(req);
+      if (bad) throw new ComposeError(bad);
+      const { tesouroPriceAccount, ...priceDraft } = req.price ?? {};
       return [
         getSetConfigInstruction(
           {
@@ -484,11 +488,11 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             payoutSlaSecs: c.payoutSlaSecs,
             featureFlags: c.featureFlags,
             mutavCapitalWallet: c.mutavCapitalWallet,
-            caps: { ...caps, ...(req.caps ?? {}) },
-            price,
+            caps: { ...caps, ...(req.caps ?? {}), ...(req.maxTesouroShareBps !== undefined ? { maxTesouroShareBps: req.maxTesouroShareBps } : {}) },
+            price: { ...price, ...priceDraft, ...(tesouroPriceAccount !== undefined ? { tesouroPriceAccount: address(tesouroPriceAccount) } : {}) },
             exit,
-            // Never set from the app: capped at 0 until spec §12 Q47 (ADR 0017).
-            incomeTakeBps: c.incomeTakeBps,
+            // Bounded by MAX_INCOME_TAKE_BPS, which is 0 until spec §12 Q47 (ADR 0017): only 0 composes.
+            incomeTakeBps: req.incomeTakeBps ?? c.incomeTakeBps,
           },
           o,
         ),

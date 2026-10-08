@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { address, AccountRole } from "@solana/kit";
-import { findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, MUTAV_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
+import { findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getSetConfigInstructionDataDecoder, MUTAV_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
 import { fromHex } from "../serde";
 import { composeInstructions, describeInstructions, queueSeqs, unsignedTransaction } from "../server/compose";
 import { assertRelayable, invokedPrograms, isFullySigned, RelayRefusedError } from "../server/relay";
@@ -77,6 +77,23 @@ describe("compose", () => {
     const [ix] = await composeInstructions({ kind: "set_config", coverageRatioBps: 15_000 }, WALLET, { reserve: r });
     expect(ix!.programAddress).toBe(MUTAV_PROGRAM_ADDRESS);
     expect(ix!.data!.length).toBeGreaterThan(8);
+  });
+
+  it("set_config writes the reserve-asset fields and carries every other one", async () => {
+    const r = await reserve();
+    const feed = "HnDdop5PFqvVKZNujsuakwm2K5GskAUk1GxzbDSdGuMo";
+    const [ix] = await composeInstructions({ kind: "set_config", maxTesouroShareBps: 5_000, price: { tesouroPriceAccount: feed, maxStalenessSecs: 3_600n }, incomeTakeBps: 0 }, WALLET, { reserve: r });
+    const d = getSetConfigInstructionDataDecoder().decode(ix!.data!);
+    expect(d.caps.maxTesouroShareBps).toBe(5_000);
+    expect(d.caps.maxTvl).toBe(r.config.caps.maxTvl);
+    expect(d.price.tesouroPriceAccount).toBe(feed);
+    expect(d.price.maxStalenessSecs).toBe(3_600n);
+    expect(d.price.maxNavMoveBps).toBe(r.config.price.maxNavMoveBps);
+    expect(d.coverageRatioBps).toBe(r.config.coverageRatioBps);
+    expect(d.incomeTakeBps).toBe(0);
+    // The income-take cap is 0 until spec §12 Q47: a non-zero take never composes.
+    await expect(composeInstructions({ kind: "set_config", incomeTakeBps: 100 }, WALLET, { reserve: r })).rejects.toThrow(/MAX_INCOME_TAKE_BPS/);
+    await expect(composeInstructions({ kind: "set_config", maxTesouroShareBps: 10_001 }, WALLET, { reserve: r })).rejects.toThrow(/max_tesouro_share_bps/);
   });
 
   it("sweep_income moves the statement from the income inbox, signed by the operator only", async () => {

@@ -34,6 +34,17 @@ export type InvestorTx =
 
 export type PublicTx = { kind: "refresh" };
 
+/** `PriceParams` fields the admin may change through `set_config` (spec §7). Addresses travel as base58. */
+export type PriceDraft = Partial<{
+  tesouroPriceAccount: string;
+  p0: bigint;
+  t0: bigint;
+  yMaxBps: number;
+  maxStalenessSecs: bigint;
+  maxDeviationBps: number;
+  maxNavMoveBps: number;
+}>;
+
 export type AdminTx =
   | { kind: "fulfil_deposits"; count: number }
   | { kind: "fulfil_redeems"; count: number; maxAssets: bigint }
@@ -44,6 +55,12 @@ export type AdminTx =
       kind: "set_config";
       coverageRatioBps?: number;
       caps?: Partial<Record<"maxTvl" | "maxCoverPerGuarantee" | "maxCoverPerAgency" | "maxClaimPerCall" | "maxClaimPerPeriod" | "minRequest" | "maxRequest" | "minFillAssets", bigint>>;
+      /** `caps.max_tesouro_share_bps`: the most of stable assets `allocate` may put in TESOURO. */
+      maxTesouroShareBps?: number;
+      /** TESOURO price parameters (spec §7); blank fields carry over. */
+      price?: PriceDraft;
+      /** MUTAV's take from issuer income (ADR 0017); `≤ MAX_INCOME_TAKE_BPS`, 0 until spec §12 Q47. */
+      incomeTakeBps?: number;
     }
   | { kind: "set_allowlist_root"; owners: string[] };
 
