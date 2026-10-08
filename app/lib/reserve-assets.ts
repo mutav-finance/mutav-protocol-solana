@@ -9,7 +9,7 @@
  * ratios of those fields, never a value the chain does not hold.
  */
 import { isAddress } from "@solana/kit";
-import { MAX_INCOME_TAKE_BPS, U64_MAX } from "@mutav-finance/mutav-protocol-solana";
+import { MAX_INCOME_TAKE_BPS, minSettlementBps, U64_MAX } from "@mutav-finance/mutav-protocol-solana";
 import type { AdapterEntry, IncomeReceipt } from "@mutav-finance/mutav-protocol-solana";
 import { bytesToHex } from "./serde";
 import type { Role } from "./roles";
@@ -58,8 +58,8 @@ export type Composition = {
   adapterShareBps: bigint | null;
   /**
    * The settlement floor, `min_settlement_bps` (ADR 0018): the minimum share of
-   * stable assets held in BRS. TODO(rename): read as `10_000 − caps.max_tesouro_share_bps`
-   * until the program field is replaced by `min_settlement_bps`.
+   * stable assets held in BRS, read through the client's `minSettlementBps`
+   * (the program stores its complement, `caps.max_allocated_bps`).
    */
   floorBps: number;
   /** The BRS the floor requires at today's stable assets. */
@@ -80,14 +80,11 @@ const shareBps = (part: bigint, whole: bigint) => (whole === 0n ? null : (part *
 /** No adapter holds anything allocated. */
 const nothingAllocated = (adapters: AdapterRow[]) => adapters.every((a) => a.allocated === 0n);
 
-/** TODO(rename): `min_settlement_bps` from today's `caps.max_tesouro_share_bps` (its complement). */
-export const settlementFloorBps = (maxTesouroShareBps: number) => BPS_MAX - maxTesouroShareBps;
-
 export function reserveComposition(r: Pick<ReserveView, "state" | "config" | "solvency" | "incomeInbox">): Composition {
   const brs = r.state.brsBalance;
   const adapterValue = r.solvency.tesouroValue;
   const stableAssets = brs + adapterValue;
-  const floorBps = settlementFloorBps(r.config.caps.maxTesouroShareBps);
+  const floorBps = minSettlementBps(r.config);
   const floorValue = (BigInt(floorBps) * stableAssets + 9_999n) / 10_000n;
   const adapters = adapterRows(r.config.adapters);
   const enabled = adapters.filter((a) => a.enabled);
@@ -238,12 +235,11 @@ export const parseBps = (input: string, max = BPS_MAX): number | null => {
 
 /**
  * The settlement-floor control: "min held in the settlement token", 0–10_000
- * bps. TODO(rename): composed on today's field as `max_tesouro_share_bps =
- * 10_000 − V` until the program field becomes `min_settlement_bps`.
+ * bps, composed as `caps.min_settlement_bps` (ADR 0018).
  */
 export const settlementFloorRequest = (input: string) => {
   const v = parseBps(input);
-  return v === null ? null : ({ kind: "set_config", maxTesouroShareBps: BPS_MAX - v } as const);
+  return v === null ? null : ({ kind: "set_config", minSettlementBps: v } as const);
 };
 
 /** The income-take control: `≤ MAX_INCOME_TAKE_BPS`, which is 0 until spec §12 Q47 is decided. */
@@ -256,9 +252,9 @@ export const incomeTakeRequest = (input: string) => {
  * The program's bound on each reserve-asset field of `set_config`, checked
  * again by the server before composing (the program checks it last).
  */
-export function reserveConfigError(req: { maxTesouroShareBps?: number; incomeTakeBps?: number; price?: PriceDraft }): string | null {
+export function reserveConfigError(req: { minSettlementBps?: number; incomeTakeBps?: number; price?: PriceDraft }): string | null {
   const bps = (v: number | undefined, max: number) => v !== undefined && (!Number.isInteger(v) || v < 0 || v > max);
-  if (bps(req.maxTesouroShareBps, BPS_MAX)) return "the settlement floor must be 0–10000 bps";
+  if (bps(req.minSettlementBps, BPS_MAX)) return "the settlement floor must be 0–10000 bps";
   if (bps(req.incomeTakeBps, MAX_INCOME_TAKE_BPS))
     return `income_take_bps must be ≤ MAX_INCOME_TAKE_BPS (${MAX_INCOME_TAKE_BPS}): the cap is undecided (spec §12 Q47), so the program refuses any non-zero take`;
   const p = req.price ?? {};

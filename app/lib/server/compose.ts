@@ -23,6 +23,7 @@ import {
 } from "@solana/kit";
 import {
   buildAllowlist,
+  capsInputFromConfig,
   fetchGuarantee,
   getCancelDepositInstruction,
   getCancelRedeemInstruction,
@@ -56,6 +57,7 @@ import {
   getSetPaymentsAccountInstruction,
   getRevokeOperatorInstruction,
   getSetConfigInstruction,
+  parseSetConfigInstruction,
   getSettlePayoutInstruction,
   getSweepIncomeInstruction,
   getUnpauseInstruction,
@@ -488,10 +490,10 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "set_config": {
       // Write only what changed; carry every other field over as it is on-chain.
       const c = r.config;
-      const { reserved: _c, ...caps } = c.caps;
+      // The floor travels as `minSettlementBps`; the account stores its complement (ADR 0018).
+      const caps = capsInputFromConfig(c.caps);
       const { reserved: _p, ...price } = c.price;
       const { reserved: _e, ...exit } = c.exit;
-      void _c;
       void _p;
       void _e;
       const bad = generalConfigError(req) ?? capsError({ ...caps, ...(req.caps ?? {}) }) ?? reserveConfigError(req);
@@ -502,6 +504,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
           {
             ...common,
             admin: signer,
+            state: a.state,
             treasuryAccount: c.treasuryAccount,
             paymentsAccount: c.paymentsAccount,
             coverageRatioBps: req.coverageRatioBps ?? c.coverageRatioBps,
@@ -509,7 +512,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             payoutSlaSecs: req.payoutSlaSecs ?? c.payoutSlaSecs,
             featureFlags: c.featureFlags,
             mutavCapitalWallet: c.mutavCapitalWallet,
-            caps: { ...caps, ...(req.caps ?? {}), ...(req.maxTesouroShareBps !== undefined ? { maxTesouroShareBps: req.maxTesouroShareBps } : {}) },
+            caps: { ...caps, ...(req.caps ?? {}), ...(req.minSettlementBps !== undefined ? { minSettlementBps: req.minSettlementBps } : {}) },
             price: { ...price, ...priceDraft, ...(tesouroPriceAccount !== undefined ? { tesouroPriceAccount: address(tesouroPriceAccount) } : {}) },
             exit,
             // Bounded by MAX_INCOME_TAKE_BPS, which is 0 until spec §12 Q47 (ADR 0017): only 0 composes.
@@ -579,7 +582,7 @@ export function describeInstructions(ixs: Instruction[], config?: VaultConfig) {
     // Callers pass only MUTAV instructions with a config (the build route's composed set).
     if (config && ix.data && ix.data.length >= 8) {
       try {
-        if (identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig) changes = setConfigChanges(new Uint8Array(ix.data), config, accounts[2]?.address);
+        if (identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig) changes = setConfigChanges(new Uint8Array(ix.data), config, parseSetConfigInstruction(ix as never).accounts.treasuryAccount.address);
       } catch {
         changes = undefined;
       }

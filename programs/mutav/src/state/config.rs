@@ -9,7 +9,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{field, MAX_ADAPTERS, PROGRAM_LAYOUT_VERSION, VAULT_CONFIG_SIZE},
+    constants::{field, BPS_DENOMINATOR, MAX_ADAPTERS, PROGRAM_LAYOUT_VERSION, VAULT_CONFIG_SIZE},
     events::ConfigChanges,
 };
 
@@ -120,11 +120,16 @@ impl VaultConfig {
             &mut c.claim_period_secs,
             a.claim_period_secs,
         );
+        // The settlement floor is stored as its complement (ADR 0018 option
+        // (a)), so a zeroed field reads as "nothing allocated". The event
+        // reports the floor itself.
+        let mut floor = c.min_settlement_bps();
         ch.set(
-            field::CAPS_MAX_TESOURO_SHARE_BPS,
-            &mut c.max_tesouro_share_bps,
-            a.max_tesouro_share_bps,
+            field::CAPS_MIN_SETTLEMENT_BPS,
+            &mut floor,
+            a.min_settlement_bps,
         );
+        c.max_allocated_bps = BPS_DENOMINATOR.saturating_sub(floor);
         ch.set(field::CAPS_MIN_REQUEST, &mut c.min_request, a.min_request);
         ch.set(field::CAPS_MAX_REQUEST, &mut c.max_request, a.max_request);
         ch.set(
@@ -252,9 +257,18 @@ pub struct AdapterEntry {
     /// Current BRS-equivalent value allocated.
     pub allocated: u64,
     pub enabled: bool,
+    // -- carved from `_reserved` by ADR 0018 (2 bytes), before the freeze --
+    /// The most of `stable_assets` this adapter's value may be, in bps
+    /// (`adapter value ≤ max_share_bps × stable_assets / 10_000`, ADR 0018).
+    /// Zero (an entry never configured) means nothing may be allocated.
+    /// Written by `whitelist_adapter` and read by `allocate`, both built with
+    /// the first adapter upgrade.
+    pub max_share_bps: u16,
     /// Zeroed. Room for adapter pinning (PC-27: deployed slot `u64` and
-    /// upgrade authority `Pubkey`, 40 bytes) without a migration.
-    pub _reserved: [u8; 64],
+    /// upgrade authority `Pubkey`, 40 bytes) without a migration. The price
+    /// feed, its bounds and the position live in the `AdapterState` PDA
+    /// (`["adapter_state", config, program_id]`, spec §3.9).
+    pub _reserved: [u8; 62],
 }
 
 /// Caps (spec §8). All values in BRS base units unless noted.
@@ -266,12 +280,27 @@ pub struct Caps {
     pub max_claim_per_call: u64,
     pub max_claim_per_period: u64,
     pub claim_period_secs: i64,
-    pub max_tesouro_share_bps: u16,
+    /// The most of `stable_assets` all adapters together may hold outside
+    /// `reserve_mint`, in bps: the complement of the settlement floor
+    /// `min_settlement_bps` (ADR 0018 option (a)). Stored as the complement so
+    /// that zero is the pilot's "nothing allocated" (spec §14.2 R3). Every
+    /// edge (instruction args, `ConfigUpdated`, client, app) speaks
+    /// `min_settlement_bps = 10_000 − max_allocated_bps`; read it through
+    /// [`Caps::min_settlement_bps`].
+    pub max_allocated_bps: u16,
     pub min_request: u64,
     pub max_request: u64,
     pub min_fill_assets: u64,
     /// Zeroed. Later caps (PC-43) are carved here.
     pub _reserved: [u8; 32],
+}
+
+impl Caps {
+    /// The settlement floor (ADR 0018): the minimum share of `stable_assets`
+    /// held in `reserve_mint`, in bps. `10_000` in the pilot.
+    pub fn min_settlement_bps(&self) -> u16 {
+        BPS_DENOMINATOR.saturating_sub(self.max_allocated_bps)
+    }
 }
 
 /// TESOURO price bounds (spec §7).
@@ -328,7 +357,9 @@ pub struct CapsInput {
     pub max_claim_per_call: u64,
     pub max_claim_per_period: u64,
     pub claim_period_secs: i64,
-    pub max_tesouro_share_bps: u16,
+    /// The settlement floor (ADR 0018), `<= 10_000`. Stored as its complement
+    /// `Caps::max_allocated_bps`.
+    pub min_settlement_bps: u16,
     pub min_request: u64,
     pub max_request: u64,
     pub min_fill_assets: u64,
@@ -415,6 +446,7 @@ mod tests {
         c.apply_caps(
             &CapsInput {
                 max_tvl: 1,
+                min_settlement_bps: BPS_DENOMINATOR,
                 ..Default::default()
             },
             &mut ch,
@@ -437,5 +469,34 @@ mod tests {
         assert_eq!(c.price._reserved, [8; 32]);
         assert_eq!(c.exit._reserved, [9; 32]);
         assert_eq!(ch.0.len(), 6);
+    }
+
+    #[test]
+    fn settlement_floor_is_stored_as_its_complement() {
+        let mut c = zeroed();
+        // Zeroed storage is the pilot: nothing allocated, a 100% floor.
+        assert_eq!(c.caps.max_allocated_bps, 0);
+        assert_eq!(c.caps.min_settlement_bps(), 10_000);
+        let mut ch = ConfigChanges::default();
+        let input = |v| CapsInput {
+            min_settlement_bps: v,
+            ..Default::default()
+        };
+        c.apply_caps(&input(10_000), &mut ch);
+        assert!(ch.0.is_empty(), "a 100% floor is the zeroed field");
+        c.apply_caps(&input(6_000), &mut ch);
+        assert_eq!(c.caps.max_allocated_bps, 4_000);
+        assert_eq!(c.caps.min_settlement_bps(), 6_000);
+        // The event speaks the floor, not the stored complement.
+        assert_eq!(
+            ch.0,
+            vec![(
+                field::CAPS_MIN_SETTLEMENT_BPS,
+                crate::events::FieldBytes::field_bytes(&10_000u16),
+                crate::events::FieldBytes::field_bytes(&6_000u16),
+            )]
+        );
+        c.apply_caps(&input(0), &mut ch);
+        assert_eq!(c.caps.max_allocated_bps, 10_000);
     }
 }

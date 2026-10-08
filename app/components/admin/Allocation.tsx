@@ -147,13 +147,13 @@ function FloorControl({ mode, c }: { mode: Mode; c: Composition }) {
   // Starts blank, and an unchanged value proposes nothing: no no-op proposals.
   const [floor, setFloor] = useState("");
   const parsed = settlementFloorRequest(floor);
-  const v = parsed ? BPS_MAX - parsed.maxTesouroShareBps : null;
+  const v = parsed ? parsed.minSettlementBps : null;
   const req = v !== null && v !== c.floorBps ? parsed : null;
   const preview = v === null ? null : (BigInt(v) * c.stableAssets + 9_999n) / 10_000n;
   return (
     <AdminAction title="Min held in the settlement token" label="set_config" mode={mode} request={req}>
       <Facts
-        now={m(`${fmtPct(c.floorBps)} in BRS (read as 10000 − max_tesouro_share_bps until the rename)`)}
+        now={m(`${fmtPct(c.floorBps)} in BRS (min_settlement_bps)`)}
         bound={m(`0 – ${BPS_MAX} bps · pilot ${BPS_MAX} (100%)`)}
         does="The minimum share of stable assets held in BRS, the token guarantee fees come in and claim payments go out in. All adapters together may use only the share above it. 100% in the pilot (ADR 0018); it binds once allocate exists."
       />

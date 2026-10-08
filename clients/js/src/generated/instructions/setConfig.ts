@@ -41,12 +41,14 @@ import {
 } from "@solana/kit";
 import {
   getAccountMetaFactory,
+  getAddressFromResolvedInstructionAccount,
   type InstructionAccountInput,
   type InstructionAccountInputAddress,
   type InstructionSignerInput,
   type ResolvedInstructionAccount,
   type ResolvedInstructionAccountMeta,
 } from "@solana/kit/program-client-core";
+import { findStatePda } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 import {
   getCapsInputDecoder,
@@ -75,6 +77,7 @@ export type SetConfigInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
   TAccountAdmin extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
+  TAccountState extends string | AccountMeta<string> = string,
   TAccountTreasuryAccount extends string | AccountMeta<string> = string,
   TAccountPaymentsAccount extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
@@ -91,6 +94,9 @@ export type SetConfigInstruction<
       TAccountConfig extends string
         ? WritableAccount<TAccountConfig>
         : TAccountConfig,
+      TAccountState extends string
+        ? WritableAccount<TAccountState>
+        : TAccountState,
       TAccountTreasuryAccount extends string
         ? ReadonlyAccount<TAccountTreasuryAccount>
         : TAccountTreasuryAccount,
@@ -177,9 +183,10 @@ export function getSetConfigInstructionDataCodec(): FixedSizeCodec<
   );
 }
 
-export type SetConfigInput<
+export type SetConfigAsyncInput<
   TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
+  TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput =
@@ -190,6 +197,197 @@ export type SetConfigInput<
 > = {
   admin: TAccountAdmin;
   config: TAccountConfig;
+  /** Its cached `coverage_required` follows a change of `c`. */
+  state?: TAccountState;
+  /**
+   * The treasury token account after this update (the current one, or a
+   * new one).
+   */
+  treasuryAccount: TAccountTreasuryAccount;
+  /** The current payments token account, to compare owners (spec §2.1). */
+  paymentsAccount: TAccountPaymentsAccount;
+  eventAuthority: TAccountEventAuthority;
+  program: TAccountProgram;
+  coverageRatioBps: SetConfigInstructionDataArgs["coverageRatioBps"];
+  feeTakeBps: SetConfigInstructionDataArgs["feeTakeBps"];
+  payoutSlaSecs: SetConfigInstructionDataArgs["payoutSlaSecs"];
+  featureFlags: SetConfigInstructionDataArgs["featureFlags"];
+  mutavCapitalWallet: SetConfigInstructionDataArgs["mutavCapitalWallet"];
+  caps: SetConfigInstructionDataArgs["caps"];
+  price: SetConfigInstructionDataArgs["price"];
+  exit: SetConfigInstructionDataArgs["exit"];
+  incomeTakeBps: SetConfigInstructionDataArgs["incomeTakeBps"];
+};
+
+export async function getSetConfigInstructionAsync<
+  TAccountAdmin extends InstructionSignerInput,
+  TAccountConfig extends InstructionAccountInput,
+  TAccountState extends InstructionAccountInput,
+  TAccountTreasuryAccount extends InstructionAccountInput,
+  TAccountPaymentsAccount extends InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput,
+  TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
+>(
+  input: SetConfigAsyncInput<
+    TAccountAdmin,
+    TAccountConfig,
+    TAccountState,
+    TAccountTreasuryAccount,
+    TAccountPaymentsAccount,
+    TAccountEventAuthority,
+    TAccountProgram
+  >,
+  config?: { programAddress?: TProgramAddress },
+): Promise<
+  SetConfigInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<
+      TAccountAdmin,
+      InstructionAccountInputAddress<TAccountAdmin>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountConfig,
+      InstructionAccountInputAddress<TAccountConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountState,
+      InstructionAccountInputAddress<TAccountState>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTreasuryAccount,
+      InstructionAccountInputAddress<TAccountTreasuryAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPaymentsAccount,
+      InstructionAccountInputAddress<TAccountPaymentsAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
+  >
+> {
+  // Program address.
+  const programAddress = config?.programAddress ?? MUTAV_PROGRAM_ADDRESS;
+
+  // Account meta helper.
+  const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
+
+  // Original accounts.
+  const originalAccounts = {
+    admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
+    config: { value: input.config ?? null, isSigner: false, isWritable: true },
+    state: { value: input.state ?? null, isSigner: false, isWritable: true },
+    treasuryAccount: {
+      value: input.treasuryAccount ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    paymentsAccount: {
+      value: input.paymentsAccount ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    eventAuthority: {
+      value: input.eventAuthority ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    program: {
+      value: input.program ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+  };
+  const accounts = originalAccounts as Record<
+    keyof typeof originalAccounts,
+    ResolvedInstructionAccount
+  >;
+
+  // Original args.
+  const args = { ...input };
+
+  // Resolve default values.
+  if (!accounts.state.value) {
+    accounts.state.value = await findStatePda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+
+  return Object.freeze({
+    accounts: [
+      getAccountMeta("admin", accounts.admin),
+      getAccountMeta("config", accounts.config),
+      getAccountMeta("state", accounts.state),
+      getAccountMeta("treasuryAccount", accounts.treasuryAccount),
+      getAccountMeta("paymentsAccount", accounts.paymentsAccount),
+      getAccountMeta("eventAuthority", accounts.eventAuthority),
+      getAccountMeta("program", accounts.program),
+    ],
+    data: getSetConfigInstructionDataEncoder().encode(
+      args as SetConfigInstructionDataArgs,
+    ),
+    programAddress,
+  } as SetConfigInstruction<
+    TProgramAddress,
+    ResolvedInstructionAccountMeta<
+      TAccountAdmin,
+      InstructionAccountInputAddress<TAccountAdmin>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountConfig,
+      InstructionAccountInputAddress<TAccountConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountState,
+      InstructionAccountInputAddress<TAccountState>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountTreasuryAccount,
+      InstructionAccountInputAddress<TAccountTreasuryAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPaymentsAccount,
+      InstructionAccountInputAddress<TAccountPaymentsAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountEventAuthority,
+      InstructionAccountInputAddress<TAccountEventAuthority>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountProgram,
+      InstructionAccountInputAddress<TAccountProgram>
+    >
+  >);
+}
+
+export type SetConfigInput<
+  TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+  TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
+  TAccountState extends InstructionAccountInput = InstructionAccountInput,
+  TAccountTreasuryAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPaymentsAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountEventAuthority extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
+> = {
+  admin: TAccountAdmin;
+  config: TAccountConfig;
+  /** Its cached `coverage_required` follows a change of `c`. */
+  state: TAccountState;
   /**
    * The treasury token account after this update (the current one, or a
    * new one).
@@ -213,6 +411,7 @@ export type SetConfigInput<
 export function getSetConfigInstruction<
   TAccountAdmin extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
+  TAccountState extends InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
@@ -222,6 +421,7 @@ export function getSetConfigInstruction<
   input: SetConfigInput<
     TAccountAdmin,
     TAccountConfig,
+    TAccountState,
     TAccountTreasuryAccount,
     TAccountPaymentsAccount,
     TAccountEventAuthority,
@@ -237,6 +437,10 @@ export function getSetConfigInstruction<
   ResolvedInstructionAccountMeta<
     TAccountConfig,
     InstructionAccountInputAddress<TAccountConfig>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountState,
+    InstructionAccountInputAddress<TAccountState>
   >,
   ResolvedInstructionAccountMeta<
     TAccountTreasuryAccount,
@@ -265,6 +469,7 @@ export function getSetConfigInstruction<
   const originalAccounts = {
     admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
     config: { value: input.config ?? null, isSigner: false, isWritable: true },
+    state: { value: input.state ?? null, isSigner: false, isWritable: true },
     treasuryAccount: {
       value: input.treasuryAccount ?? null,
       isSigner: false,
@@ -298,6 +503,7 @@ export function getSetConfigInstruction<
     accounts: [
       getAccountMeta("admin", accounts.admin),
       getAccountMeta("config", accounts.config),
+      getAccountMeta("state", accounts.state),
       getAccountMeta("treasuryAccount", accounts.treasuryAccount),
       getAccountMeta("paymentsAccount", accounts.paymentsAccount),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
@@ -316,6 +522,10 @@ export function getSetConfigInstruction<
     ResolvedInstructionAccountMeta<
       TAccountConfig,
       InstructionAccountInputAddress<TAccountConfig>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountState,
+      InstructionAccountInputAddress<TAccountState>
     >,
     ResolvedInstructionAccountMeta<
       TAccountTreasuryAccount,
@@ -344,15 +554,17 @@ export type ParsedSetConfigInstruction<
   accounts: {
     admin: TAccountMetas[0];
     config: TAccountMetas[1];
+    /** Its cached `coverage_required` follows a change of `c`. */
+    state: TAccountMetas[2];
     /**
      * The treasury token account after this update (the current one, or a
      * new one).
      */
-    treasuryAccount: TAccountMetas[2];
+    treasuryAccount: TAccountMetas[3];
     /** The current payments token account, to compare owners (spec §2.1). */
-    paymentsAccount: TAccountMetas[3];
-    eventAuthority: TAccountMetas[4];
-    program: TAccountMetas[5];
+    paymentsAccount: TAccountMetas[4];
+    eventAuthority: TAccountMetas[5];
+    program: TAccountMetas[6];
   };
   data: SetConfigInstructionData;
 };
@@ -365,12 +577,12 @@ export function parseSetConfigInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSetConfigInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+  if (instruction.accounts.length < 7) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 6,
+        expectedAccountMetas: 7,
       },
     );
   }
@@ -385,6 +597,7 @@ export function parseSetConfigInstruction<
     accounts: {
       admin: getNextAccount(),
       config: getNextAccount(),
+      state: getNextAccount(),
       treasuryAccount: getNextAccount(),
       paymentsAccount: getNextAccount(),
       eventAuthority: getNextAccount(),

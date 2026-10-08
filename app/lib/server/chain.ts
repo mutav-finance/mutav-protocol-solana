@@ -89,11 +89,7 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
     clusterNow(env),
     readTokenFacts(env, config.data.reserveMint, addresses.reserve),
     // ADR 0017: issuer income paid and not swept yet (never in NAV).
-    fetchIncomeInbox(rpc, {
-      vaultAuthority: addresses.vaultAuthority,
-      reserveMint: config.data.reserveMint,
-      tokenProgram: config.data.reserveTokenProgram,
-    }),
+    fetchIncomeInbox(rpc, { vaultAuthority: addresses.vaultAuthority, config: config.data }),
   ]);
   return {
     cluster: env.cluster,

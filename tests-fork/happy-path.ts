@@ -174,7 +174,7 @@ export async function forkHappyPath(programKeypair?: string) {
       caps: {
         maxTvl: '100000000000', maxCoverPerGuarantee: '30000000000', maxCoverPerAgency: '60000000000',
         maxClaimPerCall: '10000000000', maxClaimPerPeriod: '20000000000', claimPeriodSecs: 2_592_000,
-        maxTesouroShareBps: 0, minRequest: '1000000000', maxRequest: '30000000000', minFillAssets: '500000000',
+        minSettlementBps: 10_000, minRequest: '1000000000', maxRequest: '30000000000', minFillAssets: '500000000',
       },
       price: {
         tesouroPriceAccount: '11111111111111111111111111111111', p0: 1_000_000_000, t0: 0, yMaxBps: 1_500,

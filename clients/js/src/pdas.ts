@@ -93,21 +93,23 @@ export const ASSOCIATED_TOKEN_PROGRAM_ADDRESS = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH2
 
 /**
  * The income inbox (spec §3.3, ADR 0017): the vault authority's associated
- * token account for the reserve mint, under the reserve's token program
- * (`config.reserveTokenProgram`; classic SPL Token by default). Nora pays
+ * token account for the reserve mint, under the reserve's token program.
+ * `tokenProgram` is required (pass `config.reserveTokenProgram`): a
+ * Token-2022 reserve's inbox is a different address, and a default would
+ * silently derive the wrong one (#29). Nora pays
  * the monthly revenue share here; `sweep_income` moves a statement's amount
  * into the reserve. Its balance never counts toward NAV.
  */
 export async function findIncomeInboxAddress(s: {
   vaultAuthority: Address;
   reserveMint: Address;
-  tokenProgram?: Address;
+  tokenProgram: Address;
 }): Promise<Address> {
   const [inbox] = await getProgramDerivedAddress({
     programAddress: ASSOCIATED_TOKEN_PROGRAM_ADDRESS,
     seeds: [
       addr.encode(s.vaultAuthority),
-      addr.encode(s.tokenProgram ?? TOKEN_PROGRAM_ADDRESS),
+      addr.encode(s.tokenProgram),
       addr.encode(s.reserveMint),
     ],
   });

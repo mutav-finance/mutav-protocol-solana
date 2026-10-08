@@ -59,7 +59,7 @@ pub(crate) fn validate_params(
         MutavError::InvalidParameter
     );
     for bps in [
-        caps.max_tesouro_share_bps,
+        caps.min_settlement_bps,
         price.max_deviation_bps,
         price.max_nav_move_bps,
         price.y_max_bps,

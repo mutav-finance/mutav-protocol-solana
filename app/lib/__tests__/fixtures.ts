@@ -17,7 +17,7 @@ export function config(over: Partial<VaultConfig> = {}): VaultConfig {
       maxClaimPerCall: 10_000n * BRL,
       maxClaimPerPeriod: 20_000n * BRL,
       claimPeriodSecs: 2_592_000n,
-      maxTesouroShareBps: 0,
+      maxAllocatedBps: 0,
       minRequest: 1_000n * BRL,
       maxRequest: 30_000n * BRL,
       minFillAssets: 500n * BRL,

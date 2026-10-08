@@ -1,14 +1,21 @@
 //! `set_config` (spec §5.1, §14.3).
+//!
+//! Also recomputes the cached `VaultState.coverage_required` when the
+//! coverage ratio `c` changes (#29), so readers of the cache see the new `c`
+//! at once. `mode` stays `refresh`'s: it needs the bounded price and emits
+//! `ModeChanged`. Every gate recomputes both, so neither cache is a safety
+//! input.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
-    constants::{field, MAX_INCOME_TAKE_BPS, SUPPORTED_FEATURES},
+    constants::{field, MAX_INCOME_TAKE_BPS, STATE_SEED, SUPPORTED_FEATURES},
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges},
     instructions::admin::{validate_money_accounts, validate_params, vault_authority_key},
-    state::{CapsInput, ExitInput, PriceInput, VaultConfig},
+    solvency::coverage_required,
+    state::{CapsInput, ExitInput, PriceInput, VaultConfig, VaultState},
 };
 
 /// The full set of `VaultConfig` fields `set_config` manages. Roles, the
@@ -41,6 +48,15 @@ pub struct SetConfig<'info> {
         constraint = config.admin == admin.key() @ MutavError::Unauthorized,
     )]
     pub config: Box<Account<'info, VaultConfig>>,
+
+    /// Its cached `coverage_required` follows a change of `c`.
+    #[account(
+        mut,
+        seeds = [STATE_SEED, config.key().as_ref()],
+        bump = state.bump,
+        constraint = state.is_supported() @ MutavError::UnsupportedVersion,
+    )]
+    pub state: Box<Account<'info, VaultState>>,
 
     /// The treasury token account after this update (the current one, or a
     /// new one).
@@ -129,6 +145,14 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
     config.apply_price(&args.price, &mut ch);
     config.apply_exit(&args.exit, &mut ch);
 
+    // The cached `coverage_required` (spec §3.2) with the new `c`, as
+    // `register_guarantee`, `file_claim`, `pay_claim` and `close_guarantee`
+    // keep it. `mode` is left to `refresh` (see the module doc).
+    let c = config.coverage_ratio_bps;
+    let state = &mut ctx.accounts.state;
+    state.coverage_required = coverage_required(state.remaining_cover_total, c, state.provisions)?;
+
+    let config = &ctx.accounts.config;
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;

@@ -45,11 +45,12 @@ Rules for AI agents and humans working in this repo. `mutav-finance/mutav-protoc
 
 The pilot web app lives in [`app/`](app/) (Next.js 16, Bun). Its full rules are in [`app/CLAUDE.md`](app/CLAUDE.md); the essentials:
 
-- Routes: `/` landing, `/reserve` public transparency, `/demo` guided operator demo, `/admin` Squads admin console. Spec: [`app/docs/spec.md`](app/docs/spec.md).
+- Routes: `/` landing, `/reserve`, `/operator`, `/investor`, `/admin` (General · Money in & out · Allocation), `/demo`, `/simulator` (static `public/simulator.html`). Spec: [`app/docs/spec.md`](app/docs/spec.md).
+- The pilot reserve is BRS-only and expands through adapters (ADR 0018).
 - **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts through `clients/js`. Previews use the client's math mirror and are labelled as previews.
 - **Cluster by env:** `NEXT_PUBLIC_CLUSTER` is `localnet` or `devnet`; mainnet is refused.
 - `app/` depends on `file:../clients/js`; its postinstall builds and copies the client (see [`app/README.md`](app/README.md)). Never edit `clients/js` from app work.
-- The same language rules apply in UI copy; a unit test greps the UI for forbidden words. The pilot reserve is not investable, and copy says so.
+- The same language rules apply in UI copy; a unit test greps the UI for forbidden words. The pilot runs on MUTAV's own capital and is not open to public investment; investor actions are gated by the on-chain allowlist.
 - Checks: `cd app && bun run typecheck && bun run test && bun run build`. The Playwright smoke (`bun run e2e`) needs `anchor build` and starts its own validator: it is a heavy process.
 
 ## Git

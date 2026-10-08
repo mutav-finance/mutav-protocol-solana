@@ -47,7 +47,7 @@ describe('devnet.example.json', () => {
     expect(c.cluster).toBe('devnet');
     expect(c.reserveMint as string).toBe('BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4');
     expect(c.price.maxNavMoveBps).toBe(10_000);
-    expect(c.caps.maxTesouroShareBps).toBe(0);
+    expect(c.caps.minSettlementBps).toBe(10_000);
   });
 
   test('starts at c = 0.10 with caps sized for it (ADR 0016)', () => {

@@ -204,12 +204,20 @@ const TOKEN_AMOUNT_OFFSET = 64;
  * The income inbox of a reserve (ADR 0017) and its untracked balance: what
  * Nora has paid and the operator has not swept yet. `exists: false` before
  * `initialize`. This balance never counts toward NAV.
+ *
+ * The mint and token program come from the reserve's `VaultConfig`
+ * (`reserveMint`, `reserveTokenProgram`), so a Token-2022 reserve reads its
+ * own inbox (#29).
  */
 export async function fetchIncomeInbox(
   rpc: ReadRpc,
-  r: { vaultAuthority: Address; reserveMint: Address; tokenProgram?: Address },
+  r: { vaultAuthority: Address; config: Pick<VaultConfig, 'reserveMint' | 'reserveTokenProgram'> },
 ): Promise<{ address: Address; exists: boolean; amount: bigint }> {
-  const address = await findIncomeInboxAddress(r);
+  const address = await findIncomeInboxAddress({
+    vaultAuthority: r.vaultAuthority,
+    reserveMint: r.config.reserveMint,
+    tokenProgram: r.config.reserveTokenProgram,
+  });
   const { value } = (await rpc.getAccountInfo(address, { encoding: 'base64' }).send()) as unknown as {
     value: { data: [string, string] } | null;
   };

@@ -183,16 +183,22 @@ describe('queue positions', () => {
 describe('issuer income (ADR 0017)', () => {
   test('reads the inbox balance, and reports a missing inbox', async () => {
     const { rpc, a } = await setup();
-    const r = { vaultAuthority: a.vaultAuthority, reserveMint: MINT };
+    const config = { reserveMint: MINT, reserveTokenProgram: TOKEN_PROGRAM_ADDRESS };
+    const r = { vaultAuthority: a.vaultAuthority, config };
+    const inboxAddress = await findIncomeInboxAddress({
+      vaultAuthority: a.vaultAuthority,
+      reserveMint: MINT,
+      tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    });
     expect(await fetchIncomeInbox(rpc as never, r)).toEqual({
-      address: await findIncomeInboxAddress(r),
+      address: inboxAddress,
       exists: false,
       amount: 0n,
     });
     // An SPL token account (165 bytes) holding 1,234.5 BRS.
     const acc = new Uint8Array(165);
     new DataView(acc.buffer).setBigUint64(64, 1_234_500_000n, true);
-    rpc.set(await findIncomeInboxAddress(r), acc, TOKEN_PROGRAM_ADDRESS);
+    rpc.set(inboxAddress, acc, TOKEN_PROGRAM_ADDRESS);
     const inbox = await fetchIncomeInbox(rpc as never, r);
     expect(inbox.exists).toBe(true);
     expect(inbox.amount).toBe(1_234_500_000n);

@@ -27,13 +27,13 @@
     "maxClaimPerCall": 10000000000,
     "maxClaimPerPeriod": 20000000000,
     "claimPeriodSecs": 2592000,
-    "maxTesouroShareBps": 0,
+    "minSettlementBps": 10000,
     "minRequest": 1000000000,
     "maxRequest": 100000000000,
     "minFillAssets": 500000000
   },
   "price": {
-    "_comment": "TESOURO is not held in the pilot (no adapter), so the price fields are placeholders. maxNavMoveBps is 10000 (100%) on devnet on purpose: the NAV-move guard measures the move gross, so a large guarantee-fee batch or claim payment against a small demo reserve would trip it and halt fulfilment. The inflow-adjusted guard is ADR 0013 (pending); until then, if the guard trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
+    "_comment": "TESOURO is not held in the pilot (no adapter), so the price fields are placeholders. maxNavMoveBps is 10000 (100%) on devnet on purpose: the guard nets out guarantee fees and swept income per share (ADR 0017), but a claim provision or payment against a small demo reserve is a real NAV move and would trip it and halt fulfilment. If it trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
     "tesouroPriceAccount": "11111111111111111111111111111111",
     "p0": 1000000000,
     "t0": 0,

@@ -137,7 +137,8 @@ fn sweep_moves_the_statement_into_the_reserve_and_raises_nav() {
     assert_eq!(s.brs_balance, 101_000 * BRL);
     assert_eq!(s.income_total, 1_000 * BRL);
     assert_eq!(s.income_take_total, 0);
-    assert_eq!(s.inflows_since_refresh, 1_000 * BRL);
+    // The guard's counter is per share: 1,000 / 100,000 shares = 0.01.
+    assert_eq!(s.inflow_nav, NAV_SCALE / 100);
     assert_eq!(s.fees_in_total, 0, "income is not a guarantee fee");
     assert_eq!(f.balance(&f.income_inbox()), 0);
     assert_eq!(f.balance(&f.pdas.reserve), 101_000 * BRL);
@@ -363,7 +364,7 @@ fn wrong_mint_or_token_program_is_refused() {
     let mut a = f.income_accounts();
     a.token_program = TOKEN_2022_PROGRAM;
     let ix = f.sweep_income_ix(a, unique_hash(), PERIOD, 1);
-    assert_mutav_err(f.send(ix, &o), MutavError::InvalidMint);
+    assert_mutav_err(f.send(ix, &o), MutavError::InvalidTokenProgram);
 }
 
 #[test]
@@ -455,11 +456,16 @@ fn a_frozen_inbox_or_reserve_fails_closed_and_changes_nothing() {
     let mut f = funded();
     f.pay_income(1_000 * BRL);
     let inbox = f.income_inbox();
-    for frozen in [inbox, f.pdas.reserve] {
+    // A frozen inbox is not a valid source; a frozen reserve is the usual
+    // reserve freeze.
+    for (frozen, err) in [
+        (inbox, MutavError::InvalidIncomeSource),
+        (f.pdas.reserve, MutavError::ReserveFrozen),
+    ] {
         f.set_frozen(&frozen, true);
         let before = snapshot(&f);
         let (res, r) = f.sweep(1_000 * BRL);
-        assert_mutav_err(res, MutavError::ReserveFrozen);
+        assert_mutav_err(res, err);
         assert_eq!(snapshot(&f), before);
         assert!(f
             .svm
@@ -603,7 +609,8 @@ fn an_injected_take_goes_to_the_treasury_rounded_down() {
     let s = f.state();
     assert_eq!(s.brs_balance, 100_000 * BRL + net);
     assert_eq!((s.income_total, s.income_take_total), (net, take));
-    assert_eq!(s.inflows_since_refresh, net);
+    // ceil(750.000003 / 100,000 × 10⁹): rounded up (pricing::inflow_nav).
+    assert_eq!(s.inflow_nav, 7_500_001);
     let rec = f.income_receipt(&r);
     assert_eq!((rec.gross, rec.take, rec.net), (1_000 * BRL + 3, take, net));
     let e = &events::<IncomeSwept>(&meta)[0];

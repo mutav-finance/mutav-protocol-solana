@@ -112,7 +112,7 @@ macro_rules! vault_state_fields {
             "late_payouts" => late_payouts, "fulfil_halted" => fulfil_halted,
             "last_refresh_ts" => last_refresh_ts, "last_refresh_slot" => last_refresh_slot,
             "income_total" => income_total, "income_take_total" => income_take_total,
-            "inflows_since_refresh" => inflows_since_refresh,
+            "inflow_nav" => inflow_nav,
         )
     };
 }
@@ -129,6 +129,7 @@ macro_rules! vault_config_fields {
             "payments_account" => payments_account, "treasury_account" => treasury_account,
             "investor_allowlist_root" => investor_allowlist_root,
             "adapters[0].program_id" => adapters[0].program_id,
+            "adapters[7].max_share_bps" => adapters[7].max_share_bps,
             "adapters[7]._reserved" => adapters[7]._reserved,
             "caps.max_tvl" => caps.max_tvl, "caps._reserved" => caps._reserved,
             "price.tesouro_price_account" => price.tesouro_price_account,
@@ -151,7 +152,7 @@ macro_rules! caps_fields {
             "max_claim_per_call" => max_claim_per_call,
             "max_claim_per_period" => max_claim_per_period,
             "claim_period_secs" => claim_period_secs,
-            "max_tesouro_share_bps" => max_tesouro_share_bps,
+            "max_allocated_bps" => max_allocated_bps,
             "min_request" => min_request, "max_request" => max_request,
             "min_fill_assets" => min_fill_assets, "_reserved" => _reserved,
         )
@@ -194,7 +195,8 @@ macro_rules! adapter_fields {
         spans!($t;
             "program_id" => program_id, "sub_authority" => sub_authority,
             "asset_mint" => asset_mint, "cap" => cap, "allocated" => allocated,
-            "enabled" => enabled, "_reserved" => _reserved,
+            "enabled" => enabled, "max_share_bps" => max_share_bps,
+            "_reserved" => _reserved,
         )
     };
 }

@@ -20,13 +20,14 @@ const REPO = join(__dirname, "../../..");
 const ADAPTER = "HnDdop5PFqvVKZNujsuakwm2K5GskAUk1GxzbDSdGuMo";
 const MINT = "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4";
 
-const empty = { programId: UNSET_ADDRESS, subAuthority: UNSET_ADDRESS, assetMint: UNSET_ADDRESS, cap: 0n, allocated: 0n, enabled: false, reserved: new Uint8Array(64) };
+const empty = { programId: UNSET_ADDRESS, subAuthority: UNSET_ADDRESS, assetMint: UNSET_ADDRESS, cap: 0n, allocated: 0n, enabled: false, maxShareBps: 0, reserved: new Uint8Array(62) };
 const slots = (...used: Partial<typeof empty>[]) => [...used.map((u) => ({ ...empty, ...u })), ...Array(8 - used.length).fill(empty)];
 
-function view({ brs, tesouro = 0n, inbox = 0n, capBps = 0, adapters = slots() }: { brs: bigint; tesouro?: bigint; inbox?: bigint; capBps?: number; adapters?: unknown[] }) {
+function view({ brs, tesouro = 0n, inbox = 0n, floorBps = 10_000, adapters = slots() }: { brs: bigint; tesouro?: bigint; inbox?: bigint; floorBps?: number; adapters?: unknown[] }) {
   const c = config();
   return {
-    config: { ...c, caps: { ...c.caps, maxTesouroShareBps: capBps }, adapters } as never,
+    // Stored as the complement of the floor (ADR 0018 option (a)).
+    config: { ...c, caps: { ...c.caps, maxAllocatedBps: 10_000 - floorBps }, adapters } as never,
     state: state({ brsBalance: brs, tesouroUnits: tesouro } as never),
     solvency: { tesouroValue: tesouro } as never,
     incomeInbox: { address: ADAPTER, exists: true, amount: inbox },
@@ -40,7 +41,7 @@ describe("reserve composition", () => {
     expect(c.brsShareBps).toBe(10_000n);
     expect(c.adapterShareBps).toBe(0n);
     expect(c.inbox).toBe(1_250n * BRL);
-    // TODO(rename): max_tesouro_share_bps = 0 reads as min_settlement_bps = 10_000.
+    // A zeroed max_allocated_bps reads as min_settlement_bps = 10_000.
     expect(c.floorBps).toBe(10_000);
     expect(c.floorValue).toBe(300_000n * BRL);
     expect(c.roomAboveFloor).toBe(0n);
@@ -59,8 +60,7 @@ describe("reserve composition", () => {
 
   it("measures BRS against the settlement floor once an adapter holds value", () => {
     const adapters = slots({ programId: ADAPTER, assetMint: MINT, cap: 200n * BRL, allocated: 100n * BRL, enabled: true });
-    // max_tesouro_share_bps 5_000 = a 50% floor.
-    const c = reserveComposition(view({ brs: 300n * BRL, tesouro: 100n * BRL, capBps: 5_000, adapters }));
+    const c = reserveComposition(view({ brs: 300n * BRL, tesouro: 100n * BRL, floorBps: 5_000, adapters }));
     expect(c.stableAssets).toBe(400n * BRL);
     expect(c.adapterShareBps).toBe(2_500n);
     expect(c.brsShareBps).toBe(7_500n);
@@ -73,7 +73,7 @@ describe("reserve composition", () => {
   });
 
   it("flags BRS below the floor (after a price move or a floor raise)", () => {
-    const c = reserveComposition(view({ brs: 100n * BRL, tesouro: 100n * BRL, capBps: 2_000 }));
+    const c = reserveComposition(view({ brs: 100n * BRL, tesouro: 100n * BRL, floorBps: 8_000 }));
     expect(c.floorBps).toBe(8_000);
     expect(c.belowFloor).toBe(true);
     expect(c.roomAboveFloor).toBe(0n);
@@ -91,15 +91,15 @@ describe("reserve composition", () => {
 });
 
 describe("set_config controls", () => {
-  it("composes the settlement floor as its complement on today's field (TODO(rename))", () => {
-    expect(settlementFloorRequest("10000")).toEqual({ kind: "set_config", maxTesouroShareBps: 0 });
-    expect(settlementFloorRequest("5000")).toEqual({ kind: "set_config", maxTesouroShareBps: 5_000 });
-    expect(settlementFloorRequest("0")).toEqual({ kind: "set_config", maxTesouroShareBps: 10_000 });
+  it("composes the settlement floor as min_settlement_bps", () => {
+    expect(settlementFloorRequest("10000")).toEqual({ kind: "set_config", minSettlementBps: 10_000 });
+    expect(settlementFloorRequest("5000")).toEqual({ kind: "set_config", minSettlementBps: 5_000 });
+    expect(settlementFloorRequest("0")).toEqual({ kind: "set_config", minSettlementBps: 0 });
     expect(settlementFloorRequest("10001")).toBeNull();
     expect(settlementFloorRequest("-1")).toBeNull();
     expect(settlementFloorRequest("50.5")).toBeNull();
     expect(settlementFloorRequest("")).toBeNull();
-    expect(reserveConfigError({ maxTesouroShareBps: 10_001 })).toMatch(/settlement floor/);
+    expect(reserveConfigError({ minSettlementBps: 10_001 })).toMatch(/settlement floor/);
   });
 
   it("accepts only a zero income take while MAX_INCOME_TAKE_BPS is 0 (spec §12 Q47)", () => {

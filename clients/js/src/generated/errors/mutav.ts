@@ -78,8 +78,8 @@ export const MUTAV_ERROR__QUEUE_ORDER_VIOLATION = 0x178d; // 6029
 export const MUTAV_ERROR__ADAPTER_NOT_WHITELISTED = 0x178e; // 6030
 /** AdapterCapExceeded: Adapter cap exceeded */
 export const MUTAV_ERROR__ADAPTER_CAP_EXCEEDED = 0x178f; // 6031
-/** TesouroShareCapExceeded: TESOURO share cap exceeded */
-export const MUTAV_ERROR__TESOURO_SHARE_CAP_EXCEEDED = 0x1790; // 6032
+/** SettlementFloorBreached: Allocation would breach the settlement-token floor */
+export const MUTAV_ERROR__SETTLEMENT_FLOOR_BREACHED = 0x1790; // 6032
 /** WorsensCoverage: Operation worsens coverage */
 export const MUTAV_ERROR__WORSENS_COVERAGE = 0x1791; // 6033
 /** PostCpiCheckFailed: Post-CPI check failed */
@@ -100,6 +100,8 @@ export const MUTAV_ERROR__UNSUPPORTED_VERSION = 0x1798; // 6040
 export const MUTAV_ERROR__INVALID_INCOME_SOURCE = 0x1799; // 6041
 /** IncomeExceedsInbox: Amount exceeds the income inbox balance */
 export const MUTAV_ERROR__INCOME_EXCEEDS_INBOX = 0x179a; // 6042
+/** InvalidTokenProgram: Token program is not the reserve's token program */
+export const MUTAV_ERROR__INVALID_TOKEN_PROGRAM = 0x179b; // 6043
 
 export type MutavError =
   | typeof MUTAV_ERROR__ADAPTER_CAP_EXCEEDED
@@ -122,6 +124,7 @@ export type MutavError =
   | typeof MUTAV_ERROR__INVALID_PARAMETER
   | typeof MUTAV_ERROR__INVALID_PAYMENTS_ACCOUNT
   | typeof MUTAV_ERROR__INVALID_REQUEST_STATUS
+  | typeof MUTAV_ERROR__INVALID_TOKEN_PROGRAM
   | typeof MUTAV_ERROR__INVALID_TREASURY_ACCOUNT
   | typeof MUTAV_ERROR__LEG_MISMATCH
   | typeof MUTAV_ERROR__MATH_OVERFLOW
@@ -137,8 +140,8 @@ export type MutavError =
   | typeof MUTAV_ERROR__REQUEST_TOO_SMALL
   | typeof MUTAV_ERROR__RESERVE_FROZEN
   | typeof MUTAV_ERROR__ROLES_NOT_DISTINCT
+  | typeof MUTAV_ERROR__SETTLEMENT_FLOOR_BREACHED
   | typeof MUTAV_ERROR__STALE_PRICE
-  | typeof MUTAV_ERROR__TESOURO_SHARE_CAP_EXCEEDED
   | typeof MUTAV_ERROR__TVL_CAP_EXCEEDED
   | typeof MUTAV_ERROR__UNAUTHORIZED
   | typeof MUTAV_ERROR__UNDER_COVERED
@@ -169,6 +172,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [MUTAV_ERROR__INVALID_PARAMETER]: `Invalid parameter`,
     [MUTAV_ERROR__INVALID_PAYMENTS_ACCOUNT]: `Invalid payments account`,
     [MUTAV_ERROR__INVALID_REQUEST_STATUS]: `Invalid request status`,
+    [MUTAV_ERROR__INVALID_TOKEN_PROGRAM]: `Token program is not the reserve's token program`,
     [MUTAV_ERROR__INVALID_TREASURY_ACCOUNT]: `Invalid treasury account`,
     [MUTAV_ERROR__LEG_MISMATCH]: `Leg does not match the claim filing`,
     [MUTAV_ERROR__MATH_OVERFLOW]: `Math overflow`,
@@ -184,8 +188,8 @@ if (process.env["NODE_ENV"] !== "production") {
     [MUTAV_ERROR__REQUEST_TOO_SMALL]: `Request is below the minimum`,
     [MUTAV_ERROR__RESERVE_FROZEN]: `A reserve token account is frozen`,
     [MUTAV_ERROR__ROLES_NOT_DISTINCT]: `Roles must be distinct keys`,
+    [MUTAV_ERROR__SETTLEMENT_FLOOR_BREACHED]: `Allocation would breach the settlement-token floor`,
     [MUTAV_ERROR__STALE_PRICE]: `Price is stale`,
-    [MUTAV_ERROR__TESOURO_SHARE_CAP_EXCEEDED]: `TESOURO share cap exceeded`,
     [MUTAV_ERROR__TVL_CAP_EXCEEDED]: `TVL cap exceeded`,
     [MUTAV_ERROR__UNAUTHORIZED]: `Signer is not authorized for this instruction`,
     [MUTAV_ERROR__UNDER_COVERED]: `The reserve is under-covered`,

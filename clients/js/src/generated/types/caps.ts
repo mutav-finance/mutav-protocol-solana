@@ -34,7 +34,16 @@ export type Caps = {
   maxClaimPerCall: bigint;
   maxClaimPerPeriod: bigint;
   claimPeriodSecs: bigint;
-  maxTesouroShareBps: number;
+  /**
+   * The most of `stable_assets` all adapters together may hold outside
+   * `reserve_mint`, in bps: the complement of the settlement floor
+   * `min_settlement_bps` (ADR 0018 option (a)). Stored as the complement so
+   * that zero is the pilot's "nothing allocated" (spec §14.2 R3). Every
+   * edge (instruction args, `ConfigUpdated`, client, app) speaks
+   * `min_settlement_bps = 10_000 − max_allocated_bps`; read it through
+   * [`Caps::min_settlement_bps`].
+   */
+  maxAllocatedBps: number;
   minRequest: bigint;
   maxRequest: bigint;
   minFillAssets: bigint;
@@ -49,7 +58,16 @@ export type CapsArgs = {
   maxClaimPerCall: number | bigint;
   maxClaimPerPeriod: number | bigint;
   claimPeriodSecs: number | bigint;
-  maxTesouroShareBps: number;
+  /**
+   * The most of `stable_assets` all adapters together may hold outside
+   * `reserve_mint`, in bps: the complement of the settlement floor
+   * `min_settlement_bps` (ADR 0018 option (a)). Stored as the complement so
+   * that zero is the pilot's "nothing allocated" (spec §14.2 R3). Every
+   * edge (instruction args, `ConfigUpdated`, client, app) speaks
+   * `min_settlement_bps = 10_000 − max_allocated_bps`; read it through
+   * [`Caps::min_settlement_bps`].
+   */
+  maxAllocatedBps: number;
   minRequest: number | bigint;
   maxRequest: number | bigint;
   minFillAssets: number | bigint;
@@ -65,7 +83,7 @@ export function getCapsEncoder(): FixedSizeEncoder<CapsArgs> {
     ["maxClaimPerCall", getU64Encoder()],
     ["maxClaimPerPeriod", getU64Encoder()],
     ["claimPeriodSecs", getI64Encoder()],
-    ["maxTesouroShareBps", getU16Encoder()],
+    ["maxAllocatedBps", getU16Encoder()],
     ["minRequest", getU64Encoder()],
     ["maxRequest", getU64Encoder()],
     ["minFillAssets", getU64Encoder()],
@@ -81,7 +99,7 @@ export function getCapsDecoder(): FixedSizeDecoder<Caps> {
     ["maxClaimPerCall", getU64Decoder()],
     ["maxClaimPerPeriod", getU64Decoder()],
     ["claimPeriodSecs", getI64Decoder()],
-    ["maxTesouroShareBps", getU16Decoder()],
+    ["maxAllocatedBps", getU16Decoder()],
     ["minRequest", getU64Decoder()],
     ["maxRequest", getU64Decoder()],
     ["minFillAssets", getU64Decoder()],

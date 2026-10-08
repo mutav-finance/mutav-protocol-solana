@@ -84,7 +84,7 @@ pub struct VaultStateV2 {
     pub last_refresh_slot: u64,
     pub income_total: u64,
     pub income_take_total: u64,
-    pub inflows_since_refresh: u64,
+    pub inflow_nav: u64,
     // -- carved from `_reserved` --
     pub instant_exit: InstantExitState,
     pub _reserved: [u8; 144],

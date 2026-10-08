@@ -48,7 +48,7 @@ pub fn handle_clear_fulfil_halt(ctx: Context<ClearFulfilHalt>) -> Result<()> {
     state.nav_per_share = nav;
     // The new baseline already includes every inflow so far, so the next
     // `refresh` must not subtract them again (ADR 0017).
-    state.inflows_since_refresh = 0;
+    state.inflow_nav = 0;
 
     emit_cpi!(FulfilHaltCleared {
         config: ctx.accounts.config.key(),

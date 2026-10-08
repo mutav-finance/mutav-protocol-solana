@@ -34,8 +34,8 @@ export const CONFIG_FIELD_HOME = {
   maxClaimPerPeriod: "money-claims",
   claimPeriodSecs: "money-claims",
   payoutSlaSecs: "money-claims",
-  /** The settlement floor; TODO(rename) `min_settlement_bps`. */
-  maxTesouroShareBps: "allocation-controls",
+  /** The settlement floor, `caps.min_settlement_bps` (ADR 0018). */
+  minSettlementBps: "allocation-controls",
   maxNavMoveBps: "general-emergency",
 } as const;
 

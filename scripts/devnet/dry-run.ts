@@ -152,7 +152,7 @@ export async function dryRun(programKeypair?: string) {
         maxClaimPerCall: '10000000000',
         maxClaimPerPeriod: '20000000000',
         claimPeriodSecs: 2_592_000,
-        maxTesouroShareBps: 0,
+        minSettlementBps: 10_000,
         minRequest: '1000000000',
         maxRequest: '30000000000',
         minFillAssets: '500000000',

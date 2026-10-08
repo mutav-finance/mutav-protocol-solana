@@ -96,11 +96,15 @@ export type VaultState = {
   /** Lifetime take from issuer income sent to the treasury. */
   incomeTakeTotal: bigint;
   /**
-   * Net verified inflows (`contribute_fees`, `sweep_income`) since the last
-   * `refresh`. The NAV-move guard measures net of them; `refresh` and
-   * `clear_fulfil_halt` reset it to 0.
+   * NAV per share (`NAV_SCALE`) added by verified inflows
+   * (`contribute_fees`, `sweep_income`) since the last `refresh`: the sum
+   * of `ceil(net × NAV_SCALE / shares_outstanding)` at each inflow
+   * (`pricing::inflow_nav`; `0` while no shares are outstanding),
+   * saturating. Per share, so fills in the window leave it exact. The
+   * NAV-move guard measures net of it; `refresh` and `clear_fulfil_halt`
+   * reset it to 0.
    */
-  inflowsSinceRefresh: bigint;
+  inflowNav: bigint;
   /** Zeroed. Phase 2 carves `InstantExitState` (88 bytes) from the front. */
   reserved: ReadonlyUint8Array;
 };
@@ -149,11 +153,15 @@ export type VaultStateArgs = {
   /** Lifetime take from issuer income sent to the treasury. */
   incomeTakeTotal: number | bigint;
   /**
-   * Net verified inflows (`contribute_fees`, `sweep_income`) since the last
-   * `refresh`. The NAV-move guard measures net of them; `refresh` and
-   * `clear_fulfil_halt` reset it to 0.
+   * NAV per share (`NAV_SCALE`) added by verified inflows
+   * (`contribute_fees`, `sweep_income`) since the last `refresh`: the sum
+   * of `ceil(net × NAV_SCALE / shares_outstanding)` at each inflow
+   * (`pricing::inflow_nav`; `0` while no shares are outstanding),
+   * saturating. Per share, so fills in the window leave it exact. The
+   * NAV-move guard measures net of it; `refresh` and `clear_fulfil_halt`
+   * reset it to 0.
    */
-  inflowsSinceRefresh: number | bigint;
+  inflowNav: number | bigint;
   /** Zeroed. Phase 2 carves `InstantExitState` (88 bytes) from the front. */
   reserved: ReadonlyUint8Array;
 };
@@ -197,7 +205,7 @@ export function getVaultStateEncoder(): FixedSizeEncoder<VaultStateArgs> {
       ["lastRefreshSlot", getU64Encoder()],
       ["incomeTotal", getU64Encoder()],
       ["incomeTakeTotal", getU64Encoder()],
-      ["inflowsSinceRefresh", getU64Encoder()],
+      ["inflowNav", getU64Encoder()],
       ["reserved", fixEncoderSize(getBytesEncoder(), 232)],
     ]),
     (value) => ({ ...value, discriminator: VAULT_STATE_DISCRIMINATOR }),
@@ -242,7 +250,7 @@ export function getVaultStateDecoder(): FixedSizeDecoder<VaultState> {
     ["lastRefreshSlot", getU64Decoder()],
     ["incomeTotal", getU64Decoder()],
     ["incomeTakeTotal", getU64Decoder()],
-    ["inflowsSinceRefresh", getU64Decoder()],
+    ["inflowNav", getU64Decoder()],
     ["reserved", fixDecoderSize(getBytesDecoder(), 232)],
   ]);
 }

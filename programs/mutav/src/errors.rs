@@ -71,8 +71,11 @@ pub enum MutavError {
     AdapterNotWhitelisted,
     #[msg("Adapter cap exceeded")]
     AdapterCapExceeded,
-    #[msg("TESOURO share cap exceeded")]
-    TesouroShareCapExceeded,
+    /// `allocate` would leave less than `min_settlement_bps` of stable assets
+    /// in `reserve_mint` (ADR 0018). Same code as the former
+    /// `TesouroShareCapExceeded`.
+    #[msg("Allocation would breach the settlement-token floor")]
+    SettlementFloorBreached,
     #[msg("Operation worsens coverage")]
     WorsensCoverage,
     #[msg("Post-CPI check failed")]
@@ -93,4 +96,6 @@ pub enum MutavError {
     InvalidIncomeSource,
     #[msg("Amount exceeds the income inbox balance")]
     IncomeExceedsInbox,
+    #[msg("Token program is not the reserve's token program")]
+    InvalidTokenProgram,
 }

@@ -60,11 +60,10 @@ export type AdminTx =
       /** `payout_sla_secs`: payment → PIX settlement before a payout is late (≥ 0). */
       payoutSlaSecs?: bigint;
       /**
-       * `caps.max_tesouro_share_bps`, the complement of the settlement floor
-       * (ADR 0018). TODO(rename): becomes `min_settlement_bps`; the app sends
-       * `10_000 − V` for a floor of V until the program field is replaced.
+       * `caps.min_settlement_bps`, the settlement floor (ADR 0018), 0–10_000.
+       * The program stores its complement `caps.max_allocated_bps`.
        */
-      maxTesouroShareBps?: number;
+      minSettlementBps?: number;
       /** TESOURO price parameters (spec §7); blank fields carry over. */
       price?: PriceDraft;
       /** MUTAV's take from issuer income (ADR 0017); `≤ MAX_INCOME_TAKE_BPS`, 0 until spec §12 Q47. */
