@@ -54,15 +54,8 @@ const sim = loadSimulator();
 /** BRS base units per real (6 decimals). */
 const BRL_UNITS = 1_000_000;
 
-/**
- * Expected `coverage_required` under ADR 0016: `max(ceil(c × remaining / 10_000), provisions)`.
- * TODO(PR A): once the client's `coverageRequired` takes `provisions`, call it directly
- * instead of taking the max here.
- */
-const expectedRequired = (remaining: bigint, bps: number, provisions: bigint) => {
-  const c = coverageRequired(remaining, bps);
-  return c > provisions ? c : provisions;
-};
+/** Expected `coverage_required` under ADR 0016, straight from the client: `max(ceil(c × remaining / 10_000), provisions)`. */
+const expectedRequired = (remaining: bigint, bps: number, provisions: bigint) => coverageRequired(remaining, bps, provisions);
 
 /** Deterministic PRNG (mulberry32), so a failure is reproducible. */
 function rng(seed: number) {
@@ -142,19 +135,19 @@ describe("simulator ↔ client coverage maths", () => {
 });
 
 describe("simulator defaults = the devnet config", () => {
-  // TODO(PR A): read these from scripts/devnet/devnet.example.json once it carries the
-  // locked values (c = 1_000 and the caps below); until then they are pinned here.
+  // Read from the devnet config the deploy uses, so the simulator can't drift from it.
   const BRL = 1_000_000;
+  const cfg = JSON.parse(readFileSync(fileURLToPath(new URL("../../../scripts/devnet/devnet.example.json", import.meta.url)), "utf8"));
   const devnet = {
-    coverageRatioBps: 1_000,
+    coverageRatioBps: Number(cfg.coverageRatioBps),
     caps: {
-      maxTvl: 300_000 * BRL,
-      maxCoverPerGuarantee: 40_000 * BRL,
-      maxCoverPerAgency: 10_000_000 * BRL,
-      maxClaimPerCall: 10_000 * BRL,
-      maxClaimPerPeriod: 20_000 * BRL,
-      // the settlement-token floor (min_settlement_bps): the reserve keeps at least this share in BRS
-      minSettlementBps: 10_000,
+      maxTvl: Number(cfg.caps.maxTvl),
+      maxCoverPerGuarantee: Number(cfg.caps.maxCoverPerGuarantee),
+      maxCoverPerAgency: Number(cfg.caps.maxCoverPerAgency),
+      maxClaimPerCall: Number(cfg.caps.maxClaimPerCall),
+      maxClaimPerPeriod: Number(cfg.caps.maxClaimPerPeriod),
+      // the settlement-token floor (min_settlement_bps, ADR 0018) is stored on-chain as its complement
+      minSettlementBps: 10_000 - Number(cfg.caps.maxTesouroShareBps),
     },
     feeTakeBpsMax: 3_000,
   };
