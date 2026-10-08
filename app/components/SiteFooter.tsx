@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function SiteFooter() {
   return (
-    <footer style={{ borderTop: "1px solid var(--color-border)", padding: "28px var(--section-pad-x)", marginTop: "auto" }}>
+    <footer className="bg-(--color-surface) mt-auto border-t" style={{ padding: "28px var(--section-pad-x)" }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 24, justifyContent: "space-between", alignItems: "flex-start" }}>
         <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)", margin: 0, maxWidth: 640, lineHeight: 1.6 }}>
           The pilot runs on MUTAV&apos;s own capital and is not open to public investment. Capital requests are gated by an allowlist (KYC off-chain), and nothing here is an offer to invest. The program is unaudited

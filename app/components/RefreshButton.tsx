@@ -16,7 +16,7 @@ export function RefreshButton({ onConfirmed }: { onConfirmed?: () => void }) {
   const busy = !["idle", "confirmed", "failed"].includes(state.phase);
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", maxWidth: 420 }}>
-      <Button variant="outline" disabled={busy} onClick={() => run({ kind: "refresh" })} title={address ? "Send refresh from your wallet (anyone may call it)" : "Connect any wallet to send refresh"}>
+      <Button variant="outline" style={{ borderColor: "var(--color-border-input)" }} disabled={busy} onClick={() => run({ kind: "refresh" })} title={address ? "Send refresh from your wallet (anyone may call it)" : "Connect any wallet to send refresh"}>
         {busy ? "Refreshing…" : "Refresh on-chain"}
       </Button>
       {!address && state.phase === "idle" && (

@@ -90,7 +90,8 @@
   /* ── Border radius — always 0 (Precision Brutalism) ── */
   --radius: 0px;
 
-  /* ── Shared full-bleed horizontal padding (layout token, front-agnostic) ── */
+  /* ── Shared full-bleed horizontal padding (layout token, front-agnostic).
+     Brand layout (STYLE.md §3.7): 32px margin, 16px on phones. ── */
   --page-pad: 32px;
 
   /* NOTE: intentionally NO custom spacing scale override here. An earlier 8px-grid
@@ -395,7 +396,11 @@ input:disabled {
    (border-bottoms bleed edge-to-edge) while content never sprawls on wide
    displays. Collapses to --page-pad once the viewport drops below the max. ── */
 :root {
-  --section-pad-x: max(var(--page-pad), calc((100% - 1280px) / 2));
+  --section-pad-x: max(var(--page-pad), calc((100% - var(--page-wide-max-width)) / 2 + var(--page-pad)));
+  /* Width policy: wide content caps at the brand max-width (1440px, STYLE.md
+     §3.7), narrow content (forms, prose) at 4xl. */
+  --page-wide-max-width: 90rem;
+  --page-content-max-width: 56rem;
 }
 
 /* ── Inline-anchor CTAs — anchors miss the button:active rule, so add explicit
@@ -420,28 +425,67 @@ input:disabled {
   opacity: 0.85;
 }
 
-/* ── Responsive nav: desktop links inline, collapse to a hamburger < 768px ── */
+/* ── App nav tabs: full-height tabs, 1px amber bottom border on the active
+   one (STYLE.md §3.6). ── */
+.nav-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-2);
+  text-decoration: none;
+  text-transform: capitalize;
+}
+.nav-tab:hover {
+  color: var(--color-text);
+}
+.nav-tab[aria-current="page"] {
+  color: var(--color-text);
+}
+.nav-tab[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--color-accent);
+}
+
+/* ── Responsive nav: desktop links inline, collapse to a hamburger < 1024px
+   (the centred tabs collide with the wallet controls below that width). ── */
 .nav-links-desktop {
   display: flex;
 }
 .nav-hamburger {
   display: none;
 }
+.nav-cluster-desktop {
+  display: inline-flex;
+}
 /* Panel visibility is breakpoint-governed (like its siblings above), not just
-   render-state — so it can't linger if the menu is open while resizing past 768px. */
+   render-state — so it can't linger if the menu is open while resizing past 1024px. */
 .nav-mobile-panel {
   display: none;
 }
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .nav-links-desktop {
     display: none;
   }
   .nav-hamburger {
     display: inline-flex;
   }
+  /* The cluster badge moves into the menu panel. */
+  .nav-cluster-desktop {
+    display: none;
+  }
   .nav-mobile-panel {
     display: block;
   }
+}
+@media (max-width: 767px) {
   :root {
     --page-pad: 16px;
   }
@@ -550,6 +594,7 @@ input[type="number"]::-webkit-outer-spin-button {
   --color-input: var(--color-border-input);
   --color-ring: var(--color-accent);               /* amber focus ring color */
 
+
   /* Precision Brutalism: every radius utility collapses to 0 (no rounded corners). */
   --radius-sm: 0px;
   --radius-md: 0px;
@@ -613,10 +658,13 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 }
 
-/* Data tables: hairline rows, mono numbers, horizontal scroll on phones. */
+/* Data tables (web investidor): a surface card, mono uppercase header in
+   text-3, roomy hairline rows with a surface-2 hover, mono numbers right-aligned,
+   horizontal scroll on phones. */
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 .data-table {
   width: 100%;
@@ -625,22 +673,27 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .data-table th {
   text-align: left;
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--color-text-2);
-  padding: 10px 12px;
+  color: var(--color-text-3);
+  padding: 12px 16px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
   white-space: nowrap;
 }
 .data-table td {
-  padding: 10px 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--color-border);
   vertical-align: top;
   white-space: nowrap;
+}
+.data-table tbody tr {
+  transition: background-color 150ms ease-out;
+}
+.data-table tbody tr:hover {
+  background: var(--color-surface-2);
 }
 .data-table tr:last-child td {
   border-bottom: none;
@@ -666,7 +719,7 @@ input[type="number"]::-webkit-outer-spin-button {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-copper);
-  border: 1px dashed var(--color-copper-dim);
+  border: 1px solid var(--color-copper-dim);
   padding: 2px 6px;
 }
 

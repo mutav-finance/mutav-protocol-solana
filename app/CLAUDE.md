@@ -21,7 +21,12 @@ Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto
 
 ## Styling (ported from mutav-pulse — read before writing UI)
 
-Two layers: shadcn primitives in `components/ui/*` (Tailwind utilities; build every button/input from them — ESLint blocks raw `<button>`/`<input>`), and product components styled with inline `style={{}}` over `var(--color-*)` brand tokens. Precision Brutalism: radius 0, no shadows, no gradients; amber is scarce (<5% of pixels).
+Two layers: shadcn primitives in `components/ui/*` (Tailwind utilities; build every button/input from them — ESLint blocks raw `<button>`/`<input>`), and product components styled over `var(--color-*)` brand tokens. Precision Brutalism: radius 0, no shadows, no gradients; amber is scarce (<5% of pixels).
+
+- **Brand contract wins on details:** `STYLE.md` of the brand system (`mutav/.design/branding/mutav/patterns/`). 6px-square badges with a mono label (no pills, no background fill); 1px borders only; 56px nav on the canvas with a 1px amber active border; cards 24px padding, Inter Medium 12px caps label, bold mono value; 8px spacing rhythm; max-width 1440px (`--page-wide-max-width`), 32px margin (`--page-pad`, 16px on phones).
+- **Structure reference: the web investidor** (`mutav-finance/mutav-fund`): centred nav tabs, page header and width policy, sections as bento grids of surface tiles, tables and charts in surface cards. Where it contradicts `STYLE.md` (pills, 2px borders, 64px nav), `STYLE.md` wins. Its canvas grid texture is **not** ported (retired by the brand).
+- **Photography: deliberate exception** to STYLE.md's "no photography in Dashboard Investidor", decided by the founder (2026-10-08): licensed architectural photos, grayscale, at low opacity (≤ 0.2) behind a title or a CTA tile, decorative only (`alt=""`). Never behind numbers.
+- New and restyled shared components use Tailwind utilities that read the tokens directly (`bg-(--color-surface)`, `text-(--color-text-2)`). Don't alias brand tokens in `@theme inline` under their own names (it emits self-referencing variables).
 
 - **Never** redefine Tailwind's spacing scale in `@theme` (it once made `h-10` 80px).
 - **Never** let `@theme inline` redefine `--color-accent` or `--color-border`.

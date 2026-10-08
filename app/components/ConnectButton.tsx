@@ -73,7 +73,7 @@ export function ConnectButton() {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <Button variant="outline" size="sm" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((v) => !v)}>
+      <Button variant="outline" aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((v) => !v)} className="h-10 px-4 text-(--color-accent)" style={{ borderColor: "var(--color-accent)" }}>
         Connect wallet
       </Button>
       {open && (

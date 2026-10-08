@@ -3,10 +3,9 @@
 /**
  * MetricCard — a single metric in the reserve dashboard metric grid.
  *
- * Design: Precision Brutalism / Investidor front.
- * - Geist Bold value (Declaration layer)
- * - Inter label, ALL CAPS (Explanation layer)
- * - JetBrains Mono unit annotation (Evidence layer)
+ * Design: brand card (STYLE.md §3.1) — Inter Medium 12px ALL CAPS label in
+ * text-2, bold value in JetBrains Mono (numeric data is always mono), mono
+ * sub-value in text-3.
  * - Optional tooltip on label
  * - No rounded corners, no shadows, surface-1 background
  */
@@ -48,7 +47,7 @@ export function MetricCard({
       style={{
         backgroundColor: compact ? "transparent" : "var(--color-surface)",
         border: compact ? "none" : "1px solid var(--color-border)",
-        padding: compact ? 0 : dense ? "9px 11px" : "20px 24px",
+        padding: compact ? 0 : dense ? "16px" : "24px",
         position: "relative",
         display: "flex",
         flexDirection: "column",
@@ -72,13 +71,13 @@ export function MetricCard({
         <p
           className="font-body"
           style={{
-            fontSize: "11px",
+            fontSize: "12px",
             fontWeight: 500,
-            letterSpacing: "0.08em",
+            letterSpacing: "0.01em",
             color: "var(--color-text-2)",
             textTransform: "uppercase",
             margin: 0,
-            lineHeight: dense ? 1.4 : 1,
+            lineHeight: 1.4,
           }}
         >
           {label}
@@ -115,18 +114,19 @@ export function MetricCard({
         </p>
       ) : (
         <p
-          className="font-display"
+          className="font-mono"
           style={{
+            fontWeight: 700,
             // Scale to the card width (cqi) so any value length fits, capped at
             // the original size; floor keeps it legible on the narrowest card.
             fontSize: compact
-              ? "clamp(13px, 8cqi, 22px)"
+              ? "clamp(13px, 8cqi, 20px)"
               : dense
-                ? "clamp(16px, 7cqi, 21px)"
-                : "clamp(14px, 9cqi, 28px)",
+                ? "clamp(14px, 7cqi, 18px)"
+                : "clamp(14px, 9cqi, 24px)",
             color: accentValue ? "var(--color-accent)" : "var(--color-text)",
-            letterSpacing: "-0.02em",
-            lineHeight: 1,
+            letterSpacing: 0,
+            lineHeight: 1.1,
             margin: 0,
             whiteSpace: "nowrap",
             overflow: "hidden",
@@ -145,7 +145,7 @@ export function MetricCard({
             fontFamily: "var(--font-mono)",
             fontFeatureSettings: '"tnum" 1',
             margin: 0,
-            lineHeight: dense ? 1.5 : 1,
+            lineHeight: 1.4,
           }}
         >
           {unit}

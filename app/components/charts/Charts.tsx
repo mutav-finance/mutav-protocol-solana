@@ -24,13 +24,13 @@ const short = (hex: string) => `${hex.slice(0, 8)}…`;
 
 export function ChartFrame({ title, caption, legend, children, id }: { title: string; caption: ReactNode; legend?: ReactNode; children: ReactNode; id?: string }) {
   return (
-    <figure id={id} aria-label={title} style={{ margin: 0, border: "1px solid var(--color-border)", background: "var(--color-surface)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-        <p className="font-body" style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{title}</p>
+    <figure id={id} aria-label={title} className="bg-(--color-surface) m-0 flex min-w-0 flex-col gap-4 border p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="font-body text-(--color-text-2) m-0 text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>{title}</p>
         {legend}
       </div>
       {children}
-      <figcaption className="font-body" style={{ fontSize: 11, color: "var(--color-text-3)", lineHeight: 1.5 }}>
+      <figcaption className="font-body text-(--color-text-3) text-2xs leading-relaxed">
         {caption}
       </figcaption>
     </figure>
@@ -48,10 +48,10 @@ export function Swatch({ color, label, outline }: { color: string; label: string
 
 export const Legend = ({ children }: { children: ReactNode }) => <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>{children}</div>;
 
-type Seg = { f: number; color: string; outline?: boolean };
+export type Seg = { f: number; color: string; outline?: boolean };
 
 /** A bar track: segments laid left to right with a 2px surface gap between them. */
-function Track({ segs, height = 12, align = "left", marker }: { segs: Seg[]; height?: number; align?: "left" | "right"; marker?: { f: number; label: string } }) {
+export function Track({ segs, height = 12, align = "left", marker }: { segs: Seg[]; height?: number; align?: "left" | "right"; marker?: { f: number; label: string } }) {
   const shown = segs.filter((s) => s.f > 0);
   return (
     <div style={{ position: "relative", height, display: "flex", justifyContent: align === "right" ? "flex-end" : "flex-start", minWidth: 0 }}>
@@ -71,14 +71,14 @@ function Track({ segs, height = 12, align = "left", marker }: { segs: Seg[]; hei
         />
       ))}
       {marker && (
-        <div aria-hidden="true" title={marker.label} style={{ position: "absolute", left: pct(marker.f), top: -4, bottom: -4, borderLeft: "1px dashed var(--color-text-2)" }} />
+        <div aria-hidden="true" title={marker.label} style={{ position: "absolute", left: pct(marker.f), top: -4, bottom: -4, borderLeft: "1px solid var(--color-text-2)" }} />
       )}
     </div>
   );
 }
 
 /** One chart row: label | track | value. Focusable; the summary is its accessible name and hover title. */
-function Row({ label, value, summary, children, labelWidth = 170 }: { label: ReactNode; value: ReactNode; summary: string; children: ReactNode; labelWidth?: number }) {
+export function Row({ label, value, summary, children, labelWidth = 170 }: { label: ReactNode; value: ReactNode; summary: string; children: ReactNode; labelWidth?: number }) {
   return (
     <div className="chart-row" tabIndex={0} role="img" aria-label={summary} title={summary} style={{ ["--label-w" as string]: `${labelWidth}px` }}>
       <div className="chart-row-label">{label}</div>
@@ -88,7 +88,7 @@ function Row({ label, value, summary, children, labelWidth = 170 }: { label: Rea
   );
 }
 
-const RowLabel = ({ children, sub }: { children: ReactNode; sub?: ReactNode }) => (
+export const RowLabel = ({ children, sub }: { children: ReactNode; sub?: ReactNode }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
     <span className="font-body" style={{ fontSize: 12, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{children}</span>
     {sub}
@@ -97,7 +97,8 @@ const RowLabel = ({ children, sub }: { children: ReactNode; sub?: ReactNode }) =
 
 // ── Coverage vs the reserve ─────────────────────────────────────────────────
 
-const C = {
+/** Chart palette (brand tokens). */
+export const C = {
   ink: "var(--color-chart-1)",
   mid: "var(--color-chart-2)",
   good: "var(--color-success)",
@@ -251,7 +252,7 @@ export function ClaimSpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaS
           <Swatch color={C.bad} label="late" />
         </Legend>
       }
-      caption={<>Filed → paid: ClaimFiling.filed_at to Payout.paid_at. Paid → settled: Payout.paid_at to settled_at (PIX); the dashed line is the payout SLA ({fmtDuration(slaSecs)}, set by the Reserve Admin). Every step is signed by the operator. Oldest filing first.</>}
+      caption={<>Filed → paid: ClaimFiling.filed_at to Payout.paid_at. Paid → settled: Payout.paid_at to settled_at (PIX); the vertical line is the payout SLA ({fmtDuration(slaSecs)}, set by the Reserve Admin). Every step is signed by the operator. Oldest filing first.</>}
     >
       <div className="grid-2">
         {panel("Filed → paid", payAxis, (c) => ({ v: c.fileToPay, seg: c.fileToPay === null ? null : { f: frac(c.fileToPay, payAxis), color: C.ink }, text: c.fileToPay === null ? "not paid" : fmtDuration(c.fileToPay) }))}
@@ -354,7 +355,7 @@ export function ClaimCapChart({ cap }: { cap: ClaimCap }) {
 
 /**
  * What the reserve holds, on one axis: BRS (the settlement token, left) and
- * any adapter assets (right) make up stable assets; the dashed marker is the
+ * any adapter assets (right) make up stable assets; the vertical marker is the
  * settlement floor (ADR 0018), and BRS must reach past it. In the pilot that
  * is BRS only with a 100% floor. The income inbox is drawn outlined on its own
  * row because it counts toward nothing until the operator sweeps it.
@@ -375,7 +376,7 @@ export function CompositionChart({ c }: { c: Composition }) {
       }
       caption={
         <>
-          Stable assets = brs_balance{c.brsOnly ? "" : " + adapter value at the bounded price"}, from VaultState; {c.brsOnly ? "the pilot reserve holds BRS only (ADR 0018). " : ""}The dashed line is the settlement floor, the minimum held in BRS ({fmtPct(c.floorBps)} = {fmtBrs(c.floorValue, 0)}, set by the Reserve Admin); adapters may use only the share above it. The inbox is the vault authority&apos;s BRS account.
+          Stable assets = brs_balance{c.brsOnly ? "" : " + adapter value at the bounded price"}, from VaultState; {c.brsOnly ? "the pilot reserve holds BRS only (ADR 0018). " : ""}The vertical line is the settlement floor, the minimum held in BRS ({fmtPct(c.floorBps)} = {fmtBrs(c.floorValue, 0)}, set by the Reserve Admin); adapters may use only the share above it. The inbox is the vault authority&apos;s BRS account.
         </>
       }
     >
