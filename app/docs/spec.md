@@ -87,6 +87,12 @@ Also usable outside the script: a free-form operator panel for each operator ins
 
 For Squads members.
 
+- **Reserve assets** (first section, `#reserve-assets`): what the reserve holds and who manages it.
+  - **Composition now:** BRS in `reserve` (`brs_balance`), TESOURO through adapters (0 on devnet, with the reason), the income inbox shown apart as "not yet counted", and the TESOURO share against `max_tesouro_share_bps` (composition bar with the cap marker); `VaultConfig.adapters` with each adapter's cap and allocated.
+  - **Who does what:** Nora pays the inbox; the Operator sweeps it (`sweep_income`, on `/operator`); the Reserve Admin sets the TESOURO cap, the price feed and the income take, and later allocates; anyone runs `refresh`.
+  - **Controls today:** `set_config` proposals for `max_tesouro_share_bps`, the TESOURO price parameters and `income_take_bps` (program cap 0 until spec §12 Q47), each with its on-chain value, the program's bound and what it does.
+  - **Planned:** `whitelist_adapter`, `remove_adapter`, `allocate`, `deallocate`, listed as disabled rows with what gates them; no button sends them. Blocked on a BRS↔TESOURO path (Etherfuse mints against USDC).
+  - **Issuer income:** inbox balance, `income_total`, `income_take_total`, the take, and the last swept statements from `IncomeReceipt`s.
 - Shows `VaultConfig`: roles, caps, price params, take rate, feature flags, the treasury and payments accounts, the allowlist root.
 - Actions, each built as a **Squads vault-transaction proposal** that members approve and execute from their wallets: `fulfil_deposits`, `fulfil_redeems`, `pause` / `unpause`, `clear_fulfil_halt`, `set_config` (caps), `set_allowlist_root` (with the client's Merkle builder).
 - Proposal list with status (pending, approved, executable, executed) and the time-lock countdown.

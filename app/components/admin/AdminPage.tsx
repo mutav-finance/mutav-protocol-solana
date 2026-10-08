@@ -8,9 +8,9 @@
  * When the configured admin is not a Squads vault (localnet only), actions
  * can be signed directly, clearly labelled.
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { address as toAddress } from "@solana/kit";
-import { buildAllowlist, MIN_COVERAGE_RATIO_BPS } from "@mutav-finance/mutav-protocol-solana";
+import { buildAllowlist, MAX_INCOME_TAKE_BPS, MIN_COVERAGE_RATIO_BPS } from "@mutav-finance/mutav-protocol-solana";
 import { Page, ReadError, Section } from "@/components/Section";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
@@ -25,12 +25,15 @@ import { usePoll } from "@/lib/client/use-poll";
 import { useTx } from "@/lib/client/use-tx";
 import { fmtBps, fmtBrs, fmtDuration, fmtTime, parseBrs } from "@/lib/format";
 import { bytesToHex } from "@/lib/serde";
-import type { AdminTx, TxRequest } from "@/lib/tx-kinds";
+import type { AdminTx } from "@/lib/tx-kinds";
 import { capitalQueue, configSummary, type Ledger, type ReserveView } from "@/lib/view";
 import { Action, Grid, LiveProvider, Note, TextField, useLive } from "@/components/demo/shared";
+import { AdminAction, KV, Meaning, type Mode } from "@/components/admin/shared";
+import { ReserveAssets } from "@/components/admin/ReserveAssets";
 import Link from "next/link";
 import { RoleLine, RoleTag } from "@/components/RoleTag";
 import { ACCOUNT_ROLES } from "@/lib/roles";
+import { PRICE_PARAM_INFO, UNSET_ADDRESS } from "@/lib/reserve-assets";
 
 type ProposalView = {
   index: bigint;
@@ -53,9 +56,6 @@ type SquadsResp =
       multisig: { address: string; vault: string; threshold: number; timeLock: number; members: { key: string; permissions: number }[]; transactionIndex: bigint; proposals: ProposalView[] };
     };
 
-/** How admin actions are sent on this deployment. */
-type Mode = { via: "squads" | "direct"; label: string } | null;
-
 function modeOf(sq: SquadsResp | null): Mode {
   if (sq?.configured && sq.adminIsVault) return { via: "squads", label: "Squads proposal" };
   if (CLUSTER === "localnet") return { via: "direct", label: "Direct signing · localnet only" };
@@ -70,23 +70,6 @@ function RoleKey({ label, a }: { label: string; a: (typeof ACCOUNT_ROLES)[keyof 
       {label}
       {a.role && <RoleTag role={a.role} suffix={<span style={{ color: "var(--color-text-3)", textTransform: "none", letterSpacing: 0 }}>· {a.note}</span>} />}
     </span>
-  );
-}
-
-function KV({ rows }: { rows: [ReactNode, ReactNode][] }) {
-  return (
-    <div className="table-wrap">
-      <table className="data-table">
-        <tbody>
-          {rows.map(([k, v], i) => (
-            <tr key={i}>
-              <td className="font-body" style={{ fontSize: 13, width: "40%" }}>{k}</td>
-              <td>{v}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 
@@ -106,12 +89,13 @@ function ConfigView({ r }: { r: ReserveView }) {
           ]}
         />
         <h3 style={{ fontSize: 15, margin: "8px 0 0" }}>Accounts</h3>
-        <KV rows={[["Treasury account", <Explorer key="t" value={c.accounts.treasuryAccount} full />], ["Payments account", <Explorer key="p" value={c.accounts.paymentsAccount} full />], ["BRS mint", <Explorer key="m" value={c.accounts.reserveMint} full />], ["Share mint", <Explorer key="s" value={c.accounts.shareMint} full />]]} />
+        <KV rows={[["Treasury account", <Explorer key="t" value={c.accounts.treasuryAccount} full />], ["Payments account", <Explorer key="p" value={c.accounts.paymentsAccount} full />], [<Meaning key="m" label="BRS mint">The reserve asset (issued by Nora). Fixed at initialize.</Meaning>, <Explorer key="m" value={c.accounts.reserveMint} full />], [<Meaning key="i" label="Income inbox">The vault authority&apos;s BRS account: Nora pays issuer income here; it counts toward nothing until the Operator sweeps it.</Meaning>, <Explorer key="i" value={r.incomeInbox.address} full />], ["Share mint", <Explorer key="s" value={c.accounts.shareMint} full />]]} />
         <h3 style={{ fontSize: 15, margin: "8px 0 0" }}>Parameters</h3>
         <KV
           rows={[
             ["Coverage ratio", m(fmtBps(c.params.coverageRatioBps))],
             ["Fee take", m(fmtBps(c.params.feeTakeBps))],
+            [<Meaning key="it" label="Income take (income_take_bps)">MUTAV&apos;s share of each swept Nora statement, sent to the treasury; the rest builds the reserve. Program cap {fmtBps(MAX_INCOME_TAKE_BPS)} until spec §12 Q47 is decided.</Meaning>, m(fmtBps(r.config.incomeTakeBps))],
             ["Payout SLA", m(fmtDuration(c.params.payoutSlaSecs))],
             ["Feature flags", m(`0x${c.params.featureFlags.toString(16)}${c.params.featureFlags === 0n ? " (none: pilot)" : ""}`)],
             ["Paused", m(String(c.params.paused))],
@@ -128,19 +112,20 @@ function ConfigView({ r }: { r: ReserveView }) {
             ["Max cover per agency", m(fmtBrs(c.caps.maxCoverPerAgency, 0))],
             ["Max claim payment per call", m(fmtBrs(c.caps.maxClaimPerCall, 0))],
             ["Max claim payments per period", m(`${fmtBrs(c.caps.maxClaimPerPeriod, 0)} / ${fmtDuration(c.caps.claimPeriodSecs)}`)],
-            ["TESOURO share", m(fmtBps(c.caps.maxTesouroShareBps))],
+            [<Meaning key="ts" label="TESOURO share (max_tesouro_share_bps)">The most of stable assets that allocate may put in TESOURO; the rest stays BRS. 0% = BRS only.</Meaning>, m(fmtBps(c.caps.maxTesouroShareBps))],
             ["Request size", m(`${fmtBrs(c.caps.minRequest, 0)} – ${fmtBrs(c.caps.maxRequest, 0)}`)],
             ["Partial-fill floor", m(fmtBrs(c.caps.minFillAssets, 0))],
           ]}
         />
-        <h3 style={{ fontSize: 15, margin: "8px 0 0" }}>Price parameters</h3>
+        <h3 style={{ fontSize: 15, margin: "8px 0 0" }}>TESOURO price parameters</h3>
         <KV
           rows={[
-            ["TESOURO price account", <Explorer key="pa" value={c.price.tesouroPriceAccount} />],
-            ["Max staleness", m(fmtDuration(c.price.maxStalenessSecs))],
-            ["Max deviation", m(fmtBps(c.price.maxDeviationBps))],
-            ["Max NAV move per refresh", m(fmtBps(c.price.maxNavMoveBps))],
-            ["y max", m(fmtBps(c.price.yMaxBps))],
+            [<Meaning key="pa" label={PRICE_PARAM_INFO.tesouroPriceAccount.label}>{PRICE_PARAM_INFO.tesouroPriceAccount.meaning}</Meaning>, c.price.tesouroPriceAccount === UNSET_ADDRESS ? m("unset (no TESOURO price feed)") : <Explorer key="pa" value={c.price.tesouroPriceAccount} />],
+            [<Meaning key="p0" label="Reference p0 / t0">{PRICE_PARAM_INFO.p0.meaning}</Meaning>, m(`${c.price.p0.toString()} @ ${c.price.t0 === 0n ? "t0 = 0" : fmtTime(c.price.t0)}`)],
+            [<Meaning key="y" label={PRICE_PARAM_INFO.yMaxBps.label}>{PRICE_PARAM_INFO.yMaxBps.meaning}</Meaning>, m(fmtBps(c.price.yMaxBps))],
+            [<Meaning key="st" label={PRICE_PARAM_INFO.maxStalenessSecs.label}>{PRICE_PARAM_INFO.maxStalenessSecs.meaning}</Meaning>, m(fmtDuration(c.price.maxStalenessSecs))],
+            [<Meaning key="dv" label={PRICE_PARAM_INFO.maxDeviationBps.label}>{PRICE_PARAM_INFO.maxDeviationBps.meaning}</Meaning>, m(fmtBps(c.price.maxDeviationBps))],
+            [<Meaning key="nm" label={PRICE_PARAM_INFO.maxNavMoveBps.label}>{PRICE_PARAM_INFO.maxNavMoveBps.meaning}</Meaning>, m(fmtBps(c.price.maxNavMoveBps))],
           ]}
         />
       </div>
@@ -246,23 +231,6 @@ function SquadsPanel({ sq, error, onDone }: { sq: SquadsResp | null; error: Erro
 
 // ── Actions ─────────────────────────────────────────────────────────────────
 
-function AdminAction({ title, children, mode, request, label, note }: { title: string; children?: ReactNode; mode: Mode; request: AdminTx | TxRequest | null | (() => Promise<AdminTx | null>); label: string; note?: ReactNode }) {
-  return (
-    <article style={{ border: "1px solid var(--color-border)", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 6 }}>
-      <h3 style={{ fontSize: 15, margin: 0, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
-        {title} <RoleTag role="admin" />
-      </h3>
-      {note && <Note>{note}</Note>}
-      {children}
-      {mode ? (
-        <Action label={mode.via === "squads" ? `Propose: ${label}` : `Sign directly: ${label}`} request={request} via={mode.via} variant={mode.via === "direct" ? "outline" : "default"} />
-      ) : (
-        <Note tone="warn">No Squads multisig configured, and direct signing is localnet-only.</Note>
-      )}
-    </article>
-  );
-}
-
 function Actions({ mode }: { mode: Mode }) {
   const { reserve, ledger } = useLive();
   const q = capitalQueue(reserve.state, ledger);
@@ -359,6 +327,7 @@ export function AdminPage() {
               <Note>The configured admin is a plain local key, not a Squads vault. Actions are signed directly by that key. On devnet every admin action is a proposal.</Note>
             </div>
           )}
+          <ReserveAssets mode={mode} />
           <Section id="config" title="VaultConfig" kicker="On-chain configuration" roles={<RoleLine items={[{ role: "admin", prefix: "written only by" }]}>The Operator and Investor wallets are listed here; they cannot change it.</RoleLine>}>
             <ConfigView r={d.reserve} />
           </Section>
