@@ -4,7 +4,8 @@
  *
  *   - a funded reserve: MUTAV's capital wallet deposits R$30,000 through the
  *     FIFO queue, the admin fulfils it and the shares are claimed;
- *   - two guarantees near the gate (R$22,000 of cover against R$30,000);
+ *   - two guarantees (R$22,000 of cover against R$30,000; at c = 0.10 they
+ *     need R$2,200 of coverage);
  *   - one paid guarantee fee (R$1,000 gross, 20% take to the treasury);
  *   - one settled claim (filed → paid → settled by PIX) for the timeline.
  *
@@ -112,19 +113,21 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     mutavCapitalWallet: s("capital").address,
     treasuryAccount: treasury,
     paymentsAccount: payments,
-    coverageRatioBps: 10_000,
+    // c = 0.10 and the caps of scripts/devnet/devnet.example.json (ADR 0016),
+    // so localnet mirrors devnet.
+    coverageRatioBps: 1_000,
     feeTakeBps: 2_000,
     payoutSlaSecs: 172_800,
     caps: {
-      maxTvl: "100000000000",
-      maxCoverPerGuarantee: "30000000000",
-      maxCoverPerAgency: "60000000000",
+      maxTvl: "300000000000",
+      maxCoverPerGuarantee: "40000000000",
+      maxCoverPerAgency: "10000000000000",
       maxClaimPerCall: "10000000000",
       maxClaimPerPeriod: "20000000000",
       claimPeriodSecs: 2_592_000,
       maxTesouroShareBps: 0,
       minRequest: "1000000000",
-      maxRequest: "30000000000",
+      maxRequest: "100000000000",
       minFillAssets: "500000000",
     },
     price: { tesouroPriceAccount: "11111111111111111111111111111111", p0: 1_000_000_000, t0: 0, yMaxBps: 1_500, maxStalenessSecs: 86_400, maxDeviationBps: 200, maxNavMoveBps: 10_000 },
@@ -142,7 +145,7 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   await go("admin", { kind: "fulfil_deposits", count: 1 }, "fulfil_deposits (admin)");
   await go("capital", { kind: "claim_shares", seq: 0n }, "claim_shares");
 
-  console.log("\n== seed: guarantees near the gate");
+  console.log("\n== seed: two guarantees");
   const lease = async (leaseLabel: string, agency: string, rent: bigint) =>
     go(
       "operator",
@@ -197,7 +200,8 @@ export async function setScenario(url: string, keysDir: string, scenario: "under
   assertLocal(url);
   const p = await protocolLib();
   const k = await localKeys(keysDir, p.run);
-  const ratio = scenario === "under-covered" ? 15_000 : 10_000;
+  // Restores the seeded c = 0.10 (ADR 0016).
+  const ratio = scenario === "under-covered" ? 15_000 : 1_000;
   await act(url, config, [], k.admin.signer, { kind: "set_config", coverageRatioBps: ratio }, `set_config coverage_ratio_bps = ${ratio}`);
   await act(url, config, [], k.pauser.signer, { kind: "refresh" }, "refresh");
 }

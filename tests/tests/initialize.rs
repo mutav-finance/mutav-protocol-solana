@@ -171,6 +171,24 @@ fn fee_take_bounded_by_program_max() {
 }
 
 #[test]
+fn coverage_ratio_bounded_by_program_min() {
+    // ADR 0016: c ≥ 0.10, so 999 is refused and 1_000 is the floor.
+    assert_eq!(MIN_COVERAGE_RATIO_BPS, 1_000);
+    let mut f = Fixture::uninitialized();
+    let mut args = f.init_args();
+    args.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1;
+    assert_mutav_err(f.initialize(args), MutavError::InvalidParameter);
+
+    for c in [MIN_COVERAGE_RATIO_BPS, 5_000] {
+        let mut f = Fixture::uninitialized();
+        let mut args = f.init_args();
+        args.coverage_ratio_bps = c;
+        f.initialize(args).expect("c at or above the floor");
+        assert_eq!(f.config().coverage_ratio_bps, c);
+    }
+}
+
+#[test]
 fn roles_must_be_distinct_and_set() {
     let mut f = Fixture::uninitialized();
     let base = f.init_args();
@@ -203,8 +221,9 @@ fn params_out_of_program_bounds_rejected() {
     let mut f = Fixture::uninitialized();
     let base = f.init_args();
     let cases: Vec<Box<dyn Fn(&mut mutav::InitializeArgs)>> = vec![
-        // Coverage ratio below 1.0 (floor TBD, fails closed).
-        Box::new(|a| a.coverage_ratio_bps = 9_999),
+        // Coverage ratio below the 0.10 floor (ADR 0016).
+        Box::new(|a| a.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1),
+        Box::new(|a| a.coverage_ratio_bps = 0),
         Box::new(|a| a.caps.max_tesouro_share_bps = 10_001),
         Box::new(|a| a.price.max_deviation_bps = 10_001),
         Box::new(|a| a.price.max_nav_move_bps = 10_001),

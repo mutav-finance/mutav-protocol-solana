@@ -4,7 +4,7 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 
 ## Pilot
 
-The goal of the pilot is to prove that a digital-asset reserve can be run as a viable operation: MUTAV operates it, and anyone can verify it. It runs with real money and real guarantees under a **low ceiling** of hard on-chain caps (proposed: R$100k maximum reserve, R$30k maximum cover per guarantee, R$60k per agency, R$10k / R$20k claim payments per call / per 30 days). Admins raise the caps only as the pilot proves itself. See [`docs/spec.md`](docs/spec.md#8-caps) for the full list.
+The goal of the pilot is to prove that a digital-asset reserve can be run as a viable operation: MUTAV operates it, and anyone can verify it. It runs with real money and real guarantees under a **low ceiling** of hard on-chain caps (proposed, and the devnet starting values: coverage ratio `c` = 0.10, the program floor; R$300k maximum reserve; R$40k maximum cover per guarantee; R$3M per agency, which never binds at `c` = 0.10; R$10k / R$20k claim payments per call / per 30 days). The reserve holds `c` × the remaining cover of every guarantee, and never less than the filed claims ([ADR 0016](docs/decisions/0016-coverage-ratio-below-one.md)). Admins raise the caps only as the pilot proves itself. See [`docs/spec.md`](docs/spec.md#8-caps) for the full list.
 
 The reserve holds BRS (Nora Finance, 1:1 BRL stablecoin) and, through an adapter, Etherfuse TESOURO (tokenized Brazilian treasury).
 

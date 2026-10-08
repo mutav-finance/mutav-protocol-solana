@@ -62,6 +62,7 @@ pub fn handle_close_guarantee(ctx: Context<CloseGuarantee>, id: [u8; 32]) -> Res
     state.coverage_required = coverage_required(
         state.remaining_cover_total,
         ctx.accounts.config.coverage_ratio_bps,
+        state.provisions,
     )?;
     state.active_guarantees = state
         .active_guarantees

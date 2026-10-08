@@ -6,6 +6,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::ClaimFiled,
+    solvency::coverage_required,
     state::{ClaimFiling, Guarantee, VaultConfig, VaultState},
 };
 
@@ -85,6 +86,12 @@ pub fn handle_file_claim(
         .provisions
         .checked_add(amount)
         .ok_or(MutavError::MathOverflow)?;
+    // Below c = 1 the provisions can bind `coverage_required` (ADR 0016).
+    state.coverage_required = coverage_required(
+        state.remaining_cover_total,
+        ctx.accounts.config.coverage_ratio_bps,
+        state.provisions,
+    )?;
 
     let now = Clock::get()?.unix_timestamp;
     let guarantee_key = ctx.accounts.guarantee.key();

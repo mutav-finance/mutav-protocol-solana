@@ -69,8 +69,10 @@ pub struct FulfilRedeems<'info> {
 /// The error for a call that fills nothing: `InsufficientLiquidBalance` when
 /// `liquid_budget` was the binding term of the budget, else
 /// `InsufficientFreeCapital` (spec §5.5). With BRS only, `liquid_budget ≥
-/// free_capital` always holds (`coverage_required ≥ provisions`), so the
-/// liquid term binds only once TESOURO is held.
+/// free_capital` holds at any `c`, because `coverage_required` includes the
+/// provisions by construction (`max(ceil(c × remaining_cover_total),
+/// provisions)`, ADR 0016), so the liquid term binds only once TESOURO is
+/// held.
 pub fn nothing_filled_error(admin_left: u64, free_capital: u64, liquid_budget: u64) -> MutavError {
     if liquid_budget < free_capital && liquid_budget < admin_left {
         MutavError::InsufficientLiquidBalance

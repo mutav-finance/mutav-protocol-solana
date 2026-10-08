@@ -66,6 +66,9 @@ pub const BPS_DENOMINATOR: u16 = 10_000;
 /// Program maximum for `fee_take_bps` (30%).
 pub const MAX_FEE_TAKE_BPS: u16 = 3_000;
 
+/// Program minimum for `coverage_ratio_bps` (c ≥ 0.10; ADR 0016).
+pub const MIN_COVERAGE_RATIO_BPS: u16 = 1_000;
+
 /// Share mint decimals (spec Conventions).
 pub const SHARE_DECIMALS: u8 = 6;
 
