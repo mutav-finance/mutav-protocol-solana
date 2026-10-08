@@ -50,6 +50,7 @@
 *{box-sizing:border-box;border-radius:0}
 html{-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;scroll-padding-top:64px;scroll-padding-bottom:64px}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 var(--fs-body)/1.5 var(--sans);padding-bottom:48px;touch-action:manipulation}
+@media (min-width:901px) and (max-width:1500px){ body{padding-bottom:76px} }
 h1,h2,h3{font-family:var(--display);font-weight:700;text-wrap:balance}
 p{text-wrap:pretty}
 button,input,select{touch-action:manipulation;font-family:inherit}
@@ -153,7 +154,7 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .seghint{font-size:var(--fs-help);color:var(--ink-2);background:var(--surface-2);border-left:2px solid var(--line-input);padding:var(--sp2) var(--sp3);line-height:1.5}
 .seghint b{color:var(--ink);font-weight:600}
 .seghint.risk{background:var(--risk-soft);border-left-color:var(--risk)}
-.legendsrc{font-size:var(--fs-help);color:var(--ink-3);margin:0 0 var(--sp4);line-height:1.7;padding-bottom:var(--sp3);border-bottom:1px solid var(--line)}
+.legendsrc{font-size:var(--fs-help);color:var(--ink-3);margin:0;line-height:1.7}
 .legendsrc .src{margin-left:2px}
 .linkbtn{font:inherit;font-weight:500;background:none;border:0;padding:0;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:3px;cursor:pointer}
 /* view mode */
@@ -264,7 +265,8 @@ h3:first-child{margin-top:0}
 .method p{font-size:var(--fs-body);color:var(--ink-2);margin:var(--sp2) 0;line-height:1.6;max-width:820px}
 .disc-full{border:1px solid var(--line);padding:var(--sp3) var(--sp4);font-size:var(--fs-body);color:var(--ink-2);background:var(--surface)}
 .footbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1px solid var(--line);font-size:var(--fs-help);color:var(--ink-2);line-height:1.4}
-.footbar .in{max-width:1440px;margin:0 auto;padding:var(--sp2) var(--sp6)}
+.footbar .in{max-width:1440px;margin:0 auto;padding:var(--sp2) var(--sp6);display:flex;align-items:center;justify-content:space-between;gap:var(--sp2) var(--sp6);flex-wrap:wrap}
+@media (max-width:900px){ .footbar .legendsrc{display:none} }
 .footbar strong{color:var(--ink);font-weight:600}
 @media (max-width:900px){
   .bar .in{padding:var(--sp3) var(--sp4)}
@@ -318,7 +320,6 @@ h3:first-child{margin-top:0}
 
 <div class="app">
   <aside class="panel" id="panel" aria-label="Inputs">
-    <div class="legendsrc adv">Assumption sources: <span class="src c">canonical</span> 02-parameters / 40-reserve · <span class="src p">protocol</span> on-chain config (devnet) · <span class="src r">research</span> notes in this folder · <span class="src e">estimate</span> prior until pilot data.</div>
     <div id="groups"></div>
   </aside>
 
@@ -507,7 +508,7 @@ bad_year_net_gain    = net fees − leases × bad_year_claims + stable × (tesou
 </div>
 
 <div class="htip" id="htip" role="tooltip"></div>
-<div class="footbar" role="note"><div class="in"><strong>Model estimates, not a return promise.</strong> Reserve planning only; not investment advice and not an offer of securities. Self-contained, works offline.</div></div>
+<div class="footbar" role="note"><div class="in"><span class="disc"><strong>Model estimates, not a return promise.</strong> Reserve planning only; not investment advice and not an offer of securities. Self-contained, works offline.</span><div class="legendsrc">Assumption sources: <span class="src c">canonical</span> 02-parameters / 40-reserve · <span class="src p">protocol</span> on-chain config (devnet) · <span class="src r">research</span> notes in this folder · <span class="src e">estimate</span> prior until pilot data.</div></div></div>
 
 <script id="calc">
 /* Pure model. No DOM access, so it can be tested in node (app/lib/__tests__/simulator-parity.test.ts).
