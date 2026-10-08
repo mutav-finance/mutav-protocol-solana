@@ -51,6 +51,7 @@
     "instantExit": "1",
     "maxAllowlistProofLen": 32,
     "maxFulfilBatch": 8,
+    "maxIncomeTakeBps": 0,
     "minCoverageRatioBps": 1000,
     "modeNormal": 0,
     "modeUnderCovered": 1,

@@ -63,14 +63,15 @@ pub struct SweepIncome<'info> {
     #[account(mut, seeds = [RESERVE_SEED, config.key().as_ref()], bump)]
     pub reserve: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// CHECK: the whitelisted MUTAV treasury (address-checked); receives the
-    /// take when `income_take_bps > 0`, and the token program validates it
-    /// on that transfer. Not read when the take is 0.
+    /// The whitelisted MUTAV treasury: receives the take when
+    /// `income_take_bps > 0`.
+    /// CHECK: address-checked; the token program validates it on transfer.
     #[account(mut, address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
     pub treasury_account: UncheckedAccount<'info>,
 
-    /// CHECK: data-less PDA; owns the inbox and `reserve` and signs the
+    /// The vault authority: owns the inbox and `reserve` and signs the
     /// transfers.
+    /// CHECK: data-less PDA, seeds-checked.
     #[account(seeds = [AUTHORITY_SEED, config.key().as_ref()], bump = config.authority_bump)]
     pub vault_authority: UncheckedAccount<'info>,
 

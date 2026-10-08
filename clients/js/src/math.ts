@@ -19,6 +19,12 @@ const I64_MAX = (1n << 63n) - 1n;
 export const BPS_DENOMINATOR = 10_000n;
 /** Program minimum for `coverage_ratio_bps`: c ≥ 0.10 (ADR 0016). */
 export const MIN_COVERAGE_RATIO_BPS = 1_000;
+/**
+ * Program cap on `income_take_bps` (ADR 0017). Its value is TBD (spec §12
+ * Q47), so the program fails closed at 0: all issuer income builds the
+ * reserve.
+ */
+export const MAX_INCOME_TAKE_BPS = 0;
 /** Scale of TESOURO prices: BRS base units per TESOURO base unit × 10^9. */
 export const PRICE_SCALE = 1_000_000_000n;
 /** Scale of NAV per share: `NAV_SCALE` is NAV 1.0. */
@@ -245,4 +251,19 @@ export function computeSolvency(i: SolvencyInputs): Solvency {
     underCovered,
     deficit: satSub(required, stable),
   };
+}
+
+/**
+ * The split `sweep_income` (and `contribute_fees`) applies: `take =
+ * floor(amount × takeBps / 10_000)` to the treasury, `net = amount − take`
+ * into the reserve, rounded in the reserve's favour (ADR 0017).
+ */
+export function takeSplit(amount: bigint, takeBps: number): { take: bigint; net: bigint } {
+  const take = mulDiv(amount, BigInt(takeBps), BPS_DENOMINATOR, 'down');
+  return { take, net: amount - take };
+}
+
+/** `true` for a well-formed `YYYYMM` statement month, as `sweep_income` checks. */
+export function isValidIncomePeriod(period: number): boolean {
+  return Number.isInteger(period) && period >= 200_001 && period <= 999_912 && period % 100 >= 1 && period % 100 <= 12;
 }

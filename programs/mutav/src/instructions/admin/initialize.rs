@@ -144,10 +144,9 @@ pub struct Initialize<'info> {
     )]
     pub claims: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// CHECK: the income inbox (ADR 0017): the vault authority's associated
-    /// token account for `reserve_mint`. Its address is checked in the
-    /// handler; the associated token account program creates it (or finds
-    /// it already created) with the right mint and owner.
+    /// The income inbox (ADR 0017): the vault authority's associated token
+    /// account for `reserve_mint`, created here idempotently.
+    /// CHECK: address checked in the handler; the ATA program creates it.
     #[account(mut)]
     pub income_inbox: UncheckedAccount<'info>,
 

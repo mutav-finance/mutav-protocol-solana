@@ -14,6 +14,9 @@ import {
   sharesFor,
   VIRTUAL_OFFSET,
   INSTANT_EXIT,
+  isValidIncomePeriod,
+  MAX_INCOME_TAKE_BPS,
+  takeSplit,
   type SolvencyInputs,
 } from '../src';
 import { outcome, vectors } from './vectors';
@@ -117,5 +120,23 @@ describe('input validation', () => {
   test('rejects values outside u64', () => {
     expect(() => mulDiv(-1n, 1n, 1n, 'down')).toThrow(RangeError);
     expect(() => sharesFor(1n << 64n, 0n, 0n)).toThrow(RangeError);
+  });
+});
+
+describe('issuer income (ADR 0017)', () => {
+  test('the take cap matches the program (0 until decided)', () => {
+    expect(MAX_INCOME_TAKE_BPS).toBe(vectors.constants.maxIncomeTakeBps);
+    expect(MAX_INCOME_TAKE_BPS).toBe(0);
+  });
+
+  test('takeSplit rounds the take down, in the reserve’s favour', () => {
+    expect(takeSplit(1_000_000_003n, 2_500)).toEqual({ take: 250_000_000n, net: 750_000_003n });
+    expect(takeSplit(7n, 2_000)).toEqual({ take: 1n, net: 6n });
+    expect(takeSplit(5_000n, 0)).toEqual({ take: 0n, net: 5_000n });
+  });
+
+  test('periods are YYYYMM months, as the program checks', () => {
+    for (const p of [202_610, 202_601, 202_612]) expect(isValidIncomePeriod(p)).toBe(true);
+    for (const p of [0, 202_600, 202_613, 2_026, 199_912, 1_000_001, 202_610.5]) expect(isValidIncomePeriod(p)).toBe(false);
   });
 });

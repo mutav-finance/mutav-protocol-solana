@@ -41,6 +41,7 @@ import {
   getFeeReceiptCodec,
   getGuaranteeCodec,
   getHolderStateCodec,
+  getIncomeReceiptCodec,
   getPayoutCodec,
   getRedeemRequestCodec,
   getVaultConfigCodec,
@@ -57,6 +58,8 @@ import {
   type GuaranteeArgs,
   type HolderState,
   type HolderStateArgs,
+  type IncomeReceipt,
+  type IncomeReceiptArgs,
   type Payout,
   type PayoutArgs,
   type RedeemRequest,
@@ -91,6 +94,7 @@ import {
   getSetPaymentsAccountInstruction,
   getSetRolesInstruction,
   getSettlePayoutInstructionAsync,
+  getSweepIncomeInstructionAsync,
   getUnpauseInstruction,
   parseAdvanceQueueHeadsInstruction,
   parseCancelDepositInstruction,
@@ -116,6 +120,7 @@ import {
   parseSetPaymentsAccountInstruction,
   parseSetRolesInstruction,
   parseSettlePayoutInstruction,
+  parseSweepIncomeInstruction,
   parseUnpauseInstruction,
   type AdvanceQueueHeadsAsyncInput,
   type CancelDepositAsyncInput,
@@ -153,6 +158,7 @@ import {
   type ParsedSetPaymentsAccountInstruction,
   type ParsedSetRolesInstruction,
   type ParsedSettlePayoutInstruction,
+  type ParsedSweepIncomeInstruction,
   type ParsedUnpauseInstruction,
   type PauseInput,
   type PayClaimAsyncInput,
@@ -166,6 +172,7 @@ import {
   type SetPaymentsAccountInput,
   type SetRolesInput,
   type SettlePayoutAsyncInput,
+  type SweepIncomeAsyncInput,
   type UnpauseInput,
 } from "../instructions";
 import {
@@ -175,6 +182,7 @@ import {
   findFeeReceiptPda,
   findGuaranteePda,
   findHolderStatePda,
+  findIncomeReceiptPda,
   findPayoutPda,
   findPendingDepositsPda,
   findPendingRedemptionsPda,
@@ -194,6 +202,7 @@ export enum MutavAccount {
   FeeReceipt,
   Guarantee,
   HolderState,
+  IncomeReceipt,
   Payout,
   RedeemRequest,
   VaultConfig,
@@ -274,6 +283,17 @@ export function identifyMutavAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([33, 167, 246, 148, 183, 13, 0, 79]),
+      ),
+      0,
+    )
+  ) {
+    return MutavAccount.IncomeReceipt;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([69, 45, 245, 131, 218, 101, 158, 228]),
       ),
       0,
@@ -339,6 +359,7 @@ export enum MutavEvent {
   FulfilHaltCleared,
   GuaranteeClosed,
   GuaranteeRegistered,
+  IncomeSwept,
   ModeChanged,
   OperatorRevoked,
   Paused,
@@ -564,6 +585,17 @@ export function identifyMutavEvent(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([166, 166, 210, 79, 8, 87, 60, 88]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.IncomeSwept;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([149, 123, 78, 29, 237, 72, 67, 229]),
       ),
       0,
@@ -777,6 +809,7 @@ export enum MutavInstruction {
   SetPaymentsAccount,
   SetRoles,
   SettlePayout,
+  SweepIncome,
   Unpause,
 }
 
@@ -1052,6 +1085,17 @@ export function identifyMutavInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([230, 174, 73, 83, 170, 88, 41, 115]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SweepIncome;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([169, 144, 4, 38, 10, 141, 188, 255]),
       ),
       0,
@@ -1140,6 +1184,9 @@ export type ParsedMutavInstruction<
   | ({
       instructionType: MutavInstruction.SettlePayout;
     } & ParsedSettlePayoutInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.SweepIncome;
+    } & ParsedSweepIncomeInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.Unpause;
     } & ParsedUnpauseInstruction<TProgram>);
@@ -1317,6 +1364,13 @@ export function parseMutavInstruction<TProgram extends string>(
         ...parseSettlePayoutInstruction(instruction),
       };
     }
+    case MutavInstruction.SweepIncome: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SweepIncome,
+        ...parseSweepIncomeInstruction(instruction),
+      };
+    }
     case MutavInstruction.Unpause: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1354,6 +1408,8 @@ export type MutavPluginAccounts = {
     SelfFetchFunctions<GuaranteeArgs, Guarantee>;
   holderState: ReturnType<typeof getHolderStateCodec> &
     SelfFetchFunctions<HolderStateArgs, HolderState>;
+  incomeReceipt: ReturnType<typeof getIncomeReceiptCodec> &
+    SelfFetchFunctions<IncomeReceiptArgs, IncomeReceipt>;
   payout: ReturnType<typeof getPayoutCodec> &
     SelfFetchFunctions<PayoutArgs, Payout>;
   redeemRequest: ReturnType<typeof getRedeemRequestCodec> &
@@ -1457,6 +1513,10 @@ export type MutavPluginInstructions = {
     input: SettlePayoutAsyncInput,
   ) => ReturnType<typeof getSettlePayoutInstructionAsync> &
     SelfPlanAndSendFunctions;
+  sweepIncome: (
+    input: MakeOptional<SweepIncomeAsyncInput, "payer">,
+  ) => ReturnType<typeof getSweepIncomeInstructionAsync> &
+    SelfPlanAndSendFunctions;
   unpause: (
     input: UnpauseInput,
   ) => ReturnType<typeof getUnpauseInstruction> & SelfPlanAndSendFunctions;
@@ -1476,6 +1536,7 @@ export type MutavPluginPdas = {
   config: typeof findConfigPda;
   shareMint: typeof findShareMintPda;
   payout: typeof findPayoutPda;
+  incomeReceipt: typeof findIncomeReceiptPda;
 };
 
 export type MutavPluginRequirements = ClientWithRpc<
@@ -1504,6 +1565,7 @@ export function mutavProgram() {
           feeReceipt: addSelfFetchFunctions(client, getFeeReceiptCodec()),
           guarantee: addSelfFetchFunctions(client, getGuaranteeCodec()),
           holderState: addSelfFetchFunctions(client, getHolderStateCodec()),
+          incomeReceipt: addSelfFetchFunctions(client, getIncomeReceiptCodec()),
           payout: addSelfFetchFunctions(client, getPayoutCodec()),
           redeemRequest: addSelfFetchFunctions(client, getRedeemRequestCodec()),
           vaultConfig: addSelfFetchFunctions(client, getVaultConfigCodec()),
@@ -1636,6 +1698,14 @@ export function mutavProgram() {
               client,
               getSettlePayoutInstructionAsync(input),
             ),
+          sweepIncome: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSweepIncomeInstructionAsync({
+                ...input,
+                payer: input.payer ?? client.payer,
+              }),
+            ),
           unpause: (input) =>
             addSelfPlanAndSendFunctions(client, getUnpauseInstruction(input)),
         },
@@ -1653,6 +1723,7 @@ export function mutavProgram() {
           config: findConfigPda,
           shareMint: findShareMintPda,
           payout: findPayoutPda,
+          incomeReceipt: findIncomeReceiptPda,
         },
         identifyAccount: identifyMutavAccount,
         identifyInstruction: identifyMutavInstruction,

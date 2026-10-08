@@ -1,7 +1,8 @@
 /**
  * PDA helpers (spec §3). The generated `find*Pda` functions cover the PDAs
  * whose seeds the IDL describes; this file adds the ones it cannot (seeded by
- * a queue `seq` or an agency id) and one call for every reserve-level address.
+ * a queue `seq` or an agency id), the income inbox (an associated token
+ * account, ADR 0017) and one call for every reserve-level address.
  */
 import {
   getAddressEncoder,
@@ -84,3 +85,31 @@ export const findRedeemRequestPda = (s: { config: Address; seq: bigint }, o: Pro
 /** `AgencyExposure`: `["agency", config, agency_id]`. */
 export const findAgencyExposurePda = (s: { config: Address; agencyId: ReadonlyUint8Array }, o: ProgramOpt = {}) =>
   Promise.resolve().then(() => pda(['agency', addr.encode(s.config), bytes32(s.agencyId, 'agencyId')], o));
+
+/** The classic SPL Token program (BRS is a classic SPL mint). */
+export const TOKEN_PROGRAM_ADDRESS = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address;
+/** The associated token account program. */
+export const ASSOCIATED_TOKEN_PROGRAM_ADDRESS = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL' as Address;
+
+/**
+ * The income inbox (spec §3.3, ADR 0017): the vault authority's associated
+ * token account for the reserve mint, under the reserve's token program
+ * (`config.reserveTokenProgram`; classic SPL Token by default). Nora pays
+ * the monthly revenue share here; `sweep_income` moves a statement's amount
+ * into the reserve. Its balance never counts toward NAV.
+ */
+export async function findIncomeInboxAddress(s: {
+  vaultAuthority: Address;
+  reserveMint: Address;
+  tokenProgram?: Address;
+}): Promise<Address> {
+  const [inbox] = await getProgramDerivedAddress({
+    programAddress: ASSOCIATED_TOKEN_PROGRAM_ADDRESS,
+    seeds: [
+      addr.encode(s.vaultAuthority),
+      addr.encode(s.tokenProgram ?? TOKEN_PROGRAM_ADDRESS),
+      addr.encode(s.reserveMint),
+    ],
+  });
+  return inbox;
+}

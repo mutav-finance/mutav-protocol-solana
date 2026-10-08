@@ -603,6 +603,7 @@ fn build() -> Value {
             "virtualOffset": s(VIRTUAL_OFFSET),
             "bpsDenominator": BPS_DENOMINATOR,
             "minCoverageRatioBps": MIN_COVERAGE_RATIO_BPS,
+            "maxIncomeTakeBps": MAX_INCOME_TAKE_BPS,
             "instantExit": s(INSTANT_EXIT),
             "modeNormal": MODE_NORMAL,
             "modeUnderCovered": MODE_UNDER_COVERED,
