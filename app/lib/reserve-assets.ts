@@ -131,9 +131,10 @@ export type ExpansionStep = {
 };
 
 /**
- * How a new asset joins the reserve (ADR 0018): every step a Squads proposal
- * under the time lock, the first a program upgrade. A test checks each live
- * step's signer against the program and each planned one against the spec.
+ * How a new asset joins the reserve (ADR 0018): step 1 is a program upgrade,
+ * steps 2–4 are Squads proposals under the time lock, and step 5 (refresh) is
+ * signed by anyone. A test checks each live step's signer against the program
+ * and each planned one against the spec.
  */
 export const EXPANSION_STEPS: readonly ExpansionStep[] = [
   { actor: "admin", ix: null, live: false, action: "Upgrade the program with the adapter instructions and deploy the asset's adapter program, after its own security review." },
@@ -217,7 +218,7 @@ export const PLANNED_RESERVE_INSTRUCTIONS: readonly PlannedInstruction[] = [
 ];
 
 export const PLANNED_BLOCKER =
-  "Every step is a Squads proposal under the time lock. The four planned instructions ship in the program upgrade that adds the first adapter (ADR 0018).";
+  "Step 1 is a program upgrade; steps 2–4 are Squads proposals under the time lock; refresh is signed by anyone. The four planned instructions ship in the upgrade that adds the first adapter (ADR 0018).";
 
 // ── Admin controls (set_config) ─────────────────────────────────────────────
 

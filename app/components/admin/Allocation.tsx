@@ -144,9 +144,11 @@ function PlannedInstructions() {
 }
 
 function FloorControl({ mode, c }: { mode: Mode; c: Composition }) {
-  const [floor, setFloor] = useState(String(c.floorBps));
-  const req = settlementFloorRequest(floor);
-  const v = req ? BPS_MAX - req.maxTesouroShareBps : null;
+  // Starts blank, and an unchanged value proposes nothing: no no-op proposals.
+  const [floor, setFloor] = useState("");
+  const parsed = settlementFloorRequest(floor);
+  const v = parsed ? BPS_MAX - parsed.maxTesouroShareBps : null;
+  const req = v !== null && v !== c.floorBps ? parsed : null;
   const preview = v === null ? null : (BigInt(v) * c.stableAssets + 9_999n) / 10_000n;
   return (
     <AdminAction title="Min held in the settlement token" label="set_config" mode={mode} request={req}>
@@ -156,7 +158,7 @@ function FloorControl({ mode, c }: { mode: Mode; c: Composition }) {
         does="The minimum share of stable assets held in BRS, the token guarantee fees come in and claim payments go out in. All adapters together may use only the share above it. 100% in the pilot (ADR 0018); it binds once allocate exists."
       />
       <Grid>
-        <TextField id="adm-settlement-floor" label="New floor (bps)" value={floor} onChange={setFloor} numeric hint={v !== null ? `${fmtPct(v)} · preview: at least ${fmtBrs(preview!, 0)} in BRS at today's stable assets` : `0 – ${BPS_MAX} bps`} />
+        <TextField id="adm-settlement-floor" label="New floor (bps)" value={floor} onChange={setFloor} numeric hint={v === null ? `now ${fmtPct(c.floorBps)} · 0 – ${BPS_MAX} bps` : v === c.floorBps ? "unchanged: nothing to propose" : `${fmtPct(v)} · preview: at least ${fmtBrs(preview!, 0)} in BRS at today's stable assets`} />
       </Grid>
     </AdminAction>
   );
@@ -193,10 +195,16 @@ export function Allocation({ mode }: { mode: Mode }) {
       {/* Alias for links to the earlier #reserve-assets anchor. */}
       <span id={ALLOCATION_ALIAS} aria-hidden="true" style={{ position: "relative", top: -112, display: "block", height: 0 }} />
       <WhatThis>
-        The pilot reserve holds BRS only (ADR 0018): BRS already earns near Selic through Nora&apos;s revenue share. More assets can be added later through whitelisted, capped adapters; TESOURO is the first candidate, not a commitment.
+        The pilot reserve holds BRS only (ADR 0018). BRS bears no yield; the reserve receives Nora&apos;s issuer partnership revenue in BRS (ADR 0017), at a rate set by a commercial agreement that is not on-chain (MUTAV expects it below but near Selic, pending Nora&apos;s confirmation). More assets can be added later through whitelisted, capped adapters; TESOURO is the first candidate, not a commitment.
       </WhatThis>
       <Sub id="allocation-composition" title="Composition" badge={LIVE}>
         <CompositionNow c={c} />
+      </Sub>
+      <Sub id="allocation-controls" title="Settlement floor" badge={LIVE}>
+        <Note>A live control: a valid Squads proposal today. It stays 100% in the pilot, until an adapter is live.</Note>
+        <Cards>
+          <FloorControl mode={mode} c={c} />
+        </Cards>
       </Sub>
       <Sub id="allocation-expand" title="Expand with adapters" badge={<StatusBadge color="var(--color-text-3)" label="NOT PART OF THE PILOT" />}>
         <Note>{PLANNED_BLOCKER}</Note>
@@ -211,14 +219,10 @@ export function Allocation({ mode }: { mode: Mode }) {
         <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-3)", margin: 0, lineHeight: 1.6 }}>
           No button here sends any of these: the program would reject an instruction it does not have.
         </p>
-        <div id="allocation-controls" style={{ display: "flex", flexDirection: "column", gap: 12, scrollMarginTop: 112 }}>
-          <H>Limits</H>
-          <Note>The floor is a valid Squads proposal today, but not part of the pilot&apos;s day-to-day: it stays 100% until an adapter is live.</Note>
-          <Cards>
-            <FloorControl mode={mode} c={c} />
-            <PriceFeedPlanned />
-          </Cards>
-        </div>
+        <H>Per-adapter price feed</H>
+        <Cards>
+          <PriceFeedPlanned />
+        </Cards>
       </Sub>
     </Section>
   );

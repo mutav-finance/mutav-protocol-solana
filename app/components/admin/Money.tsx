@@ -58,7 +58,7 @@ function Deposits({ mode }: { mode: Mode }) {
           <Facts
             now={m(`${q.deposits.length} waiting · head seq ${reserve.state.depositHead}`)}
             bound={m(`max reserve ${fmtBrs(c.caps.maxTvl, 0)} · up to 8 per call`)}
-            does="Moves escrowed BRS into the reserve in FIFO order and mints shares at NAV. Allowed in under-coverage; refused while paused, while a claim notice is open, or while fulfilment is halted."
+            does="Moves escrowed BRS into the reserve in FIFO order and mints shares at NAV. Allowed in under-coverage; refused while paused or while fulfilment is halted."
           />
           <Grid><TextField id="adm-dep" label="Count" value={count} onChange={setCount} numeric /></Grid>
         </AdminAction>
