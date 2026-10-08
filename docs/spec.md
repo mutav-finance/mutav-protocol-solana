@@ -1,6 +1,8 @@
 # MUTAV reserve program — specification
 
-*Status: draft for the pilot build, 2026-10-01; revised 2026-10-02 for partial fills at the queue head ([ADR 0010](decisions/0010-partial-fills-at-queue-head.md)), the earmark-aware solvency formula, the phase-2 instant exit and upgrade readiness ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)), and the alignment with a limited fiança onerosa, Lei 8.245/91 art. 37 II ([ADR 0012](decisions/0012-fianca-aligned-guarantee-lifecycle.md)); revised 2026-10-07 for the BRS income intake ([ADR 0017](decisions/0017-brs-income-intake.md)). Derived from the MUTAV project document (§2–§7), the adversarial review and the mutav-app operations review. This file is the source of truth for the program's business rules. Any change to economic behaviour needs an ADR in [`decisions/`](decisions/).*
+*Status: draft for the pilot build, 2026-10-01; revised 2026-10-02 for partial fills at the queue head ([ADR 0010](decisions/0010-partial-fills-at-queue-head.md)), the earmark-aware solvency formula, the phase-2 instant exit and upgrade readiness ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)), and the alignment with a limited fiança onerosa, Lei 8.245/91 art. 37 II ([ADR 0012](decisions/0012-fianca-aligned-guarantee-lifecycle.md)); revised 2026-10-07 for the BRS income intake ([ADR 0017](decisions/0017-brs-income-intake.md)) and the BRS-only pilot reserve ([ADR 0018](decisions/0018-brs-only-pilot-reserve.md)).
+
+**Pilot assets.** The pilot reserve holds BRS only; more assets can be added through adapters (TESOURO is the first candidate, pending an Etherfuse BRS path; ADR 0018). The TESOURO fields, pricing (§7) and allocation instructions (§5.7) below define that first adapter; with `max_tesouro_share_bps = 0` and no adapter whitelisted, `tesouro_units` stays 0 and no price is read. Derived from the MUTAV project document (§2–§7), the adversarial review and the mutav-app operations review. This file is the source of truth for the program's business rules. Any change to economic behaviour needs an ADR in [`decisions/`](decisions/).*
 
 Where a value or behaviour is not yet decided, this spec says **TBD** and lists it under [§12 Open questions](#12-open-questions). Items marked *(derived)* are not named in the project document but follow from a rule it states; they are the minimum the program needs to enforce that rule.
 
@@ -44,7 +46,7 @@ Where a value or behaviour is not yet decided, this spec says **TBD** and lists 
    - Off-chain items (fees in transit, recoveries, BRL at MUTAV's bank) count only once they settle on-chain.
    - Losses are recognized early: a filed claim is provisioned immediately.
    - The program's accounting is internal: it tracks the amounts it moved, not raw token-account balances, so a direct transfer into a reserve account does not move NAV. Issuer income enters NAV only when `sweep_income` books a statement (ADR 0017).
-   - The remaining trust in issuer backing (Nora for BRS, Etherfuse for TESOURO) is disclosed, not hidden.
+   - The remaining trust in issuer backing (Nora for BRS; Etherfuse for TESOURO, once an adapter adds it) is disclosed, not hidden.
 3. **MUTAV operates every chain touchpoint.** Agencies, tenants and landlords never sign on-chain. The operator key is the only writer for guarantees and claims. It pays claims within its caps; a payment above them goes through the admin (`pay_claim_admin`, ADR 0012).
 4. **The solvency gate protects the reserve. It never stops a claim payment.** It gates capital moving in and out, allocations, and new guarantees. `pay_claim` is never solvency-gated.
 5. **No arbitrary outflows.** Reserve funds leave only to (a) investor claim escrows on fulfilled redemptions, (b) the whitelisted MUTAV payments account, (c) a whitelisted adapter's capped sub-authority, or (d) in phase 2 only, an instant redemption paid from the earmarked buffer to the redeeming holder ([§13](#13-phase-2--instant-exit-designed-disabled-in-the-pilot)). The income inbox (§3.3) is not reserve money; its only exits are `reserve` and, with a non-zero `income_take_bps`, the whitelisted treasury (ADR 0017).
@@ -834,6 +836,8 @@ MUTAV contributes and withdraws capital through the **same async flow as every i
 
 ### 5.7 Reserve allocation (admin, through adapters)
 
+*Not in the pilot binary (ADR 0018).* This is how the reserve expands beyond BRS: a program upgrade adds these instructions, then Squads proposals whitelist an adapter with its cap, set the price feed and raise the asset's share cap. TESOURO is the first candidate.
+
 The core never passes the vault authority or the share-mint authority into a CPI. Each adapter acts only through its own capped sub-authority PDA, which owns only that adapter's staging account.
 
 **CPI depth.** Admin instructions run inside Squads `vault_transaction_execute`, so `allocate` is already Squads (1) → mutav (2) → adapter (3) → venue (4) → token program (5), the maximum invoke stack height. Adapter rule: an adapter makes at most one level of CPI into its venue, the venue path must not exceed one further CPI, and the adapter emits no events by self-CPI (the core emits them). Plan Tasks 13–14 test `allocate` / `deallocate` executed through a real Squads v4 vault transaction, not only `fulfil_redeems`.
@@ -927,7 +931,7 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). Valu
 | `max_claim_per_call` | `u64` | `pay_claim` | R$10k |
 | `max_claim_per_period` | `u64` | `pay_claim` | R$20k |
 | `claim_period_secs` | `i64` | `pay_claim` | 30 days |
-| `max_tesouro_share_bps` | `u16` | `allocate` | 5_000 (min BRS buffer 50%); 0 on devnet (no adapter) |
+| `max_tesouro_share_bps` | `u16` | `allocate` | `0` in the pilot and on devnet: BRS only (ADR 0018). Proposed 5_000 (min BRS buffer 50%) once a TESOURO adapter is live |
 | `min_request`, `max_request` | `u64`, `u64` | `request_deposit`, `request_redeem`; `min_request` also bounds a partial fill's remainder | TBD; proposed R$1,000 / R$100,000 |
 | `min_fill_assets` | `u64` | `fulfil_redeems` (smallest partial fill) | TBD; proposed R$500 |
 | `coverage_ratio_bps` (`c`) | `u16` | all gates | 1_000 (0.10, the program floor; ADR 0016) |
@@ -1050,7 +1054,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 3. **Cap values.** Final values for every cap in §8, including `min_request` / `max_request`.
 4. **Take rate.** The value of `fee_take_bps` (program maximum 30%).
 5. **Recoveries.** Whether recoveries flow back to the reserve (would add a `record_recovery` instruction, PC-3).
-6. **BRS↔TESOURO path.** No direct path exists on Solana today (Etherfuse mints and redeems against USDC). `allocate`/`deallocate` against a real venue may need an async conversion state (PC-18).
+6. **BRS↔TESOURO path.** No direct path exists on Solana today (Etherfuse mints and redeems against USDC). `allocate`/`deallocate` against a real venue may need an async conversion state (PC-18). Until a path exists the pilot reserve is BRS only (ADR 0018).
 
 **Raised while writing this spec:**
 

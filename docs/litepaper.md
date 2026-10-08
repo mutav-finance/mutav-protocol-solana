@@ -167,7 +167,7 @@ The protocol has four components ([ADR 0002](decisions/0002-core-program-and-cap
 - **`mutav`**, the core program: custody, the share mint, NAV, the guarantee exposure registry, the solvency gate, the async queue, roles and claim payments.
 - **`mutav-adapter-interface`**, a crate fixing the discriminators and layouts every venue adapter implements (`deposit`, `withdraw`, `position_value`).
 - **`mutav-adapter-mock`**, for devnet and tests.
-- **One adapter program per venue.** TESOURO comes first and ships as **interface and mock only** until the price-account layout and a BRS↔TESOURO conversion path are confirmed.
+- **One adapter program per venue, added later.** The pilot reserve holds BRS only ([ADR 0018](decisions/0018-brs-only-pilot-reserve.md)); more assets come in through adapters. TESOURO is the first candidate and ships as **interface and mock only** until the price-account layout and a BRS↔TESOURO conversion path are confirmed.
 
 A Codama-generated TypeScript client composes instructions and holds no keys; the MUTAV platform signs.
 
@@ -397,18 +397,18 @@ The reserve holds two kinds of asset ([spec §7](spec.md#7-price-safety)).
 
 **Issuer income** ([ADR 0017](decisions/0017-brs-income-intake.md), proposed). BRS bears no yield, but Nora pays partners a monthly revenue share in BRS under a commercial agreement, to an address the partner chooses. MUTAV names the reserve's *income inbox*: the vault authority's associated token account for BRS, created at `initialize`. Nothing in it counts toward NAV; each month the operator sweeps the amount on Nora's statement into the reserve with `sweep_income`, which books it once per statement and raises NAV for every holder. The NAV-move guard measures net of these inflows, so a monthly payment does not halt fulfilment. The income depends on one contract with one issuer, which can change its rate or end, so it is shown as issuer partnership revenue, separate from guarantee fees, and never counted in the coverage math. Its terms with Nora are **open**.
 
-**TESOURO** ([Etherfuse](https://etherfuse.com/products/stablebonds)) is tokenized exposure to Brazilian federal bonds: a Token-2022 mint that carries an on-chain `BondPrice` account. Its layout, update cadence and rate basis are being confirmed with the issuer. In this design the reserve can hold at most 50% of its value in TESOURO, only through a capped adapter; in the pilot that adapter is an interface and a mock.
+**TESOURO** ([Etherfuse](https://etherfuse.com/products/stablebonds)) is tokenized exposure to Brazilian federal bonds: a Token-2022 mint that carries an on-chain `BondPrice` account. Its layout, update cadence and rate basis are being confirmed with the issuer. It is the first candidate for an adapter, not part of the pilot: the pilot reserve holds BRS only (ADR 0018), because BRS already earns near Selic through Nora's revenue share and Etherfuse has no BRS path yet. Once an adapter is live, the design caps TESOURO at 50% of the reserve, only through that capped adapter.
 
 The **mint guard** rejects any Token-2022 mint with a PermanentDelegate, a TransferHook, a non-zero TransferFee, NonTransferable, or a default-frozen account state. Mints are allowlisted **by address, never by symbol**, because impostor BRL tokens exist.
 
-**Asset mix is open.** MUTAV's working business plan targets roughly 80% tokenized federal bonds with a 20% liquidity sleeve held in a USD stablecoin. This program design instead keeps at least half the reserve in BRS and caps TESOURO at 50%, so claim payments never wait on a bond redemption or carry FX risk between BRL claims and the reserve. Neither the mix nor the sleeve asset is decided. A USD sleeve would need its own valuation rule and mint-guard review before it could count toward `stable_assets`.
+**Asset mix is open.** MUTAV's working business plan targets roughly 80% tokenized federal bonds with a 20% liquidity sleeve held in a USD stablecoin. The pilot holds BRS only (ADR 0018); once adapters are live, the design keeps at least half the reserve in BRS and caps TESOURO at 50%, so claim payments never wait on a bond redemption or carry FX risk between BRL claims and the reserve. Neither the mix nor the sleeve asset is decided. A USD sleeve would need its own valuation rule and mint-guard review before it could count toward `stable_assets`.
 
-**Table 6. Reserve assets** (this design; open against the business plan)
+**Table 6. Reserve assets** (the pilot holds BRS only, ADR 0018; the TESOURO row applies once an adapter is live)
 
 | Asset | Issuer | Token program | Valuation rule | Cap | Key risk |
 |---|---|---|---|---|---|
-| BRS | Nora Finance | Classic SPL, 6 dp | Par (1 BRS = R$1) | None; at least 50% of the reserve (proposed) | Issuer backing, freeze authority, thin market |
-| TESOURO | Etherfuse | Token-2022 | `min(BondPrice, accrual ceiling)`, with staleness and deviation bounds | ≤50% of the reserve (proposed; business plan ~80%), plus adapter cap | Price staleness, conversion path, issuer |
+| BRS | Nora Finance | Classic SPL, 6 dp | Par (1 BRS = R$1) | None; 100% of the pilot reserve | Issuer backing, freeze authority, thin market |
+| TESOURO | Etherfuse | Token-2022 | `min(BondPrice, accrual ceiling)`, with staleness and deviation bounds | 0% in the pilot (ADR 0018); ≤50% once an adapter is live (proposed; business plan ~80%), plus adapter cap | Price staleness, conversion path, issuer |
 | BRZ (new mint) | Transfero | Token-2022 | — | **Not eligible** | Fails the mint guard (PermanentDelegate) |
 
 **The thin market is a design input.** No on-chain venue could absorb a forced sale, so the design keeps a BRS buffer, uses async exits and reserves liquidity for filed requests. Funding the pilot would mint many times today's on-chain BRS supply, a concentration risk; confirming issuance and off-ramp capacity is a start condition (§12).
@@ -475,7 +475,7 @@ Caps rise from the first track toward the second only through the time-locked mu
 
 **Proposed start conditions:** counsel's sign-off; the limited-fiança instrument and landlord mandate signed through the platform; the claims tail and payment term set; a PSP contracted for boleto and PIX; BRS issuance and off-ramp capacity confirmed and the PIX↔BRS round trip measured; the issuers' answers on PDA mint destinations and CPI burn; reserve capital committed and disclosed; and an independent security review (whether a full audit is **open**). Before an audit, the pilot holds real funds in unaudited software; commit nothing you cannot afford to lose.
 
-The proposed caps (Appendix B) are a R$100k reserve (`max_tvl`), `c` (open: 1.0 or expected-loss sizing, §8), R$30k of cover per guarantee and R$60k per agency, operator payments of R$10k per call and R$20k per 30 days, at most 50% in TESOURO (open), and a 10-day `pay_claim` → `settle_payout` alarm; the take rate is open (program maximum 30%). Only the time-locked multisig can change them.
+The proposed caps (Appendix B) are a R$100k reserve (`max_tvl`), `c` (open: 1.0 or expected-loss sizing, §8), R$30k of cover per guarantee and R$60k per agency, operator payments of R$10k per call and R$20k per 30 days, no TESOURO (BRS only, ADR 0018), and a 10-day `pay_claim` → `settle_payout` alarm; the take rate is open (program maximum 30%). Only the time-locked multisig can change them.
 
 **Capacity, honestly.** The working product (12× + 6× rent, under legal review) is a *valor afiançado* of R$39,600 per lease. At `c` = 1 a R$100k reserve backs **2** such guarantees and R$300k backs **7**; the 170-lease book needs ≈R$6.7M, while expected-loss sizing plans R$300k for it (§8). The proposed per-guarantee cap (R$30k) must rise to at least R$39,600, or the product must shrink (e.g. 6× + 6× = R$26,400), before the working product can be registered.
 
@@ -557,7 +557,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 
 - reserve sizing: the on-chain tail floor, and which coverage figure may be published (§8; `c` ≥ 0.10 is decided, ADR 0016);
 - capital source: MUTAV's balance sheet only, or also selected third-party providers (§9);
-- asset mix: TESOURO 50% or ~80%; liquidity sleeve in BRS or a USD stablecoin (§10);
+- asset mix once adapters exist: TESOURO 50% or ~80% (the pilot is BRS only, ADR 0018); liquidity sleeve in BRS or a USD stablecoin (§10);
 - exit-leg scope A, B (spec default) or C, at ≈37% / 30% / 21% claims-to-fees (§12);
 - the 12× ceiling (legal review) and the per-guarantee cap against the R$39,600 working product;
 - the claims tail, the payment term N, and the filing window (T0+9 or the spec's 15 days);
@@ -574,7 +574,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 
 **Phase 2: instant exit (designed, not deployed)** ([spec §13](spec.md#13-phase-2--instant-exit-designed-disabled-in-the-pilot)). An allowlisted holder could exit at once at NAV minus a haircut that stays in the reserve, paid from a buffer earmarked out of surplus; it switches off whenever the queue is closed or the reserve is stressed, and MUTAV's own wallets are barred. The pilot already ships the earmark-aware formulas at zero.
 
-**Assets and composability.** A live TESOURO adapter follows once the price account and the BRS↔TESOURO path are confirmed. Reserve shares could later compose with other protocols; that is **not promised** and would need loss-aware NAV publication, exit liquidity and a securities analysis.
+**Assets and composability.** The pilot reserve is BRS only; more assets come in through whitelisted, capped adapters ([ADR 0018](decisions/0018-brs-only-pilot-reserve.md)). A live TESOURO adapter, the first candidate, follows once the price account and the BRS↔TESOURO path are confirmed. Reserve shares could later compose with other protocols; that is **not promised** and would need loss-aware NAV publication, exit liquidity and a securities analysis.
 
 **Platform.** Boleto issuance through a licensed PSP, BRL→BRS conversion through an authorized minter, `contribute_fees` per agency bill with automated reconciliation, on-chain claim payments wired to platform approvals, the landlord mandate and *quitação* records, a recoveries flow, and an external completeness attestation.
 
@@ -608,9 +608,9 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 | *Exoneração* | MUTAV's statutory exit once the lease runs for an indefinite term; liable 120 more days (LI 40 X) |
 | Claims tail | Period after the keys or an effective exoneration during which payment requests may still be filed |
 | `EXHAUSTED` / `VOID` | The *valor afiançado* is used up and the fiança extinguished / a lease that never took effect, closed with nothing paid |
-| Reserve / reserve share | BRS and TESOURO custodied by the `mutav` program / SPL token for a pro-rata share of `net_assets` |
+| Reserve / reserve share | BRS (in the pilot; other assets such as TESOURO once adapters add them) custodied by the `mutav` program / SPL token for a pro-rata share of `net_assets` |
 | NAV | `net_assets / shares_outstanding` |
-| `stable_assets` / `coverage_required` | BRS plus TESOURO at the bounded price / `c` × remaining cover of all guarantees not closed, never below the open provisions |
+| `stable_assets` / `coverage_required` | BRS plus any adapter asset (TESOURO) at the bounded price / `c` × remaining cover of all guarantees not closed, never below the open provisions |
 | Surplus / free capital / liquid budget | Assets above `coverage_required` (minus the phase-2 earmark) / BRS not needed by filed requests |
 | Under-coverage mode | `stable_assets < coverage_required`; outflows freeze; public wording *reserva abaixo da meta; suporte da MUTAV ativo* |
 | PDA / CPI / upgrade authority | Program-derived address / cross-program invocation / key allowed to replace a program's code (the Squads multisig) |
@@ -625,7 +625,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 | `max_cover_per_agency` | `register_guarantee` | R$10M | Proposed; well above `max_tvl` / 0.10 plus fee growth, so it never binds while one reserve serves the agency |
 | `max_claim_per_call` | `pay_claim` (operator only) | R$10k | Proposed |
 | `max_claim_per_period` / `claim_period_secs` | `pay_claim` (operator only) | R$20k / 30 days | Proposed |
-| `max_tesouro_share_bps` | `allocate` | 50% (0% on devnet) | Proposed; business plan targets ~80% (open) |
+| `max_tesouro_share_bps` | `allocate` | 0% in the pilot and on devnet (ADR 0018) | 50% proposed once a TESOURO adapter is live; business plan targets ~80% (open) |
 | `min_request` / `max_request` | `request_*`, partial-fill remainder | R$1,000 / R$100,000 | Proposed |
 | `min_fill_assets` | `fulfil_redeems` | R$500 | Proposed |
 | `c` (`coverage_ratio_bps`) | All gates | 0.10 | Program floor 0.10 (ADR 0016); the two-tail-year check stays off-chain |
@@ -663,7 +663,7 @@ Phase 2 only, not deployed:
 
 ### D. Worked month, full table
 
-*Illustrative. The guarantee fee (10% of rent per guarantee-month: R$200 on R$2,000 rent, R$150 on R$1,500) and take (20%) are placeholders, not MUTAV pricing. The covers (3× + 6× on R$2,000) are smaller than the working product (12× + 6× on R$2,200, §12); they are chosen so the arithmetic is legible. Fee receipts land after each agency's bill is paid and converted, so the days are illustrative. `c` = 1.0. The virtual share offset is ignored, so the real program differs by a few base units. Amounts in R$, rounded to R$1 in the columns; after day 21 the reserve keeps one extra base unit (R$0.000001) from rounding. TESOURO is included to show the bounded-price mechanics; in the pilot the TESOURO adapter is a mock. The day-20 accrual is exaggerated for legibility and is not a rate forecast.*
+*Illustrative. The guarantee fee (10% of rent per guarantee-month: R$200 on R$2,000 rent, R$150 on R$1,500) and take (20%) are placeholders, not MUTAV pricing. The covers (3× + 6× on R$2,000) are smaller than the working product (12× + 6× on R$2,200, §12); they are chosen so the arithmetic is legible. Fee receipts land after each agency's bill is paid and converted, so the days are illustrative. `c` = 1.0. The virtual share offset is ignored, so the real program differs by a few base units. Amounts in R$, rounded to R$1 in the columns; after day 21 the reserve keeps one extra base unit (R$0.000001) from rounding. TESOURO is included to show the bounded-price mechanics of a future adapter; the pilot reserve holds BRS only (ADR 0018). The day-20 accrual is exaggerated for legibility and is not a rate forecast.*
 
 **Setup.** 90,000 shares at NAV 1.000000. The reserve holds R$60,000 in BRS and TESOURO valued at R$30,000. Four guarantees, G1–G4, across two agencies (two each), each on R$2,000 rent with R$6,000 of default cover and R$12,000 of exit cover.
 
