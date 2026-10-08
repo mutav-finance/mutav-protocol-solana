@@ -57,10 +57,15 @@ describe("chart shaping", () => {
   });
 
   it("totals flows by kind with the role that moved them", () => {
-    const { bars, axis } = flowBars({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, claimsPaid: 2_500n, depositsIn: 0n, redemptionsOut: 0n });
+    const { bars, axis } = flowBars({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, incomeNetToReserve: 1_500n, incomeTakeToTreasury: 0n, claimsPaid: 2_500n, depositsIn: 0n, redemptionsOut: 0n });
     expect(axis).toBe(2_500n);
     expect(bars.find((b) => b.key === "claims")).toMatchObject({ direction: "out", by: "operator", source: "state" });
     expect(bars.find((b) => b.key === "deposits")).toMatchObject({ direction: "in", by: "admin", requestedBy: "investor", source: "events" });
     expect(bars.find((b) => b.key === "take")).toMatchObject({ direction: "outside" });
+    // ADR 0017: issuer income flows in, swept by the operator; with a 0 take there is no take bar.
+    expect(bars.find((b) => b.key === "income")).toMatchObject({ direction: "in", by: "operator", amount: 1_500n, source: "state" });
+    expect(bars.find((b) => b.key === "income-take")).toBeUndefined();
+    const withTake = flowBars({ feesNetToReserve: 0n, feeTakeToTreasury: 0n, incomeNetToReserve: 750n, incomeTakeToTreasury: 250n, claimsPaid: 0n, depositsIn: 0n, redemptionsOut: 0n });
+    expect(withTake.bars.find((b) => b.key === "income-take")).toMatchObject({ direction: "outside", amount: 250n });
   });
 });

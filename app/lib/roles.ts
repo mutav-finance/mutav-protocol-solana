@@ -47,7 +47,7 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   operator: {
     label: "Operator",
     holder: "MUTAV's operator key",
-    duty: "Issues guarantees, books guarantee fees, files, pays and settles claims.",
+    duty: "Issues guarantees, books guarantee fees and issuer income, files, pays and settles claims.",
     color: "var(--color-role-operator)",
     marker: "diamond",
   },
@@ -86,6 +86,7 @@ export const INSTRUCTION_ROLE = {
   register_guarantee: "operator",
   close_guarantee: "operator",
   contribute_fees: "operator",
+  sweep_income: "operator",
   file_claim: "operator",
   pay_claim: "operator",
   settle_payout: "operator",
@@ -129,6 +130,8 @@ export function rolesOfWallet(address: string | null, c: Pick<VaultConfig, "admi
  */
 export const FLOW_ROLES = {
   fee: { by: "operator" },
+  /** Issuer income: Nora pays the income inbox; the operator sweeps each statement (ADR 0017). */
+  income: { by: "operator" },
   claim: { by: "operator" },
   deposit: { by: "admin", requestedBy: "investor" },
   redemption: { by: "admin", requestedBy: "investor" },
@@ -144,8 +147,10 @@ export const ACCOUNT_ROLES = {
   capital: { role: "investor", note: "allowlisted capital wallet" },
   /** Written only by admin instructions (spec §3.1). */
   config: { role: "admin", note: "written only by admin instructions" },
-  /** Set by the admin; receives the take of the operator's contribute_fees. */
+  /** Set by the admin; receives the take of the operator's contribute_fees (and of sweep_income, 0 in the pilot). */
   treasury: { role: "operator", note: "receives the fee take of contribute_fees" },
+  /** The vault authority's associated token account for BRS: Nora pays issuer income here; only sweep_income moves it (ADR 0017). */
+  incomeInbox: { role: null, note: "program-owned; Nora pays issuer income here, outside NAV until swept" },
   /** Set by the admin; receives the operator's pay_claim. */
   payments: { role: "operator", note: "receives pay_claim" },
   program: { role: null, note: "program-owned" },

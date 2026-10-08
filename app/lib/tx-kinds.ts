@@ -17,6 +17,8 @@ export type OperatorTx =
     }
   | { kind: "close_guarantee"; guarantee: string }
   | { kind: "contribute_fees"; invoiceRefHash: string; amount: bigint }
+  /** ADR 0017: sweep one issuer income statement from the income inbox into the reserve. `period` is YYYYMM. */
+  | { kind: "sweep_income"; incomeRefHash: string; period: number; amount: bigint }
   | { kind: "file_claim"; guarantee: string; leg: 0 | 1; amount: bigint; noticeRefHash: string }
   | { kind: "pay_claim"; guarantee: string; leg: 0 | 1; amount: bigint; noticeRefHash: string }
   | { kind: "settle_payout"; guarantee: string; noticeRefHash: string; pixE2eHash: string };
@@ -60,6 +62,7 @@ export const OPERATOR_KINDS: ReadonlySet<TxKind> = new Set([
   "register_guarantee",
   "close_guarantee",
   "contribute_fees",
+  "sweep_income",
   "file_claim",
   "pay_claim",
   "settle_payout",

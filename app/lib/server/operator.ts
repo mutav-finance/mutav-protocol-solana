@@ -15,6 +15,7 @@ import {
   REVOKE_OPERATOR_DISCRIMINATOR,
   SET_ROLES_DISCRIMINATOR,
   SETTLE_PAYOUT_DISCRIMINATOR,
+  SWEEP_INCOME_DISCRIMINATOR,
 } from "@mutav-finance/mutav-protocol-solana";
 import { instructionName, type OperatorActivity } from "../operator";
 import type { ReserveView } from "../view";
@@ -25,6 +26,7 @@ const TABLE = [
   ["register_guarantee", REGISTER_GUARANTEE_DISCRIMINATOR],
   ["close_guarantee", CLOSE_GUARANTEE_DISCRIMINATOR],
   ["contribute_fees", CONTRIBUTE_FEES_DISCRIMINATOR],
+  ["sweep_income", SWEEP_INCOME_DISCRIMINATOR],
   ["file_claim", FILE_CLAIM_DISCRIMINATOR],
   ["pay_claim", PAY_CLAIM_DISCRIMINATOR],
   ["settle_payout", SETTLE_PAYOUT_DISCRIMINATOR],

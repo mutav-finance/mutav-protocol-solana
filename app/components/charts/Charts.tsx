@@ -284,7 +284,7 @@ export function FlowChart({ totals }: { totals: FlowTotals }) {
           <Swatch color={C.mid} label="outside the reserve" outline />
         </Legend>
       }
-      caption={<>Guarantee fees, the fee take and claim payments are VaultState totals (complete). Deposits and redemptions sum the fill events in the last 100 transactions of each escrow. Totals since launch, not a time series: the chain keeps no balance history to plot.</>}
+      caption={<>Guarantee fees, issuer income (swept from the income inbox), the fee take and claim payments are VaultState totals (complete). Deposits and redemptions sum the fill events in the last 100 transactions of each escrow. Totals since launch, not a time series: the chain keeps no balance history to plot.</>}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {bars.map((b) => {
