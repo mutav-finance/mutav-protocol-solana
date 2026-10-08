@@ -153,7 +153,8 @@ describe("simulator defaults = the devnet config", () => {
       maxCoverPerAgency: 10_000_000 * BRL,
       maxClaimPerCall: 10_000 * BRL,
       maxClaimPerPeriod: 20_000 * BRL,
-      maxTesouroShareBps: 0,
+      // the settlement-token floor (min_settlement_bps): the reserve keeps at least this share in BRS
+      minSettlementBps: 10_000,
     },
     feeTakeBpsMax: 3_000,
   };
@@ -166,7 +167,8 @@ describe("simulator defaults = the devnet config", () => {
     expect((d.maxCoverPerAgency as number) * BRL).toBe(devnet.caps.maxCoverPerAgency);
     expect((d.maxClaimPerCall as number) * BRL).toBe(devnet.caps.maxClaimPerCall);
     expect((d.maxClaimPerPeriod as number) * BRL).toBe(devnet.caps.maxClaimPerPeriod);
-    expect(Math.round((d.maxTesouroSharePct as number) * 100)).toBe(devnet.caps.maxTesouroShareBps);
+    // the simulator keeps the model key maxTesouroSharePct = 100 − floor, so hashes and storage stay valid
+    expect(Math.round((100 - (d.maxTesouroSharePct as number)) * 100)).toBe(devnet.caps.minSettlementBps);
     expect(sim.MUTAV_PROTOCOL.MAX_FEE_TAKE_BPS).toBe(devnet.feeTakeBpsMax);
     expect((d.takePct as number) * 100).toBeLessThanOrEqual(devnet.feeTakeBpsMax);
   });
@@ -178,7 +180,7 @@ describe("simulator defaults = the devnet config", () => {
 
 describe("simulator on the pilot", () => {
   const pilot = (o: Params = {}) =>
-    sim.mutavCompute({ ...sim.MUTAV_DEFAULTS, months: 6, perMonth: 10, tesouroSharePct: 50, ...o });
+    sim.mutavCompute({ ...sim.MUTAV_DEFAULTS, months: 6, perMonth: 10, ...o });
 
   it("backs about 75 leases on R$300k at c = 0.10 and runs the 30- and 60-lease pilots", () => {
     const rec = pilot();
@@ -191,7 +193,8 @@ describe("simulator on the pilot", () => {
   it("drops to about 7 leases at full backing (c = 1.0)", () => {
     const full = pilot({ coverageRatio: 1 });
     expect(full.capacityAtStart).toBe(7);
-    expect(full.finalActive).toBe(7);
+    // BRS income (12,75% default) grows the stable assets enough for an 8th lease by month 6
+    expect(full.finalActive).toBe(8);
     expect(full.firstRefusal).toBe("free-capital");
   });
 
@@ -213,7 +216,8 @@ describe("simulator on the pilot", () => {
 
   it("holds TESOURO to its cap and the take to 30%", () => {
     expect(pilot().tesouroShare).toBe(0);
-    expect(pilot({ maxTesouroSharePct: 50 }).tesouroShare).toBe(0.5);
+    expect(pilot({ tesouroSharePct: 50 }).tesouroShare).toBe(0);
+    expect(pilot({ tesouroSharePct: 50, maxTesouroSharePct: 50 }).tesouroShare).toBe(0.5);
     expect(pilot({ takePct: 45 }).take).toBe(0.3);
   });
 
@@ -224,18 +228,23 @@ describe("simulator on the pilot", () => {
 });
 
 describe("simulator BRS income (swept monthly)", () => {
-  const run = (o: Params = {}) => sim.mutavCompute({ ...sim.MUTAV_DEFAULTS, months: 6, perMonth: 10, tesouroSharePct: 50, ...o });
+  // BRS yield set to 0 explicitly, so each test adds only the income it measures
+  const run = (o: Params = {}) => sim.mutavCompute({ ...sim.MUTAV_DEFAULTS, months: 6, perMonth: 10, tesouroSharePct: 50, brsYieldPct: 0, ...o });
   /** Every result except the new BRS fields, which are 0 at a 0% BRS yield. */
   const strip = (r: Result) => JSON.parse(JSON.stringify(r, (k, v) => (k === "brsIncome" || k === "brs" ? undefined : v)));
 
-  it("defaults to a 0% BRS yield", () => {
-    expect(sim.MUTAV_DEFAULTS.brsYieldPct).toBe(0);
+  it("defaults to a BRS-only pilot: BRS yield 12,75% (Selic − 1 pp), no TESOURO", () => {
+    expect(sim.MUTAV_DEFAULTS.brsYieldPct).toBe(12.75);
+    expect((sim.MUTAV_DEFAULTS.selicPct as number) - (sim.MUTAV_DEFAULTS.brsYieldPct as number)).toBeCloseTo(1, 9);
+    expect(sim.MUTAV_DEFAULTS.tesouroSharePct).toBe(0);
+    expect(sim.MUTAV_DEFAULTS.maxTesouroSharePct).toBe(0);
   });
 
   it("a 0% BRS yield leaves every result unchanged", () => {
     const cases: Params[] = [{}, { maxTesouroSharePct: 50 }, { stressOn: true }, { withdraw: "share" }, { coverageRatio: 1 }, { monthlyRaise: 50_000 }];
     for (const o of cases) {
       const without: Params = { ...sim.MUTAV_DEFAULTS, months: 6, perMonth: 10, tesouroSharePct: 50, ...o };
+      // no BRS yield at all: the model must treat a missing value as 0
       delete without.brsYieldPct;
       const a = run({ ...o, brsYieldPct: 0 });
       expect(strip(a)).toEqual(strip(sim.mutavCompute(without)));
