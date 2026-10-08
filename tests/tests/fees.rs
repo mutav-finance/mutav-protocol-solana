@@ -222,7 +222,7 @@ fn wrong_mint_or_token_program_is_rejected() {
     a.token_program = TOKEN_2022_PROGRAM;
     assert_mutav_err(
         f.send(f.contribute_fees_ix(a, unique_hash(), 1), &op),
-        MutavError::InvalidMint,
+        MutavError::InvalidTokenProgram,
     );
 }
 

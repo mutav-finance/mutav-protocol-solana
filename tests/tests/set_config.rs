@@ -75,7 +75,7 @@ fn same_bounds_as_initialize() {
     let cases: Vec<Box<dyn Fn(&mut mutav::SetConfigArgs)>> = vec![
         Box::new(|a| a.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1),
         Box::new(|a| a.coverage_ratio_bps = 0),
-        Box::new(|a| a.caps.max_tesouro_share_bps = 10_001),
+        Box::new(|a| a.caps.min_settlement_bps = 10_001),
         Box::new(|a| a.price.max_deviation_bps = 10_001),
         Box::new(|a| a.price.max_nav_move_bps = 10_001),
         Box::new(|a| a.price.y_max_bps = 10_001),
@@ -261,4 +261,50 @@ fn payments_cannot_be_a_reserve_account() {
         assert_mutav_err(f.send(ix, &admin), MutavError::InvalidParameter);
     }
     assert_eq!(f.config().payments_account, f.payments);
+}
+
+#[test]
+fn a_new_coverage_ratio_recomputes_the_cached_coverage_required() {
+    // #29: the cached `coverage_required` follows `c` at once instead of at
+    // the next `refresh` (c 1.0 → 0.10 used to leave it 10× too high).
+    let mut f = Fixture::new();
+    f.fund_reserve(50_000 * BRL);
+    f.register(guarantee_args(unique_hash(), 20_001 * BRL, 0))
+        .unwrap();
+    let s = f.state();
+    let cover = s.remaining_cover_total;
+    assert_eq!(s.coverage_required, cover, "c = 1.0");
+    let mode = s.mode;
+
+    let mut args = set_config_args(&f.config());
+    args.coverage_ratio_bps = 1_000;
+    f.set_config(args).unwrap();
+    let s = f.state();
+    // ceil(0.10 × cover), in the reserve's favour.
+    assert_eq!(s.coverage_required, cover.div_ceil(10));
+    assert_eq!(s.mode, mode, "mode is left to refresh");
+
+    // An unchanged `c` leaves it as it is.
+    f.set_config(set_config_args(&f.config())).unwrap();
+    assert_eq!(f.state().coverage_required, cover.div_ceil(10));
+}
+
+#[test]
+fn the_settlement_floor_is_stored_as_its_complement() {
+    // ADR 0018 option (a): `set_config` takes `min_settlement_bps`, stores
+    // `max_allocated_bps = 10_000 − min_settlement_bps` and reports the
+    // floor in `ConfigUpdated`.
+    let mut f = Fixture::new();
+    assert_eq!(f.config().caps.min_settlement_bps(), 5_000);
+    let mut args = set_config_args(&f.config());
+    args.caps.min_settlement_bps = 10_000;
+    let meta = f.set_config(args).unwrap();
+    let c = f.config();
+    assert_eq!(c.caps.max_allocated_bps, 0, "the pilot: nothing allocated");
+    assert_eq!(c.caps.min_settlement_bps(), 10_000);
+    let ev = events::<ConfigUpdated>(&meta);
+    assert_eq!(ev.len(), 1);
+    assert_eq!(ev[0].field, field::CAPS_MIN_SETTLEMENT_BPS);
+    assert_eq!(&ev[0].old[..2], &5_000u16.to_le_bytes());
+    assert_eq!(&ev[0].new[..2], &10_000u16.to_le_bytes());
 }
