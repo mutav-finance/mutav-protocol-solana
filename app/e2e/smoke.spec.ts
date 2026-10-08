@@ -71,13 +71,20 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/admin — VaultConfig and direct signing labelled localnet-only", async ({ page }) => {
+  test("/admin — General controls, Money in & out, Allocation; direct signing labelled localnet-only", async ({ page }) => {
     await page.goto("/admin");
-    await expect(page.getByRole("heading", { name: "VaultConfig" })).toBeVisible();
+    const nav = page.getByRole("navigation", { name: "Admin sections" });
+    await expect(nav.getByRole("link")).toHaveText(["01 General controls", "02 Money in & out", "03 Allocation"]);
+    for (const [id, heading] of [["general", "General controls"], ["money", "Money in & out"], ["allocation", "Allocation management"]]) {
+      await expect(page.locator(`#${id}`).getByRole("heading", { name: heading, level: 2 })).toBeVisible();
+    }
+    await expect(page.locator("#reserve-assets")).toHaveCount(1);
+    await expect(page.getByRole("region", { name: "Emergency" })).toContainText("NOT PAUSED");
     await expect(page.getByText("DIRECT SIGNING · LOCALNET ONLY").first()).toBeVisible();
     await expect(page.getByText("NO SQUADS MULTISIG CONFIGURED")).toBeVisible();
-    await expect(page.locator("#config")).toContainText("100.00%");
-    await expect(page.getByRole("button", { name: "Sign directly: fulfil_deposits" })).toBeVisible();
+    await expect(page.locator("#general-coverage")).toContainText("10.00%");
+    await expect(page.locator("#money").getByRole("button", { name: "Sign directly: fulfil_deposits" })).toBeVisible();
+    await expect(page.locator("#allocation").getByRole("table", { name: "Planned reserve-allocation instructions" }).locator("tbody tr")).toHaveCount(4);
     await noBannedWords(page);
   });
 

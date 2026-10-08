@@ -85,18 +85,17 @@ Also usable outside the script: a free-form operator panel for each operator ins
 
 ### `/admin` Admin console
 
-For Squads members.
+For Squads members. A sticky in-page nav (General controls · Money in & out · Allocation) over three sections; every parameter lives with the thing it governs, and each control lives in exactly one place. Every admin change is a **Squads vault-transaction proposal** that members approve and execute from their wallets; `set_config` controls write only their own fields and carry the rest over from on-chain. If the configured admin is not a Squads vault (localnet only), direct signing is allowed, clearly labelled.
 
-- **Reserve assets** (first section, `#reserve-assets`): what the reserve holds and who manages it.
-  - **Composition now:** BRS in `reserve` (`brs_balance`), TESOURO through adapters (0 on devnet, with the reason), the income inbox shown apart as "not yet counted", and the TESOURO share against `max_tesouro_share_bps` (composition bar with the cap marker); `VaultConfig.adapters` with each adapter's cap and allocated.
-  - **Who does what:** Nora pays the inbox; the Operator sweeps it (`sweep_income`, on `/operator`); the Reserve Admin sets the TESOURO cap, the price feed and the income take, and later allocates; anyone runs `refresh`.
-  - **Controls today:** `set_config` proposals for `max_tesouro_share_bps`, the TESOURO price parameters and `income_take_bps` (program cap 0 until spec §12 Q47), each with its on-chain value, the program's bound and what it does.
-  - **Planned:** `whitelist_adapter`, `remove_adapter`, `allocate`, `deallocate`, listed as disabled rows with what gates them; no button sends them. Blocked on a BRS↔TESOURO path (Etherfuse mints against USDC).
-  - **Issuer income:** inbox balance, `income_total`, `income_take_total`, the take, and the last swept statements from `IncomeReceipt`s.
-- Shows `VaultConfig`: roles, caps, price params, take rate, feature flags, the treasury and payments accounts, the allowlist root.
-- Actions, each built as a **Squads vault-transaction proposal** that members approve and execute from their wallets: `fulfil_deposits`, `fulfil_redeems`, `pause` / `unpause`, `clear_fulfil_halt`, `set_config` (caps), `set_allowlist_root` (with the client's Merkle builder).
-- Proposal list with status (pending, approved, executable, executed) and the time-lock countdown.
-- If the configured admin is not a Squads vault (localnet only), allow direct signing, clearly labelled.
+- **General controls** (`#general`), the cross-cutting settings:
+  - **Emergency** strip: paused, fulfil halted, operator active or revoked; `pause` and `revoke_operator` (pauser key or admin, signed directly, no time lock), `unpause` and `clear_fulfil_halt` (Reserve Admin, through Squads).
+  - **Roles & multisig:** the Squads status, time lock and proposal list, with the create → approve → execute flow explained once; the roles; `set_roles`.
+  - **Coverage & reserve limits:** coverage ratio c, `max_tvl`, `max_cover_per_guarantee`, `max_cover_per_agency`, payout SLA; one `set_config`.
+  - **Allowlist & accounts:** allowlist root, treasury, payments, mints; `set_allowlist_root` (client Merkle builder), `set_payments_account`.
+- **Money in & out** (`#money`): each flow with its settings. Operator and Investor steps are one-line context rows (role tag, live total, link to `/operator`, `/investor` or `/reserve`); charts stay on `/reserve`.
+  - In: **deposits** (`fulfil_deposits`; request sizes and partial-fill floor), **guarantee fees** (`fee_take_bps`), **BRS issuer income** (Nora → inbox → `sweep_income`; inbox balance, swept total, last statements; `income_take_bps`, fail-closed cap 0 until spec §12 Q47).
+  - Out: **redemptions** (`fulfil_redeems`, gated by free capital), **claim payments** (`max_claim_per_call`, `max_claim_per_period`, `claim_period_secs`; `pay_claim_admin` shown as planned).
+- **Allocation management** (`#allocation`, alias `#reserve-assets`): composition (BRS, TESOURO, the income inbox kept apart, the TESOURO share cap marker); the TESOURO share cap and price parameters; `VaultConfig.adapters`; `whitelist_adapter`, `remove_adapter`, `allocate`, `deallocate` as disabled planned rows with their gates, blocked on a BRS↔TESOURO path (Etherfuse mints against USDC).
 
 ## Seed scenario
 

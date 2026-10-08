@@ -85,7 +85,7 @@ export function Health({ r }: { r: ReserveView }) {
       </div>
       <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-3)", margin: 0 }}>
         Stable assets by asset: BRS {fmtBrs(s.brsBalance, 0)} · TESOURO {fmtBrs(sol.tesouroValue, 0)} (share cap {fmtBps(r.config.caps.maxTesouroShareBps)}) · income inbox {fmtBrs(r.incomeInbox.amount, 0)}, not yet counted.{" "}
-        <Link href="/admin#reserve-assets" className="ext-link">How BRS and TESOURO are managed →</Link>
+        <Link href="/admin#allocation" className="ext-link">How BRS and TESOURO are managed →</Link>
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
         <StatusBadge bordered color={underCovered ? "var(--color-error)" : "var(--color-success)"} label={`MODE ${MODE_LABEL(s.mode).toUpperCase()}`} ariaLabel={`Mode: ${MODE_LABEL(s.mode)}`} />

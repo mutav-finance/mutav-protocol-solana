@@ -122,11 +122,10 @@ export type Duty = {
   href?: string;
 };
 
+/** Who acts on where the reserve's assets sit. Income flows are under Money in & out. */
 export const RESERVE_ASSET_DUTIES: readonly Duty[] = [
-  { actor: "external", ix: null, live: true, action: "Nora, the BRS issuer, pays the monthly revenue share in BRS to the income inbox. A plain transfer: it counts toward nothing until swept." },
-  { actor: "operator", ix: "sweep_income", live: true, href: "/operator", action: "Sweeps each Nora statement from the inbox into the reserve, once per statement reference. NAV rises; no shares are minted." },
-  { actor: "admin", ix: "set_config", live: true, href: "#reserve-asset-controls", action: "Sets the TESOURO share cap, the TESOURO price account and its bounds, and MUTAV's take from issuer income. Squads proposal, time-locked." },
-  { actor: "admin", ix: "allocate", live: false, href: "#reserve-asset-planned", action: "Whitelists TESOURO adapters, allocates BRS to TESOURO and deallocates back. Planned: not in this program binary." },
+  { actor: "admin", ix: "set_config", live: true, href: "#allocation-controls", action: "Sets the TESOURO share cap and the TESOURO price account and its bounds. Squads proposal, time-locked." },
+  { actor: "admin", ix: "allocate", live: false, href: "#allocation-planned", action: "Whitelists TESOURO adapters, allocates BRS to TESOURO and deallocates back. Planned: not in this program binary." },
   { actor: "anyone", ix: "refresh", live: true, action: "Re-values the reserve: reads and bounds the TESOURO price, recomputes stable assets, NAV and the mode." },
 ];
 
