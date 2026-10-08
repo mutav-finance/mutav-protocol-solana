@@ -4,10 +4,12 @@ import { serverEnv } from "@/lib/server/env";
 import { errorResponse } from "@/lib/server/respond";
 import { composeProposalApprove, composeProposalExecute, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
+import { MockChainError, mockEnabled, mockSquads } from "@/lib/server/mock";
 
 /** The admin multisig and its recent proposals, or why there is none. */
 export async function GET() {
   try {
+    if (mockEnabled()) return jsonResponse(await mockSquads());
     const env = serverEnv();
     const reserve = await readReserve(env);
     if (!env.squadsMultisig) {
@@ -24,6 +26,7 @@ export async function GET() {
 /** Compose an unsigned approve or execute transaction for a member's wallet. */
 export async function POST(req: Request) {
   try {
+    if (mockEnabled()) throw new MockChainError();
     const body = decode<{ action: "approve" | "execute"; index: bigint; member: string }>(await req.text());
     const env = serverEnv();
     const member = address(body.member);

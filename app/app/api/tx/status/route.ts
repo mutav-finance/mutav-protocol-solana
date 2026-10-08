@@ -3,9 +3,11 @@ import { rpcFor } from "@/lib/server/chain";
 import { serverEnv } from "@/lib/server/env";
 import { errorResponse } from "@/lib/server/respond";
 import { jsonResponse } from "@/lib/serde";
+import { MockChainError, mockEnabled } from "@/lib/server/mock";
 
 export async function GET(req: Request) {
   try {
+    if (mockEnabled()) throw new MockChainError();
     const sig = new URL(req.url).searchParams.get("sig") ?? "";
     const env = serverEnv();
     const { value } = await rpcFor(env).getSignatureStatuses([toSignature(sig)], { searchTransactionHistory: true }).send();

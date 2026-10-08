@@ -4,10 +4,12 @@ import { assertRelayable } from "@/lib/server/relay";
 import { errorResponse } from "@/lib/server/respond";
 import { SQUADS_PROGRAM } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
+import { MockChainError, mockEnabled } from "@/lib/server/mock";
 
 /** Relay a wallet-signed transaction to the configured cluster (never mainnet). */
 export async function POST(req: Request) {
   try {
+    if (mockEnabled()) throw new MockChainError();
     const { tx } = decode<{ tx: string }>(await req.text());
     const env = serverEnv();
     assertRelayable(tx, [env.programId, SQUADS_PROGRAM]);

@@ -6,6 +6,7 @@ import { errorResponse } from "@/lib/server/respond";
 import { composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 import type { TxRequest } from "@/lib/tx-kinds";
+import { MockChainError, mockEnabled } from "@/lib/server/mock";
 
 export type BuildBody = {
   request: TxRequest;
@@ -21,6 +22,7 @@ export type BuildBody = {
  */
 export async function POST(req: Request) {
   try {
+    if (mockEnabled()) throw new MockChainError();
     const body = decode<BuildBody>(await req.text());
     const env = serverEnv();
     const signer = address(body.signer);
