@@ -11,9 +11,15 @@
  * `.localnet/env` (addresses only, no keys) and `.localnet/state.json`.
  * `down` stops it, deletes the ledger and asserts with pgrep that no
  * validator is left on the port. Localnet only.
+ *
+ * `up` refuses a port where anything already answers JSON-RPC (another
+ * validator, Surfpool, a forgotten localnet), fails at once if the validator
+ * exits during startup, and on a failed seed keeps `validator.log` in the
+ * temp dir and prints its tail before stopping the validator. The seed's
+ * transactions are re-sent until they land (scripts/devnet/lib/local.ts).
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MUTAV_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
@@ -42,6 +48,32 @@ const alive = (pid: number) => {
   }
 };
 
+/** `true` if anything answers JSON-RPC at `url` (any validator, Surfpool, …). */
+async function rpcAnswers(url: string): Promise<boolean> {
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth" }),
+      signal: AbortSignal.timeout(1_000),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Keeps a failed run's validator log (the ledger is deleted) and prints its tail. */
+function keepLog(ledger: string): string | null {
+  const log = join(ledger, "validator.log");
+  if (!existsSync(log)) return null;
+  const kept = join(tmpdir(), `mutav-localnet-failed-${Date.now()}.log`);
+  copyFileSync(log, kept);
+  const tail = readFileSync(kept, "utf8").trimEnd().split("\n").slice(-25).join("\n");
+  console.error(`--- validator.log (last 25 lines; full log kept at ${kept}) ---\n${tail}\n---`);
+  return kept;
+}
+
 function pgrep(pattern: string): string {
   const p = Bun.spawnSync(["pgrep", "-f", pattern], { stdout: "pipe" });
   return p.stdout.toString().trim();
@@ -56,6 +88,9 @@ async function up() {
   const port = Number(a.port ?? 8899);
   const url = `http://127.0.0.1:${port}`;
   if (pgrep(`solana-test-validator.*--rpc-port ${port}`)) throw new Error(`a solana-test-validator already listens on ${port}`);
+  // Anything else serving JSON-RPC on the port (Surfpool, a validator started
+  // by hand) would answer waitForRpc and receive the seed instead.
+  if (await rpcAnswers(url)) throw new Error(`something already serves JSON-RPC on ${url} (another validator or Surfpool?); stop it or pass --port`);
   const p = await protocolLib();
   const keysDir = a["keys-dir"] || defaultKeysDir();
   const keys = await localKeys(keysDir, p.run, a["admin-keypair"] ? { admin: a["admin-keypair"] } : {});
@@ -77,6 +112,12 @@ async function up() {
     ],
     { detached: true, stdio: ["ignore", logFd, logFd] },
   );
+  // A validator that cannot start (a port taken, a bad flag) exits at once;
+  // report that instead of waiting for an RPC that never comes.
+  const died = new Promise<never>((_, reject) =>
+    child.once("exit", (code, signal) => reject(new Error(`solana-test-validator exited during startup (${code ?? signal})`))),
+  );
+  died.catch(() => undefined);
   child.unref();
   const pid = child.pid!;
   mkdirSync(STATE_DIR, { recursive: true });
@@ -84,7 +125,8 @@ async function up() {
   writeFileSync(STATE, JSON.stringify(partial, null, 2));
   console.log(`solana-test-validator pid ${pid} at ${url} (program ${MUTAV_PROGRAM_ADDRESS} from ${p.programSo})`);
   try {
-    await waitForRpc(url);
+    await Promise.race([waitForRpc(url), died]);
+    if (!alive(pid)) throw new Error("solana-test-validator exited during startup");
     const r = await seed({ url, keysDir, adminKeypair: a["admin-keypair"], operator: a.operator });
     const state: State = { ...partial, config: r.config, operator: r.operator, allowlist: r.allowlist };
     writeFileSync(STATE, JSON.stringify(state, null, 2));
@@ -107,7 +149,8 @@ async function up() {
     const rel = STATE_DIR.slice(APP_ROOT.length + 1);
     console.log(`\nApp env: ${rel}/env  →  cp ${rel}/env .env.local && bun run dev`);
   } catch (e) {
-    console.error(`seed failed; stopping the validator. Log: ${join(ledger, "validator.log")}`);
+    console.error("seed failed; stopping the validator.");
+    keepLog(ledger);
     await down();
     throw e;
   }

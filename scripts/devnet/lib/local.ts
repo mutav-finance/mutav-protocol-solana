@@ -113,15 +113,45 @@ export async function airdrop(rpc: LocalRpc, to: Address, sol: number) {
   await confirm(rpc, sig);
 }
 
-async function confirm(rpc: LocalRpc, sig: string) {
-  for (let i = 0; i < 120; i++) {
+/** How long a local transaction may take to confirm before it is reported. */
+export const CONFIRM_TIMEOUT_MS = 90_000;
+/** How often an unconfirmed transaction is sent again. */
+const RESEND_EVERY_MS = 2_000;
+
+/**
+ * Waits for `confirmed`. With `resend`, re-sends the signed transaction every
+ * 2 s (skipping preflight) until it lands or its blockhash expires: a
+ * validator starved of CPU, or still warming up, can drop a transaction that
+ * the RPC accepted, and a single send then never confirms. The error names
+ * the validator's slot, so a stalled validator is obvious.
+ */
+export async function confirm(
+  rpc: LocalRpc,
+  sig: string,
+  resend?: { wire: string; lastValidBlockHeight: bigint },
+) {
+  const start = Date.now();
+  let lastResend = start;
+  while (Date.now() - start < CONFIRM_TIMEOUT_MS) {
     const { value } = await rpc.getSignatureStatuses([sig as never]).send();
     const s = value[0];
     if (s?.err) throw new Error(`transaction ${sig} failed: ${JSON.stringify(s.err, (_, v) => (typeof v === 'bigint' ? v.toString() : v))}`);
     if (s && (s.confirmationStatus === 'confirmed' || s.confirmationStatus === 'finalized')) return;
+    if (resend && Date.now() - lastResend >= RESEND_EVERY_MS) {
+      lastResend = Date.now();
+      const height = await rpc.getBlockHeight({ commitment: 'confirmed' }).send();
+      if (height > resend.lastValidBlockHeight) throw new Error(`transaction ${sig} expired (blockhash too old) without landing`);
+      await rpc
+        .sendTransaction(resend.wire as never, { encoding: 'base64', skipPreflight: true })
+        .send()
+        .catch(() => undefined);
+    }
     await Bun.sleep(250);
   }
-  throw new Error(`transaction ${sig} not confirmed`);
+  const slot = await rpc.getSlot({ commitment: 'processed' }).send().catch(() => null);
+  throw new Error(
+    `transaction ${sig} not confirmed in ${CONFIRM_TIMEOUT_MS / 1000} s; the validator is at slot ${slot ?? 'unknown'} (a slot that does not move means the validator is stalled or starved of CPU)`,
+  );
 }
 
 /** Sign with in-memory test signers and send to the local cluster. */
@@ -135,15 +165,14 @@ export async function send(rpc: LocalRpc, feePayer: TransactionSigner, ixs: Inst
   );
   const tx = await signTransactionMessageWithSigners(msg);
   const sig = getSignatureFromTransaction(tx);
+  const wire = getBase64EncodedWireTransaction(tx);
   try {
-    await rpc
-      .sendTransaction(getBase64EncodedWireTransaction(tx), { encoding: 'base64', preflightCommitment: 'confirmed' })
-      .send();
+    await rpc.sendTransaction(wire, { encoding: 'base64', preflightCommitment: 'confirmed' }).send();
   } catch (e) {
     const logs = (e as { context?: { logs?: string[] } }).context?.logs;
     throw new Error(`${(e as Error).message}${logs ? '\n' + logs.join('\n') : ''}`);
   }
-  await confirm(rpc, sig);
+  await confirm(rpc, sig, { wire, lastValidBlockHeight: blockhash.lastValidBlockHeight });
   return sig;
 }
 

@@ -58,6 +58,7 @@ export async function protocolLib() {
     run: local.run as (cmd: string[], o?: { quiet?: boolean }) => string,
     airdrop: local.airdrop as (rpc: unknown, to: Address, sol: number) => Promise<void>,
     send: local.send as (rpc: unknown, feePayer: KeyPairSigner, ixs: Instruction[]) => Promise<string>,
+    confirm: local.confirm as (rpc: unknown, sig: string, resend?: { wire: string; lastValidBlockHeight: bigint }) => Promise<void>,
     assertNoProcess: local.assertNoProcess as (pattern: string) => void,
     composeInitialize: compose.composeInitialize as (cfg: unknown, s: { upgradeAuthority: KeyPairSigner; payer: KeyPairSigner }) => Promise<Instruction>,
     composeSetAllowlistRoot: compose.composeSetAllowlistRoot as (cfg: unknown, root: Uint8Array, admin: KeyPairSigner) => Promise<Instruction>,
@@ -117,20 +118,17 @@ export async function signAndSend(rpc: LocalRpc, feePayer: Address, signers: Key
     compileTransaction(msg),
   );
   const sig = getSignatureFromTransaction(tx);
+  const wire = getBase64EncodedWireTransaction(tx);
   try {
-    await rpc.sendTransaction(getBase64EncodedWireTransaction(tx), { encoding: "base64", preflightCommitment: "confirmed" }).send();
+    await rpc.sendTransaction(wire, { encoding: "base64", preflightCommitment: "confirmed" }).send();
   } catch (e) {
     const logs = (e as { context?: { logs?: string[] } }).context?.logs;
     throw new Error(`${(e as Error).message}${logs ? "\n" + logs.join("\n") : ""}`);
   }
-  for (let i = 0; i < 120; i++) {
-    const { value: st } = await rpc.getSignatureStatuses([sig]).send();
-    const s = st[0];
-    if (s?.err) throw new Error(`transaction ${sig} failed: ${JSON.stringify(s.err, (_, v) => (typeof v === "bigint" ? v.toString() : v))}`);
-    if (s && (s.confirmationStatus === "confirmed" || s.confirmationStatus === "finalized")) return sig;
-    await Bun.sleep(250);
-  }
-  throw new Error(`transaction ${sig} not confirmed`);
+  // Same confirmation as the protocol's harness: re-sent every 2 s until it
+  // lands or its blockhash expires, and a stalled validator is named.
+  await (await protocolLib()).confirm(rpc, sig, { wire, lastValidBlockHeight: value.lastValidBlockHeight });
+  return sig;
 }
 
 export async function waitForRpc(url: string, timeoutMs = 120_000) {
