@@ -48,9 +48,16 @@ pub const REDEEM_SEED: &[u8] = b"redeem";
 /// `HolderState`: `["holder", config, owner]` (spec §3.10).
 pub const HOLDER_SEED: &[u8] = b"holder";
 
-/// Seed prefixes reserved for phase 2 (spec §14.2). No pilot PDA may use them.
-/// (`"notice"` is used by the pilot `ClaimNotice`.)
-pub const RESERVED_SEED_PREFIXES: [&[u8]; 3] = [b"exit_buffer", b"exit_limit", b"instant_exit"];
+/// Seed prefixes reserved for later PDAs (spec §14.2). No pilot PDA may use
+/// them: phase 2's instant exit, and the per-adapter `AdapterState` at
+/// `["adapter_state", config, adapter_program_id]` (ADR 0018), built with the
+/// first adapter upgrade. (`"notice"` is used by the pilot `ClaimNotice`.)
+pub const RESERVED_SEED_PREFIXES: [&[u8]; 4] = [
+    b"exit_buffer",
+    b"exit_limit",
+    b"instant_exit",
+    b"adapter_state",
+];
 
 // ---------------------------------------------------------------------------
 // Program constants (spec §8, §14).
@@ -201,7 +208,9 @@ pub mod field {
     pub const CAPS_MAX_CLAIM_PER_CALL: u16 = 103;
     pub const CAPS_MAX_CLAIM_PER_PERIOD: u16 = 104;
     pub const CAPS_CLAIM_PERIOD_SECS: u16 = 105;
-    pub const CAPS_MAX_TESOURO_SHARE_BPS: u16 = 106;
+    /// The settlement floor (ADR 0018). Stored as its complement
+    /// `caps.max_allocated_bps`; `ConfigUpdated` reports the floor.
+    pub const CAPS_MIN_SETTLEMENT_BPS: u16 = 106;
     pub const CAPS_MIN_REQUEST: u16 = 107;
     pub const CAPS_MAX_REQUEST: u16 = 108;
     pub const CAPS_MIN_FILL_ASSETS: u16 = 109;
@@ -296,10 +305,7 @@ pub const CONFIG_FIELDS: &[ConfigField] = &[
         "caps.max_claim_per_period",
     ),
     f(field::CAPS_CLAIM_PERIOD_SECS, "caps.claim_period_secs"),
-    f(
-        field::CAPS_MAX_TESOURO_SHARE_BPS,
-        "caps.max_tesouro_share_bps",
-    ),
+    f(field::CAPS_MIN_SETTLEMENT_BPS, "caps.min_settlement_bps"),
     f(field::CAPS_MIN_REQUEST, "caps.min_request"),
     f(field::CAPS_MAX_REQUEST, "caps.max_request"),
     f(field::CAPS_MIN_FILL_ASSETS, "caps.min_fill_assets"),
@@ -386,7 +392,12 @@ mod tests {
         }
         assert_eq!(
             RESERVED_SEED_PREFIXES,
-            [&b"exit_buffer"[..], b"exit_limit", b"instant_exit"]
+            [
+                &b"exit_buffer"[..],
+                b"exit_limit",
+                b"instant_exit",
+                b"adapter_state"
+            ]
         );
     }
 

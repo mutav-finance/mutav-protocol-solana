@@ -64,10 +64,10 @@ fn initialize_creates_the_reserve() {
     assert_eq!(c.caps._reserved, [0; 32]);
     assert_eq!(c.price._reserved, [0; 32]);
     assert_eq!(c.adapters.len(), MAX_ADAPTERS);
-    assert!(c
-        .adapters
-        .iter()
-        .all(|a| a.program_id == Pubkey::default() && !a.enabled && a._reserved == [0; 64]));
+    assert!(c.adapters.iter().all(|a| a.program_id == Pubkey::default()
+        && !a.enabled
+        && a.max_share_bps == 0
+        && a._reserved == [0; 62]));
     // ADR 0017: no take from issuer income at launch.
     assert_eq!(c.income_take_bps, 0);
     assert_eq!(c._reserved, [0; 510]);
@@ -86,7 +86,7 @@ fn initialize_creates_the_reserve() {
     assert_eq!(s.next_redeem_seq, 0);
     assert!(!s.fulfil_halted);
     assert_eq!(
-        (s.income_total, s.income_take_total, s.inflows_since_refresh),
+        (s.income_total, s.income_take_total, s.inflow_nav),
         (0, 0, 0)
     );
     assert_eq!(s._reserved, [0; 232]);
@@ -239,7 +239,7 @@ fn params_out_of_program_bounds_rejected() {
         // Coverage ratio below the 0.10 floor (ADR 0016).
         Box::new(|a| a.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1),
         Box::new(|a| a.coverage_ratio_bps = 0),
-        Box::new(|a| a.caps.max_tesouro_share_bps = 10_001),
+        Box::new(|a| a.caps.min_settlement_bps = 10_001),
         Box::new(|a| a.price.max_deviation_bps = 10_001),
         Box::new(|a| a.price.max_nav_move_bps = 10_001),
         Box::new(|a| a.price.y_max_bps = 10_001),

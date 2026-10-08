@@ -41,7 +41,7 @@ fn inject_noise(f: &mut Fixture, seed: u64) {
     c.exit._reserved.copy_from_slice(&noise(seed + 3, 32));
     for (i, a) in c.adapters.iter_mut().enumerate() {
         a._reserved
-            .copy_from_slice(&noise(seed + 10 + i as u64, 64));
+            .copy_from_slice(&noise(seed + 10 + i as u64, 62));
     }
     f.write_config(&c);
     let mut s = f.state();

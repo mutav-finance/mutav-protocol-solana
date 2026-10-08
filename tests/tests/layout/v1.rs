@@ -7,7 +7,12 @@
 //! `FeeReceipt`, `ClaimNotice`, `IncomeReceipt`) get their `…V1` copy and
 //! offset table here in the task that adds them. The ADR 0017 fields of
 //! `VaultConfig` and `VaultState` were carved before the devnet layout
-//! freeze, so they are part of v1.
+//! freeze, so they are part of v1. So are the ADR 0018 edits
+//! (`Caps.max_allocated_bps`, the stored complement of the settlement floor,
+//! renamed in place; `AdapterEntry.max_share_bps` carved from its padding)
+//! and the per-share NAV-guard counter `VaultState.inflow_nav`. That was the
+//! last pre-freeze edit of v1 (spec §14.2): from the devnet deploy on, these
+//! copies only ever gain a `V2` sibling.
 
 use anchor_lang::prelude::*;
 
@@ -19,7 +24,8 @@ pub struct AdapterEntryV1 {
     pub cap: u64,
     pub allocated: u64,
     pub enabled: bool,
-    pub _reserved: [u8; 64],
+    pub max_share_bps: u16,
+    pub _reserved: [u8; 62],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -30,7 +36,7 @@ pub struct CapsV1 {
     pub max_claim_per_call: u64,
     pub max_claim_per_period: u64,
     pub claim_period_secs: i64,
-    pub max_tesouro_share_bps: u16,
+    pub max_allocated_bps: u16,
     pub min_request: u64,
     pub max_request: u64,
     pub min_fill_assets: u64,
@@ -138,7 +144,7 @@ pub struct VaultStateV1 {
     // ADR 0017, carved before the layout freeze.
     pub income_total: u64,
     pub income_take_total: u64,
-    pub inflows_since_refresh: u64,
+    pub inflow_nav: u64,
     pub _reserved: [u8; 232],
 }
 
@@ -182,7 +188,7 @@ pub const VAULT_STATE_V1: OffsetTable = &[
     ("last_refresh_slot", 208, 8),
     ("income_total", 216, 8),
     ("income_take_total", 224, 8),
-    ("inflows_since_refresh", 232, 8),
+    ("inflow_nav", 232, 8),
     ("_reserved", 240, 232),
 ];
 
@@ -203,7 +209,8 @@ pub const VAULT_CONFIG_V1: OffsetTable = &[
     ("treasury_account", 232, 32),
     ("investor_allowlist_root", 264, 32),
     ("adapters[0].program_id", 296, 32),
-    ("adapters[7]._reserved", 296 + 7 * 177 + 113, 64),
+    ("adapters[7].max_share_bps", 296 + 7 * 177 + 113, 2),
+    ("adapters[7]._reserved", 296 + 7 * 177 + 115, 62),
     ("caps.max_tvl", 1712, 8),
     ("caps._reserved", 1712 + 74, 32),
     ("price.tesouro_price_account", 1818, 32),
@@ -225,7 +232,7 @@ pub const CAPS_V1: OffsetTable = &[
     ("max_claim_per_call", 24, 8),
     ("max_claim_per_period", 32, 8),
     ("claim_period_secs", 40, 8),
-    ("max_tesouro_share_bps", 48, 2),
+    ("max_allocated_bps", 48, 2),
     ("min_request", 50, 8),
     ("max_request", 58, 8),
     ("min_fill_assets", 66, 8),
@@ -271,7 +278,8 @@ pub const ADAPTER_ENTRY_V1: OffsetTable = &[
     ("cap", 96, 8),
     ("allocated", 104, 8),
     ("enabled", 112, 1),
-    ("_reserved", 113, 64),
+    ("max_share_bps", 113, 2),
+    ("_reserved", 115, 62),
 ];
 
 // ---------------------------------------------------------------------------
