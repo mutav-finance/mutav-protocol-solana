@@ -111,6 +111,8 @@ macro_rules! vault_state_fields {
             "fee_take_total" => fee_take_total, "claims_paid_total" => claims_paid_total,
             "late_payouts" => late_payouts, "fulfil_halted" => fulfil_halted,
             "last_refresh_ts" => last_refresh_ts, "last_refresh_slot" => last_refresh_slot,
+            "income_total" => income_total, "income_take_total" => income_take_total,
+            "inflows_since_refresh" => inflows_since_refresh,
         )
     };
 }
@@ -135,6 +137,7 @@ macro_rules! vault_config_fields {
             "feature_flags" => feature_flags, "mutav_capital_wallet" => mutav_capital_wallet,
             "exit.buffer_target_bps" => exit.buffer_target_bps,
             "exit._reserved" => exit._reserved,
+            "income_take_bps" => income_take_bps,
             "_reserved" => _reserved,
         )
     };

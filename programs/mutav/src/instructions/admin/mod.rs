@@ -23,7 +23,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
-    constants::{AUTHORITY_SEED, BPS_DENOMINATOR, MAX_FEE_TAKE_BPS},
+    constants::{AUTHORITY_SEED, BPS_DENOMINATOR, MAX_FEE_TAKE_BPS, MIN_COVERAGE_RATIO_BPS},
     errors::MutavError,
     state::{CapsInput, PriceInput},
 };
@@ -52,10 +52,10 @@ pub(crate) fn validate_params(
         fee_take_bps <= MAX_FEE_TAKE_BPS,
         MutavError::InvalidParameter
     );
-    // TODO(spec: §12 Q17 / PC-14 — floor for `coverage_ratio_bps` is TBD).
-    // Fail closed at 1.0 (the starting value) until a lower floor is decided.
+    // c ≥ 0.10 (spec §12 Q17, ADR 0016). No upper bound: a higher c only
+    // asks for more capital.
     require!(
-        coverage_ratio_bps >= BPS_DENOMINATOR,
+        coverage_ratio_bps >= MIN_COVERAGE_RATIO_BPS,
         MutavError::InvalidParameter
     );
     for bps in [

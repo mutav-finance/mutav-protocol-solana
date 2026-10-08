@@ -5,7 +5,7 @@
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, Discriminator, Space};
 use mutav::{
     constants::*,
-    state::{AgencyExposure, ClaimFiling, FeeReceipt, Guarantee, Payout},
+    state::{AgencyExposure, ClaimFiling, FeeReceipt, Guarantee, IncomeReceipt, Payout},
 };
 
 use crate::{pattern, ser, spans, v1::*, zeroed};
@@ -128,6 +128,36 @@ fn fee_receipt_layout_is_frozen() {
     assert_eq!(
         FeeReceipt::DISCRIMINATOR,
         &[135, 174, 32, 77, 183, 44, 26, 107]
+    );
+}
+
+#[test]
+fn income_receipt_layout_is_frozen() {
+    assert_eq!(8 + IncomeReceipt::INIT_SPACE, INCOME_RECEIPT_SIZE);
+    assert_eq!(INCOME_RECEIPT_SIZE, 142);
+    assert_eq!(
+        8 + ser(&zeroed::<IncomeReceipt>()).len(),
+        INCOME_RECEIPT_SIZE
+    );
+    assert_eq!(
+        8 + ser(&zeroed::<IncomeReceiptV1>()).len(),
+        INCOME_RECEIPT_SIZE
+    );
+    macro_rules! fields {
+        ($t:ty) => {
+            spans!($t;
+                "version" => version, "bump" => bump, "income_ref_hash" => income_ref_hash,
+                "period" => period, "gross" => gross, "take" => take, "net" => net,
+                "slot" => slot, "_reserved" => _reserved)
+        };
+    }
+    assert_eq!(fields!(IncomeReceiptV1), INCOME_RECEIPT_V1.to_vec());
+    assert_eq!(fields!(IncomeReceipt), INCOME_RECEIPT_V1.to_vec());
+    v1_round_trip::<IncomeReceiptV1, IncomeReceipt>(INCOME_RECEIPT_SIZE);
+    // sha256("account:IncomeReceipt")[..8], computed independently.
+    assert_eq!(
+        IncomeReceipt::DISCRIMINATOR,
+        &[33, 167, 246, 148, 183, 13, 0, 79]
     );
 }
 

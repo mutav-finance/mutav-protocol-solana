@@ -26,6 +26,12 @@ pub enum Ext {
     NonTransferable,
     /// `DefaultAccountState` with this state.
     DefaultState(AccountState),
+    /// `ScaledUiAmount` with multiplier 1.0 (ADR 0017).
+    ScaledUiAmount,
+    /// `InterestBearingConfig` at 5% (ADR 0017).
+    InterestBearing,
+    /// `Pausable` (ADR 0017).
+    Pausable,
 }
 
 impl Ext {
@@ -36,6 +42,9 @@ impl Ext {
             Ext::TransferFee(_) => ExtensionType::TransferFeeConfig,
             Ext::NonTransferable => ExtensionType::NonTransferable,
             Ext::DefaultState(_) => ExtensionType::DefaultAccountState,
+            Ext::ScaledUiAmount => ExtensionType::ScaledUiAmount,
+            Ext::InterestBearing => ExtensionType::InterestBearingConfig,
+            Ext::Pausable => ExtensionType::Pausable,
         }
     }
 }
@@ -84,6 +93,23 @@ pub fn create_token2022_mint(
                 t22::instruction::initialize_non_transferable_mint(p, m).unwrap()
             }
             Ext::DefaultState(state) => initialize_default_account_state(p, m, &state).unwrap(),
+            Ext::ScaledUiAmount => t22::extension::scaled_ui_amount::instruction::initialize(
+                p,
+                m,
+                Some(payer.pubkey()),
+                1.0,
+            )
+            .unwrap(),
+            Ext::InterestBearing => t22::extension::interest_bearing_mint::instruction::initialize(
+                p,
+                m,
+                Some(payer.pubkey()),
+                500,
+            )
+            .unwrap(),
+            Ext::Pausable => {
+                t22::extension::pausable::instruction::initialize(p, m, &payer.pubkey()).unwrap()
+            }
         });
     }
     ixs.push(

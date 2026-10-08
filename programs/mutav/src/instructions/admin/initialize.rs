@@ -9,9 +9,14 @@
 //! are validated. The upstream unrestricted asset withdrawal (`withdraw_assets`)
 //! is not carried over: no instruction in this program moves reserve funds to an
 //! arbitrary account (spec §1 principle 5).
+//!
+//! `initialize` also creates the income inbox (ADR 0017): the vault
+//! authority's associated token account for the reserve mint, created
+//! idempotently so it succeeds even if someone created it first.
 
 use anchor_lang::{prelude::*, solana_program::bpf_loader_upgradeable};
 use anchor_spl::{
+    associated_token::{self, get_associated_token_address_with_program_id, AssociatedToken},
     token::Token,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
@@ -139,6 +144,12 @@ pub struct Initialize<'info> {
     )]
     pub claims: Box<InterfaceAccount<'info, TokenAccount>>,
 
+    /// The income inbox (ADR 0017): the vault authority's associated token
+    /// account for `reserve_mint`, created here idempotently.
+    /// CHECK: address checked in the handler; the ATA program creates it.
+    #[account(mut)]
+    pub income_inbox: UncheckedAccount<'info>,
+
     /// MUTAV treasury token account (BRS); receives the fee take.
     pub treasury_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
@@ -149,6 +160,7 @@ pub struct Initialize<'info> {
     /// The share mint is a classic SPL Token mint.
     pub share_token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Result<()> {
@@ -168,6 +180,7 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
         &args.mutav_capital_wallet,
         &ctx.accounts.vault_authority.key(),
     )?;
+    create_income_inbox(&ctx)?;
     // No seed deposit (spec §12 Q20, decided 2026-10-06): the reserve starts
     // with zero shares and `V = 1` handles the empty-reserve conversion.
 
@@ -215,4 +228,33 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
         share_mint,
     });
     Ok(())
+}
+
+/// Creates the income inbox (ADR 0017) with an idempotent associated token
+/// account create: it succeeds when a third party created the account first.
+/// Nora pays issuer income here; it counts toward nothing until
+/// `sweep_income` moves a statement's amount into `reserve`.
+fn create_income_inbox(ctx: &Context<Initialize>) -> Result<()> {
+    let a = &ctx.accounts;
+    let expected = get_associated_token_address_with_program_id(
+        &a.vault_authority.key(),
+        &a.reserve_mint.key(),
+        &a.reserve_token_program.key(),
+    );
+    require_keys_eq!(
+        a.income_inbox.key(),
+        expected,
+        MutavError::InvalidIncomeSource
+    );
+    associated_token::create_idempotent(CpiContext::new(
+        a.associated_token_program.key(),
+        associated_token::Create {
+            payer: a.payer.to_account_info(),
+            associated_token: a.income_inbox.to_account_info(),
+            authority: a.vault_authority.to_account_info(),
+            mint: a.reserve_mint.to_account_info(),
+            system_program: a.system_program.to_account_info(),
+            token_program: a.reserve_token_program.to_account_info(),
+        },
+    ))
 }

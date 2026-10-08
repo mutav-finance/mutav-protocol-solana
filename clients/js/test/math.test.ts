@@ -3,6 +3,8 @@ import {
   assetsFor,
   computeSolvency,
   conversionNav,
+  coverageRequired,
+  MIN_COVERAGE_RATIO_BPS,
   headStarved,
   MathOverflowError,
   mulDiv,
@@ -12,6 +14,9 @@ import {
   sharesFor,
   VIRTUAL_OFFSET,
   INSTANT_EXIT,
+  isValidIncomePeriod,
+  MAX_INCOME_TAKE_BPS,
+  takeSplit,
   type SolvencyInputs,
 } from '../src';
 import { outcome, vectors } from './vectors';
@@ -22,6 +27,20 @@ describe('constants match the program', () => {
     expect(NAV_SCALE.toString()).toBe(vectors.constants.navScale);
     expect(VIRTUAL_OFFSET.toString()).toBe(vectors.constants.virtualOffset);
     expect(INSTANT_EXIT.toString()).toBe(vectors.constants.instantExit);
+    expect(MIN_COVERAGE_RATIO_BPS).toBe(vectors.constants.minCoverageRatioBps);
+  });
+});
+
+describe('coverageRequired (ADR 0016)', () => {
+  test('c × remaining cover, rounded up, never below provisions', () => {
+    // c = 0.10 on 100,000 of cover.
+    expect(coverageRequired(100_000n, 1_000, 4_000n)).toBe(10_000n);
+    expect(coverageRequired(100_000n, 1_000, 25_000n)).toBe(25_000n);
+    // 11 × 0.1 = 1.1 → 2.
+    expect(coverageRequired(11n, MIN_COVERAGE_RATIO_BPS, 0n)).toBe(2n);
+    // At c ≥ 1 provisions ≤ cover never bind.
+    expect(coverageRequired(100_000n, 10_000, 100_000n)).toBe(100_000n);
+    expect(coverageRequired(100_000n, 15_000, 100_000n)).toBe(150_000n);
   });
 });
 
@@ -80,6 +99,12 @@ describe('solvency parity (earmark_eff, free_capital, liquid_budget, …)', () =
     const outs = vectors.solvency.filter((v: any) => v.output !== 'error');
     expect(outs.some((v: any) => v.output.earmarkEff !== '0')).toBe(true);
     expect(outs.some((v: any) => v.output.mode === 1)).toBe(true);
+    // c < 1 with the provisions term binding.
+    expect(
+      outs.some(
+        (v: any) => v.input.coverageRatioBps < 10_000 && v.output.coverageRequired === v.input.provisions && v.input.provisions !== '0',
+      ),
+    ).toBe(true);
     expect(outs.some((v: any) => v.input.headStarved && v.input.featureFlags !== '0')).toBe(true);
   });
 });
@@ -95,5 +120,23 @@ describe('input validation', () => {
   test('rejects values outside u64', () => {
     expect(() => mulDiv(-1n, 1n, 1n, 'down')).toThrow(RangeError);
     expect(() => sharesFor(1n << 64n, 0n, 0n)).toThrow(RangeError);
+  });
+});
+
+describe('issuer income (ADR 0017)', () => {
+  test('the take cap matches the program (0 until decided)', () => {
+    expect(MAX_INCOME_TAKE_BPS).toBe(vectors.constants.maxIncomeTakeBps);
+    expect(MAX_INCOME_TAKE_BPS).toBe(0);
+  });
+
+  test('takeSplit rounds the take down, in the reserve’s favour', () => {
+    expect(takeSplit(1_000_000_003n, 2_500)).toEqual({ take: 250_000_000n, net: 750_000_003n });
+    expect(takeSplit(7n, 2_000)).toEqual({ take: 1n, net: 6n });
+    expect(takeSplit(5_000n, 0)).toEqual({ take: 0n, net: 5_000n });
+  });
+
+  test('periods are YYYYMM months, as the program checks', () => {
+    for (const p of [202_610, 202_601, 202_612]) expect(isValidIncomePeriod(p)).toBe(true);
+    for (const p of [0, 202_600, 202_613, 2_026, 199_912, 1_000_001, 202_610.5]) expect(isValidIncomePeriod(p)).toBe(false);
   });
 });

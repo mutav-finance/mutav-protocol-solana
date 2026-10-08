@@ -51,6 +51,8 @@
     "instantExit": "1",
     "maxAllowlistProofLen": 32,
     "maxFulfilBatch": 8,
+    "maxIncomeTakeBps": 0,
+    "minCoverageRatioBps": 1000,
     "modeNormal": 0,
     "modeUnderCovered": 1,
     "navScale": "1000000000",
@@ -2153,6 +2155,15 @@
       "args": {},
       "data": "485c000564d6bb27",
       "name": "clearFulfilHalt"
+    },
+    {
+      "args": {
+        "amount": "1234567890",
+        "incomeRefHash": "1717171717171717171717171717171717171717171717171717171717171717",
+        "period": 202610
+      },
+      "data": "e6ae4953aa582973171717171717171717171717171717171717171717171717171717171717171772170300d202964900000000",
+      "name": "sweepIncome"
     }
   ],
   "mulDiv": [
@@ -3631,6 +3642,8 @@
       "feeReceipt": "763kq4ZwsTJDdSKNcFGCmGN64YvwjA6mXLWcvEwkndDJ",
       "guarantee": "8ihapfWjSAQxFRDhDErj9Hyiuvm6Y9sLBP6Em9avKjPZ",
       "holderState": "EE8HGWKyuo4T8YR8ApDS7EX1u3kjj9uWaUYRkvh18Fq1",
+      "incomeInbox": "69fTuiwUSs3o9Vw4uoZzu2sCeUgauyn6VbLtrL7EF6jh",
+      "incomeReceipt": "ERSurZvdGRhahXtYDR7MWq12tPnXJ4cyjWktaY4vCFAj",
       "payout": "3StJJRVDpGbf4us5QeAKycXZtgTijMWHhXeaZV9PSW4r",
       "pendingDeposits": "9FGGZibuPcnzkKm3uJvUByAXx5QoKqwAN8YU1EmdHmak",
       "pendingRedemptions": "CVHPDW4vgisQQ6jh6M4V3NqfburUnkVJSP3J897sEs31",
@@ -3643,6 +3656,7 @@
     "inputs": {
       "agencyId": "35f6d7a7a1df26c341dc8605b46ba41ae7cbc864b3c91395656f8166d2261378",
       "guaranteeId": "349989bc13efd7c9dd0f714a886ca6c305d5c7aa71979778cd15192062a6b1e3",
+      "incomeRefHash": "1717171717171717171717171717171717171717171717171717171717171717",
       "invoiceRefHash": "be56cad14c6dbfc8e67040c07f8a2b49d03bc6cb2154b82b736c010a0e359053",
       "noticeRefHash": "8f1a202e20655f68eeddd2fae6856c633c28c41f54c29e6972892f6a44c25cd8",
       "owner": "EZF81pzNwewL8Cg7qt9B5WzbcXWqQrmspRngzNnyfL1V",
@@ -3779,6 +3793,56 @@
     },
     {
       "input": {
+        "brsBalance": "60000",
+        "bufferEarmark": "5000",
+        "coverageRatioBps": 1000,
+        "featureFlags": "1",
+        "headStarved": false,
+        "provisions": "2000",
+        "remainingCoverTotal": "80000",
+        "tesouroPrice": "1005000000",
+        "tesouroUnits": "40000"
+      },
+      "output": {
+        "coverageRequired": "8000",
+        "deficit": "0",
+        "earmarkEff": "5000",
+        "freeCapital": "87200",
+        "liquidBudget": "53000",
+        "mode": 0,
+        "netAssets": "98200",
+        "stableAssets": "100200",
+        "surplus": "92200",
+        "tesouroValue": "40200"
+      }
+    },
+    {
+      "input": {
+        "brsBalance": "60000",
+        "bufferEarmark": "5000",
+        "coverageRatioBps": 1000,
+        "featureFlags": "1",
+        "headStarved": false,
+        "provisions": "30000",
+        "remainingCoverTotal": "80000",
+        "tesouroPrice": "1005000000",
+        "tesouroUnits": "40000"
+      },
+      "output": {
+        "coverageRequired": "30000",
+        "deficit": "0",
+        "earmarkEff": "5000",
+        "freeCapital": "65200",
+        "liquidBudget": "25000",
+        "mode": 0,
+        "netAssets": "70200",
+        "stableAssets": "100200",
+        "surplus": "70200",
+        "tesouroValue": "40200"
+      }
+    },
+    {
+      "input": {
         "brsBalance": "18446744073709551615",
         "bufferEarmark": "5000",
         "coverageRatioBps": 10000,
@@ -3854,15 +3918,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "21742643971",
+        "coverageRequired": "687035982206",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "725089912312845586",
+        "freeCapital": "725089247019507351",
         "liquidBudget": "725089247019507351",
         "mode": 0,
         "netAssets": "725089247019507351",
         "stableAssets": "725089934055489557",
-        "surplus": "725089912312845586",
+        "surplus": "725089247019507351",
         "tesouroValue": "0"
       }
     },
@@ -3879,15 +3943,15 @@
         "tesouroUnits": "9387262825517361049"
       },
       "output": {
-        "coverageRequired": "904338176749108923",
+        "coverageRequired": "13959611135624685894",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "15406844895817191190",
+        "freeCapital": "2351571936941614219",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "2351571936941614219",
         "stableAssets": "16311183072566300113",
-        "surplus": "15406844895817191190",
+        "surplus": "2351571936941614219",
         "tesouroValue": "6404378393522637574"
       }
     },
@@ -3904,8 +3968,8 @@
         "tesouroUnits": "170"
       },
       "output": {
-        "coverageRequired": "1095526566049528658",
-        "deficit": "1095526024538155472",
+        "coverageRequired": "2180497711189006754",
+        "deficit": "2180497169677633568",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -3929,15 +3993,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "668584996",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551267",
+        "deficit": "2329121537021785303",
         "earmarkEff": "0",
-        "freeCapital": "16117622536019180968",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "16117622536687765964",
-        "surplus": "16117622536019180968",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -3993,15 +4057,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "420",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550672",
+        "deficit": "12020194130492817733",
         "earmarkEff": "0",
-        "freeCapital": "6426549943216732519",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "6426549943216732939",
-        "surplus": "6426549943216732519",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -4018,8 +4082,8 @@
         "tesouroUnits": "939666037596374747"
       },
       "output": {
-        "coverageRequired": "666882542993817587",
-        "deficit": "596345902978053250",
+        "coverageRequired": "18446744073709551307",
+        "deficit": "18376207433693786970",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -4057,15 +4121,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "288834287131",
-        "deficit": "0",
+        "coverageRequired": "545667808818102137",
+        "deficit": "545666851928629591",
         "earmarkEff": "0",
-        "freeCapital": "668055185415",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "956889472546",
-        "surplus": "668055185415",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -4107,15 +4171,15 @@
         "tesouroUnits": "694729478541"
       },
       "output": {
-        "coverageRequired": "1266",
-        "deficit": "0",
+        "coverageRequired": "880530195691830547",
+        "deficit": "880530136849920507",
         "earmarkEff": "0",
-        "freeCapital": "58841908774",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "58841910040",
-        "surplus": "58841908774",
+        "surplus": "0",
         "tesouroValue": "58841909755"
       }
     },
@@ -4196,15 +4260,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "61",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550652",
+        "deficit": "18446743113977582126",
         "earmarkEff": "0",
-        "freeCapital": "959731968465",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "959731968526",
-        "surplus": "959731968465",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -4246,15 +4310,15 @@
         "tesouroUnits": "606716640992507522"
       },
       "output": {
-        "coverageRequired": "1573",
-        "deficit": "0",
+        "coverageRequired": "13091540061168589419",
+        "deficit": "13044923740133951052",
         "earmarkEff": "0",
-        "freeCapital": "46616321034636794",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "46616321034638367",
-        "surplus": "46616321034636794",
+        "surplus": "0",
         "tesouroValue": "46615334867482871"
       }
     },
@@ -4271,15 +4335,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "201",
+        "coverageRequired": "1952278129216966724",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "6534567280754038638",
+        "freeCapital": "4582289151537072115",
         "liquidBudget": "4582289151537072115",
         "mode": 0,
         "netAssets": "4582289151537072115",
         "stableAssets": "6534567280754038839",
-        "surplus": "6534567280754038638",
+        "surplus": "4582289151537072115",
         "tesouroValue": "0"
       }
     },
@@ -4296,15 +4360,15 @@
         "tesouroUnits": "398541741996"
       },
       "output": {
-        "coverageRequired": "42163288060",
-        "deficit": "0",
+        "coverageRequired": "3503177631140209474",
+        "deficit": "3503177060627777613",
         "earmarkEff": "0",
-        "freeCapital": "528349143801",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "570512431861",
-        "surplus": "528349143801",
+        "surplus": "0",
         "tesouroValue": "570512431531"
       }
     },
@@ -4374,15 +4438,15 @@
         "tesouroUnits": "505"
       },
       "output": {
-        "coverageRequired": "141",
-        "deficit": "0",
+        "coverageRequired": "18406245423422509069",
+        "deficit": "12728808513185480751",
         "earmarkEff": "0",
-        "freeCapital": "5677436910237028177",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "5677436910237028318",
-        "surplus": "5677436910237028177",
+        "surplus": "0",
         "tesouroValue": "84"
       }
     },
@@ -4580,15 +4644,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "65106970116",
-        "deficit": "0",
+        "coverageRequired": "235310720927891217",
+        "deficit": "103785334665816925",
         "earmarkEff": "0",
-        "freeCapital": "131525321155104176",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "131525386262074292",
-        "surplus": "131525321155104176",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -4655,15 +4719,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "1322",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550742",
+        "deficit": "3833652041496557668",
         "earmarkEff": "0",
-        "freeCapital": "14613092032212991752",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "14613092032212993074",
-        "surplus": "14613092032212991752",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -4680,15 +4744,15 @@
         "tesouroUnits": "75677362836"
       },
       "output": {
-        "coverageRequired": "69",
+        "coverageRequired": "719207111886",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "852972795240270287",
+        "freeCapital": "852972076033158470",
         "liquidBudget": "852971850729570671",
         "mode": 0,
         "netAssets": "852972076033158470",
         "stableAssets": "852972795240270356",
-        "surplus": "852972795240270287",
+        "surplus": "852972076033158470",
         "tesouroValue": "225303587799"
       }
     },
@@ -4758,15 +4822,15 @@
         "tesouroUnits": "11481192929639284914"
       },
       "output": {
-        "coverageRequired": "1324",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551317",
+        "deficit": "12194440750705680670",
         "earmarkEff": "0",
-        "freeCapital": "6252303323003869323",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "6252303323003870647",
-        "surplus": "6252303323003869323",
+        "surplus": "0",
         "tesouroValue": "5519826110011882430"
       }
     },
@@ -4783,8 +4847,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "840",
-        "deficit": "620",
+        "coverageRequired": "889016808610995307",
+        "deficit": "889016808610995087",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -4808,8 +4872,8 @@
         "tesouroUnits": "150"
       },
       "output": {
-        "coverageRequired": "179995264808",
-        "deficit": "179995263844",
+        "coverageRequired": "17673057047329084114",
+        "deficit": "17673057047329083150",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -4886,15 +4950,15 @@
         "tesouroUnits": "999796958876"
       },
       "output": {
-        "coverageRequired": "95",
+        "coverageRequired": "875",
         "deficit": "0",
         "earmarkEff": "373202104356",
-        "freeCapital": "16339629831159338384",
+        "freeCapital": "16339629831159337604",
         "liquidBudget": "16339628342414074503",
         "mode": 0,
         "netAssets": "16339630204361441960",
         "stableAssets": "16339630204361442835",
-        "surplus": "16339630204361442740",
+        "surplus": "16339630204361441960",
         "tesouroValue": "1488745263101"
       }
     },
@@ -4911,15 +4975,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "7550321257",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551347",
+        "deficit": "690",
         "earmarkEff": "0",
-        "freeCapital": "18446744066159229400",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "18446744073709550657",
-        "surplus": "18446744066159229400",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -4964,15 +5028,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "506746039792993952",
+        "coverageRequired": "4995171726832465844",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "17939998033916557405",
+        "freeCapital": "13451572346877085513",
         "liquidBudget": "13451572346877085513",
         "mode": 0,
         "netAssets": "13451572346877085513",
         "stableAssets": "18446744073709551357",
-        "surplus": "17939998033916557405",
+        "surplus": "13451572346877085513",
         "tesouroValue": "0"
       }
     },
@@ -4989,15 +5053,15 @@
         "tesouroUnits": "7619667552310401704"
       },
       "output": {
-        "coverageRequired": "137404572066",
+        "coverageRequired": "804729193928274167",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "12114126979574631546",
+        "freeCapital": "11309397923050929445",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "11309397923050929445",
         "stableAssets": "12114127116979203612",
-        "surplus": "12114126979574631546",
+        "surplus": "11309397923050929445",
         "tesouroValue": "12114127116979202942"
       }
     },
@@ -5014,15 +5078,15 @@
         "tesouroUnits": "55"
       },
       "output": {
-        "coverageRequired": "900",
+        "coverageRequired": "255152822650315302",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "368182724364110974",
+        "freeCapital": "113029901713796572",
         "liquidBudget": "113029901713796545",
         "mode": 0,
         "netAssets": "113029901713796572",
         "stableAssets": "368182724364111874",
-        "surplus": "368182724364110974",
+        "surplus": "113029901713796572",
         "tesouroValue": "27"
       }
     },
@@ -5117,15 +5181,15 @@
         "tesouroUnits": "18446744073709551547"
       },
       "output": {
-        "coverageRequired": "654",
+        "coverageRequired": "37253231066",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "4298954631280896247",
+        "freeCapital": "4298954594027665835",
         "liquidBudget": "581908970736516541",
         "mode": 0,
         "netAssets": "4298954594027665835",
         "stableAssets": "4298954631280896901",
-        "surplus": "4298954631280896247",
+        "surplus": "4298954594027665835",
         "tesouroValue": "3717045623291149294"
       }
     },
@@ -5156,15 +5220,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "514",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550972",
+        "deficit": "18262231750273689275",
         "earmarkEff": "0",
-        "freeCapital": "184512323435861183",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "184512323435861697",
-        "surplus": "184512323435861183",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -5273,15 +5337,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "228139133563283657",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550977",
+        "deficit": "6923265052990152883",
         "earmarkEff": "0",
-        "freeCapital": "11295339887156114437",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "11523479020719398094",
-        "surplus": "11295339887156114437",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -5312,8 +5376,8 @@
         "tesouroUnits": "505"
       },
       "output": {
-        "coverageRequired": "961763050574",
-        "deficit": "961763048750",
+        "coverageRequired": "16053857490822172534",
+        "deficit": "16053857490822170710",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -5337,15 +5401,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "924721966536",
+        "coverageRequired": "838472670507522677",
         "deficit": "0",
         "earmarkEff": "802766431221",
-        "freeCapital": "5420069709705343387",
+        "freeCapital": "4581597963919787246",
         "liquidBudget": "4581597963919787246",
         "mode": 0,
         "netAssets": "4581598766686218467",
         "stableAssets": "5420071437193741144",
-        "surplus": "5420070512471774608",
+        "surplus": "4581598766686218467",
         "tesouroValue": "0"
       }
     },
@@ -5390,15 +5454,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "244",
-        "deficit": "0",
+        "coverageRequired": "581480924324562477",
+        "deficit": "441211747896254015",
         "earmarkEff": "0",
-        "freeCapital": "140269176428308218",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "140269176428308462",
-        "surplus": "140269176428308218",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -5468,15 +5532,15 @@
         "tesouroUnits": "634025449756499674"
       },
       "output": {
-        "coverageRequired": "239723376099478942",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550922",
+        "deficit": "17084375800632903461",
         "earmarkEff": "0",
-        "freeCapital": "1122644896977168519",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "1362368273076647461",
-        "surplus": "1122644896977168519",
+        "surplus": "0",
         "tesouroValue": "1362368273076647236"
       }
     },
@@ -5507,15 +5571,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "275",
+        "coverageRequired": "971441396875480077",
         "deficit": "0",
         "earmarkEff": "499957438220831957",
-        "freeCapital": "17946786635488719345",
+        "freeCapital": "16975345238613239543",
         "liquidBudget": "16975345238613239543",
         "mode": 0,
         "netAssets": "17475302676834071500",
         "stableAssets": "18446744073709551577",
-        "surplus": "18446744073709551302",
+        "surplus": "17475302676834071500",
         "tesouroValue": "0"
       }
     },
@@ -5546,15 +5610,15 @@
         "tesouroUnits": "285"
       },
       "output": {
-        "coverageRequired": "1303",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551012",
+        "deficit": "5321557424771577144",
         "earmarkEff": "0",
-        "freeCapital": "13125186648937972565",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "13125186648937973868",
-        "surplus": "13125186648937972565",
+        "surplus": "0",
         "tesouroValue": "279"
       }
     },
@@ -5596,15 +5660,15 @@
         "tesouroUnits": "18446744073709550672"
       },
       "output": {
-        "coverageRequired": "140",
+        "coverageRequired": "594891956801",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "7707202753653867476",
+        "freeCapital": "7707202158761910815",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "7707202158761910815",
         "stableAssets": "7707202753653867616",
-        "surplus": "7707202753653867476",
+        "surplus": "7707202158761910815",
         "tesouroValue": "7707202708184685765"
       }
     },
@@ -5660,15 +5724,15 @@
         "tesouroUnits": "870"
       },
       "output": {
-        "coverageRequired": "89096006024595277",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551077",
+        "deficit": "18067512086253867267",
         "earmarkEff": "0",
-        "freeCapital": "290135981431088533",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "379231987455683810",
-        "surplus": "290135981431088533",
+        "surplus": "0",
         "tesouroValue": "2348"
       }
     },
@@ -5699,15 +5763,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "792738871066",
+        "coverageRequired": "11462304890270377489",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "18446743280970680151",
+        "freeCapital": "6984439183439173728",
         "liquidBudget": "6984439183439173728",
         "mode": 0,
         "netAssets": "6984439183439173728",
         "stableAssets": "18446744073709551217",
-        "surplus": "18446743280970680151",
+        "surplus": "6984439183439173728",
         "tesouroValue": "0"
       }
     },
@@ -5763,15 +5827,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "335",
-        "deficit": "0",
+        "coverageRequired": "15702931674850649784",
+        "deficit": "15702931674850649019",
         "earmarkEff": "0",
-        "freeCapital": "430",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "765",
-        "surplus": "430",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -5930,15 +5994,15 @@
         "tesouroUnits": "680"
       },
       "output": {
-        "coverageRequired": "324731461201",
-        "deficit": "0",
+        "coverageRequired": "17066699293548677579",
+        "deficit": "3015052722558452903",
         "earmarkEff": "0",
-        "freeCapital": "14051646246258763475",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "14051646570990224676",
-        "surplus": "14051646246258763475",
+        "surplus": "0",
         "tesouroValue": "292"
       }
     },
@@ -5955,15 +6019,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "637310475176",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551337",
+        "deficit": "300",
         "earmarkEff": "0",
-        "freeCapital": "18446743436399075861",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "18446744073709551037",
-        "surplus": "18446743436399075861",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -6175,15 +6239,15 @@
         "tesouroUnits": "4089894707272542"
       },
       "output": {
-        "coverageRequired": "247",
+        "coverageRequired": "815191784726",
         "deficit": "0",
         "earmarkEff": "993285437101",
-        "freeCapital": "11773801524163536094",
+        "freeCapital": "11773800708971751615",
         "liquidBudget": "11767562436868308487",
         "mode": 0,
         "netAssets": "11773801702257188716",
         "stableAssets": "11773802517448973442",
-        "surplus": "11773802517448973195",
+        "surplus": "11773801702257188716",
         "tesouroValue": "6238272103443128"
       }
     },
@@ -6200,15 +6264,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "464578562946353932",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550717",
+        "deficit": "4402066600970797388",
         "earmarkEff": "0",
-        "freeCapital": "13580098909792399397",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "14044677472738753329",
-        "surplus": "13580098909792399397",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -6225,15 +6289,15 @@
         "tesouroUnits": "981692077878358952"
       },
       "output": {
-        "coverageRequired": "225743316803",
-        "deficit": "0",
+        "coverageRequired": "903313935873855067",
+        "deficit": "374172991216671353",
         "earmarkEff": "0",
-        "freeCapital": "529140718913866911",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "529140944657183714",
-        "surplus": "529140718913866911",
+        "surplus": "0",
         "tesouroValue": "204959767932030052"
       }
     },
@@ -6250,15 +6314,15 @@
         "tesouroUnits": "300"
       },
       "output": {
-        "coverageRequired": "170",
-        "deficit": "0",
+        "coverageRequired": "555397517738361807",
+        "deficit": "555397096338163499",
         "earmarkEff": "0",
-        "freeCapital": "421400198138",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "421400198308",
-        "surplus": "421400198138",
+        "surplus": "0",
         "tesouroValue": "597"
       }
     },
@@ -6275,8 +6339,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "418005744442010302",
-        "deficit": "418005156776568131",
+        "coverageRequired": "18446744073709550687",
+        "deficit": "18446743486044108516",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -6364,15 +6428,15 @@
         "tesouroUnits": "510986926969375707"
       },
       "output": {
-        "coverageRequired": "520",
-        "deficit": "0",
+        "coverageRequired": "4908271608414628999",
+        "deficit": "4451391426945514548",
         "earmarkEff": "0",
-        "freeCapital": "456880181469113931",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "456880181469114451",
-        "surplus": "456880181469113931",
+        "surplus": "0",
         "tesouroValue": "456880181469114236"
       }
     },
@@ -6389,8 +6453,8 @@
         "tesouroUnits": "389637690291"
       },
       "output": {
-        "coverageRequired": "346998293996530587",
-        "deficit": "346997900320883302",
+        "coverageRequired": "12549185720338168344",
+        "deficit": "12549185326662521059",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -6414,15 +6478,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "694",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551477",
+        "deficit": "9293659518618152328",
         "earmarkEff": "0",
-        "freeCapital": "9153084555091398455",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "9153084555091399149",
-        "surplus": "9153084555091398455",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -6464,15 +6528,15 @@
         "tesouroUnits": "596389833401425402"
       },
       "output": {
-        "coverageRequired": "659333731226",
-        "deficit": "0",
+        "coverageRequired": "10561980858716734089",
+        "deficit": "8380682338309376441",
         "earmarkEff": "0",
-        "freeCapital": "2181297861073626422",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "2181298520407357648",
-        "surplus": "2181297861073626422",
+        "surplus": "0",
         "tesouroValue": "1434715709321834051"
       }
     },
@@ -6553,8 +6617,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "274658553059917482",
-        "deficit": "274658001772122921",
+        "coverageRequired": "18446744073709551552",
+        "deficit": "18446743522421756991",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -6578,15 +6642,15 @@
         "tesouroUnits": "12845979665532821844"
       },
       "output": {
-        "coverageRequired": "1575746208890946712",
+        "coverageRequired": "8850330798405810959",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "7743958033954602265",
+        "freeCapital": "469373444439738018",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "469373444439738018",
         "stableAssets": "9319704242845548977",
-        "surplus": "7743958033954602265",
+        "surplus": "469373444439738018",
         "tesouroValue": "9319704242845548347"
       }
     },
@@ -6628,8 +6692,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "1711805324669574439",
-        "deficit": "1711804539664081358",
+        "coverageRequired": "18446744073709551147",
+        "deficit": "18446743288704058066",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -6653,15 +6717,15 @@
         "tesouroUnits": "971911196166"
       },
       "output": {
-        "coverageRequired": "98020949056",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551132",
+        "deficit": "13449691005747033732",
         "earmarkEff": "0",
-        "freeCapital": "4997052969941568344",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "4997053067962517400",
-        "surplus": "4997052969941568344",
+        "surplus": "0",
         "tesouroValue": "2075482749751"
       }
     },
@@ -6678,15 +6742,15 @@
         "tesouroUnits": "877050025401"
       },
       "output": {
-        "coverageRequired": "325",
-        "deficit": "0",
+        "coverageRequired": "432543267355675117",
+        "deficit": "432541077546965403",
         "earmarkEff": "0",
-        "freeCapital": "2189808709389",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "2189808709714",
-        "surplus": "2189808709389",
+        "surplus": "0",
         "tesouroValue": "2005776489548"
       }
     },
@@ -6728,15 +6792,15 @@
         "tesouroUnits": "7566594382460017569"
       },
       "output": {
-        "coverageRequired": "1691",
+        "coverageRequired": "875495760726",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "15209663365736106421",
+        "freeCapital": "15209662490240347386",
         "liquidBudget": "10470852499191108743",
         "mode": 0,
         "netAssets": "15209662490240347386",
         "stableAssets": "15209663365736108112",
-        "surplus": "15209663365736106421",
+        "surplus": "15209662490240347386",
         "tesouroValue": "4738809991049238643"
       }
     },
@@ -6767,8 +6831,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "830046054881",
-        "deficit": "165448424330",
+        "coverageRequired": "9456935972957670009",
+        "deficit": "9456935308360039458",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -6792,15 +6856,15 @@
         "tesouroUnits": "420"
       },
       "output": {
-        "coverageRequired": "760",
+        "coverageRequired": "666275213969736272",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "17850354211287144461",
+        "freeCapital": "17184078997317408949",
         "liquidBudget": "17184078997317408612",
         "mode": 0,
         "netAssets": "17184078997317408949",
         "stableAssets": "17850354211287145221",
-        "surplus": "17850354211287144461",
+        "surplus": "17184078997317408949",
         "tesouroValue": "337"
       }
     },
@@ -6842,15 +6906,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "85",
+        "coverageRequired": "893336128586461007",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "18446744073709550672",
+        "freeCapital": "17553407945123089750",
         "liquidBudget": "17553407945123089750",
         "mode": 0,
         "netAssets": "17553407945123089750",
         "stableAssets": "18446744073709550757",
-        "surplus": "18446744073709550672",
+        "surplus": "17553407945123089750",
         "tesouroValue": "0"
       }
     },
@@ -6881,15 +6945,15 @@
         "tesouroUnits": "67385778421"
       },
       "output": {
-        "coverageRequired": "113190086461935499",
-        "deficit": "0",
+        "coverageRequired": "868886864117035752",
+        "deficit": "478592069946053135",
         "earmarkEff": "0",
-        "freeCapital": "277104707709047118",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "390294794170982617",
-        "surplus": "277104707709047118",
+        "surplus": "0",
         "tesouroValue": "108146184905"
       }
     },
@@ -7012,8 +7076,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "11176321602050993859",
-        "deficit": "11176321602050993294",
+        "coverageRequired": "18446744073709551362",
+        "deficit": "18446744073709550797",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -7065,8 +7129,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "716755085418232205",
-        "deficit": "26453043887550048",
+        "coverageRequired": "7587817019550233104",
+        "deficit": "6897514978019550947",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -7129,15 +7193,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "427629896898",
+        "coverageRequired": "972601644191",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "6750798597604309516",
+        "freeCapital": "6750798052632562223",
         "liquidBudget": "6750798052632562223",
         "mode": 0,
         "netAssets": "6750798052632562223",
         "stableAssets": "6750799025234206414",
-        "surplus": "6750798597604309516",
+        "surplus": "6750798052632562223",
         "tesouroValue": "0"
       }
     },
@@ -7154,15 +7218,15 @@
         "tesouroUnits": "897923293456"
       },
       "output": {
-        "coverageRequired": "1156183468666",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551082",
+        "deficit": "17548254585631537515",
         "earmarkEff": "0",
-        "freeCapital": "898488331894544901",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "898489488078013567",
-        "surplus": "898488331894544901",
+        "surplus": "0",
         "tesouroValue": "1904612555345"
       }
     },
@@ -7179,15 +7243,15 @@
         "tesouroUnits": "730580161056"
       },
       "output": {
-        "coverageRequired": "270",
+        "coverageRequired": "194835330446",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "655679373959095006",
+        "freeCapital": "655679179123764830",
         "liquidBudget": "655677187102390876",
         "mode": 0,
         "netAssets": "655679179123764830",
         "stableAssets": "655679373959095276",
-        "surplus": "655679373959095006",
+        "surplus": "655679179123764830",
         "tesouroValue": "1992021373954"
       }
     },
@@ -7204,15 +7268,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "1199",
+        "coverageRequired": "18446744073709550767",
         "deficit": "0",
         "earmarkEff": "105",
-        "freeCapital": "18446744073709549568",
+        "freeCapital": "0",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "105",
         "stableAssets": "18446744073709550872",
-        "surplus": "18446744073709549673",
+        "surplus": "105",
         "tesouroValue": "0"
       }
     },
@@ -7304,15 +7368,15 @@
         "tesouroUnits": "570"
       },
       "output": {
-        "coverageRequired": "383450902168",
-        "deficit": "0",
+        "coverageRequired": "15940245342852232754",
+        "deficit": "15779676182581906153",
         "earmarkEff": "0",
-        "freeCapital": "160568776819424433",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "160569160270326601",
-        "surplus": "160568776819424433",
+        "surplus": "0",
         "tesouroValue": "859"
       }
     },
@@ -7329,15 +7393,15 @@
         "tesouroUnits": "1936953399844009444"
       },
       "output": {
-        "coverageRequired": "65624797821",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551037",
+        "deficit": "14542458217356460691",
         "earmarkEff": "0",
-        "freeCapital": "3904285790728292525",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "3904285856353090346",
-        "surplus": "3904285790728292525",
+        "surplus": "0",
         "tesouroValue": "3904285496446729170"
       }
     },
@@ -7379,15 +7443,15 @@
         "tesouroUnits": "245"
       },
       "output": {
-        "coverageRequired": "47",
-        "deficit": "0",
+        "coverageRequired": "676887196681",
+        "deficit": "244936504174",
         "earmarkEff": "0",
-        "freeCapital": "431950692460",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "431950692507",
-        "surplus": "431950692460",
+        "surplus": "0",
         "tesouroValue": "101"
       }
     },
@@ -7404,15 +7468,15 @@
         "tesouroUnits": "711209842191"
       },
       "output": {
-        "coverageRequired": "1004",
-        "deficit": "0",
+        "coverageRequired": "609885744062511187",
+        "deficit": "609884558879692542",
         "earmarkEff": "0",
-        "freeCapital": "1185182817641",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "1185182818645",
-        "surplus": "1185182817641",
+        "surplus": "0",
         "tesouroValue": "1185182818405"
       }
     },
@@ -7479,15 +7543,15 @@
         "tesouroUnits": "420807053231"
       },
       "output": {
-        "coverageRequired": "235",
-        "deficit": "0",
+        "coverageRequired": "6980187574287164149",
+        "deficit": "6980186143659589645",
         "earmarkEff": "0",
-        "freeCapital": "1430627574269",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "1430627574504",
-        "surplus": "1430627574269",
+        "surplus": "0",
         "tesouroValue": "1080159207018"
       }
     },
@@ -7529,15 +7593,15 @@
         "tesouroUnits": "947856428566"
       },
       "output": {
-        "coverageRequired": "85",
+        "coverageRequired": "910692058841",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "1554033746997",
+        "freeCapital": "643341688241",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "643341688241",
         "stableAssets": "1554033747082",
-        "surplus": "1554033746997",
+        "surplus": "643341688241",
         "tesouroValue": "1554033746122"
       }
     },
@@ -7632,15 +7696,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "247",
+        "coverageRequired": "8824605736",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "18074059584484048012",
+        "freeCapital": "18074059575659442523",
         "liquidBudget": "18074059575659442523",
         "mode": 0,
         "netAssets": "18074059575659442523",
         "stableAssets": "18074059584484048259",
-        "surplus": "18074059584484048012",
+        "surplus": "18074059575659442523",
         "tesouroValue": "0"
       }
     },
@@ -7671,8 +7735,8 @@
         "tesouroUnits": "490"
       },
       "output": {
-        "coverageRequired": "108004554370492214",
-        "deficit": "108004554370491408",
+        "coverageRequired": "18446744073709550622",
+        "deficit": "18446744073709549816",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -7696,15 +7760,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "530",
+        "coverageRequired": "167030303454069017",
         "deficit": "0",
         "earmarkEff": "10041996503137622594",
-        "freeCapital": "8404747570571928368",
+        "freeCapital": "8237717267117859881",
         "liquidBudget": "8237717267117859881",
         "mode": 0,
         "netAssets": "18279713770255482475",
         "stableAssets": "18446744073709551492",
-        "surplus": "18446744073709550962",
+        "surplus": "18279713770255482475",
         "tesouroValue": "0"
       }
     },
@@ -7721,15 +7785,15 @@
         "tesouroUnits": "360"
       },
       "output": {
-        "coverageRequired": "518328325641",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550987",
+        "deficit": "6672791941430531439",
         "earmarkEff": "0",
-        "freeCapital": "11773951613950693907",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "11773952132279019548",
-        "surplus": "11773951613950693907",
+        "surplus": "0",
         "tesouroValue": "814"
       }
     },
@@ -7760,15 +7824,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "305",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550867",
+        "deficit": "155",
         "earmarkEff": "0",
-        "freeCapital": "18446744073709550407",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "18446744073709550712",
-        "surplus": "18446744073709550407",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -7785,15 +7849,15 @@
         "tesouroUnits": "11090522334661620094"
       },
       "output": {
-        "coverageRequired": "345",
+        "coverageRequired": "8216703431144606874",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "13658609378324812221",
+        "freeCapital": "5441905947180205692",
         "liquidBudget": "3489989276838493050",
         "mode": 0,
         "netAssets": "5441905947180205692",
         "stableAssets": "13658609378324812566",
-        "surplus": "13658609378324812221",
+        "surplus": "5441905947180205692",
         "tesouroValue": "1951916670341712642"
       }
     },
@@ -7810,15 +7874,15 @@
         "tesouroUnits": "6030435197345283619"
       },
       "output": {
-        "coverageRequired": "565",
+        "coverageRequired": "775",
         "deficit": "0",
         "earmarkEff": "125",
-        "freeCapital": "12558587093103097951",
+        "freeCapital": "12558587093103097741",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "12558587093103097866",
         "stableAssets": "12558587093103098641",
-        "surplus": "12558587093103098076",
+        "surplus": "12558587093103097866",
         "tesouroValue": "12558587093103097741"
       }
     },
@@ -7835,8 +7899,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "651889581071811822",
-        "deficit": "651889031412584701",
+        "coverageRequired": "2366132468691188899",
+        "deficit": "2366131919031961778",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -7888,8 +7952,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "6610449565393134639",
-        "deficit": "5788121877458311137",
+        "coverageRequired": "13668646116317439329",
+        "deficit": "12846318428382615827",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -7913,15 +7977,15 @@
         "tesouroUnits": "238732250526565732"
       },
       "output": {
-        "coverageRequired": "1004503943033",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551232",
+        "deficit": "17771898828026048473",
         "earmarkEff": "0",
-        "freeCapital": "674844241179559726",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "674845245683502759",
-        "surplus": "674844241179559726",
+        "surplus": "0",
         "tesouroValue": "674844677243511213"
       }
     },
@@ -7938,15 +8002,15 @@
         "tesouroUnits": "115"
       },
       "output": {
-        "coverageRequired": "373709277225737817",
+        "coverageRequired": "14000556518367451259",
         "deficit": "0",
         "earmarkEff": "84064410114416777",
-        "freeCapital": "17988970386369396976",
+        "freeCapital": "4362123145227683534",
         "liquidBudget": "4362123145227683486",
         "mode": 0,
         "netAssets": "4446187555342100311",
         "stableAssets": "18446744073709551570",
-        "surplus": "18073034796483813753",
+        "surplus": "4446187555342100311",
         "tesouroValue": "48"
       }
     },
@@ -8052,15 +8116,15 @@
         "tesouroUnits": "12701182918909208434"
       },
       "output": {
-        "coverageRequired": "1350",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551202",
+        "deficit": "3379357831117974719",
         "earmarkEff": "0",
-        "freeCapital": "15067386242591575133",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "15067386242591576483",
-        "surplus": "15067386242591575133",
+        "surplus": "0",
         "tesouroValue": "14586896441682690201"
       }
     },
@@ -8077,8 +8141,8 @@
         "tesouroUnits": "378343593701"
       },
       "output": {
-        "coverageRequired": "14270401215421708520",
-        "deficit": "14270400585252020824",
+        "coverageRequired": "18446744073709551502",
+        "deficit": "18446743443539863806",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -8166,15 +8230,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "53",
+        "coverageRequired": "475",
         "deficit": "0",
         "earmarkEff": "12342565277209966654",
-        "freeCapital": "422",
+        "freeCapital": "0",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "12342565277209966654",
         "stableAssets": "12342565277209967129",
-        "surplus": "12342565277209967076",
+        "surplus": "12342565277209966654",
         "tesouroValue": "0"
       }
     },
@@ -8191,8 +8255,8 @@
         "tesouroUnits": "238321372091"
       },
       "output": {
-        "coverageRequired": "65484261886774292",
-        "deficit": "65483906579593710",
+        "coverageRequired": "11317046830659923284",
+        "deficit": "11317046475352742702",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -8255,15 +8319,15 @@
         "tesouroUnits": "268712455916"
       },
       "output": {
-        "coverageRequired": "576",
+        "coverageRequired": "325383995177152422",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "16328325814066534498",
+        "freeCapital": "16002941818889382652",
         "liquidBudget": "16002941260017248762",
         "mode": 0,
         "netAssets": "16002941818889382652",
         "stableAssets": "16328325814066535074",
-        "surplus": "16328325814066534498",
+        "surplus": "16002941818889382652",
         "tesouroValue": "558872133890"
       }
     },
@@ -8305,15 +8369,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "206250639592687937",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551477",
+        "deficit": "95",
         "earmarkEff": "0",
-        "freeCapital": "18240493434116863445",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "18446744073709551382",
-        "surplus": "18240493434116863445",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -8330,8 +8394,8 @@
         "tesouroUnits": "740"
       },
       "output": {
-        "coverageRequired": "292332301276",
-        "deficit": "292332299502",
+        "coverageRequired": "838654179551",
+        "deficit": "838654177777",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -8355,15 +8419,15 @@
         "tesouroUnits": "684617738021"
       },
       "output": {
-        "coverageRequired": "166",
+        "coverageRequired": "85318472156",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "1938961949575",
+        "freeCapital": "1853643477585",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "1853643477585",
         "stableAssets": "1938961949741",
-        "surplus": "1938961949575",
+        "surplus": "1853643477585",
         "tesouroValue": "1938961948926"
       }
     },
@@ -8419,15 +8483,15 @@
         "tesouroUnits": "820"
       },
       "output": {
-        "coverageRequired": "615",
-        "deficit": "0",
+        "coverageRequired": "9951880696779918099",
+        "deficit": "5722260002642792998",
         "earmarkEff": "0",
-        "freeCapital": "4229620694137124486",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "4229620694137125101",
-        "surplus": "4229620694137124486",
+        "surplus": "0",
         "tesouroValue": "877"
       }
     },
@@ -8522,15 +8586,15 @@
         "tesouroUnits": "222519311201"
       },
       "output": {
-        "coverageRequired": "935",
-        "deficit": "0",
+        "coverageRequired": "13728245747170716119",
+        "deficit": "13728244798278878999",
         "earmarkEff": "0",
-        "freeCapital": "948891836185",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "948891837120",
-        "surplus": "948891836185",
+        "surplus": "0",
         "tesouroValue": "627695651964"
       }
     },
@@ -8600,15 +8664,15 @@
         "tesouroUnits": "108206550961478167"
       },
       "output": {
-        "coverageRequired": "58412496923",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550967",
+        "deficit": "17725013476474421438",
         "earmarkEff": "0",
-        "freeCapital": "721730538822632606",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "721730597235129529",
-        "surplus": "721730538822632606",
+        "surplus": "0",
         "tesouroValue": "39605277125778482"
       }
     },
@@ -8625,15 +8689,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "3731442982",
-        "deficit": "0",
+        "coverageRequired": "6275041202319337884",
+        "deficit": "6275040520092337258",
         "earmarkEff": "0",
-        "freeCapital": "678495557644",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "682227000626",
-        "surplus": "678495557644",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -8689,8 +8753,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "134600526397384852",
-        "deficit": "134600161269024701",
+        "coverageRequired": "6014491675025029594",
+        "deficit": "6014491309896669443",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -8714,15 +8778,15 @@
         "tesouroUnits": "285"
       },
       "output": {
-        "coverageRequired": "44",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551277",
+        "deficit": "18446744073709550149",
         "earmarkEff": "0",
-        "freeCapital": "1084",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "1128",
-        "surplus": "1084",
+        "surplus": "0",
         "tesouroValue": "753"
       }
     },
@@ -8792,15 +8856,15 @@
         "tesouroUnits": "950147646121"
       },
       "output": {
-        "coverageRequired": "3993387883",
-        "deficit": "0",
+        "coverageRequired": "529607902467034397",
+        "deficit": "529607188909444986",
         "earmarkEff": "0",
-        "freeCapital": "709564201528",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "713557589411",
-        "surplus": "709564201528",
+        "surplus": "0",
         "tesouroValue": "582404392910"
       }
     },
@@ -8870,15 +8934,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "480",
-        "deficit": "0",
+        "coverageRequired": "651737734821370032",
+        "deficit": "519234933809295765",
         "earmarkEff": "0",
-        "freeCapital": "132502801012073787",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "132502801012074267",
-        "surplus": "132502801012073787",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -8976,15 +9040,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "354",
+        "coverageRequired": "595",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "23743661177743828",
+        "freeCapital": "23743661177743587",
         "liquidBudget": "23743661177743587",
         "mode": 0,
         "netAssets": "23743661177743587",
         "stableAssets": "23743661177744182",
-        "surplus": "23743661177743828",
+        "surplus": "23743661177743587",
         "tesouroValue": "0"
       }
     },
@@ -9029,15 +9093,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "9005070785886779434",
+        "coverageRequired": "18446744073709551142",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "9441673287822772163",
+        "freeCapital": "455",
         "liquidBudget": "455",
         "mode": 0,
         "netAssets": "455",
         "stableAssets": "18446744073709551597",
-        "surplus": "9441673287822772163",
+        "surplus": "455",
         "tesouroValue": "0"
       }
     },
@@ -9054,8 +9118,8 @@
         "tesouroUnits": "305076319103012137"
       },
       "output": {
-        "coverageRequired": "815412539351077767",
-        "deficit": "343103538340244326",
+        "coverageRequired": "18446744073709550837",
+        "deficit": "17974435072698717396",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -9118,8 +9182,8 @@
         "tesouroUnits": "535"
       },
       "output": {
-        "coverageRequired": "472255409252",
-        "deficit": "472255407201",
+        "coverageRequired": "12794958163389455334",
+        "deficit": "12794958163389453283",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -9185,15 +9249,15 @@
         "tesouroUnits": "504674334391"
       },
       "output": {
-        "coverageRequired": "114864047690",
-        "deficit": "0",
+        "coverageRequired": "13276602605930617359",
+        "deficit": "13276601222337041959",
         "earmarkEff": "0",
-        "freeCapital": "1268729527710",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "1383593575400",
-        "surplus": "1268729527710",
+        "surplus": "0",
         "tesouroValue": "817616337969"
       }
     },
@@ -9210,15 +9274,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "710",
+        "coverageRequired": "510313141876",
         "deficit": "0",
         "earmarkEff": "442132618742275257",
-        "freeCapital": "8727945239779185507",
+        "freeCapital": "8727944729466044341",
         "liquidBudget": "8727944729466044341",
         "mode": 0,
         "netAssets": "9170077348208319598",
         "stableAssets": "9170077858521461474",
-        "surplus": "9170077858521460764",
+        "surplus": "9170077348208319598",
         "tesouroValue": "0"
       }
     },
@@ -9249,15 +9313,15 @@
         "tesouroUnits": "9816360306837345514"
       },
       "output": {
-        "coverageRequired": "839984690565",
+        "coverageRequired": "10023508618978026974",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "15707400803075800167",
+        "freeCapital": "5683893024082463758",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "5683893024082463758",
         "stableAssets": "15707401643060490732",
-        "surplus": "15707400803075800167",
+        "surplus": "5683893024082463758",
         "tesouroValue": "15707401376378839986"
       }
     },
@@ -9288,15 +9352,15 @@
         "tesouroUnits": "635"
       },
       "output": {
-        "coverageRequired": "543",
+        "coverageRequired": "552566818426223634",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "620552318606776946",
+        "freeCapital": "67985500180553855",
         "liquidBudget": "67985500180551953",
         "mode": 0,
         "netAssets": "67985500180553855",
         "stableAssets": "620552318606777489",
-        "surplus": "620552318606776946",
+        "surplus": "67985500180553855",
         "tesouroValue": "1902"
       }
     },
@@ -9313,15 +9377,15 @@
         "tesouroUnits": "132401501320410092"
       },
       "output": {
-        "coverageRequired": "95",
+        "coverageRequired": "565",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "274279807718129292",
+        "freeCapital": "274279807718128822",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "274279807718128822",
         "stableAssets": "274279807718129387",
-        "surplus": "274279807718129292",
+        "surplus": "274279807718128822",
         "tesouroValue": "274279807718129207"
       }
     },
@@ -9338,15 +9402,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "9",
-        "deficit": "0",
+        "coverageRequired": "189866719801975102",
+        "deficit": "28971339589014735",
         "earmarkEff": "0",
-        "freeCapital": "160895380212960358",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "160895380212960367",
-        "surplus": "160895380212960358",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -9377,15 +9441,15 @@
         "tesouroUnits": "665"
       },
       "output": {
-        "coverageRequired": "541884406683",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551487",
+        "deficit": "6316147444476073743",
         "earmarkEff": "0",
-        "freeCapital": "12130596087349071061",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "12130596629233477744",
-        "surplus": "12130596087349071061",
+        "surplus": "0",
         "tesouroValue": "545"
       }
     },
@@ -9402,15 +9466,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "1738847851820",
-        "deficit": "0",
+        "coverageRequired": "14875414698815309774",
+        "deficit": "5749950405553983540",
         "earmarkEff": "0",
-        "freeCapital": "9125462554413474414",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "9125464293261326234",
-        "surplus": "9125462554413474414",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -9441,8 +9505,8 @@
         "tesouroUnits": "866622071561"
       },
       "output": {
-        "coverageRequired": "18446744073709551427",
-        "deficit": "18446743737082353355",
+        "coverageRequired": "18446744073709551477",
+        "deficit": "18446743737082353405",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -9466,15 +9530,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "310",
+        "coverageRequired": "5749410858556787584",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "18446744073709551032",
+        "freeCapital": "12697333215152763758",
         "liquidBudget": "12697333215152763758",
         "mode": 0,
         "netAssets": "12697333215152763758",
         "stableAssets": "18446744073709551342",
-        "surplus": "18446744073709551032",
+        "surplus": "12697333215152763758",
         "tesouroValue": "0"
       }
     },
@@ -9583,15 +9647,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "40089895374322442",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551592",
+        "deficit": "430",
         "earmarkEff": "0",
-        "freeCapital": "18406654178335228720",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "18446744073709551162",
-        "surplus": "18406654178335228720",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -9608,8 +9672,8 @@
         "tesouroUnits": "547644928366"
       },
       "output": {
-        "coverageRequired": "5122325067184436109",
-        "deficit": "4579393605205401236",
+        "coverageRequired": "18446744073709550672",
+        "deficit": "17903812611730515799",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -9647,8 +9711,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "18446744073709550847",
-        "deficit": "200",
+        "coverageRequired": "18446744073709551102",
+        "deficit": "455",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -9672,8 +9736,8 @@
         "tesouroUnits": "628576304291"
       },
       "output": {
-        "coverageRequired": "29406952704305489",
-        "deficit": "29405575216440927",
+        "coverageRequired": "18446744073709551112",
+        "deficit": "18446742696221686550",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -9775,15 +9839,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "120",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551427",
+        "deficit": "18446743137414008566",
         "earmarkEff": "0",
-        "freeCapital": "936295542741",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "936295542861",
-        "surplus": "936295542741",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -9800,8 +9864,8 @@
         "tesouroUnits": "50"
       },
       "output": {
-        "coverageRequired": "1170",
-        "deficit": "384",
+        "coverageRequired": "17554166460275807454",
+        "deficit": "17554166460275806668",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -9825,15 +9889,15 @@
         "tesouroUnits": "775673018566"
       },
       "output": {
-        "coverageRequired": "370",
+        "coverageRequired": "43932766031337177",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "403836732201828386",
+        "freeCapital": "359903966170491579",
         "liquidBudget": "359903578597926760",
         "mode": 0,
         "netAssets": "359903966170491579",
         "stableAssets": "403836732201828756",
-        "surplus": "403836732201828386",
+        "surplus": "359903966170491579",
         "tesouroValue": "387572564819"
       }
     },
@@ -9850,8 +9914,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "227851928905",
-        "deficit": "227851928310",
+        "coverageRequired": "797630070580976999",
+        "deficit": "797630070580976404",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -9956,15 +10020,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "365",
-        "deficit": "0",
+        "coverageRequired": "18446744073709550722",
+        "deficit": "18446743836885762196",
         "earmarkEff": "0",
-        "freeCapital": "236823788161",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "236823788526",
-        "surplus": "236823788161",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -10031,15 +10095,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "1725800296200",
+        "coverageRequired": "9666244497396415979",
         "deficit": "0",
         "earmarkEff": "0",
-        "freeCapital": "18446742347909254927",
+        "freeCapital": "8780499576313135148",
         "liquidBudget": "8780499576313135148",
         "mode": 0,
         "netAssets": "8780499576313135148",
         "stableAssets": "18446744073709551127",
-        "surplus": "18446742347909254927",
+        "surplus": "8780499576313135148",
         "tesouroValue": "0"
       }
     },
@@ -10056,8 +10120,8 @@
         "tesouroUnits": "676947407316"
       },
       "output": {
-        "coverageRequired": "184228809916749341",
-        "deficit": "184227915672919238",
+        "coverageRequired": "18446744073709551372",
+        "deficit": "18446743179465721269",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -10159,15 +10223,15 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "128",
-        "deficit": "0",
+        "coverageRequired": "15547014653429675799",
+        "deficit": "13664307977456570160",
         "earmarkEff": "0",
-        "freeCapital": "1882706675973105511",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "1882706675973105639",
-        "surplus": "1882706675973105511",
+        "surplus": "0",
         "tesouroValue": "0"
       }
     },
@@ -10184,15 +10248,15 @@
         "tesouroUnits": "990"
       },
       "output": {
-        "coverageRequired": "8968806968637583642",
+        "coverageRequired": "18446744073709550722",
         "deficit": "0",
         "earmarkEff": "160",
-        "freeCapital": "9477937105071967625",
+        "freeCapital": "545",
         "liquidBudget": "0",
         "mode": 0,
         "netAssets": "705",
         "stableAssets": "18446744073709551427",
-        "surplus": "9477937105071967785",
+        "surplus": "705",
         "tesouroValue": "545"
       }
     },
@@ -10234,8 +10298,8 @@
         "tesouroUnits": "0"
       },
       "output": {
-        "coverageRequired": "1455478934099850801",
-        "deficit": "1455478759896639895",
+        "coverageRequired": "8445604609108720544",
+        "deficit": "8445604434905509638",
         "earmarkEff": "0",
         "freeCapital": "0",
         "liquidBudget": "0",
@@ -10259,15 +10323,15 @@
         "tesouroUnits": "220"
       },
       "output": {
-        "coverageRequired": "1185",
-        "deficit": "0",
+        "coverageRequired": "18446744073709551082",
+        "deficit": "17746854991320207487",
         "earmarkEff": "0",
-        "freeCapital": "699889082389342410",
+        "freeCapital": "0",
         "liquidBudget": "0",
-        "mode": 0,
+        "mode": 1,
         "netAssets": "0",
         "stableAssets": "699889082389343595",
-        "surplus": "699889082389342410",
+        "surplus": "0",
         "tesouroValue": "468"
       }
     },

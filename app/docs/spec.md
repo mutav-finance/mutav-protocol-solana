@@ -45,7 +45,7 @@ Read-only, no wallet needed.
 - **Health:** `stable_assets`, `coverage_required`, surplus, `free_capital`, NAV per share, shares outstanding, `mode` (Normal / UnderCovered), `fulfil_halted`, paused, last refresh.
 - **Coverage:** remaining cover by guarantee (default and exit legs), active guarantee count, per-agency exposure.
 - **Claims timeline:** each claim with on-chain timestamps for filed → paid → settled, the PIX settlement hash, and late flags. This is the "proven speed" view.
-- **Money flows:** guarantee fees in (net to reserve, take to treasury), claim payments out, deposits and redemptions.
+- **Money flows:** guarantee fees in (net to reserve, take to treasury), issuer income in (Nora's revenue share, swept per statement by `sweep_income`, ADR 0017) and the untracked income-inbox balance, claim payments out, deposits and redemptions.
 - **Capital queue:** pending deposits and redemptions in FIFO order.
 - **Disclosures:** BRS is issued by Nora; its freeze authority is a single Nora wallet; a freeze stops outflows until thawed. Pilot capital is MUTAV's own. Built-later features (partial fills, claim notices, adapters).
 - A "Refresh" button that sends the permissionless `refresh` instruction from any connected wallet.
@@ -56,7 +56,7 @@ Read-only, no wallet needed.
 During the launch and the hackathon MUTAV's team operates the reserve by hand from this page with the operator wallet; later mutav-app's backend sends the same instructions with a KMS-held key. Anyone can read it; actions are enabled only when the connected wallet is `VaultConfig.operator` (localnet and devnet: the wallet signs).
 
 - **Limits now:** the claim-payment cap window (`claim_period_start`, `claim_period_paid` vs `max_claim_per_period`, `max_claim_per_call`), payouts against `payout_sla_secs`, free capital for new guarantees.
-- **Console:** a form per operator instruction (shared with `/demo`), each with its on-chain bound shown before signing and the gate preview where it applies.
+- **Console:** a form per operator instruction (shared with `/demo`), each with its on-chain bound shown before signing and the gate preview where it applies. `sweep_income` (ADR 0017) shows the income-inbox balance and previews the split; it sweeps exactly the amount on a Nora statement.
 - **Responsibilities:** each instruction, what is done by hand today and what will trigger it in the backend; undocumented triggers say "triggered by the MUTAV platform".
 - **Recent activity:** the operator key's last MUTAV transactions, and the last `set_roles` in VaultConfig's recent history, when the RPC keeps history.
 - **Safety:** what bounds a compromised operator key (caps, fixed payments account, `revoke_operator`, admin-only config).
@@ -85,16 +85,21 @@ Also usable outside the script: a free-form operator panel for each operator ins
 
 ### `/admin` Admin console
 
-For Squads members.
+For Squads members. A sticky in-page nav (General controls · Money in & out · Allocation) over three sections; every parameter lives with the thing it governs, and each control lives in exactly one place. Every admin change is a **Squads vault-transaction proposal** that members approve and execute from their wallets; `set_config` controls write only their own fields and carry the rest over from on-chain. If the configured admin is not a Squads vault (localnet only), direct signing is allowed, clearly labelled.
 
-- Shows `VaultConfig`: roles, caps, price params, take rate, feature flags, the treasury and payments accounts, the allowlist root.
-- Actions, each built as a **Squads vault-transaction proposal** that members approve and execute from their wallets: `fulfil_deposits`, `fulfil_redeems`, `pause` / `unpause`, `clear_fulfil_halt`, `set_config` (caps), `set_allowlist_root` (with the client's Merkle builder).
-- Proposal list with status (pending, approved, executable, executed) and the time-lock countdown.
-- If the configured admin is not a Squads vault (localnet only), allow direct signing, clearly labelled.
+- **General controls** (`#general`), the cross-cutting settings:
+  - **Emergency** strip: paused, fulfil halted, operator active or revoked; `pause` and `revoke_operator` (pauser key or admin, signed directly, no time lock), `unpause` and `clear_fulfil_halt` (Reserve Admin, through Squads).
+  - **Roles & multisig:** the Squads status, time lock and proposal list, with the create → approve → execute flow explained once; the roles; `set_roles`.
+  - **Coverage & reserve limits:** coverage ratio c, `max_tvl`, `max_cover_per_guarantee`, `max_cover_per_agency`; one `set_config`.
+  - **Allowlist & accounts:** allowlist root, treasury, payments, mints; `set_allowlist_root` (client Merkle builder), `set_payments_account`.
+- **Money in & out** (`#money`): each flow with its settings. Operator and Investor steps are one-line context rows (role tag, live total, link to `/operator`, `/investor` or `/reserve`); charts stay on `/reserve`.
+  - In: **deposits** (`fulfil_deposits`; `min_request`, `max_request`), **guarantee fees** (`fee_take_bps`), **BRS issuer income** (Nora → inbox → `sweep_income`; inbox balance, swept total, last statements; `income_take_bps`, fail-closed cap 0 until spec §12 Q47).
+  - Out: **redemptions** (`fulfil_redeems`, gated by free capital; `min_fill_assets`), **claim payments** (`max_claim_per_call`, `max_claim_per_period`, `claim_period_secs`, `payout_sla_secs`; `pay_claim_admin` shown as planned).
+- **Allocation** (`#allocation`, alias `#reserve-assets`): "BRS today, more assets through adapters" (ADR 0018). Composition shows BRS plus the income inbox kept apart, "100% BRS (pilot)", with the settlement floor as a marker ("Min in BRS (settlement token): 100%"). **Expand with adapters** explains how a new asset is added (upgrade with the adapter instructions; whitelist an adapter with its cap, share limit and own price feed; lower the settlement floor; allocate and deallocate within the gates), lists TESOURO as the first candidate with its blocker (no Etherfuse BRS path), and shows the per-adapter table (`VaultConfig.adapters`: cap, share limit, price feed, allocated) and the planned instructions. Controls: "Min held in the settlement token" (`min_settlement_bps`; composed as `max_tesouro_share_bps = 10_000 − V` until the rename, `TODO(rename)`), and the per-adapter price feed shown as planned.
 
 ## Seed scenario
 
-A script (`scripts/seed.ts`, localnet and devnet) that drives the program into the demo's starting state: a funded reserve from the capital wallet, a few guarantees near the gate, one paid fee, and an under-coverage scenario for step 5. It reuses the protocol's devnet scripts and outputs unsigned transactions where admin authority is needed.
+A script (`scripts/seed.ts`, localnet and devnet) that drives the program into the demo's starting state: a funded reserve from the capital wallet, a few guarantees (at c = 0.10, as on devnet), one paid fee, one swept month of issuer income with a remainder left in the income inbox, and an under-coverage scenario for step 5. It reuses the protocol's devnet scripts and outputs unsigned transactions where admin authority is needed.
 
 ## Tests
 
@@ -103,4 +108,4 @@ A script (`scripts/seed.ts`, localnet and devnet) that drives the program into t
 
 ## Not in scope
 
-Agencies, tenants, PIX integration, Auth0, i18n, mainnet, income intake (ADR 0013, pending).
+Agencies, tenants, PIX integration, Auth0, i18n, mainnet.

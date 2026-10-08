@@ -112,6 +112,11 @@ pub fn handle_contribute_fees(
         .fee_take_total
         .checked_add(take)
         .ok_or(MutavError::MathOverflow)?;
+    // A verified inflow: the NAV-move guard measures net of it (ADR 0017).
+    state.inflows_since_refresh = state
+        .inflows_since_refresh
+        .checked_add(net)
+        .ok_or(MutavError::MathOverflow)?;
 
     let clock = Clock::get()?;
     let r = &mut ctx.accounts.fee_receipt;

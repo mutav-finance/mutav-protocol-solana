@@ -7,6 +7,8 @@ import {
   findFeeReceiptPda,
   findGuaranteePda,
   findHolderStatePda,
+  findIncomeInboxAddress,
+  findIncomeReceiptPda,
   findPayoutPda,
   findRedeemRequestPda,
   findReserveAddresses,
@@ -57,6 +59,19 @@ describe('PDA derivation matches the program', () => {
     expect((await findHolderStatePda({ config, owner: address(inputs.owner) }))[0]).toBe(
       expected.holderState,
     );
+  });
+
+  test('income receipt and income inbox (ADR 0017)', async () => {
+    const config = address(expected.config);
+    expect((await findIncomeReceiptPda({ config, incomeRefHash: unhex(inputs.incomeRefHash) }))[0]).toBe(
+      expected.incomeReceipt,
+    );
+    expect(
+      await findIncomeInboxAddress({
+        vaultAuthority: address(expected.vaultAuthority),
+        reserveMint: address(inputs.reserveMint),
+      }),
+    ).toBe(expected.incomeInbox);
   });
 
   test('seq must be a u64', async () => {

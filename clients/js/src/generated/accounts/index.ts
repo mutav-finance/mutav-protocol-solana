@@ -12,6 +12,7 @@ export * from "./depositRequest";
 export * from "./feeReceipt";
 export * from "./guarantee";
 export * from "./holderState";
+export * from "./incomeReceipt";
 export * from "./payout";
 export * from "./redeemRequest";
 export * from "./vaultConfig";

@@ -117,6 +117,8 @@ export type SetConfigInstructionData = {
   caps: CapsInput;
   price: PriceInput;
   exit: ExitInput;
+  /** MUTAV's take from issuer income (ADR 0017), `<= MAX_INCOME_TAKE_BPS`. */
+  incomeTakeBps: number;
 };
 
 export type SetConfigInstructionDataArgs = {
@@ -128,6 +130,8 @@ export type SetConfigInstructionDataArgs = {
   caps: CapsInputArgs;
   price: PriceInputArgs;
   exit: ExitInputArgs;
+  /** MUTAV's take from issuer income (ADR 0017), `<= MAX_INCOME_TAKE_BPS`. */
+  incomeTakeBps: number;
 };
 
 export function getSetConfigInstructionDataEncoder(): FixedSizeEncoder<SetConfigInstructionDataArgs> {
@@ -142,6 +146,7 @@ export function getSetConfigInstructionDataEncoder(): FixedSizeEncoder<SetConfig
       ["caps", getCapsInputEncoder()],
       ["price", getPriceInputEncoder()],
       ["exit", getExitInputEncoder()],
+      ["incomeTakeBps", getU16Encoder()],
     ]),
     (value) => ({ ...value, discriminator: SET_CONFIG_DISCRIMINATOR }),
   );
@@ -158,6 +163,7 @@ export function getSetConfigInstructionDataDecoder(): FixedSizeDecoder<SetConfig
     ["caps", getCapsInputDecoder()],
     ["price", getPriceInputDecoder()],
     ["exit", getExitInputDecoder()],
+    ["incomeTakeBps", getU16Decoder()],
   ]);
 }
 
@@ -201,6 +207,7 @@ export type SetConfigInput<
   caps: SetConfigInstructionDataArgs["caps"];
   price: SetConfigInstructionDataArgs["price"];
   exit: SetConfigInstructionDataArgs["exit"];
+  incomeTakeBps: SetConfigInstructionDataArgs["incomeTakeBps"];
 };
 
 export function getSetConfigInstruction<

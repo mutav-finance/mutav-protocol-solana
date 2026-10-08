@@ -14,6 +14,7 @@ import {
   getAddressEncoder,
   getBase64EncodedWireTransaction,
   getProgramDerivedAddress,
+  isAddress,
   pipe,
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
@@ -31,6 +32,9 @@ import {
   findDepositRequestPda,
   findFeeReceiptPda,
   findGuaranteePda,
+  findIncomeInboxAddress,
+  findIncomeReceiptPda,
+  isValidIncomePeriod,
   findHolderStatePda,
   findPayoutPda,
   findRedeemRequestPda,
@@ -48,11 +52,21 @@ import {
   getRegisterGuaranteeInstruction,
   getRequestDepositInstruction,
   getSetAllowlistRootInstruction,
+  getSetRolesInstruction,
+  getSetPaymentsAccountInstruction,
+  getRevokeOperatorInstruction,
   getSetConfigInstruction,
   getSettlePayoutInstruction,
+  getSweepIncomeInstruction,
   getUnpauseInstruction,
+  identifyMutavInstruction,
+  MutavInstruction,
+  type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
 import { ALLOWLIST_TEXT, checkAllowlist } from "../allowlist";
+import { reserveConfigError } from "../reserve-assets";
+import { capsError, generalConfigError, rolesError } from "../admin";
+import { pendingSetConfig, pendingSetConfigText, setConfigChanges, type ConfigChange } from "../config-diff";
 import { fromHex } from "../serde";
 import type { TxRequest } from "../tx-kinds";
 import { ADMIN_KINDS } from "../tx-kinds";
@@ -210,6 +224,35 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             payer: signer,
             systemProgram: SYSTEM_PROGRAM,
             invoiceRefHash,
+            amount: req.amount,
+          },
+          o,
+        ),
+      ];
+    }
+    case "sweep_income": {
+      // ADR 0017: the vault authority moves the statement's amount from the
+      // income inbox into the reserve; the operator signs the instruction.
+      if (!isValidIncomePeriod(req.period)) throw new ComposeError("period must be a YYYYMM month");
+      const incomeRefHash = bytes32(req.incomeRefHash, "incomeRefHash");
+      const [incomeReceipt] = await findIncomeReceiptPda({ config, incomeRefHash }, o);
+      return [
+        getSweepIncomeInstruction(
+          {
+            ...common,
+            operator: signer,
+            state: a.state,
+            incomeReceipt,
+            incomeInbox: await findIncomeInboxAddress({ vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram }),
+            reserve: a.reserve,
+            treasuryAccount: r.config.treasuryAccount,
+            vaultAuthority: a.vaultAuthority,
+            reserveMint: mint,
+            tokenProgram,
+            payer: signer,
+            systemProgram: SYSTEM_PROGRAM,
+            incomeRefHash,
+            period: req.period,
             amount: req.amount,
           },
           o,
@@ -426,6 +469,18 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     }
     case "pause":
       return [getPauseInstruction({ ...common, signer }, o)];
+    case "revoke_operator":
+      return [getRevokeOperatorInstruction({ ...common, signer }, o)];
+    case "set_roles": {
+      const bad = rolesError(req, r.config.admin);
+      if (bad) throw new ComposeError(bad);
+      return [getSetRolesInstruction({ ...common, admin: signer, operator: address(req.operator), pauser: address(req.pauser) }, o)];
+    }
+    case "set_payments_account": {
+      if (!isAddress(req.paymentsAccount)) throw new ComposeError("payments account is not an address");
+      if (req.paymentsAccount === r.config.treasuryAccount) throw new ComposeError("the payments account must differ from the treasury account (spec §2.1)");
+      return [getSetPaymentsAccountInstruction({ ...common, admin: signer, paymentsAccount: address(req.paymentsAccount), treasuryAccount: r.config.treasuryAccount }, o)];
+    }
     case "unpause":
       return [getUnpauseInstruction({ ...common, admin: signer }, o)];
     case "clear_fulfil_halt":
@@ -439,6 +494,9 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       void _c;
       void _p;
       void _e;
+      const bad = generalConfigError(req) ?? capsError({ ...caps, ...(req.caps ?? {}) }) ?? reserveConfigError(req);
+      if (bad) throw new ComposeError(bad);
+      const { tesouroPriceAccount, ...priceDraft } = req.price ?? {};
       return [
         getSetConfigInstruction(
           {
@@ -447,13 +505,15 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             treasuryAccount: c.treasuryAccount,
             paymentsAccount: c.paymentsAccount,
             coverageRatioBps: req.coverageRatioBps ?? c.coverageRatioBps,
-            feeTakeBps: c.feeTakeBps,
-            payoutSlaSecs: c.payoutSlaSecs,
+            feeTakeBps: req.feeTakeBps ?? c.feeTakeBps,
+            payoutSlaSecs: req.payoutSlaSecs ?? c.payoutSlaSecs,
             featureFlags: c.featureFlags,
             mutavCapitalWallet: c.mutavCapitalWallet,
-            caps: { ...caps, ...(req.caps ?? {}) },
-            price,
+            caps: { ...caps, ...(req.caps ?? {}), ...(req.maxTesouroShareBps !== undefined ? { maxTesouroShareBps: req.maxTesouroShareBps } : {}) },
+            price: { ...price, ...priceDraft, ...(tesouroPriceAccount !== undefined ? { tesouroPriceAccount: address(tesouroPriceAccount) } : {}) },
             exit,
+            // Bounded by MAX_INCOME_TAKE_BPS, which is 0 until spec §12 Q47 (ADR 0017): only 0 composes.
+            incomeTakeBps: req.incomeTakeBps ?? c.incomeTakeBps,
           },
           o,
         ),
@@ -508,13 +568,31 @@ export function unsignedTransaction(feePayer: Address, ixs: Instruction[], lifet
 }
 
 /** For the UI: which accounts an instruction touches, and how. */
-export function describeInstructions(ixs: Instruction[]) {
-  return ixs.map((ix) => ({
-    program: ix.programAddress as string,
-    accounts: (ix.accounts ?? []).map((m) => ({
+export function describeInstructions(ixs: Instruction[], config?: VaultConfig) {
+  return ixs.map((ix) => {
+    const accounts = (ix.accounts ?? []).map((m) => ({
       address: m.address as string,
       writable: m.role === AccountRole.WRITABLE || m.role === AccountRole.WRITABLE_SIGNER,
       signer: m.role === AccountRole.READONLY_SIGNER || m.role === AccountRole.WRITABLE_SIGNER,
-    })),
-  }));
+    }));
+    let changes: ConfigChange[] | undefined;
+    // Callers pass only MUTAV instructions with a config (the build route's composed set).
+    if (config && ix.data && ix.data.length >= 8) {
+      try {
+        if (identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig) changes = setConfigChanges(new Uint8Array(ix.data), config, accounts[2]?.address);
+      } catch {
+        changes = undefined;
+      }
+    }
+    return { program: ix.programAddress as string, accounts, ...(changes ? { changes } : {}) };
+  });
+}
+
+/**
+ * Refuses a second set_config while one is live in the multisig: set_config
+ * writes every field, so the later one would undo the earlier when both run.
+ */
+export function refuseOverlappingSetConfig(proposals: Parameters<typeof pendingSetConfig>[0]) {
+  const pending = pendingSetConfig(proposals);
+  if (pending !== null) throw new ComposeError(pendingSetConfigText(pending));
 }

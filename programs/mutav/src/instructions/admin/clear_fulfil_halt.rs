@@ -46,6 +46,9 @@ pub fn handle_clear_fulfil_halt(ctx: Context<ClearFulfilHalt>) -> Result<()> {
     let nav = published_nav(sol.net_assets, state.shares_outstanding)?;
     state.fulfil_halted = false;
     state.nav_per_share = nav;
+    // The new baseline already includes every inflow so far, so the next
+    // `refresh` must not subtract them again (ADR 0017).
+    state.inflows_since_refresh = 0;
 
     emit_cpi!(FulfilHaltCleared {
         config: ctx.accounts.config.key(),

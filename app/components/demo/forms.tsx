@@ -7,7 +7,7 @@
  * the last read and labelled PREVIEW.
  */
 import { useEffect, useMemo, useState } from "react";
-import { previewRedeemFulfil } from "@mutav-finance/mutav-protocol-solana";
+import { isValidIncomePeriod, previewRedeemFulfil, takeSplit } from "@mutav-finance/mutav-protocol-solana";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -245,6 +245,49 @@ export function FeeForm({ p = "" }: { p?: string }) {
       )}
       <RoleWarning need="operator" />
       <Action label="contribute_fees" request={async () => (gross && invoice.trim() ? { kind: "contribute_fees", invoiceRefHash: await REF.invoice(invoice.trim()), amount: gross } : null)} onDone={() => setInvoice(`INV-2026-${String(ledger.fees.length + 2).padStart(4, "0")}`)} />
+    </div>
+  );
+}
+
+// ── Issuer income (ADR 0017) ────────────────────────────────────────────────
+
+/** This month as YYYYMM, from the cluster clock of the last read. */
+const periodOf = (unix: bigint) => {
+  const d = new Date(Number(unix) * 1000);
+  return String(d.getUTCFullYear() * 100 + d.getUTCMonth() + 1);
+};
+
+export function IncomeForm({ p = "" }: { p?: string }) {
+  const { reserve, ledger } = useLive();
+  const [statement, setStatement] = useState(`NORA-${periodOf(reserve.now)}-${String(ledger.income.length + 1).padStart(2, "0")}`);
+  const [period, setPeriod] = useState(periodOf(reserve.now));
+  const [amount, setAmount] = useState("");
+  const gross = parseBrs(amount);
+  const inbox = reserve.incomeInbox.amount;
+  const month = Number(period);
+  const periodOk = isValidIncomePeriod(month);
+  const split = gross ? takeSplit(gross, reserve.config.incomeTakeBps) : null;
+  const overInbox = gross !== null && gross > inbox;
+  return (
+    <div>
+      <Grid>
+        <TextField id={`${p}inc-ref`} label="Nora statement reference" value={statement} onChange={setStatement} hint="each statement is recorded once" />
+        <TextField id={`${p}inc-period`} label="Statement month (YYYYMM)" value={period} onChange={setPeriod} numeric />
+        <TextField id={`${p}inc-amt`} label="Amount on the statement (BRS)" value={amount} onChange={setAmount} numeric hint={`in the inbox now: ${fmtBrs(inbox)}`} />
+      </Grid>
+      {split && (
+        <PreviewBox ok={overInbox || !periodOk ? false : null} title={overInbox ? "Refused: IncomeExceedsInbox" : !periodOk ? "Refused: the month must be YYYYMM" : "Split"}>
+          {kv(`MUTAV take (${fmtBps(reserve.config.incomeTakeBps)}) → treasury`, fmtBrs(split.take))}
+          {kv("Net → reserve (raises NAV for every holder)", fmtBrs(split.net))}
+          {kv("Left in the inbox, untracked", fmtBrs(overInbox ? inbox : inbox - gross!))}
+        </PreviewBox>
+      )}
+      <RoleWarning need="operator" />
+      <Action
+        label="sweep_income"
+        request={async () => (gross && periodOk && statement.trim() ? { kind: "sweep_income", incomeRefHash: await REF.income(statement.trim()), period: month, amount: gross } : null)}
+        onDone={() => setStatement(`NORA-${periodOf(reserve.now)}-${String(ledger.income.length + 2).padStart(2, "0")}`)}
+      />
     </div>
   );
 }

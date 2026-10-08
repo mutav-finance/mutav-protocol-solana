@@ -9,7 +9,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::{ModeChanged, PayoutLate, ReserveFrozenDetected, StateRefreshed},
-    pricing::{nav_move_exceeds, published_nav},
+    pricing::{guard_nav, nav_move_exceeds, published_nav},
     solvency::{Solvency, SolvencyInputs},
     state::{Guarantee, Payout, VaultConfig, VaultState},
 };
@@ -145,12 +145,22 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
     let state = &mut ctx.accounts.state;
 
     // 3. NAV-move guard (spec §7): measured against the last published NAV,
-    // which is 0 only when no shares were outstanding. A frozen reserve
-    // counted as 0 is a measured move, and so is the thaw.
-    // Only the admin's `clear_fulfil_halt` clears the flag (ADR 0015).
-    if nav_move_exceeds(state.nav_per_share, nav, max_nav_move_bps) {
+    // which is 0 only when no shares were outstanding, and net of the
+    // verified inflows since then (ADR 0017), so guarantee fees and swept
+    // income never trip it. A frozen reserve counted as 0 is a measured move,
+    // and so is the thaw. Only the admin's `clear_fulfil_halt` clears the
+    // flag (ADR 0015).
+    let moved_nav = guard_nav(
+        sol.net_assets,
+        state.inflows_since_refresh,
+        state.shares_outstanding,
+    )?;
+    if nav_move_exceeds(state.nav_per_share, moved_nav, max_nav_move_bps) {
         state.fulfil_halted = true;
     }
+    // The published NAV below includes the inflows: they start the next
+    // window at zero.
+    state.inflows_since_refresh = 0;
 
     // 4. Mode (spec §6).
     let (from, to) = (state.mode, sol.mode());

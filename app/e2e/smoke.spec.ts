@@ -71,13 +71,23 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/admin — VaultConfig and direct signing labelled localnet-only", async ({ page }) => {
+  test("/admin — General controls, Money in & out, Allocation; direct signing labelled localnet-only", async ({ page }) => {
     await page.goto("/admin");
-    await expect(page.getByRole("heading", { name: "VaultConfig" })).toBeVisible();
+    const nav = page.getByRole("navigation", { name: "Admin sections" });
+    await expect(nav.getByRole("link")).toHaveText(["01 General controls", "02 Money in & out", "03 Allocation"]);
+    for (const [id, heading] of [["general", "General controls"], ["money", "Money in & out"], ["allocation", "Allocation: BRS today, more assets through adapters"]]) {
+      await expect(page.locator(`#${id}`).getByRole("heading", { name: heading, level: 2 })).toBeVisible();
+    }
+    await expect(page.locator("#reserve-assets")).toHaveCount(1);
+    await expect(page.getByRole("region", { name: "Emergency" })).toContainText("NOT PAUSED");
     await expect(page.getByText("DIRECT SIGNING · LOCALNET ONLY").first()).toBeVisible();
     await expect(page.getByText("NO SQUADS MULTISIG CONFIGURED")).toBeVisible();
-    await expect(page.locator("#config")).toContainText("100.00%");
-    await expect(page.getByRole("button", { name: "Sign directly: fulfil_deposits" })).toBeVisible();
+    await expect(page.locator("#general-coverage")).toContainText("10.00%");
+    await expect(page.locator("#money").getByRole("button", { name: "Sign directly: fulfil_deposits" })).toBeVisible();
+    await expect(page.locator("#allocation-composition")).toContainText("100% BRS (pilot)");
+    await expect(page.locator("#allocation-composition")).toContainText("Min in BRS (settlement token): 100%");
+    await expect(page.locator("#allocation-expand").getByRole("table", { name: "Planned reserve-allocation instructions" }).locator("tbody tr")).toHaveCount(4);
+    await expect(page.locator("#allocation-expand").getByRole("table", { name: "Adapter candidates" })).toContainText("TESOURO");
     await noBannedWords(page);
   });
 
@@ -102,6 +112,46 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.locator("#console").getByRole("button", { name: "register_guarantee" })).toBeDisabled();
     await expect(page.getByRole("table", { name: "Operator duties" }).locator("tbody tr")).toHaveCount(6);
     await expect(page.getByRole("heading", { name: "If the operator key is compromised" })).toBeVisible();
+    await noBannedWords(page);
+  });
+
+  test("/simulator — static reserve simulator in protocol terms, one full view", async ({ page }) => {
+    await page.goto("/simulator");
+    await expect(page.getByRole("heading", { name: "Reserve simulator", level: 1 })).toBeVisible();
+    await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0,1");
+    await expect(page.locator("#glance")).toContainText("Coverage & safety");
+    await expect(page.locator("#chart")).toContainText("Stable assets vs coverage required");
+    await expect(page.locator("#kstrip")).toContainText("What the reserve earns");
+    await expect(page.locator("#kstrip")).toContainText("vs Selic");
+    await expect(page.locator("#kstrip")).toContainText("MUTAV take");
+
+    // inputs read like outputs (pt-BR) and accept pasted values with or without separators
+    await page.getByRole("tab", { name: "Capital" }).click();
+    const start = page.getByLabel(/Starting capital/);
+    await expect(start).toHaveValue("300.000");
+    await start.fill("250000");
+    await start.blur();
+    await expect(start).toHaveValue("250.000");
+    await expect(page.locator("#scenSel")).toHaveValue("custom");
+
+    // Export menu: keyboard operable, closes on Escape
+    await page.getByRole("button", { name: "Export" }).click();
+    await expect(page.getByRole("menuitem", { name: /Copy summary/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menuitem", { name: /Copy summary/ })).toBeHidden();
+    await page.getByRole("button", { name: "Reset" }).click();
+    await noBannedWords(page);
+
+    await expect(page.getByRole("button", { name: "Advanced" })).toHaveCount(0);
+    await page.getByRole("tab", { name: "Compare c & sizing" }).click();
+    await expect(page.locator("#ruleTbl tbody tr")).toHaveCount(3);
+    await page.getByRole("tab", { name: "Reserve yield" }).click();
+    await expect(page.locator("#ychart svg")).toBeVisible();
+    await page.getByRole("tab", { name: "What MUTAV earns" }).click();
+    await expect(page.locator("#takeKpis")).toContainText("take total");
+    await noBannedWords(page);
+    await page.getByRole("tab", { name: "Method" }).click();
+    await expect(page.locator("#pane-method")).toContainText("coverage_required");
     await noBannedWords(page);
   });
 

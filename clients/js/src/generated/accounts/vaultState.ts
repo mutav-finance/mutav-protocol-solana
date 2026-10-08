@@ -91,6 +91,16 @@ export type VaultState = {
   fulfilHalted: boolean;
   lastRefreshTs: bigint;
   lastRefreshSlot: bigint;
+  /** Lifetime net issuer income swept into `reserve` (`sweep_income`). */
+  incomeTotal: bigint;
+  /** Lifetime take from issuer income sent to the treasury. */
+  incomeTakeTotal: bigint;
+  /**
+   * Net verified inflows (`contribute_fees`, `sweep_income`) since the last
+   * `refresh`. The NAV-move guard measures net of them; `refresh` and
+   * `clear_fulfil_halt` reset it to 0.
+   */
+  inflowsSinceRefresh: bigint;
   /** Zeroed. Phase 2 carves `InstantExitState` (88 bytes) from the front. */
   reserved: ReadonlyUint8Array;
 };
@@ -134,6 +144,16 @@ export type VaultStateArgs = {
   fulfilHalted: boolean;
   lastRefreshTs: number | bigint;
   lastRefreshSlot: number | bigint;
+  /** Lifetime net issuer income swept into `reserve` (`sweep_income`). */
+  incomeTotal: number | bigint;
+  /** Lifetime take from issuer income sent to the treasury. */
+  incomeTakeTotal: number | bigint;
+  /**
+   * Net verified inflows (`contribute_fees`, `sweep_income`) since the last
+   * `refresh`. The NAV-move guard measures net of them; `refresh` and
+   * `clear_fulfil_halt` reset it to 0.
+   */
+  inflowsSinceRefresh: number | bigint;
   /** Zeroed. Phase 2 carves `InstantExitState` (88 bytes) from the front. */
   reserved: ReadonlyUint8Array;
 };
@@ -175,7 +195,10 @@ export function getVaultStateEncoder(): FixedSizeEncoder<VaultStateArgs> {
       ["fulfilHalted", getBooleanEncoder()],
       ["lastRefreshTs", getI64Encoder()],
       ["lastRefreshSlot", getU64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 256)],
+      ["incomeTotal", getU64Encoder()],
+      ["incomeTakeTotal", getU64Encoder()],
+      ["inflowsSinceRefresh", getU64Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 232)],
     ]),
     (value) => ({ ...value, discriminator: VAULT_STATE_DISCRIMINATOR }),
   );
@@ -217,7 +240,10 @@ export function getVaultStateDecoder(): FixedSizeDecoder<VaultState> {
     ["fulfilHalted", getBooleanDecoder()],
     ["lastRefreshTs", getI64Decoder()],
     ["lastRefreshSlot", getU64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 256)],
+    ["incomeTotal", getU64Decoder()],
+    ["incomeTakeTotal", getU64Decoder()],
+    ["inflowsSinceRefresh", getU64Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 232)],
   ]);
 }
 

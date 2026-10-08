@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
-    constants::{field, SUPPORTED_FEATURES},
+    constants::{field, MAX_INCOME_TAKE_BPS, SUPPORTED_FEATURES},
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges},
     instructions::admin::{validate_money_accounts, validate_params, vault_authority_key},
@@ -26,6 +26,8 @@ pub struct SetConfigArgs {
     pub caps: CapsInput,
     pub price: PriceInput,
     pub exit: ExitInput,
+    /// MUTAV's take from issuer income (ADR 0017), `<= MAX_INCOME_TAKE_BPS`.
+    pub income_take_bps: u16,
 }
 
 #[event_cpi]
@@ -59,6 +61,11 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
     // `ExitParams` may be staged while `INSTANT_EXIT` is off; their bounds are
     // checked only when the resulting config has the flag on, which no pilot
     // binary allows (spec §13.2).
+    // MUTAV's take from issuer income: capped by a program constant (ADR 0017).
+    require!(
+        args.income_take_bps <= MAX_INCOME_TAKE_BPS,
+        MutavError::InvalidParameter
+    );
     validate_params(
         args.coverage_ratio_bps,
         args.fee_take_bps,
@@ -112,6 +119,11 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
         field::MUTAV_CAPITAL_WALLET,
         &mut config.mutav_capital_wallet,
         args.mutav_capital_wallet,
+    );
+    ch.set(
+        field::INCOME_TAKE_BPS,
+        &mut config.income_take_bps,
+        args.income_take_bps,
     );
     config.apply_caps(&args.caps, &mut ch);
     config.apply_price(&args.price, &mut ch);

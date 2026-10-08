@@ -1,9 +1,9 @@
 import { address } from "@solana/kit";
 import { readLedger, readReserve, rpcFor } from "@/lib/server/chain";
-import { ComposeError, composeInstructions, describeInstructions, isAdminKind, unsignedTransaction } from "@/lib/server/compose";
+import { ComposeError, composeInstructions, describeInstructions, isAdminKind, refuseOverlappingSetConfig, unsignedTransaction } from "@/lib/server/compose";
 import { serverEnv } from "@/lib/server/env";
 import { errorResponse } from "@/lib/server/respond";
-import { composeProposalCreate, vaultAddress } from "@/lib/server/squads";
+import { composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 import type { TxRequest } from "@/lib/tx-kinds";
 
@@ -32,9 +32,10 @@ export async function POST(req: Request) {
       if (!env.squadsMultisig) throw new ComposeError("SQUADS_MULTISIG is not set: no Squads proposal can be built");
       const vault = address(vaultAddress(env.squadsMultisig));
       if (reserve.config.admin !== vault) throw new ComposeError(`VaultConfig.admin ${reserve.config.admin} is not the Squads vault ${vault}`);
+      if (body.request.kind === "set_config") refuseOverlappingSetConfig((await readMultisig(env, reserve.now)).proposals);
       const inner = await composeInstructions(body.request, vault, ctx);
       const { tx, index } = await composeProposalCreate(env, signer, inner, `mutav ${body.request.kind}`);
-      return jsonResponse({ tx, proposalIndex: index, instructions: describeInstructions(inner), via: "squads" });
+      return jsonResponse({ tx, proposalIndex: index, instructions: describeInstructions(inner, reserve.config), via: "squads" });
     }
     if (isAdminKind(body.request) && env.cluster !== "localnet") {
       throw new ComposeError("direct admin signing is localnet-only; on devnet the admin is a Squads vault");
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
     const ixs = await composeInstructions(body.request, signer, ctx);
     const { value } = await rpcFor(env).getLatestBlockhash({ commitment: "confirmed" }).send();
     const tx = unsignedTransaction(signer, ixs, value);
-    return jsonResponse({ tx, instructions: describeInstructions(ixs), via: "direct" });
+    return jsonResponse({ tx, instructions: describeInstructions(ixs, reserve.config), via: "direct" });
   } catch (e) {
     return errorResponse(e);
   }

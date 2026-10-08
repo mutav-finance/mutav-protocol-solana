@@ -11,8 +11,9 @@ import type { CSSProperties, ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { RoleTag } from "@/components/RoleTag";
 import { agencyCapUse, claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "@/lib/charts";
-import { fmtBps, fmtBrs, fmtDuration, fmtTime } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtDuration, fmtPct, fmtTime } from "@/lib/format";
 import type { ClaimCap } from "@/lib/operator";
+import type { Composition } from "@/lib/reserve-assets";
 import type { AgencyRow, ClaimRow, CoverageRow, FlowTotals } from "@/lib/view";
 import type { Solvency } from "@mutav-finance/mutav-protocol-solana";
 
@@ -284,7 +285,7 @@ export function FlowChart({ totals }: { totals: FlowTotals }) {
           <Swatch color={C.mid} label="outside the reserve" outline />
         </Legend>
       }
-      caption={<>Guarantee fees, the fee take and claim payments are VaultState totals (complete). Deposits and redemptions sum the fill events in the last 100 transactions of each escrow. Totals since launch, not a time series: the chain keeps no balance history to plot.</>}
+      caption={<>Guarantee fees, issuer income (swept from the income inbox), the fee take and claim payments are VaultState totals (complete). Deposits and redemptions sum the fill events in the last 100 transactions of each escrow. Totals since launch, not a time series: the chain keeps no balance history to plot.</>}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {bars.map((b) => {
@@ -343,6 +344,60 @@ export function ClaimCapChart({ cap }: { cap: ClaimCap }) {
         </Row>
         <Row label={<RowLabel>Per call</RowLabel>} value={fmtBrs(cap.perCall, 0)} summary={`At most ${fmtBrs(cap.perCall)} per pay_claim.`} labelWidth={130}>
           <Track segs={[{ f: frac(cap.perCall, axis), color: C.mid }]} />
+        </Row>
+      </div>
+    </ChartFrame>
+  );
+}
+
+// ── Reserve composition (BRS, adapter assets, income inbox) ────────────────
+
+/**
+ * What the reserve holds, on one axis: BRS (the settlement token, left) and
+ * any adapter assets (right) make up stable assets; the dashed marker is the
+ * settlement floor (ADR 0018), and BRS must reach past it. In the pilot that
+ * is BRS only with a 100% floor. The income inbox is drawn outlined on its own
+ * row because it counts toward nothing until the operator sweeps it.
+ */
+export function CompositionChart({ c }: { c: Composition }) {
+  const axis = c.stableAssets + c.inbox;
+  const share = (bps: bigint | null) => (bps === null ? "—" : fmtBps(bps));
+  const floor = `Min in BRS (settlement token): ${fmtPct(c.floorBps)}`;
+  return (
+    <ChartFrame
+      title="Reserve composition"
+      legend={
+        <Legend>
+          <Swatch color={C.ink} label="BRS in reserve" />
+          {!c.brsOnly && <Swatch color={C.mid} label="through adapters" />}
+          <Swatch color={C.mid} label="income inbox, not yet counted" outline />
+        </Legend>
+      }
+      caption={
+        <>
+          Stable assets = brs_balance{c.brsOnly ? "" : " + adapter value at the bounded price"}, from VaultState; {c.brsOnly ? "the pilot reserve holds BRS only (ADR 0018). " : ""}The dashed line is the settlement floor, the minimum held in BRS ({fmtPct(c.floorBps)} = {fmtBrs(c.floorValue, 0)}, set by the Reserve Admin); adapters may use only the share above it. The inbox is the vault authority&apos;s BRS account.
+        </>
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Row
+          label={<RowLabel sub={<Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>{c.brsOnly ? "100% BRS (pilot)" : `BRS ${share(c.brsShareBps)} · adapters ${share(c.adapterShareBps)}`}</Mono>}>{c.brsOnly ? "BRS in reserve" : "Counted (stable assets)"}</RowLabel>}
+          value={fmtBrs(c.stableAssets, 0)}
+          summary={`Stable assets ${fmtBrs(c.stableAssets)}: BRS ${fmtBrs(c.brs)}${c.brsOnly ? "" : `, through adapters ${fmtBrs(c.adapterValue)}`}. ${floor}.`}
+          labelWidth={190}
+        >
+          <Track segs={[{ f: frac(c.brs, axis), color: c.belowFloor ? C.bad : C.ink }, { f: frac(c.adapterValue, axis), color: C.mid }]} marker={{ f: frac(c.floorValue, axis), label: floor }} />
+        </Row>
+        <Mono style={{ fontSize: 11, color: c.belowFloor ? "var(--color-error)" : "var(--color-text-3)", alignSelf: "flex-end" }}>
+          ┆ {floor}{c.belowFloor ? " · BRS is below it" : ""}
+        </Mono>
+        <Row
+          label={<RowLabel sub={<RoleTag role="operator" prefix="swept by the" />}>Income inbox</RowLabel>}
+          value={fmtBrs(c.inbox, 0)}
+          summary={`Income inbox ${fmtBrs(c.inbox)}: paid by Nora, not yet counted, swept by the Operator.`}
+          labelWidth={190}
+        >
+          <Track segs={[{ f: frac(c.inbox, axis), color: C.mid, outline: true }]} />
         </Row>
       </div>
     </ChartFrame>

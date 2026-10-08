@@ -41,7 +41,7 @@ export type GatePreview = {
   freeCapitalBefore: bigint;
   stableAssets: bigint;
   coverageRequiredBefore: bigint;
-  /** `ceil(c × (remaining_cover_total + new_cover) / 10_000)`. */
+  /** `max(ceil(c × (remaining_cover_total + new_cover) / 10_000), provisions)` (ADR 0016). */
   coverageRequiredAfter: bigint;
   /** `coverage_required_after + earmark_eff_before`; must be ≤ `stable_assets`. */
   needed: bigint;
@@ -58,7 +58,7 @@ type StateView = Pick<
 export function previewRegisterGuarantee(config: ConfigView, state: StateView, g: GateInput): GatePreview {
   const before = solvencyFromAccounts(config, state);
   const newCover = g.defaultCover + g.exitCover;
-  const coverageRequiredAfter = coverageRequired(state.remainingCoverTotal + newCover, config.coverageRatioBps);
+  const coverageRequiredAfter = coverageRequired(state.remainingCoverTotal + newCover, config.coverageRatioBps, state.provisions);
   const needed = coverageRequiredAfter + before.earmarkEff;
   const base = {
     newCover,
@@ -86,7 +86,7 @@ export function previewRegisterGuarantee(config: ConfigView, state: StateView, g
 export const REFUSAL_TEXT: Record<GateRefusal, string> = {
   Paused: "The reserve is paused.",
   UnderCovered: "The reserve is under-covered: new guarantees are frozen until coverage is restored.",
-  StalePrice: "The reserve holds TESOURO and its price is stale.",
+  StalePrice: "The reserve holds an adapter asset (TESOURO) and its price is stale.",
   InvalidParameter: "Rent and cover must both be above zero.",
   GuaranteeCapExceeded: "The cover is above the per-guarantee cap.",
   AgencyCapExceeded: "This agency would go over its per-agency cap.",

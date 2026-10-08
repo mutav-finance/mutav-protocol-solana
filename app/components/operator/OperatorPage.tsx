@@ -20,7 +20,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallet } from "@/components/WalletProvider";
 import { ActionGate, LiveProvider, Note, useLive } from "@/components/demo/shared";
-import { CloseGuaranteeForm, FeeForm, FileClaimForm, PayClaimList, RegisterForm, SettleList } from "@/components/demo/forms";
+import { CloseGuaranteeForm, FeeForm, FileClaimForm, IncomeForm, PayClaimList, RegisterForm, SettleList } from "@/components/demo/forms";
 import { usePoll } from "@/lib/client/use-poll";
 import { fmtBps, fmtBrs, fmtDuration, fmtTime } from "@/lib/format";
 import { claimCap, claimCapRefusal, claimWork, DUTIES, payoutsDue } from "@/lib/operator";
@@ -142,6 +142,19 @@ function RegisterBound() {
   );
 }
 
+function IncomeBound() {
+  const { reserve } = useLive();
+  return (
+    <Bound>
+      {kv("Income inbox (paid, not swept)", fmtBrs(reserve.incomeInbox.amount))}
+      {kv("Income take to the treasury", fmtBps(reserve.config.incomeTakeBps))}
+      <span>
+        Nora pays the monthly revenue share into the income inbox (<Explorer value={reserve.incomeInbox.address} />), the vault authority&apos;s BRS account. It counts toward nothing until swept. Sweep exactly the amount on the statement: at most the inbox balance, each statement reference once. The vault authority moves it into the reserve; NAV rises for every holder and no shares are minted. Never paused, never gated.
+      </span>
+    </Bound>
+  );
+}
+
 function Console({ locked }: { locked: boolean }) {
   const { reserve } = useLive();
   return (
@@ -150,6 +163,7 @@ function Console({ locked }: { locked: boolean }) {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="register">register_guarantee</TabsTrigger>
           <TabsTrigger value="fee">contribute_fees</TabsTrigger>
+          <TabsTrigger value="income">sweep_income</TabsTrigger>
           <TabsTrigger value="file">file_claim</TabsTrigger>
           <TabsTrigger value="pay">pay_claim</TabsTrigger>
           <TabsTrigger value="settle">settle_payout</TabsTrigger>
@@ -165,6 +179,10 @@ function Console({ locked }: { locked: boolean }) {
             <span>Each invoice reference is recorded once (FeeReceipt). Fees are never paused or gated. The BRS comes from the operator wallet&apos;s own BRS account.</span>
           </Bound>
           <FeeForm p="op-" />
+        </TabsContent>
+        <TabsContent value="income">
+          <IncomeBound />
+          <IncomeForm p="op-" />
         </TabsContent>
         <TabsContent value="file">
           <Bound>
@@ -283,6 +301,7 @@ function Safety({ r }: { r: ReserveView }) {
   );
   return (
     <ul style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 18, maxWidth: 860 }}>
+      {item("Issuer income only moves into the reserve", <>The operator key can move income-inbox BRS only into the reserve (and, with a take, to the whitelisted treasury; 0 in the pilot). At worst a stolen key books a stray transfer as income. No instruction lets anyone take BRS out of the inbox elsewhere.</>)}
       {item("Caps bound every outflow", <>A stolen operator key can pay claims only to the fixed payments account, at most {fmtBrs(c.maxClaimPerCall, 0)} per call and {fmtBrs(c.maxClaimPerPeriod, 0)} per {fmtDuration(c.claimPeriodSecs)}, and only against filed claims within remaining cover. New guarantees stay inside the per-guarantee and per-agency caps and the solvency gate.</>)}
       {item("The operator cannot touch config or capital", <>Config, caps, roles, the allowlist and the capital queue are Reserve Admin instructions (a time-locked Squads multisig). The operator never signs them.</>)}
       {item("The pauser can revoke it at once", <><Mono>revoke_operator</Mono>, signed by the pauser key or the admin with no time lock, sets the operator to the default key. Every operator instruction then fails, claim payments included, until the Reserve Admin appoints a new key with <Mono>set_roles</Mono>. The pilot binary has no admin-only claim-payment path.</>)}

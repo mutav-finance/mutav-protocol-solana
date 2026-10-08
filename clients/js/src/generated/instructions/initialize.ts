@@ -92,6 +92,7 @@ export type InitializeInstruction<
   TAccountPendingDeposits extends string | AccountMeta<string> = string,
   TAccountPendingRedemptions extends string | AccountMeta<string> = string,
   TAccountClaims extends string | AccountMeta<string> = string,
+  TAccountIncomeInbox extends string | AccountMeta<string> = string,
   TAccountTreasuryAccount extends string | AccountMeta<string> = string,
   TAccountPaymentsAccount extends string | AccountMeta<string> = string,
   TAccountReserveTokenProgram extends string | AccountMeta<string> = string,
@@ -99,6 +100,8 @@ export type InitializeInstruction<
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -144,6 +147,9 @@ export type InitializeInstruction<
       TAccountClaims extends string
         ? WritableAccount<TAccountClaims>
         : TAccountClaims,
+      TAccountIncomeInbox extends string
+        ? WritableAccount<TAccountIncomeInbox>
+        : TAccountIncomeInbox,
       TAccountTreasuryAccount extends string
         ? ReadonlyAccount<TAccountTreasuryAccount>
         : TAccountTreasuryAccount,
@@ -159,6 +165,9 @@ export type InitializeInstruction<
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
+      TAccountAssociatedTokenProgram extends string
+        ? ReadonlyAccount<TAccountAssociatedTokenProgram>
+        : TAccountAssociatedTokenProgram,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -256,6 +265,7 @@ export type InitializeAsyncInput<
   TAccountPendingRedemptions extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountClaims extends InstructionAccountInput = InstructionAccountInput,
+  TAccountIncomeInbox extends InstructionAccountInput = InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput =
@@ -265,6 +275,8 @@ export type InitializeAsyncInput<
   TAccountShareTokenProgram extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
@@ -286,6 +298,11 @@ export type InitializeAsyncInput<
   pendingDeposits?: TAccountPendingDeposits;
   pendingRedemptions?: TAccountPendingRedemptions;
   claims?: TAccountClaims;
+  /**
+   * The income inbox (ADR 0017): the vault authority's associated token
+   * account for `reserve_mint`, created here idempotently.
+   */
+  incomeInbox: TAccountIncomeInbox;
   /** MUTAV treasury token account (BRS); receives the fee take. */
   treasuryAccount: TAccountTreasuryAccount;
   /** MUTAV payments token account (BRS); receives claim payments. */
@@ -294,6 +311,7 @@ export type InitializeAsyncInput<
   /** The share mint is a classic SPL Token mint. */
   shareTokenProgram?: TAccountShareTokenProgram;
   systemProgram?: TAccountSystemProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   admin: InitializeInstructionDataArgs["admin"];
@@ -320,11 +338,13 @@ export async function getInitializeInstructionAsync<
   TAccountPendingDeposits extends InstructionAccountInput,
   TAccountPendingRedemptions extends InstructionAccountInput,
   TAccountClaims extends InstructionAccountInput,
+  TAccountIncomeInbox extends InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput,
   TAccountReserveTokenProgram extends InstructionAccountInput,
   TAccountShareTokenProgram extends InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -342,11 +362,13 @@ export async function getInitializeInstructionAsync<
     TAccountPendingDeposits,
     TAccountPendingRedemptions,
     TAccountClaims,
+    TAccountIncomeInbox,
     TAccountTreasuryAccount,
     TAccountPaymentsAccount,
     TAccountReserveTokenProgram,
     TAccountShareTokenProgram,
     TAccountSystemProgram,
+    TAccountAssociatedTokenProgram,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -403,6 +425,10 @@ export async function getInitializeInstructionAsync<
       InstructionAccountInputAddress<TAccountClaims>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountIncomeInbox,
+      InstructionAccountInputAddress<TAccountIncomeInbox>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountTreasuryAccount,
       InstructionAccountInputAddress<TAccountTreasuryAccount>
     >,
@@ -421,6 +447,10 @@ export async function getInitializeInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountSystemProgram,
       InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -484,6 +514,11 @@ export async function getInitializeInstructionAsync<
       isWritable: true,
     },
     claims: { value: input.claims ?? null, isSigner: false, isWritable: true },
+    incomeInbox: {
+      value: input.incomeInbox ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     treasuryAccount: {
       value: input.treasuryAccount ?? null,
       isSigner: false,
@@ -506,6 +541,11 @@ export async function getInitializeInstructionAsync<
     },
     systemProgram: {
       value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
       isSigner: false,
       isWritable: false,
     },
@@ -640,6 +680,10 @@ export async function getInitializeInstructionAsync<
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
 
   return Object.freeze({
     accounts: [
@@ -655,11 +699,13 @@ export async function getInitializeInstructionAsync<
       getAccountMeta("pendingDeposits", accounts.pendingDeposits),
       getAccountMeta("pendingRedemptions", accounts.pendingRedemptions),
       getAccountMeta("claims", accounts.claims),
+      getAccountMeta("incomeInbox", accounts.incomeInbox),
       getAccountMeta("treasuryAccount", accounts.treasuryAccount),
       getAccountMeta("paymentsAccount", accounts.paymentsAccount),
       getAccountMeta("reserveTokenProgram", accounts.reserveTokenProgram),
       getAccountMeta("shareTokenProgram", accounts.shareTokenProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -718,6 +764,10 @@ export async function getInitializeInstructionAsync<
       InstructionAccountInputAddress<TAccountClaims>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountIncomeInbox,
+      InstructionAccountInputAddress<TAccountIncomeInbox>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountTreasuryAccount,
       InstructionAccountInputAddress<TAccountTreasuryAccount>
     >,
@@ -736,6 +786,10 @@ export async function getInitializeInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountSystemProgram,
       InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -765,6 +819,7 @@ export type InitializeInput<
   TAccountPendingRedemptions extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountClaims extends InstructionAccountInput = InstructionAccountInput,
+  TAccountIncomeInbox extends InstructionAccountInput = InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput =
@@ -774,6 +829,8 @@ export type InitializeInput<
   TAccountShareTokenProgram extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
@@ -795,6 +852,11 @@ export type InitializeInput<
   pendingDeposits: TAccountPendingDeposits;
   pendingRedemptions: TAccountPendingRedemptions;
   claims: TAccountClaims;
+  /**
+   * The income inbox (ADR 0017): the vault authority's associated token
+   * account for `reserve_mint`, created here idempotently.
+   */
+  incomeInbox: TAccountIncomeInbox;
   /** MUTAV treasury token account (BRS); receives the fee take. */
   treasuryAccount: TAccountTreasuryAccount;
   /** MUTAV payments token account (BRS); receives claim payments. */
@@ -803,6 +865,7 @@ export type InitializeInput<
   /** The share mint is a classic SPL Token mint. */
   shareTokenProgram?: TAccountShareTokenProgram;
   systemProgram?: TAccountSystemProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   admin: InitializeInstructionDataArgs["admin"];
@@ -829,11 +892,13 @@ export function getInitializeInstruction<
   TAccountPendingDeposits extends InstructionAccountInput,
   TAccountPendingRedemptions extends InstructionAccountInput,
   TAccountClaims extends InstructionAccountInput,
+  TAccountIncomeInbox extends InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput,
   TAccountReserveTokenProgram extends InstructionAccountInput,
   TAccountShareTokenProgram extends InstructionAccountInput,
   TAccountSystemProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -851,11 +916,13 @@ export function getInitializeInstruction<
     TAccountPendingDeposits,
     TAccountPendingRedemptions,
     TAccountClaims,
+    TAccountIncomeInbox,
     TAccountTreasuryAccount,
     TAccountPaymentsAccount,
     TAccountReserveTokenProgram,
     TAccountShareTokenProgram,
     TAccountSystemProgram,
+    TAccountAssociatedTokenProgram,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -911,6 +978,10 @@ export function getInitializeInstruction<
     InstructionAccountInputAddress<TAccountClaims>
   >,
   ResolvedInstructionAccountMeta<
+    TAccountIncomeInbox,
+    InstructionAccountInputAddress<TAccountIncomeInbox>
+  >,
+  ResolvedInstructionAccountMeta<
     TAccountTreasuryAccount,
     InstructionAccountInputAddress<TAccountTreasuryAccount>
   >,
@@ -929,6 +1000,10 @@ export function getInitializeInstruction<
   ResolvedInstructionAccountMeta<
     TAccountSystemProgram,
     InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -991,6 +1066,11 @@ export function getInitializeInstruction<
       isWritable: true,
     },
     claims: { value: input.claims ?? null, isSigner: false, isWritable: true },
+    incomeInbox: {
+      value: input.incomeInbox ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     treasuryAccount: {
       value: input.treasuryAccount ?? null,
       isSigner: false,
@@ -1013,6 +1093,11 @@ export function getInitializeInstruction<
     },
     systemProgram: {
       value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
       isSigner: false,
       isWritable: false,
     },
@@ -1044,6 +1129,10 @@ export function getInitializeInstruction<
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
   }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
 
   return Object.freeze({
     accounts: [
@@ -1059,11 +1148,13 @@ export function getInitializeInstruction<
       getAccountMeta("pendingDeposits", accounts.pendingDeposits),
       getAccountMeta("pendingRedemptions", accounts.pendingRedemptions),
       getAccountMeta("claims", accounts.claims),
+      getAccountMeta("incomeInbox", accounts.incomeInbox),
       getAccountMeta("treasuryAccount", accounts.treasuryAccount),
       getAccountMeta("paymentsAccount", accounts.paymentsAccount),
       getAccountMeta("reserveTokenProgram", accounts.reserveTokenProgram),
       getAccountMeta("shareTokenProgram", accounts.shareTokenProgram),
       getAccountMeta("systemProgram", accounts.systemProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -1122,6 +1213,10 @@ export function getInitializeInstruction<
       InstructionAccountInputAddress<TAccountClaims>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountIncomeInbox,
+      InstructionAccountInputAddress<TAccountIncomeInbox>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountTreasuryAccount,
       InstructionAccountInputAddress<TAccountTreasuryAccount>
     >,
@@ -1140,6 +1235,10 @@ export function getInitializeInstruction<
     ResolvedInstructionAccountMeta<
       TAccountSystemProgram,
       InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -1174,16 +1273,22 @@ export type ParsedInitializeInstruction<
     pendingDeposits: TAccountMetas[9];
     pendingRedemptions: TAccountMetas[10];
     claims: TAccountMetas[11];
+    /**
+     * The income inbox (ADR 0017): the vault authority's associated token
+     * account for `reserve_mint`, created here idempotently.
+     */
+    incomeInbox: TAccountMetas[12];
     /** MUTAV treasury token account (BRS); receives the fee take. */
-    treasuryAccount: TAccountMetas[12];
+    treasuryAccount: TAccountMetas[13];
     /** MUTAV payments token account (BRS); receives claim payments. */
-    paymentsAccount: TAccountMetas[13];
-    reserveTokenProgram: TAccountMetas[14];
+    paymentsAccount: TAccountMetas[14];
+    reserveTokenProgram: TAccountMetas[15];
     /** The share mint is a classic SPL Token mint. */
-    shareTokenProgram: TAccountMetas[15];
-    systemProgram: TAccountMetas[16];
-    eventAuthority: TAccountMetas[17];
-    program: TAccountMetas[18];
+    shareTokenProgram: TAccountMetas[16];
+    systemProgram: TAccountMetas[17];
+    associatedTokenProgram: TAccountMetas[18];
+    eventAuthority: TAccountMetas[19];
+    program: TAccountMetas[20];
   };
   data: InitializeInstructionData;
 };
@@ -1196,12 +1301,12 @@ export function parseInitializeInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 19) {
+  if (instruction.accounts.length < 21) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 19,
+        expectedAccountMetas: 21,
       },
     );
   }
@@ -1226,11 +1331,13 @@ export function parseInitializeInstruction<
       pendingDeposits: getNextAccount(),
       pendingRedemptions: getNextAccount(),
       claims: getNextAccount(),
+      incomeInbox: getNextAccount(),
       treasuryAccount: getNextAccount(),
       paymentsAccount: getNextAccount(),
       reserveTokenProgram: getNextAccount(),
       shareTokenProgram: getNextAccount(),
       systemProgram: getNextAccount(),
+      associatedTokenProgram: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

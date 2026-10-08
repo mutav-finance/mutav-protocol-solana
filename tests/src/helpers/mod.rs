@@ -4,10 +4,12 @@
 
 pub mod book;
 pub mod capital;
+pub mod income;
 pub mod mints;
 
 pub use book::*;
 pub use capital::*;
+pub use income::*;
 
 use std::path::PathBuf;
 
@@ -290,6 +292,16 @@ pub struct InitAccounts {
     pub payments: Pubkey,
 }
 
+/// The income inbox (ADR 0017): the vault authority's associated token
+/// account for the reserve mint under its token program.
+pub fn income_inbox_address(authority: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> Pubkey {
+    anchor_spl::associated_token::get_associated_token_address_with_program_id(
+        authority,
+        mint,
+        token_program,
+    )
+}
+
 pub fn initialize_ix(a: &InitAccounts, args: InitializeArgs) -> Instruction {
     let p = Pdas::new(&a.reserve_mint);
     Instruction::new_with_bytes(
@@ -308,11 +320,17 @@ pub fn initialize_ix(a: &InitAccounts, args: InitializeArgs) -> Instruction {
             pending_deposits: p.pending_deposits,
             pending_redemptions: p.pending_redemptions,
             claims: p.claims,
+            income_inbox: income_inbox_address(
+                &p.authority,
+                &a.reserve_mint,
+                &a.reserve_token_program,
+            ),
             treasury_account: a.treasury,
             payments_account: a.payments,
             reserve_token_program: a.reserve_token_program,
             share_token_program: TOKEN_PROGRAM,
             system_program: anchor_lang::solana_program::system_program::ID,
+            associated_token_program: anchor_spl::associated_token::ID,
             event_authority: p.event_authority,
             program: mutav::ID,
         }
@@ -511,6 +529,7 @@ pub fn set_config_args(c: &VaultConfig) -> mutav::SetConfigArgs {
             allowlist_root: c.exit.allowlist_root,
             barred: c.exit.barred,
         },
+        income_take_bps: c.income_take_bps,
     }
 }
 
@@ -676,6 +695,7 @@ impl Fixture {
     /// operator.
     pub fn pilot_instructions(&mut self) -> Vec<(&'static str, Instruction, Keypair)> {
         let mut out = self.book_instructions();
+        out.extend(self.income_instructions());
         out.extend(self.capital_instructions());
         out.extend(self.admin_instructions());
         out

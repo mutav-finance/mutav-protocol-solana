@@ -32,6 +32,21 @@ describe('solvencyFromAccounts', () => {
     expect(s.netAssets).toBe(95_000n * BRL);
   });
 
+  test('below c = 1 the provisions bind coverage required (ADR 0016)', () => {
+    const { config, state } = reserve({
+      brsBalance: 10_000n * BRL,
+      remainingCoverTotal: 60_000n * BRL,
+      provisions: 9_000n * BRL,
+    });
+    const s = solvencyFromAccounts({ ...config, coverageRatioBps: 1_000 }, state);
+    expect(s.coverageRequired).toBe(9_000n * BRL);
+    expect(s.freeCapital).toBe(1_000n * BRL);
+    expect(s.liquidBudget).toBe(1_000n * BRL);
+    const low = solvencyFromAccounts({ ...config, coverageRatioBps: 1_000 }, { ...state, provisions: 0n });
+    expect(low.coverageRequired).toBe(6_000n * BRL);
+    expect(low.freeCapital).toBe(4_000n * BRL);
+  });
+
   test('applies the earmark when the flag is set', () => {
     const { config, state } = reserve({ brsBalance: 100n, bufferEarmark: 30n });
     const s = solvencyFromAccounts({ ...config, featureFlags: INSTANT_EXIT }, state);
@@ -109,5 +124,24 @@ describe('previewRedeemFulfil (whole fills only)', () => {
     expect(previewRedeemFulfil(config, state, []).stoppedBy).toBe('UnderCovered');
     const h = reserve({ brsBalance: 10n, fulfilHalted: true });
     expect(previewRedeemFulfil(h.config, h.state, []).stoppedBy).toBe('FulfilHalted');
+  });
+
+  test('below c = 1, filed claims bind coverage and fills use exactly the free capital (ADR 0016)', () => {
+    // 10,000 BRS, 60,000 cover at c = 0.10 (ratio term 6,000), 9,000 filed:
+    // coverage required 9,000, free capital = liquid = net assets = 1,000.
+    const { config, state } = reserve({
+      brsBalance: 10_000n,
+      remainingCoverTotal: 60_000n,
+      provisions: 9_000n,
+      sharesOutstanding: 1_200n,
+    });
+    const c = { ...config, coverageRatioBps: 1_000 };
+    const sol = solvencyFromAccounts(c, state);
+    expect([sol.coverageRequired, sol.freeCapital, sol.liquidBudget]).toEqual([9_000n, 1_000n, 1_000n]);
+    const reqs = [0n, 1n].map((seq) => ({ seq, sharesRemaining: 600n, requestedAt: 0n }));
+    const r = previewRedeemFulfil(c, state, reqs);
+    // floor(600 × 1,001 / 1,201) = 500, then floor(600 × 501 / 601) = 500.
+    expect(r.fills.map((f) => f.assets)).toEqual([500n, 500n]);
+    expect(r.stoppedBy).toBeNull();
   });
 });

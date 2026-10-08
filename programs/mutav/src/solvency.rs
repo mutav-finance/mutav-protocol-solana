@@ -7,7 +7,7 @@
 //! ```text
 //! tesouro_value     = floor(tesouro_units × bounded_price / PRICE_SCALE)
 //! stable_assets     = brs_balance + tesouro_value
-//! coverage_required = ceil(c × remaining_cover_total / 10_000)
+//! coverage_required = max(ceil(c × remaining_cover_total / 10_000), provisions)
 //! surplus           = max(0, stable_assets − coverage_required)
 //! earmark_eff       = 0 if INSTANT_EXIT is clear or the head is starved,
 //!                     else min(buffer_earmark, surplus, max(0, brs_balance − provisions))
@@ -41,15 +41,22 @@ pub fn stable_assets(brs_balance: u64, tesouro_value: u64) -> Result<u64> {
         .ok_or_else(|| error!(MutavError::MathOverflow))
 }
 
-/// `ceil(c × remaining_cover_total / 10_000)`: rounded up, in the reserve's
-/// favour.
-pub fn coverage_required(remaining_cover_total: u64, coverage_ratio_bps: u16) -> Result<u64> {
-    mul_div(
+/// `max(ceil(c × remaining_cover_total / 10_000), provisions)` (spec §4,
+/// ADR 0016). The ratio term is rounded up, in the reserve's favour. The
+/// provisions term keeps filed claims fully covered when `c < 1`; at
+/// `c ≥ 1` it never binds, because `provisions ≤ remaining_cover_total`.
+pub fn coverage_required(
+    remaining_cover_total: u64,
+    coverage_ratio_bps: u16,
+    provisions: u64,
+) -> Result<u64> {
+    let by_ratio = mul_div(
         remaining_cover_total,
         coverage_ratio_bps as u64,
         BPS_DENOMINATOR as u64,
         Rounding::Up,
-    )
+    )?;
+    Ok(by_ratio.max(provisions))
 }
 
 /// Capital above required coverage, saturating at 0.
@@ -170,7 +177,8 @@ impl Solvency {
     pub fn compute(i: &SolvencyInputs) -> Result<Self> {
         let tesouro_value = tesouro_value(i.tesouro_units, i.tesouro_price)?;
         let stable_assets = stable_assets(i.brs_balance, tesouro_value)?;
-        let coverage_required = coverage_required(i.remaining_cover_total, i.coverage_ratio_bps)?;
+        let coverage_required =
+            coverage_required(i.remaining_cover_total, i.coverage_ratio_bps, i.provisions)?;
         let surplus = surplus(stable_assets, coverage_required);
         let earmark_eff = earmark_eff(&EarmarkInputs {
             feature_flags: i.feature_flags,
@@ -215,6 +223,7 @@ impl Solvency {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::constants::MIN_COVERAGE_RATIO_BPS;
     use proptest::prelude::*;
 
     fn cfg() -> ProptestConfig {
@@ -253,14 +262,69 @@ mod tests {
 
     #[test]
     fn coverage_required_rounds_up() {
-        assert_eq!(coverage_required(1, 10_000).unwrap(), 1);
+        assert_eq!(coverage_required(1, 10_000, 0).unwrap(), 1);
         // 1 × 1.5 = 1.5 → 2.
-        assert_eq!(coverage_required(1, 15_000).unwrap(), 2);
+        assert_eq!(coverage_required(1, 15_000, 0).unwrap(), 2);
         // 3 × 0.3333 = 0.9999 → 1.
-        assert_eq!(coverage_required(3, 3_333).unwrap(), 1);
-        assert_eq!(coverage_required(0, 15_000).unwrap(), 0);
-        assert_eq!(coverage_required(u64::MAX, 10_000).unwrap(), u64::MAX);
-        assert!(coverage_required(u64::MAX, 10_001).is_err());
+        assert_eq!(coverage_required(3, 3_333, 0).unwrap(), 1);
+        assert_eq!(coverage_required(0, 15_000, 0).unwrap(), 0);
+        assert_eq!(coverage_required(u64::MAX, 10_000, 0).unwrap(), u64::MAX);
+        assert!(coverage_required(u64::MAX, 10_001, 0).is_err());
+        // c = 0.10 (the floor): 11 × 0.1 = 1.1 → 2.
+        assert_eq!(coverage_required(11, MIN_COVERAGE_RATIO_BPS, 0).unwrap(), 2);
+    }
+
+    #[test]
+    fn coverage_required_is_never_below_provisions() {
+        // ADR 0016. c = 0.10 on 100,000 of cover is 10,000.
+        assert_eq!(coverage_required(100_000, 1_000, 4_000).unwrap(), 10_000);
+        // Provisions above the ratio term bind.
+        assert_eq!(coverage_required(100_000, 1_000, 25_000).unwrap(), 25_000);
+        assert_eq!(coverage_required(0, 1_000, 7).unwrap(), 7);
+        // At c ≥ 1, provisions ≤ remaining_cover_total never bind.
+        assert_eq!(
+            coverage_required(100_000, 10_000, 100_000).unwrap(),
+            100_000
+        );
+        assert_eq!(
+            coverage_required(100_000, 15_000, 100_000).unwrap(),
+            150_000
+        );
+    }
+
+    #[test]
+    fn compute_below_one_with_provisions_binding() {
+        let i = SolvencyInputs {
+            brs_balance: 30_000,
+            remaining_cover_total: 100_000,
+            coverage_ratio_bps: 1_000,
+            provisions: 2_000,
+            ..Default::default()
+        };
+        let s = Solvency::compute(&i).unwrap();
+        assert_eq!(s.coverage_required, 10_000);
+        assert_eq!(s.surplus, 20_000);
+        assert_eq!(s.free_capital, 20_000);
+        // BRS only: liquid_budget ≥ free_capital (fulfil_redeems relies on it).
+        assert_eq!(s.liquid_budget, 28_000);
+
+        let s = Solvency::compute(&SolvencyInputs {
+            provisions: 18_000,
+            ..i
+        })
+        .unwrap();
+        assert_eq!(s.coverage_required, 18_000);
+        assert_eq!(s.surplus, 12_000);
+        assert_eq!(s.liquid_budget, 12_000);
+        assert!(!s.under_covered());
+
+        let s = Solvency::compute(&SolvencyInputs {
+            provisions: 31_000,
+            ..i
+        })
+        .unwrap();
+        assert!(s.under_covered());
+        assert_eq!(s.deficit(), 1_000);
     }
 
     #[test]
@@ -438,7 +502,7 @@ mod tests {
             0u64..=1u64 << 40,
             1u64..=1u64 << 40,
             0u64..=1u64 << 50,
-            10_000u16..=20_000,
+            MIN_COVERAGE_RATIO_BPS..=20_000,
             0u64..=1u64 << 50,
             0u64..=1u64 << 50,
             any::<bool>(),
@@ -462,7 +526,9 @@ mod tests {
     fn oracle_surplus(i: &SolvencyInputs) -> u64 {
         let tv = i.tesouro_units as u128 * i.tesouro_price as u128 / PRICE_SCALE as u128;
         let stable = i.brs_balance as u128 + tv;
-        let cov = (i.remaining_cover_total as u128 * i.coverage_ratio_bps as u128).div_ceil(10_000);
+        let cov = (i.remaining_cover_total as u128 * i.coverage_ratio_bps as u128)
+            .div_ceil(10_000)
+            .max(i.provisions as u128);
         stable.saturating_sub(cov) as u64
     }
 
@@ -563,6 +629,7 @@ mod tests {
                         let after = coverage_required(
                             i.remaining_cover_total + add,
                             i.coverage_ratio_bps,
+                            i.provisions,
                         ).unwrap();
                         if after + before.earmark_eff > before.stable_assets { continue; }
                         i.remaining_cover_total += add;
@@ -581,6 +648,56 @@ mod tests {
                 prop_assert_eq!(after.earmark_eff, before.earmark_eff);
             }
             prop_assert_eq!(Solvency::compute(&i).unwrap().earmark_eff, e0);
+        }
+
+        /// Invariant 7, generalised to any `c` (ADR 0016): a claim payment of
+        /// `a` lowers `brs_balance` and `remaining_cover_total` by `a` and
+        /// releases its provision (here equal to `a`). While the ratio term
+        /// binds before and after, the
+        /// surplus changes by `(c − 1)·a` (± 1 base unit of rounding): it
+        /// grows for `c > 1`, is unchanged at `c = 1`, and shrinks for
+        /// `c < 1`. When the provisions term binds, coverage never falls
+        /// below the provisions still open.
+        #[test]
+        fn claim_payment_moves_surplus_by_c_minus_one(
+            brs in 0u64..=1u64 << 50,
+            cover in 1u64..=1u64 << 50,
+            c in MIN_COVERAGE_RATIO_BPS..=20_000,
+            other_prov_frac in 0u64..=100,
+            a_frac in 1u64..=100,
+        ) {
+            let a = (brs.min(cover) * a_frac / 100).max(1).min(brs.min(cover));
+            prop_assume!(a > 0);
+            let other = (cover - a) * other_prov_frac / 100;
+            let before_i = SolvencyInputs {
+                brs_balance: brs,
+                remaining_cover_total: cover,
+                coverage_ratio_bps: c,
+                provisions: other + a,
+                ..Default::default()
+            };
+            let after_i = SolvencyInputs {
+                brs_balance: brs - a,
+                remaining_cover_total: cover - a,
+                provisions: other,
+                ..before_i
+            };
+            let before = Solvency::compute(&before_i).unwrap();
+            let after = Solvency::compute(&after_i).unwrap();
+            prop_assert!(after.coverage_required >= after_i.provisions);
+            let ratio = |cv: u64| (cv as u128 * c as u128).div_ceil(10_000);
+            let ratio_binds = ratio(cover) >= before_i.provisions as u128
+                && ratio(cover - a) >= after_i.provisions as u128;
+            let stable_ok = before.stable_assets >= before.coverage_required
+                && after.stable_assets >= after.coverage_required;
+            if ratio_binds && stable_ok {
+                let delta = after.surplus as i128 - before.surplus as i128;
+                let expected = (c as i128 - 10_000) * a as i128 / 10_000;
+                prop_assert!((delta - expected).abs() <= 1, "delta {} expected {}", delta, expected);
+                if c == 10_000 {
+                    prop_assert_eq!(delta, 0);
+                }
+            }
         }
     }
 }
