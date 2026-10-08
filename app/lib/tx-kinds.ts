@@ -54,7 +54,11 @@ export type AdminTx =
   | {
       kind: "set_config";
       coverageRatioBps?: number;
-      caps?: Partial<Record<"maxTvl" | "maxCoverPerGuarantee" | "maxCoverPerAgency" | "maxClaimPerCall" | "maxClaimPerPeriod" | "minRequest" | "maxRequest" | "minFillAssets", bigint>>;
+      /** MUTAV's take from each guarantee fee, `≤ MAX_FEE_TAKE_BPS` (3_000). */
+      feeTakeBps?: number;
+      caps?: Partial<Record<"maxTvl" | "maxCoverPerGuarantee" | "maxCoverPerAgency" | "maxClaimPerCall" | "maxClaimPerPeriod" | "minRequest" | "maxRequest" | "minFillAssets" | "claimPeriodSecs", bigint>>;
+      /** `payout_sla_secs`: payment → PIX settlement before a payout is late (≥ 0). */
+      payoutSlaSecs?: bigint;
       /** `caps.max_tesouro_share_bps`: the most of stable assets `allocate` may put in TESOURO. */
       maxTesouroShareBps?: number;
       /** TESOURO price parameters (spec §7); blank fields carry over. */
@@ -62,7 +66,13 @@ export type AdminTx =
       /** MUTAV's take from issuer income (ADR 0017); `≤ MAX_INCOME_TAKE_BPS`, 0 until spec §12 Q47. */
       incomeTakeBps?: number;
     }
-  | { kind: "set_allowlist_root"; owners: string[] };
+  | { kind: "set_allowlist_root"; owners: string[] }
+  /** Replace the operator and pauser keys (distinct from the admin and each other). */
+  | { kind: "set_roles"; operator: string; pauser: string }
+  /** Point claim payments at a new BRS token account (spec §2.1 checks run on-chain). */
+  | { kind: "set_payments_account"; paymentsAccount: string }
+  /** Pauser key or admin, no time lock: clears the operator at once. */
+  | { kind: "revoke_operator" };
 
 export type TxRequest = OperatorTx | InvestorTx | PublicTx | AdminTx;
 export type TxKind = TxRequest["kind"];
@@ -74,6 +84,8 @@ export const ADMIN_KINDS: ReadonlySet<TxKind> = new Set([
   "clear_fulfil_halt",
   "set_config",
   "set_allowlist_root",
+  "set_roles",
+  "set_payments_account",
 ]);
 export const OPERATOR_KINDS: ReadonlySet<TxKind> = new Set([
   "register_guarantee",
@@ -89,7 +101,7 @@ export const OPERATOR_KINDS: ReadonlySet<TxKind> = new Set([
 export function expectedSigner(kind: TxKind): "operator" | "admin" | "pauser-or-admin" | "investor" | "anyone" {
   if (OPERATOR_KINDS.has(kind)) return "operator";
   if (ADMIN_KINDS.has(kind)) return "admin";
-  if (kind === "pause") return "pauser-or-admin";
+  if (kind === "pause" || kind === "revoke_operator") return "pauser-or-admin";
   if (kind === "refresh") return "anyone";
   return "investor";
 }

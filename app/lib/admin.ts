@@ -1,0 +1,44 @@
+/**
+ * /admin section map and the program bounds the general and per-flow
+ * `set_config` controls check before composing (the program checks them last).
+ */
+import { isAddress } from "@solana/kit";
+import { MIN_COVERAGE_RATIO_BPS } from "@mutav-finance/mutav-protocol-solana";
+
+/** Program maximum for `fee_take_bps` (`MAX_FEE_TAKE_BPS`, 30%); a test checks it against constants.rs. */
+export const MAX_FEE_TAKE_BPS = 3_000;
+
+/** The /admin sections, in page order. `#reserve-assets` is kept as an alias of `#allocation`. */
+export const ADMIN_SECTIONS = [
+  { id: "general", label: "General controls" },
+  { id: "money", label: "Money in & out" },
+  { id: "allocation", label: "Allocation" },
+] as const;
+export const ALLOCATION_ALIAS = "reserve-assets";
+
+// ── General controls ────────────────────────────────────────────────────────
+
+/** The bound `validate_roles` enforces: set, distinct from the admin and from each other. */
+export function rolesError(req: { operator: string; pauser: string }, admin: string): string | null {
+  if (!isAddress(req.operator) || !isAddress(req.pauser)) return "operator and pauser must be addresses";
+  if (req.operator === "11111111111111111111111111111111" || req.pauser === "11111111111111111111111111111111") return "operator and pauser must be set";
+  if (req.operator === admin || req.pauser === admin || req.operator === req.pauser) return "operator, pauser and admin must be three distinct keys";
+  return null;
+}
+
+/** The bounds `validate_params` puts on the general `set_config` fields. */
+export function generalConfigError(req: { coverageRatioBps?: number; feeTakeBps?: number; payoutSlaSecs?: bigint }): string | null {
+  if (req.payoutSlaSecs !== undefined && req.payoutSlaSecs < 0n) return "payout_sla_secs must be ≥ 0";
+  const c = req.coverageRatioBps;
+  if (c !== undefined && (!Number.isInteger(c) || c < MIN_COVERAGE_RATIO_BPS || c > 65_535)) return `coverage_ratio_bps must be ≥ ${MIN_COVERAGE_RATIO_BPS} (c ≥ 0.10, ADR 0016)`;
+  const f = req.feeTakeBps;
+  if (f !== undefined && (!Number.isInteger(f) || f < 0 || f > MAX_FEE_TAKE_BPS)) return `fee_take_bps must be 0–${MAX_FEE_TAKE_BPS}`;
+  return null;
+}
+
+/** Bounds on the caps after the change is merged over the on-chain values (`validate_params`). */
+export function capsError(caps: { minRequest: bigint; maxRequest: bigint; claimPeriodSecs: bigint }): string | null {
+  if (caps.minRequest > caps.maxRequest) return "min_request must be ≤ max_request";
+  if (caps.claimPeriodSecs <= 0n) return "claim_period_secs must be > 0";
+  return null;
+}

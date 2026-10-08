@@ -96,6 +96,32 @@ describe("compose", () => {
     await expect(composeInstructions({ kind: "set_config", maxTesouroShareBps: 10_001 }, WALLET, { reserve: r })).rejects.toThrow(/max_tesouro_share_bps/);
   });
 
+  it("composes the general admin instructions, each signed by the right key", async () => {
+    const r = await reserve();
+    const op = "HnDdop5PFqvVKZNujsuakwm2K5GskAUk1GxzbDSdGuMo";
+    const pa = "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4";
+    for (const req of [
+      { kind: "set_roles", operator: op, pauser: pa },
+      { kind: "set_payments_account", paymentsAccount: pa },
+      { kind: "revoke_operator" },
+    ] as const) {
+      const [ix] = await composeInstructions(req, WALLET, { reserve: r });
+      const d = describeInstructions([ix!])[0]!;
+      expect([req.kind, d.accounts.filter((a) => a.signer).map((a) => a.address)]).toEqual([req.kind, [WALLET]]);
+    }
+    await expect(composeInstructions({ kind: "set_roles", operator: op, pauser: op }, WALLET, { reserve: r })).rejects.toThrow(/distinct/);
+    await expect(composeInstructions({ kind: "set_payments_account", paymentsAccount: r.config.treasuryAccount }, WALLET, { reserve: r })).rejects.toThrow(/treasury/);
+  });
+
+  it("set_config writes each flow's own fields and refuses merged caps out of bound", async () => {
+    const r = await reserve();
+    const [ix] = await composeInstructions({ kind: "set_config", feeTakeBps: 1_500, payoutSlaSecs: 3_600n, caps: { claimPeriodSecs: 86_400n } }, WALLET, { reserve: r });
+    const d = getSetConfigInstructionDataDecoder().decode(ix!.data!);
+    expect([d.feeTakeBps, d.payoutSlaSecs, d.caps.claimPeriodSecs, d.caps.maxClaimPerCall]).toEqual([1_500, 3_600n, 86_400n, r.config.caps.maxClaimPerCall]);
+    await expect(composeInstructions({ kind: "set_config", feeTakeBps: 3_001 }, WALLET, { reserve: r })).rejects.toThrow(/fee_take_bps/);
+    await expect(composeInstructions({ kind: "set_config", caps: { minRequest: r.config.caps.maxRequest + 1n } }, WALLET, { reserve: r })).rejects.toThrow(/min_request/);
+  });
+
   it("sweep_income moves the statement from the income inbox, signed by the operator only", async () => {
     const r = await reserve();
     const incomeRefHash = "17".repeat(32);

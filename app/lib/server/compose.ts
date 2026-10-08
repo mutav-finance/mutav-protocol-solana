@@ -14,6 +14,7 @@ import {
   getAddressEncoder,
   getBase64EncodedWireTransaction,
   getProgramDerivedAddress,
+  isAddress,
   pipe,
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
@@ -51,6 +52,9 @@ import {
   getRegisterGuaranteeInstruction,
   getRequestDepositInstruction,
   getSetAllowlistRootInstruction,
+  getSetRolesInstruction,
+  getSetPaymentsAccountInstruction,
+  getRevokeOperatorInstruction,
   getSetConfigInstruction,
   getSettlePayoutInstruction,
   getSweepIncomeInstruction,
@@ -58,6 +62,7 @@ import {
 } from "@mutav-finance/mutav-protocol-solana";
 import { ALLOWLIST_TEXT, checkAllowlist } from "../allowlist";
 import { reserveConfigError } from "../reserve-assets";
+import { capsError, generalConfigError, rolesError } from "../admin";
 import { fromHex } from "../serde";
 import type { TxRequest } from "../tx-kinds";
 import { ADMIN_KINDS } from "../tx-kinds";
@@ -460,6 +465,18 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     }
     case "pause":
       return [getPauseInstruction({ ...common, signer }, o)];
+    case "revoke_operator":
+      return [getRevokeOperatorInstruction({ ...common, signer }, o)];
+    case "set_roles": {
+      const bad = rolesError(req, r.config.admin);
+      if (bad) throw new ComposeError(bad);
+      return [getSetRolesInstruction({ ...common, admin: signer, operator: address(req.operator), pauser: address(req.pauser) }, o)];
+    }
+    case "set_payments_account": {
+      if (!isAddress(req.paymentsAccount)) throw new ComposeError("payments account is not an address");
+      if (req.paymentsAccount === r.config.treasuryAccount) throw new ComposeError("the payments account must differ from the treasury account (spec §2.1)");
+      return [getSetPaymentsAccountInstruction({ ...common, admin: signer, paymentsAccount: address(req.paymentsAccount), treasuryAccount: r.config.treasuryAccount }, o)];
+    }
     case "unpause":
       return [getUnpauseInstruction({ ...common, admin: signer }, o)];
     case "clear_fulfil_halt":
@@ -473,7 +490,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       void _c;
       void _p;
       void _e;
-      const bad = reserveConfigError(req);
+      const bad = generalConfigError(req) ?? capsError({ ...caps, ...(req.caps ?? {}) }) ?? reserveConfigError(req);
       if (bad) throw new ComposeError(bad);
       const { tesouroPriceAccount, ...priceDraft } = req.price ?? {};
       return [
@@ -484,8 +501,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             treasuryAccount: c.treasuryAccount,
             paymentsAccount: c.paymentsAccount,
             coverageRatioBps: req.coverageRatioBps ?? c.coverageRatioBps,
-            feeTakeBps: c.feeTakeBps,
-            payoutSlaSecs: c.payoutSlaSecs,
+            feeTakeBps: req.feeTakeBps ?? c.feeTakeBps,
+            payoutSlaSecs: req.payoutSlaSecs ?? c.payoutSlaSecs,
             featureFlags: c.featureFlags,
             mutavCapitalWallet: c.mutavCapitalWallet,
             caps: { ...caps, ...(req.caps ?? {}), ...(req.maxTesouroShareBps !== undefined ? { maxTesouroShareBps: req.maxTesouroShareBps } : {}) },
