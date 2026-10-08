@@ -271,10 +271,7 @@ mod tests {
         assert_eq!(coverage_required(u64::MAX, 10_000, 0).unwrap(), u64::MAX);
         assert!(coverage_required(u64::MAX, 10_001, 0).is_err());
         // c = 0.10 (the floor): 11 × 0.1 = 1.1 → 2.
-        assert_eq!(
-            coverage_required(11, MIN_COVERAGE_RATIO_BPS, 0).unwrap(),
-            2
-        );
+        assert_eq!(coverage_required(11, MIN_COVERAGE_RATIO_BPS, 0).unwrap(), 2);
     }
 
     #[test]
@@ -285,8 +282,14 @@ mod tests {
         assert_eq!(coverage_required(100_000, 1_000, 25_000).unwrap(), 25_000);
         assert_eq!(coverage_required(0, 1_000, 7).unwrap(), 7);
         // At c ≥ 1, provisions ≤ remaining_cover_total never bind.
-        assert_eq!(coverage_required(100_000, 10_000, 100_000).unwrap(), 100_000);
-        assert_eq!(coverage_required(100_000, 15_000, 100_000).unwrap(), 150_000);
+        assert_eq!(
+            coverage_required(100_000, 10_000, 100_000).unwrap(),
+            100_000
+        );
+        assert_eq!(
+            coverage_required(100_000, 15_000, 100_000).unwrap(),
+            150_000
+        );
     }
 
     #[test]

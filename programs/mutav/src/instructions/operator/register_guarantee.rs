@@ -113,8 +113,11 @@ pub fn handle_register_guarantee(
         .remaining_cover_total
         .checked_add(new_cover)
         .ok_or(MutavError::MathOverflow)?;
-    let coverage_after =
-        coverage_required(cover_total_after, config.coverage_ratio_bps, state.provisions)?;
+    let coverage_after = coverage_required(
+        cover_total_after,
+        config.coverage_ratio_bps,
+        state.provisions,
+    )?;
     let needed = (coverage_after as u128) + (before.earmark_eff as u128);
     require!(
         needed <= before.stable_assets as u128,

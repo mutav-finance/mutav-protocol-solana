@@ -133,12 +133,20 @@ fn below_one_a_claim_payment_tips_into_under_coverage_and_is_not_refused() {
     }
     // R$90k of cover at c = 0.10: coverage R$9k, free capital R$1k.
     let sol = solvency(&f.config(), &f.state());
-    assert_eq!((sol.coverage_required, sol.free_capital), (9_000 * BRL, 1_000 * BRL));
+    assert_eq!(
+        (sol.coverage_required, sol.free_capital),
+        (9_000 * BRL, 1_000 * BRL)
+    );
 
     let c = Claim::on(&g, 5_000 * BRL);
     f.file_claim(c).unwrap();
-    let meta = f.pay_claim(c).expect("pay_claim is never refused for solvency");
-    assert!(events::<ModeChanged>(&meta).is_empty(), "pay_claim does not switch mode");
+    let meta = f
+        .pay_claim(c)
+        .expect("pay_claim is never refused for solvency");
+    assert!(
+        events::<ModeChanged>(&meta).is_empty(),
+        "pay_claim does not switch mode"
+    );
     // stable 5k < coverage max(0.10 × 85k, 0) = 8.5k.
     let s = f.state();
     assert_eq!(s.coverage_required, 8_500 * BRL);
@@ -156,7 +164,8 @@ fn below_one_a_claim_payment_tips_into_under_coverage_and_is_not_refused() {
     // Under-covered: further claim payments still go through.
     let c2 = Claim::on(&g, 1_000 * BRL);
     f.file_claim(c2).unwrap();
-    f.pay_claim(c2).expect("pay_claim is never blocked while under-covered");
+    f.pay_claim(c2)
+        .expect("pay_claim is never blocked while under-covered");
 }
 
 #[test]
