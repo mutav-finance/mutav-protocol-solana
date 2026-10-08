@@ -397,11 +397,11 @@ The reserve holds two kinds of asset ([spec §7](spec.md#7-price-safety)).
 
 **Issuer income** ([ADR 0017](decisions/0017-brs-income-intake.md), proposed). BRS bears no yield, but Nora pays partners a monthly revenue share in BRS under a commercial agreement, to an address the partner chooses. MUTAV names the reserve's *income inbox*: the vault authority's associated token account for BRS, created at `initialize`. Nothing in it counts toward NAV; each month the operator sweeps the amount on Nora's statement into the reserve with `sweep_income`, which books it once per statement and raises NAV for every holder. The NAV-move guard measures net of these inflows, so a monthly payment does not halt fulfilment. The income depends on one contract with one issuer, which can change its rate or end, so it is shown as issuer partnership revenue, separate from guarantee fees, and never counted in the coverage math. Its terms with Nora are **open**.
 
-**TESOURO** ([Etherfuse](https://etherfuse.com/products/stablebonds)) is tokenized exposure to Brazilian federal bonds: a Token-2022 mint that carries an on-chain `BondPrice` account. Its layout, update cadence and rate basis are being confirmed with the issuer. It is the first candidate for an adapter, not part of the pilot: the pilot reserve holds BRS only (ADR 0018), because BRS already earns near Selic through Nora's revenue share and Etherfuse has no BRS path yet. Once an adapter is live, it is held only through that capped adapter, and a floor keeps at least half the reserve in BRS, the settlement token.
+**TESOURO** ([Etherfuse](https://etherfuse.com/products/stablebonds)) is tokenized exposure to Brazilian federal bonds: a Token-2022 mint that carries an on-chain `BondPrice` account. Its layout, update cadence and rate basis are being confirmed with the issuer. It is the first candidate for an adapter, not part of the pilot: the pilot reserve holds BRS only (ADR 0018), because the reserve already receives Nora's issuer partnership revenue in BRS (ADR 0017), at a rate set by a commercial agreement that is not on-chain (MUTAV expects it below but near Selic, pending Nora's confirmation), and Etherfuse has no BRS path yet. Once an adapter is live, it is held only through that capped adapter, and a settlement floor would keep at least half the reserve in BRS, the settlement token (50% is proposed, not decided).
 
 The **mint guard** rejects any Token-2022 mint with a PermanentDelegate, a TransferHook, a non-zero TransferFee, NonTransferable, or a default-frozen account state. Mints are allowlisted **by address, never by symbol**, because impostor BRL tokens exist.
 
-**Asset mix is open.** MUTAV's working business plan targets roughly 80% tokenized federal bonds with a 20% liquidity sleeve held in a USD stablecoin. The pilot holds BRS only (ADR 0018); once adapters are live, a settlement floor (`min_settlement_bps`) keeps at least half the reserve in BRS, with per-adapter caps, so claim payments never wait on a bond redemption or carry FX risk between BRL claims and the reserve. Neither the mix nor the sleeve asset is decided. A USD sleeve would need its own valuation rule and mint-guard review before it could count toward `stable_assets`.
+**Asset mix is open.** MUTAV's working business plan targets roughly 80% tokenized federal bonds with a 20% liquidity sleeve held in a USD stablecoin. The pilot holds BRS only (ADR 0018); once adapters are live, a settlement floor (`min_settlement_bps`, proposed at 50%, not decided) would keep at least half the reserve in BRS, with per-adapter caps, so claim payments never wait on a bond redemption or carry FX risk between BRL claims and the reserve. Neither the mix nor the sleeve asset is decided. A USD sleeve would need its own valuation rule and mint-guard review before it could count toward `stable_assets`.
 
 **Table 6. Reserve assets** (the pilot holds BRS only, ADR 0018; the TESOURO row applies once an adapter is live)
 
@@ -468,27 +468,27 @@ Legend: solid bar = done, outlined bar = planned, hatched = stretch. As of v0.3,
 
 | Track | What it proves | Size | Capital |
 |---|---|---|---|
-| On-chain mainnet pilot | The mechanism | Program cap R$100k; at `c` = 1, two working-product guarantees | MUTAV capital |
+| On-chain mainnet pilot | The mechanism | Program cap R$300k (`max_tvl`, the devnet value); at `c` = 0.10, about 75 working-product guarantees (R$3M of cover) | MUTAV capital |
 | Operating plan | The business | ~170 guarantees across up to 5 partner agencies, ~6 months | Working reserve target R$300k from MUTAV's equity round and angel capital, not yet raised |
 
-Caps rise from the first track toward the second only through the time-locked multisig, after an external audit, and while the KPIs below hold. At `c` = 1 the operating plan does not fit, which is why `c` is the decision that joins the two (§8).
+Caps rise from the first track toward the second only through the time-locked multisig, after an external audit, and while the KPIs below hold. At `c` = 1 the operating plan would not fit; `c` = 0.10 (ADR 0016, proposed) is the decision that joins the two (§8).
 
 **Proposed start conditions:** counsel's sign-off; the limited-fiança instrument and landlord mandate signed through the platform; the claims tail and payment term set; a PSP contracted for boleto and PIX; BRS issuance and off-ramp capacity confirmed and the PIX↔BRS round trip measured; the issuers' answers on PDA mint destinations and CPI burn; reserve capital committed and disclosed; and an independent security review (whether a full audit is **open**). Before an audit, the pilot holds real funds in unaudited software; commit nothing you cannot afford to lose.
 
-The proposed caps (Appendix B) are a R$100k reserve (`max_tvl`), `c` (open: 1.0 or expected-loss sizing, §8), R$30k of cover per guarantee and R$60k per agency, operator payments of R$10k per call and R$20k per 30 days, no TESOURO (BRS only, ADR 0018), and a 10-day `pay_claim` → `settle_payout` alarm; the take rate is open (program maximum 30%). Only the time-locked multisig can change them.
+The proposed caps (Appendix B, also the devnet values) are a R$300k reserve (`max_tvl`), `c` = 0.10 (the program floor, ADR 0016, proposed), R$40k of cover per guarantee and R$10M per agency (well above `max_tvl` / 0.10, so it never binds), operator payments of R$10k per call and R$20k per 30 days, no TESOURO (BRS only, ADR 0018), and a 10-day `pay_claim` → `settle_payout` alarm; the take rate is open (program maximum 30%). Only the time-locked multisig can change them.
 
-**Capacity, honestly.** The working product (12× + 6× rent, under legal review) is a *valor afiançado* of R$39,600 per lease. At `c` = 1 a R$100k reserve backs **2** such guarantees and R$300k backs **7**; the 170-lease book needs ≈R$6.7M, while expected-loss sizing plans R$300k for it (§8). The proposed per-guarantee cap (R$30k) must rise to at least R$39,600, or the product must shrink (e.g. 6× + 6× = R$26,400), before the working product can be registered.
+**Capacity, honestly.** The working product (12× + 6× rent, under legal review) is a *valor afiançado* of R$39,600 per lease. At `c` = 0.10 a R$300k reserve backs about **75** such guarantees (R$3M of cover); at `c` = 1 it would back **7**. The 170-lease book carries ≈R$6.7M of cover, ≈R$673k of reserve at `c` = 0.10, so R$300k serves it only up to ~75 leases until the reserve grows (§8). The proposed per-guarantee cap (R$40k) fits the working product.
 
 **Unit economics.** MUTAV prices by tenant score in three bands of 9%, 12% and 15% of monthly rent, and refuses scores below 400. Our models use 10% (R$220 a month on the working R$2,200 rent), below the middle band and so conservative. That sits at or above the market band (CredPago/Loft publicly lists 8–10%).
 
 | Reserve | Working-product guarantees at `c` = 1 (R$39,600 each) | Gross guarantee fees per month at R$220 | MUTAV revenue |
 |---|---|---|---|
-| R$100k | 2 | R$440 | take `t` × gross |
+| R$100k (earlier mainnet proposal) | 2 | R$440 | take `t` × gross |
 | R$300k | 7 | R$1,540 | take `t` × gross |
 | R$1M | 25 | R$5,500 | take `t` × gross |
 | R$10M | 252 | R$55,440 | take `t` × gross |
 
-At `c` = 1 the pilot is a cost centre by design; the levers are more capital, covers matched to risk, and a lower `c` (§8).
+At `c` = 1 the pilot is a cost centre by design; the levers are more capital, covers matched to risk, and a lower `c` (§8). At `c` = 0.10 (the devnet value, ADR 0016, proposed) each reserve backs ten times the guarantees in this table: R$300k ≈ 75.
 
 **Claims against fees, by scope of the exit leg** (working parameters; expected payouts per lease-year ÷ gross guarantee fees; fee 10% of rent per 30 days; rent arrears at 2.01% of annual rent, the Superlógica IIL three-month average for RS apartments; evictions at 0.25% of leases a year (range 0.10–0.60%: CNJ DataJud filings in TJRS, TJSC and TJPR over IBGE PNAD rented households, adjusted for outcomes and for an underwritten book; not MUTAV data), each consuming the 6× exit sub-limit; non-eviction exit debts 0.19× rent a year). Scope A, all liquidated tenant debts including the early-termination penalty: **≈37%**. Scope B, the same without the penalty (the spec default): **≈30%**. Scope C, arrears, evictions and abandonment only: **≈21%**. Rent arrears alone are ≈20%. Evictions are rare but expensive: while the fiança is in force the fast eviction order (Lei 8.245/91 art. 59 §1º IX) is unavailable, so each one uses about the full exit sub-limit; at 0.25% a year they add only about one point. Which scope the instrument covers is **open**. These figures are inferences; no Brazilian dataset measures exit-cost frequency.
 
@@ -555,7 +555,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 
 **Open decisions.**
 
-- reserve sizing: the on-chain tail floor, and which coverage figure may be published (§8; `c` ≥ 0.10 is decided, ADR 0016);
+- reserve sizing: the on-chain tail floor, and which coverage figure may be published (§8; `c` ≥ 0.10 is proposed in ADR 0016, pending founder confirmation);
 - capital source: MUTAV's balance sheet only, or also selected third-party providers (§9);
 - asset mix once adapters exist: TESOURO 50% or ~80% (the pilot is BRS only, ADR 0018); liquidity sleeve in BRS or a USD stablecoin (§10);
 - exit-leg scope A, B (spec default) or C, at ≈37% / 30% / 21% claims-to-fees (§12);
