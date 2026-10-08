@@ -168,6 +168,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - Second `pay_claim` for the same notice fails (idempotency).
   - **Property test:** `pay_claim` is never refused for solvency or under-coverage (fuzz `stable_assets` below `coverage_required`).
   - At `c = 1.0`, paying a claim leaves `free_capital` unchanged.
+  - At `c < 1` (floor 0.10, ADR 0016), paying a claim lowers `free_capital` by `(1 − c)` times the amount, can tip the reserve into under-coverage at the next `refresh`, and is never refused; `coverage_required` never falls below `provisions`.
   - Frozen `reserve` → `ReserveFrozen`, clean failure, retry succeeds after thaw.
   - **Carried from 2a:**
     - `ClaimFilingV1` and `PayoutV1` golden layouts; padding zero at init; unknown leg or status constants refused with `UnsupportedVersion`; `file_claim`, `pay_claim` and `settle_payout` added to `Fixture::pilot_instructions()`.

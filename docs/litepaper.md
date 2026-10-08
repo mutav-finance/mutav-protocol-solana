@@ -8,7 +8,7 @@ v0.3 · October 2026 · Not legal advice. Not an offer of securities. Unaudited 
 
 ## Abstract
 
-MUTAV is an institutional *fiador*. It gives Brazilian tenants a paid rental guarantee (*fiança onerosa*, Lei 8.245/91 art. 37 II) through the real-estate agencies that already run their leases, so no personal guarantor or locked-up deposit is needed. Each partner agency pays MUTAV one consolidated bill a month, by boleto or PIX, for the guarantee fees of all its leases. The `mutav` Solana program is designed to record every guarantee with its remaining *valor afiançado* (the fiança's R$ ceiling) and to custody a BRL reserve that refuses any capital movement that would leave that cover under-backed by the governed coverage ratio `c`. It never refuses a claim payment for solvency, pause or price reasons: only the guarantee's remaining *valor afiançado* and the liquid BRS bound it. The operator's payment caps limit what a single hot key can move, and payments above them go through the time-locked admin multisig or a MUTAV advance that the reserve reimburses. The Colosseum submission delivers the program on devnet; a capped mainnet pilot follows once its start conditions are met (proposed program cap R$100k; working reserve target R$300k; open, §12). The reserve is not a yield product, and nothing here promises a return.
+MUTAV is an institutional *fiador*. It gives Brazilian tenants a paid rental guarantee (*fiança onerosa*, Lei 8.245/91 art. 37 II) through the real-estate agencies that already run their leases, so no personal guarantor or locked-up deposit is needed. Each partner agency pays MUTAV one consolidated bill a month, by boleto or PIX, for the guarantee fees of all its leases. The `mutav` Solana program is designed to record every guarantee with its remaining *valor afiançado* (the fiança's R$ ceiling) and to custody a BRL reserve that refuses any capital movement that would leave that cover under-backed by the governed coverage ratio `c`. It never refuses a claim payment for solvency, pause or price reasons: only the guarantee's remaining *valor afiançado* and the liquid BRS bound it. The operator's payment caps limit what a single hot key can move, and payments above them go through the time-locked admin multisig or a MUTAV advance that the reserve reimburses. The Colosseum submission delivers the program on devnet; a capped mainnet pilot follows once its start conditions are met (proposed program cap R$300k, the working reserve target; open, §12). The reserve is not a yield product, and nothing here promises a return.
 
 **For Colosseum judges.**
 
@@ -152,7 +152,7 @@ Six rules shape every mechanism ([spec §1](spec.md#1-principles)).
 5. **Start tight.** Hard on-chain caps bound every outflow and every new liability. Only the time-locked multisig raises them.
 6. **Upgrade without migration** ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)).
 
-**Prior art.** Nexus Mutual allows NXM redemptions only while its capital ratio MCR% is above 100%, where MCR is active cover divided by 4.8, a gearing heuristic ([Nexus docs](https://docs.nexusmutual.io/protocol/capital-pool/mcr/)). MUTAV's gate works per guarantee and requires `c` × remaining cover, with `c` a governed parameter (1.0 in this spec; the pilot value is open, §8). OnRe contributed patterns for a Squads-held admin, supply caps and per-request partial fills, and our async core is forked from [solana-foundation/vault](https://github.com/solana-foundation/vault) (MIT). To our knowledge, MUTAV is the first BRL guarantee reserve on Solana whose capital flows are gated by on-chain coverage of its liabilities (Appendix G).
+**Prior art.** Nexus Mutual allows NXM redemptions only while its capital ratio MCR% is above 100%, where MCR is active cover divided by 4.8, a gearing heuristic ([Nexus docs](https://docs.nexusmutual.io/protocol/capital-pool/mcr/)). MUTAV's gate works per guarantee and requires `c` × remaining cover, with `c` a governed parameter (at least 0.10; devnet starts at 0.10, §8). OnRe contributed patterns for a Squads-held admin, supply caps and per-request partial fills, and our async core is forked from [solana-foundation/vault](https://github.com/solana-foundation/vault) (MIT). To our knowledge, MUTAV is the first BRL guarantee reserve on Solana whose capital flows are gated by on-chain coverage of its liabilities (Appendix G).
 
 ---
 
@@ -282,7 +282,7 @@ tesouro_value         = floor(tesouro_units × bounded_tesouro_price / PRICE_SCA
 stable_assets         = brs_balance + tesouro_value
 remaining_cover(g)    = (default_cover − default_paid) + (exit_cover − exit_paid)
 remaining_cover_total = Σ remaining_cover(g)                 over guarantees not CLOSED
-coverage_required     = ceil(c × remaining_cover_total)      c governed; value open
+coverage_required     = max(ceil(c × remaining_cover_total), provisions)   c ≥ 0.10
 surplus               = max(0, stable_assets − coverage_required)
 free_capital          = surplus − earmark_eff                earmark_eff = 0 in the pilot
 liquid_budget         = max(0, brs_balance − provisions − earmark_eff)
@@ -290,12 +290,12 @@ net_assets            = max(0, stable_assets − provisions)
 NAV per share         = net_assets / shares_outstanding
 ```
 
-**What `c` means, and why it is open.** `c` (`coverage_ratio_bps`) is a governed parameter that only the time-locked multisig changes. Two sizings are on the table, and **neither is decided**.
+**What `c` means.** `c` (`coverage_ratio_bps`) is the share of remaining cover the reserve must hold in stable assets. It is a governed parameter that only the time-locked multisig changes, above a program floor of 0.10 ([ADR 0016](decisions/0016-coverage-ratio-below-one.md)). Two sizings were on the table:
 
-- **Full backing, `c` = 1** (this spec's default). The reserve holds every active guarantee's whole remaining *valor afiançado*, so even every lease exhausting at once is paid from the reserve. It is capital-heavy: one working-product guarantee locks R$39,600, so R$300k backs 7 leases and the 170-lease book would need ≈R$6.7M.
+- **Full backing, `c` = 1.** The reserve holds every active guarantee's whole remaining *valor afiançado*, so even every lease exhausting at once is paid from the reserve. It is capital-heavy: one working-product guarantee locks R$39,600, so R$300k backs 7 leases and the 170-lease book would need ≈R$6.7M.
 - **Expected loss plus a one-year tail** (MUTAV's working business plan). The reserve is sized to the book's losses, not its ceiling: for 170 leases, expected rent-arrears losses of ≈R$90k a year at the base anchor (2.01% of annual rent) and ≈R$266k in a tail year (5.93%), against a working target of R$300k, about 1.1× the tail year; exit debts add to both. In program terms `c` sits far below 1, and MUTAV's own balance sheet, disclosed as the backstop, carries the rest of the legal ceiling.
 
-At `c` < 1 a claim payment lowers surplus (invariant 7 holds only at `c` = 1). Whether `c` gets a program-enforced floor, and which coverage figure MUTAV publishes before counsel's opinion, are open; any figure published will be shown both against maximum exposure and against a tail year, because either alone misleads.
+MUTAV chose the second, and the program now expresses it ([ADR 0016](decisions/0016-coverage-ratio-below-one.md)). `c` has a program floor of 0.10, the worst-case floor of the business rule that limits the book (grow only while the reserve holds at least 10% of total cover and at least two tail years). Devnet starts at that floor: R$300k backs about R$3M of cover, around 75 working-product leases. `coverage_required` is never below the open provisions, so filed payment requests stay fully covered at any `c`. At `c` < 1 a claim payment lowers surplus by `(1 − c)` times the amount (invariant 7) and can move the reserve into under-coverage; it is still never refused. The two-tail-year check stays off-chain for now; a per-lease tail floor is a later ADR. Which coverage figure MUTAV publishes before counsel's opinion is still open; any figure published will be shown both against maximum exposure and against a tail year, because either alone misleads.
 
 **What is gated** ([ADR 0005](decisions/0005-solvency-gate-scope.md)). Table 4 has the full matrix. In short: new guarantees and redemption fills must fit in the `free_capital` computed before them; nothing on the claim-payment path, nor fees, closes or `refresh`, is gated on solvency. Redemption fills are also capped by `liquid_budget`, so no capital exit or allocation can spend BRS a filed payment request needs. Fee receivables are not reserve assets: a missed agency payment lowers fee inflow, not coverage.
 
@@ -307,7 +307,7 @@ At `c` < 1 a claim payment lowers surplus (invariant 7 holds only at `c` = 1). W
 
 **Price safety.** TESOURO is valued at `min(BondPrice, accrual ceiling)`; stale prices fail gated instructions closed, a deviation bound rejects jumps, and `fulfil_halted` stops fills after an outsized NAV move. `pay_claim` never reads the price.
 
-**Invariants.** The test plan asserts, after every instruction, that `stable_assets` uses only tracked balances and the bounded price (1); paid ≤ cover on each leg (2); a provision lowers NAV, never `stable_assets` (6); at `c` = 1 a claim payment leaves surplus unchanged (7); and no fill lowers NAV per share (12). A planned property test fuzzes `stable_assets` below `coverage_required` and asserts that `pay_claim` is never refused for solvency.
+**Invariants.** The test plan asserts, after every instruction, that `stable_assets` uses only tracked balances and the bounded price (1); paid ≤ cover on each leg (2); a provision lowers NAV, never `stable_assets` (6); a claim payment moves surplus by `(c − 1)` times the amount, so it is unchanged at `c` = 1 (7); and no fill lowers NAV per share (12). A property test fuzzes `stable_assets` below `coverage_required` and `c` from 0.10 to 2.0, and asserts that `pay_claim` is never refused for solvency.
 
 ```figure id="fig-4-coverage-bar" title="Figure 4. Balance sheet and coverage"
 Two vertical stacked bars side by side on a common baseline.
@@ -552,7 +552,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 
 **Open decisions.**
 
-- reserve sizing: `c` = 1 or expected loss plus a tail year, a floor for `c`, and which coverage figure may be published (§8);
+- reserve sizing: the on-chain tail floor, and which coverage figure may be published (§8; `c` ≥ 0.10 is decided, ADR 0016);
 - capital source: MUTAV's balance sheet only, or also selected third-party providers (§9);
 - asset mix: TESOURO 50% or ~80%; liquidity sleeve in BRS or a USD stablecoin (§10);
 - exit-leg scope A, B (spec default) or C, at ≈37% / 30% / 21% claims-to-fees (§12);
@@ -607,7 +607,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 | `EXHAUSTED` / `VOID` | The *valor afiançado* is used up and the fiança extinguished / a lease that never took effect, closed with nothing paid |
 | Reserve / reserve share | BRS and TESOURO custodied by the `mutav` program / SPL token for a pro-rata share of `net_assets` |
 | NAV | `net_assets / shares_outstanding` |
-| `stable_assets` / `coverage_required` | BRS plus TESOURO at the bounded price / `c` × remaining cover of all guarantees not closed |
+| `stable_assets` / `coverage_required` | BRS plus TESOURO at the bounded price / `c` × remaining cover of all guarantees not closed, never below the open provisions |
 | Surplus / free capital / liquid budget | Assets above `coverage_required` (minus the phase-2 earmark) / BRS not needed by filed requests |
 | Under-coverage mode | `stable_assets < coverage_required`; outflows freeze; public wording *reserva abaixo da meta; suporte da MUTAV ativo* |
 | PDA / CPI / upgrade authority | Program-derived address / cross-program invocation / key allowed to replace a program's code (the Squads multisig) |
@@ -617,15 +617,15 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 
 | Parameter | Enforced in | Proposed pilot value | Status |
 |---|---|---|---|
-| `max_tvl` | `fulfil_deposits` | R$100k | Proposed; working reserve target R$300k |
-| `max_cover_per_guarantee` | `register_guarantee` | R$30k | Proposed; below the R$39,600 working product (open) |
-| `max_cover_per_agency` | `register_guarantee` | R$60k | Proposed |
+| `max_tvl` | `fulfil_deposits` | R$300k | Proposed; the working reserve target |
+| `max_cover_per_guarantee` | `register_guarantee` | R$40k | Proposed; fits the R$39,600 working product |
+| `max_cover_per_agency` | `register_guarantee` | R$3M | Proposed; `max_tvl` / 0.10, so it never binds while one reserve serves the agency |
 | `max_claim_per_call` | `pay_claim` (operator only) | R$10k | Proposed |
 | `max_claim_per_period` / `claim_period_secs` | `pay_claim` (operator only) | R$20k / 30 days | Proposed |
-| `max_tesouro_share_bps` | `allocate` | 50% | Proposed; business plan targets ~80% (open) |
-| `min_request` / `max_request` | `request_*`, partial-fill remainder | R$1,000 / R$30,000 | Proposed |
+| `max_tesouro_share_bps` | `allocate` | 50% (0% on devnet) | Proposed; business plan targets ~80% (open) |
+| `min_request` / `max_request` | `request_*`, partial-fill remainder | R$1,000 / R$100,000 | Proposed |
 | `min_fill_assets` | `fulfil_redeems` | R$500 | Proposed |
-| `c` (`coverage_ratio_bps`) | All gates | 1.0 in spec / expected-loss sizing in business plan | Open (conflict); floor open |
+| `c` (`coverage_ratio_bps`) | All gates | 0.10 | Program floor 0.10 (ADR 0016); the two-tail-year check stays off-chain |
 | `fee_take_bps` | `contribute_fees` | — | Open; program max 30% |
 | `payout_sla_secs` | `refresh`, `settle_payout` | 10 days | Proposed; to be reconciled with the ≤4-day working target |
 | `claims_tail_secs` | `notify_exoneration`, `record_keys_returned` | — | Open (≤3 years; 0 keeps guarantees `ACTIVE`) |
