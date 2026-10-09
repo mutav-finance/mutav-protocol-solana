@@ -614,33 +614,6 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 /* ─── Pilot app ──────────────────────────────────────────────────────────── */
 
-/* Landing "two-nav swap": the full wordmark nav sits over the hero; past the
-   hero a compact pinned bar with a solid CTA slides in. Compositor-only:
-   translate + visibility, 300ms ease-out. Visibility is delayed on hide so the
-   bar finishes sliding out before it leaves the a11y tree and tab order. */
-.compact-bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 110;
-  transform: translate3d(0, -100%, 0);
-  visibility: hidden;
-  transition: transform 300ms ease-out, visibility 0s linear 300ms;
-  will-change: transform;
-}
-.compact-bar[data-visible="true"] {
-  transform: translate3d(0, 0, 0);
-  visibility: visible;
-  transition: transform 300ms ease-out, visibility 0s linear 0s;
-}
-@media (prefers-reduced-motion: reduce) {
-  .compact-bar,
-  .compact-bar[data-visible="true"] {
-    transition: none;
-  }
-}
-
 /* Generic responsive grids for metric and section layouts. */
 .grid-metrics {
   display: grid;

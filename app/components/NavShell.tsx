@@ -13,9 +13,10 @@ import { ClusterBadge } from "@/components/ClusterBadge";
 import { Button } from "@/components/ui/button";
 
 const LINKS = [
-  { href: "/reserve", label: "reserve" },
-  { href: "/operator", label: "operator" },
+  { href: "/", label: "home" },
   { href: "/dashboard", label: "dashboard" },
+  { href: "/reserve", label: "transparency" },
+  { href: "/operator", label: "operator" },
   { href: "/demo", label: "demo" },
   { href: "/admin", label: "admin" },
 ];
@@ -36,7 +37,8 @@ export function NavShell() {
   }, [open]);
 
   const link = (l: (typeof LINKS)[number], mobile: boolean) => {
-    const active = pathname.startsWith(l.href);
+    // "/" is active only on the home page itself; the others also match their sub-routes.
+    const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
     if (!mobile)
       return (
         <li key={l.href} className="flex list-none items-stretch">
@@ -62,11 +64,12 @@ export function NavShell() {
 
   return (
     <nav aria-label="Main navigation" className="bg-(--color-canvas) sticky top-0 z-[100] border-b">
-      <div className="relative flex h-14 items-stretch justify-between" style={{ padding: "0 var(--page-pad)" }}>
+      <div className="relative flex h-14 items-stretch justify-between" style={{ padding: "0 var(--section-pad-x)" }}>
         <Link href="/" aria-label="MUTAV, home" className="flex shrink-0 items-center gap-2.5 no-underline">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/logo-mutav.svg" alt="MUTAV" height={24} style={{ height: 24, width: "auto", display: "block" }} />
-          <span className="font-mono text-(--color-text-3) text-2xs tracking-widest">PILOT</span>
+          {/* Wordmark (STYLE.md §3.6): "mutav", Geist Bold lowercase, amber. */}
+          <span className="font-display text-(--color-accent) text-xl font-bold leading-none" aria-hidden="true">mutav</span>
         </Link>
         <div className="nav-links-desktop pointer-events-none absolute inset-0 justify-center">
           <ul className="pointer-events-auto m-0 flex items-stretch p-0">{LINKS.map((l) => link(l, false))}</ul>
@@ -93,7 +96,7 @@ export function NavShell() {
         </div>
       </div>
       {open && (
-        <ul id="nav-mobile-panel" className="nav-mobile-panel m-0 border-t" style={{ padding: "8px var(--page-pad) 16px" }}>
+        <ul id="nav-mobile-panel" className="nav-mobile-panel m-0 border-t" style={{ padding: "8px var(--section-pad-x) 16px" }}>
           {LINKS.map((l) => link(l, true))}
           <li className="list-none pt-3">
             <ClusterBadge />

@@ -9,7 +9,7 @@ async function noBannedWords(page: Page) {
 }
 
 test.describe("smoke: every route renders against a seeded localnet", () => {
-  test("/ — story, live strip from the chain, diagram, two-nav swap", async ({ page }) => {
+  test("/ — story, live strip from the chain, diagram, shared nav", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("backed by a reserve anyone can verify");
     const strip = page.getByTestId("live-strip");
