@@ -1,25 +1,26 @@
 "use client";
 
 /**
- * /reserve · Claims. Renders on-chain values from /api/ledger; nothing is
- * computed here beyond sums and differences of account fields.
+ * /reserve · Claims. Answers one question: are claims paid on time?
+ * Hero: claim payments in the period; support strip: the slowest timings and
+ * late count; then the promise band, the speed chart (3+ claims) and the
+ * detail table. One period picker drives every block. Renders on-chain values
+ * from /api/ledger; nothing is computed here beyond sums and differences of
+ * account fields.
  */
 import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
-import { Explorer } from "@/components/Explorer";
-import { InfoTooltip } from "@/components/InfoTooltip";
-import { fmtBrs, fmtDuration, fmtTime } from "@/lib/format";
+import { fmtBrs, fmtDuration } from "@/lib/format";
 import { claimsTimeline, type ClaimRow, type Ledger, type ReserveView } from "@/lib/view";
 import { claimSpeed, frac } from "@/lib/charts";
 import { C, ChartFrame, Legend, Row, RowLabel, Swatch, Track, type Seg } from "@/components/charts/Charts";
 
-import { Empty, Num, Table, short } from "@/components/reserve/sections/shared";
+import { Empty, short } from "@/components/reserve/sections/shared";
 import { ImageSlot } from "@/components/ImageSlot";
 import { PeriodPicker, inPeriod, type Period } from "@/components/reserve/sections/Flows";
 import { Section } from "@/components/Section";
+import { ClaimsTable } from "@/components/reserve/claims/ClaimsTable";
 import type { Data } from "@/components/reserve/sections/shared";
-
-// ── Claims timeline ─────────────────────────────────────────────────────────
 
 const LABEL = { letterSpacing: "0.01em" } as const;
 
@@ -29,13 +30,15 @@ const Label = ({ children }: { children: ReactNode }) => (
   </span>
 );
 
+const PERIOD_NAME: Record<Period, string> = { "7D": "last 7 days", "30D": "last 30 days", "90D": "last 90 days", All: "all time" };
+
 /** Slowest of the recorded durations (worst case is the honest proof of speed). */
 const slowest = (xs: (bigint | null)[]): bigint | null => xs.reduce<bigint | null>((m, x) => (x === null ? m : m === null || x > m ? x : m), null);
 
-/** Decorative image banner carrying the core spec property of this section. */
-function GuardTile({ className = "" }: { className?: string }) {
+/** The spec promise as a wide image band (section divider, no numbers on it). */
+function GuardBand() {
   return (
-    <ImageSlot slot="reserve-claims" aspect="wide" className={`min-h-[120px] ${className}`}>
+    <ImageSlot slot="reserve-claims" aspect="6:1" className="min-h-[120px] w-full">
       <div className="flex h-full min-h-[120px] flex-col justify-end p-6">
         <p className="font-display text-(--color-text) m-0 text-xl font-bold leading-snug">Claim payments are never blocked by solvency or by a pause.</p>
       </div>
@@ -43,44 +46,61 @@ function GuardTile({ className = "" }: { className?: string }) {
   );
 }
 
-/** Lead tile: the slowest filed → paid and paid → settled on record, against the SLA. */
-function SpeedTile({ rows, slaSecs }: { rows: ClaimRow[]; slaSecs: bigint }) {
+/** One cell of the support strip: label, value, optional sub-line. */
+function Cell({ label, value, sub, color, first }: { label: string; value: string; sub?: string; color?: string; first?: boolean }) {
+  return (
+    <div className={`flex min-w-0 flex-col gap-2 p-6 ${first ? "" : "border-t sm:border-t-0 sm:border-l"}`}>
+      <Label>{label}</Label>
+      <Mono style={{ fontSize: 24, fontWeight: 700, lineHeight: 1, color: color ?? "var(--color-text)" }}>{value}</Mono>
+      {sub && <span className="font-body text-(--color-text-3) text-xs">{sub}</span>}
+    </div>
+  );
+}
+
+/** Block 1: hero (claim payments in the period) over a 3-cell support strip, with the period picker. */
+function Summary({ rows, total, slaSecs, period, onPeriod }: { rows: ClaimRow[]; total: number; slaSecs: bigint; period: Period; onPeriod: (p: Period) => void }) {
+  const paidRows = rows.filter((c) => c.paidAt !== null);
+  const paidSum = paidRows.reduce((s, c) => s + (c.amount ?? 0n), 0n);
+  const settled = rows.filter((c) => c.settledAt !== null).length;
   const pay = slowest(rows.map((c) => c.fileToPay));
   const settle = slowest(rows.map((c) => c.payToSettle));
   const late = rows.filter((c) => c.lateOnChain).length;
   const overdue = rows.filter((c) => !c.lateOnChain && c.overdue).length;
-  const bad = late > 0;
-  const stat = (label: string, v: bigint | null, empty: string, sub?: string) => (
-    <div className="flex flex-col gap-2">
-      <Label>{label}</Label>
-      <Mono style={{ fontSize: "clamp(28px, 3.2vw, 40px)", fontWeight: 700, lineHeight: 1, color: v === null ? "var(--color-text-3)" : "var(--color-text)" }}>{v === null ? empty : fmtDuration(v)}</Mono>
-      {sub && <Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>{sub}</Mono>}
-    </div>
-  );
   return (
-    <div className="bg-(--color-surface) flex flex-col justify-between gap-6 border p-6 lg:col-span-4" style={{ borderColor: bad ? "var(--color-error)" : "var(--color-border)" }}>
-      {stat("Filed → paid · slowest", pay, "not paid yet")}
-      {stat("Paid → settled · slowest", settle, "not settled yet", `payout SLA ${fmtDuration(slaSecs)}`)}
-      <div className="flex flex-col gap-1 border-t pt-4">
-        <span className="font-mono text-xs" style={{ color: bad ? "var(--color-error)" : overdue > 0 ? "var(--color-copper)" : "var(--color-text-3)" }}>
-          {late} late{overdue > 0 ? ` · ${overdue} past SLA, not yet recorded` : ""}
-        </span>
+    <div className="bg-(--color-surface) border">
+      <div className="flex flex-wrap items-start justify-between gap-6 p-6">
+        <div className="flex flex-col gap-2">
+          <Label>Claims paid · {PERIOD_NAME[period]}</Label>
+          <Mono style={{ fontSize: "clamp(36px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{fmtBrs(paidSum)}</Mono>
+          <span className="font-body text-(--color-text-2) text-sm">
+            {paidRows.length} of {rows.length} filed paid · {settled} settled by PIX
+            {rows.length !== total && <span className="text-(--color-text-3)"> · {total} on record</span>}
+          </span>
+        </div>
+        <PeriodPicker value={period} onChange={onPeriod} label="Claims period" />
+      </div>
+      <div className="grid grid-cols-1 border-t sm:grid-cols-3">
+        <Cell first label="Slowest filed → paid" value={pay === null ? "—" : fmtDuration(pay)} sub={pay === null ? "None paid yet" : undefined} />
+        <Cell label="Slowest paid → settled" value={settle === null ? "—" : fmtDuration(settle)} sub={`Payout SLA ${fmtDuration(slaSecs)}`} />
+        <Cell
+          label="Late"
+          value={String(late)}
+          color={late > 0 ? "var(--color-error)" : undefined}
+          sub={overdue > 0 ? `${overdue} past SLA, not yet recorded` : "Recorded on-chain"}
+        />
       </div>
     </div>
   );
 }
 
-/**
- * Claim speed bars (local variant of the shared ClaimSpeedChart, with a
- * one-line caption; the field-level definitions sit in its ⓘ).
- */
+/** Block 3: claim speed bars against the SLA. Only with 3+ claims; with fewer, the strip already says it. */
 function SpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaSecs: bigint; now: bigint }) {
   const { claims, payAxis, settleAxis } = claimSpeed(rows, slaSecs, now);
-  if (claims.length === 0) return null;
+  if (claims.length < 3) return null;
   const panel = (title: string, axis: bigint, pick: (c: (typeof claims)[number]) => { seg: Seg | null; text: string }, marker?: { f: number; label: string }) => (
     <div className="flex min-w-0 flex-col gap-2">
-      <p className="font-mono text-(--color-text-2) m-0 text-2xs uppercase" style={{ letterSpacing: "0.01em" }}>
-        {title} <span className="text-(--color-text-3)">· axis 0 – {fmtDuration(axis)}</span>
+      <p className="font-mono text-(--color-text-2) m-0 text-2xs" style={LABEL}>
+        {title} <span className="text-(--color-text-3)">· 0 – {fmtDuration(axis)}</span>
       </p>
       {claims.map((c) => {
         const p = pick(c);
@@ -98,18 +118,11 @@ function SpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaSecs: bigint;
       legend={
         <Legend>
           <Swatch color={C.ink} label="done" />
-          <Swatch color={C.ink} label="pending (so far)" outline />
+          <Swatch color={C.ink} label="pending" outline />
           <Swatch color={C.bad} label="late" />
         </Legend>
       }
-      caption={
-        <span className="inline-flex items-center gap-2">
-          Oldest filing first. The vertical line is the payout SLA.
-          <InfoTooltip label="About claim speed">
-            Filed → paid: from when the claim was filed to when it was paid. Paid → settled: from payment to settlement by PIX; a pending payment shows the time so far.
-          </InfoTooltip>
-        </span>
-      }
+      caption="Oldest filing first. The vertical line is the payout SLA."
     >
       <div className="grid-2">
         {panel("Filed → paid", payAxis, (c) => ({ seg: c.fileToPay === null ? null : { f: frac(c.fileToPay, payAxis), color: C.ink }, text: c.fileToPay === null ? "not paid" : fmtDuration(c.fileToPay) }))}
@@ -127,107 +140,51 @@ function SpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaSecs: bigint;
   );
 }
 
-const CLAIM_TIPS = {
-  SLA: "The settlement deadline set by the Reserve Admin. A payment not settled in time is marked late on-chain at the next refresh.",
-  "Filed → paid": "From when the claim was filed to when it was paid.",
-  "Paid → settled": "From payment to settlement by PIX; a pending payment shows the time so far.",
-};
-
 export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
   const rows = claimsTimeline(l, r.config.payoutSlaSecs, r.now);
   if (rows.length === 0)
     return (
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="bg-(--color-surface) flex items-center border p-6 lg:col-span-6">
-          <Empty>No claims filed yet.</Empty>
+      <div className="flex flex-col gap-6">
+        <div className="bg-(--color-surface) border px-6 py-2">
+          <Empty>No claims filed yet. Filed claims appear here with their amount and timings.</Empty>
         </div>
-        <GuardTile className="lg:col-span-6" />
+        <GuardBand />
       </div>
     );
-  const paid = rows.filter((c) => c.paidAt !== null).length;
-  const settled = rows.filter((c) => c.settledAt !== null).length;
-  return <ClaimsBody r={r} rows={rows} paid={paid} settled={settled} />;
+  return <ClaimsBody r={r} rows={rows} />;
 }
 
-/** With few claims (< 3) the table leads and the chart follows; otherwise chart, then table. The period filters the table by filed date. */
-function ClaimsBody({ r, rows, paid, settled }: { r: ReserveView; rows: ClaimRow[]; paid: number; settled: number }) {
+/** Hero + strip → promise band → speed chart → table. The period filters every block by filed date. */
+function ClaimsBody({ r, rows }: { r: ReserveView; rows: ClaimRow[] }) {
   const [period, setPeriod] = useState<Period>("All");
   const shown = rows.filter((c) => inPeriod(c.filedAt, r.now, period));
-  const few = rows.length < 3;
-  const table = (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-mono text-(--color-text-2) m-0 text-xs">
-          {rows.length} filed · {paid} paid · {settled} settled
-        </p>
-        <PeriodPicker value={period} onChange={setPeriod} label="Claims period" />
-      </div>
+  const sla = r.config.payoutSlaSecs;
+  return (
+    <div className="flex flex-col gap-6">
+      <Summary rows={shown} total={rows.length} slaSecs={sla} period={period} onPeriod={setPeriod} />
+      <GuardBand />
       {shown.length === 0 ? (
-        <Empty>No claims filed in this period.</Empty>
+        <div className="bg-(--color-surface) border px-6 py-2">
+          <Empty>No claims filed in this period.</Empty>
+        </div>
       ) : (
-        <Table label="Claims timeline" head={["Guarantee", ["Amount", "num"], "SLA", ["Filed → paid", "num"], ["Paid → settled", "num"], "Filed", "Paid", "Settled (PIX)", "Leg"]} tips={CLAIM_TIPS}>
-          {shown.map((c) => (
-            <tr key={c.filing}>
-              <td><Explorer value={c.guarantee} label={short(c.guaranteeId)} /></td>
-              <Num>{fmtBrs(c.amount ?? c.provision)}</Num>
-              <td>
-                {c.lateOnChain ? (
-                  <Mono style={{ color: "var(--color-error)" }}>late</Mono>
-                ) : c.overdue ? (
-                  <span title="Marked late on-chain at the next refresh.">
-                    <Mono style={{ color: "var(--color-copper)" }}>past SLA</Mono>
-                  </span>
-                ) : (
-                  <Mono dim>on time</Mono>
-                )}
-              </td>
-              <Num>{c.fileToPay !== null ? fmtDuration(c.fileToPay) : "—"}</Num>
-              <Num>{c.payToSettle !== null ? fmtDuration(c.payToSettle) : "—"}</Num>
-              <td><Explorer value={c.filing} label={fmtTime(c.filedAt)} /></td>
-              <td>{c.payout && c.paidAt !== null ? <Explorer value={c.payout} label={fmtTime(c.paidAt)} /> : <Mono dim>—</Mono>}</td>
-              <td><Mono dim={c.settledAt === null}>{c.settledAt !== null ? fmtTime(c.settledAt) : "pending"}</Mono></td>
-              <td><Mono>{c.leg}</Mono></td>
-            </tr>
-          ))}
-        </Table>
+        <>
+          <SpeedChart rows={shown} slaSecs={sla} now={r.now} />
+          <ClaimsTable rows={shown} />
+        </>
       )}
     </div>
   );
-  const chart = <SpeedChart rows={rows} slaSecs={r.config.payoutSlaSecs} now={r.now} />;
-  if (few)
-    return (
-      <div className="flex flex-col gap-4">
-        {/* Few claims: the speed tile beside the promise banner, then the table, then the chart. */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <SpeedTile rows={rows} slaSecs={r.config.payoutSlaSecs} />
-          <GuardTile className="lg:col-span-8" />
-        </div>
-        {table}
-        {chart}
-      </div>
-    );
-  return (
-    <div className="flex flex-col gap-4">
-      {/* The speed lead tile beside the speed chart; the spec promise as a banner under them. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <SpeedTile rows={rows} slaSecs={r.config.payoutSlaSecs} />
-        <div className="grid lg:col-span-8">{chart}</div>
-        <GuardTile className="lg:col-span-12" />
-      </div>
-      {table}
-    </div>
-  );
 }
 
-/** The Claims section of /reserve: heading, roles and body. */
+/** The Claims section of /reserve: heading and body. */
 export function ClaimsSection({ d }: { d: Data }) {
   return (
     <Section
       id="claims"
       title="Claims"
-      kicker="Claim payments"
-      subtitle="How fast claims are paid, from on-chain timestamps."
-      info="Timestamps recorded on-chain for each claim. Filed: the claim is booked, and NAV already reflects it before any money leaves the reserve. Paid: the claim payment leaves the reserve. Settled: the landlord receives it by PIX. The payout SLA is set by the Reserve Admin."
+      subtitle="Are claims paid on time? Every timestamp is read on-chain."
+      info="Filed: the claim is booked, and NAV already reflects it before any money leaves the reserve. Paid: the claim payment leaves the reserve. Settled: the landlord receives it by PIX. The payout SLA is set by the Reserve Admin."
     >
       <Claims r={d.reserve} l={d.ledger} />
     </Section>
