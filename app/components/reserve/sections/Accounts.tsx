@@ -1,155 +1,190 @@
 "use client";
 
 /**
- * /reserve · Accounts. Renders on-chain values from /api/ledger; nothing is
- * computed here beyond sums and differences of account fields.
+ * /reserve · Accounts. Answers "who can act on the reserve, and where do I
+ * check it?". Lead: the four keys that sign. Then the program and every
+ * account it uses, grouped by job, each with copy and Explorer. Addresses come
+ * from /api/ledger; nothing is hardcoded.
  */
-import { Mono } from "@/components/Mono";
-import { Explorer } from "@/components/Explorer";
-import { type ReserveView } from "@/lib/view";
 import { RoleTag } from "@/components/RoleTag";
+import { ImageSlot, type ImageSlotName } from "@/components/ImageSlot";
+import { type ReserveView } from "@/lib/view";
 import { ACCOUNT_ROLES, type AccountRole } from "@/lib/roles";
-
 import { Section } from "@/components/Section";
+import { AddressLine } from "@/components/reserve/accounts/AddressLine";
 import type { Data } from "@/components/reserve/sections/shared";
 
-// ── Accounts ────────────────────────────────────────────────────────────────
-
-type Row = [label: string, address: string, role: AccountRole];
-type Signer = [...Row, check: string];
-type Group = { id: string; title: string; rows: Row[] };
+type Signer = { name: string; address: string; a: AccountRole; does: string };
+type Row = { name: string; address: string; a: AccountRole };
+type Group = { id: string; title: string; open?: boolean; rows: Row[] };
 
 const LABEL = "font-body text-(--color-text-2) m-0 text-xs font-medium uppercase";
+const LABEL_STYLE = { letterSpacing: "0.01em" } as const;
 
-/** Plain-language notes for this page (lib/roles keeps the instruction-level wording for the operator and admin screens). */
+/**
+ * Plain notes for this page, keyed by the instruction-level wording in
+ * lib/roles. Program-owned accounts get no note: the "Program-owned" tag says it.
+ */
 const PLAIN_NOTE: Record<string, string> = {
-  "signs every admin instruction": "governs the reserve (multisig)",
-  "pause and revoke_operator only": "can pause the reserve and revoke the operator",
-  "signs every operator instruction": "runs guarantees and claim payments",
-  "written only by admin instructions": "the reserve's settings",
-  "receives the fee take of contribute_fees": "receives MUTAV's fee take",
-  "receives pay_claim": "receives claim payments",
-  "program-owned; Nora pays issuer income here, outside NAV until swept": "issuer income lands here before it joins the reserve",
-  "upgrade authority: the Reserve Admin": "upgradable by the Reserve Admin",
-  "program-owned": "held by the program",
+  "written only by admin instructions": "The reserve's settings",
+  "receives the fee take of contribute_fees": "Receives MUTAV's fee take",
+  "receives pay_claim": "Receives claim payments",
+  "program-owned; Nora pays issuer income here, outside NAV until swept": "Issuer income waits here until swept",
+  "upgrade authority: the Reserve Admin": "Upgradable by the Reserve Admin",
+  "issued by Nora": "Issued by Nora",
 };
 
-/** Role tag (or a dash for program-owned accounts) and its note. */
-function RoleNote({ a }: { a: AccountRole }) {
+const DIVIDER_SLOT: ImageSlotName = "accounts-verify";
+
+/** Who owns the account: its role tag, or "Program-owned". */
+function Owner({ a }: { a: AccountRole }) {
+  if (a.role) return <RoleTag role={a.role} />;
+  // The program itself and the BRS mint are not program-owned: their note says who controls them.
+  if (!a.note.startsWith("program-owned")) return null;
   return (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      {a.role ? <RoleTag role={a.role} /> : <Mono dim>—</Mono>}
-      <span className="font-body text-(--color-text-3) text-2xs">{PLAIN_NOTE[a.note] ?? a.note}</span>
+    <span className="font-mono text-(--color-text-3) text-2xs uppercase" style={{ letterSpacing: "0.06em" }}>
+      Program-owned
     </span>
   );
 }
 
-/** A full address that wraps inside narrow tiles instead of overflowing. */
-const Address = ({ value }: { value: string }) => (
-  <span style={{ wordBreak: "break-all" }}>
-    <Explorer value={value} full />
-  </span>
-);
+/** One account row: name, owner and note on the left; full address with copy and Explorer on the right. */
+function AccountRow({ row, last }: { row: Row; last: boolean }) {
+  const note = PLAIN_NOTE[row.a.note];
+  return (
+    <li className={`grid grid-cols-1 gap-2 px-6 py-4 md:grid-cols-[minmax(200px,280px)_1fr] md:items-center md:gap-6 ${last ? "" : "border-b"}`}>
+      <div className="flex flex-col gap-1">
+        <span className="font-body text-(--color-text) text-sm">{row.name}</span>
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <Owner a={row.a} />
+          {note && <span className="font-body text-(--color-text-3) text-2xs">{note}</span>}
+        </span>
+      </div>
+      <AddressLine value={row.address} label={row.name} />
+    </li>
+  );
+}
 
 export function Accounts({ r }: { r: ReserveView }) {
   const P = ACCOUNT_ROLES.program;
-  // The keys that sign: what a verifier checks first.
+
+  // Hero: the keys that sign. What a verifier checks first.
   const signers: Signer[] = [
-    ["Admin (Squads vault)", r.config.admin, ACCOUNT_ROLES.admin, "Check: the address is a Squads vault, and the program's upgrade authority."],
-    ["Pauser", r.config.pauser, ACCOUNT_ROLES.pauser, "Check: it can pause and revoke the operator, nothing else."],
-    ["Operator", r.config.operator, ACCOUNT_ROLES.operator, "Check: its transactions register guarantees and pay claims, within the caps."],
-    ["MUTAV capital wallet", r.config.mutavCapitalWallet, ACCOUNT_ROLES.capital, "Check: the only depositor in the pilot queue."],
+    { name: "Admin (Squads multisig)", address: r.config.admin, a: ACCOUNT_ROLES.admin, does: "Governs the reserve. Also the program's upgrade authority." },
+    { name: "Pauser", address: r.config.pauser, a: ACCOUNT_ROLES.pauser, does: "Can pause and revoke the operator. Nothing else." },
+    { name: "Operator", address: r.config.operator, a: ACCOUNT_ROLES.operator, does: "Registers guarantees and pays claims, within the caps." },
+    { name: "MUTAV capital wallet", address: r.config.mutavCapitalWallet, a: ACCOUNT_ROLES.capital, does: "The only depositor in the pilot queue." },
   ];
+
+  // The root every account below derives from: always visible.
+  const program: Row = { name: "Program", address: r.programId, a: { role: null, note: "upgrade authority: the Reserve Admin" } };
+
+  // Ordered by what a reader looks for: where money lands, then state, escrows, mints.
   const groups: Group[] = [
     {
-      id: "program",
-      title: "Program and state",
+      id: "money",
+      title: "Money accounts",
+      open: true,
       rows: [
-        ["Program", r.programId, { role: null, note: "upgrade authority: the Reserve Admin" }],
-        ["Reserve settings", r.addresses.config, ACCOUNT_ROLES.config],
-        ["Reserve state", r.addresses.state, P],
-        ["Reserve authority", r.addresses.vaultAuthority, P],
+        { name: "Income inbox", address: r.incomeInbox.address, a: ACCOUNT_ROLES.incomeInbox },
+        { name: "Treasury account", address: r.config.treasuryAccount, a: ACCOUNT_ROLES.treasury },
+        { name: "Payments account", address: r.config.paymentsAccount, a: ACCOUNT_ROLES.payments },
+      ],
+    },
+    {
+      id: "state",
+      title: "Reserve state",
+      rows: [
+        { name: "Reserve settings", address: r.addresses.config, a: ACCOUNT_ROLES.config },
+        { name: "Reserve state", address: r.addresses.state, a: P },
+        { name: "Reserve authority", address: r.addresses.vaultAuthority, a: P },
       ],
     },
     {
       id: "token",
       title: "Token accounts and escrows",
       rows: [
-        ["Reserve token account", r.addresses.reserve, P],
-        ["Pending deposits escrow", r.addresses.pendingDeposits, P],
-        ["Pending redemptions escrow", r.addresses.pendingRedemptions, P],
-        ["Filled redemptions escrow", r.addresses.claims, P],
-      ],
-    },
-    {
-      id: "money",
-      title: "Money accounts",
-      rows: [
-        ["Income inbox (issuer income)", r.incomeInbox.address, ACCOUNT_ROLES.incomeInbox],
-        ["Treasury account (fee take)", r.config.treasuryAccount, ACCOUNT_ROLES.treasury],
-        ["Payments account (claim payments)", r.config.paymentsAccount, ACCOUNT_ROLES.payments],
+        { name: "Reserve token account", address: r.addresses.reserve, a: P },
+        { name: "Pending deposits escrow", address: r.addresses.pendingDeposits, a: P },
+        { name: "Pending redemptions escrow", address: r.addresses.pendingRedemptions, a: P },
+        { name: "Filled redemptions escrow", address: r.addresses.claims, a: P },
       ],
     },
     {
       id: "mints",
       title: "Mints",
       rows: [
-        ["Share mint", r.addresses.shareMint, P],
-        ["BRS mint", r.config.reserveMint, { role: null, note: "issued by Nora" }],
+        { name: "Share mint", address: r.addresses.shareMint, a: P },
+        { name: "BRS mint", address: r.config.reserveMint, a: { role: null, note: "issued by Nora" } },
       ],
     },
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Lead: the role holders, one tile each. */}
+    <div className="flex flex-col gap-12">
+      {/* [B] Hero: who signs. One strip, 1px dividers, full addresses. */}
       <div className="flex flex-col gap-3">
-        <h3 id="accounts-signers" className={LABEL} style={{ letterSpacing: "0.01em" }}>
+        <h3 id="accounts-signers" className={LABEL} style={LABEL_STYLE}>
           Who signs
         </h3>
-        <ul aria-labelledby="accounts-signers" className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-4">
-          {signers.map(([k, v, a, check]) => (
-            <li key={k} className="bg-(--color-surface) flex flex-col justify-between gap-4 border p-6">
+        <ul aria-labelledby="accounts-signers" className="bg-(--color-border) m-0 grid list-none grid-cols-1 gap-px border p-0 md:grid-cols-2">
+          {signers.map((s) => (
+            <li key={s.name} className="bg-(--color-surface) flex flex-col gap-4 p-6">
               <div className="flex flex-col gap-2">
-                <span className="font-display text-(--color-text) text-base font-bold">{k}</span>
-                <RoleNote a={a} />
-                <span className="font-body text-(--color-text-2) text-xs leading-relaxed">{check}</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                  <span className="font-display text-(--color-text) text-base font-bold">{s.name}</span>
+                  <Owner a={s.a} />
+                </div>
+                <span className="font-body text-(--color-text-2) text-sm">{s.does}</span>
               </div>
-              <Address value={v} />
+              <AddressLine value={s.address} label={s.name} />
             </li>
           ))}
         </ul>
       </div>
 
-      {/* The rest, grouped by what each account does. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {groups.map((g) => (
-          <div key={g.id} className="bg-(--color-surface) flex flex-col border">
-            <h3 id={`accounts-${g.id}`} className={`${LABEL} border-b px-6 py-3`} style={{ letterSpacing: "0.01em" }}>
-              {g.title}
+      {/* [E] Detail: the program, then every account it uses, grouped by job. */}
+      <div className="flex flex-col gap-3">
+        <ImageSlot slot={DIVIDER_SLOT} aspect="6:1" className="min-h-[96px]">
+          <div className="flex h-full min-h-[96px] flex-col justify-end gap-1 px-6 py-4">
+            <h3 id="accounts-all" className="font-display text-(--color-text) m-0 text-lg font-bold">
+              Every account
             </h3>
-            <ul aria-labelledby={`accounts-${g.id}`} className="m-0 list-none p-0">
-              {g.rows.map(([k, v, a], i) => (
-                <li key={k} className={`flex flex-col gap-2 px-6 py-4 ${i < g.rows.length - 1 ? "border-b" : ""}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                    <span className="font-body text-(--color-text) text-sm">{k}</span>
-                    <RoleNote a={a} />
-                  </div>
-                  <Address value={v} />
-                </li>
-              ))}
-            </ul>
+            <p className="font-body text-(--color-text-2) m-0 text-sm">Each one derives from the program below. Open a group to check it.</p>
           </div>
-        ))}
+        </ImageSlot>
+
+        <div className="flex flex-col border" aria-labelledby="accounts-all" role="group">
+          <ul className="bg-(--color-surface) m-0 list-none border-b p-0">
+            <AccountRow row={program} last />
+          </ul>
+          {groups.map((g, gi) => (
+            <details key={g.id} open={g.open} className={`group ${gi < groups.length - 1 ? "border-b" : ""}`}>
+              <summary className="font-body text-(--color-text-2) hover:text-(--color-text) flex cursor-pointer list-none items-center gap-3 px-6 py-3 [&::-webkit-details-marker]:hidden">
+                <span aria-hidden="true" className="font-mono text-(--color-text-3) inline-block w-3 group-open:hidden">+</span>
+                <span aria-hidden="true" className="font-mono text-(--color-text-3) hidden w-3 group-open:inline-block">−</span>
+                <span id={`accounts-${g.id}`} className={LABEL} style={LABEL_STYLE}>
+                  {g.title}
+                </span>
+                <span className="font-mono text-(--color-text-3) text-2xs">{g.rows.length}</span>
+              </summary>
+              <ul aria-labelledby={`accounts-${g.id}`} className="bg-(--color-surface) m-0 list-none border-t p-0">
+                {g.rows.map((row, i) => (
+                  <AccountRow key={row.name} row={row} last={i === g.rows.length - 1} />
+                ))}
+              </ul>
+            </details>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-/** The Accounts section of /reserve: heading, roles and body. */
+/** The Accounts section of /reserve: heading and body. */
 export function AccountsSection({ d }: { d: Data }) {
   return (
-    <Section id="accounts" title="Accounts" kicker="Verify it yourself" subtitle="Open any address on Solana Explorer to check the numbers yourself.">
+    <Section id="accounts" title="Accounts" kicker="Verify it yourself" subtitle="Who can act on the reserve, and every address to check.">
       <Accounts r={d.reserve} />
     </Section>
   );
