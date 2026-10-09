@@ -15,6 +15,11 @@ export const IMAGE_SLOTS = {
   "reserve-claims": null,
   "reserve-disclosures": null,
   "reserve-risks": null,
+  "overview-promises": null,
+  "flows-capital": null,
+  "queue-line": null,
+  "accounts-verify": null,
+  "dashboard-header": null,
 } satisfies Record<string, string | null>;
 
 export type ImageSlotName = keyof typeof IMAGE_SLOTS;
