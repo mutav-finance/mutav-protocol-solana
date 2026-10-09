@@ -117,10 +117,14 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await page.goto("/investor");
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
-    await expect(page.getByText("NO WALLET CONNECTED · READ-ONLY")).toBeVisible();
-    await expect(page.getByRole("button", { name: "request_deposit" })).toBeDisabled();
-    await page.getByRole("tab", { name: "Redeem" }).click();
-    await expect(page.getByRole("button", { name: "request_redeem" })).toBeDisabled();
+    const gate = page.getByRole("dialog", { name: "Connect your wallet" });
+    await expect(gate).toContainText("Connect the allowlisted wallet to send requests.");
+    await expect(gate.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
+    // Behind the dialog the page stays read-only.
+    await expect(page.getByRole("button", { name: "Request deposit" })).toBeDisabled();
+    await page.getByRole("tab", { name: "Redeem" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("button", { name: "Request redemption" })).toBeDisabled();
     const seeded = await (await request.get("/api/reserve")).json();
     const capital = (await (await request.get(`/api/investor?owner=${seeded.config.mutavCapitalWallet}`)).json()).allowlist.state;
     const operator = (await (await request.get(`/api/investor?owner=${seeded.config.operator}`)).json()).allowlist.state;
