@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { MetricCard } from "@/components/MetricCard";
 import { Mono } from "@/components/Mono";
 import { InfoTooltip } from "@/components/InfoTooltip";
-import { fmtBps, fmtBrs, fmtNav, fmtRatio, fmtShares, fmtTime } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtNav, fmtRatio, fmtShares } from "@/lib/format";
 import { frac, solvencyMeter } from "@/lib/charts";
 import { MODE_LABEL, type ReserveView } from "@/lib/view";
 import { navPerShare } from "@mutav-finance/mutav-protocol-solana";
@@ -82,14 +82,6 @@ export function Health({ r }: { r: ReserveView }) {
         {underCovered && <Badge color="var(--color-error)" label={`${MODE_LABEL(s.mode).toUpperCase()} MODE`} />}
         <Badge color={s.fulfilHalted ? "var(--color-error)" : "var(--color-text-3)"} label={s.fulfilHalted ? "QUEUE FILLS HALTED" : "QUEUE FILLS OPEN"} />
         <Badge color={r.config.paused ? "var(--color-error)" : "var(--color-text-3)"} label={r.config.paused ? "PAUSED" : "NOT PAUSED"} />
-        <span className="font-mono text-(--color-text-3) inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs lg:ml-auto">
-          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-            NAV published {fmtTime(s.lastRefreshTs)}
-            <InfoTooltip label="About the two timestamps" width={260}>
-              The header shows when this page last read the chain. This line shows when NAV, coverage and mode were last published on-chain.
-            </InfoTooltip>
-          </span>
-        </span>
       </div>
     </div>
   );

@@ -15,7 +15,7 @@ import { ReadError } from "@/components/Section";
 import { StatusBadge } from "@/components/StatusBadge";
 import { usePoll } from "@/lib/client/use-poll";
 import { Mono } from "@/components/Mono";
-import { fmtBrs, fmtShares } from "@/lib/format";
+import { fmtBrs, fmtShares, fmtTime } from "@/lib/format";
 import { activeRemainingCover, agencyRows, capitalQueue, coverageRows, moneyFlows } from "@/lib/view";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -56,26 +56,62 @@ function StatsStrip({ d }: { d: Data }) {
   const q = capitalQueue(r.state, l);
   const pendingDeposits = q.deposits.reduce((s, x) => s + x.waiting, 0n);
   const pendingShares = q.redeems.reduce((s, x) => s + x.waiting, 0n);
-  const cells: [string, string, string, string][] = [
-    ["/reserve/coverage", "Remaining cover", fmtBrs(activeRemainingCover(rows)), "active guarantees"],
-    ["/reserve/coverage", "Active guarantees", String(r.state.activeGuarantees), "registered, not closed"],
-    ["/reserve/coverage", "Agencies", String(agencies.length), "with exposure"],
-    ["/reserve/claims", "Claims paid", fmtBrs(r.state.claimsPaidTotal), "lifetime"],
-    ["/reserve/flows", "Earned net", `${earned >= 0n ? "+" : "−"}${fmtBrs(earned < 0n ? -earned : earned)}`, "fees + income − claims"],
-    ["/reserve/queue", "In the queue", fmtBrs(pendingDeposits), `deposits · ${fmtShares(pendingShares)} shares to redeem`],
+  const groups: { name: string; span: string; cells: [string, string, string, string][] }[] = [
+    {
+      name: "Cover",
+      span: "lg:col-span-3",
+      cells: [
+        ["/reserve/coverage", "Remaining cover", fmtBrs(activeRemainingCover(rows)), "active guarantees"],
+        ["/reserve/coverage", "Active guarantees", String(r.state.activeGuarantees), "registered, not closed"],
+        ["/reserve/coverage", "Agencies", String(agencies.length), "with exposure"],
+      ],
+    },
+    { name: "Claims", span: "lg:col-span-1", cells: [["/reserve/claims", "Claims paid", fmtBrs(r.state.claimsPaidTotal), "lifetime"]] },
+    {
+      name: "Money",
+      span: "lg:col-span-2",
+      cells: [
+        ["/reserve/flows", "Earned net", `${earned >= 0n ? "+" : "−"}${fmtBrs(earned < 0n ? -earned : earned)}`, "fees + income − claims"],
+        ["/reserve/queue", "In the queue", fmtBrs(pendingDeposits), `deposits · ${fmtShares(pendingShares)} shares to redeem`],
+      ],
+    },
   ];
+  // Grouped by what the figures are about; each cell links to the view that details it.
   return (
-    <nav aria-label="Reserve figures" className="-mx-px mb-4 grid grid-cols-2 gap-px border sm:grid-cols-3 lg:grid-cols-6" style={{ background: "var(--color-border)" }}>
-      {cells.map(([href, label, value, note]) => (
-        <Link key={label} href={href} className="bg-(--color-surface) hover:bg-(--color-surface-2) flex min-w-0 flex-col gap-1 px-4 py-3 no-underline">
-          <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>
-            {label}
+    <nav aria-label="Reserve figures" className="-mx-px mb-4 grid grid-cols-1 gap-px border lg:grid-cols-6" style={{ background: "var(--color-border)" }}>
+      {groups.map((g) => (
+        <div key={g.name} className={`flex flex-col gap-px ${g.span}`}>
+          <span className="bg-(--color-canvas) font-mono text-(--color-text-3) px-4 py-1.5 text-2xs uppercase" style={{ letterSpacing: "0.08em" }}>
+            {g.name}
           </span>
-          <Mono style={{ fontSize: "clamp(14px, 3.6vw, 17px)", fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap" }}>{value}</Mono>
-          <span className="font-mono text-(--color-text-3) truncate text-2xs">{note}</span>
-        </Link>
+          <div className="grid flex-1 gap-px" style={{ gridTemplateColumns: `repeat(${g.cells.length}, minmax(0, 1fr))` }}>
+            {g.cells.map(([href, label, value, note]) => (
+              <Link key={label} href={href} className="group bg-(--color-surface) hover:bg-(--color-surface-2) flex min-w-0 flex-col gap-1 px-4 py-3 no-underline">
+                <span className="font-body text-(--color-text-2) flex items-center justify-between gap-2 text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>
+                  {label}
+                  <span aria-hidden="true" className="text-(--color-text-3) group-hover:text-(--color-accent)">→</span>
+                </span>
+                <Mono style={{ fontSize: "clamp(14px, 3.6vw, 17px)", fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap" }}>{value}</Mono>
+                <span className="font-mono text-(--color-text-3) truncate text-2xs">{note}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
       ))}
     </nav>
+  );
+}
+
+/** Static placeholders in the shape of the strip and the lead tile, while the first read is in flight. */
+function Skeleton() {
+  const block = (cls: string) => <div className={`bg-(--color-surface) border ${cls}`} />;
+  return (
+    <div aria-busy="true" aria-label="Reading the chain" className="flex flex-col gap-4 pt-6">
+      <span className="sr-only">Reading the chain…</span>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">{Array.from({ length: 6 }, (_, i) => <div key={i}>{block("h-[76px]")}</div>)}</div>
+      {block("h-[220px]")}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{Array.from({ length: 4 }, (_, i) => <div key={i}>{block("h-[120px]")}</div>)}</div>
+    </div>
   );
 }
 
@@ -124,9 +160,11 @@ export function ReserveShell({ children }: { children: ReactNode }) {
                   live · page read {new Date(poll.updatedAt).toISOString().slice(11, 19)} UTC
                 </span>
               )}
+              {d && <span className="whitespace-nowrap">· NAV published {fmtTime(d.reserve.state.lastRefreshTs)}</span>}
               <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                <InfoTooltip label="About this page">
-                  Every number is read from the MUTAV program&apos;s on-chain accounts, refreshed every 10 seconds. No wallet needed.
+                <InfoTooltip label="About this page" width={280}>
+                  Every number is read from the MUTAV program&apos;s on-chain accounts, every 10 seconds; no wallet needed. &ldquo;Page read&rdquo; is when this page last read
+                  the chain; &ldquo;NAV published&rdquo; is when NAV, coverage and mode were last published on-chain.
                 </InfoTooltip>
               </span>
             </span>
@@ -174,14 +212,10 @@ export function ReserveShell({ children }: { children: ReactNode }) {
       <main id="reserve-view" className="flex w-full flex-1 flex-col pb-12" style={{ paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" }}>
         {poll.error && !d && (
           <div className="pt-6">
-            <ReadError error={poll.error} />
+            <ReadError error={poll.error} onRetry={poll.refresh} />
           </div>
         )}
-        {poll.loading && !d && (
-          <p className="font-mono text-(--color-text-3) pt-6 text-xs" aria-busy="true">
-            Reading the chain…
-          </p>
-        )}
+        {poll.loading && !d && <Skeleton />}
         {d && <ReserveCtx.Provider value={{ d, refresh: poll.refresh }}>{children}</ReserveCtx.Provider>}
       </main>
     </div>

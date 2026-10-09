@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { Button } from "@/components/ui/button";
 
 /**
  * A page section (web investidor rhythm): mono kicker, 24px Geist heading,
@@ -65,8 +66,8 @@ export function Page({ children, title, lede, banner, intro }: { children: React
   );
 }
 
-/** Shown when a read fails: the app never invents a number to fill the gap. */
-export function ReadError({ error }: { error: Error & { notConfigured?: boolean } }) {
+/** Shown when a read fails: the app never invents a number to fill the gap. `onRetry` reads again now. */
+export function ReadError({ error, onRetry }: { error: Error & { notConfigured?: boolean }; onRetry?: () => void }) {
   if (error.notConfigured)
     return (
       <div role="status" style={{ border: "1px solid var(--color-border)", padding: "14px 16px", background: "var(--color-surface)" }}>
@@ -76,10 +77,15 @@ export function ReadError({ error }: { error: Error & { notConfigured?: boolean 
       </div>
     );
   return (
-    <div role="alert" style={{ border: "1px solid var(--color-error)", padding: "14px 16px", background: "var(--color-surface)" }}>
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3" style={{ border: "1px solid var(--color-error)", padding: "14px 16px", background: "var(--color-surface)" }}>
       <p className="font-mono" style={{ fontSize: 12, color: "var(--color-error)", margin: 0 }}>
         Could not read the chain: {error.message}
       </p>
+      {onRetry && (
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          Retry
+        </Button>
+      )}
     </div>
   );
 }
