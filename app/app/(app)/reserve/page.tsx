@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Overview } from "@/components/reserve/Overview";
 
 export const metadata: Metadata = {
-  title: "Reserve",
+  title: "Transparency",
   description: "The MUTAV pilot reserve, read live from Solana: health, coverage, claims, money flows and the capital queue.",
 };
 

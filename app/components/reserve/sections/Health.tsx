@@ -5,7 +5,6 @@
  * computed here beyond sums and differences of account fields.
  */
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { MetricCard } from "@/components/MetricCard";
 import { Mono } from "@/components/Mono";
 import { InfoTooltip } from "@/components/InfoTooltip";
@@ -16,7 +15,6 @@ import { navPerShare } from "@mutav-finance/mutav-protocol-solana";
 import { C, Track } from "@/components/charts/Charts";
 
 import { Section } from "@/components/Section";
-import { RoleLine } from "@/components/RoleTag";
 import type { Data } from "@/components/reserve/sections/shared";
 
 // ── Health ──────────────────────────────────────────────────────────────────
@@ -43,40 +41,37 @@ export function Health({ r }: { r: ReserveView }) {
   const sol = r.solvency;
   const navNow = navPerShare(sol.netAssets, s.sharesOutstanding);
   const underCovered = s.mode !== 0;
-  // ★ the lead tile; ● three figures and the assets tile beside it; ○ one quiet strip.
+  // ★ the full-width lead tile; ● four figures in one row; ○ one quiet strip.
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-12">
-        <SolvencyTile r={r} />
-        <div className="col-span-1 grid lg:col-span-4">
+      <SolvencyTile r={r} />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="col-span-1 grid">
           <MetricCard
             label="Free capital"
             value={fmtBrs(sol.freeCapital)}
-            unit="equals the surplus in the pilot"
-            tooltip={`Surplus (stable assets − coverage required, ${fmtBrs(sol.surplus)}) minus the instant-exit earmark, zero in the pilot. New guarantees and redemptions are checked against it; it never blocks a claim payment.`}
+            unit="available for new guarantees and redemptions"
+            tooltip={`Equals the surplus in the pilot: stable assets − coverage required (${fmtBrs(sol.surplus)}). New guarantees and redemptions are checked against it; it never blocks a claim payment.`}
           />
         </div>
-        <div className="col-span-1 grid lg:col-span-4">
+        <div className="col-span-1 grid">
           <MetricCard
             label="NAV per share"
             value={fmtNav(s.navPerShare)}
-            unit={`at last refresh · now ${fmtNav(navNow)}`}
+            unit={navNow !== s.navPerShare ? `published on-chain · now ${fmtNav(navNow)} (recomputed)` : "published on-chain"}
             tooltip="Net assets (stable assets − open claim provisions) ÷ shares outstanding. A filed claim books a provision, so net assets drop before any BRS leaves the reserve. Published on refresh; 'now' is recomputed from the current accounts."
           />
         </div>
-        <div className="col-span-1 grid lg:col-span-4">
+        <div className="col-span-1 grid">
           <MetricCard label="Open provisions" value={fmtBrs(s.provisions)} unit="filed claims, not yet paid" tooltip="Booked when a claim is filed; already out of NAV." />
         </div>
-        <div className="bg-(--color-surface) relative col-span-1 flex min-h-[160px] flex-col justify-end gap-4 overflow-hidden border p-6 lg:col-span-4">
-          {/* Decorative image tile (Unsplash, Valentyn Chernetskyi). No numbers sit on the photo. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/img/reserve-assets.jpg" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 30%", opacity: 0.14 }} />
-          <p className="font-body text-(--color-text-2) relative m-0 text-sm leading-relaxed">
-            {sol.tesouroValue > 0n ? "BRS plus assets held through capped adapters." : "100% BRS today. More assets through capped adapters."}
-          </p>
-          <Link href="/admin#allocation" className="font-body cta-outline bg-(--color-canvas) relative self-start border border-(--color-border-input) px-4 py-2 text-sm text-(--color-text) no-underline">
-            How assets are managed and added →
-          </Link>
+        <div className="col-span-1 grid">
+          <MetricCard
+            label="Asset mix"
+            value={sol.tesouroValue > 0n && sol.stableAssets > 0n ? `${fmtBps(Number(((sol.stableAssets - sol.tesouroValue) * 10_000n) / sol.stableAssets))} BRS` : "100% BRS"}
+            unit="more assets through capped adapters"
+            tooltip="Stable assets by kind: BRS held in the reserve, plus any value held through whitelisted, capped adapters (none in the pilot). The Reserve Admin manages the allocation."
+          />
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t pt-4">
@@ -84,11 +79,16 @@ export function Health({ r }: { r: ReserveView }) {
           <Label>Shares outstanding</Label>
           <Mono style={{ fontSize: 13, color: "var(--color-text)" }}>{fmtShares(s.sharesOutstanding)}</Mono>
         </span>
-        <Badge color={underCovered ? "var(--color-error)" : "var(--color-success)"} label={`MODE ${MODE_LABEL(s.mode).toUpperCase()}`} />
-        <Badge color={s.fulfilHalted ? "var(--color-error)" : "var(--color-text-3)"} label={s.fulfilHalted ? "FULFIL HALTED" : "FULFIL OPEN"} />
+        {underCovered && <Badge color="var(--color-error)" label={`${MODE_LABEL(s.mode).toUpperCase()} MODE`} />}
+        <Badge color={s.fulfilHalted ? "var(--color-error)" : "var(--color-text-3)"} label={s.fulfilHalted ? "QUEUE FILLS HALTED" : "QUEUE FILLS OPEN"} />
         <Badge color={r.config.paused ? "var(--color-error)" : "var(--color-text-3)"} label={r.config.paused ? "PAUSED" : "NOT PAUSED"} />
-        <span className="font-mono text-(--color-text-3) text-xs lg:ml-auto">
-          last refresh {fmtTime(s.lastRefreshTs)} · slot {s.lastRefreshSlot.toString()}
+        <span className="font-mono text-(--color-text-3) inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs lg:ml-auto">
+          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+            NAV published {fmtTime(s.lastRefreshTs)}
+            <InfoTooltip label="About the two timestamps" width={260}>
+              The header shows when this page last read the chain. This line shows when NAV, coverage and mode were last published on-chain.
+            </InfoTooltip>
+          </span>
         </span>
       </div>
     </div>
@@ -123,9 +123,10 @@ function SolvencyTile({ r }: { r: ReserveView }) {
     <div
       role="status"
       aria-label={`Coverage status: ${label}, ratio ${fmtRatio(m.stableAssets, m.coverageRequired)}`}
-      className="col-span-2 flex flex-col justify-between gap-6 border p-6 lg:col-span-4 lg:row-span-2"
-      style={{ background: `color-mix(in oklab, ${color} 10%, var(--color-surface))`, borderColor: `color-mix(in oklab, ${color} 45%, transparent)` }}
+      className="bg-(--color-surface) grid grid-cols-1 gap-6 border p-6 lg:grid-cols-2 lg:gap-10"
+      style={{ borderTop: `4px solid ${color}` }}
     >
+      <div className="flex flex-col justify-between gap-4">
       <Badge color={color} label={label} />
       <div className="flex flex-col gap-2">
         <span className="inline-flex items-center gap-1.5">
@@ -135,17 +136,18 @@ function SolvencyTile({ r }: { r: ReserveView }) {
         <Mono style={{ fontSize: "clamp(40px, 5vw, 64px)", fontWeight: 700, lineHeight: 1, color }}>{fmtRatio(m.stableAssets, m.coverageRequired)}</Mono>
         {status && <Mono style={{ fontSize: 11, color: m.underCovered ? "var(--color-error)" : "var(--color-text-3)" }}>{status}</Mono>}
       </div>
-      <div className="flex flex-col gap-4 border-t pt-4" style={{ borderColor: `color-mix(in oklab, ${color} 30%, transparent)` }}>
+      </div>
+      <div className="flex flex-col justify-center gap-4 border-t pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10">
         {bar(
           "Stable assets",
-          "BRS held by the reserve: internal accounting of the reserve token account (brs_balance). Excludes pending deposits and assets owed to filled redemptions. Bar: the part that backs cover, then the surplus.",
+          "BRS held by the reserve: the reserve token account. Excludes pending deposits and assets owed to filled redemptions. Bar: the part that backs cover, then the surplus.",
           m.stableAssets,
           "BRS only in the pilot",
           [{ f: frac(m.backing, m.axis), color: C.ink }, { f: frac(m.surplus, m.axis), color: C.good }],
         )}
         {bar(
           "Coverage required",
-          "ceil(c × remaining cover of every active guarantee), never less than the open claim provisions. The coverage ratio c is at least 10%. A red segment is a shortfall.",
+          `Required share of remaining cover (set by the Reserve Admin, at least 10%; today ${fmtBps(r.config.coverageRatioBps)}): ceil(c × remaining cover of every active guarantee). Never less than open claim provisions. A red segment is a shortfall.`,
           m.coverageRequired,
           `${fmtBps(r.config.coverageRatioBps)} of remaining cover`,
           [{ f: frac(m.backing, m.axis), color: C.mid }, { f: frac(m.shortfall, m.axis), color: C.bad }],
@@ -162,9 +164,8 @@ export function HealthSection({ d }: { d: Data }) {
       id="health"
       title="Health"
       kicker="Solvency"
-      subtitle="Is the reserve covered? Read live from VaultState."
-      info="Computed with the program's own formulas (spec §4) from VaultConfig and VaultState. The coverage ratio and caps are set by the Reserve Admin; anyone can send refresh."
-      roles={<RoleLine items={[{ role: "admin" }, { role: "anyone" }]} />}
+      subtitle="Is the reserve covered? Read live from the program's accounts."
+      info="Computed with the program's own formulas from its on-chain accounts. The coverage ratio and caps are set by the Reserve Admin."
     >
       <Health r={d.reserve} />
     </Section>

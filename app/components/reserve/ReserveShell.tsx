@@ -2,18 +2,21 @@
 
 /**
  * The /reserve platform shell: one read of /api/ledger shared by every tab,
- * a compact sticky header (status, live read, refresh, role key) and the tab
- * bar. Each tab is its own route under /reserve.
+ * a compact header (views menu, status, live read), a persistent stats
+ * strip linking to the views, and a side menu of the views. Each view is its
+ * own route under /reserve.
  */
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { InfoTooltip } from "@/components/InfoTooltip";
-import { RefreshButton } from "@/components/RefreshButton";
-import { RoleLegend } from "@/components/RoleTag";
+import { Button } from "@/components/ui/button";
 import { ReadError } from "@/components/Section";
 import { StatusBadge } from "@/components/StatusBadge";
 import { usePoll } from "@/lib/client/use-poll";
+import { Mono } from "@/components/Mono";
+import { fmtBrs, fmtShares } from "@/lib/format";
+import { activeRemainingCover, agencyRows, capitalQueue, coverageRows, moneyFlows } from "@/lib/view";
 import type { Data } from "@/components/reserve/sections/shared";
 
 type Ctx = { d: Data; refresh: () => Promise<void> };
@@ -37,57 +40,137 @@ export const TABS: [string, string][] = [
   ["/reserve/accounts", "Accounts"],
 ];
 
+/**
+ * Persistent stats strip, on every view: figures that complement Health (which
+ * owns ratio, stable assets, coverage required, free capital and NAV). Each cell
+ * links to the view that details it. Sums of the shared read only.
+ */
+function StatsStrip({ d }: { d: Data }) {
+  const r = d.reserve;
+  const l = d.ledger;
+  const rows = coverageRows(l.guarantees);
+  const agencies = agencyRows(l.exposures, r.config.caps.maxCoverPerAgency);
+  const { totals } = moneyFlows(r.state, l);
+  // Earned net: guarantee fees net + issuer income net − claim payments (capital moves are not earnings). Same as Flows.
+  const earned = totals.feesNetToReserve + totals.incomeNetToReserve - totals.claimsPaid;
+  const q = capitalQueue(r.state, l);
+  const pendingDeposits = q.deposits.reduce((s, x) => s + x.waiting, 0n);
+  const pendingShares = q.redeems.reduce((s, x) => s + x.waiting, 0n);
+  const cells: [string, string, string, string][] = [
+    ["/reserve/coverage", "Remaining cover", fmtBrs(activeRemainingCover(rows)), "active guarantees"],
+    ["/reserve/coverage", "Active guarantees", String(r.state.activeGuarantees), "registered, not closed"],
+    ["/reserve/coverage", "Agencies", String(agencies.length), "with exposure"],
+    ["/reserve/claims", "Claims paid", fmtBrs(r.state.claimsPaidTotal), "lifetime"],
+    ["/reserve/flows", "Earned net", `${earned >= 0n ? "+" : "−"}${fmtBrs(earned < 0n ? -earned : earned)}`, "fees + income − claims"],
+    ["/reserve/queue", "In the queue", fmtBrs(pendingDeposits), `deposits · ${fmtShares(pendingShares)} shares to redeem`],
+  ];
+  return (
+    <nav aria-label="Reserve figures" className="-mx-px mb-4 grid grid-cols-2 gap-px border sm:grid-cols-3 lg:grid-cols-6" style={{ background: "var(--color-border)" }}>
+      {cells.map(([href, label, value, note]) => (
+        <Link key={label} href={href} className="bg-(--color-surface) hover:bg-(--color-surface-2) flex min-w-0 flex-col gap-1 px-4 py-3 no-underline">
+          <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>
+            {label}
+          </span>
+          <Mono style={{ fontSize: "clamp(14px, 3.6vw, 17px)", fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap" }}>{value}</Mono>
+          <span className="font-mono text-(--color-text-3) truncate text-2xs">{note}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 export function ReserveShell({ children }: { children: ReactNode }) {
   const poll = usePoll<Data>("/api/ledger", 10_000);
   const pathname = usePathname();
+  const [menu, setMenu] = useState(false);
+  const isActive = (href: string) => (href === "/reserve" ? pathname === "/reserve" : pathname.startsWith(href));
+  const current = TABS.find(([href]) => isActive(href))?.[1];
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menu]);
   const d = poll.data;
   const covered = d ? d.reserve.solvency.stableAssets >= d.reserve.solvency.coverageRequired : null;
   return (
     <div className="flex w-full flex-1 flex-col">
-      <header className="bg-(--color-canvas) z-[90] border-b lg:sticky lg:top-14" style={{ paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" }}>
+      <header className="bg-(--color-canvas) z-[90] border-b" style={{ paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" }}>
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 pt-4 pb-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <h1 className="font-display text-(--color-text) m-0 text-2xl font-bold tracking-tight">Reserve</h1>
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label="Open transparency menu"
+              aria-expanded={menu}
+              aria-controls="reserve-menu"
+              onClick={() => setMenu(true)}
+              style={{ width: 40, height: 40, border: "1px solid var(--color-border)", color: "var(--color-text-2)" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" style={{ width: 18, height: 18 }}>
+                <path d="M3 6h18M3 12h18M3 18h18" />
+              </svg>
+            </Button>
+            <h1 className="font-display text-(--color-text) m-0 text-2xl font-bold tracking-tight">
+              Transparency
+              {current && current !== "Overview" && <span className="text-(--color-text-3) font-normal"> / {current}</span>}
+            </h1>
             {covered !== null && <StatusBadge color={covered ? "var(--color-success)" : "var(--color-error)"} label={covered ? "COVERED" : "UNDER-COVERED"} />}
-            {poll.updatedAt && (
-              <span className="font-mono text-(--color-text-3) inline-flex items-center gap-2 text-xs">
-                <span className="live-dot" aria-hidden="true" />
-                live · read {new Date(poll.updatedAt).toLocaleTimeString()}
-                {d ? ` · slot ${d.reserve.slot}` : ""}
+            {/* The live line and its ⓘ wrap as one unit, so the ⓘ is never left alone on a line. */}
+            <span className="font-mono text-(--color-text-3) inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+              {poll.updatedAt && (
+                <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                  <span className="live-dot" aria-hidden="true" />
+                  live · page read {new Date(poll.updatedAt).toISOString().slice(11, 19)} UTC
+                </span>
+              )}
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                <InfoTooltip label="About this page">
+                  Every number is read from the MUTAV program&apos;s on-chain accounts, refreshed every 10 seconds. No wallet needed.
+                </InfoTooltip>
               </span>
-            )}
-            <InfoTooltip label="About this page">
-              Every number is read from the MUTAV program&apos;s on-chain accounts, refreshed every 10 seconds. No wallet needed.
-            </InfoTooltip>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="hidden items-center gap-2 lg:inline-flex">
-              <RoleLegend withAnyone />
-              <InfoTooltip label="About the role tags">
-                Each section names who wrote it: the Reserve Admin (a Squads multisig), the Operator (MUTAV&apos;s key) or the Investor (the allowlisted capital
-                provider; in the pilot, MUTAV&apos;s capital wallet). Anyone can call the public instructions.
-              </InfoTooltip>
             </span>
-            <RefreshButton onConfirmed={poll.refresh} />
           </div>
         </div>
-        <nav aria-label="Reserve views" className="scroll-dark -mb-px flex gap-1 overflow-x-auto">
-          {TABS.map(([href, label]) => {
-            const active = href === "/reserve" ? pathname === "/reserve" : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={`font-body shrink-0 border-b px-3 py-2 text-sm no-underline ${active ? "text-(--color-text) font-medium" : "text-(--color-text-2) hover:text-(--color-text) border-transparent"}`}
-                style={active ? { borderBottomColor: "var(--color-accent)" } : undefined}
-              >
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
+        {d && <StatsStrip d={d} />}
       </header>
+      {menu && (
+        <div className="fixed inset-0 z-[160]" onClick={() => setMenu(false)} style={{ background: "color-mix(in oklab, var(--color-canvas) 70%, transparent)" }}>
+          <nav
+            id="reserve-menu"
+            aria-label="Transparency views"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-(--color-surface) absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col border-r"
+          >
+            <div className="flex h-14 items-center justify-between border-b px-4">
+              <span className="font-display text-(--color-text) text-base font-bold">Transparency</span>
+              <Button type="button" variant="ghost" aria-label="Close transparency menu" onClick={() => setMenu(false)} style={{ width: 36, height: 36, color: "var(--color-text-2)" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" style={{ width: 16, height: 16 }}>
+                  <path d="M5 5l14 14M19 5L5 19" />
+                </svg>
+              </Button>
+            </div>
+            <ul className="m-0 flex flex-col p-0 py-2">
+              {TABS.map(([href, label]) => {
+                const active = isActive(href);
+                return (
+                  <li key={href} className="list-none">
+                    <Link
+                      href={href}
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => setMenu(false)}
+                      className={`font-body flex min-h-11 items-center px-4 text-sm no-underline ${active ? "text-(--color-text) bg-(--color-surface-2) font-medium" : "text-(--color-text-2) hover:text-(--color-text) hover:bg-(--color-surface-2)"}`}
+                      style={{ borderLeft: `1px solid ${active ? "var(--color-accent)" : "transparent"}` }}
+                    >
+                      {label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        </div>
+      )}
       <main id="reserve-view" className="flex w-full flex-1 flex-col pb-12" style={{ paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" }}>
         {poll.error && !d && (
           <div className="pt-6">

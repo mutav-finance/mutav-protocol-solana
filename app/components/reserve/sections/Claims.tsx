@@ -4,7 +4,7 @@
  * /reserve · Claims. Renders on-chain values from /api/ledger; nothing is
  * computed here beyond sums and differences of account fields.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { InfoTooltip } from "@/components/InfoTooltip";
@@ -14,8 +14,9 @@ import { claimSpeed, frac } from "@/lib/charts";
 import { C, ChartFrame, Legend, Row, RowLabel, Swatch, Track, type Seg } from "@/components/charts/Charts";
 
 import { Empty, Num, Table, short } from "@/components/reserve/sections/shared";
+import { ImageSlot } from "@/components/ImageSlot";
+import { PeriodPicker, inPeriod, type Period } from "@/components/reserve/sections/Flows";
 import { Section } from "@/components/Section";
-import { RoleLine } from "@/components/RoleTag";
 import type { Data } from "@/components/reserve/sections/shared";
 
 // ── Claims timeline ─────────────────────────────────────────────────────────
@@ -34,12 +35,11 @@ const slowest = (xs: (bigint | null)[]): bigint | null => xs.reduce<bigint | nul
 /** Decorative image banner carrying the core spec property of this section. */
 function GuardTile({ className = "" }: { className?: string }) {
   return (
-    <div className={`bg-(--color-surface) relative flex min-h-[120px] flex-col justify-end overflow-hidden border p-6 ${className}`}>
-      {/* Decorative image tile (Unsplash, Yamato Yamaguchi). */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/img/reserve-claims.jpg" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.16 }} />
-      <p className="font-display text-(--color-text) relative m-0 text-xl font-bold leading-snug">The Reserve Admin cannot block a claim payment.</p>
-    </div>
+    <ImageSlot slot="reserve-claims" aspect="wide" className={`min-h-[120px] ${className}`}>
+      <div className="flex h-full min-h-[120px] flex-col justify-end p-6">
+        <p className="font-display text-(--color-text) m-0 text-xl font-bold leading-snug">Claim payments are never blocked by solvency or by a pause.</p>
+      </div>
+    </ImageSlot>
   );
 }
 
@@ -50,18 +50,18 @@ function SpeedTile({ rows, slaSecs }: { rows: ClaimRow[]; slaSecs: bigint }) {
   const late = rows.filter((c) => c.lateOnChain).length;
   const overdue = rows.filter((c) => !c.lateOnChain && c.overdue).length;
   const bad = late > 0;
-  const stat = (label: string, v: bigint | null, empty: string) => (
+  const stat = (label: string, v: bigint | null, empty: string, sub?: string) => (
     <div className="flex flex-col gap-2">
       <Label>{label}</Label>
       <Mono style={{ fontSize: "clamp(28px, 3.2vw, 40px)", fontWeight: 700, lineHeight: 1, color: v === null ? "var(--color-text-3)" : "var(--color-text)" }}>{v === null ? empty : fmtDuration(v)}</Mono>
+      {sub && <Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>{sub}</Mono>}
     </div>
   );
   return (
     <div className="bg-(--color-surface) flex flex-col justify-between gap-6 border p-6 lg:col-span-4" style={{ borderColor: bad ? "var(--color-error)" : "var(--color-border)" }}>
       {stat("Filed → paid · slowest", pay, "not paid yet")}
-      {stat("Paid → settled · slowest", settle, "not settled yet")}
+      {stat("Paid → settled · slowest", settle, "not settled yet", `payout SLA ${fmtDuration(slaSecs)}`)}
       <div className="flex flex-col gap-1 border-t pt-4">
-        <span className="font-mono text-(--color-text-2) text-xs">payout SLA {fmtDuration(slaSecs)}</span>
         <span className="font-mono text-xs" style={{ color: bad ? "var(--color-error)" : overdue > 0 ? "var(--color-copper)" : "var(--color-text-3)" }}>
           {late} late{overdue > 0 ? ` · ${overdue} past SLA, not yet recorded` : ""}
         </span>
@@ -106,7 +106,7 @@ function SpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaSecs: bigint;
         <span className="inline-flex items-center gap-2">
           Oldest filing first. The vertical line is the payout SLA.
           <InfoTooltip label="About claim speed">
-            Filed → paid: ClaimFiling.filed_at to Payout.paid_at. Paid → settled: Payout.paid_at to settled_at (PIX); a pending payout shows the time so far. Every step is signed by the operator.
+            Filed → paid: from when the claim was filed to when it was paid. Paid → settled: from payment to settlement by PIX; a pending payment shows the time so far.
           </InfoTooltip>
         </span>
       }
@@ -140,43 +140,75 @@ export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
     );
   const paid = rows.filter((c) => c.paidAt !== null).length;
   const settled = rows.filter((c) => c.settledAt !== null).length;
+  return <ClaimsBody r={r} rows={rows} paid={paid} settled={settled} />;
+}
+
+/** With few claims (< 3) the table leads and the chart follows; otherwise chart, then table. The period filters the table by filed date. */
+function ClaimsBody({ r, rows, paid, settled }: { r: ReserveView; rows: ClaimRow[]; paid: number; settled: number }) {
+  const [period, setPeriod] = useState<Period>("All");
+  const shown = rows.filter((c) => inPeriod(c.filedAt, r.now, period));
+  const few = rows.length < 3;
+  const table = (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-mono text-(--color-text-2) m-0 text-xs">
+          {rows.length} filed · {paid} paid · {settled} settled
+        </p>
+        <PeriodPicker value={period} onChange={setPeriod} label="Claims period" />
+      </div>
+      {shown.length === 0 ? (
+        <Empty>No claims filed in this period.</Empty>
+      ) : (
+        <Table label="Claims timeline" head={["Guarantee", ["Amount", "num"], "SLA", ["Filed → paid", "num"], ["Paid → settled", "num"], "Filed", "Paid", "Settled (PIX)", "Leg"]}>
+          {shown.map((c) => (
+            <tr key={c.filing}>
+              <td><Explorer value={c.guarantee} label={short(c.guaranteeId)} /></td>
+              <Num>{fmtBrs(c.amount ?? c.provision)}</Num>
+              <td>
+                {c.lateOnChain ? (
+                  <Mono style={{ color: "var(--color-error)" }}>late</Mono>
+                ) : c.overdue ? (
+                  <span title="Marked late on-chain at the next refresh.">
+                    <Mono style={{ color: "var(--color-copper)" }}>past SLA</Mono>
+                  </span>
+                ) : (
+                  <Mono dim>on time</Mono>
+                )}
+              </td>
+              <Num>{c.fileToPay !== null ? fmtDuration(c.fileToPay) : "—"}</Num>
+              <Num>{c.payToSettle !== null ? fmtDuration(c.payToSettle) : "—"}</Num>
+              <td><Explorer value={c.filing} label={fmtTime(c.filedAt)} /></td>
+              <td>{c.payout && c.paidAt !== null ? <Explorer value={c.payout} label={fmtTime(c.paidAt)} /> : <Mono dim>—</Mono>}</td>
+              <td><Mono dim={c.settledAt === null}>{c.settledAt !== null ? fmtTime(c.settledAt) : "pending"}</Mono></td>
+              <td><Mono>{c.leg}</Mono></td>
+            </tr>
+          ))}
+        </Table>
+      )}
+    </div>
+  );
+  const chart = <SpeedChart rows={rows} slaSecs={r.config.payoutSlaSecs} now={r.now} />;
+  if (few)
+    return (
+      <div className="flex flex-col gap-4">
+        {/* Few claims: the speed tile beside the promise banner, then the table, then the chart. */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+          <SpeedTile rows={rows} slaSecs={r.config.payoutSlaSecs} />
+          <GuardTile className="lg:col-span-8" />
+        </div>
+        {table}
+        {chart}
+      </div>
+    );
   return (
     <div className="flex flex-col gap-4">
-      {/* ★ speed lead tile beside ● the speed chart; the spec promise as a banner under them. */}
+      {/* The speed lead tile beside the speed chart; the spec promise as a banner under them. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <SpeedTile rows={rows} slaSecs={r.config.payoutSlaSecs} />
-        <div className="grid lg:col-span-8">
-          <SpeedChart rows={rows} slaSecs={r.config.payoutSlaSecs} now={r.now} />
-        </div>
+        <div className="grid lg:col-span-8">{chart}</div>
         <GuardTile className="lg:col-span-12" />
       </div>
-      <p className="font-mono text-(--color-text-2) m-0 pt-2 text-xs">
-        {rows.length} filed · {paid} paid · {settled} settled
-      </p>
-      <Table label="Claims timeline" head={["Guarantee", "Leg", ["Amount", "num"], "Filed", "Paid", ["Filed → paid", "num"], "Settled (PIX)", ["Paid → settled", "num"], "PIX E2E hash", "SLA"]}>
-        {rows.map((c) => (
-          <tr key={c.filing}>
-            <td><Explorer value={c.guarantee} label={short(c.guaranteeId)} /></td>
-            <td><Mono>{c.leg}</Mono></td>
-            <Num>{fmtBrs(c.amount ?? c.provision)}</Num>
-            <td><Explorer value={c.filing} label={fmtTime(c.filedAt)} /></td>
-            <td>{c.payout && c.paidAt !== null ? <Explorer value={c.payout} label={fmtTime(c.paidAt)} /> : <Mono dim>—</Mono>}</td>
-            <Num>{c.fileToPay !== null ? fmtDuration(c.fileToPay) : "—"}</Num>
-            <td><Mono dim={c.settledAt === null}>{c.settledAt !== null ? fmtTime(c.settledAt) : "pending"}</Mono></td>
-            <Num>{c.payToSettle !== null ? fmtDuration(c.payToSettle) : "—"}</Num>
-            <td><Mono dim>{c.pixE2eHash ? short(c.pixE2eHash) : "—"}</Mono></td>
-            <td>
-              {c.lateOnChain ? (
-                <Mono style={{ color: "var(--color-error)" }}>late</Mono>
-              ) : c.overdue ? (
-                <Mono style={{ color: "var(--color-copper)" }}>past SLA (refresh records it)</Mono>
-              ) : (
-                <Mono dim>on time</Mono>
-              )}
-            </td>
-          </tr>
-        ))}
-      </Table>
+      {table}
     </div>
   );
 }
@@ -186,11 +218,10 @@ export function ClaimsSection({ d }: { d: Data }) {
   return (
     <Section
       id="claims"
-      title="Claims timeline"
-      kicker="Proven speed"
+      title="Claims"
+      kicker="Claim payments"
       subtitle="How fast claims are paid, from on-chain timestamps."
-      roles={<RoleLine items={[{ role: "operator" }]} />}
-      info="On-chain timestamps per claim. Filed: ClaimFiling booked; the provision lowers NAV before any BRS leaves the reserve. Paid: claim payment in BRS to the payments account. Settled: PIX to the agency, recorded by the hash of its end-to-end id. The operator signs every step; the payout SLA is set by the Reserve Admin."
+      info="Timestamps recorded on-chain for each claim. Filed: the claim is booked, and NAV already reflects it before any money leaves the reserve. Paid: the claim payment leaves the reserve. Settled: the landlord receives it by PIX. The payout SLA is set by the Reserve Admin."
     >
       <Claims r={d.reserve} l={d.ledger} />
     </Section>

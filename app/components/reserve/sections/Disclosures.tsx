@@ -10,6 +10,7 @@ import { Explorer } from "@/components/Explorer";
 import { fmtBrs, fmtDuration } from "@/lib/format";
 import { type ReserveView } from "@/lib/view";
 
+import { ImageSlot, type ImageSlotName } from "@/components/ImageSlot";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -18,16 +19,11 @@ import type { Data } from "@/components/reserve/sections/shared";
 const LABEL = { letterSpacing: "0.01em" } as const;
 
 /** One disclosure: Declaration (Geist), Explanation (Inter), Evidence (mono rows). */
-function Tile({ title, children, evidence, image, border }: { title: string; children: ReactNode; evidence?: ReactNode; image?: string; border?: string }) {
+function Tile({ title, children, evidence, image, border }: { title: string; children: ReactNode; evidence?: ReactNode; image?: ImageSlotName; border?: string }) {
   return (
     <article className="bg-(--color-surface) relative flex flex-col gap-4 overflow-hidden border p-6 lg:col-span-4" style={border ? { borderColor: border } : undefined}>
-      {image && (
-        <>
-          {/* Decorative image (Unsplash, Sasun Bughdaryan); no numbers on this tile. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.1 }} />
-        </>
-      )}
+      {/* Decorative image slot; no numbers on this tile. */}
+      {image && <ImageSlot slot={image} aspect="tile" opacity={0.1} fill />}
       <h3 className="font-display text-(--color-text) relative m-0 text-lg font-bold leading-snug">{title}</h3>
       <div className="font-body text-(--color-text-2) relative text-sm leading-relaxed">{children}</div>
       {evidence && <dl className="relative m-0 mt-auto flex flex-col gap-2 border-t pt-4">{evidence}</dl>}
@@ -57,13 +53,24 @@ function Badge({ color, label }: { color: string; label: string }) {
 const BUILT_LATER = [
   "Partial redemption fills at the queue head",
   "On-chain claim notices",
-  "More reserve assets through capped adapters (TESOURO first, pending an Etherfuse BRS path)",
+  "More reserve assets through capped adapters",
 ];
 
 export function Disclosures({ r }: { r: ReserveView }) {
   const frozen = r.token.reserveFrozen;
   return (
     <div className="flex flex-col gap-4">
+      {/* Verification strip: the program to check, the cluster, and its audit status (also in the site footer). */}
+      <div className="bg-(--color-surface) font-mono text-(--color-text-2) flex flex-wrap items-center gap-x-4 gap-y-2 border px-6 py-3 text-xs">
+        <span className="inline-flex items-center gap-2">
+          <span className="font-body text-(--color-text-2) font-medium uppercase" style={LABEL}>Program</span>
+          <Explorer value={r.programId} />
+        </span>
+        <span aria-hidden="true" className="text-(--color-text-3)">·</span>
+        <span className="uppercase">{r.cluster}</span>
+        <span aria-hidden="true" className="text-(--color-text-3)">·</span>
+        <span>unaudited pilot program</span>
+      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <Tile
           title="BRS is issued by Nora, and Nora can freeze it"
@@ -75,13 +82,12 @@ export function Disclosures({ r }: { r: ReserveView }) {
               </Fact>
               <Fact k="Freeze authority">
                 {r.token.freezeAuthority ? <Explorer value={r.token.freezeAuthority} /> : <Mono>none</Mono>}
-                <span className="font-body text-(--color-text-3) ml-2 text-xs">{r.cluster === "localnet" ? "localnet test mint (seed script)" : "a single Nora wallet"}</span>
+                <span className="font-body text-(--color-text-3) ml-2 text-xs">{r.cluster === "localnet" ? "" : "a single Nora wallet"}</span>
               </Fact>
             </>
           }
         >
-          A freeze of the reserve token account stops every outflow, claim payments included, until it is thawed. <Mono>refresh</Mono> detects it, and frozen
-          balances stop counting as stable assets.
+          A freeze of the reserve token account stops every outflow, claim payments included, until it is thawed.
         </Tile>
 
         <Tile
@@ -95,22 +101,23 @@ export function Disclosures({ r }: { r: ReserveView }) {
             </>
           }
         >
-          The solvency gate stops new guarantees and redemptions when free capital runs out, never <Mono>pay_claim</Mono>. A claim payment is bounded by the
+          The solvency gate stops new guarantees and redemptions when free capital runs out, never a claim payment. A claim payment is bounded by the
           guarantee&apos;s remaining cover, the liquid BRS and these caps.
         </Tile>
 
-        <Tile title="MUTAV's own capital, not open to public investment" image="/img/reserve-disclosures.jpg">
+        <Tile title="MUTAV's own capital, not open to public investment" image="reserve-disclosures">
           Deposits and redemptions are gated by an on-chain allowlist (KYC off-chain); in the pilot only MUTAV&apos;s capital wallet is on it, and it waits in the
           same FIFO queue as anyone. Nothing on this page is an offer to invest.
         </Tile>
       </div>
 
-      <details className="bg-(--color-surface) group border px-6 py-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+      <details open className="bg-(--color-surface) group border px-6 py-4 lg:col-span-8">
         <summary className="font-body text-(--color-text-2) hover:text-(--color-text) flex cursor-pointer list-none items-center gap-3 text-sm [&::-webkit-details-marker]:hidden">
           <span aria-hidden="true" className="font-mono text-(--color-text-3) inline-block w-3 group-open:hidden">+</span>
           <span aria-hidden="true" className="font-mono text-(--color-text-3) hidden w-3 group-open:inline-block">−</span>
           <span>
-            <span className="font-display text-(--color-text) font-bold">Built later</span> · designed, not part of this pilot binary
+            <span className="font-display text-(--color-text) font-bold">Built later</span> · designed, not in this pilot yet
           </span>
         </summary>
         <ul className="font-body text-(--color-text) m-0 mt-4 flex flex-col gap-2 border-t p-0 pt-4 text-sm">
@@ -122,6 +129,8 @@ export function Disclosures({ r }: { r: ReserveView }) {
           ))}
         </ul>
       </details>
+      <ImageSlot slot="reserve-risks" aspect="tile" className="min-h-[160px] lg:col-span-4" />
+      </div>
     </div>
   );
 }
@@ -129,7 +138,7 @@ export function Disclosures({ r }: { r: ReserveView }) {
 /** The Disclosures section of /reserve: heading, roles and body. */
 export function DisclosuresSection({ d }: { d: Data }) {
   return (
-    <Section id="disclosures" title="Disclosures" kicker="Read this" subtitle="The risks and limits a verifier should know.">
+    <Section id="disclosures" title="Risks" kicker="Disclosures" subtitle="The risks and limits to know before relying on this reserve.">
       <Disclosures r={d.reserve} />
     </Section>
   );

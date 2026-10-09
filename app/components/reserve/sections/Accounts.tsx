@@ -20,12 +20,25 @@ type Group = { id: string; title: string; rows: Row[] };
 
 const LABEL = "font-body text-(--color-text-2) m-0 text-xs font-medium uppercase";
 
+/** Plain-language notes for this page (lib/roles keeps the instruction-level wording for the operator and admin screens). */
+const PLAIN_NOTE: Record<string, string> = {
+  "signs every admin instruction": "governs the reserve (multisig)",
+  "pause and revoke_operator only": "can pause the reserve and revoke the operator",
+  "signs every operator instruction": "runs guarantees and claim payments",
+  "written only by admin instructions": "the reserve's settings",
+  "receives the fee take of contribute_fees": "receives MUTAV's fee take",
+  "receives pay_claim": "receives claim payments",
+  "program-owned; Nora pays issuer income here, outside NAV until swept": "issuer income lands here before it joins the reserve",
+  "upgrade authority: the Reserve Admin": "upgradable by the Reserve Admin",
+  "program-owned": "held by the program",
+};
+
 /** Role tag (or a dash for program-owned accounts) and its note. */
 function RoleNote({ a }: { a: AccountRole }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       {a.role ? <RoleTag role={a.role} /> : <Mono dim>—</Mono>}
-      <span className="font-body text-(--color-text-3) text-2xs">{a.note}</span>
+      <span className="font-body text-(--color-text-3) text-2xs">{PLAIN_NOTE[a.note] ?? a.note}</span>
     </span>
   );
 }
@@ -52,9 +65,9 @@ export function Accounts({ r }: { r: ReserveView }) {
       title: "Program and state",
       rows: [
         ["Program", r.programId, { role: null, note: "upgrade authority: the Reserve Admin" }],
-        ["VaultConfig", r.addresses.config, ACCOUNT_ROLES.config],
-        ["VaultState", r.addresses.state, P],
-        ["Vault authority (PDA)", r.addresses.vaultAuthority, P],
+        ["Reserve settings", r.addresses.config, ACCOUNT_ROLES.config],
+        ["Reserve state", r.addresses.state, P],
+        ["Reserve authority", r.addresses.vaultAuthority, P],
       ],
     },
     {
@@ -64,7 +77,7 @@ export function Accounts({ r }: { r: ReserveView }) {
         ["Reserve token account", r.addresses.reserve, P],
         ["Pending deposits escrow", r.addresses.pendingDeposits, P],
         ["Pending redemptions escrow", r.addresses.pendingRedemptions, P],
-        ["Claims (filled redemptions)", r.addresses.claims, P],
+        ["Filled redemptions escrow", r.addresses.claims, P],
       ],
     },
     {
@@ -134,7 +147,7 @@ export function Accounts({ r }: { r: ReserveView }) {
 /** The Accounts section of /reserve: heading, roles and body. */
 export function AccountsSection({ d }: { d: Data }) {
   return (
-    <Section id="accounts" title="Every account" kicker="Verify it yourself" subtitle="Open any address on Solana Explorer to check the numbers yourself.">
+    <Section id="accounts" title="Accounts" kicker="Verify it yourself" subtitle="Open any address on Solana Explorer to check the numbers yourself.">
       <Accounts r={d.reserve} />
     </Section>
   );

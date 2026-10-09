@@ -6,15 +6,14 @@
  */
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
-import { InfoTooltip } from "@/components/InfoTooltip";
 import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
 import { frac } from "@/lib/charts";
 import { activeRemainingCover, agencyRows, coverageRows, type AgencyRow, type CoverageRow, type Ledger, type ReserveView } from "@/lib/view";
 import { C } from "@/components/charts/Charts";
 
 import { Empty, Num, Table, short } from "@/components/reserve/sections/shared";
+import { ImageSlot } from "@/components/ImageSlot";
 import { Section } from "@/components/Section";
-import { RoleLine } from "@/components/RoleTag";
 import type { Data } from "@/components/reserve/sections/shared";
 
 // ── Coverage ────────────────────────────────────────────────────────────────
@@ -50,19 +49,28 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   const rows = byRemaining(coverageRows(l.guarantees));
   const agencies = agencyRows(l.exposures, r.config.caps.maxCoverPerAgency);
   const sum = activeRemainingCover(rows);
-  const matches = sum === r.state.remainingCoverTotal;
   const active = rows.filter((g) => g.active);
   const defaultLeft = active.reduce((s, g) => s + g.defaultRemaining, 0n);
   const exitLeft = active.reduce((s, g) => s + g.exitRemaining, 0n);
   const coverAxis = active.reduce((m, g) => (g.remaining > m ? g.remaining : m), 0n);
   const agencyAxis = agencies.reduce((m, a) => (a.outstandingCover > m ? a.outstandingCover : m), 0n);
+  // Agencies have no name on-chain: number them in table order; the hash stays beside.
+  const agencyName = new Map(agencies.map((a, i) => [a.agencyId, `Agency ${i + 1}`]));
+  const registered = new Map<string, number>();
+  for (const g of rows) registered.set(g.agencyId, (registered.get(g.agencyId) ?? 0) + 1);
+  const AgencyCell = ({ id }: { id: string }) => (
+    <span className="inline-flex items-baseline gap-2">
+      {agencyName.has(id) && <span className="font-body text-(--color-text) text-sm">{agencyName.get(id)}</span>}
+      <Mono dim>{short(id)}</Mono>
+    </span>
+  );
   return (
     <div className="flex flex-col gap-4">
-      {/* Bento: the Σ lead tile beside an image tile. */}
+      {/* Bento: the remaining-cover lead tile beside an image slot. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="bg-(--color-surface) flex flex-col gap-6 border p-6 lg:col-span-5">
+        <div className="bg-(--color-surface) flex flex-col gap-6 border p-6 lg:col-span-8">
           <div className="flex flex-col gap-2">
-            <p className={LABEL} style={{ letterSpacing: "0.01em" }}>Σ remaining cover</p>
+            <p className={LABEL} style={{ letterSpacing: "0.01em" }}>Remaining cover</p>
             <Mono style={{ fontSize: "clamp(28px, 3.4vw, 40px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{fmtBrs(sum)}</Mono>
             <span className="font-body text-(--color-text-2) text-sm">
               <Mono style={{ color: "var(--color-text)" }}>{r.state.activeGuarantees}</Mono> active guarantees · <Mono style={{ color: "var(--color-text)" }}>{agencies.length}</Mono> agencies
@@ -78,20 +86,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
               <Mono style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)" }}>{fmtBrs(exitLeft)}</Mono>
             </div>
           </div>
-          <span className="inline-flex items-center gap-2">
-            <Mono style={{ fontSize: 12, color: matches ? "var(--color-text-3)" : "var(--color-error)" }}>
-              {matches ? "✓ matches VaultState" : `✗ VaultState says ${fmtBrs(r.state.remainingCoverTotal)}`}
-            </Mono>
-            <InfoTooltip label="About this check" width={260}>
-              The sum of remaining cover over every active Guarantee account, checked against remaining_cover_total in VaultState.
-            </InfoTooltip>
-          </span>
         </div>
-        <div className="bg-(--color-surface) relative min-h-[200px] overflow-hidden border lg:col-span-7">
-          {/* Decorative image tile (Unsplash, Khay Edwards). Image only. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/img/reserve-coverage.jpg" alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" style={{ opacity: 0.16 }} />
-        </div>
+        <ImageSlot slot="reserve-coverage" aspect="4:3" className="min-h-[200px] lg:col-span-4" />
       </div>
 
       <SubHead>By guarantee</SubHead>
@@ -102,10 +98,13 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
           {rows.map((g) => (
             <tr key={g.address}>
               <td><Explorer value={g.address} label={short(g.id)} /></td>
-              <td><Mono dim>{short(g.agencyId)}</Mono></td>
+              <td><AgencyCell id={g.agencyId} /></td>
               <td>
                 {g.active ? (
-                  <MiniBar segs={[{ f: frac(g.defaultRemaining, coverAxis), color: C.ink }, { f: frac(g.exitRemaining, coverAxis), color: C.mid }]} />
+                  <span className="inline-flex items-center gap-3">
+                    <MiniBar segs={[{ f: frac(g.defaultRemaining, coverAxis), color: C.ink }, { f: frac(g.exitRemaining, coverAxis), color: C.mid }]} />
+                    <Mono>{fmtBrs(g.remaining)}</Mono>
+                  </span>
                 ) : (
                   <Mono dim>—</Mono>
                 )}
@@ -116,7 +115,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
               <Num color={g.provision > 0n ? "var(--color-copper)" : undefined}>{fmtBrs(g.provision)}</Num>
               <Num>{g.openClaims}</Num>
               <td><Mono style={{ color: g.active ? "var(--color-success)" : "var(--color-text-3)" }}>{g.active ? "active" : "closed"}</Mono></td>
-              <td><Mono dim>{fmtTime(g.registeredAt)}</Mono></td>
+              <td><Mono dim>{fmtTime(g.registeredAt).slice(0, 10)}</Mono></td>
             </tr>
           ))}
         </Table>
@@ -126,10 +125,10 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       {agencies.length === 0 ? (
         <Empty>No agency exposure yet.</Empty>
       ) : (
-        <Table label="Per-agency exposure" head={["Agency", ["Outstanding cover", "num"], ["Cap used", "num"], ["Active", "num"], ["Claims paid", "num"], "Account"]}>
+        <Table label="Per-agency exposure" head={["Agency", ["Outstanding cover", "num"], ["Cap used", "num"], ["Active", "num"], ["Guarantees registered", "num"], ["Claims paid", "num"]]}>
           {agencies.map((a) => (
             <tr key={a.address}>
-              <td><Mono>{short(a.agencyId)}</Mono></td>
+              <td><AgencyCell id={a.agencyId} /></td>
               <Num>{fmtBrs(a.outstandingCover)}</Num>
               <td className="num">
                 <span className="inline-flex items-center gap-3">
@@ -138,8 +137,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
                 </span>
               </td>
               <Num>{a.activeGuarantees}</Num>
+              <Num>{registered.get(a.agencyId) ?? 0}</Num>
               <Num>{fmtBrs(a.claimsPaidTotal)}</Num>
-              <td><Explorer value={a.address} /></td>
             </tr>
           ))}
         </Table>
@@ -156,8 +155,7 @@ export function CoverageSection({ d }: { d: Data }) {
       title="Coverage"
       kicker="Guarantees"
       subtitle="How much the reserve guarantees, per lease and per agency."
-      roles={<RoleLine items={[{ role: "operator" }, { role: "admin" }]} />}
-      info={`Each guarantee has a default (rent-arrears) leg and an exit (property-recovery) leg. Remaining cover is cover minus what was already paid. The Operator registers every guarantee; the Reserve Admin sets the caps. Remaining bars: default leg (light) and exit leg (dark), scaled to the largest active guarantee. Cap used = outstanding cover ÷ max cover per agency (${fmtBrs(d.reserve.config.caps.maxCoverPerAgency, 0)}); its bars scale to the largest agency.`}
+      info={`Each guarantee has a default (rent-arrears) leg and an exit (property-recovery) leg. Remaining cover is cover minus what was already paid. The Operator registers every guarantee; the Reserve Admin sets the caps. Remaining bars: default leg (light) and exit leg (dark), scaled to the largest active guarantee. Cap used = outstanding cover ÷ max cover per agency (${fmtBrs(d.reserve.config.caps.maxCoverPerAgency, 0)}); its bars scale to the largest agency. Guarantee and agency IDs are hashes; names are kept off-chain.`}
     >
       <Coverage r={d.reserve} l={d.ledger} />
     </Section>

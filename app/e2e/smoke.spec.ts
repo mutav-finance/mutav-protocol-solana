@@ -20,25 +20,24 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByRole("heading", { name: "Who does what" })).toBeVisible();
     for (const role of ["Reserve Admin", "Operator", "Investor"]) await expect(page.locator(".role-grid").getByRole("heading", { name: role })).toBeVisible();
 
-    const bar = page.getByTestId("compact-bar");
-    await expect(bar).toHaveAttribute("data-visible", "false");
-    await expect(bar).toBeHidden();
+    // The landing uses the same sticky app nav as every other page.
+    const nav = page.getByRole("navigation", { name: "Main navigation" });
+    await expect(nav.getByRole("link", { name: "Transparency" })).toBeVisible();
     await page.mouse.wheel(0, 3000);
-    await expect(bar).toHaveAttribute("data-visible", "true");
-    await expect(bar.getByRole("link", { name: "See the reserve" })).toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await expect(bar).toHaveAttribute("data-visible", "false");
+    await expect(nav).toBeInViewport();
     await noBannedWords(page);
   });
 
   test("/reserve — overview: promises, health, a summary card per tab", async ({ page }) => {
     await page.goto("/reserve");
-    const views = page.getByRole("navigation", { name: "Reserve views" });
+    await page.getByRole("button", { name: "Open transparency menu" }).click();
+    const views = page.getByRole("navigation", { name: "Transparency views" });
     for (const tab of ["Overview", "Coverage", "Claims", "Flows", "Queue", "Risks", "Accounts"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(views).toBeHidden();
     await expect(page.getByText("Claim payments are never blocked by solvency.")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
     await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Refresh on-chain" })).toBeVisible();
     await expect(page.getByText("The pilot runs on MUTAV's own capital and is not open to public investment")).toBeVisible();
     await noBannedWords(page);
   });
@@ -46,7 +45,6 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   test("/reserve tabs — coverage, claims, flows, queue, risks, accounts", async ({ page }) => {
     await page.goto("/reserve/coverage");
     await expect(page.getByText("2 active guarantees")).toBeVisible();
-    await expect(page.getByText("✓ matches VaultState")).toBeVisible();
     await expect(page.getByRole("table", { name: "Remaining cover by guarantee" }).locator("tbody tr")).toHaveCount(2);
     await expect(page.getByRole("table", { name: "Per-agency exposure" }).locator("tbody tr")).toHaveCount(2);
     await noBannedWords(page);
@@ -55,7 +53,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     const claims = page.getByRole("table", { name: "Claims timeline" });
     await expect(claims.locator("tbody tr")).toHaveCount(1);
     await expect(claims).toContainText("on time");
-    await expect(page.getByText("The Reserve Admin cannot block a claim payment.")).toBeVisible();
+    await expect(page.getByText("Claim payments are never blocked by solvency or by a pause.")).toBeVisible();
     await noBannedWords(page);
 
     await page.goto("/reserve/flows");
