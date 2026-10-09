@@ -30,6 +30,15 @@ function byRemaining(rows: CoverageRow[]): CoverageRow[] {
   );
 }
 
+const COVER_TIPS = {
+  "Default leg left": "Sub-limit for rent and charges in arrears while the lease runs, minus what was already paid on it.",
+  "Exit leg left": "Sub-limit for the tenant's debts up to and at the end of occupation, minus what was already paid on it.",
+  Provision: "Booked when a claim is filed and not yet paid; already out of NAV.",
+};
+const AGENCY_TIPS = {
+  "Cap used": "Outstanding cover of the agency ÷ the per-agency cap set by the Reserve Admin.",
+};
+
 function SubHead({ children }: { children: string }) {
   return <h3 className="font-display text-(--color-text) m-0 pt-4 text-base font-bold">{children}</h3>;
 }
@@ -94,7 +103,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       {rows.length === 0 ? (
         <Empty>No guarantees registered yet.</Empty>
       ) : (
-        <Table label="Remaining cover by guarantee" head={["Guarantee", "Agency", "Remaining", ["Rent", "num"], ["Default leg left", "num"], ["Exit leg left", "num"], ["Provision", "num"], ["Open claims", "num"], "Status", "Registered"]}>
+        <Table label="Remaining cover by guarantee" head={["Guarantee", "Agency", "Remaining", ["Rent", "num"], ["Default leg left", "num"], ["Exit leg left", "num"], ["Provision", "num"], ["Open claims", "num"], "Status", "Registered"]} tips={COVER_TIPS}>
           {rows.map((g) => (
             <tr key={g.address}>
               <td><Explorer value={g.address} label={short(g.id)} /></td>
@@ -125,7 +134,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       {agencies.length === 0 ? (
         <Empty>No agency exposure yet.</Empty>
       ) : (
-        <Table label="Per-agency exposure" head={["Agency", ["Outstanding cover", "num"], ["Cap used", "num"], ["Active", "num"], ["Guarantees registered", "num"], ["Claims paid", "num"]]}>
+        <Table label="Per-agency exposure" head={["Agency", ["Outstanding cover", "num"], ["Cap used", "num"], ["Active", "num"], ["Guarantees registered", "num"], ["Claims paid", "num"]]} tips={AGENCY_TIPS}>
           {agencies.map((a) => (
             <tr key={a.address}>
               <td><AgencyCell id={a.agencyId} /></td>

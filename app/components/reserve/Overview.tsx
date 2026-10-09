@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useReserve } from "@/components/reserve/ReserveShell";
 import { HealthSection } from "@/components/reserve/sections/Health";
 import { VerifyStrip } from "@/components/reserve/sections/Disclosures";
+import { Glossary } from "@/components/reserve/sections/Glossary";
 
 /** The two promises the spec makes, each linked to the view that shows them. */
 const PROMISES: [string, string, string, string][] = [
@@ -40,6 +41,8 @@ export function Overview() {
           ))}
         </ul>
       </section>
+
+      <Glossary />
     </div>
   );
 }

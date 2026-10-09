@@ -127,6 +127,12 @@ function SpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaSecs: bigint;
   );
 }
 
+const CLAIM_TIPS = {
+  SLA: "The settlement deadline set by the Reserve Admin. A payment not settled in time is marked late on-chain at the next refresh.",
+  "Filed → paid": "From when the claim was filed to when it was paid.",
+  "Paid → settled": "From payment to settlement by PIX; a pending payment shows the time so far.",
+};
+
 export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
   const rows = claimsTimeline(l, r.config.payoutSlaSecs, r.now);
   if (rows.length === 0)
@@ -159,7 +165,7 @@ function ClaimsBody({ r, rows, paid, settled }: { r: ReserveView; rows: ClaimRow
       {shown.length === 0 ? (
         <Empty>No claims filed in this period.</Empty>
       ) : (
-        <Table label="Claims timeline" head={["Guarantee", ["Amount", "num"], "SLA", ["Filed → paid", "num"], ["Paid → settled", "num"], "Filed", "Paid", "Settled (PIX)", "Leg"]}>
+        <Table label="Claims timeline" head={["Guarantee", ["Amount", "num"], "SLA", ["Filed → paid", "num"], ["Paid → settled", "num"], "Filed", "Paid", "Settled (PIX)", "Leg"]} tips={CLAIM_TIPS}>
           {shown.map((c) => (
             <tr key={c.filing}>
               <td><Explorer value={c.guarantee} label={short(c.guaranteeId)} /></td>
