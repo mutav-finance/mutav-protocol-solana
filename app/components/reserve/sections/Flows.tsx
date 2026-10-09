@@ -113,21 +113,24 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
   const signed = (v: bigint) => `${v >= 0n ? "+" : "−"}${fmtBrs(abs(v))}`;
   return (
     <div className="flex flex-col gap-4">
-      {/* Neutral totals row: context, not a headline. */}
-      <div className="bg-(--color-surface) flex flex-wrap items-center gap-x-8 gap-y-3 border px-6 py-4">
-        <span className="font-mono text-(--color-text-3) text-2xs uppercase" style={{ letterSpacing: "0.08em" }}>
-          Lifetime
-        </span>
-        <Total label="Earned net" value={signed(earned)} />
-        <Total label="Capital net" value={signed(capital)} />
-        <Total label="In" value={`+${fmtBrs(into)}`} />
-        <Total label="Out" value={`−${fmtBrs(out)}`} />
-        <span className="ml-auto">
-          <InfoTooltip label="About these totals" width={300}>
+      {/* Lead: what the reserve earned. Capital moves sit beside it, smaller: a deposit is not income. */}
+      <div className="bg-(--color-surface) grid grid-cols-1 gap-6 border p-6 lg:grid-cols-12 lg:gap-10">
+        <div className="flex flex-col gap-2 lg:col-span-5">
+          <span className="inline-flex items-center gap-2">
+            <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={label12}>Earned net · lifetime</span>
+            <InfoTooltip label="About these totals" width={300}>
             Lifetime totals: the period filter applies to the ledger below, not to these figures. Earned net = guarantee fees net + issuer income net − claim payments. Capital net = deposits − redemptions. In and Out add both. Guarantee fees, issuer income, the fee take and claim payments are lifetime on-chain totals. Deposits and
             redemptions sum the fills in the last 100 transactions of each escrow.
           </InfoTooltip>
-        </span>
+          </span>
+          <Mono style={{ fontSize: "clamp(28px, 3.4vw, 40px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{signed(earned)}</Mono>
+          <span className="font-mono text-(--color-text-3) text-2xs">guarantee fees + issuer income − claim payments</span>
+        </div>
+        <div className="flex flex-wrap content-center items-center gap-x-8 gap-y-3 border-t pt-4 lg:col-span-7 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10">
+          <Total label="Capital net" value={signed(capital)} />
+          <Total label="In" value={`+${fmtBrs(into)}`} />
+          <Total label="Out" value={`−${fmtBrs(out)}`} />
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <Group title="Into the reserve" span="lg:col-span-5">

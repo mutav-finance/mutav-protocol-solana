@@ -16,6 +16,7 @@ import type { Data } from "@/components/reserve/sections/shared";
 // ── Accounts ────────────────────────────────────────────────────────────────
 
 type Row = [label: string, address: string, role: AccountRole];
+type Signer = [...Row, check: string];
 type Group = { id: string; title: string; rows: Row[] };
 
 const LABEL = "font-body text-(--color-text-2) m-0 text-xs font-medium uppercase";
@@ -53,11 +54,11 @@ const Address = ({ value }: { value: string }) => (
 export function Accounts({ r }: { r: ReserveView }) {
   const P = ACCOUNT_ROLES.program;
   // The keys that sign: what a verifier checks first.
-  const signers: Row[] = [
-    ["Admin (Squads vault)", r.config.admin, ACCOUNT_ROLES.admin],
-    ["Pauser", r.config.pauser, ACCOUNT_ROLES.pauser],
-    ["Operator", r.config.operator, ACCOUNT_ROLES.operator],
-    ["MUTAV capital wallet", r.config.mutavCapitalWallet, ACCOUNT_ROLES.capital],
+  const signers: Signer[] = [
+    ["Admin (Squads vault)", r.config.admin, ACCOUNT_ROLES.admin, "Check: the address is a Squads vault, and the program's upgrade authority."],
+    ["Pauser", r.config.pauser, ACCOUNT_ROLES.pauser, "Check: it can pause and revoke the operator, nothing else."],
+    ["Operator", r.config.operator, ACCOUNT_ROLES.operator, "Check: its transactions register guarantees and pay claims, within the caps."],
+    ["MUTAV capital wallet", r.config.mutavCapitalWallet, ACCOUNT_ROLES.capital, "Check: the only depositor in the pilot queue."],
   ];
   const groups: Group[] = [
     {
@@ -107,11 +108,12 @@ export function Accounts({ r }: { r: ReserveView }) {
           Who signs
         </h3>
         <ul aria-labelledby="accounts-signers" className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-4">
-          {signers.map(([k, v, a]) => (
+          {signers.map(([k, v, a, check]) => (
             <li key={k} className="bg-(--color-surface) flex flex-col justify-between gap-4 border p-6">
               <div className="flex flex-col gap-2">
                 <span className="font-display text-(--color-text) text-base font-bold">{k}</span>
                 <RoleNote a={a} />
+                <span className="font-body text-(--color-text-2) text-xs leading-relaxed">{check}</span>
               </div>
               <Address value={v} />
             </li>

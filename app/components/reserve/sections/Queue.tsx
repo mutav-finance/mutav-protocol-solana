@@ -31,7 +31,7 @@ function Side({ title, empty, rows, unit, capital }: { title: string; empty: str
       </div>
       {rows.length === 0 ? (
         <div className="border-t px-6">
-          <Empty>{empty}</Empty>
+          <Empty>{empty} New requests join the end of the line and are filled oldest first.</Empty>
         </div>
       ) : (
         <Table label={title} head={[["#", "num"], "Owner (investor)", ["Waiting", "num"], "Requested", "Account"]}>

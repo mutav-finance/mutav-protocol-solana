@@ -30,6 +30,7 @@ function byRemaining(rows: CoverageRow[]): CoverageRow[] {
   );
 }
 
+const GUARANTEE_HEAD: (string | [string, "num"])[] = ["Guarantee", "Agency", "Remaining", ["Rent", "num"], ["Default leg left", "num"], ["Exit leg left", "num"], ["Provision", "num"], ["Open claims", "num"], "Status", "Registered"];
 const COVER_TIPS = {
   "Default leg left": "Sub-limit for rent and charges in arrears while the lease runs, minus what was already paid on it.",
   "Exit leg left": "Sub-limit for the tenant's debts up to and at the end of occupation, minus what was already paid on it.",
@@ -73,6 +74,30 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       <Mono dim>{short(id)}</Mono>
     </span>
   );
+  const closed = rows.filter((g) => !g.active);
+  const row = (g: (typeof rows)[number]) => (
+    <tr key={g.address}>
+      <td><Explorer value={g.address} label={short(g.id)} /></td>
+      <td><AgencyCell id={g.agencyId} /></td>
+      <td>
+        {g.active ? (
+          <span className="inline-flex items-center gap-3">
+            <MiniBar segs={[{ f: frac(g.defaultRemaining, coverAxis), color: C.ink }, { f: frac(g.exitRemaining, coverAxis), color: C.mid }]} />
+            <Mono>{fmtBrs(g.remaining)}</Mono>
+          </span>
+        ) : (
+          <Mono dim>—</Mono>
+        )}
+      </td>
+      <Num>{fmtBrs(g.rent)}</Num>
+      <Num>{fmtBrs(g.defaultRemaining)}</Num>
+      <Num>{fmtBrs(g.exitRemaining)}</Num>
+      <Num color={g.provision > 0n ? "var(--color-copper)" : undefined}>{fmtBrs(g.provision)}</Num>
+      <Num>{g.openClaims}</Num>
+      <td><Mono style={{ color: g.active ? "var(--color-success)" : "var(--color-text-3)" }}>{g.active ? "active" : "closed"}</Mono></td>
+      <td><Mono dim>{fmtTime(g.registeredAt).slice(0, 10)}</Mono></td>
+    </tr>
+  );
   return (
     <div className="flex flex-col gap-4">
       {/* Bento: the remaining-cover lead tile beside an image slot. */}
@@ -103,31 +128,27 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       {rows.length === 0 ? (
         <Empty>No guarantees registered yet.</Empty>
       ) : (
-        <Table label="Remaining cover by guarantee" head={["Guarantee", "Agency", "Remaining", ["Rent", "num"], ["Default leg left", "num"], ["Exit leg left", "num"], ["Provision", "num"], ["Open claims", "num"], "Status", "Registered"]} tips={COVER_TIPS}>
-          {rows.map((g) => (
-            <tr key={g.address}>
-              <td><Explorer value={g.address} label={short(g.id)} /></td>
-              <td><AgencyCell id={g.agencyId} /></td>
-              <td>
-                {g.active ? (
-                  <span className="inline-flex items-center gap-3">
-                    <MiniBar segs={[{ f: frac(g.defaultRemaining, coverAxis), color: C.ink }, { f: frac(g.exitRemaining, coverAxis), color: C.mid }]} />
-                    <Mono>{fmtBrs(g.remaining)}</Mono>
-                  </span>
-                ) : (
-                  <Mono dim>—</Mono>
-                )}
-              </td>
-              <Num>{fmtBrs(g.rent)}</Num>
-              <Num>{fmtBrs(g.defaultRemaining)}</Num>
-              <Num>{fmtBrs(g.exitRemaining)}</Num>
-              <Num color={g.provision > 0n ? "var(--color-copper)" : undefined}>{fmtBrs(g.provision)}</Num>
-              <Num>{g.openClaims}</Num>
-              <td><Mono style={{ color: g.active ? "var(--color-success)" : "var(--color-text-3)" }}>{g.active ? "active" : "closed"}</Mono></td>
-              <td><Mono dim>{fmtTime(g.registeredAt).slice(0, 10)}</Mono></td>
-            </tr>
-          ))}
-        </Table>
+        <>
+          {active.length === 0 ? (
+            <Empty>No active guarantees.</Empty>
+          ) : (
+            <Table label="Remaining cover by guarantee" head={GUARANTEE_HEAD} tips={COVER_TIPS}>
+              {active.map(row)}
+            </Table>
+          )}
+          {closed.length > 0 && (
+            <details className="group">
+              <summary className="font-body text-(--color-text-2) hover:text-(--color-text) flex cursor-pointer list-none items-center gap-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
+                <span aria-hidden="true" className="font-mono text-(--color-text-3) inline-block w-3 group-open:hidden">+</span>
+                <span aria-hidden="true" className="font-mono text-(--color-text-3) hidden w-3 group-open:inline-block">−</span>
+                Closed guarantees <Mono dim>({closed.length})</Mono>
+              </summary>
+              <Table label="Closed guarantees" head={GUARANTEE_HEAD} tips={COVER_TIPS}>
+                {closed.map(row)}
+              </Table>
+            </details>
+          )}
+        </>
       )}
 
       <SubHead>By agency</SubHead>
