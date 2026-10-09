@@ -66,15 +66,11 @@ export function Health({ r }: { r: ReserveView }) {
           <MetricCard label="Open provisions" value={fmtBrs(s.provisions)} unit="filed claims, not yet paid" tooltip="Booked when a claim is filed; already out of NAV." />
         </div>
         <div className="col-span-1 grid">
-          <MetricCard
-            label="Asset mix"
-            value={sol.tesouroValue > 0n && sol.stableAssets > 0n ? `${fmtBps(Number(((sol.stableAssets - sol.tesouroValue) * 10_000n) / sol.stableAssets))} BRS` : "100% BRS"}
-            unit="more assets through capped adapters"
-            tooltip="Stable assets by kind: BRS held in the reserve, plus any value held through whitelisted, capped adapters (none in the pilot). The Reserve Admin manages the allocation."
-          />
+          <AssetMix r={r} />
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t pt-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t pt-4" role="group" aria-label="Program state">
+        <span className="font-mono text-(--color-text-3) text-2xs uppercase" style={{ letterSpacing: "0.08em" }}>Program state</span>
         <span className="inline-flex items-baseline gap-2">
           <Label>Shares outstanding</Label>
           <Mono style={{ fontSize: 13, color: "var(--color-text)" }}>{fmtShares(s.sharesOutstanding)}</Mono>
@@ -82,6 +78,41 @@ export function Health({ r }: { r: ReserveView }) {
         {underCovered && <Badge color="var(--color-error)" label={`${MODE_LABEL(s.mode).toUpperCase()} MODE`} />}
         <Badge color={s.fulfilHalted ? "var(--color-error)" : "var(--color-text-3)"} label={s.fulfilHalted ? "QUEUE FILLS HALTED" : "QUEUE FILLS OPEN"} />
         <Badge color={r.config.paused ? "var(--color-error)" : "var(--color-text-3)"} label={r.config.paused ? "PAUSED" : "NOT PAUSED"} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Asset mix as one stacked bar: BRS held in the reserve, then value held
+ * through capped adapters (none in the pilot). Same figures as before, drawn.
+ */
+function AssetMix({ r }: { r: ReserveView }) {
+  const sol = r.solvency;
+  const brs = sol.stableAssets - sol.tesouroValue;
+  const brsShare = sol.tesouroValue > 0n && sol.stableAssets > 0n ? fmtBps(Number((brs * 10_000n) / sol.stableAssets)) : "100%";
+  const legend = (color: string, name: string, value: bigint) => (
+    <span className="inline-flex items-center gap-2">
+      <span aria-hidden="true" style={{ width: 6, height: 6, flexShrink: 0, background: color }} />
+      <Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>
+        {name} {fmtBrs(value)}
+      </Mono>
+    </span>
+  );
+  return (
+    <div className="bg-(--color-surface) flex min-w-0 flex-col gap-3 border p-6">
+      <span className="inline-flex items-center gap-1.5">
+        <Label>Asset mix</Label>
+        <InfoTooltip label="Info: Asset mix" width={240}>
+          Stable assets by kind: BRS held in the reserve, plus any value held through whitelisted, capped adapters (none in the pilot). The Reserve Admin manages the
+          allocation.
+        </InfoTooltip>
+      </span>
+      <Mono style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)" }}>{brsShare} BRS</Mono>
+      <Track height={8} segs={[{ f: frac(brs, sol.stableAssets), color: C.ink }, { f: frac(sol.tesouroValue, sol.stableAssets), color: C.mid }]} />
+      <div className="flex flex-col gap-1">
+        {legend(C.ink, "BRS", brs)}
+        {legend(C.mid, "Adapters", sol.tesouroValue)}
       </div>
     </div>
   );
