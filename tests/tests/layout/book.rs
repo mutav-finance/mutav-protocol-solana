@@ -59,7 +59,7 @@ fn v1_round_trip<
 fn book_sizes_are_pinned() {
     assert_eq!(8 + Guarantee::INIT_SPACE, GUARANTEE_SIZE);
     assert_eq!(8 + AgencyExposure::INIT_SPACE, AGENCY_EXPOSURE_SIZE);
-    assert_eq!(GUARANTEE_SIZE, 249);
+    assert_eq!(GUARANTEE_SIZE, 377);
     assert_eq!(AGENCY_EXPOSURE_SIZE, 126);
     assert_eq!(8 + ser(&zeroed::<Guarantee>()).len(), GUARANTEE_SIZE);
     assert_eq!(8 + ser(&zeroed::<GuaranteeV1>()).len(), GUARANTEE_SIZE);
@@ -164,7 +164,7 @@ fn income_receipt_layout_is_frozen() {
 #[test]
 fn claim_filing_layout_is_frozen() {
     assert_eq!(8 + ClaimFiling::INIT_SPACE, CLAIM_FILING_SIZE);
-    assert_eq!(CLAIM_FILING_SIZE, 156);
+    assert_eq!(CLAIM_FILING_SIZE, 220);
     assert_eq!(8 + ser(&zeroed::<ClaimFiling>()).len(), CLAIM_FILING_SIZE);
     assert_eq!(8 + ser(&zeroed::<ClaimFilingV1>()).len(), CLAIM_FILING_SIZE);
     macro_rules! fields {
@@ -187,7 +187,7 @@ fn claim_filing_layout_is_frozen() {
 #[test]
 fn payout_layout_is_frozen() {
     assert_eq!(8 + Payout::INIT_SPACE, PAYOUT_SIZE);
-    assert_eq!(PAYOUT_SIZE, 229);
+    assert_eq!(PAYOUT_SIZE, 293);
     assert_eq!(8 + ser(&zeroed::<Payout>()).len(), PAYOUT_SIZE);
     assert_eq!(8 + ser(&zeroed::<PayoutV1>()).len(), PAYOUT_SIZE);
     macro_rules! fields {
@@ -207,4 +207,25 @@ fn payout_layout_is_frozen() {
         Payout::DISCRIMINATOR,
         &[69, 45, 245, 131, 218, 101, 158, 228]
     );
+}
+
+/// L-1 (ADR 0019): the padding of `Guarantee`, `ClaimFiling` and `Payout`
+/// still holds the ADR 0012 lifecycle carve (spec §3.5–§3.7, §14.2), so the
+/// lifecycle ships later as a carve, without a migration of live records.
+#[test]
+fn padding_holds_the_adr_0012_carve() {
+    // Bytes the ADR 0012 fields need, from the spec §14.2 table.
+    const GUARANTEE_CARVE: usize = 32 + 32 + 8 + 8 + 8;
+    const CLAIM_FILING_CARVE: usize = 1 + 8 + 8 + 32;
+    const PAYOUT_CARVE: usize = 1 + 1 + 8 + 32 + 32;
+    assert_eq!(
+        (GUARANTEE_CARVE, CLAIM_FILING_CARVE, PAYOUT_CARVE),
+        (88, 49, 74)
+    );
+    let g = zeroed::<Guarantee>()._reserved.len();
+    let c = zeroed::<ClaimFiling>()._reserved.len();
+    let p = zeroed::<Payout>()._reserved.len();
+    assert!(g >= GUARANTEE_CARVE, "Guarantee padding {g}");
+    assert!(c >= CLAIM_FILING_CARVE, "ClaimFiling padding {c}");
+    assert!(p >= PAYOUT_CARVE, "Payout padding {p}");
 }

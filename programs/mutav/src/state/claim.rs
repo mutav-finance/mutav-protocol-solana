@@ -23,8 +23,10 @@ pub struct ClaimFiling {
     pub filed_at: i64,
     /// `CLAIM_FILED` / `CLAIM_PAID`.
     pub status: u8,
-    /// Zeroed. Never read or written by logic.
-    pub _reserved: [u8; 64],
+    /// Zeroed. Never read or written by logic. The 128-byte pilot budget
+    /// (spec §14.2) holds the ADR 0012 claim fields (49 bytes) without a
+    /// migration; it was grown from 64 before the layout freeze (ADR 0019).
+    pub _reserved: [u8; 128],
 }
 
 const _: () = assert!(8 + ClaimFiling::INIT_SPACE == CLAIM_FILING_SIZE);

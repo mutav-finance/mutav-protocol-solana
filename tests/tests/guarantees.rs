@@ -479,11 +479,11 @@ fn guarantee_and_agency_padding_is_zero_at_init_and_preserved() {
     let ag = agency();
     let args = guarantee_args(ag, 1_000 * BRL, 0);
     f.register(args.clone()).unwrap();
-    assert_eq!(f.guarantee(&args.id)._reserved, [0; 64]);
+    assert_eq!(f.guarantee(&args.id)._reserved, [0; 192]);
     assert_eq!(f.agency(&ag)._reserved, [0; 64]);
 
     let mut g = f.guarantee(&args.id);
-    g._reserved = [0xa5; 64];
+    g._reserved = [0xa5; 192];
     f.write_guarantee(&g);
     let mut a = f.agency(&ag);
     a._reserved = [0x5a; 64];
@@ -493,7 +493,7 @@ fn guarantee_and_agency_padding_is_zero_at_init_and_preserved() {
     f.register(guarantee_args(ag, 1_000 * BRL, 0)).unwrap();
     assert_eq!(f.agency(&ag)._reserved, [0x5a; 64]);
     f.close_guarantee(args.id, ag).unwrap();
-    assert_eq!(f.guarantee(&args.id)._reserved, [0xa5; 64]);
+    assert_eq!(f.guarantee(&args.id)._reserved, [0xa5; 192]);
     assert_eq!(f.agency(&ag)._reserved, [0x5a; 64]);
 }
 

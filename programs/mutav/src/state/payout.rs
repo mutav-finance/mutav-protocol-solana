@@ -29,8 +29,10 @@ pub struct Payout {
     pub settled_at: i64,
     /// `0`/`1`: settlement exceeded the SLA.
     pub late: u8,
-    /// Zeroed. Never read or written by logic.
-    pub _reserved: [u8; 64],
+    /// Zeroed. Never read or written by logic. The 128-byte pilot budget
+    /// (spec §14.2) holds the ADR 0012 settlement fields (74 bytes) without a
+    /// migration; it was grown from 64 before the layout freeze (ADR 0019).
+    pub _reserved: [u8; 128],
 }
 
 const _: () = assert!(8 + Payout::INIT_SPACE == PAYOUT_SIZE);

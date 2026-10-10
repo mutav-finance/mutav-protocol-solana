@@ -164,11 +164,11 @@ pub const NOTICE_CLOSED_WITHDRAWN: u8 = 2;
 
 pub const VAULT_CONFIG_SIZE: usize = 2_756;
 pub const VAULT_STATE_SIZE: usize = 480;
-pub const GUARANTEE_SIZE: usize = 249;
+pub const GUARANTEE_SIZE: usize = 377;
 pub const AGENCY_EXPOSURE_SIZE: usize = 126;
 pub const FEE_RECEIPT_SIZE: usize = 138;
-pub const CLAIM_FILING_SIZE: usize = 156;
-pub const PAYOUT_SIZE: usize = 229;
+pub const CLAIM_FILING_SIZE: usize = 220;
+pub const PAYOUT_SIZE: usize = 293;
 pub const DEPOSIT_REQUEST_SIZE: usize = 155;
 pub const REDEEM_REQUEST_SIZE: usize = 181;
 pub const HOLDER_STATE_SIZE: usize = 114;

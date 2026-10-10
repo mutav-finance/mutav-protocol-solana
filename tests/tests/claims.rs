@@ -70,7 +70,7 @@ fn file_claim_books_the_provision() {
         (x.notice_ref_hash, x.provision, x.filed_at),
         (c.notice, 6_000 * BRL, 1_760_000_000)
     );
-    assert_eq!(x._reserved, [0; 64]);
+    assert_eq!(x._reserved, [0; 128]);
 
     let gg = f.guarantee(&g.id);
     assert_eq!(
@@ -271,7 +271,7 @@ fn pay_claim_pays_the_payments_account_and_releases_the_provision() {
         (p.paid_at, p.settled_at, p.pix_e2e_hash, p.late),
         (1_770_000_000, 0, [0; 32], 0)
     );
-    assert_eq!(p._reserved, [0; 64]);
+    assert_eq!(p._reserved, [0; 128]);
 
     let ev = events::<ClaimPaid>(&meta);
     assert_eq!(ev.len(), 1);
@@ -796,17 +796,17 @@ fn claim_padding_is_preserved_in_place() {
     let c = Claim::on(&g, BRL);
     f.file_claim(c).unwrap();
     let mut x = f.claim_filing(&c);
-    x._reserved = [0x3c; 64];
+    x._reserved = [0x3c; 128];
     f.write_claim_filing(&c, &x);
     let mut gg = f.guarantee(&g.id);
-    gg._reserved = [0xc3; 64];
+    gg._reserved = [0xc3; 192];
     f.write_guarantee(&gg);
     f.pay_claim(c).unwrap();
-    assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 64]);
-    assert_eq!(f.guarantee(&g.id)._reserved, [0xc3; 64]);
+    assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 128]);
+    assert_eq!(f.guarantee(&g.id)._reserved, [0xc3; 192]);
     let mut p = f.payout(&c);
-    p._reserved = [0x77; 64];
+    p._reserved = [0x77; 128];
     f.write_payout(&c, &p);
     f.settle_payout(c, unique_hash()).unwrap();
-    assert_eq!(f.payout(&c)._reserved, [0x77; 64]);
+    assert_eq!(f.payout(&c)._reserved, [0x77; 128]);
 }

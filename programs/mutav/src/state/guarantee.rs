@@ -45,8 +45,10 @@ pub struct Guarantee {
     pub registered_at: i64,
     /// `0` while active.
     pub closed_at: i64,
-    /// Zeroed. Never read or written by logic.
-    pub _reserved: [u8; 64],
+    /// Zeroed. Never read or written by logic. The 192-byte pilot budget
+    /// (spec §14.2) holds the ADR 0012 lifecycle fields (88 bytes) without a
+    /// migration; it was grown from 64 before the layout freeze (ADR 0019).
+    pub _reserved: [u8; 192],
 }
 
 const _: () = assert!(8 + Guarantee::INIT_SPACE == GUARANTEE_SIZE);

@@ -306,7 +306,7 @@ pub struct GuaranteeV1 {
     pub status: u8,
     pub registered_at: i64,
     pub closed_at: i64,
-    pub _reserved: [u8; 64],
+    pub _reserved: [u8; 192],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -339,7 +339,7 @@ pub const GUARANTEE_V1: OffsetTable = &[
     ("status", 160, 1),
     ("registered_at", 161, 8),
     ("closed_at", 169, 8),
-    ("_reserved", 177, 64),
+    ("_reserved", 177, 192),
 ];
 
 pub const AGENCY_EXPOSURE_V1: OffsetTable = &[
@@ -422,7 +422,7 @@ pub struct ClaimFilingV1 {
     pub provision: u64,
     pub filed_at: i64,
     pub status: u8,
-    pub _reserved: [u8; 64],
+    pub _reserved: [u8; 128],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -439,7 +439,7 @@ pub struct PayoutV1 {
     pub pix_e2e_hash: [u8; 32],
     pub settled_at: i64,
     pub late: u8,
-    pub _reserved: [u8; 64],
+    pub _reserved: [u8; 128],
 }
 
 pub const CLAIM_FILING_V1: OffsetTable = &[
@@ -451,7 +451,7 @@ pub const CLAIM_FILING_V1: OffsetTable = &[
     ("provision", 67, 8),
     ("filed_at", 75, 8),
     ("status", 83, 1),
-    ("_reserved", 84, 64),
+    ("_reserved", 84, 128),
 ];
 
 pub const PAYOUT_V1: OffsetTable = &[
@@ -467,7 +467,7 @@ pub const PAYOUT_V1: OffsetTable = &[
     ("pix_e2e_hash", 116, 32),
     ("settled_at", 148, 8),
     ("late", 156, 1),
-    ("_reserved", 157, 64),
+    ("_reserved", 157, 128),
 ];
 
 // ---------------------------------------------------------------------------
