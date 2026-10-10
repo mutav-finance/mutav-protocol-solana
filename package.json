@@ -10,7 +10,7 @@
     "typecheck": "bun run --cwd clients/js typecheck",
     "test:client": "bun test --cwd clients/js",
     "test:scripts": "bun test scripts/test",
-    "check:no-keys": "bash scripts/check-no-keys.sh clients/js/src",
+    "check:no-keys": "bash scripts/check-no-keys.sh --allowlist scripts/no-keys-allowlist.txt clients/js/src app scripts",
     "idl-compat": "bun scripts/idl-compat.ts",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
     "dry-run": "bun scripts/devnet/dry-run.ts",
