@@ -8,7 +8,7 @@ use crate::{
     errors::MutavError,
     events::GuaranteeClosed,
     solvency::coverage_required,
-    state::{AgencyExposure, Guarantee, VaultConfig, VaultState},
+    state::{Guarantee, VaultConfig, VaultState},
 };
 
 #[event_cpi]
@@ -38,14 +38,6 @@ pub struct CloseGuarantee<'info> {
         constraint = guarantee.is_supported() @ MutavError::UnsupportedVersion,
     )]
     pub guarantee: Box<Account<'info, Guarantee>>,
-
-    #[account(
-        mut,
-        seeds = [AGENCY_SEED, config.key().as_ref(), guarantee.agency_id.as_ref()],
-        bump = agency_exposure.bump,
-        constraint = agency_exposure.is_supported() @ MutavError::UnsupportedVersion,
-    )]
-    pub agency_exposure: Box<Account<'info, AgencyExposure>>,
 }
 
 pub fn handle_close_guarantee(ctx: Context<CloseGuarantee>, id: [u8; 32]) -> Result<()> {
@@ -65,16 +57,6 @@ pub fn handle_close_guarantee(ctx: Context<CloseGuarantee>, id: [u8; 32]) -> Res
         state.provisions,
     )?;
     state.active_guarantees = state
-        .active_guarantees
-        .checked_sub(1)
-        .ok_or(MutavError::MathOverflow)?;
-
-    let agency = &mut ctx.accounts.agency_exposure;
-    agency.outstanding_cover = agency
-        .outstanding_cover
-        .checked_sub(released)
-        .ok_or(MutavError::MathOverflow)?;
-    agency.active_guarantees = agency
         .active_guarantees
         .checked_sub(1)
         .ok_or(MutavError::MathOverflow)?;

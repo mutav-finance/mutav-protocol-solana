@@ -18,29 +18,17 @@
   "paymentsAccount": "<FILL: BRS token account receiving claim payments>",
   "coverageRatioBps": 1000,
   "feeTakeBps": "<FILL: take rate in bps, at most 3000 (spec §12 Q4)>",
-  "payoutSlaSecs": 172800,
   "caps": {
-    "_comment": "BRS base units (6 dp). Sized for c = 0.10 (ADR 0016): R$300k reserve, R$40k per guarantee, R$10M per agency (well above maxTvl / 0.10 = R$3M, leaving room for fee growth, so it never binds while MUTAV's operator allocates every lease to this reserve), R$10k / R$20k claim payments per call / per 30 days, TESOURO 0% (no adapter on devnet), requests R$1k–R$100k, partial-fill floor R$500.",
+    "_comment": "BRS base units (6 dp). Sized for c = 0.10 (ADR 0016): R$300k reserve, R$40k per guarantee, R$10k / R$20k claim payments per call / per 31 days (ADR 0019), requests R$1k–R$100k. maxNavMoveBps is 10000 (100%) on devnet on purpose: the guard nets out guarantee fees and swept income per share (ADR 0017), but a claim provision or payment against a small demo reserve is a real NAV move and would trip it and halt fulfilment. If it trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
     "maxTvl": 300000000000,
     "maxCoverPerGuarantee": 40000000000,
-    "maxCoverPerAgency": 10000000000000,
     "maxClaimPerCall": 10000000000,
     "maxClaimPerPeriod": 20000000000,
-    "claimPeriodSecs": 2592000,
-    "minSettlementBps": 10000,
     "minRequest": 1000000000,
     "maxRequest": 100000000000,
-    "minFillAssets": 500000000
-  },
-  "price": {
-    "_comment": "TESOURO is not held in the pilot (no adapter), so the price fields are placeholders. maxNavMoveBps is 10000 (100%) on devnet on purpose: the guard nets out guarantee fees and swept income per share (ADR 0017), but a claim provision or payment against a small demo reserve is a real NAV move and would trip it and halt fulfilment. If it trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
-    "tesouroPriceAccount": "11111111111111111111111111111111",
-    "p0": 1000000000,
-    "t0": 0,
-    "yMaxBps": 1500,
-    "maxStalenessSecs": 86400,
-    "maxDeviationBps": 200,
     "maxNavMoveBps": 10000
   },
-  "allowlist": ["<FILL: MUTAV capital wallet, plus any devnet investor wallets>"]
+  "allowlist": [
+    "<FILL: MUTAV capital wallet, plus any devnet investor wallets>"
+  ]
 }

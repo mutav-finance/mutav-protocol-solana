@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { address, AccountRole } from "@solana/kit";
+import { address } from "@solana/kit";
 import { findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getSetConfigInstructionDataDecoder, MUTAV_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
 import { fromHex } from "../serde";
 import { composeInstructions, describeInstructions, queueSeqs, refuseOverlappingSetConfig, unsignedTransaction } from "../server/compose";
@@ -29,9 +29,6 @@ async function reserve(): Promise<ReserveView> {
       paymentsAccount: PAYMENTS,
       mutavCapitalWallet: WALLET,
       investorAllowlistRoot: new Uint8Array(32),
-      incomeTakeBps: 0,
-      price: { tesouroPriceAccount: address("11111111111111111111111111111111"), p0: 1n, t0: 0n, yMaxBps: 0, maxStalenessSecs: 0n, maxDeviationBps: 0, maxNavMoveBps: 10_000, reserved: new Uint8Array(32) },
-      exit: { bufferTargetBps: 0, bufferHeadroomBps: 0, bufferReleaseAfterSecs: 0n, curveVersion: 0, hMinBps: 0, hPegBps: 0, hMaxBps: 0, pressureEpochSecs: 0n, minInstantAssets: 0n, maxInstantPerTx: 0n, maxInstantPerWallet: 0n, maxInstantPerPeriod: 0n, instantPeriodSecs: 0n, minHoldSecs: 0n, maxPriceAgeSecs: 0n, allowlistRoot: new Uint8Array(32), barred: Array(4).fill(address("11111111111111111111111111111111")), reserved: new Uint8Array(32) },
     } as never,
     state: state({ depositHead: 2n, nextDepositSeq: 5n } as never),
     solvency: {} as never,
@@ -51,18 +48,11 @@ describe("compose", () => {
     expect(queueSeqs(5n, 5n, 3)).toEqual([]);
   });
 
-  it("refresh passes (guarantee, payout) pairs for pending payouts only", async () => {
+  it("refresh takes no remaining accounts (no payout SLA, ADR 0019)", async () => {
     const r = await reserve();
-    const payouts = [
-      { address: "P1", data: { status: 0, guarantee: "HnDdop5PFqvVKZNujsuakwm2K5GskAUk1GxzbDSdGuMo" } },
-      { address: "P2", data: { status: 1, guarantee: "HnDdop5PFqvVKZNujsuakwm2K5GskAUk1GxzbDSdGuMo" } },
-    ].map((p) => ({ ...p, address: p.address === "P1" ? "9b4N73CtqN6PWE9tvocRvGjJnSfiy94oev4wbR31xMeU" : "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf" }));
-    const [ix] = await composeInstructions({ kind: "refresh" }, WALLET, { reserve: r, ledger: { payouts: payouts as never, guarantees: [] } });
-    const tail = ix!.accounts!.slice(-2);
-    expect(tail.map((a) => [a.address, a.role])).toEqual([
-      ["HnDdop5PFqvVKZNujsuakwm2K5GskAUk1GxzbDSdGuMo", AccountRole.READONLY],
-      ["9b4N73CtqN6PWE9tvocRvGjJnSfiy94oev4wbR31xMeU", AccountRole.WRITABLE],
-    ]);
+    const [ix] = await composeInstructions({ kind: "refresh" }, WALLET, { reserve: r });
+    // config, state, the four token accounts, event authority, program.
+    expect(ix!.accounts!.length).toBe(8);
   });
 
   it("fulfil_deposits appends the request PDAs from the head, writable", async () => {
@@ -80,23 +70,16 @@ describe("compose", () => {
     expect(ix!.data!.length).toBeGreaterThan(8);
   });
 
-  it("set_config writes the reserve-asset fields and carries every other one", async () => {
+  it("set_config writes the NAV-move bound into caps and carries every other field", async () => {
     const r = await reserve();
-    const feed = "HnDdop5PFqvVKZNujsuakwm2K5GskAUk1GxzbDSdGuMo";
-    const [ix] = await composeInstructions({ kind: "set_config", minSettlementBps: 5_000, price: { tesouroPriceAccount: feed, maxStalenessSecs: 3_600n }, incomeTakeBps: 0 }, WALLET, { reserve: r });
+    const [ix] = await composeInstructions({ kind: "set_config", maxNavMoveBps: 500 }, WALLET, { reserve: r });
     const d = getSetConfigInstructionDataDecoder().decode(ix!.data!);
-    expect(d.caps.minSettlementBps).toBe(5_000);
+    expect(d.caps.maxNavMoveBps).toBe(500);
     // set_config takes the state account, for the cached coverage_required (#29).
     expect(ix!.accounts![2]!.address).toBe((await findReserveAddresses(MINT)).state);
     expect(d.caps.maxTvl).toBe(r.config.caps.maxTvl);
-    expect(d.price.tesouroPriceAccount).toBe(feed);
-    expect(d.price.maxStalenessSecs).toBe(3_600n);
-    expect(d.price.maxNavMoveBps).toBe(r.config.price.maxNavMoveBps);
     expect(d.coverageRatioBps).toBe(r.config.coverageRatioBps);
-    expect(d.incomeTakeBps).toBe(0);
-    // The income-take cap is 0 until spec §12 Q47: a non-zero take never composes.
-    await expect(composeInstructions({ kind: "set_config", incomeTakeBps: 100 }, WALLET, { reserve: r })).rejects.toThrow(/MAX_INCOME_TAKE_BPS/);
-    await expect(composeInstructions({ kind: "set_config", minSettlementBps: 10_001 }, WALLET, { reserve: r })).rejects.toThrow(/settlement floor/);
+    await expect(composeInstructions({ kind: "set_config", maxNavMoveBps: 10_001 }, WALLET, { reserve: r })).rejects.toThrow(/max_nav_move_bps/);
   });
 
   it("composes the general admin instructions, each signed by the right key", async () => {
@@ -118,9 +101,9 @@ describe("compose", () => {
 
   it("set_config writes each flow's own fields and refuses merged caps out of bound", async () => {
     const r = await reserve();
-    const [ix] = await composeInstructions({ kind: "set_config", feeTakeBps: 1_500, payoutSlaSecs: 3_600n, caps: { claimPeriodSecs: 86_400n } }, WALLET, { reserve: r });
+    const [ix] = await composeInstructions({ kind: "set_config", feeTakeBps: 1_500, caps: { maxClaimPerPeriod: 30_000_000_000n } }, WALLET, { reserve: r });
     const d = getSetConfigInstructionDataDecoder().decode(ix!.data!);
-    expect([d.feeTakeBps, d.payoutSlaSecs, d.caps.claimPeriodSecs, d.caps.maxClaimPerCall]).toEqual([1_500, 3_600n, 86_400n, r.config.caps.maxClaimPerCall]);
+    expect([d.feeTakeBps, d.caps.maxClaimPerPeriod, d.caps.maxClaimPerCall]).toEqual([1_500, 30_000_000_000n, r.config.caps.maxClaimPerCall]);
     await expect(composeInstructions({ kind: "set_config", feeTakeBps: 3_001 }, WALLET, { reserve: r })).rejects.toThrow(/fee_take_bps/);
     await expect(composeInstructions({ kind: "set_config", caps: { minRequest: r.config.caps.maxRequest + 1n } }, WALLET, { reserve: r })).rejects.toThrow(/min_request/);
   });

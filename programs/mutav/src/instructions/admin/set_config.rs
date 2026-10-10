@@ -10,12 +10,12 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
-    constants::{field, MAX_INCOME_TAKE_BPS, STATE_SEED, SUPPORTED_FEATURES},
+    constants::{field, STATE_SEED, SUPPORTED_FEATURES},
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges},
     instructions::admin::{validate_money_accounts, validate_params, vault_authority_key},
     solvency::coverage_required,
-    state::{CapsInput, ExitInput, PriceInput, VaultConfig, VaultState},
+    state::{CapsInput, VaultConfig, VaultState},
 };
 
 /// The full set of `VaultConfig` fields `set_config` manages. Roles, the
@@ -27,14 +27,9 @@ use crate::{
 pub struct SetConfigArgs {
     pub coverage_ratio_bps: u16,
     pub fee_take_bps: u16,
-    pub payout_sla_secs: i64,
     pub feature_flags: u64,
     pub mutav_capital_wallet: Pubkey,
     pub caps: CapsInput,
-    pub price: PriceInput,
-    pub exit: ExitInput,
-    /// MUTAV's take from issuer income (ADR 0017), `<= MAX_INCOME_TAKE_BPS`.
-    pub income_take_bps: u16,
 }
 
 #[event_cpi]
@@ -74,21 +69,7 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
         args.feature_flags & !SUPPORTED_FEATURES == 0,
         MutavError::FeatureNotSupported
     );
-    // `ExitParams` may be staged while `INSTANT_EXIT` is off; their bounds are
-    // checked only when the resulting config has the flag on, which no pilot
-    // binary allows (spec §13.2).
-    // MUTAV's take from issuer income: capped by a program constant (ADR 0017).
-    require!(
-        args.income_take_bps <= MAX_INCOME_TAKE_BPS,
-        MutavError::InvalidParameter
-    );
-    validate_params(
-        args.coverage_ratio_bps,
-        args.fee_take_bps,
-        args.payout_sla_secs,
-        &args.caps,
-        &args.price,
-    )?;
+    validate_params(args.coverage_ratio_bps, args.fee_take_bps, &args.caps)?;
     let vault_authority = vault_authority_key(
         &ctx.accounts.config.key(),
         ctx.accounts.config.authority_bump,
@@ -122,11 +103,6 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
         treasury,
     );
     ch.set(
-        field::PAYOUT_SLA_SECS,
-        &mut config.payout_sla_secs,
-        args.payout_sla_secs,
-    );
-    ch.set(
         field::FEATURE_FLAGS,
         &mut config.feature_flags,
         args.feature_flags,
@@ -136,14 +112,7 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
         &mut config.mutav_capital_wallet,
         args.mutav_capital_wallet,
     );
-    ch.set(
-        field::INCOME_TAKE_BPS,
-        &mut config.income_take_bps,
-        args.income_take_bps,
-    );
     config.apply_caps(&args.caps, &mut ch);
-    config.apply_price(&args.price, &mut ch);
-    config.apply_exit(&args.exit, &mut ch);
 
     // The cached `coverage_required` (spec §3.2) with the new `c`, as
     // `register_guarantee`, `file_claim`, `pay_claim` and `close_guarantee`

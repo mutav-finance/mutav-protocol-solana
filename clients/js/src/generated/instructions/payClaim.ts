@@ -34,7 +34,6 @@ import {
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type WritableAccount,
-  type WritableSignerAccount,
 } from "@solana/kit";
 import {
   getAccountMetaFactory,
@@ -48,7 +47,6 @@ import {
 } from "@solana/kit/program-client-core";
 import {
   findClaimFilingPda,
-  findPayoutPda,
   findReservePda,
   findStatePda,
   findVaultAuthorityPda,
@@ -69,18 +67,13 @@ export type PayClaimInstruction<
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
   TAccountGuarantee extends string | AccountMeta<string> = string,
-  TAccountAgencyExposure extends string | AccountMeta<string> = string,
   TAccountClaimFiling extends string | AccountMeta<string> = string,
-  TAccountPayout extends string | AccountMeta<string> = string,
   TAccountReserve extends string | AccountMeta<string> = string,
   TAccountPaymentsAccount extends string | AccountMeta<string> = string,
   TAccountVaultAuthority extends string | AccountMeta<string> = string,
   TAccountReserveMint extends string | AccountMeta<string> = string,
   TAccountTokenProgram extends string | AccountMeta<string> =
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-  TAccountPayer extends string | AccountMeta<string> = string,
-  TAccountSystemProgram extends string | AccountMeta<string> =
-    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -101,15 +94,9 @@ export type PayClaimInstruction<
       TAccountGuarantee extends string
         ? WritableAccount<TAccountGuarantee>
         : TAccountGuarantee,
-      TAccountAgencyExposure extends string
-        ? WritableAccount<TAccountAgencyExposure>
-        : TAccountAgencyExposure,
       TAccountClaimFiling extends string
         ? WritableAccount<TAccountClaimFiling>
         : TAccountClaimFiling,
-      TAccountPayout extends string
-        ? WritableAccount<TAccountPayout>
-        : TAccountPayout,
       TAccountReserve extends string
         ? WritableAccount<TAccountReserve>
         : TAccountReserve,
@@ -125,13 +112,6 @@ export type PayClaimInstruction<
       TAccountTokenProgram extends string
         ? ReadonlyAccount<TAccountTokenProgram>
         : TAccountTokenProgram,
-      TAccountPayer extends string
-        ? WritableSignerAccount<TAccountPayer> &
-            AccountSignerMeta<TAccountPayer>
-        : TAccountPayer,
-      TAccountSystemProgram extends string
-        ? ReadonlyAccount<TAccountSystemProgram>
-        : TAccountSystemProgram,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -191,10 +171,7 @@ export type PayClaimAsyncInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountClaimFiling extends InstructionAccountInput = InstructionAccountInput,
-  TAccountPayout extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput =
     InstructionAccountInput,
@@ -202,9 +179,6 @@ export type PayClaimAsyncInput<
     InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput =
-    InstructionAccountInput,
-  TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
-  TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
@@ -214,21 +188,17 @@ export type PayClaimAsyncInput<
   config: TAccountConfig;
   state?: TAccountState;
   guarantee: TAccountGuarantee;
-  agencyExposure: TAccountAgencyExposure;
   /**
    * Decoded in the handler, so a missing filing fails with
    * `ClaimNotFiled` (spec §5.4 rule 1) rather than a framework error.
    */
   claimFiling?: TAccountClaimFiling;
-  payout?: TAccountPayout;
   reserve?: TAccountReserve;
   /** Must be `config.payments_account` (spec §5.4 rule 5). */
   paymentsAccount: TAccountPaymentsAccount;
   vaultAuthority?: TAccountVaultAuthority;
   reserveMint: TAccountReserveMint;
   tokenProgram?: TAccountTokenProgram;
-  payer: TAccountPayer;
-  systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   leg: PayClaimInstructionDataArgs["leg"];
@@ -241,16 +211,12 @@ export async function getPayClaimInstructionAsync<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput,
   TAccountClaimFiling extends InstructionAccountInput,
-  TAccountPayout extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput,
   TAccountVaultAuthority extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput,
-  TAccountPayer extends InstructionSignerInput,
-  TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -260,16 +226,12 @@ export async function getPayClaimInstructionAsync<
     TAccountConfig,
     TAccountState,
     TAccountGuarantee,
-    TAccountAgencyExposure,
     TAccountClaimFiling,
-    TAccountPayout,
     TAccountReserve,
     TAccountPaymentsAccount,
     TAccountVaultAuthority,
     TAccountReserveMint,
     TAccountTokenProgram,
-    TAccountPayer,
-    TAccountSystemProgram,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -294,16 +256,8 @@ export async function getPayClaimInstructionAsync<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountAgencyExposure,
-      InstructionAccountInputAddress<TAccountAgencyExposure>
-    >,
-    ResolvedInstructionAccountMeta<
       TAccountClaimFiling,
       InstructionAccountInputAddress<TAccountClaimFiling>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountPayout,
-      InstructionAccountInputAddress<TAccountPayout>
     >,
     ResolvedInstructionAccountMeta<
       TAccountReserve,
@@ -324,14 +278,6 @@ export async function getPayClaimInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountTokenProgram,
       InstructionAccountInputAddress<TAccountTokenProgram>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountPayer,
-      InstructionAccountInputAddress<TAccountPayer>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountSystemProgram,
-      InstructionAccountInputAddress<TAccountSystemProgram>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -363,17 +309,11 @@ export async function getPayClaimInstructionAsync<
       isSigner: false,
       isWritable: true,
     },
-    agencyExposure: {
-      value: input.agencyExposure ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
     claimFiling: {
       value: input.claimFiling ?? null,
       isSigner: false,
       isWritable: true,
     },
-    payout: { value: input.payout ?? null, isSigner: false, isWritable: true },
     reserve: {
       value: input.reserve ?? null,
       isSigner: false,
@@ -396,12 +336,6 @@ export async function getPayClaimInstructionAsync<
     },
     tokenProgram: {
       value: input.tokenProgram ?? null,
-      isSigner: false,
-      isWritable: false,
-    },
-    payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
-    systemProgram: {
-      value: input.systemProgram ?? null,
       isSigner: false,
       isWritable: false,
     },
@@ -451,21 +385,6 @@ export async function getPayClaimInstructionAsync<
       { programAddress },
     );
   }
-  if (!accounts.payout.value) {
-    accounts.payout.value = await findPayoutPda(
-      {
-        guarantee: getAddressFromResolvedInstructionAccount(
-          "guarantee",
-          accounts.guarantee.value,
-        ),
-        noticeRefHash: getNonNullResolvedInstructionInput(
-          "noticeRefHash",
-          args.noticeRefHash,
-        ),
-      },
-      { programAddress },
-    );
-  }
   if (!accounts.reserve.value) {
     accounts.reserve.value = await findReservePda(
       {
@@ -492,10 +411,6 @@ export async function getPayClaimInstructionAsync<
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
-  }
 
   return Object.freeze({
     accounts: [
@@ -503,16 +418,12 @@ export async function getPayClaimInstructionAsync<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("guarantee", accounts.guarantee),
-      getAccountMeta("agencyExposure", accounts.agencyExposure),
       getAccountMeta("claimFiling", accounts.claimFiling),
-      getAccountMeta("payout", accounts.payout),
       getAccountMeta("reserve", accounts.reserve),
       getAccountMeta("paymentsAccount", accounts.paymentsAccount),
       getAccountMeta("vaultAuthority", accounts.vaultAuthority),
       getAccountMeta("reserveMint", accounts.reserveMint),
       getAccountMeta("tokenProgram", accounts.tokenProgram),
-      getAccountMeta("payer", accounts.payer),
-      getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -539,16 +450,8 @@ export async function getPayClaimInstructionAsync<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountAgencyExposure,
-      InstructionAccountInputAddress<TAccountAgencyExposure>
-    >,
-    ResolvedInstructionAccountMeta<
       TAccountClaimFiling,
       InstructionAccountInputAddress<TAccountClaimFiling>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountPayout,
-      InstructionAccountInputAddress<TAccountPayout>
     >,
     ResolvedInstructionAccountMeta<
       TAccountReserve,
@@ -571,14 +474,6 @@ export async function getPayClaimInstructionAsync<
       InstructionAccountInputAddress<TAccountTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountPayer,
-      InstructionAccountInputAddress<TAccountPayer>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountSystemProgram,
-      InstructionAccountInputAddress<TAccountSystemProgram>
-    >,
-    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -594,10 +489,7 @@ export type PayClaimInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountClaimFiling extends InstructionAccountInput = InstructionAccountInput,
-  TAccountPayout extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput =
     InstructionAccountInput,
@@ -605,9 +497,6 @@ export type PayClaimInput<
     InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput =
-    InstructionAccountInput,
-  TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
-  TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
@@ -617,21 +506,17 @@ export type PayClaimInput<
   config: TAccountConfig;
   state: TAccountState;
   guarantee: TAccountGuarantee;
-  agencyExposure: TAccountAgencyExposure;
   /**
    * Decoded in the handler, so a missing filing fails with
    * `ClaimNotFiled` (spec §5.4 rule 1) rather than a framework error.
    */
   claimFiling: TAccountClaimFiling;
-  payout: TAccountPayout;
   reserve: TAccountReserve;
   /** Must be `config.payments_account` (spec §5.4 rule 5). */
   paymentsAccount: TAccountPaymentsAccount;
   vaultAuthority: TAccountVaultAuthority;
   reserveMint: TAccountReserveMint;
   tokenProgram?: TAccountTokenProgram;
-  payer: TAccountPayer;
-  systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   leg: PayClaimInstructionDataArgs["leg"];
@@ -644,16 +529,12 @@ export function getPayClaimInstruction<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput,
   TAccountClaimFiling extends InstructionAccountInput,
-  TAccountPayout extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput,
   TAccountVaultAuthority extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput,
-  TAccountPayer extends InstructionSignerInput,
-  TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -663,16 +544,12 @@ export function getPayClaimInstruction<
     TAccountConfig,
     TAccountState,
     TAccountGuarantee,
-    TAccountAgencyExposure,
     TAccountClaimFiling,
-    TAccountPayout,
     TAccountReserve,
     TAccountPaymentsAccount,
     TAccountVaultAuthority,
     TAccountReserveMint,
     TAccountTokenProgram,
-    TAccountPayer,
-    TAccountSystemProgram,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -696,16 +573,8 @@ export function getPayClaimInstruction<
     InstructionAccountInputAddress<TAccountGuarantee>
   >,
   ResolvedInstructionAccountMeta<
-    TAccountAgencyExposure,
-    InstructionAccountInputAddress<TAccountAgencyExposure>
-  >,
-  ResolvedInstructionAccountMeta<
     TAccountClaimFiling,
     InstructionAccountInputAddress<TAccountClaimFiling>
-  >,
-  ResolvedInstructionAccountMeta<
-    TAccountPayout,
-    InstructionAccountInputAddress<TAccountPayout>
   >,
   ResolvedInstructionAccountMeta<
     TAccountReserve,
@@ -726,14 +595,6 @@ export function getPayClaimInstruction<
   ResolvedInstructionAccountMeta<
     TAccountTokenProgram,
     InstructionAccountInputAddress<TAccountTokenProgram>
-  >,
-  ResolvedInstructionAccountMeta<
-    TAccountPayer,
-    InstructionAccountInputAddress<TAccountPayer>
-  >,
-  ResolvedInstructionAccountMeta<
-    TAccountSystemProgram,
-    InstructionAccountInputAddress<TAccountSystemProgram>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -764,17 +625,11 @@ export function getPayClaimInstruction<
       isSigner: false,
       isWritable: true,
     },
-    agencyExposure: {
-      value: input.agencyExposure ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
     claimFiling: {
       value: input.claimFiling ?? null,
       isSigner: false,
       isWritable: true,
     },
-    payout: { value: input.payout ?? null, isSigner: false, isWritable: true },
     reserve: {
       value: input.reserve ?? null,
       isSigner: false,
@@ -797,12 +652,6 @@ export function getPayClaimInstruction<
     },
     tokenProgram: {
       value: input.tokenProgram ?? null,
-      isSigner: false,
-      isWritable: false,
-    },
-    payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
-    systemProgram: {
-      value: input.systemProgram ?? null,
       isSigner: false,
       isWritable: false,
     },
@@ -830,10 +679,6 @@ export function getPayClaimInstruction<
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
-  if (!accounts.systemProgram.value) {
-    accounts.systemProgram.value =
-      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
-  }
 
   return Object.freeze({
     accounts: [
@@ -841,16 +686,12 @@ export function getPayClaimInstruction<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("guarantee", accounts.guarantee),
-      getAccountMeta("agencyExposure", accounts.agencyExposure),
       getAccountMeta("claimFiling", accounts.claimFiling),
-      getAccountMeta("payout", accounts.payout),
       getAccountMeta("reserve", accounts.reserve),
       getAccountMeta("paymentsAccount", accounts.paymentsAccount),
       getAccountMeta("vaultAuthority", accounts.vaultAuthority),
       getAccountMeta("reserveMint", accounts.reserveMint),
       getAccountMeta("tokenProgram", accounts.tokenProgram),
-      getAccountMeta("payer", accounts.payer),
-      getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -877,16 +718,8 @@ export function getPayClaimInstruction<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountAgencyExposure,
-      InstructionAccountInputAddress<TAccountAgencyExposure>
-    >,
-    ResolvedInstructionAccountMeta<
       TAccountClaimFiling,
       InstructionAccountInputAddress<TAccountClaimFiling>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountPayout,
-      InstructionAccountInputAddress<TAccountPayout>
     >,
     ResolvedInstructionAccountMeta<
       TAccountReserve,
@@ -909,14 +742,6 @@ export function getPayClaimInstruction<
       InstructionAccountInputAddress<TAccountTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountPayer,
-      InstructionAccountInputAddress<TAccountPayer>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountSystemProgram,
-      InstructionAccountInputAddress<TAccountSystemProgram>
-    >,
-    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -937,23 +762,19 @@ export type ParsedPayClaimInstruction<
     config: TAccountMetas[1];
     state: TAccountMetas[2];
     guarantee: TAccountMetas[3];
-    agencyExposure: TAccountMetas[4];
     /**
      * Decoded in the handler, so a missing filing fails with
      * `ClaimNotFiled` (spec §5.4 rule 1) rather than a framework error.
      */
-    claimFiling: TAccountMetas[5];
-    payout: TAccountMetas[6];
-    reserve: TAccountMetas[7];
+    claimFiling: TAccountMetas[4];
+    reserve: TAccountMetas[5];
     /** Must be `config.payments_account` (spec §5.4 rule 5). */
-    paymentsAccount: TAccountMetas[8];
-    vaultAuthority: TAccountMetas[9];
-    reserveMint: TAccountMetas[10];
-    tokenProgram: TAccountMetas[11];
-    payer: TAccountMetas[12];
-    systemProgram: TAccountMetas[13];
-    eventAuthority: TAccountMetas[14];
-    program: TAccountMetas[15];
+    paymentsAccount: TAccountMetas[6];
+    vaultAuthority: TAccountMetas[7];
+    reserveMint: TAccountMetas[8];
+    tokenProgram: TAccountMetas[9];
+    eventAuthority: TAccountMetas[10];
+    program: TAccountMetas[11];
   };
   data: PayClaimInstructionData;
 };
@@ -966,12 +787,12 @@ export function parsePayClaimInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedPayClaimInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 16) {
+  if (instruction.accounts.length < 12) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 16,
+        expectedAccountMetas: 12,
       },
     );
   }
@@ -988,16 +809,12 @@ export function parsePayClaimInstruction<
       config: getNextAccount(),
       state: getNextAccount(),
       guarantee: getNextAccount(),
-      agencyExposure: getNextAccount(),
       claimFiling: getNextAccount(),
-      payout: getNextAccount(),
       reserve: getNextAccount(),
       paymentsAccount: getNextAccount(),
       vaultAuthority: getNextAccount(),
       reserveMint: getNextAccount(),
       tokenProgram: getNextAccount(),
-      payer: getNextAccount(),
-      systemProgram: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

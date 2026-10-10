@@ -32,13 +32,10 @@ import {
 import {
   buildAllowlist,
   fetchReserve,
-  findAgencyExposurePda,
   findClaimFilingPda,
   findDepositRequestPda,
   findFeeReceiptPda,
   findGuaranteePda,
-  findHolderStatePda,
-  findPayoutPda,
   findReserveAddresses,
   getClaimSharesInstruction,
   getContributeFeesInstruction,
@@ -48,8 +45,8 @@ import {
   getRegisterGuaranteeInstruction,
   getRequestDepositInstruction,
   getSettlePayoutInstruction,
+  fetchClaimFiling,
   fetchGuarantee,
-  fetchPayout,
 } from '../clients/js/src';
 import { opt, parseArgs } from '../scripts/devnet/lib/cli';
 import {
@@ -170,15 +167,9 @@ export async function forkHappyPath(programKeypair?: string) {
       paymentsAccount: payments,
       coverageRatioBps: 10_000,
       feeTakeBps: 2_000,
-      payoutSlaSecs: 172_800,
       caps: {
-        maxTvl: '100000000000', maxCoverPerGuarantee: '30000000000', maxCoverPerAgency: '60000000000',
-        maxClaimPerCall: '10000000000', maxClaimPerPeriod: '20000000000', claimPeriodSecs: 2_592_000,
-        minSettlementBps: 10_000, minRequest: '1000000000', maxRequest: '30000000000', minFillAssets: '500000000',
-      },
-      price: {
-        tesouroPriceAccount: '11111111111111111111111111111111', p0: 1_000_000_000, t0: 0, yMaxBps: 1_500,
-        maxStalenessSecs: 86_400, maxDeviationBps: 200, maxNavMoveBps: 10_000,
+        maxTvl: '100000000000', maxCoverPerGuarantee: '30000000000', maxClaimPerCall: '10000000000',
+        maxClaimPerPeriod: '20000000000', minRequest: '1000000000', maxRequest: '30000000000', maxNavMoveBps: 10_000,
       },
       allowlist: [capital!.address, investor!.address],
     });
@@ -196,11 +187,10 @@ export async function forkHappyPath(programKeypair?: string) {
     const investorBrs = await setTokenBalance(investor!.address, BRS_DEVNET_MINT, deposit);
     const seq = r.state.data.nextDepositSeq;
     const [depositRequest] = await findDepositRequestPda({ config: a.config, seq }, po);
-    const [holderState] = await findHolderStatePda({ config: a.config, owner: investor!.address }, po);
     await sendAs(investor!, [
       getRequestDepositInstruction(
         {
-          owner: investor!, config: a.config, state: a.state, depositRequest, holderState, source: investorBrs,
+          owner: investor!, config: a.config, state: a.state, depositRequest, source: investorBrs,
           pendingDeposits: a.pendingDeposits, reserveMint: BRS_DEVNET_MINT, tokenProgram: TOKEN_PROGRAM,
           eventAuthority: a.eventAuthority, program: programId, assets: deposit, proof: tree.proofs.get(investor!.address)!,
         },
@@ -220,7 +210,7 @@ export async function forkHappyPath(programKeypair?: string) {
     await sendAs(investor!, [
       getClaimSharesInstruction(
         {
-          owner: investor!, config: a.config, depositRequest, holderState, shareMint: a.shareMint,
+          owner: investor!, config: a.config, depositRequest, shareMint: a.shareMint,
           ownerShares: investorShares, vaultAuthority: a.vaultAuthority, eventAuthority: a.eventAuthority, program: programId,
         },
         po,
@@ -235,14 +225,12 @@ export async function forkHappyPath(programKeypair?: string) {
     const id = bytes32('fork-guarantee-1');
     const agencyId = bytes32('fork-agency-1');
     const [guarantee] = await findGuaranteePda({ config: a.config, id }, po);
-    const [agencyExposure] = await findAgencyExposurePda({ config: a.config, agencyId }, po);
     const op = { operator: operator!, config: a.config, eventAuthority: a.eventAuthority, program: programId };
     await sendAs(operator!, [
       getRegisterGuaranteeInstruction(
         {
-          ...op, state: a.state, guarantee, agencyExposure, payer: operator!,
-          id, agencyId, refsHash: bytes32('refs'), rent: 1_000n * BRL, defaultMultiplierBps: 10_000,
-          exitMultiplierBps: 5_000, defaultCover: 1_000n * BRL, exitCover: 500n * BRL,
+          ...op, state: a.state, guarantee, payer: operator!,
+          id, agencyId, refsHash: bytes32('refs'), defaultCover: 1_000n * BRL, exitCover: 500n * BRL,
         },
         po,
       ),
@@ -265,7 +253,6 @@ export async function forkHappyPath(programKeypair?: string) {
     const notice = bytes32('notice-1');
     const claim = 400n * BRL;
     const [claimFiling] = await findClaimFilingPda({ guarantee, noticeRefHash: notice }, po);
-    const [payout] = await findPayoutPda({ guarantee, noticeRefHash: notice }, po);
     await sendAs(operator!, [
       getFileClaimInstruction(
         { ...op, state: a.state, guarantee, claimFiling, payer: operator!, leg: 0, amount: claim, noticeRefHash: notice },
@@ -275,24 +262,24 @@ export async function forkHappyPath(programKeypair?: string) {
     await sendAs(operator!, [
       getPayClaimInstruction(
         {
-          ...op, state: a.state, guarantee, agencyExposure, claimFiling, payout, reserve: a.reserve,
+          ...op, state: a.state, guarantee, claimFiling, reserve: a.reserve,
           paymentsAccount: payments, vaultAuthority: a.vaultAuthority, reserveMint: BRS_DEVNET_MINT,
-          tokenProgram: TOKEN_PROGRAM, payer: operator!, leg: 0, amount: claim, noticeRefHash: notice,
+          tokenProgram: TOKEN_PROGRAM, leg: 0, amount: claim, noticeRefHash: notice,
         },
         po,
       ),
     ]);
     check((await tokenAmount(rpc, payments)) === claim, 'claim payment reached the payments account');
     await sendAs(operator!, [
-      getSettlePayoutInstruction({ ...op, guarantee, payout, noticeRefHash: notice, pixE2eHash: bytes32('pix-e2e-1') }, po),
+      getSettlePayoutInstruction({ ...op, guarantee, claimFiling, noticeRefHash: notice, pixE2eHash: bytes32('pix-e2e-1') }, po),
     ]);
     const g = await fetchGuarantee(rpc, guarantee);
-    const p = await fetchPayout(rpc, payout);
+    const p = await fetchClaimFiling(rpc, claimFiling);
     check(g.data.defaultPaid === claim, 'guarantee records the paid default leg');
-    check(p.data.status === 1, 'payout settled');
+    check(p.data.status === 3 && p.data.paidAmount === claim, 'claim paid and settled');
     r = await fetchReserve(rpc, BRS_DEVNET_MINT, po);
     check(r.state.data.brsBalance === deposit + fee - 20n * BRL - claim, 'reserve = deposit + fee − take − claim');
-    check(r.state.data.bufferEarmark === 0n && r.config.data.featureFlags === 0n, 'earmark and feature flags stay 0');
+    check(r.config.data.featureFlags === 0n, 'feature flags stay 0');
     console.log('\nFORK HAPPY PATH PASSED');
   } finally {
     step('stop Surfpool');

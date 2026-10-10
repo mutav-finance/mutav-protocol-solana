@@ -10,8 +10,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { RoleTag } from "@/components/RoleTag";
-import { agencyCapUse, claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "@/lib/charts";
-import { fmtBps, fmtBrs, fmtDuration, fmtPct, fmtTime } from "@/lib/format";
+import { agencyCoverShare, claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "@/lib/charts";
+import { fmtBps, fmtBrs, fmtDuration, fmtPct } from "@/lib/format";
 import type { ClaimCap } from "@/lib/operator";
 import type { Composition } from "@/lib/reserve-assets";
 import type { AgencyRow, ClaimRow, CoverageRow, FlowTotals } from "@/lib/view";
@@ -203,16 +203,17 @@ export function CoverChart({ rows }: { rows: CoverageRow[] }) {
   );
 }
 
-export function AgencyCapChart({ rows, cap }: { rows: AgencyRow[]; cap: bigint }) {
-  const use = agencyCapUse(rows);
+// TODO(PR 5): the agency view's final shape; the program has no per-agency cap (ADR 0019).
+export function AgencyCoverChart({ rows }: { rows: AgencyRow[] }) {
+  const use = agencyCoverShare(rows);
   if (use.length === 0) return null;
   return (
-    <ChartFrame title="Agency exposure against the per-agency cap" caption={<>Outstanding cover of each agency ÷ max cover per agency ({fmtBrs(cap, 0)}, set by the Reserve Admin). From AgencyExposure accounts.</>}>
+    <ChartFrame title="Outstanding cover by agency" caption={<>Remaining cover of each agency&apos;s active guarantees, against the largest. Derived from the Guarantee accounts; the program sets no per-agency cap.</>}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {use.map((a) => (
-          <Row key={a.address} label={<RowLabel><Mono>{short(a.agencyId)}</Mono></RowLabel>} value={`${(a.used * 100).toFixed(1)}%`} summary={`Agency ${short(a.agencyId)}: ${fmtBrs(a.outstanding)} outstanding, ${(a.used * 100).toFixed(1)}% of the cap.`} labelWidth={110}>
+          <Row key={a.agencyId} label={<RowLabel><Mono>{short(a.agencyId)}</Mono></RowLabel>} value={fmtBrs(a.outstanding)} summary={`Agency ${short(a.agencyId)}: ${fmtBrs(a.outstanding)} outstanding.`} labelWidth={110}>
             <div style={{ background: "var(--color-chart-track)", minWidth: 0 }}>
-              <Track segs={[{ f: Math.min(1, a.used), color: a.used > 1 ? C.bad : C.ink }]} />
+              <Track segs={[{ f: Math.min(1, a.used), color: C.ink }]} />
             </div>
           </Row>
         ))}
@@ -223,8 +224,8 @@ export function AgencyCapChart({ rows, cap }: { rows: AgencyRow[]; cap: bigint }
 
 // ── Claim speed ─────────────────────────────────────────────────────────────
 
-export function ClaimSpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaSecs: bigint; now: bigint }) {
-  const { claims, payAxis, settleAxis } = claimSpeed(rows, slaSecs, now);
+export function ClaimSpeedChart({ rows, now }: { rows: ClaimRow[]; now: bigint }) {
+  const { claims, payAxis, settleAxis } = claimSpeed(rows, now);
   if (claims.length === 0) return null;
   const panel = (title: string, axis: bigint, pick: (c: (typeof claims)[number]) => { v: bigint | null; seg: Seg | null; text: string }, marker?: { f: number; label: string }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
@@ -248,10 +249,9 @@ export function ClaimSpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaS
         <Legend>
           <Swatch color={C.ink} label="done" />
           <Swatch color={C.ink} label="pending (so far)" outline />
-          <Swatch color={C.bad} label="late" />
         </Legend>
       }
-      caption={<>Filed → paid: ClaimFiling.filed_at to Payout.paid_at. Paid → settled: Payout.paid_at to settled_at (PIX); the dashed line is the payout SLA ({fmtDuration(slaSecs)}, set by the Reserve Admin). Every step is signed by the operator. Oldest filing first.</>}
+      caption={<>Filed → paid: ClaimFiling.filed_at to paid_at. Paid → settled: paid_at to settled_at (PIX). Every step is signed by the operator. Oldest filing first.</>}
     >
       <div className="grid-2">
         {panel("Filed → paid", payAxis, (c) => ({ v: c.fileToPay, seg: c.fileToPay === null ? null : { f: frac(c.fileToPay, payAxis), color: C.ink }, text: c.fileToPay === null ? "not paid" : fmtDuration(c.fileToPay) }))}
@@ -260,10 +260,9 @@ export function ClaimSpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaS
           settleAxis,
           (c) => ({
             v: c.payToSettle,
-            seg: c.payToSettle === null ? null : { f: frac(c.payToSettle, settleAxis), color: c.late ? C.bad : C.ink, outline: c.pending && !c.late },
-            text: c.payToSettle === null ? "—" : `${fmtDuration(c.payToSettle)}${c.pending ? " so far" : ""}${c.late ? " · late" : ""}`,
+            seg: c.payToSettle === null ? null : { f: frac(c.payToSettle, settleAxis), color: C.ink, outline: c.pending },
+            text: c.payToSettle === null ? "—" : `${fmtDuration(c.payToSettle)}${c.pending ? " so far" : ""}`,
           }),
-          { f: frac(slaSecs, settleAxis), label: `SLA ${fmtDuration(slaSecs)}` },
         )}
       </div>
     </ChartFrame>
@@ -325,7 +324,7 @@ export function FlowChart({ totals }: { totals: FlowTotals }) {
 /** The per-period claim-payment cap: paid in the current window against the cap, and the per-call cap, on one axis. */
 export function ClaimCapChart({ cap }: { cap: ClaimCap }) {
   const axis = cap.perPeriod > cap.perCall ? cap.perPeriod : cap.perCall;
-  const window = cap.windowStart === null ? "No payment yet: the first pay_claim opens the window." : cap.rolled ? `The last window ended ${fmtTime(cap.windowEnd!)}; the next pay_claim opens a new one.` : `Window ${fmtTime(cap.windowStart!)} → ${fmtTime(cap.windowEnd!)}.`;
+  const window = "The window is the last 31 UTC days, this payment included (ADR 0019).";
   return (
     <ChartFrame
       title="Claim-payment caps"

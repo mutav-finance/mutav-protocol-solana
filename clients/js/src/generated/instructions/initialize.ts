@@ -14,8 +14,6 @@ import {
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getI64Decoder,
-  getI64Encoder,
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
@@ -62,12 +60,8 @@ import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 import {
   getCapsInputDecoder,
   getCapsInputEncoder,
-  getPriceInputDecoder,
-  getPriceInputEncoder,
   type CapsInput,
   type CapsInputArgs,
-  type PriceInput,
-  type PriceInputArgs,
 } from "../types";
 
 export const INITIALIZE_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
@@ -187,9 +181,7 @@ export type InitializeInstructionData = {
   mutavCapitalWallet: Address;
   coverageRatioBps: number;
   feeTakeBps: number;
-  payoutSlaSecs: bigint;
   caps: CapsInput;
-  price: PriceInput;
 };
 
 export type InitializeInstructionDataArgs = {
@@ -200,9 +192,7 @@ export type InitializeInstructionDataArgs = {
   mutavCapitalWallet: Address;
   coverageRatioBps: number;
   feeTakeBps: number;
-  payoutSlaSecs: number | bigint;
   caps: CapsInputArgs;
-  price: PriceInputArgs;
 };
 
 export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<InitializeInstructionDataArgs> {
@@ -215,9 +205,7 @@ export function getInitializeInstructionDataEncoder(): FixedSizeEncoder<Initiali
       ["mutavCapitalWallet", getAddressEncoder()],
       ["coverageRatioBps", getU16Encoder()],
       ["feeTakeBps", getU16Encoder()],
-      ["payoutSlaSecs", getI64Encoder()],
       ["caps", getCapsInputEncoder()],
-      ["price", getPriceInputEncoder()],
     ]),
     (value) => ({ ...value, discriminator: INITIALIZE_DISCRIMINATOR }),
   );
@@ -232,9 +220,7 @@ export function getInitializeInstructionDataDecoder(): FixedSizeDecoder<Initiali
     ["mutavCapitalWallet", getAddressDecoder()],
     ["coverageRatioBps", getU16Decoder()],
     ["feeTakeBps", getU16Decoder()],
-    ["payoutSlaSecs", getI64Decoder()],
     ["caps", getCapsInputDecoder()],
-    ["price", getPriceInputDecoder()],
   ]);
 }
 
@@ -320,9 +306,7 @@ export type InitializeAsyncInput<
   mutavCapitalWallet: InitializeInstructionDataArgs["mutavCapitalWallet"];
   coverageRatioBps: InitializeInstructionDataArgs["coverageRatioBps"];
   feeTakeBps: InitializeInstructionDataArgs["feeTakeBps"];
-  payoutSlaSecs: InitializeInstructionDataArgs["payoutSlaSecs"];
   caps: InitializeInstructionDataArgs["caps"];
-  price: InitializeInstructionDataArgs["price"];
 };
 
 export async function getInitializeInstructionAsync<
@@ -874,9 +858,7 @@ export type InitializeInput<
   mutavCapitalWallet: InitializeInstructionDataArgs["mutavCapitalWallet"];
   coverageRatioBps: InitializeInstructionDataArgs["coverageRatioBps"];
   feeTakeBps: InitializeInstructionDataArgs["feeTakeBps"];
-  payoutSlaSecs: InitializeInstructionDataArgs["payoutSlaSecs"];
   caps: InitializeInstructionDataArgs["caps"];
-  price: InitializeInstructionDataArgs["price"];
 };
 
 export function getInitializeInstruction<

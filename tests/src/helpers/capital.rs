@@ -11,7 +11,7 @@ use litesvm::types::TransactionResult;
 use mutav::{
     allowlist,
     constants::*,
-    state::{DepositRequest, HolderState, RedeemRequest},
+    state::{DepositRequest, RedeemRequest},
 };
 use solana_keypair::Keypair;
 use solana_signer::Signer;
@@ -30,11 +30,6 @@ pub fn deposit_pda(config: &Pubkey, seq: u64) -> Pubkey {
 /// `RedeemRequest`: `["redeem", config, seq]`.
 pub fn redeem_pda(config: &Pubkey, seq: u64) -> Pubkey {
     pda(&[REDEEM_SEED, config.as_ref(), &seq.to_le_bytes()])
-}
-
-/// `HolderState`: `["holder", config, owner]`.
-pub fn holder_pda(config: &Pubkey, owner: &Pubkey) -> Pubkey {
-    pda(&[HOLDER_SEED, config.as_ref(), owner.as_ref()])
 }
 
 /// A Merkle tree over wallets, with the program's encoding
@@ -167,7 +162,6 @@ impl Fixture {
                 config,
                 state: self.pdas.state,
                 deposit_request: deposit_pda(&config, seq),
-                holder_state: holder_pda(&config, owner),
                 source: *source,
                 pending_deposits: self.pdas.pending_deposits,
                 reserve_mint: self.reserve_mint,
@@ -233,12 +227,10 @@ impl Fixture {
                 owner: *owner,
                 config,
                 deposit_request: deposit_pda(&config, seq),
-                holder_state: holder_pda(&config, owner),
                 share_mint: self.pdas.share_mint,
                 owner_shares: *owner_shares,
                 vault_authority: self.pdas.authority,
                 share_token_program: TOKEN_PROGRAM,
-                system_program: anchor_lang::solana_program::system_program::ID,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -493,16 +485,6 @@ impl Fixture {
         Some(RedeemRequest::try_deserialize(&mut acc.data.as_slice()).expect("decode redeem"))
     }
 
-    pub fn holder(&self, owner: &Pubkey) -> Option<HolderState> {
-        let acc = self
-            .svm
-            .get_account(&holder_pda(&self.pdas.config, owner))?;
-        if acc.data.is_empty() {
-            return None;
-        }
-        Some(HolderState::try_deserialize(&mut acc.data.as_slice()).expect("decode holder"))
-    }
-
     /// Serializes `r` over the redeem request of its seq.
     pub fn write_redeem_request(&mut self, r: &RedeemRequest) {
         use anchor_lang::Discriminator;
@@ -523,7 +505,7 @@ impl Fixture {
 
     /// Asserts the capital invariants of spec §4 over every request ever
     /// created: 4 (token balances cover the tracked amounts), 5 (shares
-    /// outstanding), 8, 9 and 11 (redemption queue).
+    /// outstanding), 8 and 9 (redemption queue).
     pub fn assert_capital_invariants(&self, at: &str) {
         let s = self.state();
         let mut unclaimed_shares = 0u64;
@@ -540,14 +522,16 @@ impl Fixture {
         let (mut remaining, mut claimable) = (0u64, 0u64);
         for seq in 0..s.next_redeem_seq {
             if let Some(r) = self.redeem_request(seq) {
-                remaining += r.shares_remaining;
-                claimable += r.assets_claimable;
-                if r.status != REDEEM_CANCELLED {
+                remaining += r.shares_remaining();
+                if r.status == REDEEM_PENDING {
                     assert_eq!(
-                        r.shares_filled + r.shares_remaining,
-                        r.shares_requested,
-                        "{at}: invariant 11, seq {seq}"
+                        (r.assets_out, r.shares_filled),
+                        (0, 0),
+                        "{at}: pending seq {seq}"
                     );
+                } else {
+                    assert_eq!(r.shares_filled, r.shares, "{at}: filled seq {seq}");
+                    claimable += r.assets_out;
                 }
             }
         }
@@ -666,16 +650,15 @@ impl Fixture {
                 self.advance_queue_heads_ix(4, &[r0, r1], &[d0, d1]),
                 self.payer.insecure_clone(),
             ),
-            ("refresh", self.refresh_ix(&[]), self.payer.insecure_clone()),
+            ("refresh", self.refresh_ix(), self.payer.insecure_clone()),
         ]
     }
 }
 
 impl Fixture {
-    /// `refresh` (spec §5.8), with `payouts` as `(guarantee, payout)` pairs of
-    /// remaining accounts (Task 10).
-    pub fn refresh_ix(&self, payouts: &[(Pubkey, Pubkey)]) -> Instruction {
-        let mut metas = mutav::accounts::Refresh {
+    /// `refresh` (spec §5.8). It takes no remaining accounts.
+    pub fn refresh_ix(&self) -> Instruction {
+        let metas = mutav::accounts::Refresh {
             config: self.pdas.config,
             state: self.pdas.state,
             reserve: self.pdas.reserve,
@@ -686,10 +669,6 @@ impl Fixture {
             program: mutav::ID,
         }
         .to_account_metas(None);
-        for (g, p) in payouts {
-            metas.push(AccountMeta::new_readonly(*g, false));
-            metas.push(AccountMeta::new(*p, false));
-        }
         Instruction::new_with_bytes(mutav::ID, &mutav::instruction::Refresh {}.data(), metas)
     }
 
@@ -718,25 +697,11 @@ impl Fixture {
 
     /// `refresh` sent by a fresh, unrelated signer (it is permissionless).
     pub fn refresh(&mut self) -> TransactionResult {
-        self.refresh_with(&[])
-    }
-
-    /// `refresh` passing the payouts of `claims` (their guarantee and payout
-    /// accounts).
-    pub fn refresh_with(&mut self, claims: &[super::Claim]) -> TransactionResult {
         let anyone = Keypair::new();
         self.svm
             .airdrop(&anyone.pubkey(), 1_000_000_000)
             .expect("airdrop");
-        let config = self.pdas.config;
-        let pairs: Vec<(Pubkey, Pubkey)> = claims
-            .iter()
-            .map(|c| {
-                let g = super::guarantee_pda(&config, &c.id);
-                (g, super::payout_pda(&g, &c.notice))
-            })
-            .collect();
-        let ix = self.refresh_ix(&pairs);
+        let ix = self.refresh_ix();
         super::send_ix(&mut self.svm, ix, &[&anyone])
     }
 }

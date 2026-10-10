@@ -35,33 +35,21 @@ import {
   type SelfPlanAndSendFunctions,
 } from "@solana/kit/program-client-core";
 import {
-  getAgencyExposureCodec,
   getClaimFilingCodec,
   getDepositRequestCodec,
-  getFeeReceiptCodec,
   getGuaranteeCodec,
-  getHolderStateCodec,
   getIncomeReceiptCodec,
-  getPayoutCodec,
   getRedeemRequestCodec,
   getVaultConfigCodec,
   getVaultStateCodec,
-  type AgencyExposure,
-  type AgencyExposureArgs,
   type ClaimFiling,
   type ClaimFilingArgs,
   type DepositRequest,
   type DepositRequestArgs,
-  type FeeReceipt,
-  type FeeReceiptArgs,
   type Guarantee,
   type GuaranteeArgs,
-  type HolderState,
-  type HolderStateArgs,
   type IncomeReceipt,
   type IncomeReceiptArgs,
-  type Payout,
-  type PayoutArgs,
   type RedeemRequest,
   type RedeemRequestArgs,
   type VaultConfig,
@@ -181,9 +169,7 @@ import {
   findConfigPda,
   findFeeReceiptPda,
   findGuaranteePda,
-  findHolderStatePda,
   findIncomeReceiptPda,
-  findPayoutPda,
   findPendingDepositsPda,
   findPendingRedemptionsPda,
   findReservePda,
@@ -196,14 +182,10 @@ export const MUTAV_PROGRAM_ADDRESS =
   "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9" as Address<"8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9">;
 
 export enum MutavAccount {
-  AgencyExposure,
   ClaimFiling,
   DepositRequest,
-  FeeReceipt,
   Guarantee,
-  HolderState,
   IncomeReceipt,
-  Payout,
   RedeemRequest,
   VaultConfig,
   VaultState,
@@ -213,17 +195,6 @@ export function identifyMutavAccount(
   account: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MutavAccount {
   const data = "data" in account ? account.data : account;
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([1, 250, 85, 98, 115, 180, 168, 59]),
-      ),
-      0,
-    )
-  ) {
-    return MutavAccount.AgencyExposure;
-  }
   if (
     containsBytes(
       data,
@@ -250,17 +221,6 @@ export function identifyMutavAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([135, 174, 32, 77, 183, 44, 26, 107]),
-      ),
-      0,
-    )
-  ) {
-    return MutavAccount.FeeReceipt;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([198, 16, 124, 172, 230, 249, 200, 37]),
       ),
       0,
@@ -272,34 +232,12 @@ export function identifyMutavAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([222, 82, 176, 75, 3, 75, 155, 184]),
-      ),
-      0,
-    )
-  ) {
-    return MutavAccount.HolderState;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([33, 167, 246, 148, 183, 13, 0, 79]),
       ),
       0,
     )
   ) {
     return MutavAccount.IncomeReceipt;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([69, 45, 245, 131, 218, 101, 158, 228]),
-      ),
-      0,
-    )
-  ) {
-    return MutavAccount.Payout;
   }
   if (
     containsBytes(
@@ -341,17 +279,11 @@ export function identifyMutavAccount(
 }
 
 export enum MutavEvent {
-  AdapterRemoved,
-  AdapterWhitelisted,
-  Allocated,
   AllowlistRootUpdated,
   AssetsClaimed,
   ClaimFiled,
-  ClaimNoticeClosed,
-  ClaimNoticeFlagged,
   ClaimPaid,
   ConfigUpdated,
-  Deallocated,
   DepositCancelled,
   DepositRequested,
   DepositsFulfilled,
@@ -364,7 +296,6 @@ export enum MutavEvent {
   OperatorRevoked,
   Paused,
   PaymentsAccountUpdated,
-  PayoutLate,
   PayoutSettled,
   QueueHeadsAdvanced,
   RedeemCancelled,
@@ -383,39 +314,6 @@ export function identifyMutavEvent(
   event: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): MutavEvent {
   const data = "data" in event ? event.data : event;
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([2, 66, 22, 230, 197, 67, 75, 103]),
-      ),
-      0,
-    )
-  ) {
-    return MutavEvent.AdapterRemoved;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([237, 172, 209, 145, 139, 69, 188, 193]),
-      ),
-      0,
-    )
-  ) {
-    return MutavEvent.AdapterWhitelisted;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([146, 11, 194, 76, 4, 220, 226, 43]),
-      ),
-      0,
-    )
-  ) {
-    return MutavEvent.Allocated;
-  }
   if (
     containsBytes(
       data,
@@ -453,28 +351,6 @@ export function identifyMutavEvent(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([254, 5, 224, 199, 243, 170, 23, 131]),
-      ),
-      0,
-    )
-  ) {
-    return MutavEvent.ClaimNoticeClosed;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([65, 185, 171, 58, 20, 163, 142, 210]),
-      ),
-      0,
-    )
-  ) {
-    return MutavEvent.ClaimNoticeFlagged;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([212, 155, 88, 118, 128, 99, 132, 42]),
       ),
       0,
@@ -492,17 +368,6 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.ConfigUpdated;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([59, 63, 181, 119, 97, 158, 40, 6]),
-      ),
-      0,
-    )
-  ) {
-    return MutavEvent.Deallocated;
   }
   if (
     containsBytes(
@@ -635,17 +500,6 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.PaymentsAccountUpdated;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([97, 40, 69, 153, 143, 21, 251, 4]),
-      ),
-      0,
-    )
-  ) {
-    return MutavEvent.PayoutLate;
   }
   if (
     containsBytes(
@@ -1396,22 +1250,14 @@ export type MutavPlugin = {
 };
 
 export type MutavPluginAccounts = {
-  agencyExposure: ReturnType<typeof getAgencyExposureCodec> &
-    SelfFetchFunctions<AgencyExposureArgs, AgencyExposure>;
   claimFiling: ReturnType<typeof getClaimFilingCodec> &
     SelfFetchFunctions<ClaimFilingArgs, ClaimFiling>;
   depositRequest: ReturnType<typeof getDepositRequestCodec> &
     SelfFetchFunctions<DepositRequestArgs, DepositRequest>;
-  feeReceipt: ReturnType<typeof getFeeReceiptCodec> &
-    SelfFetchFunctions<FeeReceiptArgs, FeeReceipt>;
   guarantee: ReturnType<typeof getGuaranteeCodec> &
     SelfFetchFunctions<GuaranteeArgs, Guarantee>;
-  holderState: ReturnType<typeof getHolderStateCodec> &
-    SelfFetchFunctions<HolderStateArgs, HolderState>;
   incomeReceipt: ReturnType<typeof getIncomeReceiptCodec> &
     SelfFetchFunctions<IncomeReceiptArgs, IncomeReceipt>;
-  payout: ReturnType<typeof getPayoutCodec> &
-    SelfFetchFunctions<PayoutArgs, Payout>;
   redeemRequest: ReturnType<typeof getRedeemRequestCodec> &
     SelfFetchFunctions<RedeemRequestArgs, RedeemRequest>;
   vaultConfig: ReturnType<typeof getVaultConfigCodec> &
@@ -1473,7 +1319,7 @@ export type MutavPluginInstructions = {
     input: PauseInput,
   ) => ReturnType<typeof getPauseInstruction> & SelfPlanAndSendFunctions;
   payClaim: (
-    input: MakeOptional<PayClaimAsyncInput, "payer">,
+    input: PayClaimAsyncInput,
   ) => ReturnType<typeof getPayClaimInstructionAsync> &
     SelfPlanAndSendFunctions;
   refresh: (
@@ -1529,14 +1375,12 @@ export type MutavPluginPdas = {
   vaultAuthority: typeof findVaultAuthorityPda;
   pendingRedemptions: typeof findPendingRedemptionsPda;
   claims: typeof findClaimsPda;
-  holderState: typeof findHolderStatePda;
   guarantee: typeof findGuaranteePda;
   feeReceipt: typeof findFeeReceiptPda;
   reserve: typeof findReservePda;
   claimFiling: typeof findClaimFilingPda;
   config: typeof findConfigPda;
   shareMint: typeof findShareMintPda;
-  payout: typeof findPayoutPda;
   incomeReceipt: typeof findIncomeReceiptPda;
 };
 
@@ -1554,20 +1398,13 @@ export function mutavProgram() {
     return extendClient(client, {
       mutav: <MutavPlugin>{
         accounts: {
-          agencyExposure: addSelfFetchFunctions(
-            client,
-            getAgencyExposureCodec(),
-          ),
           claimFiling: addSelfFetchFunctions(client, getClaimFilingCodec()),
           depositRequest: addSelfFetchFunctions(
             client,
             getDepositRequestCodec(),
           ),
-          feeReceipt: addSelfFetchFunctions(client, getFeeReceiptCodec()),
           guarantee: addSelfFetchFunctions(client, getGuaranteeCodec()),
-          holderState: addSelfFetchFunctions(client, getHolderStateCodec()),
           incomeReceipt: addSelfFetchFunctions(client, getIncomeReceiptCodec()),
-          payout: addSelfFetchFunctions(client, getPayoutCodec()),
           redeemRequest: addSelfFetchFunctions(client, getRedeemRequestCodec()),
           vaultConfig: addSelfFetchFunctions(client, getVaultConfigCodec()),
           vaultState: addSelfFetchFunctions(client, getVaultStateCodec()),
@@ -1647,10 +1484,7 @@ export function mutavProgram() {
           payClaim: (input) =>
             addSelfPlanAndSendFunctions(
               client,
-              getPayClaimInstructionAsync({
-                ...input,
-                payer: input.payer ?? client.payer,
-              }),
+              getPayClaimInstructionAsync(input),
             ),
           refresh: (input) =>
             addSelfPlanAndSendFunctions(
@@ -1719,14 +1553,12 @@ export function mutavProgram() {
           vaultAuthority: findVaultAuthorityPda,
           pendingRedemptions: findPendingRedemptionsPda,
           claims: findClaimsPda,
-          holderState: findHolderStatePda,
           guarantee: findGuaranteePda,
           feeReceipt: findFeeReceiptPda,
           reserve: findReservePda,
           claimFiling: findClaimFilingPda,
           config: findConfigPda,
           shareMint: findShareMintPda,
-          payout: findPayoutPda,
           incomeReceipt: findIncomeReceiptPda,
         },
         identifyAccount: identifyMutavAccount,

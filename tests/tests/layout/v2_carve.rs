@@ -4,13 +4,13 @@
 //! every v1 field at its value and offset. The carve sizes are pinned here,
 //! not by hand.
 //!
-//! `HolderStateV2` (per-wallet exit counters) is in `capital.rs`.
+//! `RedeemRequestV2` (the ADR 0010 partial-fill carve) is at the end.
 
 use anchor_lang::{prelude::*, AccountDeserialize, Discriminator};
 use mutav::{constants::VAULT_STATE_SIZE, state::VaultState};
 use mutav_tests::helpers::*;
 
-use super::{pattern, ser, span, spans, v1::*, vault_state_fields, zeroed, Sentinel, STATE_BOOLS};
+use super::{pattern, ser, span, spans, state_bools, v1::*, zeroed, Sentinel};
 
 /// Phase-2 instant-exit counters (spec §13.2). Zero is the correct starting
 /// value of every field.
@@ -54,10 +54,6 @@ pub struct VaultStateV2 {
     pub bump: u8,
     pub mode: u8,
     pub brs_balance: u64,
-    pub tesouro_units: u64,
-    pub tesouro_price: u64,
-    pub tesouro_price_ts: i64,
-    pub stable_assets: u64,
     pub remaining_cover_total: u64,
     pub coverage_required: u64,
     pub provisions: u64,
@@ -66,29 +62,29 @@ pub struct VaultStateV2 {
     pub pending_deposits_total: u64,
     pub pending_redeem_shares: u64,
     pub claimable_assets_total: u64,
-    pub buffer_earmark: u64,
-    pub pending_notices: u32,
     pub active_guarantees: u32,
     pub next_deposit_seq: u64,
     pub deposit_head: u64,
     pub next_redeem_seq: u64,
     pub redeem_head: u64,
-    pub claim_period_start: i64,
-    pub claim_period_paid: u64,
     pub fees_in_total: u64,
     pub fee_take_total: u64,
     pub claims_paid_total: u64,
-    pub late_payouts: u32,
     pub fulfil_halted: bool,
     pub last_refresh_ts: i64,
     pub last_refresh_slot: u64,
     pub income_total: u64,
-    pub income_take_total: u64,
     pub inflow_nav: u64,
+    pub claim_day_buckets: [u64; 31],
+    pub claim_day_anchor: i64,
     // -- carved from `_reserved` --
     pub instant_exit: InstantExitState,
-    pub _reserved: [u8; 144],
+    pub _reserved: [u8; V2_PAD],
 }
+
+/// `_reserved` of v1, and what is left after the 88-byte carve.
+const V1_PAD: usize = 256;
+const V2_PAD: usize = V1_PAD - 88;
 
 /// Decodes v2 from account bytes (discriminator skipped).
 fn v2(account: &[u8]) -> VaultStateV2 {
@@ -99,18 +95,18 @@ fn v2(account: &[u8]) -> VaultStateV2 {
 #[test]
 fn carve_sizes_are_pinned() {
     assert_eq!(ser(&InstantExitState::default()).len(), 88);
-    assert_eq!(ser(&zeroed::<VaultStateV2>()._reserved).len(), 144);
+    assert_eq!(ser(&zeroed::<VaultStateV2>()._reserved).len(), V2_PAD);
     assert_eq!(8 + ser(&zeroed::<VaultStateV2>()).len(), VAULT_STATE_SIZE);
     // The carve starts where v1 `_reserved` starts.
     let (_, reserved_at, reserved_len) = *VAULT_STATE_V1.last().unwrap();
-    assert_eq!(reserved_len, 232);
+    assert_eq!(reserved_len, V1_PAD);
     assert_eq!(
         span::<VaultStateV2>(|x| x.instant_exit = Sentinel::sentinel()),
         (reserved_at, 88)
     );
     assert_eq!(
         spans!(VaultStateV2; "_reserved" => _reserved),
-        vec![("_reserved", reserved_at + 88, 144)]
+        vec![("_reserved", reserved_at + 88, V2_PAD)]
     );
 }
 
@@ -118,23 +114,24 @@ fn carve_sizes_are_pinned() {
 fn v2_keeps_every_v1_offset() {
     let mut v1 = VAULT_STATE_V1.to_vec();
     v1.pop();
-    assert_eq!(vault_state_fields!(VaultStateV2), v1);
+    let mut v2 = vault_state_fields!(VaultStateV2);
+    v2.pop(); // `_reserved` moved behind the carve
+    assert_eq!(v2, v1);
 }
 
 #[test]
 fn v1_bytes_read_as_v2_with_zero_carve() {
     // A v1 account: every v1 field set, padding zero (as the pilot writes).
-    let mut bytes = pattern(VAULT_STATE_SIZE - 8, STATE_BOOLS);
-    let (at, len) = (VAULT_STATE_V1.last().unwrap().1, 232);
+    let mut bytes = pattern(VAULT_STATE_SIZE - 8, &state_bools());
+    let (at, len) = (VAULT_STATE_V1.last().unwrap().1, V1_PAD);
     bytes[at..at + len].fill(0);
     let v1 = VaultStateV1::deserialize(&mut bytes.as_slice()).unwrap();
     let v2 = VaultStateV2::deserialize(&mut bytes.as_slice()).unwrap();
     assert_eq!(v2.instant_exit, InstantExitState::default());
-    assert_eq!(v2._reserved, [0; 144]);
+    assert_eq!(v2._reserved, [0; V2_PAD]);
     assert_eq!(ser(&v2), bytes, "v2 re-serializes the v1 bytes unchanged");
     assert_eq!(v2.brs_balance, v1.brs_balance);
-    assert_eq!(v2.buffer_earmark, v1.buffer_earmark);
-    assert_eq!(v2.pending_notices, v1.pending_notices);
+    assert_eq!(v2.inflow_nav, v1.inflow_nav);
     assert_eq!(v2.fulfil_halted, v1.fulfil_halted);
     assert_eq!(v2.last_refresh_slot, v1.last_refresh_slot);
 }
@@ -146,8 +143,6 @@ fn pilot_accounts_read_as_v2() {
     let mut f = Fixture::new();
     let mut s = f.state();
     s.brs_balance = 123;
-    s.buffer_earmark = 0;
-    s.late_payouts = 2;
     s.last_refresh_slot = 99;
     f.write_state(&s);
     // Building the list funds the reserve for the operator instructions.
@@ -160,16 +155,14 @@ fn pilot_accounts_read_as_v2() {
     let raw = f.raw(&f.pdas.state);
     let v2 = v2(&raw);
     assert_eq!(v2.instant_exit, InstantExitState::default());
-    assert_eq!(v2._reserved, [0; 144]);
+    assert_eq!(v2._reserved, [0; V2_PAD]);
     // Every v1 field reads the same through the v2 struct.
     let cur = f.state();
     assert_eq!(v2.brs_balance, cur.brs_balance);
     assert_eq!(v2.fees_in_total, cur.fees_in_total);
     assert_eq!(v2.remaining_cover_total, cur.remaining_cover_total);
     assert_eq!(v2.claims_paid_total, cur.claims_paid_total);
-    assert_eq!(v2.claim_period_start, cur.claim_period_start);
-    assert_eq!(v2.pending_notices, cur.pending_notices);
-    assert_eq!(v2.late_payouts, cur.late_payouts);
+    assert_eq!(v2.claim_day_buckets, cur.claim_day_buckets);
     assert_eq!(v2.shares_outstanding, cur.shares_outstanding);
     assert_eq!(v2.next_redeem_seq, cur.next_redeem_seq);
     assert_eq!(v2.last_refresh_slot, cur.last_refresh_slot);
@@ -180,7 +173,7 @@ fn pilot_accounts_read_as_v2() {
     let fixture = std::fs::read(super::fixtures_dir().join("vault_state.bin")).unwrap();
     let v2 = self::v2(&fixture);
     assert_eq!(v2.instant_exit, InstantExitState::default());
-    assert_eq!(v2._reserved, [0; 144]);
+    assert_eq!(v2._reserved, [0; V2_PAD]);
 }
 
 #[test]
@@ -204,4 +197,91 @@ fn v2_bytes_survive_a_v1_decode_and_rewrite() {
     let mut back = VaultState::DISCRIMINATOR.to_vec();
     back.extend(ser(&pilot));
     assert_eq!(v2(&back), x);
+}
+
+// ---------------------------------------------------------------------------
+// RedeemRequestV2: the rest of the ADR 0010 partial-fill carve (ADR 0019, M1)
+// ---------------------------------------------------------------------------
+
+/// Test-only `RedeemRequest` with the rest of the ADR 0010 partial-fill
+/// fields carved from the front of `_reserved`. `shares_filled` is already a
+/// v1 field (written on every whole fill), so the remainder `shares −
+/// shares_filled` and the claimable amount are derived, never stored.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RedeemRequestV2 {
+    pub version: u8,
+    pub bump: u8,
+    pub owner: Pubkey,
+    pub seq: u64,
+    pub shares: u64,
+    pub assets_out: u64,
+    pub nav_at_fill: u64,
+    pub requested_at: i64,
+    pub filled_at: i64,
+    pub status: u8,
+    pub shares_filled: u64,
+    // -- carved from `_reserved` --
+    pub assets_claimed: u64,
+    pub fill_count: u16,
+    pub last_fill_at: i64,
+    pub _reserved: [u8; 56 - 18],
+}
+
+impl RedeemRequestV2 {
+    fn shares_remaining(&self) -> u64 {
+        self.shares - self.shares_filled
+    }
+}
+
+#[test]
+fn redeem_carve_starts_where_v1_padding_starts() {
+    let (_, at, len) = *REDEEM_REQUEST_V1.last().unwrap();
+    assert_eq!(len, 56);
+    assert_eq!(
+        8 + ser(&zeroed::<RedeemRequestV2>()).len(),
+        mutav::constants::REDEEM_REQUEST_SIZE
+    );
+    assert_eq!(
+        span::<RedeemRequestV2>(|x| x.assets_claimed = Sentinel::sentinel()),
+        (at, 8)
+    );
+    assert_eq!(
+        span::<RedeemRequestV2>(|x| x.last_fill_at = Sentinel::sentinel()),
+        (at + 10, 8)
+    );
+}
+
+#[test]
+fn v1_requests_read_as_v2_with_the_remainder_derived() {
+    let mut f = Fixture::new();
+    let a = f.investor(20_000 * BRL);
+    let list = f.allowlist(&[a.pubkey()]);
+    f.deposit(&a, &list, 10_000 * BRL);
+    let (res, seq) = f.request_redeem(&a, &list, 4_000 * BRL);
+    res.unwrap();
+    let read = |f: &Fixture| {
+        let raw = f.raw(&redeem_pda(&f.pdas.config, seq));
+        assert_eq!(&raw[..8], mutav::state::RedeemRequest::DISCRIMINATOR);
+        RedeemRequestV2::deserialize(&mut &raw[8..]).unwrap()
+    };
+    // Pending: nothing filled, every share remaining, carve zero.
+    let v2 = read(&f);
+    assert_eq!(v2.status, mutav::constants::REDEEM_PENDING);
+    assert_eq!((v2.shares, v2.shares_filled), (4_000 * BRL, 0));
+    assert_eq!(v2.shares_remaining(), v2.shares);
+    assert_eq!(
+        (v2.assets_claimed, v2.fill_count, v2.last_fill_at),
+        (0, 0, 0)
+    );
+    assert_eq!(v2._reserved, [0; 38]);
+    // After the whole fill: shares_filled == shares, nothing remaining.
+    f.fulfil_redeems(1, u64::MAX, &[seq]).unwrap();
+    let v2 = read(&f);
+    assert_eq!(v2.status, mutav::constants::REDEEM_FILLED);
+    assert_eq!(v2.shares_filled, v2.shares);
+    assert_eq!(v2.shares_remaining(), 0);
+    assert_eq!(
+        (v2.assets_claimed, v2.fill_count, v2.last_fill_at),
+        (0, 0, 0)
+    );
 }

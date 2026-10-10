@@ -20,23 +20,6 @@ import { Action, Field, Grid, Note, RoleWarning, TextField, useLive } from "./sh
 
 const hex = (b: ArrayLike<number>) => bytesToHex(Uint8Array.from(b));
 
-function useHash(label: string, fn: (s: string) => Promise<string>) {
-  const [h, setH] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    if (!label.trim()) {
-      // Clearing the label clears the hash; no async work to wait for.
-      void Promise.resolve().then(() => alive && setH(null));
-    } else {
-      void fn(label.trim()).then((x) => alive && setH(x));
-    }
-    return () => {
-      alive = false;
-    };
-  }, [label, fn]);
-  return h;
-}
-
 function PreviewBox({ ok, title, children }: { ok: boolean | null; title: string; children: React.ReactNode }) {
   const color = ok === null ? "var(--color-border)" : ok ? "var(--color-success)" : "var(--color-error)";
   return (
@@ -127,7 +110,6 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
   const [rent, setRent] = useState("1500");
   const [defMult, setDefMult] = useState("3");
   const [exitMult, setExitMult] = useState("1");
-  const agencyHex = useHash(agency, REF.agencyId);
 
   const rentBase = parseBrs(rent);
   const dm = Number(defMult);
@@ -135,12 +117,9 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
   const multOk = Number.isInteger(dm * 100) && Number.isInteger(em * 100) && dm >= 0 && em >= 0 && dm <= 6 && em <= 6;
   const defaultCover = rentBase && multOk ? (rentBase * BigInt(Math.round(dm * 100))) / 100n : 0n;
   const exitCover = rentBase && multOk ? (rentBase * BigInt(Math.round(em * 100))) / 100n : 0n;
-  const exposure = ledger.exposures.find((e) => hex(e.data.agencyId) === agencyHex);
-  const agencyOutstanding = exposure?.data.outstandingCover ?? 0n;
-
   const preview = useMemo(
-    () => (rentBase ? previewRegisterGuarantee(reserve.config, reserve.state, { rent: rentBase, defaultCover, exitCover, agencyOutstanding }) : null),
-    [reserve, rentBase, defaultCover, exitCover, agencyOutstanding],
+    () => (rentBase ? previewRegisterGuarantee(reserve.config, reserve.state, { defaultCover, exitCover }) : null),
+    [reserve, rentBase, defaultCover, exitCover],
   );
   useEffect(() => onRefusedPreview?.(preview ? !preview.fits : false), [preview, onRefusedPreview]);
 
@@ -151,9 +130,6 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
       id: await REF.guaranteeId(lease.trim()),
       agencyId: await REF.agencyId(agency.trim()),
       refsHash: await REF.refsHash(lease.trim()),
-      rent: rentBase,
-      defaultMultiplierBps: Math.round(dm * 10_000),
-      exitMultiplierBps: Math.round(em * 10_000),
       defaultCover,
       exitCover,
     };
@@ -163,7 +139,7 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
     <div>
       <Grid>
         <TextField id={`${p}reg-lease`} label="Lease reference" value={lease} onChange={setLease} hint="hashed to the guarantee id" />
-        <TextField id={`${p}reg-agency`} label="Agency" value={agency} onChange={setAgency} hint={agencyOutstanding > 0n ? `outstanding ${fmtBrs(agencyOutstanding, 0)}` : "new agency"} />
+        <TextField id={`${p}reg-agency`} label="Agency" value={agency} onChange={setAgency} hint="hashed to the agency id" />
         <TextField id={`${p}reg-rent`} label="Monthly rent (BRS)" value={rent} onChange={setRent} numeric />
         <TextField id={`${p}reg-def`} label="Default cover (× rent)" value={defMult} onChange={setDefMult} numeric hint={fmtBrs(defaultCover, 0)} />
         <TextField id={`${p}reg-exit`} label="Exit cover (× rent)" value={exitMult} onChange={setExitMult} numeric hint={fmtBrs(exitCover, 0)} />
@@ -266,7 +242,8 @@ export function IncomeForm({ p = "" }: { p?: string }) {
   const inbox = reserve.incomeInbox.amount;
   const month = Number(period);
   const periodOk = isValidIncomePeriod(month);
-  const split = gross ? takeSplit(gross, reserve.config.incomeTakeBps) : null;
+  // No take on issuer income (ADR 0019): all of it builds the reserve.
+  const split = gross ? takeSplit(gross, 0) : null;
   const overInbox = gross !== null && gross > inbox;
   return (
     <div>
@@ -277,7 +254,6 @@ export function IncomeForm({ p = "" }: { p?: string }) {
       </Grid>
       {split && (
         <PreviewBox ok={overInbox || !periodOk ? false : null} title={overInbox ? "Refused: IncomeExceedsInbox" : !periodOk ? "Refused: the month must be YYYYMM" : "Split"}>
-          {kv(`MUTAV take (${fmtBps(reserve.config.incomeTakeBps)}) → treasury`, fmtBrs(split.take))}
           {kv("Net → reserve (raises NAV for every holder)", fmtBrs(split.net))}
           {kv("Left in the inbox, untracked", fmtBrs(overInbox ? inbox : inbox - gross!))}
         </PreviewBox>
@@ -332,8 +308,8 @@ export function FileClaimForm({ p = "" }: { p?: string }) {
 
 /** Filed, unpaid claims, each with a Pay button (`pay_claim` for the filed provision). */
 export function PayClaimList() {
-  const { reserve, ledger } = useLive();
-  const open = claimsTimeline(ledger, reserve.config.payoutSlaSecs, reserve.now).filter((c) => c.stage === "filed");
+  const { ledger } = useLive();
+  const open = claimsTimeline(ledger).filter((c) => c.stage === "filed");
   if (open.length === 0) return <Note>No filed claim waiting for payment. File one first.</Note>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -352,8 +328,8 @@ export function PayClaimList() {
 
 /** Paid claims waiting for the PIX settlement record. */
 export function SettleList() {
-  const { reserve, ledger } = useLive();
-  const paid = claimsTimeline(ledger, reserve.config.payoutSlaSecs, reserve.now).filter((c) => c.stage === "paid");
+  const { ledger } = useLive();
+  const paid = claimsTimeline(ledger).filter((c) => c.stage === "paid");
   const [e2e, setE2e] = useState<Record<string, string>>({});
   if (paid.length === 0) return <Note>No paid claim waiting for settlement.</Note>;
   return (
@@ -364,7 +340,7 @@ export function SettleList() {
         return (
           <div key={c.filing} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <Mono style={{ fontSize: 12 }}>
-              {c.guaranteeId.slice(0, 8)}… · {c.leg} leg · {fmtBrs(c.amount ?? 0n)} paid {fmtTime(c.paidAt ?? 0n)} {c.overdue ? "· past the SLA" : ""}
+              {c.guaranteeId.slice(0, 8)}… · {c.leg} leg · {fmtBrs(c.amount ?? 0n)} paid {fmtTime(c.paidAt ?? 0n)}
             </Mono>
             <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
               <div style={{ minWidth: 320 }}>
@@ -383,12 +359,12 @@ export function SettleList() {
 
 export function BlockedPreview() {
   const { reserve, ledger } = useLive();
-  const reg = previewRegisterGuarantee(reserve.config, reserve.state, { rent: 1_000_000_000n, defaultCover: 3_000_000_000n, exitCover: 1_000_000_000n, agencyOutstanding: 0n });
+  const reg = previewRegisterGuarantee(reserve.config, reserve.state, { defaultCover: 3_000_000_000n, exitCover: 1_000_000_000n });
   const heads = ledger.redeems
-    .filter((r) => r.data.sharesRemaining > 0n)
+    .filter((r) => r.data.status === 0)
     .sort((a, b) => Number(a.data.seq - b.data.seq))
-    .map((r) => ({ seq: r.data.seq, sharesRemaining: r.data.sharesRemaining, requestedAt: r.data.requestedAt }));
-  const red = previewRedeemFulfil(reserve.config, reserve.state, heads.length ? heads : [{ seq: 0n, sharesRemaining: 1_000_000n, requestedAt: reserve.now }], { now: reserve.now });
+    .map((r) => ({ seq: r.data.seq, shares: r.data.shares }));
+  const red = previewRedeemFulfil(reserve.config, reserve.state, heads.length ? heads : [{ seq: 0n, shares: 1_000_000n }]);
   return (
     <PreviewBox ok={reg.fits && red.stoppedBy === null} title={reserve.state.mode === 0 && !reserve.solvency.underCovered ? "Reserve covered: gated actions open" : "Under-covered: gated actions blocked"}>
       {kv("New guarantee (R$4,000 cover)", reg.fits ? "would be accepted" : `refused: ${reg.refusal}`, reg.fits ? "var(--color-success)" : "var(--color-error)")}

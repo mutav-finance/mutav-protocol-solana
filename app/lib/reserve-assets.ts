@@ -8,12 +8,9 @@
  * amount is an on-chain field or a sum of them; shares are layout and display
  * ratios of those fields, never a value the chain does not hold.
  */
-import { isAddress } from "@solana/kit";
-import { MAX_INCOME_TAKE_BPS, minSettlementBps, U64_MAX } from "@mutav-finance/mutav-protocol-solana";
-import type { AdapterEntry, IncomeReceipt } from "@mutav-finance/mutav-protocol-solana";
+import type { IncomeReceipt } from "@mutav-finance/mutav-protocol-solana";
 import { bytesToHex } from "./serde";
 import type { Role } from "./roles";
-import type { PriceDraft } from "./tx-kinds";
 import type { Ledger, ReserveView, Row } from "./view";
 
 /** `10_000` bps = 100%: the bound `validate_params` puts on every bps field. */
@@ -36,11 +33,13 @@ export type AdapterRow = {
   enabled: boolean;
 };
 
-/** The used slots of `VaultConfig.adapters`; an empty slot has a zero program id. */
-export function adapterRows(adapters: readonly AdapterEntry[]): AdapterRow[] {
-  return adapters
-    .map((a, slot) => ({ slot, programId: a.programId, assetMint: a.assetMint, cap: a.cap, allocated: a.allocated, enabled: a.enabled }))
-    .filter((a) => a.programId !== UNSET_ADDRESS);
+/**
+ * Whitelisted adapters. The program keeps no inline adapter list since
+ * ADR 0019 (adapters are described by their `AdapterState` PDAs when built),
+ * so the pilot has none.
+ */
+export function adapterRows(): AdapterRow[] {
+  return [];
 }
 
 export type Composition = {
@@ -57,9 +56,9 @@ export type Composition = {
   brsShareBps: bigint | null;
   adapterShareBps: bigint | null;
   /**
-   * The settlement floor, `min_settlement_bps` (ADR 0018): the minimum share of
-   * stable assets held in BRS, read through the client's `minSettlementBps`
-   * (the program stores its complement, `caps.max_allocated_bps`).
+   * The settlement floor (ADR 0018): the minimum share of stable assets held
+   * in BRS. 100% in the pilot: the program holds BRS only and has no floor
+   * field since ADR 0019.
    */
   floorBps: number;
   /** The BRS the floor requires at today's stable assets. */
@@ -82,11 +81,12 @@ const nothingAllocated = (adapters: AdapterRow[]) => adapters.every((a) => a.all
 
 export function reserveComposition(r: Pick<ReserveView, "state" | "config" | "solvency" | "incomeInbox">): Composition {
   const brs = r.state.brsBalance;
-  const adapterValue = r.solvency.tesouroValue;
-  const stableAssets = brs + adapterValue;
-  const floorBps = minSettlementBps(r.config);
+  // BRS only (ADR 0018, ADR 0019): no adapter value and a 100% floor.
+  const adapterValue = 0n;
+  const stableAssets = r.solvency.stableAssets;
+  const floorBps = BPS_MAX;
   const floorValue = (BigInt(floorBps) * stableAssets + 9_999n) / 10_000n;
-  const adapters = adapterRows(r.config.adapters);
+  const adapters = adapterRows();
   const enabled = adapters.filter((a) => a.enabled);
   let brsOnlyReason: string | null = null;
   if (adapterValue === 0n) {
@@ -98,7 +98,7 @@ export function reserveComposition(r: Pick<ReserveView, "state" | "config" | "so
   return {
     brs,
     adapterValue,
-    adapterUnits: r.state.tesouroUnits,
+    adapterUnits: 0n,
     stableAssets,
     inbox: r.incomeInbox.amount,
     brsShareBps: shareBps(brs, stableAssets),
@@ -233,38 +233,6 @@ export const parseBps = (input: string, max = BPS_MAX): number | null => {
   return v === null ? null : Number(v);
 };
 
-/**
- * The settlement-floor control: "min held in the settlement token", 0–10_000
- * bps, composed as `caps.min_settlement_bps` (ADR 0018).
- */
-export const settlementFloorRequest = (input: string) => {
-  const v = parseBps(input);
-  return v === null ? null : ({ kind: "set_config", minSettlementBps: v } as const);
-};
-
-/** The income-take control: `≤ MAX_INCOME_TAKE_BPS`, which is 0 until spec §12 Q47 is decided. */
-export const incomeTakeRequest = (input: string) => {
-  const v = parseBps(input, MAX_INCOME_TAKE_BPS);
-  return v === null ? null : ({ kind: "set_config", incomeTakeBps: v } as const);
-};
-
-/**
- * The program's bound on each reserve-asset field of `set_config`, checked
- * again by the server before composing (the program checks it last).
- */
-export function reserveConfigError(req: { minSettlementBps?: number; incomeTakeBps?: number; price?: PriceDraft }): string | null {
-  const bps = (v: number | undefined, max: number) => v !== undefined && (!Number.isInteger(v) || v < 0 || v > max);
-  if (bps(req.minSettlementBps, BPS_MAX)) return "the settlement floor must be 0–10000 bps";
-  if (bps(req.incomeTakeBps, MAX_INCOME_TAKE_BPS))
-    return `income_take_bps must be ≤ MAX_INCOME_TAKE_BPS (${MAX_INCOME_TAKE_BPS}): the cap is undecided (spec §12 Q47), so the program refuses any non-zero take`;
-  const p = req.price ?? {};
-  if (bps(p.yMaxBps, BPS_MAX) || bps(p.maxDeviationBps, BPS_MAX) || bps(p.maxNavMoveBps, BPS_MAX)) return "price bps fields must be 0–10000";
-  if (p.maxStalenessSecs !== undefined && p.maxStalenessSecs < 0n) return "price.max_staleness_secs must be ≥ 0";
-  if (p.p0 !== undefined && (p.p0 < 0n || p.p0 > U64_MAX)) return "price.p0 must fit in a u64";
-  if (p.tesouroPriceAccount !== undefined && !isAddress(p.tesouroPriceAccount)) return "price.tesouro_price_account is not an address";
-  return null;
-}
-
 // ── Issuer income ───────────────────────────────────────────────────────────
 
 export type IncomeSweep = {
@@ -284,7 +252,7 @@ export type IncomeSummary = {
   inboxExists: boolean;
   /** `VaultState.income_total`: net swept into the reserve, lifetime. */
   sweptNet: bigint;
-  /** `VaultState.income_take_total`: MUTAV's take, lifetime. */
+  /** MUTAV's take on issuer income: always 0 (ADR 0019). */
   sweptTake: bigint;
   takeBps: number;
   /** Swept statements, newest first, at most `limit`. */
@@ -301,7 +269,7 @@ export function incomeSummary(
     .map(({ address, data, blockTime }) => ({
       address,
       period: data.period,
-      ref: bytesToHex(Uint8Array.from(data.incomeRefHash)),
+      ref: bytesToHex(Uint8Array.from(data.refHash)),
       gross: data.gross,
       take: data.take,
       net: data.net,
@@ -314,8 +282,8 @@ export function incomeSummary(
     inboxAddress: r.incomeInbox.address,
     inboxExists: r.incomeInbox.exists,
     sweptNet: r.state.incomeTotal,
-    sweptTake: r.state.incomeTakeTotal,
-    takeBps: r.config.incomeTakeBps,
+    sweptTake: 0n,
+    takeBps: 0,
     last: sweeps.slice(0, limit),
     receipts: sweeps.length,
   };

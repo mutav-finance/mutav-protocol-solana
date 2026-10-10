@@ -46,8 +46,7 @@ describe('devnet.example.json', () => {
     const c = parseConfig(filled());
     expect(c.cluster).toBe('devnet');
     expect(c.reserveMint as string).toBe('BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4');
-    expect(c.price.maxNavMoveBps).toBe(10_000);
-    expect(c.caps.minSettlementBps).toBe(10_000);
+    expect(c.caps.maxNavMoveBps).toBe(10_000);
   });
 
   test('starts at c = 0.10 with caps sized for it (ADR 0016)', () => {
@@ -56,12 +55,8 @@ describe('devnet.example.json', () => {
     expect(c.coverageRatioBps).toBe(1_000);
     expect(c.caps.maxTvl).toBe(300_000n * BRL);
     expect(c.caps.maxCoverPerGuarantee).toBe(40_000n * BRL);
-    // Per-agency cap never binds: at least 3x the cover max_tvl backs at c (fees grow stable assets above max_tvl).
-    expect(c.caps.maxCoverPerAgency).toBe(10_000_000n * BRL);
-    expect(c.caps.maxCoverPerAgency >= (3n * c.caps.maxTvl * 10_000n) / BigInt(c.coverageRatioBps)).toBe(true);
     expect([c.caps.maxClaimPerCall, c.caps.maxClaimPerPeriod]).toEqual([10_000n * BRL, 20_000n * BRL]);
     expect([c.caps.minRequest, c.caps.maxRequest]).toEqual([1_000n * BRL, 100_000n * BRL]);
-    expect(c.caps.minFillAssets).toBe(500n * BRL);
   });
 });
 
@@ -78,9 +73,8 @@ describe('parseConfig bounds mirror the program', () => {
     c.coverageRatioBps = 1_000;
     expect(parseConfig(c).coverageRatioBps).toBe(1_000);
   });
-  test('bps fields', () => bad((c) => (c.price.maxNavMoveBps = 10_001), 'price.maxNavMoveBps'));
+  test('bps fields', () => bad((c) => (c.caps.maxNavMoveBps = 10_001), 'caps.maxNavMoveBps'));
   test('request bounds', () => bad((c) => (c.caps.minRequest = '999999999999999'), 'minRequest'));
-  test('claim period', () => bad((c) => (c.caps.claimPeriodSecs = 0), 'claimPeriodSecs'));
   test('distinct roles', () => bad((c) => (c.pauser = c.operator), 'distinct'));
   test('distinct money accounts', () => bad((c) => (c.paymentsAccount = c.treasuryAccount), 'differ'));
   test('addresses', () => bad((c) => (c.operator = 'not-an-address'), 'operator'));

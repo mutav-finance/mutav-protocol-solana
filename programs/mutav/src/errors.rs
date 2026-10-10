@@ -2,6 +2,8 @@
 //!
 //! Codes are numbered by enum order, so this list is **append-only** from the
 //! first devnet deploy: new errors go at the end; none is reordered or removed.
+//! Errors no instruction could raise were removed before the freeze
+//! (ADR 0019); later features append their own.
 
 use anchor_lang::prelude::*;
 
@@ -27,18 +29,12 @@ pub enum MutavError {
     InsufficientFreeCapital,
     #[msg("Insufficient liquid balance")]
     InsufficientLiquidBalance,
-    #[msg("Price is stale")]
-    StalePrice,
-    #[msg("Price deviation beyond the bound")]
-    PriceDeviation,
     #[msg("Fulfilment is halted by the NAV-move guard")]
     FulfilHalted,
     #[msg("TVL cap exceeded")]
     TvlCapExceeded,
     #[msg("Per-guarantee cap exceeded")]
     GuaranteeCapExceeded,
-    #[msg("Per-agency cap exceeded")]
-    AgencyCapExceeded,
     #[msg("Guarantee is not active")]
     GuaranteeNotActive,
     #[msg("Guarantee has open claims")]
@@ -67,17 +63,6 @@ pub enum MutavError {
     InvalidRequestStatus,
     #[msg("Queue order violation")]
     QueueOrderViolation,
-    #[msg("Adapter is not whitelisted")]
-    AdapterNotWhitelisted,
-    #[msg("Adapter cap exceeded")]
-    AdapterCapExceeded,
-    /// `allocate` would leave less than `min_settlement_bps` of stable assets
-    /// in `reserve_mint` (ADR 0018). Same code as the former
-    /// `TesouroShareCapExceeded`.
-    #[msg("Allocation would breach the settlement-token floor")]
-    SettlementFloorBreached,
-    #[msg("Operation worsens coverage")]
-    WorsensCoverage,
     #[msg("Post-CPI check failed")]
     PostCpiCheckFailed,
     #[msg("Math overflow")]
@@ -86,10 +71,6 @@ pub enum MutavError {
     FeatureNotSupported,
     #[msg("Invalid treasury account")]
     InvalidTreasuryAccount,
-    #[msg("A claim notice is pending")]
-    ClaimNoticePending,
-    #[msg("Claim notice is not resolved")]
-    NoticeNotResolved,
     #[msg("Unsupported account version or status")]
     UnsupportedVersion,
     #[msg("Income source is not the reserve's income inbox")]
@@ -98,4 +79,6 @@ pub enum MutavError {
     IncomeExceedsInbox,
     #[msg("Token program is not the reserve's token program")]
     InvalidTokenProgram,
+    #[msg("Claim has not been paid")]
+    ClaimNotPaid,
 }

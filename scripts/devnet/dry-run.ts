@@ -33,7 +33,6 @@ import {
   fetchReserve,
   fetchVaultConfig,
   findDepositRequestPda,
-  findHolderStatePda,
   findReserveAddresses,
   getRequestDepositInstruction,
 } from '../../clients/js/src';
@@ -144,26 +143,13 @@ export async function dryRun(programKeypair?: string) {
       paymentsAccount: payments,
       coverageRatioBps: 10_000,
       feeTakeBps: 2_000,
-      payoutSlaSecs: 172_800,
       caps: {
         maxTvl: '50000000000',
         maxCoverPerGuarantee: '30000000000',
-        maxCoverPerAgency: '60000000000',
         maxClaimPerCall: '10000000000',
         maxClaimPerPeriod: '20000000000',
-        claimPeriodSecs: 2_592_000,
-        minSettlementBps: 10_000,
         minRequest: '1000000000',
         maxRequest: '30000000000',
-        minFillAssets: '500000000',
-      },
-      price: {
-        tesouroPriceAccount: '11111111111111111111111111111111',
-        p0: 1_000_000_000,
-        t0: 0,
-        yMaxBps: 1_500,
-        maxStalenessSecs: 86_400,
-        maxDeviationBps: 200,
         maxNavMoveBps: 10_000,
       },
       allowlist: [capital!.address, investor!.address],
@@ -198,9 +184,9 @@ export async function dryRun(programKeypair?: string) {
       allowlistRoot: tree.root,
     });
     if (r.config.data.caps.maxTvl !== 100_000n * BRL) failures.push('caps.maxTvl not updated');
-    if (r.config.data.price.maxNavMoveBps !== 10_000) failures.push('price.maxNavMoveBps not written');
+    if (r.config.data.caps.maxNavMoveBps !== 10_000) failures.push('caps.maxNavMoveBps not written');
     if (failures.length) throw new Error(`post-deploy checks failed:\n  ${failures.join('\n  ')}`);
-    console.log('upgrade authority == vault; feature_flags == 0; buffer_earmark == 0; roles, caps, root as configured');
+    console.log('upgrade authority == vault; feature_flags == 0; roles, caps, root as configured');
 
     step('allowlisted request_deposit (root and proof accepted by the program)');
     const investorBrs = await ata(investor!.address);
@@ -213,7 +199,6 @@ export async function dryRun(programKeypair?: string) {
           config: a.config,
           state: a.state,
           depositRequest: (await findDepositRequestPda({ config: a.config, seq }, { programAddress: programId }))[0],
-          holderState: (await findHolderStatePda({ config: a.config, owner: investor!.address }, { programAddress: programId }))[0],
           source: investorBrs,
           pendingDeposits: a.pendingDeposits,
           reserveMint: mint,

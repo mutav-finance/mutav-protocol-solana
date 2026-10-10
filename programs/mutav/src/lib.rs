@@ -34,8 +34,8 @@ pub mod mutav {
         instructions::admin::initialize::handle_initialize(ctx, args)
     }
 
-    /// Update caps, price bounds, exit parameters, fee take, coverage ratio,
-    /// payout SLA, feature flags, treasury and the MUTAV capital wallet. Admin.
+    /// Update caps (including the NAV-move bound), fee take, coverage ratio,
+    /// feature flags, treasury and the MUTAV capital wallet. Admin.
     pub fn set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result<()> {
         instructions::admin::set_config::handle_set_config(ctx, args)
     }
@@ -76,8 +76,8 @@ pub mod mutav {
         instructions::admin::revoke_operator::handle_revoke_operator(ctx)
     }
 
-    /// Register a guarantee: solvency-gated, per-guarantee and per-agency
-    /// capped. Operator.
+    /// Register a guarantee: solvency-gated and capped per guarantee.
+    /// Operator.
     pub fn register_guarantee(
         ctx: Context<RegisterGuarantee>,
         args: RegisterGuaranteeArgs,
@@ -144,7 +144,7 @@ pub mod mutav {
         instructions::operator::pay_claim::handle_pay_claim(ctx, leg, amount, notice_ref_hash)
     }
 
-    /// Record the PIX settlement of a payout. Operator.
+    /// Record the PIX settlement of a paid claim on its filing. Operator.
     pub fn settle_payout(
         ctx: Context<SettlePayout>,
         notice_ref_hash: [u8; 32],

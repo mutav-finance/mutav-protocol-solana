@@ -23,8 +23,6 @@ import {
   getI64Encoder,
   getStructDecoder,
   getStructEncoder,
-  getU16Decoder,
-  getU16Encoder,
   getU64Decoder,
   getU64Encoder,
   getU8Decoder,
@@ -60,28 +58,27 @@ export type RedeemRequest = {
   owner: Address;
   /** FIFO position. Never changes. */
   seq: bigint;
-  /** Shares escrowed by `request_redeem`. Immutable. */
-  sharesRequested: bigint;
-  /** Escrowed in `pending_redemptions`, not yet filled. `0` after a cancel. */
-  sharesRemaining: bigint;
-  /** Cumulative shares burned by fills. */
-  sharesFilled: bigint;
-  /** Cumulative BRS moved to `claims`, each fill at its own NAV. */
-  assetsFilled: bigint;
-  /** BRS in `claims` owed to this request and not yet claimed. */
-  assetsClaimable: bigint;
-  fillCount: number;
-  /** Conversion price at the last fill (`NAV_SCALE`). */
-  lastFillNav: bigint;
+  /** Shares escrowed in `pending_redemptions`. Immutable. */
+  shares: bigint;
+  /** BRS moved to `claims` at the fill, owed to the owner. Set at fill. */
+  assetsOut: bigint;
+  /** Conversion price at the fill (`NAV_SCALE`). */
+  navAtFill: bigint;
   requestedAt: bigint;
-  /** `0` until the first fill. */
-  lastFillAt: bigint;
-  /**
-   * `REDEEM_PENDING` / `REDEEM_PARTIALLY_FILLED` / `REDEEM_FILLED` /
-   * `REDEEM_CANCELLED`.
-   */
+  /** `0` until filled. */
+  filledAt: bigint;
+  /** `REDEEM_PENDING` / `REDEEM_FILLED`. */
   status: number;
-  /** Zeroed. Never read or written by logic. */
+  /**
+   * Shares burned by fills: `0` while pending, `shares` after the whole
+   * fill. The remainder is derived, `shares − shares_filled`, so the
+   * partial fills of ADR 0010 only add their own counters later.
+   */
+  sharesFilled: bigint;
+  /**
+   * Zeroed. Never read or written by logic. Holds the rest of the ADR 0010
+   * partial-fill fields without a migration (ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -91,28 +88,27 @@ export type RedeemRequestArgs = {
   owner: Address;
   /** FIFO position. Never changes. */
   seq: number | bigint;
-  /** Shares escrowed by `request_redeem`. Immutable. */
-  sharesRequested: number | bigint;
-  /** Escrowed in `pending_redemptions`, not yet filled. `0` after a cancel. */
-  sharesRemaining: number | bigint;
-  /** Cumulative shares burned by fills. */
-  sharesFilled: number | bigint;
-  /** Cumulative BRS moved to `claims`, each fill at its own NAV. */
-  assetsFilled: number | bigint;
-  /** BRS in `claims` owed to this request and not yet claimed. */
-  assetsClaimable: number | bigint;
-  fillCount: number;
-  /** Conversion price at the last fill (`NAV_SCALE`). */
-  lastFillNav: number | bigint;
+  /** Shares escrowed in `pending_redemptions`. Immutable. */
+  shares: number | bigint;
+  /** BRS moved to `claims` at the fill, owed to the owner. Set at fill. */
+  assetsOut: number | bigint;
+  /** Conversion price at the fill (`NAV_SCALE`). */
+  navAtFill: number | bigint;
   requestedAt: number | bigint;
-  /** `0` until the first fill. */
-  lastFillAt: number | bigint;
-  /**
-   * `REDEEM_PENDING` / `REDEEM_PARTIALLY_FILLED` / `REDEEM_FILLED` /
-   * `REDEEM_CANCELLED`.
-   */
+  /** `0` until filled. */
+  filledAt: number | bigint;
+  /** `REDEEM_PENDING` / `REDEEM_FILLED`. */
   status: number;
-  /** Zeroed. Never read or written by logic. */
+  /**
+   * Shares burned by fills: `0` while pending, `shares` after the whole
+   * fill. The remainder is derived, `shares − shares_filled`, so the
+   * partial fills of ADR 0010 only add their own counters later.
+   */
+  sharesFilled: number | bigint;
+  /**
+   * Zeroed. Never read or written by logic. Holds the rest of the ADR 0010
+   * partial-fill fields without a migration (ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -125,17 +121,14 @@ export function getRedeemRequestEncoder(): FixedSizeEncoder<RedeemRequestArgs> {
       ["bump", getU8Encoder()],
       ["owner", getAddressEncoder()],
       ["seq", getU64Encoder()],
-      ["sharesRequested", getU64Encoder()],
-      ["sharesRemaining", getU64Encoder()],
-      ["sharesFilled", getU64Encoder()],
-      ["assetsFilled", getU64Encoder()],
-      ["assetsClaimable", getU64Encoder()],
-      ["fillCount", getU16Encoder()],
-      ["lastFillNav", getU64Encoder()],
+      ["shares", getU64Encoder()],
+      ["assetsOut", getU64Encoder()],
+      ["navAtFill", getU64Encoder()],
       ["requestedAt", getI64Encoder()],
-      ["lastFillAt", getI64Encoder()],
+      ["filledAt", getI64Encoder()],
       ["status", getU8Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 64)],
+      ["sharesFilled", getU64Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 56)],
     ]),
     (value) => ({ ...value, discriminator: REDEEM_REQUEST_DISCRIMINATOR }),
   );
@@ -149,17 +142,14 @@ export function getRedeemRequestDecoder(): FixedSizeDecoder<RedeemRequest> {
     ["bump", getU8Decoder()],
     ["owner", getAddressDecoder()],
     ["seq", getU64Decoder()],
-    ["sharesRequested", getU64Decoder()],
-    ["sharesRemaining", getU64Decoder()],
-    ["sharesFilled", getU64Decoder()],
-    ["assetsFilled", getU64Decoder()],
-    ["assetsClaimable", getU64Decoder()],
-    ["fillCount", getU16Decoder()],
-    ["lastFillNav", getU64Decoder()],
+    ["shares", getU64Decoder()],
+    ["assetsOut", getU64Decoder()],
+    ["navAtFill", getU64Decoder()],
     ["requestedAt", getI64Decoder()],
-    ["lastFillAt", getI64Decoder()],
+    ["filledAt", getI64Decoder()],
     ["status", getU8Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 64)],
+    ["sharesFilled", getU64Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 56)],
   ]);
 }
 
@@ -229,5 +219,5 @@ export async function fetchAllMaybeRedeemRequest(
 }
 
 export function getRedeemRequestSize(): number {
-  return 181;
+  return 155;
 }

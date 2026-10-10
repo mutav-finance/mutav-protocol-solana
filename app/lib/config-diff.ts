@@ -4,7 +4,7 @@
  * on-chain state undo each other when both execute. These helpers let the
  * server refuse an overlapping proposal and let approvers see the diff.
  */
-import { getSetConfigInstructionDataDecoder, minSettlementBps, type VaultConfig } from "@mutav-finance/mutav-protocol-solana";
+import { getSetConfigInstructionDataDecoder, type VaultConfig } from "@mutav-finance/mutav-protocol-solana";
 import { bytesToHex } from "./serde";
 
 export type ConfigChange = { field: string; from: string; to: string };
@@ -37,9 +37,6 @@ function leaves(o: Record<string, unknown>, prefix = ""): [string, unknown][] {
 export function setConfigChanges(data: Uint8Array, config: VaultConfig, treasury?: string): ConfigChange[] {
   const next = getSetConfigInstructionDataDecoder().decode(data) as unknown as Record<string, unknown>;
   const now: Record<string, string> = Object.fromEntries(leaves(config as unknown as Record<string, unknown>).map(([k, v]) => [k, show(v)]));
-  // The settlement floor is an argument; the account stores its complement
-  // `caps.max_allocated_bps` (ADR 0018), so compare the floor itself.
-  now["caps.min_settlement_bps"] = String(minSettlementBps(config));
   const changes: ConfigChange[] = [];
   for (const [k, v] of leaves(next)) {
     const to = show(v);

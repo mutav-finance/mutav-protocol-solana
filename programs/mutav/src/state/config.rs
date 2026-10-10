@@ -1,15 +1,15 @@
-//! `VaultConfig` and its nested structs (spec §3.1, §3.9, §7, §8, §13.2).
+//! `VaultConfig` and its nested `Caps` (spec §3.1, §8).
 //!
 //! Account and authority skeleton adapted from `solana-foundation/vault`
 //! (`programs/async_vault/src/state/async_vault.rs`, commit c359962), MIT
 //! License, Copyright (c) 2026 Solana Foundation. See `NOTICE`.
 //! Changes: per-reserve seeds, separate admin / operator / pauser roles, caps,
-//! price and exit parameters, fixed-size layout with `_reserved` padding.
+//! fixed-size layout with `_reserved` padding.
 
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{field, BPS_DENOMINATOR, MAX_ADAPTERS, PROGRAM_LAYOUT_VERSION, VAULT_CONFIG_SIZE},
+    constants::{field, PROGRAM_LAYOUT_VERSION, VAULT_CONFIG_SIZE},
     events::ConfigChanges,
 };
 
@@ -50,27 +50,41 @@ pub struct VaultConfig {
     pub treasury_account: Pubkey,
     /// Merkle root of allowlisted investor wallets.
     pub investor_allowlist_root: [u8; 32],
-    /// Whitelisted adapters.
-    pub adapters: [AdapterEntry; MAX_ADAPTERS],
     pub caps: Caps,
-    pub price: PriceParams,
-    /// Settlement SLA for payouts.
-    pub payout_sla_secs: i64,
     /// Global pause flag.
     pub paused: bool,
-    /// Bitmask of optional features. `0` in the pilot.
+    /// Bitmask of optional features. `0` in the pilot; bits outside
+    /// `SUPPORTED_FEATURES` fail closed.
     pub feature_flags: u64,
     /// MUTAV's allowlisted capital wallet, disclosed on-chain.
     pub mutav_capital_wallet: Pubkey,
-    /// Phase-2 instant-exit parameters. All zero in the pilot.
-    pub exit: ExitParams,
-    // -- carved from `_reserved` by ADR 0017 (2 bytes) --
-    /// MUTAV's take from issuer income swept by `sweep_income`,
-    /// `<= MAX_INCOME_TAKE_BPS`. `0` in the pilot: all income builds the
-    /// reserve.
-    pub income_take_bps: u16,
-    /// Zeroed. Never read or written by logic.
-    pub _reserved: [u8; 510],
+    // -- ADR 0019 carves. Each is written zero and read by no instruction of
+    // this binary; the instructions that use them come later. Zero is the
+    // pilot behaviour. --
+    /// Number of whitelisted adapters (each described by its `AdapterState`
+    /// PDA, ADR 0018). `0` = BRS only.
+    pub adapter_count: u8,
+    /// Bitmap of enabled adapter slots, `MAX_ADAPTERS` bits. `0` = none.
+    pub adapter_bitmap: u8,
+    /// Proposed new admin, waiting for its own acceptance.
+    /// `Pubkey::default()` = none pending.
+    pub pending_admin: Pubkey,
+    /// When `pending_admin` expires (unix seconds). `0` = nothing pending.
+    pub pending_admin_expires_at: i64,
+    /// Proposed new operator, waiting for its own acceptance. Default = none.
+    pub pending_operator: Pubkey,
+    /// When `pending_operator` expires. `0` = nothing pending.
+    pub pending_operator_expires_at: i64,
+    /// Proposed new pauser, waiting for its own acceptance. Default = none.
+    pub pending_pauser: Pubkey,
+    /// When `pending_pauser` expires. `0` = nothing pending.
+    pub pending_pauser_expires_at: i64,
+    /// Pause-only guardian keys. `Pubkey::default()` = empty slot.
+    pub guardians: [Pubkey; 3],
+    /// Zeroed. Never read or written by logic. Holds the planned carves
+    /// (phase-2 exit parameters, the ADR 0012 config fields) without a
+    /// migration (spec §14.2, ADR 0019).
+    pub _reserved: [u8; 512],
 }
 
 const _: () = assert!(8 + VaultConfig::INIT_SPACE == VAULT_CONFIG_SIZE);
@@ -101,11 +115,6 @@ impl VaultConfig {
             a.max_cover_per_guarantee,
         );
         ch.set(
-            field::CAPS_MAX_COVER_PER_AGENCY,
-            &mut c.max_cover_per_agency,
-            a.max_cover_per_agency,
-        );
-        ch.set(
             field::CAPS_MAX_CLAIM_PER_CALL,
             &mut c.max_claim_per_call,
             a.max_claim_per_call,
@@ -115,160 +124,14 @@ impl VaultConfig {
             &mut c.max_claim_per_period,
             a.max_claim_per_period,
         );
-        ch.set(
-            field::CAPS_CLAIM_PERIOD_SECS,
-            &mut c.claim_period_secs,
-            a.claim_period_secs,
-        );
-        // The settlement floor is stored as its complement (ADR 0018 option
-        // (a)), so a zeroed field reads as "nothing allocated". The event
-        // reports the floor itself.
-        let mut floor = c.min_settlement_bps();
-        ch.set(
-            field::CAPS_MIN_SETTLEMENT_BPS,
-            &mut floor,
-            a.min_settlement_bps,
-        );
-        c.max_allocated_bps = BPS_DENOMINATOR.saturating_sub(floor);
         ch.set(field::CAPS_MIN_REQUEST, &mut c.min_request, a.min_request);
         ch.set(field::CAPS_MAX_REQUEST, &mut c.max_request, a.max_request);
         ch.set(
-            field::CAPS_MIN_FILL_ASSETS,
-            &mut c.min_fill_assets,
-            a.min_fill_assets,
-        );
-    }
-
-    /// Writes `price` in place, field by field, recording changes.
-    pub fn apply_price(&mut self, a: &PriceInput, ch: &mut ConfigChanges) {
-        let p = &mut self.price;
-        ch.set(
-            field::PRICE_TESOURO_PRICE_ACCOUNT,
-            &mut p.tesouro_price_account,
-            a.tesouro_price_account,
-        );
-        ch.set(field::PRICE_P0, &mut p.p0, a.p0);
-        ch.set(field::PRICE_T0, &mut p.t0, a.t0);
-        ch.set(field::PRICE_Y_MAX_BPS, &mut p.y_max_bps, a.y_max_bps);
-        ch.set(
-            field::PRICE_MAX_STALENESS_SECS,
-            &mut p.max_staleness_secs,
-            a.max_staleness_secs,
-        );
-        ch.set(
-            field::PRICE_MAX_DEVIATION_BPS,
-            &mut p.max_deviation_bps,
-            a.max_deviation_bps,
-        );
-        ch.set(
-            field::PRICE_MAX_NAV_MOVE_BPS,
-            &mut p.max_nav_move_bps,
+            field::MAX_NAV_MOVE_BPS,
+            &mut c.max_nav_move_bps,
             a.max_nav_move_bps,
         );
     }
-
-    /// Writes `exit` in place, field by field, recording changes.
-    pub fn apply_exit(&mut self, a: &ExitInput, ch: &mut ConfigChanges) {
-        let e = &mut self.exit;
-        ch.set(
-            field::EXIT_BUFFER_TARGET_BPS,
-            &mut e.buffer_target_bps,
-            a.buffer_target_bps,
-        );
-        ch.set(
-            field::EXIT_BUFFER_HEADROOM_BPS,
-            &mut e.buffer_headroom_bps,
-            a.buffer_headroom_bps,
-        );
-        ch.set(
-            field::EXIT_BUFFER_RELEASE_AFTER_SECS,
-            &mut e.buffer_release_after_secs,
-            a.buffer_release_after_secs,
-        );
-        ch.set(
-            field::EXIT_CURVE_VERSION,
-            &mut e.curve_version,
-            a.curve_version,
-        );
-        ch.set(field::EXIT_H_MIN_BPS, &mut e.h_min_bps, a.h_min_bps);
-        ch.set(field::EXIT_H_PEG_BPS, &mut e.h_peg_bps, a.h_peg_bps);
-        ch.set(field::EXIT_H_MAX_BPS, &mut e.h_max_bps, a.h_max_bps);
-        ch.set(
-            field::EXIT_PRESSURE_EPOCH_SECS,
-            &mut e.pressure_epoch_secs,
-            a.pressure_epoch_secs,
-        );
-        ch.set(
-            field::EXIT_MIN_INSTANT_ASSETS,
-            &mut e.min_instant_assets,
-            a.min_instant_assets,
-        );
-        ch.set(
-            field::EXIT_MAX_INSTANT_PER_TX,
-            &mut e.max_instant_per_tx,
-            a.max_instant_per_tx,
-        );
-        ch.set(
-            field::EXIT_MAX_INSTANT_PER_WALLET,
-            &mut e.max_instant_per_wallet,
-            a.max_instant_per_wallet,
-        );
-        ch.set(
-            field::EXIT_MAX_INSTANT_PER_PERIOD,
-            &mut e.max_instant_per_period,
-            a.max_instant_per_period,
-        );
-        ch.set(
-            field::EXIT_INSTANT_PERIOD_SECS,
-            &mut e.instant_period_secs,
-            a.instant_period_secs,
-        );
-        ch.set(
-            field::EXIT_MIN_HOLD_SECS,
-            &mut e.min_hold_secs,
-            a.min_hold_secs,
-        );
-        ch.set(
-            field::EXIT_MAX_PRICE_AGE_SECS,
-            &mut e.max_price_age_secs,
-            a.max_price_age_secs,
-        );
-        ch.set(
-            field::EXIT_ALLOWLIST_ROOT,
-            &mut e.allowlist_root,
-            a.allowlist_root,
-        );
-        for (i, (slot, new)) in e.barred.iter_mut().zip(a.barred).enumerate() {
-            ch.set(field::EXIT_BARRED_0 + i as u16, slot, new);
-        }
-    }
-}
-
-/// A whitelisted adapter, stored inline in `VaultConfig.adapters` (spec §3.9).
-/// 177 bytes; `MAX_ADAPTERS × entry` is part of the `VaultConfig` layout.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace, PartialEq, Eq, Debug)]
-pub struct AdapterEntry {
-    pub program_id: Pubkey,
-    /// PDA `["adapter", config, program_id]` of the core program.
-    pub sub_authority: Pubkey,
-    pub asset_mint: Pubkey,
-    /// Max BRS-equivalent value allocated through this adapter.
-    pub cap: u64,
-    /// Current BRS-equivalent value allocated.
-    pub allocated: u64,
-    pub enabled: bool,
-    // -- carved from `_reserved` by ADR 0018 (2 bytes), before the freeze --
-    /// The most of `stable_assets` this adapter's value may be, in bps
-    /// (`adapter value ≤ max_share_bps × stable_assets / 10_000`, ADR 0018).
-    /// Zero (an entry never configured) means nothing may be allocated.
-    /// Written by `whitelist_adapter` and read by `allocate`, both built with
-    /// the first adapter upgrade.
-    pub max_share_bps: u16,
-    /// Zeroed. Room for adapter pinning (PC-27: deployed slot `u64` and
-    /// upgrade authority `Pubkey`, 40 bytes) without a migration. The price
-    /// feed, its bounds and the position live in the `AdapterState` PDA
-    /// (`["adapter_state", config, program_id]`, spec §3.9).
-    pub _reserved: [u8; 62],
 }
 
 /// Caps (spec §8). All values in BRS base units unless noted.
@@ -276,71 +139,27 @@ pub struct AdapterEntry {
 pub struct Caps {
     pub max_tvl: u64,
     pub max_cover_per_guarantee: u64,
-    pub max_cover_per_agency: u64,
     pub max_claim_per_call: u64,
+    /// The most `pay_claim` may pay in any `CLAIM_WINDOW_DAYS` (31) UTC days
+    /// (ADR 0019).
     pub max_claim_per_period: u64,
-    pub claim_period_secs: i64,
-    /// The most of `stable_assets` all adapters together may hold outside
-    /// `reserve_mint`, in bps: the complement of the settlement floor
-    /// `min_settlement_bps` (ADR 0018 option (a)). Stored as the complement so
-    /// that zero is the pilot's "nothing allocated" (spec §14.2 R3). Every
-    /// edge (instruction args, `ConfigUpdated`, client, app) speaks
-    /// `min_settlement_bps = 10_000 − max_allocated_bps`; read it through
-    /// [`Caps::min_settlement_bps`].
-    pub max_allocated_bps: u16,
     pub min_request: u64,
     pub max_request: u64,
-    pub min_fill_assets: u64,
-    /// Zeroed. Later caps (PC-43) are carved here.
-    pub _reserved: [u8; 32],
-}
-
-impl Caps {
-    /// The settlement floor (ADR 0018): the minimum share of `stable_assets`
-    /// held in `reserve_mint`, in bps. `10_000` in the pilot.
-    pub fn min_settlement_bps(&self) -> u16 {
-        BPS_DENOMINATOR.saturating_sub(self.max_allocated_bps)
-    }
-}
-
-/// TESOURO price bounds (spec §7).
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace, PartialEq, Eq, Debug)]
-pub struct PriceParams {
-    pub tesouro_price_account: Pubkey,
-    pub p0: u64,
-    pub t0: i64,
-    pub y_max_bps: u16,
-    pub max_staleness_secs: i64,
-    pub max_deviation_bps: u16,
+    /// The NAV-move guard (spec §7): a NAV-per-share move of more than this,
+    /// in bps, between two `refresh`es halts fulfilment.
     pub max_nav_move_bps: u16,
-    /// Zeroed. E.g. a stale-price haircut (spec §12 Q21).
-    pub _reserved: [u8; 32],
-}
-
-/// Phase-2 instant-exit and buffer parameters (spec §13.2). All zero in the
-/// pilot; validated only when `INSTANT_EXIT` is on.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace, PartialEq, Eq, Debug)]
-pub struct ExitParams {
-    pub buffer_target_bps: u16,
-    pub buffer_headroom_bps: u16,
-    pub buffer_release_after_secs: i64,
-    pub curve_version: u8,
-    pub h_min_bps: u16,
-    pub h_peg_bps: u16,
-    pub h_max_bps: u16,
-    pub pressure_epoch_secs: i64,
-    pub min_instant_assets: u64,
-    pub max_instant_per_tx: u64,
-    pub max_instant_per_wallet: u64,
-    pub max_instant_per_period: u64,
-    pub instant_period_secs: i64,
-    pub min_hold_secs: i64,
-    pub max_price_age_secs: i64,
-    pub allowlist_root: [u8; 32],
-    /// Barred wallets in addition to `mutav_capital_wallet`;
-    /// `Pubkey::default()` = empty slot.
-    pub barred: [Pubkey; 4],
-    /// Zeroed. Room for later exit parameters.
+    // -- ADR 0019 carves: written zero, read by no instruction of this
+    // binary; `set_config` and the rules that read them come later. Zero is
+    // the pilot behaviour. --
+    /// R$ amount of claims that could be filed next, for the stress term of
+    /// `coverage_required`. `0` = no stress term.
+    pub stress_buffer: u64,
+    /// After this wait anyone may fill the head redemption under the same
+    /// rules (exit fallback). `0` = off.
+    pub max_queue_wait_secs: i64,
+    /// How long after closing a guarantee may be reinstated. `0` = never.
+    pub max_reinstate_age: i64,
+    /// Zeroed. Later caps (PC-43) are carved here.
     pub _reserved: [u8; 32],
 }
 
@@ -353,48 +172,11 @@ pub struct ExitParams {
 pub struct CapsInput {
     pub max_tvl: u64,
     pub max_cover_per_guarantee: u64,
-    pub max_cover_per_agency: u64,
     pub max_claim_per_call: u64,
     pub max_claim_per_period: u64,
-    pub claim_period_secs: i64,
-    /// The settlement floor (ADR 0018), `<= 10_000`. Stored as its complement
-    /// `Caps::max_allocated_bps`.
-    pub min_settlement_bps: u16,
     pub min_request: u64,
     pub max_request: u64,
-    pub min_fill_assets: u64,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq, Eq, Debug)]
-pub struct PriceInput {
-    pub tesouro_price_account: Pubkey,
-    pub p0: u64,
-    pub t0: i64,
-    pub y_max_bps: u16,
-    pub max_staleness_secs: i64,
-    pub max_deviation_bps: u16,
     pub max_nav_move_bps: u16,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, PartialEq, Eq, Debug)]
-pub struct ExitInput {
-    pub buffer_target_bps: u16,
-    pub buffer_headroom_bps: u16,
-    pub buffer_release_after_secs: i64,
-    pub curve_version: u8,
-    pub h_min_bps: u16,
-    pub h_peg_bps: u16,
-    pub h_max_bps: u16,
-    pub pressure_epoch_secs: i64,
-    pub min_instant_assets: u64,
-    pub max_instant_per_tx: u64,
-    pub max_instant_per_wallet: u64,
-    pub max_instant_per_period: u64,
-    pub instant_period_secs: i64,
-    pub min_hold_secs: i64,
-    pub max_price_age_secs: i64,
-    pub allowlist_root: [u8; 32],
-    pub barred: [Pubkey; 4],
 }
 
 #[cfg(test)]
@@ -403,11 +185,7 @@ mod tests {
 
     #[test]
     fn nested_sizes() {
-        assert_eq!(AdapterEntry::INIT_SPACE, 177);
         assert_eq!(Caps::INIT_SPACE, 106);
-        assert_eq!(PriceParams::INIT_SPACE, 94);
-        assert_eq!(ExitParams::INIT_SPACE, 275);
-        assert_eq!(MAX_ADAPTERS, 8);
     }
 
     fn zeroed() -> VaultConfig {
@@ -440,63 +218,38 @@ mod tests {
     fn apply_never_touches_padding() {
         let mut c = zeroed();
         c.caps._reserved = [7; 32];
-        c.price._reserved = [8; 32];
-        c.exit._reserved = [9; 32];
+        c._reserved = [9; 512];
+        // The ADR 0019 carves are not `set_config` fields yet.
+        c.caps.stress_buffer = 11;
+        c.caps.max_reinstate_age = 12;
+        c.pending_admin = Pubkey::new_unique();
+        c.guardians[2] = Pubkey::new_unique();
+        let carved = (
+            c.caps.stress_buffer,
+            c.caps.max_reinstate_age,
+            c.pending_admin,
+            c.guardians,
+        );
         let mut ch = ConfigChanges::default();
         c.apply_caps(
             &CapsInput {
                 max_tvl: 1,
-                min_settlement_bps: BPS_DENOMINATOR,
-                ..Default::default()
-            },
-            &mut ch,
-        );
-        c.apply_price(
-            &PriceInput {
-                p0: 1,
-                ..Default::default()
-            },
-            &mut ch,
-        );
-        c.apply_exit(
-            &ExitInput {
-                barred: [Pubkey::new_unique(); 4],
+                max_nav_move_bps: 2,
                 ..Default::default()
             },
             &mut ch,
         );
         assert_eq!(c.caps._reserved, [7; 32]);
-        assert_eq!(c.price._reserved, [8; 32]);
-        assert_eq!(c.exit._reserved, [9; 32]);
-        assert_eq!(ch.0.len(), 6);
-    }
-
-    #[test]
-    fn settlement_floor_is_stored_as_its_complement() {
-        let mut c = zeroed();
-        // Zeroed storage is the pilot: nothing allocated, a 100% floor.
-        assert_eq!(c.caps.max_allocated_bps, 0);
-        assert_eq!(c.caps.min_settlement_bps(), 10_000);
-        let mut ch = ConfigChanges::default();
-        let input = |v| CapsInput {
-            min_settlement_bps: v,
-            ..Default::default()
-        };
-        c.apply_caps(&input(10_000), &mut ch);
-        assert!(ch.0.is_empty(), "a 100% floor is the zeroed field");
-        c.apply_caps(&input(6_000), &mut ch);
-        assert_eq!(c.caps.max_allocated_bps, 4_000);
-        assert_eq!(c.caps.min_settlement_bps(), 6_000);
-        // The event speaks the floor, not the stored complement.
+        assert_eq!(c._reserved, [9; 512]);
         assert_eq!(
-            ch.0,
-            vec![(
-                field::CAPS_MIN_SETTLEMENT_BPS,
-                crate::events::FieldBytes::field_bytes(&10_000u16),
-                crate::events::FieldBytes::field_bytes(&6_000u16),
-            )]
+            (
+                c.caps.stress_buffer,
+                c.caps.max_reinstate_age,
+                c.pending_admin,
+                c.guardians
+            ),
+            carved
         );
-        c.apply_caps(&input(0), &mut ch);
-        assert_eq!(c.caps.max_allocated_bps, 10_000);
+        assert_eq!(ch.0.len(), 2);
     }
 }

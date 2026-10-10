@@ -4,7 +4,7 @@ import { readInvestor } from "@/lib/server/investor";
 import { errorResponse } from "@/lib/server/respond";
 import { jsonResponse } from "@/lib/serde";
 
-/** `?owner=<wallet>`: that wallet's allowlist status, balances and HolderState. Without it, the allowlist facts only. */
+/** `?owner=<wallet>`: that wallet's allowlist status, and balances. Without it, the allowlist facts only. */
 export async function GET(req: Request) {
   try {
     const env = serverEnv();

@@ -150,13 +150,13 @@ bun scripts/devnet/verify.ts --config $CFG --url $RPC --confirm-cluster devnet
 `verify.ts` checks:
 
 - the upgrade authority is the configured vault;
-- `feature_flags == 0` and `buffer_earmark == 0`;
+- `feature_flags == 0`;
 - admin, operator, pauser and the allowlist root are as configured;
 - the Squads multisig has `config_authority == Pubkey::default()`, `time_lock ≥` the agreed floor, and a sane threshold.
 
 After the deploy, dump the live `VaultConfig` and `VaultState` into `tests/fixtures/layout/v1/` (spec §14.7).
 
-The devnet example sets `price.maxNavMoveBps = 10000`. The NAV-move guard measures the move gross, so on a small demo reserve a guarantee-fee batch or a claim payment would otherwise trip it and halt fulfilment. The inflow-adjusted guard is ADR 0013, which is pending. Until it lands, the admin can clear a tripped guard with `clear_fulfil_halt` (ADR 0015). Lower the bound for the real pilot.
+The devnet example sets `caps.maxNavMoveBps = 10000`. The NAV-move guard measures the move gross, so on a small demo reserve a guarantee-fee batch or a claim payment would otherwise trip it and halt fulfilment. The inflow-adjusted guard is ADR 0013, which is pending. Until it lands, the admin can clear a tripped guard with `clear_fulfil_halt` (ADR 0015). Lower the bound for the real pilot.
 
 ### Devnet addresses
 

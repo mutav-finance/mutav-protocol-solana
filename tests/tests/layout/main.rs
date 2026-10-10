@@ -1,13 +1,17 @@
-//! Layout stability (spec §14.2, §14.7; plan Task 2a).
+//! Layout stability (spec §14.2, §14.7; plan Task 2a; ADR 0019).
 //!
 //! - `v1`: frozen pilot structs and golden field-offset tables.
+//! - `fields`: the field list of each v1 account, for the tables.
 //! - `v2_carve`: a test-only phase-2 `VaultState` with `InstantExitState`
 //!   carved from `_reserved`.
+//! - `book`, `capital`: the per-record accounts.
 //!
-//! `main.rs` holds the shared machinery and the tests that compare the
-//! current program structs with the frozen v1 copies and the committed
-//! fixtures in `tests/fixtures/layout/v1/`.
+//! `main.rs` holds the shared machinery, the config and state tests, the
+//! planned-carve padding test and the committed fixtures in
+//! `tests/fixtures/layout/v1/`.
 
+#[macro_use]
+mod fields;
 mod book;
 mod capital;
 mod v1;
@@ -20,7 +24,7 @@ use anchor_lang::{
 };
 use mutav::{
     constants::*,
-    state::{AdapterEntry, Caps, ExitParams, PriceParams, VaultConfig, VaultState},
+    state::{Caps, ClaimFiling, Guarantee, RedeemRequest, VaultConfig, VaultState},
 };
 use mutav_tests::helpers::*;
 use v1::*;
@@ -52,6 +56,13 @@ impl<T: Sentinel + Copy, const N: usize> Sentinel for [T; N] {
         [T::sentinel(); N]
     }
 }
+/// Nested structs without `bool`s: every byte `0xff`.
+macro_rules! sentinel_bytes {
+    ($($t:ty),*) => {$(impl Sentinel for $t {
+        fn sentinel() -> Self { <$t>::deserialize(&mut &[0xffu8; 4096][..]).unwrap() }
+    })*};
+}
+sentinel_bytes!(Caps, CapsV1);
 
 pub fn ser<T: AnchorSerialize>(x: &T) -> Vec<u8> {
     let mut v = Vec::new();
@@ -89,118 +100,6 @@ macro_rules! spans {
     };
 }
 
-macro_rules! vault_state_fields {
-    ($t:ty) => {
-        spans!($t;
-            "version" => version, "bump" => bump, "mode" => mode,
-            "brs_balance" => brs_balance, "tesouro_units" => tesouro_units,
-            "tesouro_price" => tesouro_price, "tesouro_price_ts" => tesouro_price_ts,
-            "stable_assets" => stable_assets,
-            "remaining_cover_total" => remaining_cover_total,
-            "coverage_required" => coverage_required, "provisions" => provisions,
-            "shares_outstanding" => shares_outstanding, "nav_per_share" => nav_per_share,
-            "pending_deposits_total" => pending_deposits_total,
-            "pending_redeem_shares" => pending_redeem_shares,
-            "claimable_assets_total" => claimable_assets_total,
-            "buffer_earmark" => buffer_earmark, "pending_notices" => pending_notices,
-            "active_guarantees" => active_guarantees,
-            "next_deposit_seq" => next_deposit_seq, "deposit_head" => deposit_head,
-            "next_redeem_seq" => next_redeem_seq, "redeem_head" => redeem_head,
-            "claim_period_start" => claim_period_start,
-            "claim_period_paid" => claim_period_paid, "fees_in_total" => fees_in_total,
-            "fee_take_total" => fee_take_total, "claims_paid_total" => claims_paid_total,
-            "late_payouts" => late_payouts, "fulfil_halted" => fulfil_halted,
-            "last_refresh_ts" => last_refresh_ts, "last_refresh_slot" => last_refresh_slot,
-            "income_total" => income_total, "income_take_total" => income_take_total,
-            "inflow_nav" => inflow_nav,
-        )
-    };
-}
-pub(crate) use vault_state_fields;
-
-macro_rules! vault_config_fields {
-    ($t:ty) => {
-        spans!($t;
-            "version" => version, "bump" => bump, "authority_bump" => authority_bump,
-            "admin" => admin, "operator" => operator, "pauser" => pauser,
-            "reserve_mint" => reserve_mint, "reserve_token_program" => reserve_token_program,
-            "reserve_decimals" => reserve_decimals, "share_mint" => share_mint,
-            "coverage_ratio_bps" => coverage_ratio_bps, "fee_take_bps" => fee_take_bps,
-            "payments_account" => payments_account, "treasury_account" => treasury_account,
-            "investor_allowlist_root" => investor_allowlist_root,
-            "adapters[0].program_id" => adapters[0].program_id,
-            "adapters[7].max_share_bps" => adapters[7].max_share_bps,
-            "adapters[7]._reserved" => adapters[7]._reserved,
-            "caps.max_tvl" => caps.max_tvl, "caps._reserved" => caps._reserved,
-            "price.tesouro_price_account" => price.tesouro_price_account,
-            "price._reserved" => price._reserved,
-            "payout_sla_secs" => payout_sla_secs, "paused" => paused,
-            "feature_flags" => feature_flags, "mutav_capital_wallet" => mutav_capital_wallet,
-            "exit.buffer_target_bps" => exit.buffer_target_bps,
-            "exit._reserved" => exit._reserved,
-            "income_take_bps" => income_take_bps,
-            "_reserved" => _reserved,
-        )
-    };
-}
-
-macro_rules! caps_fields {
-    ($t:ty) => {
-        spans!($t;
-            "max_tvl" => max_tvl, "max_cover_per_guarantee" => max_cover_per_guarantee,
-            "max_cover_per_agency" => max_cover_per_agency,
-            "max_claim_per_call" => max_claim_per_call,
-            "max_claim_per_period" => max_claim_per_period,
-            "claim_period_secs" => claim_period_secs,
-            "max_allocated_bps" => max_allocated_bps,
-            "min_request" => min_request, "max_request" => max_request,
-            "min_fill_assets" => min_fill_assets, "_reserved" => _reserved,
-        )
-    };
-}
-
-macro_rules! price_fields {
-    ($t:ty) => {
-        spans!($t;
-            "tesouro_price_account" => tesouro_price_account, "p0" => p0, "t0" => t0,
-            "y_max_bps" => y_max_bps, "max_staleness_secs" => max_staleness_secs,
-            "max_deviation_bps" => max_deviation_bps, "max_nav_move_bps" => max_nav_move_bps,
-            "_reserved" => _reserved,
-        )
-    };
-}
-
-macro_rules! exit_fields {
-    ($t:ty) => {
-        spans!($t;
-            "buffer_target_bps" => buffer_target_bps,
-            "buffer_headroom_bps" => buffer_headroom_bps,
-            "buffer_release_after_secs" => buffer_release_after_secs,
-            "curve_version" => curve_version, "h_min_bps" => h_min_bps,
-            "h_peg_bps" => h_peg_bps, "h_max_bps" => h_max_bps,
-            "pressure_epoch_secs" => pressure_epoch_secs,
-            "min_instant_assets" => min_instant_assets,
-            "max_instant_per_tx" => max_instant_per_tx,
-            "max_instant_per_wallet" => max_instant_per_wallet,
-            "max_instant_per_period" => max_instant_per_period,
-            "instant_period_secs" => instant_period_secs, "min_hold_secs" => min_hold_secs,
-            "max_price_age_secs" => max_price_age_secs, "allowlist_root" => allowlist_root,
-            "barred" => barred, "_reserved" => _reserved,
-        )
-    };
-}
-
-macro_rules! adapter_fields {
-    ($t:ty) => {
-        spans!($t;
-            "program_id" => program_id, "sub_authority" => sub_authority,
-            "asset_mint" => asset_mint, "cap" => cap, "allocated" => allocated,
-            "enabled" => enabled, "max_share_bps" => max_share_bps,
-            "_reserved" => _reserved,
-        )
-    };
-}
-
 fn table(t: OffsetTable) -> Vec<(&'static str, usize, usize)> {
     t.to_vec()
 }
@@ -215,16 +114,28 @@ pub fn pattern(len: usize, bools: &[usize]) -> Vec<u8> {
     v
 }
 
-fn config_bools() -> Vec<usize> {
-    let mut b: Vec<usize> = (0..MAX_ADAPTERS).map(|i| 296 + i * 177 + 112).collect();
-    b.push(1920); // paused
-    b
+/// Offset of the one `bool` in each singleton (`paused`, `fulfil_halted`).
+fn bool_at(t: OffsetTable, name: &str) -> usize {
+    t.iter().find(|(n, _, _)| *n == name).unwrap().1
 }
 
-const STATE_BOOLS: &[usize] = &[199]; // fulfil_halted
+fn config_bools() -> Vec<usize> {
+    vec![bool_at(VAULT_CONFIG_V1, "paused")]
+}
+
+pub fn state_bools() -> Vec<usize> {
+    vec![bool_at(VAULT_STATE_V1, "fulfil_halted")]
+}
 
 fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/layout/v1")
+}
+
+/// Length of the trailing `_reserved` of an offset table.
+pub fn padding_of(t: OffsetTable) -> usize {
+    let (name, _, n) = *t.last().unwrap();
+    assert_eq!(name, "_reserved");
+    n
 }
 
 // ---------------------------------------------------------------------------
@@ -235,18 +146,16 @@ fn fixtures_dir() -> PathBuf {
 fn sizes_are_pinned() {
     assert_eq!(8 + VaultConfig::INIT_SPACE, VAULT_CONFIG_SIZE);
     assert_eq!(8 + VaultState::INIT_SPACE, VAULT_STATE_SIZE);
-    assert_eq!(VAULT_CONFIG_SIZE, 2_756);
-    assert_eq!(VAULT_STATE_SIZE, 480);
+    assert_eq!(VAULT_CONFIG_SIZE, 1_181);
+    assert_eq!(VAULT_STATE_SIZE, 688);
+    assert_eq!(VAULT_CONFIG_SIZE, 8 + VAULT_CONFIG_V1_LEN);
+    assert_eq!(VAULT_STATE_SIZE, 8 + VAULT_STATE_V1_LEN);
     // Serialized length (current and v1) equals the allocation.
     assert_eq!(8 + ser(&zeroed::<VaultConfig>()).len(), VAULT_CONFIG_SIZE);
     assert_eq!(8 + ser(&zeroed::<VaultState>()).len(), VAULT_STATE_SIZE);
     assert_eq!(8 + ser(&zeroed::<VaultConfigV1>()).len(), VAULT_CONFIG_SIZE);
     assert_eq!(8 + ser(&zeroed::<VaultStateV1>()).len(), VAULT_STATE_SIZE);
-    // Nested structs.
-    assert_eq!(ser(&zeroed::<Caps>()).len(), 106);
-    assert_eq!(ser(&zeroed::<PriceParams>()).len(), 94);
-    assert_eq!(ser(&zeroed::<ExitParams>()).len(), 275);
-    assert_eq!(ser(&zeroed::<AdapterEntry>()).len(), 177);
+    assert_eq!(ser(&zeroed::<Caps>()).len(), CAPS_V1_LEN);
 }
 
 #[test]
@@ -269,46 +178,30 @@ fn allocations_match_the_pins() {
 
 #[test]
 fn v1_offset_tables_match_the_frozen_structs() {
-    assert_eq!(vault_state_fields!(VaultStateV1), {
-        let mut t = table(VAULT_STATE_V1);
-        t.pop(); // `_reserved` is checked below
-        t
-    });
-    assert_eq!(
-        spans!(VaultStateV1; "_reserved" => _reserved),
-        vec![*VAULT_STATE_V1.last().unwrap()]
-    );
+    assert_eq!(vault_state_fields!(VaultStateV1), table(VAULT_STATE_V1));
     assert_eq!(vault_config_fields!(VaultConfigV1), table(VAULT_CONFIG_V1));
     assert_eq!(caps_fields!(CapsV1), table(CAPS_V1));
-    assert_eq!(price_fields!(PriceParamsV1), table(PRICE_PARAMS_V1));
-    assert_eq!(exit_fields!(ExitParamsV1), table(EXIT_PARAMS_V1));
-    assert_eq!(adapter_fields!(AdapterEntryV1), table(ADAPTER_ENTRY_V1));
 }
 
 #[test]
 fn current_structs_keep_every_v1_offset() {
-    let mut state = vault_state_fields!(VaultState);
-    state.extend(spans!(VaultState; "_reserved" => _reserved));
-    assert_eq!(state, table(VAULT_STATE_V1));
+    assert_eq!(vault_state_fields!(VaultState), table(VAULT_STATE_V1));
     assert_eq!(vault_config_fields!(VaultConfig), table(VAULT_CONFIG_V1));
     assert_eq!(caps_fields!(Caps), table(CAPS_V1));
-    assert_eq!(price_fields!(PriceParams), table(PRICE_PARAMS_V1));
-    assert_eq!(exit_fields!(ExitParams), table(EXIT_PARAMS_V1));
-    assert_eq!(adapter_fields!(AdapterEntry), table(ADAPTER_ENTRY_V1));
 }
 
 #[test]
 fn v1_bytes_decode_under_the_current_structs() {
     // Every byte distinct-ish, so a shifted field would read different bytes.
-    let state = pattern(VAULT_STATE_SIZE - 8, STATE_BOOLS);
+    let state = pattern(VAULT_STATE_SIZE - 8, &state_bools());
     let v1 = VaultStateV1::deserialize(&mut state.as_slice()).unwrap();
     assert_eq!(ser(&v1), state);
     let mut account = VaultState::DISCRIMINATOR.to_vec();
     account.extend(&state);
     let cur = VaultState::try_deserialize(&mut account.as_slice()).unwrap();
     assert_eq!(ser(&cur), state, "VaultState bytes moved");
-    assert_eq!(cur.buffer_earmark, v1.buffer_earmark);
-    assert_eq!(cur.pending_notices, v1.pending_notices);
+    assert_eq!(cur.inflow_nav, v1.inflow_nav);
+    assert_eq!(cur.claim_day_buckets, v1.claim_day_buckets);
     assert_eq!(cur.last_refresh_slot, v1.last_refresh_slot);
 
     let config = pattern(VAULT_CONFIG_SIZE - 8, &config_bools());
@@ -320,8 +213,8 @@ fn v1_bytes_decode_under_the_current_structs() {
     assert_eq!(ser(&cur), config, "VaultConfig bytes moved");
     assert_eq!(cur.feature_flags, v1.feature_flags);
     assert_eq!(cur.mutav_capital_wallet, v1.mutav_capital_wallet);
-    assert_eq!(cur.exit.barred, v1.exit.barred);
-    assert_eq!(cur.adapters[7].cap, v1.adapters[7].cap);
+    assert_eq!(cur.guardians, v1.guardians);
+    assert_eq!(cur.caps.max_nav_move_bps, v1.caps.max_nav_move_bps);
 }
 
 #[test]
@@ -335,6 +228,65 @@ fn account_discriminators_are_frozen() {
     assert_eq!(
         VaultState::DISCRIMINATOR,
         &[228, 196, 82, 165, 98, 210, 235, 152]
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Planned carves (ADR 0019): removed and later features still fit
+// ---------------------------------------------------------------------------
+
+/// Each account's padding holds every carve already planned for it, so the
+/// features removed from v1 (or not built yet) return as carves, without a
+/// migration of live accounts.
+#[test]
+fn padding_holds_every_planned_carve() {
+    // Phase-2 `ExitParams` (spec §13.2) and the ADR 0012 config fields
+    // (`claims_tail_secs`, `payment_term_secs`, `optional_categories`,
+    // `backstop_amount`, `backstop_commitment_hash`).
+    const EXIT_PARAMS: usize = 275;
+    const ADR_0012_CONFIG: usize = 8 + 8 + 1 + 8 + 32;
+    assert!(padding_of(VAULT_CONFIG_V1) >= EXIT_PARAMS + ADR_0012_CONFIG);
+    // Later caps (PC-43: `max_guarantees`, a concentration limit, new cover
+    // per period).
+    assert!(padding_of(CAPS_V1) >= 3 * 8);
+    // Phase-2 `InstantExitState` (88), the buffer earmark (8), the
+    // claim-notice counter (4) and the ADR 0012 counters (16).
+    assert!(padding_of(VAULT_STATE_V1) >= 88 + 8 + 4 + 16);
+    // ADR 0012 lifecycle fields.
+    assert!(padding_of(GUARANTEE_V1) >= 32 + 32 + 8 + 8 + 8);
+    // ADR 0012 claim fields (`category`, `accrued_until_ts`,
+    // `request_complete_ts`, `debt_calc_hash`: 49) and the settlement fields
+    // of the former `Payout` that the filing does not already carry
+    // (`flags`, `landlord_mandate_hash`, `quitacao_hash`: 65), with at least
+    // 64 bytes to spare after the freeze.
+    const ADR_0012_CLAIM: usize = (1 + 8 + 8 + 32) + (1 + 32 + 32);
+    assert_eq!(ADR_0012_CLAIM, 114);
+    assert!(padding_of(CLAIM_FILING_V1) >= ADR_0012_CLAIM + 64);
+    // The rest of the ADR 0010 partial fills: `assets_claimed`, `fill_count`,
+    // `last_fill_at`. `shares_filled` is already a v1 field; the remainder
+    // (`shares − shares_filled`) and the claimable amount are derived.
+    assert!(padding_of(REDEEM_REQUEST_V1) >= 8 + 2 + 8);
+    // The current structs carry the same padding as the tables.
+    assert_eq!(
+        zeroed::<VaultConfig>()._reserved.len(),
+        padding_of(VAULT_CONFIG_V1)
+    );
+    assert_eq!(
+        zeroed::<VaultState>()._reserved.len(),
+        padding_of(VAULT_STATE_V1)
+    );
+    assert_eq!(zeroed::<Caps>()._reserved.len(), padding_of(CAPS_V1));
+    assert_eq!(
+        zeroed::<Guarantee>()._reserved.len(),
+        padding_of(GUARANTEE_V1)
+    );
+    assert_eq!(
+        zeroed::<ClaimFiling>()._reserved.len(),
+        padding_of(CLAIM_FILING_V1)
+    );
+    assert_eq!(
+        zeroed::<RedeemRequest>()._reserved.len(),
+        padding_of(REDEEM_REQUEST_V1)
     );
 }
 
@@ -386,7 +338,6 @@ fn committed_fixtures_decode() {
             assert_eq!(bytes.len(), VAULT_STATE_SIZE, "{name}");
             let s = VaultState::try_deserialize(&mut bytes.as_slice()).expect("decode");
             assert!(s.is_supported(), "{name}");
-            assert_eq!(s.buffer_earmark, 0, "{name}");
             assert_eq!(ser(&s), bytes[8..], "{name}: round trip");
             VaultStateV1::deserialize(&mut &bytes[8..]).expect("v1 decode");
         } else {

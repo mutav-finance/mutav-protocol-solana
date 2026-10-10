@@ -53,17 +53,21 @@ export type Guarantee = {
   discriminator: ReadonlyUint8Array;
   version: number;
   bump: number;
-  /** Guarantee reference from the platform. */
+  /**
+   * Opaque random id assigned by the operator platform. Never a contract
+   * number or any other personal or commercial reference (spec §3.5).
+   */
   id: ReadonlyUint8Array;
+  /**
+   * Opaque per-agency id assigned by the operator platform. Never a CNPJ or
+   * a name; the mapping stays with the operator (spec §3.5).
+   */
   agencyId: ReadonlyUint8Array;
-  /** Commitment to the lease, guarantee contract and landlord mandate. */
+  /**
+   * Salted commitment to the lease, guarantee contract and landlord
+   * mandate; the salt stays with the operator (spec §3.5).
+   */
   refsHash: ReadonlyUint8Array;
-  /** Monthly rent at registration (display and audit). */
-  rent: bigint;
-  /** Display only. Never used in maths. */
-  defaultMultiplierBps: number;
-  /** Display only. Never used in maths. */
-  exitMultiplierBps: number;
   /** Absolute default (rent-arrears) cover. */
   defaultCover: bigint;
   /** Absolute exit (property-recovery) cover. */
@@ -81,24 +85,34 @@ export type Guarantee = {
   registeredAt: bigint;
   /** `0` while active. */
   closedAt: bigint;
-  /** Zeroed. Never read or written by logic. */
+  /**
+   * Zeroed. Never read or written by logic. The 192-byte pilot budget
+   * (spec §14.2) holds the ADR 0012 lifecycle fields (88 bytes) without a
+   * migration; it was grown from 64 before the layout freeze, and the 12
+   * bytes of the removed display fields (`rent`, `default_multiplier_bps`,
+   * `exit_multiplier_bps`) returned to it (ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
 export type GuaranteeArgs = {
   version: number;
   bump: number;
-  /** Guarantee reference from the platform. */
+  /**
+   * Opaque random id assigned by the operator platform. Never a contract
+   * number or any other personal or commercial reference (spec §3.5).
+   */
   id: ReadonlyUint8Array;
+  /**
+   * Opaque per-agency id assigned by the operator platform. Never a CNPJ or
+   * a name; the mapping stays with the operator (spec §3.5).
+   */
   agencyId: ReadonlyUint8Array;
-  /** Commitment to the lease, guarantee contract and landlord mandate. */
+  /**
+   * Salted commitment to the lease, guarantee contract and landlord
+   * mandate; the salt stays with the operator (spec §3.5).
+   */
   refsHash: ReadonlyUint8Array;
-  /** Monthly rent at registration (display and audit). */
-  rent: number | bigint;
-  /** Display only. Never used in maths. */
-  defaultMultiplierBps: number;
-  /** Display only. Never used in maths. */
-  exitMultiplierBps: number;
   /** Absolute default (rent-arrears) cover. */
   defaultCover: number | bigint;
   /** Absolute exit (property-recovery) cover. */
@@ -116,7 +130,13 @@ export type GuaranteeArgs = {
   registeredAt: number | bigint;
   /** `0` while active. */
   closedAt: number | bigint;
-  /** Zeroed. Never read or written by logic. */
+  /**
+   * Zeroed. Never read or written by logic. The 192-byte pilot budget
+   * (spec §14.2) holds the ADR 0012 lifecycle fields (88 bytes) without a
+   * migration; it was grown from 64 before the layout freeze, and the 12
+   * bytes of the removed display fields (`rent`, `default_multiplier_bps`,
+   * `exit_multiplier_bps`) returned to it (ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -130,9 +150,6 @@ export function getGuaranteeEncoder(): FixedSizeEncoder<GuaranteeArgs> {
       ["id", fixEncoderSize(getBytesEncoder(), 32)],
       ["agencyId", fixEncoderSize(getBytesEncoder(), 32)],
       ["refsHash", fixEncoderSize(getBytesEncoder(), 32)],
-      ["rent", getU64Encoder()],
-      ["defaultMultiplierBps", getU16Encoder()],
-      ["exitMultiplierBps", getU16Encoder()],
       ["defaultCover", getU64Encoder()],
       ["exitCover", getU64Encoder()],
       ["defaultPaid", getU64Encoder()],
@@ -143,7 +160,7 @@ export function getGuaranteeEncoder(): FixedSizeEncoder<GuaranteeArgs> {
       ["status", getU8Encoder()],
       ["registeredAt", getI64Encoder()],
       ["closedAt", getI64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 64)],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 204)],
     ]),
     (value) => ({ ...value, discriminator: GUARANTEE_DISCRIMINATOR }),
   );
@@ -158,9 +175,6 @@ export function getGuaranteeDecoder(): FixedSizeDecoder<Guarantee> {
     ["id", fixDecoderSize(getBytesDecoder(), 32)],
     ["agencyId", fixDecoderSize(getBytesDecoder(), 32)],
     ["refsHash", fixDecoderSize(getBytesDecoder(), 32)],
-    ["rent", getU64Decoder()],
-    ["defaultMultiplierBps", getU16Decoder()],
-    ["exitMultiplierBps", getU16Decoder()],
     ["defaultCover", getU64Decoder()],
     ["exitCover", getU64Decoder()],
     ["defaultPaid", getU64Decoder()],
@@ -171,7 +185,7 @@ export function getGuaranteeDecoder(): FixedSizeDecoder<Guarantee> {
     ["status", getU8Decoder()],
     ["registeredAt", getI64Decoder()],
     ["closedAt", getI64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 64)],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 204)],
   ]);
 }
 
@@ -234,5 +248,5 @@ export async function fetchAllMaybeGuarantee(
 }
 
 export function getGuaranteeSize(): number {
-  return 249;
+  return 377;
 }

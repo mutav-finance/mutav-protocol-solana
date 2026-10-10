@@ -19,8 +19,6 @@ fn unchanged_args_change_nothing() {
     assert!(events::<ConfigUpdated>(&meta).is_empty());
     let after = f.config();
     assert_eq!(after.caps, before.caps);
-    assert_eq!(after.price, before.price);
-    assert_eq!(after.exit, before.exit);
 }
 
 #[test]
@@ -33,7 +31,6 @@ fn reserve_mint_and_token_program_never_change() {
     a.coverage_ratio_bps = 12_000;
     a.fee_take_bps = 100;
     a.caps.max_tvl += 1;
-    a.price.p0 += 1;
     a.mutav_capital_wallet = Pubkey::new_unique();
     f.set_config(a).expect("set_config");
     let c = f.config();
@@ -75,14 +72,8 @@ fn same_bounds_as_initialize() {
     let cases: Vec<Box<dyn Fn(&mut mutav::SetConfigArgs)>> = vec![
         Box::new(|a| a.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1),
         Box::new(|a| a.coverage_ratio_bps = 0),
-        Box::new(|a| a.caps.min_settlement_bps = 10_001),
-        Box::new(|a| a.price.max_deviation_bps = 10_001),
-        Box::new(|a| a.price.max_nav_move_bps = 10_001),
-        Box::new(|a| a.price.y_max_bps = 10_001),
+        Box::new(|a| a.caps.max_nav_move_bps = 10_001),
         Box::new(|a| a.caps.min_request = a.caps.max_request + 1),
-        Box::new(|a| a.caps.claim_period_secs = 0),
-        Box::new(|a| a.payout_sla_secs = -1),
-        Box::new(|a| a.price.max_staleness_secs = -1),
     ];
     for case in cases {
         let mut a = base.clone();
@@ -118,33 +109,6 @@ fn every_feature_bit_fails_closed_and_clearing_is_allowed() {
     a.feature_flags = 0;
     f.set_config(a).expect("clear flags");
     assert_eq!(f.config().feature_flags, 0);
-}
-
-#[test]
-fn exit_params_can_be_staged_while_the_flag_is_off() {
-    let mut f = Fixture::new();
-    let mut a = set_config_args(&f.config());
-    a.exit.buffer_target_bps = 500;
-    a.exit.h_max_bps = 1_000;
-    a.exit.barred[2] = Pubkey::new_unique();
-    let meta = f.set_config(a.clone()).expect("stage exit params");
-    let c = f.config();
-    assert_eq!(c.feature_flags, 0);
-    assert_eq!(c.exit.buffer_target_bps, 500);
-    assert_eq!(c.exit.h_max_bps, 1_000);
-    assert_eq!(c.exit.barred[2], a.exit.barred[2]);
-    let fields: Vec<u16> = events::<ConfigUpdated>(&meta)
-        .iter()
-        .map(|e| e.field)
-        .collect();
-    assert_eq!(
-        fields,
-        vec![
-            field::EXIT_BUFFER_TARGET_BPS,
-            field::EXIT_H_MAX_BPS,
-            field::EXIT_BARRED_0 + 2
-        ]
-    );
 }
 
 #[test]
@@ -287,24 +251,4 @@ fn a_new_coverage_ratio_recomputes_the_cached_coverage_required() {
     // An unchanged `c` leaves it as it is.
     f.set_config(set_config_args(&f.config())).unwrap();
     assert_eq!(f.state().coverage_required, cover.div_ceil(10));
-}
-
-#[test]
-fn the_settlement_floor_is_stored_as_its_complement() {
-    // ADR 0018 option (a): `set_config` takes `min_settlement_bps`, stores
-    // `max_allocated_bps = 10_000 − min_settlement_bps` and reports the
-    // floor in `ConfigUpdated`.
-    let mut f = Fixture::new();
-    assert_eq!(f.config().caps.min_settlement_bps(), 5_000);
-    let mut args = set_config_args(&f.config());
-    args.caps.min_settlement_bps = 10_000;
-    let meta = f.set_config(args).unwrap();
-    let c = f.config();
-    assert_eq!(c.caps.max_allocated_bps, 0, "the pilot: nothing allocated");
-    assert_eq!(c.caps.min_settlement_bps(), 10_000);
-    let ev = events::<ConfigUpdated>(&meta);
-    assert_eq!(ev.len(), 1);
-    assert_eq!(ev[0].field, field::CAPS_MIN_SETTLEMENT_BPS);
-    assert_eq!(&ev[0].old[..2], &5_000u16.to_le_bytes());
-    assert_eq!(&ev[0].new[..2], &10_000u16.to_le_bytes());
 }

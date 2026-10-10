@@ -25,7 +25,7 @@ use anchor_spl::token_interface::TokenAccount;
 use crate::{
     constants::{AUTHORITY_SEED, BPS_DENOMINATOR, MAX_FEE_TAKE_BPS, MIN_COVERAGE_RATIO_BPS},
     errors::MutavError,
-    state::{CapsInput, PriceInput},
+    state::CapsInput,
 };
 
 /// Roles are set (non-default) and distinct (spec §2, §5.1).
@@ -44,9 +44,7 @@ pub(crate) fn validate_roles(admin: &Pubkey, operator: &Pubkey, pauser: &Pubkey)
 pub(crate) fn validate_params(
     coverage_ratio_bps: u16,
     fee_take_bps: u16,
-    payout_sla_secs: i64,
     caps: &CapsInput,
-    price: &PriceInput,
 ) -> Result<()> {
     require!(
         fee_take_bps <= MAX_FEE_TAKE_BPS,
@@ -58,22 +56,12 @@ pub(crate) fn validate_params(
         coverage_ratio_bps >= MIN_COVERAGE_RATIO_BPS,
         MutavError::InvalidParameter
     );
-    for bps in [
-        caps.min_settlement_bps,
-        price.max_deviation_bps,
-        price.max_nav_move_bps,
-        price.y_max_bps,
-    ] {
-        require!(bps <= BPS_DENOMINATOR, MutavError::InvalidParameter);
-    }
     require!(
-        caps.min_request <= caps.max_request,
+        caps.max_nav_move_bps <= BPS_DENOMINATOR,
         MutavError::InvalidParameter
     );
-    // A zero window would reset the per-period claim cap on every call.
-    require!(caps.claim_period_secs > 0, MutavError::InvalidParameter);
     require!(
-        payout_sla_secs >= 0 && price.max_staleness_secs >= 0,
+        caps.min_request <= caps.max_request,
         MutavError::InvalidParameter
     );
     Ok(())

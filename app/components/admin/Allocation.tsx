@@ -26,11 +26,11 @@ import {
   ADAPTER_CANDIDATES,
   ADAPTER_SLOTS,
   BPS_MAX,
+  parseBps,
   EXPANSION_STEPS,
   PLANNED_BLOCKER,
   PLANNED_RESERVE_INSTRUCTIONS,
   reserveComposition,
-  settlementFloorRequest,
   type Composition,
 } from "@/lib/reserve-assets";
 
@@ -146,16 +146,17 @@ function PlannedInstructions() {
 function FloorControl({ mode, c }: { mode: Mode; c: Composition }) {
   // Starts blank, and an unchanged value proposes nothing: no no-op proposals.
   const [floor, setFloor] = useState("");
-  const parsed = settlementFloorRequest(floor);
-  const v = parsed ? parsed.minSettlementBps : null;
-  const req = v !== null && v !== c.floorBps ? parsed : null;
+  // TODO(PR 5): the program has no settlement-floor field since ADR 0019 (BRS
+  // only, no adapters); the floor returns with the first adapter. Nothing to propose.
+  const v = parseBps(floor);
+  const req = null;
   const preview = v === null ? null : (BigInt(v) * c.stableAssets + 9_999n) / 10_000n;
   return (
     <AdminAction title="Min held in the settlement token" label="set_config" mode={mode} request={req}>
       <Facts
         now={m(`${fmtPct(c.floorBps)} in BRS (min_settlement_bps)`)}
         bound={m(`0 – ${BPS_MAX} bps · pilot ${BPS_MAX} (100%)`)}
-        does="The minimum share of stable assets held in BRS, the token guarantee fees come in and claim payments go out in. All adapters together may use only the share above it. 100% in the pilot (ADR 0018); it binds once allocate exists."
+        does="The minimum share of stable assets held in BRS, the token guarantee fees come in and claim payments go out in. 100% in the pilot: the program holds BRS only and has no floor field yet (ADR 0018, ADR 0019); it returns with the first adapter."
       />
       <Grid>
         <TextField id="adm-settlement-floor" label="New floor (bps)" value={floor} onChange={setFloor} numeric hint={v === null ? `now ${fmtPct(c.floorBps)} · 0 – ${BPS_MAX} bps` : v === c.floorBps ? "unchanged: nothing to propose" : `${fmtPct(v)} · preview: at least ${fmtBrs(preview!, 0)} in BRS at today's stable assets`} />

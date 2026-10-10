@@ -45,7 +45,6 @@ export type RedeemCancelledEvent = {
   owner: Address;
   seq: bigint;
   sharesReturned: bigint;
-  assetsClaimable: bigint;
 };
 
 export type RedeemCancelledEventArgs = {
@@ -54,7 +53,6 @@ export type RedeemCancelledEventArgs = {
   owner: Address;
   seq: number | bigint;
   sharesReturned: number | bigint;
-  assetsClaimable: number | bigint;
 };
 
 /** Gets the encoder for {@link RedeemCancelledEventArgs} event data. */
@@ -66,7 +64,6 @@ export function getRedeemCancelledEventEncoder(): FixedSizeEncoder<RedeemCancell
       ["owner", getAddressEncoder()],
       ["seq", getU64Encoder()],
       ["sharesReturned", getU64Encoder()],
-      ["assetsClaimable", getU64Encoder()],
     ]),
     [getConstantEncoder(REDEEM_CANCELLED_EVENT_DISCRIMINATOR)],
   );
@@ -81,7 +78,6 @@ export function getRedeemCancelledEventDecoder(): FixedSizeDecoder<RedeemCancell
       ["owner", getAddressDecoder()],
       ["seq", getU64Decoder()],
       ["sharesReturned", getU64Decoder()],
-      ["assetsClaimable", getU64Decoder()],
     ]),
     [getConstantDecoder(REDEEM_CANCELLED_EVENT_DISCRIMINATOR)],
   );

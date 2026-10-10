@@ -80,23 +80,6 @@ impl Book {
             s.remaining_cover_total, total,
             "{ctx}: remaining_cover_total"
         );
-
-        for ag in &self.agencies {
-            if f.svm.get_account(&agency_pda(&f.pdas.config, ag)).is_none() {
-                continue;
-            }
-            let mine: u64 = self
-                .active
-                .iter()
-                .filter(|(_, a)| a == ag)
-                .map(|(id, _)| remaining_cover(&f.guarantee(id)))
-                .sum();
-            assert_eq!(
-                f.agency(ag).outstanding_cover,
-                mine,
-                "{ctx}: agency outstanding_cover"
-            );
-        }
     }
 }
 
@@ -110,7 +93,8 @@ fn run(seed: u64, steps: usize) {
         open: Vec::new(),
     };
     let mut now = clock(&f.svm).unix_timestamp.max(1_750_000_000);
-    let period = f.config().caps.claim_period_secs;
+    // Past the 31-day claim window (ADR 0019).
+    let period = 31 * 86_400;
 
     for step in 0..steps {
         let ctx = format!("seed {seed:#x} step {step}");
@@ -132,8 +116,8 @@ fn run(seed: u64, steps: usize) {
                     .filter(|&i| book.open.iter().all(|(c, _)| c.id != book.active[i].0))
                     .collect();
                 if let Some(&i) = closable.get(rng.below(closable.len().max(1) as u64) as usize) {
-                    let (id, ag) = book.active.swap_remove(i);
-                    f.close_guarantee(id, ag)
+                    let (id, _) = book.active.swap_remove(i);
+                    f.close_guarantee(id)
                         .unwrap_or_else(|e| panic!("{ctx} close: {:?}", e.err));
                 }
             }
@@ -196,8 +180,8 @@ fn run(seed: u64, steps: usize) {
             .unwrap_or_else(|e| panic!("seed {seed:#x} drain: {:?}", e.err));
         book.assert_matches(&f, "drain");
     }
-    for (id, ag) in std::mem::take(&mut book.active) {
-        f.close_guarantee(id, ag)
+    for (id, _) in std::mem::take(&mut book.active) {
+        f.close_guarantee(id)
             .unwrap_or_else(|e| panic!("seed {seed:#x} final close: {:?}", e.err));
     }
     let s = f.state();

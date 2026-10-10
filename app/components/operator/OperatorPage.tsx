@@ -22,8 +22,8 @@ import { useWallet } from "@/components/WalletProvider";
 import { ActionGate, LiveProvider, Note, useLive } from "@/components/demo/shared";
 import { CloseGuaranteeForm, FeeForm, FileClaimForm, IncomeForm, PayClaimList, RegisterForm, SettleList } from "@/components/demo/forms";
 import { usePoll } from "@/lib/client/use-poll";
-import { fmtBps, fmtBrs, fmtDuration, fmtTime } from "@/lib/format";
-import { claimCap, claimCapRefusal, claimWork, DUTIES, payoutsDue } from "@/lib/operator";
+import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
+import { claimCap, claimCapRefusal, claimWork, DUTIES } from "@/lib/operator";
 import type { OperatorHistory } from "@/lib/server/operator";
 import { claimsTimeline, type Ledger, type ReserveView } from "@/lib/view";
 
@@ -95,11 +95,11 @@ const kv = (k: string, v: ReactNode) => (
 function PayBound() {
   const { reserve, ledger } = useLive();
   const cap = claimCap(reserve.config, reserve.state, reserve.now);
-  const filed = claimsTimeline(ledger, reserve.config.payoutSlaSecs, reserve.now).filter((c) => c.stage === "filed");
+  const filed = claimsTimeline(ledger).filter((c) => c.stage === "filed");
   return (
     <Bound>
       {kv("Max per call", fmtBrs(cap.perCall))}
-      {kv("Left in this period", `${fmtBrs(cap.remaining)} of ${fmtBrs(cap.perPeriod)}${cap.windowEnd !== null && !cap.rolled ? ` · window ends ${fmtTime(cap.windowEnd)}` : ""}`)}
+      {kv("Left in the last 31 days", `${fmtBrs(cap.remaining)} of ${fmtBrs(cap.perPeriod)}`)}
       {kv("Liquid BRS in the reserve", fmtBrs(reserve.state.brsBalance))}
       {filed.map((c) => {
         const refusal = claimCapRefusal(cap, c.provision);
@@ -111,19 +111,13 @@ function PayBound() {
 }
 
 function SettleBound() {
-  const { reserve, ledger } = useLive();
-  const due = payoutsDue(claimsTimeline(ledger, reserve.config.payoutSlaSecs, reserve.now), reserve.config.payoutSlaSecs, reserve.now);
+  const { ledger } = useLive();
+  const paid = claimsTimeline(ledger).filter((c) => c.stage === "paid");
   return (
     <Bound>
-      {kv("Payout SLA", fmtDuration(reserve.config.payoutSlaSecs))}
-      {due.length === 0 && <span>No payout waiting for settlement.</span>}
-      {due.map((p) =>
-        kv(
-          `${p.guaranteeId.slice(0, 8)}… ${p.leg} · ${fmtBrs(p.amount, 0)}`,
-          <span style={{ color: p.late ? "var(--color-error)" : "var(--color-text)" }}>{p.late ? `late: was due ${fmtTime(p.dueAt)}` : `${fmtDuration(p.secondsLeft)} left · due ${fmtTime(p.dueAt)}`}</span>,
-        ),
-      )}
-      <span>Settling after the SLA records the payout as late, on-chain.</span>
+      {paid.length === 0 && <span>No paid claim waiting for settlement.</span>}
+      {paid.map((p) => kv(`${p.guaranteeId.slice(0, 8)}… ${p.leg} · ${fmtBrs(p.amount ?? 0n, 0)}`, <span>paid {p.paidAt !== null ? fmtTime(p.paidAt) : "—"}</span>))}
+      <span>The program sets no settlement deadline: the payout SLA is the operator platform&apos;s (ADR 0019).</span>
     </Bound>
   );
 }
@@ -135,7 +129,6 @@ function RegisterBound() {
     <Bound>
       {kv("Free capital (new cover must fit)", fmtBrs(reserve.solvency.freeCapital))}
       {kv("Max cover per guarantee", fmtBrs(c.maxCoverPerGuarantee, 0))}
-      {kv("Max cover per agency", fmtBrs(c.maxCoverPerAgency, 0))}
       {kv("Coverage ratio", fmtBps(reserve.config.coverageRatioBps))}
       <span>Refused while paused or under-covered. The gate preview below replays the rules with the client&apos;s math mirror.</span>
     </Bound>
@@ -147,7 +140,6 @@ function IncomeBound() {
   return (
     <Bound>
       {kv("Income inbox (paid, not swept)", fmtBrs(reserve.incomeInbox.amount))}
-      {kv("Income take to the treasury", fmtBps(reserve.config.incomeTakeBps))}
       <span>
         Nora pays the monthly revenue share into the income inbox (<Explorer value={reserve.incomeInbox.address} />), the vault authority&apos;s BRS account. It counts toward nothing until swept. Sweep exactly the amount on the statement: at most the inbox balance, each statement reference once. The vault authority moves it into the reserve; NAV rises for every holder and no shares are minted. Never paused, never gated.
       </span>
@@ -212,13 +204,13 @@ function Console({ locked }: { locked: boolean }) {
 // ── Live limits, duties, activity, safety ───────────────────────────────────
 
 function Limits({ r, l }: { r: ReserveView; l: Ledger }) {
-  const rows = claimsTimeline(l, r.config.payoutSlaSecs, r.now);
+  const rows = claimsTimeline(l);
   const work = claimWork(rows);
-  const open = rows.filter((c) => c.stage !== "settled" || c.lateOnChain);
+  const open = rows.filter((c) => c.stage !== "settled");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <Mono style={{ fontSize: 12, color: work.late ? "var(--color-error)" : "var(--color-text-2)" }}>
-        {work.toPay} filed, waiting for pay_claim · {work.toSettle} paid, waiting for settle_payout · {work.late} late or past the SLA · late payouts counted by refresh: {r.state.latePayouts}
+      <Mono style={{ fontSize: 12, color: "var(--color-text-2)" }}>
+        {work.toPay} filed, waiting for pay_claim · {work.toSettle} paid, waiting for settle_payout
       </Mono>
       <div className="grid-2">
         <ClaimCapChart cap={claimCap(r.config, r.state, r.now)} />
@@ -227,7 +219,7 @@ function Limits({ r, l }: { r: ReserveView; l: Ledger }) {
           <SolvencyChart s={r.solvency} ratioBps={r.config.coverageRatioBps} compact />
         </div>
       </div>
-      {open.length > 0 ? <ClaimSpeedChart rows={open} slaSecs={r.config.payoutSlaSecs} now={r.now} /> : <Note>No claim is waiting for the operator. Settled claims are on <Link href="/reserve#claims" className="ext-link">/reserve</Link>.</Note>}
+      {open.length > 0 ? <ClaimSpeedChart rows={open} now={r.now} /> : <Note>No claim is waiting for the operator. Settled claims are on <Link href="/reserve#claims" className="ext-link">/reserve</Link>.</Note>}
     </div>
   );
 }
@@ -301,11 +293,11 @@ function Safety({ r }: { r: ReserveView }) {
   );
   return (
     <ul style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 18, maxWidth: 860 }}>
-      {item("Issuer income only moves into the reserve", <>The operator key can move income-inbox BRS only into the reserve (and, with a take, to the whitelisted treasury; 0 in the pilot). At worst a stolen key books a stray transfer as income. No instruction lets anyone take BRS out of the inbox elsewhere.</>)}
-      {item("Caps bound every outflow", <>A stolen operator key can pay claims only to the fixed payments account, at most {fmtBrs(c.maxClaimPerCall, 0)} per call and {fmtBrs(c.maxClaimPerPeriod, 0)} per {fmtDuration(c.claimPeriodSecs)}, and only against filed claims within remaining cover. New guarantees stay inside the per-guarantee and per-agency caps and the solvency gate.</>)}
+      {item("Issuer income only moves into the reserve", <>The operator key can move income-inbox BRS only into the reserve (there is no take on issuer income). At worst a stolen key books a stray transfer as income. No instruction lets anyone take BRS out of the inbox elsewhere.</>)}
+      {item("Caps bound every outflow", <>A stolen operator key can pay claims only to the fixed payments account, at most {fmtBrs(c.maxClaimPerCall, 0)} per call and {fmtBrs(c.maxClaimPerPeriod, 0)} in any 31 days, and only against filed claims within remaining cover. New guarantees stay inside the per-guarantee cap and the solvency gate.</>)}
       {item("The operator cannot touch config or capital", <>Config, caps, roles, the allowlist and the capital queue are Reserve Admin instructions (a time-locked Squads multisig). The operator never signs them.</>)}
       {item("The pauser can revoke it at once", <><Mono>revoke_operator</Mono>, signed by the pauser key or the admin with no time lock, sets the operator to the default key. Every operator instruction then fails, claim payments included, until the Reserve Admin appoints a new key with <Mono>set_roles</Mono>. The pilot binary has no admin-only claim-payment path.</>)}
-      {item("Everything it does is public", <>Every guarantee, fee, claim, payment and settlement is an account on <Link href="/reserve" className="ext-link">/reserve</Link>, with its on-chain timestamps and late flags.</>)}
+      {item("Everything it does is public", <>Every guarantee, fee, claim, payment and settlement is an account on <Link href="/reserve" className="ext-link">/reserve</Link>, with its on-chain timestamps.</>)}
     </ul>
   );
 }

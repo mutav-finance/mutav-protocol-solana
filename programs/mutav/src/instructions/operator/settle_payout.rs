@@ -1,4 +1,6 @@
-//! `settle_payout` (spec §5.4): records the PIX settlement of a payout.
+//! `settle_payout` (spec §5.4): records the PIX settlement of a paid claim on
+//! its `ClaimFiling`. The program sets no settlement deadline: the payout SLA
+//! belongs to the operator platform (ADR 0019).
 
 use anchor_lang::prelude::*;
 
@@ -6,7 +8,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::PayoutSettled,
-    state::{Guarantee, Payout, VaultConfig},
+    state::{ClaimFiling, Guarantee, VaultConfig},
 };
 
 #[event_cpi]
@@ -30,11 +32,11 @@ pub struct SettlePayout<'info> {
 
     #[account(
         mut,
-        seeds = [PAYOUT_SEED, guarantee.key().as_ref(), notice_ref_hash.as_ref()],
-        bump = payout.bump,
-        constraint = payout.is_supported() @ MutavError::UnsupportedVersion,
+        seeds = [CLAIM_SEED, guarantee.key().as_ref(), notice_ref_hash.as_ref()],
+        bump = claim_filing.bump,
+        constraint = claim_filing.is_supported() @ MutavError::UnsupportedVersion,
     )]
-    pub payout: Box<Account<'info, Payout>>,
+    pub claim_filing: Box<Account<'info, ClaimFiling>>,
 }
 
 pub fn handle_settle_payout(
@@ -42,19 +44,15 @@ pub fn handle_settle_payout(
     notice_ref_hash: [u8; 32],
     pix_e2e_hash: [u8; 32],
 ) -> Result<()> {
-    let p = &mut ctx.accounts.payout;
-    require!(p.status == PAYOUT_PENDING, MutavError::PayoutAlreadySettled);
+    let x = &mut ctx.accounts.claim_filing;
+    require!(x.status != CLAIM_SETTLED, MutavError::PayoutAlreadySettled);
+    require!(x.status == CLAIM_PAID, MutavError::ClaimNotPaid);
     require!(pix_e2e_hash != [0; 32], MutavError::InvalidParameter);
 
     let now = Clock::get()?.unix_timestamp;
-    let deadline = p
-        .paid_at
-        .saturating_add(ctx.accounts.config.payout_sla_secs);
-    let late = now > deadline;
-    p.status = PAYOUT_SETTLED;
-    p.pix_e2e_hash = pix_e2e_hash;
-    p.settled_at = now;
-    p.late = late as u8;
+    x.status = CLAIM_SETTLED;
+    x.pix_e2e_hash = pix_e2e_hash;
+    x.settled_at = now;
 
     emit_cpi!(PayoutSettled {
         config: ctx.accounts.config.key(),
@@ -62,7 +60,6 @@ pub fn handle_settle_payout(
         guarantee_id: ctx.accounts.guarantee.id,
         notice_ref_hash,
         pix_e2e_hash,
-        late,
     });
     Ok(())
 }

@@ -29,47 +29,16 @@ fn value_bytes(c: &VaultConfig, id: u16) -> [u8; 32] {
         PAYMENTS_ACCOUNT => c.payments_account.field_bytes(),
         TREASURY_ACCOUNT => c.treasury_account.field_bytes(),
         INVESTOR_ALLOWLIST_ROOT => c.investor_allowlist_root.field_bytes(),
-        PAYOUT_SLA_SECS => c.payout_sla_secs.field_bytes(),
         PAUSED => c.paused.field_bytes(),
         FEATURE_FLAGS => c.feature_flags.field_bytes(),
         MUTAV_CAPITAL_WALLET => c.mutav_capital_wallet.field_bytes(),
-        INCOME_TAKE_BPS => c.income_take_bps.field_bytes(),
         CAPS_MAX_TVL => c.caps.max_tvl.field_bytes(),
         CAPS_MAX_COVER_PER_GUARANTEE => c.caps.max_cover_per_guarantee.field_bytes(),
-        CAPS_MAX_COVER_PER_AGENCY => c.caps.max_cover_per_agency.field_bytes(),
         CAPS_MAX_CLAIM_PER_CALL => c.caps.max_claim_per_call.field_bytes(),
         CAPS_MAX_CLAIM_PER_PERIOD => c.caps.max_claim_per_period.field_bytes(),
-        CAPS_CLAIM_PERIOD_SECS => c.caps.claim_period_secs.field_bytes(),
-        CAPS_MIN_SETTLEMENT_BPS => c.caps.min_settlement_bps().field_bytes(),
         CAPS_MIN_REQUEST => c.caps.min_request.field_bytes(),
         CAPS_MAX_REQUEST => c.caps.max_request.field_bytes(),
-        CAPS_MIN_FILL_ASSETS => c.caps.min_fill_assets.field_bytes(),
-        PRICE_TESOURO_PRICE_ACCOUNT => c.price.tesouro_price_account.field_bytes(),
-        PRICE_P0 => c.price.p0.field_bytes(),
-        PRICE_T0 => c.price.t0.field_bytes(),
-        PRICE_Y_MAX_BPS => c.price.y_max_bps.field_bytes(),
-        PRICE_MAX_STALENESS_SECS => c.price.max_staleness_secs.field_bytes(),
-        PRICE_MAX_DEVIATION_BPS => c.price.max_deviation_bps.field_bytes(),
-        PRICE_MAX_NAV_MOVE_BPS => c.price.max_nav_move_bps.field_bytes(),
-        EXIT_BUFFER_TARGET_BPS => c.exit.buffer_target_bps.field_bytes(),
-        EXIT_BUFFER_HEADROOM_BPS => c.exit.buffer_headroom_bps.field_bytes(),
-        EXIT_BUFFER_RELEASE_AFTER_SECS => c.exit.buffer_release_after_secs.field_bytes(),
-        EXIT_CURVE_VERSION => c.exit.curve_version.field_bytes(),
-        EXIT_H_MIN_BPS => c.exit.h_min_bps.field_bytes(),
-        EXIT_H_PEG_BPS => c.exit.h_peg_bps.field_bytes(),
-        EXIT_H_MAX_BPS => c.exit.h_max_bps.field_bytes(),
-        EXIT_PRESSURE_EPOCH_SECS => c.exit.pressure_epoch_secs.field_bytes(),
-        EXIT_MIN_INSTANT_ASSETS => c.exit.min_instant_assets.field_bytes(),
-        EXIT_MAX_INSTANT_PER_TX => c.exit.max_instant_per_tx.field_bytes(),
-        EXIT_MAX_INSTANT_PER_WALLET => c.exit.max_instant_per_wallet.field_bytes(),
-        EXIT_MAX_INSTANT_PER_PERIOD => c.exit.max_instant_per_period.field_bytes(),
-        EXIT_INSTANT_PERIOD_SECS => c.exit.instant_period_secs.field_bytes(),
-        EXIT_MIN_HOLD_SECS => c.exit.min_hold_secs.field_bytes(),
-        EXIT_MAX_PRICE_AGE_SECS => c.exit.max_price_age_secs.field_bytes(),
-        EXIT_ALLOWLIST_ROOT => c.exit.allowlist_root.field_bytes(),
-        id if (EXIT_BARRED_0..EXIT_BARRED_0 + 4).contains(&id) => {
-            c.exit.barred[(id - EXIT_BARRED_0) as usize].field_bytes()
-        }
+        MAX_NAV_MOVE_BPS => c.caps.max_nav_move_bps.field_bytes(),
         other => panic!("field id {other} has no value mapping in this test"),
     }
 }
@@ -81,44 +50,14 @@ fn change_in_set_config(a: &mut SetConfigArgs, id: u16) -> bool {
     match id {
         COVERAGE_RATIO_BPS => a.coverage_ratio_bps += 1,
         FEE_TAKE_BPS => a.fee_take_bps += 1,
-        PAYOUT_SLA_SECS => a.payout_sla_secs += 1,
         MUTAV_CAPITAL_WALLET => a.mutav_capital_wallet = Pubkey::new_unique(),
         CAPS_MAX_TVL => a.caps.max_tvl += 1,
         CAPS_MAX_COVER_PER_GUARANTEE => a.caps.max_cover_per_guarantee += 1,
-        CAPS_MAX_COVER_PER_AGENCY => a.caps.max_cover_per_agency += 1,
         CAPS_MAX_CLAIM_PER_CALL => a.caps.max_claim_per_call += 1,
         CAPS_MAX_CLAIM_PER_PERIOD => a.caps.max_claim_per_period += 1,
-        CAPS_CLAIM_PERIOD_SECS => a.caps.claim_period_secs += 1,
-        CAPS_MIN_SETTLEMENT_BPS => a.caps.min_settlement_bps += 1,
         CAPS_MIN_REQUEST => a.caps.min_request += 1,
         CAPS_MAX_REQUEST => a.caps.max_request += 1,
-        CAPS_MIN_FILL_ASSETS => a.caps.min_fill_assets += 1,
-        PRICE_TESOURO_PRICE_ACCOUNT => a.price.tesouro_price_account = Pubkey::new_unique(),
-        PRICE_P0 => a.price.p0 += 1,
-        PRICE_T0 => a.price.t0 += 1,
-        PRICE_Y_MAX_BPS => a.price.y_max_bps += 1,
-        PRICE_MAX_STALENESS_SECS => a.price.max_staleness_secs += 1,
-        PRICE_MAX_DEVIATION_BPS => a.price.max_deviation_bps += 1,
-        PRICE_MAX_NAV_MOVE_BPS => a.price.max_nav_move_bps += 1,
-        EXIT_BUFFER_TARGET_BPS => a.exit.buffer_target_bps += 1,
-        EXIT_BUFFER_HEADROOM_BPS => a.exit.buffer_headroom_bps += 1,
-        EXIT_BUFFER_RELEASE_AFTER_SECS => a.exit.buffer_release_after_secs += 1,
-        EXIT_CURVE_VERSION => a.exit.curve_version += 1,
-        EXIT_H_MIN_BPS => a.exit.h_min_bps += 1,
-        EXIT_H_PEG_BPS => a.exit.h_peg_bps += 1,
-        EXIT_H_MAX_BPS => a.exit.h_max_bps += 1,
-        EXIT_PRESSURE_EPOCH_SECS => a.exit.pressure_epoch_secs += 1,
-        EXIT_MIN_INSTANT_ASSETS => a.exit.min_instant_assets += 1,
-        EXIT_MAX_INSTANT_PER_TX => a.exit.max_instant_per_tx += 1,
-        EXIT_MAX_INSTANT_PER_WALLET => a.exit.max_instant_per_wallet += 1,
-        EXIT_MAX_INSTANT_PER_PERIOD => a.exit.max_instant_per_period += 1,
-        EXIT_INSTANT_PERIOD_SECS => a.exit.instant_period_secs += 1,
-        EXIT_MIN_HOLD_SECS => a.exit.min_hold_secs += 1,
-        EXIT_MAX_PRICE_AGE_SECS => a.exit.max_price_age_secs += 1,
-        EXIT_ALLOWLIST_ROOT => a.exit.allowlist_root = [1; 32],
-        id if (EXIT_BARRED_0..EXIT_BARRED_0 + 4).contains(&id) => {
-            a.exit.barred[(id - EXIT_BARRED_0) as usize] = Pubkey::new_unique()
-        }
+        MAX_NAV_MOVE_BPS => a.caps.max_nav_move_bps += 1,
         _ => return false,
     }
     true
@@ -187,14 +126,6 @@ fn change_field(f: &mut Fixture, id: u16) -> litesvm::types::TransactionMetadata
             args.feature_flags = 0;
             f.set_config(args)
         }
-        // `MAX_INCOME_TAKE_BPS` is 0 in this binary (ADR 0017, cap TBD), so
-        // the only value `set_config` accepts is 0: inject a take as a later
-        // binary could have set it, then clear it.
-        field::INCOME_TAKE_BPS => {
-            let mut args = set_config_args(&f.config());
-            args.income_take_bps = 0;
-            f.set_config(args)
-        }
         id => {
             let mut args = set_config_args(&f.config());
             assert!(
@@ -220,11 +151,6 @@ fn every_mutable_config_field_emits_config_updated() {
     for row in CONFIG_FIELDS {
         if row.id == field::FEATURE_FLAGS {
             inject_feature_flags(&mut f, INSTANT_EXIT);
-        }
-        if row.id == field::INCOME_TAKE_BPS {
-            let mut c = f.config();
-            c.income_take_bps = 500;
-            f.write_config(&c);
         }
         let before = f.config();
         // Every row maps to a value (catches a table entry with no field).

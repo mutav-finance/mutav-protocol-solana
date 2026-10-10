@@ -11,7 +11,7 @@ use crate::{
     events::FeesContributed,
     math::{mul_div, Rounding},
     pricing::inflow_nav,
-    state::{FeeReceipt, VaultConfig, VaultState},
+    state::{IncomeReceipt, VaultConfig, VaultState},
 };
 
 #[event_cpi]
@@ -35,14 +35,16 @@ pub struct ContributeFees<'info> {
     )]
     pub state: Box<Account<'info, VaultState>>,
 
+    /// The fee's `IncomeReceipt` (kind `FEE`): one per invoice, so a second
+    /// contribution of the same invoice fails here.
     #[account(
         init,
         payer = payer,
-        space = FEE_RECEIPT_SIZE,
+        space = INCOME_RECEIPT_SIZE,
         seeds = [FEE_SEED, config.key().as_ref(), invoice_ref_hash.as_ref()],
         bump,
     )]
-    pub fee_receipt: Box<Account<'info, FeeReceipt>>,
+    pub fee_receipt: Box<Account<'info, IncomeReceipt>>,
 
     /// The operator's own BRS token account (fees reach it via PIX → BRS).
     /// Must be owned by the operator: spending through a delegate is refused
@@ -78,8 +80,7 @@ pub fn handle_contribute_fees(
     invoice_ref_hash: [u8; 32],
     amount: u64,
 ) -> Result<()> {
-    // Never paused, never solvency-gated (ADR 0009). Reads neither the price
-    // nor `buffer_earmark` (spec §4 ratchet scope).
+    // Never paused, never solvency-gated (ADR 0009).
     require!(amount > 0, MutavError::InvalidParameter);
 
     let take = mul_div(
@@ -124,7 +125,8 @@ pub fn handle_contribute_fees(
     let r = &mut ctx.accounts.fee_receipt;
     r.version = PROGRAM_LAYOUT_VERSION;
     r.bump = ctx.bumps.fee_receipt;
-    r.invoice_ref_hash = invoice_ref_hash;
+    r.kind = INCOME_KIND_FEE;
+    r.ref_hash = invoice_ref_hash;
     r.gross = amount;
     r.take = take;
     r.net = net;

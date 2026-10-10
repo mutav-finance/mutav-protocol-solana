@@ -70,8 +70,8 @@ function Emergency({ mode }: { mode: Mode }) {
         <ConfigCard
           title="NAV-move guard"
           mode={mode}
-          fields={[bpsField("maxNavMoveBps", "Max NAV move per refresh (bps)", reserve.config.price.maxNavMoveBps, 10_000)]}
-          build={(v) => ({ kind: "set_config", price: { maxNavMoveBps: v.maxNavMoveBps as number } })}
+          fields={[bpsField("maxNavMoveBps", "Max NAV move per refresh (bps)", reserve.config.caps.maxNavMoveBps, 10_000)]}
+          build={(v) => ({ kind: "set_config", maxNavMoveBps: v.maxNavMoveBps as number })}
           bound="0–10000 bps"
           does="If NAV per share moves more than this in one refresh (net of fees and swept income), refresh sets fulfil_halted and both capital queues stop until clear_fulfil_halt. Lower it for the real pilot; the devnet example uses 100%."
         />
@@ -110,15 +110,14 @@ function CoverageControl({ mode }: { mode: Mode }) {
         bpsField("coverageRatioBps", "Coverage ratio c (bps)", c.coverageRatioBps, 65_535, MIN_COVERAGE_RATIO_BPS),
         brsField("maxTvl", "Max reserve (BRS)", c.caps.maxTvl),
         brsField("maxCoverPerGuarantee", "Max cover per guarantee (BRS)", c.caps.maxCoverPerGuarantee),
-        brsField("maxCoverPerAgency", "Max cover per agency (BRS)", c.caps.maxCoverPerAgency),
       ]}
       build={(v) => {
         const caps: Record<string, bigint> = {};
-        for (const k of ["maxTvl", "maxCoverPerGuarantee", "maxCoverPerAgency"]) if (v[k] !== undefined) caps[k] = v[k] as bigint;
+        for (const k of ["maxTvl", "maxCoverPerGuarantee"]) if (v[k] !== undefined) caps[k] = v[k] as bigint;
         return { kind: "set_config", coverageRatioBps: v.coverageRatioBps as number | undefined, caps };
       }}
       bound={`c ≥ ${fmtBps(MIN_COVERAGE_RATIO_BPS)} (ADR 0016)`}
-      does="c sizes the reserve against the book: coverage required = c × remaining cover (never below open provisions). The limits bound the reserve and each guarantee and agency."
+      does="c sizes the reserve against the book: coverage required = c × remaining cover (never below open provisions). The limits bound the reserve and each guarantee."
     />
   );
 }
@@ -132,7 +131,6 @@ function CoverageTable() {
         [<Meaning key="c" label="Coverage ratio c">Share of remaining cover the reserve must hold in stable assets (≥ 10%, ADR 0016).</Meaning>, m(fmtBps(c.coverageRatioBps))],
         [<Meaning key="t" label="Max reserve (TVL)">fulfil_deposits stops at this size.</Meaning>, m(fmtBrs(c.caps.maxTvl, 0))],
         [<Meaning key="g" label="Max cover per guarantee">register_guarantee refuses a larger lease.</Meaning>, m(fmtBrs(c.caps.maxCoverPerGuarantee, 0))],
-        [<Meaning key="a" label="Max cover per agency">register_guarantee refuses beyond it per agency.</Meaning>, m(fmtBrs(c.caps.maxCoverPerAgency, 0))],
         ["Feature flags", m(`0x${c.featureFlags.toString(16)}${c.featureFlags === 0n ? " (none: pilot)" : ""}`)],
       ]}
     />

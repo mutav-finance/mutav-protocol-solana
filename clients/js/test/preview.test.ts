@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  INSTANT_EXIT,
   NAV_SCALE,
   previewDepositFulfil,
   previewRedeemFulfil,
@@ -17,16 +16,15 @@ function reserve(over: Partial<ReturnType<typeof blankState>> = {}) {
 }
 
 describe('solvencyFromAccounts', () => {
-  test('reads the snapshot the program reads (pilot: no earmark)', () => {
+  test('reads the snapshot the program reads (BRS only)', () => {
     const { config, state } = reserve({
       brsBalance: 100_000n * BRL,
       remainingCoverTotal: 60_000n * BRL,
       provisions: 5_000n * BRL,
-      bufferEarmark: 7n, // injected; flag clear, so no effect
     });
     const s = solvencyFromAccounts(config, state);
     expect(s.surplus).toBe(40_000n * BRL);
-    expect(s.earmarkEff).toBe(0n);
+    expect(s.stableAssets).toBe(100_000n * BRL);
     expect(s.freeCapital).toBe(s.surplus);
     expect(s.liquidBudget).toBe(95_000n * BRL);
     expect(s.netAssets).toBe(95_000n * BRL);
@@ -47,12 +45,6 @@ describe('solvencyFromAccounts', () => {
     expect(low.freeCapital).toBe(4_000n * BRL);
   });
 
-  test('applies the earmark when the flag is set', () => {
-    const { config, state } = reserve({ brsBalance: 100n, bufferEarmark: 30n });
-    const s = solvencyFromAccounts({ ...config, featureFlags: INSTANT_EXIT }, state);
-    expect(s.earmarkEff).toBe(30n);
-    expect(s.freeCapital).toBe(70n);
-  });
 });
 
 describe('previewDepositFulfil', () => {
@@ -83,9 +75,9 @@ describe('previewRedeemFulfil (whole fills only)', () => {
   test('fills FIFO while each fits free capital', () => {
     const { config, state } = base();
     const r = previewRedeemFulfil(config, state, [
-      { seq: 0n, sharesRemaining: 1_000n, requestedAt: 0n },
-      { seq: 1n, sharesRemaining: 1_500n, requestedAt: 0n },
-      { seq: 2n, sharesRemaining: 1_000n, requestedAt: 0n },
+      { seq: 0n, shares: 1_000n },
+      { seq: 1n, shares: 1_500n },
+      { seq: 2n, shares: 1_000n },
     ]);
     // free capital 3,000: 1,000 then 1,500 fit; 1,000 more does not (500 left).
     expect(r.fills.map((f) => f.seq)).toEqual([0n, 1n]);
@@ -98,7 +90,7 @@ describe('previewRedeemFulfil (whole fills only)', () => {
     const r = previewRedeemFulfil(
       config,
       state,
-      [{ seq: 0n, sharesRemaining: 1_000n, requestedAt: 0n }],
+      [{ seq: 0n, shares: 1_000n }],
       { maxAssets: 999n },
     );
     expect(r.fills).toEqual([]);
@@ -107,13 +99,13 @@ describe('previewRedeemFulfil (whole fills only)', () => {
 
   test('a request worth nothing stops the batch', () => {
     const { config, state } = reserve({ brsBalance: 1n, sharesOutstanding: 1_000_000n });
-    const r = previewRedeemFulfil(config, state, [{ seq: 0n, sharesRemaining: 1n, requestedAt: 0n }]);
+    const r = previewRedeemFulfil(config, state, [{ seq: 0n, shares: 1n }]);
     expect(r.stoppedBy).toBe('RequestTooSmall');
   });
 
   test('stops at count', () => {
     const { config, state } = base();
-    const reqs = [0n, 1n, 2n].map((seq) => ({ seq, sharesRemaining: 10n, requestedAt: 0n }));
+    const reqs = [0n, 1n, 2n].map((seq) => ({ seq, shares: 10n }));
     const r = previewRedeemFulfil(config, state, reqs, { count: 2 });
     expect(r.fills.length).toBe(2);
     expect(r.stoppedBy).toBeNull();
@@ -138,7 +130,7 @@ describe('previewRedeemFulfil (whole fills only)', () => {
     const c = { ...config, coverageRatioBps: 1_000 };
     const sol = solvencyFromAccounts(c, state);
     expect([sol.coverageRequired, sol.freeCapital, sol.liquidBudget]).toEqual([9_000n, 1_000n, 1_000n]);
-    const reqs = [0n, 1n].map((seq) => ({ seq, sharesRemaining: 600n, requestedAt: 0n }));
+    const reqs = [0n, 1n].map((seq) => ({ seq, shares: 600n }));
     const r = previewRedeemFulfil(c, state, reqs);
     // floor(600 × 1,001 / 1,201) = 500, then floor(600 × 501 / 601) = 500.
     expect(r.fills.map((f) => f.assets)).toEqual([500n, 500n]);

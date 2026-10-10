@@ -60,7 +60,6 @@ export type CloseGuaranteeInstruction<
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
   TAccountGuarantee extends string | AccountMeta<string> = string,
-  TAccountAgencyExposure extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -81,9 +80,6 @@ export type CloseGuaranteeInstruction<
       TAccountGuarantee extends string
         ? WritableAccount<TAccountGuarantee>
         : TAccountGuarantee,
-      TAccountAgencyExposure extends string
-        ? WritableAccount<TAccountAgencyExposure>
-        : TAccountAgencyExposure,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -133,8 +129,6 @@ export type CloseGuaranteeAsyncInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -143,7 +137,6 @@ export type CloseGuaranteeAsyncInput<
   config: TAccountConfig;
   state?: TAccountState;
   guarantee?: TAccountGuarantee;
-  agencyExposure: TAccountAgencyExposure;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   id: CloseGuaranteeInstructionDataArgs["id"];
@@ -154,7 +147,6 @@ export async function getCloseGuaranteeInstructionAsync<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -164,7 +156,6 @@ export async function getCloseGuaranteeInstructionAsync<
     TAccountConfig,
     TAccountState,
     TAccountGuarantee,
-    TAccountAgencyExposure,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -187,10 +178,6 @@ export async function getCloseGuaranteeInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountGuarantee,
       InstructionAccountInputAddress<TAccountGuarantee>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountAgencyExposure,
-      InstructionAccountInputAddress<TAccountAgencyExposure>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -219,11 +206,6 @@ export async function getCloseGuaranteeInstructionAsync<
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
     guarantee: {
       value: input.guarantee ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
-    agencyExposure: {
-      value: input.agencyExposure ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -277,7 +259,6 @@ export async function getCloseGuaranteeInstructionAsync<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("guarantee", accounts.guarantee),
-      getAccountMeta("agencyExposure", accounts.agencyExposure),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -304,10 +285,6 @@ export async function getCloseGuaranteeInstructionAsync<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountAgencyExposure,
-      InstructionAccountInputAddress<TAccountAgencyExposure>
-    >,
-    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -323,8 +300,6 @@ export type CloseGuaranteeInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -333,7 +308,6 @@ export type CloseGuaranteeInput<
   config: TAccountConfig;
   state: TAccountState;
   guarantee: TAccountGuarantee;
-  agencyExposure: TAccountAgencyExposure;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   id: CloseGuaranteeInstructionDataArgs["id"];
@@ -344,7 +318,6 @@ export function getCloseGuaranteeInstruction<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -354,7 +327,6 @@ export function getCloseGuaranteeInstruction<
     TAccountConfig,
     TAccountState,
     TAccountGuarantee,
-    TAccountAgencyExposure,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -376,10 +348,6 @@ export function getCloseGuaranteeInstruction<
   ResolvedInstructionAccountMeta<
     TAccountGuarantee,
     InstructionAccountInputAddress<TAccountGuarantee>
-  >,
-  ResolvedInstructionAccountMeta<
-    TAccountAgencyExposure,
-    InstructionAccountInputAddress<TAccountAgencyExposure>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -410,11 +378,6 @@ export function getCloseGuaranteeInstruction<
       isSigner: false,
       isWritable: true,
     },
-    agencyExposure: {
-      value: input.agencyExposure ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -440,7 +403,6 @@ export function getCloseGuaranteeInstruction<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("guarantee", accounts.guarantee),
-      getAccountMeta("agencyExposure", accounts.agencyExposure),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -467,10 +429,6 @@ export function getCloseGuaranteeInstruction<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountAgencyExposure,
-      InstructionAccountInputAddress<TAccountAgencyExposure>
-    >,
-    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -491,9 +449,8 @@ export type ParsedCloseGuaranteeInstruction<
     config: TAccountMetas[1];
     state: TAccountMetas[2];
     guarantee: TAccountMetas[3];
-    agencyExposure: TAccountMetas[4];
-    eventAuthority: TAccountMetas[5];
-    program: TAccountMetas[6];
+    eventAuthority: TAccountMetas[4];
+    program: TAccountMetas[5];
   };
   data: CloseGuaranteeInstructionData;
 };
@@ -506,12 +463,12 @@ export function parseCloseGuaranteeInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCloseGuaranteeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 7) {
+  if (instruction.accounts.length < 6) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 7,
+        expectedAccountMetas: 6,
       },
     );
   }
@@ -528,7 +485,6 @@ export function parseCloseGuaranteeInstruction<
       config: getNextAccount(),
       state: getNextAccount(),
       guarantee: getNextAccount(),
-      agencyExposure: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

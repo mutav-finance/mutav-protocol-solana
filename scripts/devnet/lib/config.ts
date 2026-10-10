@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { address, type Address } from '@solana/kit';
-import type { CapsInputArgs, PriceInputArgs } from '../../../clients/js/src';
+import type { CapsInputArgs } from '../../../clients/js/src';
 
 export type DeployConfig = {
   cluster: 'localnet' | 'devnet';
@@ -28,19 +28,16 @@ export type DeployConfig = {
   paymentsAccount: Address;
   coverageRatioBps: number;
   feeTakeBps: number;
-  payoutSlaSecs: bigint;
   caps: CapsInputArgs & {
     maxTvl: bigint;
     maxCoverPerGuarantee: bigint;
-    maxCoverPerAgency: bigint;
     maxClaimPerCall: bigint;
+    /** Per 31-day window (ADR 0019). */
     maxClaimPerPeriod: bigint;
-    claimPeriodSecs: bigint;
     minRequest: bigint;
     maxRequest: bigint;
-    minFillAssets: bigint;
+    maxNavMoveBps: number;
   };
-  price: PriceInputArgs & { p0: bigint; t0: bigint; maxStalenessSecs: bigint };
   /** Owners allowlisted for `request_deposit` / `request_redeem`. */
   allowlist: Address[];
 };
@@ -102,27 +99,14 @@ export function parseConfig(raw: any): DeployConfig {
     paymentsAccount: addr(raw.paymentsAccount, 'paymentsAccount'),
     coverageRatioBps: int(raw.coverageRatioBps, 'coverageRatioBps', 65_535),
     feeTakeBps: int(raw.feeTakeBps, 'feeTakeBps', 65_535),
-    payoutSlaSecs: big(raw.payoutSlaSecs, 'payoutSlaSecs'),
     caps: {
       maxTvl: big(raw.caps?.maxTvl, 'caps.maxTvl'),
       maxCoverPerGuarantee: big(raw.caps?.maxCoverPerGuarantee, 'caps.maxCoverPerGuarantee'),
-      maxCoverPerAgency: big(raw.caps?.maxCoverPerAgency, 'caps.maxCoverPerAgency'),
       maxClaimPerCall: big(raw.caps?.maxClaimPerCall, 'caps.maxClaimPerCall'),
       maxClaimPerPeriod: big(raw.caps?.maxClaimPerPeriod, 'caps.maxClaimPerPeriod'),
-      claimPeriodSecs: big(raw.caps?.claimPeriodSecs, 'caps.claimPeriodSecs'),
-      minSettlementBps: bps(raw.caps?.minSettlementBps, 'caps.minSettlementBps'),
       minRequest: big(raw.caps?.minRequest, 'caps.minRequest'),
       maxRequest: big(raw.caps?.maxRequest, 'caps.maxRequest'),
-      minFillAssets: big(raw.caps?.minFillAssets, 'caps.minFillAssets'),
-    },
-    price: {
-      tesouroPriceAccount: addr(raw.price?.tesouroPriceAccount, 'price.tesouroPriceAccount'),
-      p0: big(raw.price?.p0, 'price.p0'),
-      t0: big(raw.price?.t0, 'price.t0'),
-      yMaxBps: bps(raw.price?.yMaxBps, 'price.yMaxBps'),
-      maxStalenessSecs: big(raw.price?.maxStalenessSecs, 'price.maxStalenessSecs'),
-      maxDeviationBps: bps(raw.price?.maxDeviationBps, 'price.maxDeviationBps'),
-      maxNavMoveBps: bps(raw.price?.maxNavMoveBps, 'price.maxNavMoveBps'),
+      maxNavMoveBps: bps(raw.caps?.maxNavMoveBps, 'caps.maxNavMoveBps'),
     },
     allowlist: (raw.allowlist ?? []).map((a: unknown, i: number) => addr(a, `allowlist[${i}]`)),
   };
@@ -131,8 +115,6 @@ export function parseConfig(raw: any): DeployConfig {
   if (c.feeTakeBps > 3_000) throw new Error('feeTakeBps must be <= 3000 (program maximum, 30%)');
   if (c.coverageRatioBps < 1_000) throw new Error('coverageRatioBps must be >= 1000 (program minimum, c = 0.10; ADR 0016)');
   if (c.caps.minRequest > c.caps.maxRequest) throw new Error('caps.minRequest must be <= caps.maxRequest');
-  if (c.caps.claimPeriodSecs <= 0n) throw new Error('caps.claimPeriodSecs must be > 0');
-  if (c.payoutSlaSecs < 0n || c.price.maxStalenessSecs < 0n) throw new Error('durations must be >= 0');
   const roles = [c.admin, c.operator, c.pauser];
   if (new Set(roles).size !== 3) throw new Error('admin, operator and pauser must be distinct');
   if (c.treasuryAccount === c.paymentsAccount) throw new Error('treasuryAccount and paymentsAccount must differ');

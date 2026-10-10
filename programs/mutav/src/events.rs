@@ -168,24 +168,6 @@ pub struct AllowlistRootUpdated {
 }
 
 #[event]
-pub struct AdapterWhitelisted {
-    pub config: Pubkey,
-    pub ts: i64,
-    pub program_id: Pubkey,
-    pub asset_mint: Pubkey,
-    pub cap: u64,
-}
-
-#[event]
-pub struct AdapterRemoved {
-    pub config: Pubkey,
-    pub ts: i64,
-    pub program_id: Pubkey,
-    pub asset_mint: Pubkey,
-    pub cap: u64,
-}
-
-#[event]
 pub struct Paused {
     pub config: Pubkey,
     pub ts: i64,
@@ -210,7 +192,6 @@ pub struct GuaranteeRegistered {
     pub id: [u8; 32],
     pub agency_id: [u8; 32],
     pub refs_hash: [u8; 32],
-    pub rent: u64,
     pub default_cover: u64,
     pub exit_cover: u64,
 }
@@ -241,9 +222,7 @@ pub struct IncomeSwept {
     pub ts: i64,
     pub income_ref_hash: [u8; 32],
     pub period: u32,
-    pub gross: u64,
-    pub take: u64,
-    pub net: u64,
+    pub amount: u64,
     pub inbox_after: u64,
 }
 
@@ -275,34 +254,6 @@ pub struct PayoutSettled {
     pub guarantee_id: [u8; 32],
     pub notice_ref_hash: [u8; 32],
     pub pix_e2e_hash: [u8; 32],
-    pub late: bool,
-}
-
-#[event]
-pub struct PayoutLate {
-    pub config: Pubkey,
-    pub ts: i64,
-    pub guarantee_id: [u8; 32],
-    pub notice_ref_hash: [u8; 32],
-    pub paid_at: i64,
-}
-
-#[event]
-pub struct ClaimNoticeFlagged {
-    pub config: Pubkey,
-    pub ts: i64,
-    pub guarantee_id: [u8; 32],
-    pub notice_ref_hash: [u8; 32],
-}
-
-/// `reason`: `constants::NOTICE_CLOSED_*`.
-#[event]
-pub struct ClaimNoticeClosed {
-    pub config: Pubkey,
-    pub ts: i64,
-    pub guarantee_id: [u8; 32],
-    pub notice_ref_hash: [u8; 32],
-    pub reason: u8,
 }
 
 // ---------------------------------------------------------------------------
@@ -363,11 +314,9 @@ pub struct RedeemFilled {
     pub ts: i64,
     pub owner: Pubkey,
     pub seq: u64,
-    pub shares_filled: u64,
+    pub shares: u64,
     pub assets: u64,
     pub nav: u64,
-    pub shares_remaining: u64,
-    pub partial: bool,
 }
 
 /// One per `fulfil_redeems` batch.
@@ -380,7 +329,6 @@ pub struct RedeemsFulfilled {
     pub shares: u64,
     pub assets: u64,
     pub nav: u64,
-    pub head_partial: bool,
     pub idle_free_capital: u64,
 }
 
@@ -391,7 +339,6 @@ pub struct RedeemCancelled {
     pub owner: Pubkey,
     pub seq: u64,
     pub shares_returned: u64,
-    pub assets_claimable: u64,
 }
 
 #[event]
@@ -401,7 +348,6 @@ pub struct AssetsClaimed {
     pub owner: Pubkey,
     pub seq: u64,
     pub assets: u64,
-    pub closed: bool,
 }
 
 #[event]
@@ -417,37 +363,15 @@ pub struct QueueHeadsAdvanced {
 // ---------------------------------------------------------------------------
 
 #[event]
-pub struct Allocated {
-    pub config: Pubkey,
-    pub ts: i64,
-    pub adapter: Pubkey,
-    pub brs_out: u64,
-    pub tesouro_in: u64,
-}
-
-#[event]
-pub struct Deallocated {
-    pub config: Pubkey,
-    pub ts: i64,
-    pub adapter: Pubkey,
-    pub tesouro_out: u64,
-    pub brs_in: u64,
-}
-
-#[event]
 pub struct StateRefreshed {
     pub config: Pubkey,
     pub ts: i64,
     pub stable_assets: u64,
     pub coverage_required: u64,
     pub surplus: u64,
-    pub buffer_earmark: u64,
-    pub free_capital: u64,
     pub provisions: u64,
     pub nav_per_share: u64,
     pub mode: u8,
-    pub tesouro_price: u64,
-    pub price_stale: bool,
 }
 
 #[event]

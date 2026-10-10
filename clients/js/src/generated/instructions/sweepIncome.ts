@@ -217,8 +217,9 @@ export type SweepIncomeAsyncInput<
   incomeInbox: TAccountIncomeInbox;
   reserve?: TAccountReserve;
   /**
-   * The whitelisted MUTAV treasury: receives the take when
-   * `income_take_bps > 0`.
+   * The whitelisted MUTAV treasury. Receives nothing: there is no take on
+   * issuer income (ADR 0019). Kept in the account list until the
+   * interface change that drops it.
    */
   treasuryAccount: TAccountTreasuryAccount;
   /**
@@ -585,8 +586,9 @@ export type SweepIncomeInput<
   incomeInbox: TAccountIncomeInbox;
   reserve: TAccountReserve;
   /**
-   * The whitelisted MUTAV treasury: receives the take when
-   * `income_take_bps > 0`.
+   * The whitelisted MUTAV treasury. Receives nothing: there is no take on
+   * issuer income (ADR 0019). Kept in the account list until the
+   * interface change that drops it.
    */
   treasuryAccount: TAccountTreasuryAccount;
   /**
@@ -887,8 +889,9 @@ export type ParsedSweepIncomeInstruction<
     incomeInbox: TAccountMetas[4];
     reserve: TAccountMetas[5];
     /**
-     * The whitelisted MUTAV treasury: receives the take when
-     * `income_take_bps > 0`.
+     * The whitelisted MUTAV treasury. Receives nothing: there is no take on
+     * issuer income (ADR 0019). Kept in the account list until the
+     * interface change that drops it.
      */
     treasuryAccount: TAccountMetas[6];
     /**

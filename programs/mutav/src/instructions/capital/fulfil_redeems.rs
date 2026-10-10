@@ -1,6 +1,6 @@
-//! `fulfil_redeems(count, max_assets)` (spec §5.5; ADR 0010). Admin. Strict
-//! FIFO from `redeem_head`, out of `free_capital` and `liquid_budget` only,
-//! each fill at its own NAV.
+//! `fulfil_redeems(count, max_assets)` (spec §5.5). Admin. Strict FIFO from
+//! `redeem_head`, out of `free_capital` and `liquid_budget` only, whole fills
+//! each at its own NAV.
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -16,7 +16,7 @@ use crate::{
     events::{RedeemFilled, RedeemsFulfilled},
     instructions::capital::{load_slot, redeem_request_address, store, Slot},
     math::{assets_for, conversion_nav},
-    solvency::{head_starved, Solvency, SolvencyInputs},
+    solvency::{Solvency, SolvencyInputs},
     state::{RedeemRequest, VaultConfig, VaultState},
 };
 
@@ -104,31 +104,19 @@ pub fn handle_fulfil_redeems(
         count > 0 && count <= MAX_FULFIL_BATCH,
         MutavError::InvalidParameter
     );
-    // TODO(plan: claim notices deferred) — no pilot instruction raises
-    // `pending_notices` yet, so this gate always passes; it stays in place for
-    // `flag_claim_notice`.
-    require!(state.pending_notices == 0, MutavError::ClaimNoticePending);
     require!(state.mode == MODE_NORMAL, MutavError::UnderCovered);
     require!(!state.fulfil_halted, MutavError::FulfilHalted);
-    // TODO(plan: TESOURO pricing built later, Tasks 8–9) — no price source is
-    // read yet, so any TESOURO position fails closed with `StalePrice`.
-    require!(state.tesouro_units == 0, MutavError::StalePrice);
 
-    let snapshot = |brs_balance: u64, head_starved: bool| {
+    let snapshot = |brs_balance: u64| {
         Solvency::compute(&SolvencyInputs {
             brs_balance,
-            tesouro_units: state.tesouro_units,
-            tesouro_price: state.tesouro_price,
             remaining_cover_total: state.remaining_cover_total,
             coverage_ratio_bps: config.coverage_ratio_bps,
             provisions: state.provisions,
-            buffer_earmark: state.buffer_earmark,
-            feature_flags: config.feature_flags,
-            head_starved,
         })
     };
     require!(
-        !snapshot(state.brs_balance, false)?.under_covered(),
+        !snapshot(state.brs_balance)?.under_covered(),
         MutavError::UnderCovered
     );
 
@@ -140,7 +128,6 @@ pub fn handle_fulfil_redeems(
     let mut shares_outstanding = state.shares_outstanding;
     let (mut paid, mut burned) = (0u64, 0u64);
     let mut fills: Vec<Fill> = Vec::with_capacity(count as usize);
-    let mut earmark_eff: Option<u64> = None;
     let mut blocked: Option<MutavError> = None;
 
     for info in ctx.remaining_accounts.iter() {
@@ -158,35 +145,26 @@ pub fn handle_fulfil_redeems(
         };
         require!(r.is_supported(), MutavError::UnsupportedVersion);
         require!(r.seq == seq, MutavError::QueueOrderViolation);
-        if r.shares_remaining == 0 {
-            // Filled or cancelled: dead for the queue.
+        if r.status != REDEEM_PENDING {
+            // Filled: dead for the queue.
             seq += 1;
             continue;
         }
 
-        // The live head. Budget recomputed before every fill; the head is
-        // passed, so the starvation term applies (spec §4).
-        let starved = head_starved(
-            now,
-            Some(r.requested_at),
-            config.exit.buffer_release_after_secs,
-        );
-        let sol = snapshot(brs_balance, starved)?;
-        earmark_eff = Some(sol.earmark_eff);
+        // The live head. Budget recomputed before every fill.
+        let sol = snapshot(brs_balance)?;
         let admin_left = max_assets - paid; // paid ≤ max_assets by construction
         let budget = admin_left.min(sol.free_capital).min(sol.liquid_budget);
-        let value = assets_for(r.shares_remaining, shares_outstanding, sol.net_assets)?;
+        let value = assets_for(r.shares, shares_outstanding, sol.net_assets)?;
         if value == 0 {
-            // Worth nothing at this NAV: no fill. A fill always leaves
-            // `assets_claimable > 0` (spec §3.8); a 0-asset fill would strand
-            // a `Filled` account. Stop the batch with the head untouched.
+            // Worth nothing at this NAV: no fill. Stop the batch with the head
+            // untouched.
             blocked = Some(MutavError::RequestTooSmall);
             break;
         }
         if value > budget {
-            // TODO(plan: partial fills deferred, ADR 0010) — the pilot fills
-            // whole requests only: a head that does not fit stops the batch
-            // and is left untouched. Partial fills size `fill_max` here.
+            // Whole fills only (ADR 0019): a head that does not fit stops the
+            // batch and is left untouched.
             blocked = Some(nothing_filled_error(
                 admin_left,
                 sol.free_capital,
@@ -197,26 +175,11 @@ pub fn handle_fulfil_redeems(
 
         // Whole fill at the NAV of this fill.
         let nav = conversion_nav(shares_outstanding, sol.net_assets)?;
-        let shares = r.shares_remaining;
-        r.shares_remaining = 0;
-        r.shares_filled = r
-            .shares_filled
-            .checked_add(shares)
-            .ok_or(MutavError::MathOverflow)?;
-        r.assets_filled = r
-            .assets_filled
-            .checked_add(value)
-            .ok_or(MutavError::MathOverflow)?;
-        r.assets_claimable = r
-            .assets_claimable
-            .checked_add(value)
-            .ok_or(MutavError::MathOverflow)?;
-        r.fill_count = r
-            .fill_count
-            .checked_add(1)
-            .ok_or(MutavError::MathOverflow)?;
-        r.last_fill_nav = nav;
-        r.last_fill_at = now;
+        let shares = r.shares;
+        r.shares_filled = shares;
+        r.assets_out = value;
+        r.nav_at_fill = nav;
+        r.filled_at = now;
         r.status = REDEEM_FILLED;
         store(info, &r)?;
 
@@ -278,7 +241,7 @@ pub fn handle_fulfil_redeems(
         ctx.accounts.reserve_mint.decimals,
     )?;
 
-    let idle_free_capital = snapshot(brs_balance, false)?.free_capital;
+    let idle_free_capital = snapshot(brs_balance)?.free_capital;
     let state = &mut ctx.accounts.state;
     state.brs_balance = brs_balance;
     state.claimable_assets_total = state
@@ -291,12 +254,6 @@ pub fn handle_fulfil_redeems(
         .checked_sub(burned)
         .ok_or(MutavError::MathOverflow)?;
     state.redeem_head = seq;
-    // Ratchet (spec §4): every fill fit in the `free_capital` computed before
-    // it, so the effective earmark is unchanged (invariant 16), unless the
-    // head was starved.
-    if let Some(e) = earmark_eff {
-        state.buffer_earmark = e;
-    }
 
     for x in &fills {
         emit_cpi!(RedeemFilled {
@@ -304,11 +261,9 @@ pub fn handle_fulfil_redeems(
             ts: now,
             owner: x.owner,
             seq: x.seq,
-            shares_filled: x.shares,
+            shares: x.shares,
             assets: x.assets,
             nav: x.nav,
-            shares_remaining: 0,
-            partial: false,
         });
     }
     let (first, last) = (&fills[0], &fills[fills.len() - 1]);
@@ -320,7 +275,6 @@ pub fn handle_fulfil_redeems(
         shares: burned,
         assets: paid,
         nav: last.nav,
-        head_partial: false,
         idle_free_capital,
     });
     Ok(())

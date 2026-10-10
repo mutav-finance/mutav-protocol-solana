@@ -1,7 +1,7 @@
 /**
  * PDA helpers (spec §3). The generated `find*Pda` functions cover the PDAs
  * whose seeds the IDL describes; this file adds the ones it cannot (seeded by
- * a queue `seq` or an agency id), the income inbox (an associated token
+ * a queue `seq`), the income inbox (an associated token
  * account, ADR 0017) and one call for every reserve-level address.
  */
 import {
@@ -27,11 +27,6 @@ function pda(seeds: (string | ReadonlyUint8Array)[], o: ProgramOpt = {}): Promis
     programAddress: o.programAddress ?? MUTAV_PROGRAM_ADDRESS,
     seeds: seeds.map((s) => (typeof s === 'string' ? utf8.encode(s) : s)),
   });
-}
-
-function bytes32(b: ReadonlyUint8Array, what: string): ReadonlyUint8Array {
-  if (b.length !== 32) throw new RangeError(`${what} must be 32 bytes`);
-  return b;
 }
 
 function seqBytes(seq: bigint): ReadonlyUint8Array {
@@ -81,10 +76,6 @@ export const findDepositRequestPda = (s: { config: Address; seq: bigint }, o: Pr
 /** `RedeemRequest`: `["redeem", config, seq (u64 LE)]`. */
 export const findRedeemRequestPda = (s: { config: Address; seq: bigint }, o: ProgramOpt = {}) =>
   Promise.resolve().then(() => pda(['redeem', addr.encode(s.config), seqBytes(s.seq)], o));
-
-/** `AgencyExposure`: `["agency", config, agency_id]`. */
-export const findAgencyExposurePda = (s: { config: Address; agencyId: ReadonlyUint8Array }, o: ProgramOpt = {}) =>
-  Promise.resolve().then(() => pda(['agency', addr.encode(s.config), bytes32(s.agencyId, 'agencyId')], o));
 
 /** The classic SPL Token program (BRS is a classic SPL mint). */
 export const TOKEN_PROGRAM_ADDRESS = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address;

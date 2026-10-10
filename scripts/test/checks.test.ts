@@ -39,9 +39,9 @@ describe('postDeployChecks', () => {
     const f = postDeployChecks(
       programData(OTHER),
       { ...config(), featureFlags: 1n, paused: true },
-      { ...blankState(), bufferEarmark: 5n },
+      blankState(),
       { upgradeAuthority: VAULT, admin: VAULT, allowlistRoot: new Uint8Array(32).fill(1) },
     ).join('\n');
-    for (const s of ['upgrade authority', 'feature_flags', 'buffer_earmark', 'allowlist root', 'paused']) expect(f).toContain(s);
+    for (const s of ['upgrade authority', 'feature_flags', 'allowlist root', 'paused']) expect(f).toContain(s);
   });
 });

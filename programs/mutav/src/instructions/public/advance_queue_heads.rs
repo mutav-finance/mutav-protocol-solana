@@ -58,7 +58,7 @@ pub fn handle_advance_queue_heads(ctx: Context<AdvanceQueueHeads>, max: u8) -> R
                 Slot::Open(r) => {
                     require!(r.is_supported(), MutavError::UnsupportedVersion);
                     require!(r.seq == redeem, MutavError::QueueOrderViolation);
-                    r.shares_remaining == 0
+                    r.status != REDEEM_PENDING
                 }
             };
             if dead {

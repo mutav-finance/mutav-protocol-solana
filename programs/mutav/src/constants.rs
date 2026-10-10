@@ -27,37 +27,51 @@ pub const CLAIMS_SEED: &[u8] = b"claims";
 
 /// `Guarantee`: `["guarantee", config, id]` (spec §3.5).
 pub const GUARANTEE_SEED: &[u8] = b"guarantee";
-/// `AgencyExposure`: `["agency", config, agency_id]` (spec §3.4).
-pub const AGENCY_SEED: &[u8] = b"agency";
+// `"agency"` was the seed of `AgencyExposure`, retired with the per-agency
+// cap before the freeze (ADR 0019). Never reuse it: see `RETIRED_SEEDS`.
 
-/// `FeeReceipt`: `["fee", config, invoice_ref_hash]` (spec §3.11).
+/// `IncomeReceipt` of a guarantee fee: `["fee", config, invoice_ref_hash]`
+/// (spec §3.14, ADR 0019).
 pub const FEE_SEED: &[u8] = b"fee";
-/// `IncomeReceipt`: `["income", config, income_ref_hash]` (spec §3.14,
-/// ADR 0017).
+/// `IncomeReceipt` of an issuer statement: `["income", config,
+/// income_ref_hash]` (spec §3.14, ADR 0017).
 pub const INCOME_SEED: &[u8] = b"income";
+
+// `"payout"` was the seed of `Payout`, merged into `ClaimFiling` before the
+// freeze (ADR 0019). Never reuse it: see `RETIRED_SEEDS`.
+
+/// The `unsolicited` token account (BRS): `["unsolicited", config]`
+/// (ADR 0019). Holds money sent to the reserve unasked until the reserve
+/// admin books or returns it. The seed is reserved now; the account is
+/// created by a later change.
+pub const UNSOLICITED_SEED: &[u8] = b"unsolicited";
 
 /// `ClaimFiling`: `["claim", guarantee, notice_ref_hash]` (spec §3.6).
 pub const CLAIM_SEED: &[u8] = b"claim";
-/// `Payout`: `["payout", guarantee, notice_ref_hash]` (spec §3.7).
-pub const PAYOUT_SEED: &[u8] = b"payout";
 
 /// `DepositRequest`: `["deposit", config, seq]`, `seq` as `u64` LE (spec §3.8).
 pub const DEPOSIT_SEED: &[u8] = b"deposit";
 /// `RedeemRequest`: `["redeem", config, seq]`, `seq` as `u64` LE (spec §3.8).
 pub const REDEEM_SEED: &[u8] = b"redeem";
-/// `HolderState`: `["holder", config, owner]` (spec §3.10).
-pub const HOLDER_SEED: &[u8] = b"holder";
+// `"holder"` was the seed of `HolderState`, retired before the freeze
+// (ADR 0019). Never reuse it: see `RETIRED_SEEDS`.
 
 /// Seed prefixes reserved for later PDAs (spec §14.2). No pilot PDA may use
-/// them: phase 2's instant exit, and the per-adapter `AdapterState` at
+/// them: phase 2's instant exit, the per-adapter `AdapterState` at
 /// `["adapter_state", config, adapter_program_id]` (ADR 0018), built with the
-/// first adapter upgrade. (`"notice"` is used by the pilot `ClaimNotice`.)
-pub const RESERVED_SEED_PREFIXES: [&[u8]; 4] = [
+/// first adapter upgrade, and the claim notice (`["notice", guarantee,
+/// notice_ref_hash]`), built with the claim-notice gate.
+pub const RESERVED_SEED_PREFIXES: [&[u8]; 5] = [
     b"exit_buffer",
     b"exit_limit",
     b"instant_exit",
     b"adapter_state",
+    b"notice",
 ];
+
+/// Seeds of PDAs retired before the freeze (ADR 0019). No PDA may ever use
+/// them again, so a stale client can never address a new account by mistake.
+pub const RETIRED_SEEDS: [&[u8]; 3] = [b"agency", b"payout", b"holder"];
 
 // ---------------------------------------------------------------------------
 // Program constants (spec §8, §14).
@@ -66,9 +80,9 @@ pub const RESERVED_SEED_PREFIXES: [&[u8]; 4] = [
 /// Layout version written by `init` and accepted by this binary (spec §14.2 R1b).
 pub const PROGRAM_LAYOUT_VERSION: u8 = 1;
 
-/// Size of `VaultConfig.adapters`. Sizes `VaultConfig`; decided 2026-10-06
-/// (spec §12 Q33).
-pub const MAX_ADAPTERS: usize = 8;
+/// Most adapters one reserve may whitelist: the width of
+/// `VaultConfig.adapter_bitmap` (ADR 0018, ADR 0019).
+pub const MAX_ADAPTERS: u8 = 8;
 
 /// `10_000` basis points = 100%.
 pub const BPS_DENOMINATOR: u16 = 10_000;
@@ -78,13 +92,6 @@ pub const MAX_FEE_TAKE_BPS: u16 = 3_000;
 
 /// Program minimum for `coverage_ratio_bps` (c ≥ 0.10; ADR 0016).
 pub const MIN_COVERAGE_RATIO_BPS: u16 = 1_000;
-
-/// Program maximum for `income_take_bps`: MUTAV's take from issuer income
-/// swept by `sweep_income` (ADR 0017).
-// TODO(spec: §12 Q47 — the cap on MUTAV's take from issuer income is not
-// decided). Fails closed at 0: every swept real goes to the reserve, the
-// pilot value. Raising it is a program upgrade.
-pub const MAX_INCOME_TAKE_BPS: u16 = 0;
 
 /// Share mint decimals (spec Conventions).
 pub const SHARE_DECIMALS: u8 = 6;
@@ -97,12 +104,16 @@ pub const VIRTUAL_OFFSET_EXP: u32 = 0;
 /// The virtual offset `V = 10^k` (spec §4).
 pub const VIRTUAL_OFFSET: u64 = 10u64.pow(VIRTUAL_OFFSET_EXP);
 
-/// Scale of `VaultState.tesouro_price` and every bounded TESOURO price: BRS
-/// base units per TESOURO base unit, times `10^9` (spec §8, decided 2026-10-06).
-pub const PRICE_SCALE: u64 = 1_000_000_000;
-/// Scale of `nav_per_share` and `last_fill_nav`: BRS base units per share base
+/// Scale of `nav_per_share`, `nav_at_fulfil` and `nav_at_fill`: BRS base units per share base
 /// unit, times `10^9`, so `NAV_SCALE` is NAV 1.0 (spec §8, decided 2026-10-06).
 pub const NAV_SCALE: u64 = 1_000_000_000;
+
+/// Length of the claim-payment window in days (ADR 0019): `pay_claim` keeps
+/// the payments of the last `CLAIM_WINDOW_DAYS` UTC days, one bucket per day,
+/// within `caps.max_claim_per_period`.
+pub const CLAIM_WINDOW_DAYS: usize = 31;
+/// Seconds per day of the claim window.
+pub const SECONDS_PER_DAY: i64 = 86_400;
 
 /// Most `RedeemRequest` accounts one `fulfil_redeems` call may fill (spec §8).
 // TODO(plan: Task 10 — pin from a Mollusk benchmark of `fulfil_redeems`
@@ -130,17 +141,26 @@ pub const MODE_UNDER_COVERED: u8 = 1;
 pub const GUARANTEE_ACTIVE: u8 = 0;
 pub const GUARANTEE_CLOSED: u8 = 1;
 
-/// `ClaimFiling.leg` / `Payout.leg` (spec §3.6).
+/// `ClaimFiling.leg` (spec §3.6).
 pub const LEG_DEFAULT: u8 = 0;
 pub const LEG_EXIT: u8 = 1;
 
 /// `ClaimFiling.status` (spec §3.6).
 pub const CLAIM_FILED: u8 = 0;
 pub const CLAIM_PAID: u8 = 1;
+/// Reserved for the claim withdrawal of a later upgrade (ADR 0019). Not
+/// written or accepted by this binary.
+pub const CLAIM_WITHDRAWN: u8 = 2;
+/// Paid and settled by PIX (`settle_payout`). Terminal.
+pub const CLAIM_SETTLED: u8 = 3;
 
-/// `Payout.status` (spec §3.7).
-pub const PAYOUT_PENDING: u8 = 0;
-pub const PAYOUT_SETTLED: u8 = 1;
+/// `IncomeReceipt.kind` (ADR 0019).
+pub const INCOME_KIND_ISSUER_STATEMENT: u8 = 0;
+pub const INCOME_KIND_FEE: u8 = 1;
+/// Reserved for the unsolicited-funds instructions of a later upgrade.
+pub const INCOME_KIND_UNSOLICITED: u8 = 2;
+/// Reserved for MUTAV backstop contributions booked in a later upgrade.
+pub const INCOME_KIND_BACKSTOP: u8 = 3;
 
 /// `DepositRequest.status` (spec §3.8).
 pub const DEPOSIT_PENDING: u8 = 0;
@@ -148,39 +168,27 @@ pub const DEPOSIT_FULFILLED: u8 = 1;
 
 /// `RedeemRequest.status` (spec §3.8).
 pub const REDEEM_PENDING: u8 = 0;
-pub const REDEEM_PARTIALLY_FILLED: u8 = 1;
-pub const REDEEM_FILLED: u8 = 2;
-pub const REDEEM_CANCELLED: u8 = 3;
-
-/// `ClaimNoticeClosed.reason` (spec §9).
-pub const NOTICE_CLOSED_PAID: u8 = 0;
-pub const NOTICE_CLOSED_FULLY_PROVISIONED: u8 = 1;
-pub const NOTICE_CLOSED_WITHDRAWN: u8 = 2;
+pub const REDEEM_FILLED: u8 = 1;
 
 // ---------------------------------------------------------------------------
 // Pinned account sizes, discriminator included (spec §14.2 R7). Asserted
 // against `8 + INIT_SPACE` in `state/`.
 // ---------------------------------------------------------------------------
 
-pub const VAULT_CONFIG_SIZE: usize = 2_756;
-pub const VAULT_STATE_SIZE: usize = 480;
-pub const GUARANTEE_SIZE: usize = 249;
-pub const AGENCY_EXPOSURE_SIZE: usize = 126;
-pub const FEE_RECEIPT_SIZE: usize = 138;
-pub const CLAIM_FILING_SIZE: usize = 156;
-pub const PAYOUT_SIZE: usize = 229;
+pub const VAULT_CONFIG_SIZE: usize = 1_181;
+pub const VAULT_STATE_SIZE: usize = 688;
+pub const GUARANTEE_SIZE: usize = 377;
+pub const CLAIM_FILING_SIZE: usize = 380;
 pub const DEPOSIT_REQUEST_SIZE: usize = 155;
-pub const REDEEM_REQUEST_SIZE: usize = 181;
-pub const HOLDER_STATE_SIZE: usize = 114;
-pub const INCOME_RECEIPT_SIZE: usize = 142;
+pub const REDEEM_REQUEST_SIZE: usize = 155;
+pub const INCOME_RECEIPT_SIZE: usize = 143;
 
 // ---------------------------------------------------------------------------
 // `ConfigUpdated.field` ids (spec §9). Append-only. Top-level fields use
-// 1..99, `Caps` 100..199, `PriceParams` 200..299, `ExitParams` 300..399, so
-// fields carved later from each nested `_reserved` get ids in their own range.
-// `version`, `bump`, `authority_bump` and `_reserved` are bookkeeping, not
-// configuration, and have no id. Adapter entries are reported by
-// `AdapterWhitelisted` / `AdapterRemoved` (and `Allocated` / `Deallocated`).
+// 1..99 and `Caps` 100..199, so fields carved later from each `_reserved` get
+// ids in their own range. `version`, `bump`, `authority_bump` and `_reserved`
+// are bookkeeping, not configuration, and have no id. Retired ids are listed
+// in `RETIRED_FIELD_IDS` and are never reused.
 // ---------------------------------------------------------------------------
 
 pub mod field {
@@ -196,52 +204,33 @@ pub mod field {
     pub const PAYMENTS_ACCOUNT: u16 = 10;
     pub const TREASURY_ACCOUNT: u16 = 11;
     pub const INVESTOR_ALLOWLIST_ROOT: u16 = 12;
-    pub const PAYOUT_SLA_SECS: u16 = 13;
     pub const PAUSED: u16 = 14;
     pub const FEATURE_FLAGS: u16 = 15;
     pub const MUTAV_CAPITAL_WALLET: u16 = 16;
-    pub const INCOME_TAKE_BPS: u16 = 17;
 
     pub const CAPS_MAX_TVL: u16 = 100;
     pub const CAPS_MAX_COVER_PER_GUARANTEE: u16 = 101;
-    pub const CAPS_MAX_COVER_PER_AGENCY: u16 = 102;
     pub const CAPS_MAX_CLAIM_PER_CALL: u16 = 103;
     pub const CAPS_MAX_CLAIM_PER_PERIOD: u16 = 104;
-    pub const CAPS_CLAIM_PERIOD_SECS: u16 = 105;
-    /// The settlement floor (ADR 0018). Stored as its complement
-    /// `caps.max_allocated_bps`; `ConfigUpdated` reports the floor.
-    pub const CAPS_MIN_SETTLEMENT_BPS: u16 = 106;
     pub const CAPS_MIN_REQUEST: u16 = 107;
     pub const CAPS_MAX_REQUEST: u16 = 108;
-    pub const CAPS_MIN_FILL_ASSETS: u16 = 109;
 
-    pub const PRICE_TESOURO_PRICE_ACCOUNT: u16 = 200;
-    pub const PRICE_P0: u16 = 201;
-    pub const PRICE_T0: u16 = 202;
-    pub const PRICE_Y_MAX_BPS: u16 = 203;
-    pub const PRICE_MAX_STALENESS_SECS: u16 = 204;
-    pub const PRICE_MAX_DEVIATION_BPS: u16 = 205;
-    pub const PRICE_MAX_NAV_MOVE_BPS: u16 = 206;
-
-    pub const EXIT_BUFFER_TARGET_BPS: u16 = 300;
-    pub const EXIT_BUFFER_HEADROOM_BPS: u16 = 301;
-    pub const EXIT_BUFFER_RELEASE_AFTER_SECS: u16 = 302;
-    pub const EXIT_CURVE_VERSION: u16 = 303;
-    pub const EXIT_H_MIN_BPS: u16 = 304;
-    pub const EXIT_H_PEG_BPS: u16 = 305;
-    pub const EXIT_H_MAX_BPS: u16 = 306;
-    pub const EXIT_PRESSURE_EPOCH_SECS: u16 = 307;
-    pub const EXIT_MIN_INSTANT_ASSETS: u16 = 308;
-    pub const EXIT_MAX_INSTANT_PER_TX: u16 = 309;
-    pub const EXIT_MAX_INSTANT_PER_WALLET: u16 = 310;
-    pub const EXIT_MAX_INSTANT_PER_PERIOD: u16 = 311;
-    pub const EXIT_INSTANT_PERIOD_SECS: u16 = 312;
-    pub const EXIT_MIN_HOLD_SECS: u16 = 313;
-    pub const EXIT_MAX_PRICE_AGE_SECS: u16 = 314;
-    pub const EXIT_ALLOWLIST_ROOT: u16 = 315;
-    /// `exit.barred[i]` has id `EXIT_BARRED_0 + i`.
-    pub const EXIT_BARRED_0: u16 = 316;
+    /// `caps.max_nav_move_bps`. Keeps the id it had as
+    /// `price.max_nav_move_bps` before the price parameters were retired
+    /// (ADR 0019): same field, same meaning.
+    pub const MAX_NAV_MOVE_BPS: u16 = 206;
 }
+
+/// `ConfigUpdated` field ids of fields retired before the freeze (ADR 0019).
+/// No field may ever take one of them: 13 `payout_sla_secs`, 17
+/// `income_take_bps`, 102 `caps.max_cover_per_agency`, 106
+/// `caps.min_settlement_bps`, 105 `caps.claim_period_secs`, 109
+/// `caps.min_fill_assets`, 200–205 the TESOURO
+/// price parameters, 300–319 the phase-2 exit parameters.
+pub const RETIRED_FIELD_IDS: &[u16] = &[
+    13, 17, 102, 105, 106, 109, 200, 201, 202, 203, 204, 205, 300, 301, 302, 303, 304, 305, 306,
+    307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319,
+];
 
 /// One row of the field-id table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -285,69 +274,22 @@ pub const CONFIG_FIELDS: &[ConfigField] = &[
     f(field::PAYMENTS_ACCOUNT, "payments_account"),
     f(field::TREASURY_ACCOUNT, "treasury_account"),
     f(field::INVESTOR_ALLOWLIST_ROOT, "investor_allowlist_root"),
-    f(field::PAYOUT_SLA_SECS, "payout_sla_secs"),
     f(field::PAUSED, "paused"),
     f(field::FEATURE_FLAGS, "feature_flags"),
     f(field::MUTAV_CAPITAL_WALLET, "mutav_capital_wallet"),
-    f(field::INCOME_TAKE_BPS, "income_take_bps"),
     f(field::CAPS_MAX_TVL, "caps.max_tvl"),
     f(
         field::CAPS_MAX_COVER_PER_GUARANTEE,
         "caps.max_cover_per_guarantee",
-    ),
-    f(
-        field::CAPS_MAX_COVER_PER_AGENCY,
-        "caps.max_cover_per_agency",
     ),
     f(field::CAPS_MAX_CLAIM_PER_CALL, "caps.max_claim_per_call"),
     f(
         field::CAPS_MAX_CLAIM_PER_PERIOD,
         "caps.max_claim_per_period",
     ),
-    f(field::CAPS_CLAIM_PERIOD_SECS, "caps.claim_period_secs"),
-    f(field::CAPS_MIN_SETTLEMENT_BPS, "caps.min_settlement_bps"),
     f(field::CAPS_MIN_REQUEST, "caps.min_request"),
     f(field::CAPS_MAX_REQUEST, "caps.max_request"),
-    f(field::CAPS_MIN_FILL_ASSETS, "caps.min_fill_assets"),
-    f(
-        field::PRICE_TESOURO_PRICE_ACCOUNT,
-        "price.tesouro_price_account",
-    ),
-    f(field::PRICE_P0, "price.p0"),
-    f(field::PRICE_T0, "price.t0"),
-    f(field::PRICE_Y_MAX_BPS, "price.y_max_bps"),
-    f(field::PRICE_MAX_STALENESS_SECS, "price.max_staleness_secs"),
-    f(field::PRICE_MAX_DEVIATION_BPS, "price.max_deviation_bps"),
-    f(field::PRICE_MAX_NAV_MOVE_BPS, "price.max_nav_move_bps"),
-    f(field::EXIT_BUFFER_TARGET_BPS, "exit.buffer_target_bps"),
-    f(field::EXIT_BUFFER_HEADROOM_BPS, "exit.buffer_headroom_bps"),
-    f(
-        field::EXIT_BUFFER_RELEASE_AFTER_SECS,
-        "exit.buffer_release_after_secs",
-    ),
-    f(field::EXIT_CURVE_VERSION, "exit.curve_version"),
-    f(field::EXIT_H_MIN_BPS, "exit.h_min_bps"),
-    f(field::EXIT_H_PEG_BPS, "exit.h_peg_bps"),
-    f(field::EXIT_H_MAX_BPS, "exit.h_max_bps"),
-    f(field::EXIT_PRESSURE_EPOCH_SECS, "exit.pressure_epoch_secs"),
-    f(field::EXIT_MIN_INSTANT_ASSETS, "exit.min_instant_assets"),
-    f(field::EXIT_MAX_INSTANT_PER_TX, "exit.max_instant_per_tx"),
-    f(
-        field::EXIT_MAX_INSTANT_PER_WALLET,
-        "exit.max_instant_per_wallet",
-    ),
-    f(
-        field::EXIT_MAX_INSTANT_PER_PERIOD,
-        "exit.max_instant_per_period",
-    ),
-    f(field::EXIT_INSTANT_PERIOD_SECS, "exit.instant_period_secs"),
-    f(field::EXIT_MIN_HOLD_SECS, "exit.min_hold_secs"),
-    f(field::EXIT_MAX_PRICE_AGE_SECS, "exit.max_price_age_secs"),
-    f(field::EXIT_ALLOWLIST_ROOT, "exit.allowlist_root"),
-    f(field::EXIT_BARRED_0, "exit.barred[0]"),
-    f(field::EXIT_BARRED_0 + 1, "exit.barred[1]"),
-    f(field::EXIT_BARRED_0 + 2, "exit.barred[2]"),
-    f(field::EXIT_BARRED_0 + 3, "exit.barred[3]"),
+    f(field::MAX_NAV_MOVE_BPS, "caps.max_nav_move_bps"),
 ];
 
 #[cfg(test)]
@@ -364,6 +306,17 @@ mod tests {
     }
 
     #[test]
+    fn retired_field_ids_are_never_reused() {
+        for f in CONFIG_FIELDS {
+            assert!(
+                !RETIRED_FIELD_IDS.contains(&f.id),
+                "{} reuses a retired id",
+                f.name
+            );
+        }
+    }
+
+    #[test]
     fn pilot_seeds_avoid_reserved_prefixes() {
         let pilot = [
             CONFIG_SEED,
@@ -376,11 +329,21 @@ mod tests {
             CLAIMS_SEED,
             DEPOSIT_SEED,
             REDEEM_SEED,
-            HOLDER_SEED,
             FEE_SEED,
             INCOME_SEED,
+            UNSOLICITED_SEED,
+            GUARANTEE_SEED,
+            CLAIM_SEED,
         ];
         for seed in pilot {
+            for retired in RETIRED_SEEDS {
+                assert!(
+                    !seed.starts_with(retired) && !retired.starts_with(seed),
+                    "{:?} collides with retired {:?}",
+                    std::str::from_utf8(seed),
+                    std::str::from_utf8(retired)
+                );
+            }
             for reserved in RESERVED_SEED_PREFIXES {
                 assert!(
                     !seed.starts_with(reserved) && !reserved.starts_with(seed),
@@ -396,7 +359,8 @@ mod tests {
                 &b"exit_buffer"[..],
                 b"exit_limit",
                 b"instant_exit",
-                b"adapter_state"
+                b"adapter_state",
+                b"notice"
             ]
         );
     }

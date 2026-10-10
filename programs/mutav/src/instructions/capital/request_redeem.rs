@@ -111,8 +111,7 @@ pub fn handle_request_redeem(
     r.bump = ctx.bumps.redeem_request;
     r.owner = owner;
     r.seq = seq;
-    r.shares_requested = shares;
-    r.shares_remaining = shares;
+    r.shares = shares;
     r.requested_at = now;
     r.status = REDEEM_PENDING;
 

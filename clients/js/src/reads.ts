@@ -1,6 +1,6 @@
 /**
- * Read helpers: the reserve snapshot, guarantees, claim filings, payouts,
- * queue positions and issuer income (the inbox and its receipts). Read-only
+ * Read helpers: the reserve snapshot, guarantees, claim filings (which
+ * carry their payment and settlement), queue positions and issuer income (the inbox and its receipts). Read-only
  * RPC calls; nothing here signs or sends.
  */
 import {
@@ -25,17 +25,15 @@ import {
   INCOME_RECEIPT_DISCRIMINATOR,
   getIncomeReceiptDecoder,
   type IncomeReceipt,
-  PAYOUT_DISCRIMINATOR,
   getClaimFilingDecoder,
   getGuaranteeDecoder,
-  getPayoutDecoder,
   type ClaimFiling,
   type Guarantee,
-  type Payout,
   type VaultConfig,
   type VaultState,
 } from './generated/accounts';
 import { findGuaranteePda } from './generated/pdas/guarantee';
+import { findFeeReceiptPda } from './generated/pdas/feeReceipt';
 import { findIncomeReceiptPda } from './generated/pdas/incomeReceipt';
 import { findStatePda } from './generated/pdas/state';
 import { MUTAV_PROGRAM_ADDRESS } from './generated/programs/mutav';
@@ -114,17 +112,13 @@ export async function fetchGuaranteesForReserve(rpc: ScanRpc, config: Address, o
   return all.filter((_, i) => mine[i]);
 }
 
-/** `Payout` and `ClaimFiling` layouts: discriminator (8), version (1), bump (1), then `guarantee`. */
+/** `ClaimFiling` layout: discriminator (8), version (1), bump (1), then `guarantee`. */
 const GUARANTEE_FIELD_OFFSET = 10;
 
-/** Every `Payout` recorded against `guarantee`. */
-export const fetchPayoutsForGuarantee = (rpc: ScanRpc, guarantee: Address, o: ProgramOpt = {}) =>
-  scan<Payout>(rpc, PAYOUT_DISCRIMINATOR, (b) => getPayoutDecoder().decode(b), {
-    offset: GUARANTEE_FIELD_OFFSET,
-    bytes: getAddressEncoder().encode(guarantee),
-  }, o);
-
-/** Every `ClaimFiling` against `guarantee`. */
+/**
+ * Every `ClaimFiling` against `guarantee`: the filing, and once paid its
+ * payment and PIX settlement (the former `Payout`, ADR 0019).
+ */
 export const fetchClaimFilingsForGuarantee = (rpc: ScanRpc, guarantee: Address, o: ProgramOpt = {}) =>
   scan<ClaimFiling>(rpc, CLAIM_FILING_DISCRIMINATOR, (b) => getClaimFilingDecoder().decode(b), {
     offset: GUARANTEE_FIELD_OFFSET,
@@ -142,7 +136,7 @@ export type QueuePosition = {
   requestsAhead: number;
   /** Shares (redeem) or BRS (deposit) still waiting ahead of this one. */
   amountAhead: bigint;
-  /** This request exists and still waits (`shares_remaining > 0` / pending). */
+  /** This request exists and still waits (pending). */
   open: boolean;
 };
 
@@ -183,7 +177,7 @@ export async function getRedeemQueuePosition(rpc: ReadRpc, config: Address, seq:
   return position(state.redeemHead, state.nextRedeemSeq, seq, async (seqs) => {
     const addrs = await Promise.all(seqs.map(async (s) => (await findRedeemRequestPda({ config, seq: s }, o))[0]));
     return fetchAllMaybeRedeemRequest(rpc, addrs);
-  }, (r) => r.sharesRemaining);
+  }, (r) => (r.status === 0 ? r.shares : 0n));
 }
 
 /** Where deposit request `seq` stands in the FIFO queue. */
@@ -229,9 +223,10 @@ export async function fetchIncomeInbox(
 }
 
 /**
- * Every `IncomeReceipt` of one reserve: one per swept issuer statement
- * (ADR 0017), newest slot first. `IncomeReceipt` does not store its config,
- * so each account is kept only if it is the PDA of `(config, income_ref_hash)`.
+ * Every `IncomeReceipt` of one reserve, newest slot first: one per swept
+ * issuer statement (`kind` 0, ADR 0017) and one per guarantee fee (`kind` 1,
+ * ADR 0019). `IncomeReceipt` does not store its config, so each account is
+ * kept only if it is the PDA of `(config, ref_hash)` under its kind's seed.
  */
 export async function fetchIncomeReceiptsForReserve(rpc: ScanRpc, config: Address, o: ProgramOpt = {}) {
   const all = await scan<IncomeReceipt>(
@@ -243,7 +238,10 @@ export async function fetchIncomeReceiptsForReserve(rpc: ScanRpc, config: Addres
   );
   const mine = await Promise.all(
     all.map(
-      async (r) => (await findIncomeReceiptPda({ config, incomeRefHash: r.data.incomeRefHash }, o))[0] === r.address,
+      async (r) =>
+        (r.data.kind === 1
+          ? (await findFeeReceiptPda({ config, invoiceRefHash: r.data.refHash }, o))[0]
+          : (await findIncomeReceiptPda({ config, incomeRefHash: r.data.refHash }, o))[0]) === r.address,
     ),
   );
   return all.filter((_, i) => mine[i]).sort((a, b) => (a.data.slot < b.data.slot ? 1 : a.data.slot > b.data.slot ? -1 : 0));

@@ -97,8 +97,7 @@ describe("simulator ↔ client coverage maths", () => {
     for (let i = 0; i < 1_000; i++) {
       const remaining = amount(), c = bps(), stable = amount();
       const sol = computeSolvency({
-        brsBalance: BigInt(stable), tesouroUnits: 0n, tesouroPrice: 0n, remainingCoverTotal: BigInt(remaining),
-        coverageRatioBps: c, provisions: 0n, bufferEarmark: 0n, featureFlags: 0n, headStarved: false,
+        brsBalance: BigInt(stable), remainingCoverTotal: BigInt(remaining), coverageRatioBps: c, provisions: 0n,
       });
       expect(BigInt(sim.mutavFreeCapital(stable, remaining, c, 0))).toBe(sol.freeCapital);
     }
@@ -143,11 +142,8 @@ describe("simulator defaults = the devnet config", () => {
     caps: {
       maxTvl: Number(cfg.caps.maxTvl),
       maxCoverPerGuarantee: Number(cfg.caps.maxCoverPerGuarantee),
-      maxCoverPerAgency: Number(cfg.caps.maxCoverPerAgency),
       maxClaimPerCall: Number(cfg.caps.maxClaimPerCall),
       maxClaimPerPeriod: Number(cfg.caps.maxClaimPerPeriod),
-      // the settlement-token floor (min_settlement_bps, ADR 0018), as the devnet config states it
-      minSettlementBps: Number(cfg.caps.minSettlementBps),
     },
     feeTakeBpsMax: 3_000,
   };
@@ -157,17 +153,13 @@ describe("simulator defaults = the devnet config", () => {
     expect(sim.mutavCoverageBps(d.coverageRatio as number)).toBe(devnet.coverageRatioBps);
     expect((d.maxTvl as number) * BRL).toBe(devnet.caps.maxTvl);
     expect((d.maxCoverPerGuarantee as number) * BRL).toBe(devnet.caps.maxCoverPerGuarantee);
-    expect((d.maxCoverPerAgency as number) * BRL).toBe(devnet.caps.maxCoverPerAgency);
     expect((d.maxClaimPerCall as number) * BRL).toBe(devnet.caps.maxClaimPerCall);
     expect((d.maxClaimPerPeriod as number) * BRL).toBe(devnet.caps.maxClaimPerPeriod);
-    // the simulator keeps the model key maxTesouroSharePct = 100 − floor, so hashes and storage stay valid
-    expect(Math.round((100 - (d.maxTesouroSharePct as number)) * 100)).toBe(devnet.caps.minSettlementBps);
+    // TODO(PR 3): the simulator still models a per-agency cap and a settlement floor; the program has
+    // neither since ADR 0019 (the pilot holds BRS only, so the floor is 100%).
+    expect(Math.round((100 - (d.maxTesouroSharePct as number)) * 100)).toBe(10_000);
     expect(sim.MUTAV_PROTOCOL.MAX_FEE_TAKE_BPS).toBe(devnet.feeTakeBpsMax);
     expect((d.takePct as number) * 100).toBeLessThanOrEqual(devnet.feeTakeBpsMax);
-  });
-
-  it("the per-agency cap leaves room above max_tvl ÷ c for fee growth, so it never binds", () => {
-    expect(devnet.caps.maxCoverPerAgency).toBeGreaterThanOrEqual((3 * devnet.caps.maxTvl * 10_000) / devnet.coverageRatioBps);
   });
 });
 

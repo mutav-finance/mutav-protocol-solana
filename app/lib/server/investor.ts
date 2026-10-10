@@ -1,10 +1,9 @@
 /**
  * One investor's position, read from the chain: its BRS and reserve-share
- * token accounts (associated token accounts), its HolderState, and its
- * allowlist status against the on-chain root. Read-only.
+ * token accounts (associated token accounts) and its allowlist status against
+ * the on-chain root. Read-only.
  */
 import { address, fetchEncodedAccount, type Address } from "@solana/kit";
-import { fetchMaybeHolderState, findHolderStatePda } from "@mutav-finance/mutav-protocol-solana";
 import { checkAllowlist, type AllowlistState } from "../allowlist";
 import { bytesToHex } from "../serde";
 import type { ReserveView } from "../view";
@@ -26,6 +25,8 @@ export type InvestorView = {
   /** Token balances in base units; null when the account does not exist yet. */
   brs: { account: string; amount: bigint | null };
   shares: { account: string; amount: bigint | null };
+  /** Always null: the program keeps no per-holder account since ADR 0019. */
+  // TODO(PR 5): drop from the investor view.
   holderState: { address: string; lastSharesInTs: bigint } | null;
 };
 
@@ -44,23 +45,20 @@ export async function readInvestor(env: ServerEnv, r: ReserveView, ownerParam: s
     return { owner: null, allowlist: { state: null, ...base }, brs: { account: "", amount: null }, shares: { account: "", amount: null }, holderState: null };
   }
   const owner = address(ownerParam);
-  const o = { programAddress: env.programId };
-  const [brsAta, shareAta, [holder]] = await Promise.all([
+  const [brsAta, shareAta] = await Promise.all([
     associatedTokenAddress(owner, r.config.reserveMint, r.config.reserveTokenProgram),
     associatedTokenAddress(owner, address(r.addresses.shareMint), TOKEN_PROGRAM),
-    findHolderStatePda({ config: address(r.addresses.config), owner }, o),
   ]);
-  const [check, brs, shares, hs] = await Promise.all([
+  const [check, brs, shares] = await Promise.all([
     checkAllowlist(r.config.investorAllowlistRoot, env.allowlist, owner),
     tokenAmount(env, brsAta),
     tokenAmount(env, shareAta),
-    fetchMaybeHolderState(rpcFor(env), holder, READ),
   ]);
   return {
     owner,
     allowlist: { state: check.state, ...base },
     brs: { account: brsAta, amount: brs },
     shares: { account: shareAta, amount: shares },
-    holderState: hs.exists ? { address: hs.address, lastSharesInTs: hs.data.lastSharesInTs } : null,
+    holderState: null,
   };
 }

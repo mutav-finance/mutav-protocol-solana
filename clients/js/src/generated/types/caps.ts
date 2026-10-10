@@ -30,23 +30,31 @@ import {
 export type Caps = {
   maxTvl: bigint;
   maxCoverPerGuarantee: bigint;
-  maxCoverPerAgency: bigint;
   maxClaimPerCall: bigint;
-  maxClaimPerPeriod: bigint;
-  claimPeriodSecs: bigint;
   /**
-   * The most of `stable_assets` all adapters together may hold outside
-   * `reserve_mint`, in bps: the complement of the settlement floor
-   * `min_settlement_bps` (ADR 0018 option (a)). Stored as the complement so
-   * that zero is the pilot's "nothing allocated" (spec §14.2 R3). Every
-   * edge (instruction args, `ConfigUpdated`, client, app) speaks
-   * `min_settlement_bps = 10_000 − max_allocated_bps`; read it through
-   * [`Caps::min_settlement_bps`].
+   * The most `pay_claim` may pay in any `CLAIM_WINDOW_DAYS` (31) UTC days
+   * (ADR 0019).
    */
-  maxAllocatedBps: number;
+  maxClaimPerPeriod: bigint;
   minRequest: bigint;
   maxRequest: bigint;
-  minFillAssets: bigint;
+  /**
+   * The NAV-move guard (spec §7): a NAV-per-share move of more than this,
+   * in bps, between two `refresh`es halts fulfilment.
+   */
+  maxNavMoveBps: number;
+  /**
+   * R$ amount of claims that could be filed next, for the stress term of
+   * `coverage_required`. `0` = no stress term.
+   */
+  stressBuffer: bigint;
+  /**
+   * After this wait anyone may fill the head redemption under the same
+   * rules (exit fallback). `0` = off.
+   */
+  maxQueueWaitSecs: bigint;
+  /** How long after closing a guarantee may be reinstated. `0` = never. */
+  maxReinstateAge: bigint;
   /** Zeroed. Later caps (PC-43) are carved here. */
   reserved: ReadonlyUint8Array;
 };
@@ -54,23 +62,31 @@ export type Caps = {
 export type CapsArgs = {
   maxTvl: number | bigint;
   maxCoverPerGuarantee: number | bigint;
-  maxCoverPerAgency: number | bigint;
   maxClaimPerCall: number | bigint;
-  maxClaimPerPeriod: number | bigint;
-  claimPeriodSecs: number | bigint;
   /**
-   * The most of `stable_assets` all adapters together may hold outside
-   * `reserve_mint`, in bps: the complement of the settlement floor
-   * `min_settlement_bps` (ADR 0018 option (a)). Stored as the complement so
-   * that zero is the pilot's "nothing allocated" (spec §14.2 R3). Every
-   * edge (instruction args, `ConfigUpdated`, client, app) speaks
-   * `min_settlement_bps = 10_000 − max_allocated_bps`; read it through
-   * [`Caps::min_settlement_bps`].
+   * The most `pay_claim` may pay in any `CLAIM_WINDOW_DAYS` (31) UTC days
+   * (ADR 0019).
    */
-  maxAllocatedBps: number;
+  maxClaimPerPeriod: number | bigint;
   minRequest: number | bigint;
   maxRequest: number | bigint;
-  minFillAssets: number | bigint;
+  /**
+   * The NAV-move guard (spec §7): a NAV-per-share move of more than this,
+   * in bps, between two `refresh`es halts fulfilment.
+   */
+  maxNavMoveBps: number;
+  /**
+   * R$ amount of claims that could be filed next, for the stress term of
+   * `coverage_required`. `0` = no stress term.
+   */
+  stressBuffer: number | bigint;
+  /**
+   * After this wait anyone may fill the head redemption under the same
+   * rules (exit fallback). `0` = off.
+   */
+  maxQueueWaitSecs: number | bigint;
+  /** How long after closing a guarantee may be reinstated. `0` = never. */
+  maxReinstateAge: number | bigint;
   /** Zeroed. Later caps (PC-43) are carved here. */
   reserved: ReadonlyUint8Array;
 };
@@ -79,14 +95,14 @@ export function getCapsEncoder(): FixedSizeEncoder<CapsArgs> {
   return getStructEncoder([
     ["maxTvl", getU64Encoder()],
     ["maxCoverPerGuarantee", getU64Encoder()],
-    ["maxCoverPerAgency", getU64Encoder()],
     ["maxClaimPerCall", getU64Encoder()],
     ["maxClaimPerPeriod", getU64Encoder()],
-    ["claimPeriodSecs", getI64Encoder()],
-    ["maxAllocatedBps", getU16Encoder()],
     ["minRequest", getU64Encoder()],
     ["maxRequest", getU64Encoder()],
-    ["minFillAssets", getU64Encoder()],
+    ["maxNavMoveBps", getU16Encoder()],
+    ["stressBuffer", getU64Encoder()],
+    ["maxQueueWaitSecs", getI64Encoder()],
+    ["maxReinstateAge", getI64Encoder()],
     ["reserved", fixEncoderSize(getBytesEncoder(), 32)],
   ]);
 }
@@ -95,14 +111,14 @@ export function getCapsDecoder(): FixedSizeDecoder<Caps> {
   return getStructDecoder([
     ["maxTvl", getU64Decoder()],
     ["maxCoverPerGuarantee", getU64Decoder()],
-    ["maxCoverPerAgency", getU64Decoder()],
     ["maxClaimPerCall", getU64Decoder()],
     ["maxClaimPerPeriod", getU64Decoder()],
-    ["claimPeriodSecs", getI64Decoder()],
-    ["maxAllocatedBps", getU16Decoder()],
     ["minRequest", getU64Decoder()],
     ["maxRequest", getU64Decoder()],
-    ["minFillAssets", getU64Decoder()],
+    ["maxNavMoveBps", getU16Decoder()],
+    ["stressBuffer", getU64Decoder()],
+    ["maxQueueWaitSecs", getI64Decoder()],
+    ["maxReinstateAge", getI64Decoder()],
     ["reserved", fixDecoderSize(getBytesDecoder(), 32)],
   ]);
 }

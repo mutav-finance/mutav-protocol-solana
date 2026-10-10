@@ -59,7 +59,7 @@ pub fn handle_file_claim(
     amount: u64,
     notice_ref_hash: [u8; 32],
 ) -> Result<()> {
-    // Never paused, never solvency-gated, reads no price and no earmark.
+    // Never paused, never solvency-gated.
     // TODO(spec: §5.4, PC-2 — an on-chain check of the 15-day filing window
     // is TBD). The window is enforced in the platform.
     let g = &mut ctx.accounts.guarantee;

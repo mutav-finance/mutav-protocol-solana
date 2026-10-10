@@ -50,27 +50,13 @@ fn initialize_creates_the_reserve() {
     assert_eq!(c.treasury_account, f.treasury);
     assert_eq!(c.investor_allowlist_root, [0; 32]);
     assert_eq!(c.caps.max_tvl, args.caps.max_tvl);
-    assert_eq!(c.caps.min_fill_assets, args.caps.min_fill_assets);
-    assert_eq!(c.price.p0, args.price.p0);
-    assert_eq!(c.price.max_nav_move_bps, args.price.max_nav_move_bps);
-    assert_eq!(c.payout_sla_secs, args.payout_sla_secs);
+    assert_eq!(c.caps.max_nav_move_bps, args.caps.max_nav_move_bps);
     assert!(!c.paused);
     assert_eq!(c.mutav_capital_wallet, args.mutav_capital_wallet);
-    // Pilot defaults: no features, zeroed exit params, no adapters, zero padding.
+    // Pilot defaults: no features, zero padding.
     assert_eq!(c.feature_flags, 0);
-    assert_eq!(c.exit.buffer_target_bps, 0);
-    assert_eq!(c.exit.barred, [Pubkey::default(); 4]);
-    assert_eq!(c.exit._reserved, [0; 32]);
     assert_eq!(c.caps._reserved, [0; 32]);
-    assert_eq!(c.price._reserved, [0; 32]);
-    assert_eq!(c.adapters.len(), MAX_ADAPTERS);
-    assert!(c.adapters.iter().all(|a| a.program_id == Pubkey::default()
-        && !a.enabled
-        && a.max_share_bps == 0
-        && a._reserved == [0; 62]));
-    // ADR 0017: no take from issuer income at launch.
-    assert_eq!(c.income_take_bps, 0);
-    assert_eq!(c._reserved, [0; 510]);
+    assert_eq!(c._reserved, [0; 512]);
 
     // VaultState: empty.
     let acc = f.svm.get_account(&p.state).unwrap();
@@ -81,15 +67,10 @@ fn initialize_creates_the_reserve() {
     assert_eq!(s.mode, MODE_NORMAL);
     assert_eq!(s.brs_balance, 0);
     assert_eq!(s.shares_outstanding, 0);
-    assert_eq!(s.buffer_earmark, 0);
-    assert_eq!(s.pending_notices, 0);
     assert_eq!(s.next_redeem_seq, 0);
     assert!(!s.fulfil_halted);
-    assert_eq!(
-        (s.income_total, s.income_take_total, s.inflow_nav),
-        (0, 0, 0)
-    );
-    assert_eq!(s._reserved, [0; 232]);
+    assert_eq!((s.income_total, s.inflow_nav), (0, 0));
+    assert_eq!(s._reserved, [0; 256]);
 
     // Share mint: 6 dp, mint and freeze authority = vault authority, no supply.
     let m = mint_at(&f, &p.share_mint);
@@ -239,14 +220,8 @@ fn params_out_of_program_bounds_rejected() {
         // Coverage ratio below the 0.10 floor (ADR 0016).
         Box::new(|a| a.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS - 1),
         Box::new(|a| a.coverage_ratio_bps = 0),
-        Box::new(|a| a.caps.min_settlement_bps = 10_001),
-        Box::new(|a| a.price.max_deviation_bps = 10_001),
-        Box::new(|a| a.price.max_nav_move_bps = 10_001),
-        Box::new(|a| a.price.y_max_bps = 10_001),
+        Box::new(|a| a.caps.max_nav_move_bps = 10_001),
         Box::new(|a| a.caps.min_request = a.caps.max_request + 1),
-        Box::new(|a| a.caps.claim_period_secs = 0),
-        Box::new(|a| a.payout_sla_secs = -1),
-        Box::new(|a| a.price.max_staleness_secs = -1),
     ];
     for (i, case) in cases.iter().enumerate() {
         let mut a = base.clone();

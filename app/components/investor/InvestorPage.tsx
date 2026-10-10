@@ -73,9 +73,6 @@ function Position({ r, inv, pending }: { r: ReserveView; inv: InvestorView | nul
         <MetricCard label="Deposits waiting" value={fmtBrs(pending.deposits)} unit="escrowed, not yet fulfilled" />
         <MetricCard label="Shares waiting to redeem" value={fmtShares(pending.redeemShares)} unit="escrowed, not yet filled" />
       </div>
-      <Mono dim style={{ fontSize: 11 }}>
-        {inv.holderState ? <>HolderState <Explorer value={inv.holderState.address} /> · last shares in {fmtTime(inv.holderState.lastSharesInTs)}</> : "No HolderState yet: it is created by the first request_deposit or claim_shares."}
-      </Mono>
     </div>
   );
 }

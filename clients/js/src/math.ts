@@ -12,21 +12,11 @@
  */
 
 export const U64_MAX = (1n << 64n) - 1n;
-const I64_MIN = -(1n << 63n);
-const I64_MAX = (1n << 63n) - 1n;
 
 /** Basis-point denominator (`10_000` = 100%). */
 export const BPS_DENOMINATOR = 10_000n;
 /** Program minimum for `coverage_ratio_bps`: c ≥ 0.10 (ADR 0016). */
 export const MIN_COVERAGE_RATIO_BPS = 1_000;
-/**
- * Program cap on `income_take_bps` (ADR 0017). Its value is TBD (spec §12
- * Q47), so the program fails closed at 0: all issuer income builds the
- * reserve.
- */
-export const MAX_INCOME_TAKE_BPS = 0;
-/** Scale of TESOURO prices: BRS base units per TESOURO base unit × 10^9. */
-export const PRICE_SCALE = 1_000_000_000n;
 /** Scale of NAV per share: `NAV_SCALE` is NAV 1.0. */
 export const NAV_SCALE = 1_000_000_000n;
 /** Share-conversion virtual offset `V = 10^0 = 1` (spec §12 Q20). */
@@ -52,20 +42,12 @@ function u64(x: bigint, what = 'value'): bigint {
   return x;
 }
 
-function i64(x: bigint, what = 'value'): bigint {
-  if (typeof x !== 'bigint' || x < I64_MIN || x > I64_MAX) {
-    throw new RangeError(`${what} must be an i64 bigint, got ${String(x)}`);
-  }
-  return x;
-}
-
 function toU64(x: bigint): bigint {
   if (x > U64_MAX) throw new MathOverflowError();
   return x;
 }
 
 const satSub = (a: bigint, b: bigint) => (a > b ? a - b : 0n);
-const min = (...xs: bigint[]) => xs.reduce((m, x) => (x < m ? x : m));
 
 export type Rounding = 'down' | 'up';
 
@@ -122,15 +104,6 @@ export function conversionNav(sharesOutstanding: bigint, netAssets: bigint): big
   );
 }
 
-/** Value of the TESOURO position in BRS base units, rounded down. */
-export const tesouroValue = (units: bigint, boundedPrice: bigint) =>
-  mulDiv(units, boundedPrice, PRICE_SCALE, 'down');
-
-/** `brs_balance + tesouro_value`. */
-export function stableAssets(brsBalance: bigint, tesouroValue: bigint): bigint {
-  return toU64(u64(brsBalance) + u64(tesouroValue));
-}
-
 /**
  * `max(ceil(c × remaining_cover_total / 10_000), provisions)` (ADR 0016).
  * Filed claims stay fully covered when `c < 1`; at `c ≥ 1` the provisions
@@ -150,40 +123,8 @@ export function coverageRequired(
 export const surplus = (stableAssets: bigint, coverageRequired: bigint) =>
   satSub(u64(stableAssets), u64(coverageRequired));
 
-/**
- * `now − head_requested_at > buffer_release_after_secs > 0`. `headRequestedAt`
- * is `null` when the instruction does not hold the queue head.
- */
-export function headStarved(
-  now: bigint,
-  headRequestedAt: bigint | null,
-  bufferReleaseAfterSecs: bigint,
-): boolean {
-  i64(now, 'now');
-  i64(bufferReleaseAfterSecs, 'bufferReleaseAfterSecs');
-  if (headRequestedAt === null || bufferReleaseAfterSecs <= 0n) return false;
-  return now - i64(headRequestedAt, 'headRequestedAt') > bufferReleaseAfterSecs;
-}
-
-export type EarmarkInputs = {
-  featureFlags: bigint;
-  bufferEarmark: bigint;
-  surplus: bigint;
-  brsBalance: bigint;
-  provisions: bigint;
-  headStarved: boolean;
-};
-
-/** `0` with `INSTANT_EXIT` clear or a starved head, else `min(earmark, surplus, max(0, brs − provisions))`. */
-export function earmarkEff(i: EarmarkInputs): bigint {
-  if ((u64(i.featureFlags) & INSTANT_EXIT) === 0n || i.headStarved) return 0n;
-  return min(u64(i.bufferEarmark), u64(i.surplus), satSub(u64(i.brsBalance), u64(i.provisions)));
-}
-
-export const freeCapital = (surplus: bigint, earmarkEff: bigint) => satSub(u64(surplus), u64(earmarkEff));
-
-export const liquidBudget = (brsBalance: bigint, provisions: bigint, earmarkEff: bigint) =>
-  satSub(satSub(u64(brsBalance), u64(provisions)), u64(earmarkEff));
+/** Liquid BRS a redemption fill may use: `max(0, brs_balance − provisions)`. */
+export const liquidBudget = (brsBalance: bigint, provisions: bigint) => satSub(u64(brsBalance), u64(provisions));
 
 export const netAssets = (stableAssets: bigint, provisions: bigint) =>
   satSub(u64(stableAssets), u64(provisions));
@@ -196,23 +137,17 @@ export function navPerShare(netAssets: bigint, sharesOutstanding: bigint): bigin
 
 export type SolvencyInputs = {
   brsBalance: bigint;
-  tesouroUnits: bigint;
-  /** Bounded TESOURO price, `PRICE_SCALE`. */
-  tesouroPrice: bigint;
   remainingCoverTotal: bigint;
   coverageRatioBps: number;
   provisions: bigint;
-  bufferEarmark: bigint;
-  featureFlags: bigint;
-  headStarved: boolean;
 };
 
 export type Solvency = {
-  tesouroValue: bigint;
+  /** The tracked BRS balance: the pilot reserve holds BRS only (ADR 0019). */
   stableAssets: bigint;
   coverageRequired: bigint;
   surplus: bigint;
-  earmarkEff: bigint;
+  /** Equal to `surplus` (no instant-exit earmark, ADR 0019). */
   freeCapital: bigint;
   liquidBudget: bigint;
   netAssets: bigint;
@@ -225,27 +160,16 @@ export type Solvency = {
 
 /** Every spec §4 quantity for one snapshot (the program's `Solvency::compute`). */
 export function computeSolvency(i: SolvencyInputs): Solvency {
-  const tv = tesouroValue(i.tesouroUnits, i.tesouroPrice);
-  const stable = stableAssets(i.brsBalance, tv);
+  const stable = u64(i.brsBalance);
   const required = coverageRequired(i.remainingCoverTotal, i.coverageRatioBps, i.provisions);
   const sur = surplus(stable, required);
-  const earmark = earmarkEff({
-    featureFlags: i.featureFlags,
-    bufferEarmark: i.bufferEarmark,
-    surplus: sur,
-    brsBalance: i.brsBalance,
-    provisions: i.provisions,
-    headStarved: i.headStarved,
-  });
   const underCovered = stable < required;
   return {
-    tesouroValue: tv,
     stableAssets: stable,
     coverageRequired: required,
     surplus: sur,
-    earmarkEff: earmark,
-    freeCapital: freeCapital(sur, earmark),
-    liquidBudget: liquidBudget(i.brsBalance, i.provisions, earmark),
+    freeCapital: sur,
+    liquidBudget: liquidBudget(i.brsBalance, i.provisions),
     netAssets: netAssets(stable, i.provisions),
     mode: underCovered ? MODE_UNDER_COVERED : MODE_NORMAL,
     underCovered,
@@ -253,10 +177,32 @@ export function computeSolvency(i: SolvencyInputs): Solvency {
   };
 }
 
+/** Length of the claim-payment window in days (ADR 0019). */
+export const CLAIM_WINDOW_DAYS = 31;
+
 /**
- * The split `sweep_income` (and `contribute_fees`) applies: `take =
- * floor(amount × takeBps / 10_000)` to the treasury, `net = amount − take`
- * into the reserve, rounded in the reserve's favour (ADR 0017).
+ * Claim payments counted against `max_claim_per_period` at `now`: the
+ * buckets of the last 31 UTC days, after the roll `pay_claim` applies
+ * (ADR 0019). Mirrors `VaultState::roll_claim_window` + `claim_window_paid`.
+ */
+export function claimWindowPaid(
+  state: { claimDayBuckets: readonly bigint[]; claimDayAnchor: bigint },
+  now: bigint,
+): bigint {
+  const day = (now >= 0n ? now : now - 86_399n) / 86_400n;
+  const d = day > state.claimDayAnchor ? day : state.claimDayAnchor;
+  const gap = d - state.claimDayAnchor;
+  const n = BigInt(CLAIM_WINDOW_DAYS);
+  if (gap >= n) return 0n;
+  const cleared = new Set<number>();
+  for (let x = state.claimDayAnchor + 1n; x <= d; x++) cleared.add(Number(((x % n) + n) % n));
+  return state.claimDayBuckets.reduce((sum, b, i) => (cleared.has(i) ? sum : sum + b), 0n);
+}
+
+/**
+ * The split `contribute_fees` applies: `take = floor(amount × takeBps /
+ * 10_000)` to the treasury, `net = amount − take` into the reserve, rounded in
+ * the reserve's favour. Issuer income has no take (ADR 0019).
  */
 export function takeSplit(amount: bigint, takeBps: number): { take: bigint; net: bigint } {
   const take = mulDiv(amount, BigInt(takeBps), BPS_DENOMINATOR, 'down');

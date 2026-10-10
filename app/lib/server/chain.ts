@@ -11,11 +11,8 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
-  AGENCY_EXPOSURE_DISCRIMINATOR,
   CLAIM_FILING_DISCRIMINATOR,
-  FEE_RECEIPT_DISCRIMINATOR,
   INCOME_RECEIPT_DISCRIMINATOR,
-  PAYOUT_DISCRIMINATOR,
   fetchIncomeInbox,
   findIncomeReceiptPda,
   getIncomeReceiptDecoder,
@@ -26,15 +23,11 @@ import {
   getGuaranteeDecoder,
   fetchVaultConfig,
   fetchVaultState,
-  findAgencyExposurePda,
   findDepositRequestPda,
   findFeeReceiptPda,
   findRedeemRequestPda,
   findReserveAddresses,
-  getAgencyExposureDecoder,
   getClaimFilingDecoder,
-  getFeeReceiptDecoder,
-  getPayoutDecoder,
   solvencyFromAccounts,
   DEPOSITS_FULFILLED_EVENT_DISCRIMINATOR,
   REDEEMS_FULFILLED_EVENT_DISCRIMINATOR,
@@ -154,32 +147,28 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
   const o = { programAddress: env.programId };
   const config = r.addresses.config as Address;
 
-  const [guaranteesAll, filingsAll, payoutsAll, exposuresAll, feesAll, incomeAll] = await Promise.all([
+  const [guaranteesAll, filingsAll, receiptsAll] = await Promise.all([
     scan(env, GUARANTEE_DISCRIMINATOR, (b) => getGuaranteeDecoder().decode(b)),
     scan(env, CLAIM_FILING_DISCRIMINATOR, (b) => getClaimFilingDecoder().decode(b)),
-    scan(env, PAYOUT_DISCRIMINATOR, (b) => getPayoutDecoder().decode(b)),
-    scan(env, AGENCY_EXPOSURE_DISCRIMINATOR, (b) => getAgencyExposureDecoder().decode(b)),
-    scan(env, FEE_RECEIPT_DISCRIMINATOR, (b) => getFeeReceiptDecoder().decode(b)),
     scan(env, INCOME_RECEIPT_DISCRIMINATOR, (b) => getIncomeReceiptDecoder().decode(b)),
   ]);
+  // Guarantee fees and issuer income share one receipt type, told apart by
+  // `kind` (ADR 0019): 1 = FEE under the "fee" seed, 0 = ISSUER_STATEMENT.
+  const feesAll = receiptsAll.filter((r) => r.data.kind === 1);
+  const incomeAll = receiptsAll.filter((r) => r.data.kind === 0);
 
-  // Keep only accounts of this reserve: filings and payouts by guarantee, the
-  // rest by re-deriving their PDA under this config.
+  // Keep only accounts of this reserve: filings by guarantee, the rest by
+  // re-deriving their PDA under this config.
   const guaranteeOk = await Promise.all(guaranteesAll.map(async (g) => (await findGuaranteePda({ config, id: g.data.id }, o))[0] === g.address));
   const guarantees = guaranteesAll.filter((_, i) => guaranteeOk[i]);
   const mine = new Set(guarantees.map((g) => g.address as string));
   const filings = filingsAll.filter((f) => mine.has(f.data.guarantee));
-  const payouts = payoutsAll.filter((p) => mine.has(p.data.guarantee));
-  const exposureOk = await Promise.all(
-    exposuresAll.map(async (e) => (await findAgencyExposurePda({ config, agencyId: e.data.agencyId }, o))[0] === e.address),
-  );
   const feeOk = await Promise.all(
-    feesAll.map(async (f) => (await findFeeReceiptPda({ config, invoiceRefHash: f.data.invoiceRefHash }, o))[0] === f.address),
+    feesAll.map(async (f) => (await findFeeReceiptPda({ config, invoiceRefHash: f.data.refHash }, o))[0] === f.address),
   );
   const incomeOk = await Promise.all(
-    incomeAll.map(async (i) => (await findIncomeReceiptPda({ config, incomeRefHash: i.data.incomeRefHash }, o))[0] === i.address),
+    incomeAll.map(async (i) => (await findIncomeReceiptPda({ config, incomeRefHash: i.data.refHash }, o))[0] === i.address),
   );
-  const exposures = exposuresAll.filter((_, i) => exposureOk[i]);
   const blockTimeOf = async (slot: bigint): Promise<bigint | null> => {
     try {
       const t = await rpc.getBlockTime(slot).send();
@@ -208,8 +197,6 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
     capitalEvents,
     guarantees: guarantees.map((g) => ({ address: g.address, data: g.data })),
     filings,
-    payouts,
-    exposures,
     fees,
     income,
     deposits: depAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),

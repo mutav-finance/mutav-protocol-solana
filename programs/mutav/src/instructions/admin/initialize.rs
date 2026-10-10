@@ -26,7 +26,7 @@ use crate::{
     errors::MutavError,
     events::{ConfigChanges, VaultInitialized},
     instructions::admin::{validate_money_accounts, validate_params, validate_roles},
-    state::{CapsInput, PriceInput, VaultConfig, VaultState},
+    state::{CapsInput, VaultConfig, VaultState},
     token_guard,
 };
 
@@ -39,9 +39,7 @@ pub struct InitializeArgs {
     pub mutav_capital_wallet: Pubkey,
     pub coverage_ratio_bps: u16,
     pub fee_take_bps: u16,
-    pub payout_sla_secs: i64,
     pub caps: CapsInput,
-    pub price: PriceInput,
 }
 
 #[event_cpi]
@@ -165,13 +163,7 @@ pub struct Initialize<'info> {
 
 pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Result<()> {
     token_guard::check_reserve_mint(&ctx.accounts.reserve_mint.to_account_info())?;
-    validate_params(
-        args.coverage_ratio_bps,
-        args.fee_take_bps,
-        args.payout_sla_secs,
-        &args.caps,
-        &args.price,
-    )?;
+    validate_params(args.coverage_ratio_bps, args.fee_take_bps, &args.caps)?;
     validate_roles(&args.admin, &args.operator, &args.pauser)?;
     validate_money_accounts(
         &ctx.accounts.reserve_mint.key(),
@@ -204,14 +196,12 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
     config.fee_take_bps = args.fee_take_bps;
     config.payments_account = ctx.accounts.payments_account.key();
     config.treasury_account = ctx.accounts.treasury_account.key();
-    config.payout_sla_secs = args.payout_sla_secs;
     config.mutav_capital_wallet = args.mutav_capital_wallet;
     // Initial values are announced by `VaultInitialized`, not `ConfigUpdated`.
     let mut ignored = ConfigChanges::default();
     config.apply_caps(&args.caps, &mut ignored);
-    config.apply_price(&args.price, &mut ignored);
-    // `feature_flags`, `exit`, `adapters`, `investor_allowlist_root`, `paused`
-    // and every `_reserved` stay zero.
+    // `feature_flags`, `investor_allowlist_root`, `paused` and every
+    // `_reserved` stay zero.
 
     let state = &mut ctx.accounts.state;
     state.version = PROGRAM_LAYOUT_VERSION;

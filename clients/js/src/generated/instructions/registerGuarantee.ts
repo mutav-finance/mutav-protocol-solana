@@ -14,8 +14,6 @@ import {
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU16Decoder,
-  getU16Encoder,
   getU64Decoder,
   getU64Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
@@ -63,7 +61,6 @@ export type RegisterGuaranteeInstruction<
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
   TAccountGuarantee extends string | AccountMeta<string> = string,
-  TAccountAgencyExposure extends string | AccountMeta<string> = string,
   TAccountPayer extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
@@ -87,9 +84,6 @@ export type RegisterGuaranteeInstruction<
       TAccountGuarantee extends string
         ? WritableAccount<TAccountGuarantee>
         : TAccountGuarantee,
-      TAccountAgencyExposure extends string
-        ? WritableAccount<TAccountAgencyExposure>
-        : TAccountAgencyExposure,
       TAccountPayer extends string
         ? WritableSignerAccount<TAccountPayer> &
             AccountSignerMeta<TAccountPayer>
@@ -112,11 +106,6 @@ export type RegisterGuaranteeInstructionData = {
   id: ReadonlyUint8Array;
   agencyId: ReadonlyUint8Array;
   refsHash: ReadonlyUint8Array;
-  rent: bigint;
-  /** Display only. */
-  defaultMultiplierBps: number;
-  /** Display only. */
-  exitMultiplierBps: number;
   defaultCover: bigint;
   exitCover: bigint;
 };
@@ -125,11 +114,6 @@ export type RegisterGuaranteeInstructionDataArgs = {
   id: ReadonlyUint8Array;
   agencyId: ReadonlyUint8Array;
   refsHash: ReadonlyUint8Array;
-  rent: number | bigint;
-  /** Display only. */
-  defaultMultiplierBps: number;
-  /** Display only. */
-  exitMultiplierBps: number;
   defaultCover: number | bigint;
   exitCover: number | bigint;
 };
@@ -141,9 +125,6 @@ export function getRegisterGuaranteeInstructionDataEncoder(): FixedSizeEncoder<R
       ["id", fixEncoderSize(getBytesEncoder(), 32)],
       ["agencyId", fixEncoderSize(getBytesEncoder(), 32)],
       ["refsHash", fixEncoderSize(getBytesEncoder(), 32)],
-      ["rent", getU64Encoder()],
-      ["defaultMultiplierBps", getU16Encoder()],
-      ["exitMultiplierBps", getU16Encoder()],
       ["defaultCover", getU64Encoder()],
       ["exitCover", getU64Encoder()],
     ]),
@@ -157,9 +138,6 @@ export function getRegisterGuaranteeInstructionDataDecoder(): FixedSizeDecoder<R
     ["id", fixDecoderSize(getBytesDecoder(), 32)],
     ["agencyId", fixDecoderSize(getBytesDecoder(), 32)],
     ["refsHash", fixDecoderSize(getBytesDecoder(), 32)],
-    ["rent", getU64Decoder()],
-    ["defaultMultiplierBps", getU16Decoder()],
-    ["exitMultiplierBps", getU16Decoder()],
     ["defaultCover", getU64Decoder()],
     ["exitCover", getU64Decoder()],
   ]);
@@ -180,8 +158,6 @@ export type RegisterGuaranteeAsyncInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
@@ -193,7 +169,6 @@ export type RegisterGuaranteeAsyncInput<
   config: TAccountConfig;
   state?: TAccountState;
   guarantee: TAccountGuarantee;
-  agencyExposure: TAccountAgencyExposure;
   payer: TAccountPayer;
   systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
@@ -201,9 +176,6 @@ export type RegisterGuaranteeAsyncInput<
   id: RegisterGuaranteeInstructionDataArgs["id"];
   agencyId: RegisterGuaranteeInstructionDataArgs["agencyId"];
   refsHash: RegisterGuaranteeInstructionDataArgs["refsHash"];
-  rent: RegisterGuaranteeInstructionDataArgs["rent"];
-  defaultMultiplierBps: RegisterGuaranteeInstructionDataArgs["defaultMultiplierBps"];
-  exitMultiplierBps: RegisterGuaranteeInstructionDataArgs["exitMultiplierBps"];
   defaultCover: RegisterGuaranteeInstructionDataArgs["defaultCover"];
   exitCover: RegisterGuaranteeInstructionDataArgs["exitCover"];
 };
@@ -213,7 +185,6 @@ export async function getRegisterGuaranteeInstructionAsync<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput,
   TAccountPayer extends InstructionSignerInput,
   TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
@@ -225,7 +196,6 @@ export async function getRegisterGuaranteeInstructionAsync<
     TAccountConfig,
     TAccountState,
     TAccountGuarantee,
-    TAccountAgencyExposure,
     TAccountPayer,
     TAccountSystemProgram,
     TAccountEventAuthority,
@@ -250,10 +220,6 @@ export async function getRegisterGuaranteeInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountGuarantee,
       InstructionAccountInputAddress<TAccountGuarantee>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountAgencyExposure,
-      InstructionAccountInputAddress<TAccountAgencyExposure>
     >,
     ResolvedInstructionAccountMeta<
       TAccountPayer,
@@ -290,11 +256,6 @@ export async function getRegisterGuaranteeInstructionAsync<
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
     guarantee: {
       value: input.guarantee ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
-    agencyExposure: {
-      value: input.agencyExposure ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -346,7 +307,6 @@ export async function getRegisterGuaranteeInstructionAsync<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("guarantee", accounts.guarantee),
-      getAccountMeta("agencyExposure", accounts.agencyExposure),
       getAccountMeta("payer", accounts.payer),
       getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
@@ -375,10 +335,6 @@ export async function getRegisterGuaranteeInstructionAsync<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountAgencyExposure,
-      InstructionAccountInputAddress<TAccountAgencyExposure>
-    >,
-    ResolvedInstructionAccountMeta<
       TAccountPayer,
       InstructionAccountInputAddress<TAccountPayer>
     >,
@@ -402,8 +358,6 @@ export type RegisterGuaranteeInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
@@ -415,7 +369,6 @@ export type RegisterGuaranteeInput<
   config: TAccountConfig;
   state: TAccountState;
   guarantee: TAccountGuarantee;
-  agencyExposure: TAccountAgencyExposure;
   payer: TAccountPayer;
   systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
@@ -423,9 +376,6 @@ export type RegisterGuaranteeInput<
   id: RegisterGuaranteeInstructionDataArgs["id"];
   agencyId: RegisterGuaranteeInstructionDataArgs["agencyId"];
   refsHash: RegisterGuaranteeInstructionDataArgs["refsHash"];
-  rent: RegisterGuaranteeInstructionDataArgs["rent"];
-  defaultMultiplierBps: RegisterGuaranteeInstructionDataArgs["defaultMultiplierBps"];
-  exitMultiplierBps: RegisterGuaranteeInstructionDataArgs["exitMultiplierBps"];
   defaultCover: RegisterGuaranteeInstructionDataArgs["defaultCover"];
   exitCover: RegisterGuaranteeInstructionDataArgs["exitCover"];
 };
@@ -435,7 +385,6 @@ export function getRegisterGuaranteeInstruction<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
-  TAccountAgencyExposure extends InstructionAccountInput,
   TAccountPayer extends InstructionSignerInput,
   TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
@@ -447,7 +396,6 @@ export function getRegisterGuaranteeInstruction<
     TAccountConfig,
     TAccountState,
     TAccountGuarantee,
-    TAccountAgencyExposure,
     TAccountPayer,
     TAccountSystemProgram,
     TAccountEventAuthority,
@@ -471,10 +419,6 @@ export function getRegisterGuaranteeInstruction<
   ResolvedInstructionAccountMeta<
     TAccountGuarantee,
     InstructionAccountInputAddress<TAccountGuarantee>
-  >,
-  ResolvedInstructionAccountMeta<
-    TAccountAgencyExposure,
-    InstructionAccountInputAddress<TAccountAgencyExposure>
   >,
   ResolvedInstructionAccountMeta<
     TAccountPayer,
@@ -510,11 +454,6 @@ export function getRegisterGuaranteeInstruction<
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
     guarantee: {
       value: input.guarantee ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
-    agencyExposure: {
-      value: input.agencyExposure ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -555,7 +494,6 @@ export function getRegisterGuaranteeInstruction<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("guarantee", accounts.guarantee),
-      getAccountMeta("agencyExposure", accounts.agencyExposure),
       getAccountMeta("payer", accounts.payer),
       getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
@@ -582,10 +520,6 @@ export function getRegisterGuaranteeInstruction<
     ResolvedInstructionAccountMeta<
       TAccountGuarantee,
       InstructionAccountInputAddress<TAccountGuarantee>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountAgencyExposure,
-      InstructionAccountInputAddress<TAccountAgencyExposure>
     >,
     ResolvedInstructionAccountMeta<
       TAccountPayer,
@@ -616,11 +550,10 @@ export type ParsedRegisterGuaranteeInstruction<
     config: TAccountMetas[1];
     state: TAccountMetas[2];
     guarantee: TAccountMetas[3];
-    agencyExposure: TAccountMetas[4];
-    payer: TAccountMetas[5];
-    systemProgram: TAccountMetas[6];
-    eventAuthority: TAccountMetas[7];
-    program: TAccountMetas[8];
+    payer: TAccountMetas[4];
+    systemProgram: TAccountMetas[5];
+    eventAuthority: TAccountMetas[6];
+    program: TAccountMetas[7];
   };
   data: RegisterGuaranteeInstructionData;
 };
@@ -633,12 +566,12 @@ export function parseRegisterGuaranteeInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedRegisterGuaranteeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 9) {
+  if (instruction.accounts.length < 8) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 9,
+        expectedAccountMetas: 8,
       },
     );
   }
@@ -655,7 +588,6 @@ export function parseRegisterGuaranteeInstruction<
       config: getNextAccount(),
       state: getNextAccount(),
       guarantee: getNextAccount(),
-      agencyExposure: getNextAccount(),
       payer: getNextAccount(),
       systemProgram: getNextAccount(),
       eventAuthority: getNextAccount(),

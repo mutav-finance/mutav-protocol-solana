@@ -36,10 +36,7 @@ import {
   findIncomeInboxAddress,
   findIncomeReceiptPda,
   isValidIncomePeriod,
-  findHolderStatePda,
-  findPayoutPda,
   findRedeemRequestPda,
-  findAgencyExposurePda,
   getClaimSharesInstruction,
   getClearFulfilHaltInstruction,
   getCloseGuaranteeInstruction,
@@ -66,7 +63,6 @@ import {
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
 import { ALLOWLIST_TEXT, checkAllowlist } from "../allowlist";
-import { reserveConfigError } from "../reserve-assets";
 import { capsError, generalConfigError, rolesError } from "../admin";
 import { pendingSetConfig, pendingSetConfigText, setConfigChanges, type ConfigChange } from "../config-diff";
 import { fromHex } from "../serde";
@@ -118,8 +114,8 @@ const withRemaining = (ix: Instruction, accounts: { address: Address; role: Acco
 
 export type ComposeContext = {
   reserve: ReserveView;
-  /** Needed for `refresh` (pending payouts) and for `request_deposit` (allowlist). */
-  ledger?: Pick<Ledger, "payouts" | "guarantees">;
+  /** The guarantees, for the operator instructions that address one by account. */
+  ledger?: Pick<Ledger, "guarantees">;
   /** Allowlisted owners, to build the Merkle proof for `request_deposit` / `request_redeem`. */
   allowlist?: string[];
   /** Server env for re-reads (defaults to process.env). */
@@ -161,17 +157,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
         { ...common, state: a.state, reserve: a.reserve, pendingDeposits: a.pendingDeposits, pendingRedemptions: a.pendingRedemptions, claims: a.claims },
         o,
       );
-      // (Guarantee, Payout) pairs for every pending payout, so `refresh` records late flags.
-      const pending = (ctx.ledger?.payouts ?? []).filter((p) => p.data.status === 0).slice(0, 10);
-      return [
-        withRemaining(
-          ix,
-          pending.flatMap((p) => [
-            { address: address(p.data.guarantee), role: AccountRole.READONLY },
-            { address: address(p.address), role: AccountRole.WRITABLE },
-          ]),
-        ),
-      ];
+      // `refresh` takes no remaining accounts (no payout SLA, ADR 0019).
+      return [ix];
     }
 
     // ── operator ────────────────────────────────────────────────────────────
@@ -179,7 +166,6 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       const id = bytes32(req.id, "id");
       const agencyId = bytes32(req.agencyId, "agencyId");
       const [guarantee] = await findGuaranteePda({ config, id }, o);
-      const [agencyExposure] = await findAgencyExposurePda({ config, agencyId }, o);
       return [
         getRegisterGuaranteeInstruction(
           {
@@ -187,15 +173,11 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             operator: signer,
             state: a.state,
             guarantee,
-            agencyExposure,
             payer: signer,
             systemProgram: SYSTEM_PROGRAM,
             id,
             agencyId,
             refsHash: bytes32(req.refsHash, "refsHash"),
-            rent: req.rent,
-            defaultMultiplierBps: req.defaultMultiplierBps,
-            exitMultiplierBps: req.exitMultiplierBps,
             defaultCover: req.defaultCover,
             exitCover: req.exitCover,
           },
@@ -205,8 +187,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     }
     case "close_guarantee": {
       const g = await guaranteeAccount(ctx, req.guarantee);
-      const [agencyExposure] = await findAgencyExposurePda({ config, agencyId: g.data.agencyId }, o);
-      return [getCloseGuaranteeInstruction({ ...common, operator: signer, state: a.state, guarantee: g.address, agencyExposure, id: g.data.id }, o)];
+      return [getCloseGuaranteeInstruction({ ...common, operator: signer, state: a.state, guarantee: g.address, id: g.data.id }, o)];
     }
     case "contribute_fees": {
       const invoiceRefHash = bytes32(req.invoiceRefHash, "invoiceRefHash");
@@ -276,8 +257,6 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       const g = await guaranteeAccount(ctx, req.guarantee);
       const noticeRefHash = bytes32(req.noticeRefHash, "noticeRefHash");
       const [claimFiling] = await findClaimFilingPda({ guarantee: g.address, noticeRefHash }, o);
-      const [payout] = await findPayoutPda({ guarantee: g.address, noticeRefHash }, o);
-      const [agencyExposure] = await findAgencyExposurePda({ config, agencyId: g.data.agencyId }, o);
       return [
         getPayClaimInstruction(
           {
@@ -285,16 +264,12 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             operator: signer,
             state: a.state,
             guarantee: g.address,
-            agencyExposure,
             claimFiling,
-            payout,
             reserve: a.reserve,
             paymentsAccount: r.config.paymentsAccount,
             vaultAuthority: a.vaultAuthority,
             reserveMint: mint,
             tokenProgram,
-            payer: signer,
-            systemProgram: SYSTEM_PROGRAM,
             leg: req.leg,
             amount: req.amount,
             noticeRefHash,
@@ -306,10 +281,10 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "settle_payout": {
       const guarantee = address(req.guarantee);
       const noticeRefHash = bytes32(req.noticeRefHash, "noticeRefHash");
-      const [payout] = await findPayoutPda({ guarantee, noticeRefHash }, o);
+      const [claimFiling] = await findClaimFilingPda({ guarantee, noticeRefHash }, o);
       return [
         getSettlePayoutInstruction(
-          { ...common, operator: signer, guarantee, payout, noticeRefHash, pixE2eHash: bytes32(req.pixE2eHash, "pixE2eHash") },
+          { ...common, operator: signer, guarantee, claimFiling, noticeRefHash, pixE2eHash: bytes32(req.pixE2eHash, "pixE2eHash") },
           o,
         ),
       ];
@@ -326,7 +301,6 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             owner: signer,
             state: a.state,
             depositRequest: (await findDepositRequestPda({ config, seq }, o))[0],
-            holderState: (await findHolderStatePda({ config, owner: signerAddress }, o))[0],
             source: await associatedTokenAddress(signerAddress, mint, tokenProgram),
             pendingDeposits: a.pendingDeposits,
             reserveMint: mint,
@@ -424,12 +398,10 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             ...common,
             owner: signer,
             depositRequest: (await findDepositRequestPda({ config, seq: req.seq }, o))[0],
-            holderState: (await findHolderStatePda({ config, owner: signerAddress }, o))[0],
             shareMint: a.shareMint,
             ownerShares: await associatedTokenAddress(signerAddress, a.shareMint),
             vaultAuthority: a.vaultAuthority,
             shareTokenProgram: TOKEN_PROGRAM,
-            systemProgram: SYSTEM_PROGRAM,
           },
           o,
         ),
@@ -490,15 +462,9 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "set_config": {
       // Write only what changed; carry every other field over as it is on-chain.
       const c = r.config;
-      // The floor travels as `minSettlementBps`; the account stores its complement (ADR 0018).
       const caps = capsInputFromConfig(c.caps);
-      const { reserved: _p, ...price } = c.price;
-      const { reserved: _e, ...exit } = c.exit;
-      void _p;
-      void _e;
-      const bad = generalConfigError(req) ?? capsError({ ...caps, ...(req.caps ?? {}) }) ?? reserveConfigError(req);
+      const bad = generalConfigError(req) ?? capsError({ ...caps, ...(req.caps ?? {}) });
       if (bad) throw new ComposeError(bad);
-      const { tesouroPriceAccount, ...priceDraft } = req.price ?? {};
       return [
         getSetConfigInstruction(
           {
@@ -509,14 +475,9 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             paymentsAccount: c.paymentsAccount,
             coverageRatioBps: req.coverageRatioBps ?? c.coverageRatioBps,
             feeTakeBps: req.feeTakeBps ?? c.feeTakeBps,
-            payoutSlaSecs: req.payoutSlaSecs ?? c.payoutSlaSecs,
             featureFlags: c.featureFlags,
             mutavCapitalWallet: c.mutavCapitalWallet,
-            caps: { ...caps, ...(req.caps ?? {}), ...(req.minSettlementBps !== undefined ? { minSettlementBps: req.minSettlementBps } : {}) },
-            price: { ...price, ...priceDraft, ...(tesouroPriceAccount !== undefined ? { tesouroPriceAccount: address(tesouroPriceAccount) } : {}) },
-            exit,
-            // Bounded by MAX_INCOME_TAKE_BPS, which is 0 until spec §12 Q47 (ADR 0017): only 0 composes.
-            incomeTakeBps: req.incomeTakeBps ?? c.incomeTakeBps,
+            caps: { ...caps, ...(req.caps ?? {}), ...(req.maxNavMoveBps !== undefined ? { maxNavMoveBps: req.maxNavMoveBps } : {}) },
           },
           o,
         ),
