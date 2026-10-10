@@ -62,6 +62,17 @@
 * [Deployment and operations](technical-resources/deployment-and-operations.md)
 * [FAQ](technical-resources/faq.md)
 
+## Research
+
+* [Research](research/README.md)
+  * [BRL currencies on Solana](research/brl-currencies-on-solana.md)
+  * [Multi-asset vaults on Solana](research/multi-asset-vaults-on-solana.md)
+  * [OnRe (ONyc) as a comparable](research/onre-comparable.md)
+  * [Solana landscape and stack](research/solana-landscape-and-stack.md)
+  * [Redemption economics: partial head fills and phase-2 instant exit](research/redemption-economics.md)
+  * [Upgrade readiness: adding partial fills and instant exit to a live reserve](research/upgrade-readiness.md)
+  * [Eviction and exit costs in South Brazil](research/brazil-eviction-and-exit-costs.md)
+
 ## Decisions and sources
 
 * [Decisions](meta/decisions.md)

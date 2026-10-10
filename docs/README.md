@@ -22,6 +22,7 @@ The full table of contents is in [SUMMARY.md](SUMMARY.md).
 | [Specification](spec.md) | The program's business rules. Any change to economic behaviour needs an ADR. |
 | [Architecture decision records](meta/decisions.md) | Every accepted and proposed ADR and the dated decision log for the devnet release. Where an ADR from 0019 onward differs from older spec text, the ADR wins until the spec is updated. Undecided items are in the [open questions register](meta/open-questions.md). |
 | [Litepaper](litepaper.md) | The design and the business case in one document. |
+| [Research](research/README.md) | Prior research behind the design: BRL on Solana, comparable protocols, redemption and upgrade economics, Brazilian eviction costs. Dated, with later decisions noted. |
 | [Plan](plan.md) and [provenance](provenance.md) | The build plan and the separation of hackathon work, prior MUTAV work and third-party code. |
 
 ## Sources
