@@ -128,7 +128,7 @@ pub fn handle_pay_claim(
     );
 
     // Rule 5 (destination) is an account constraint. Rule 6: liquid BRS;
-    // TESOURO is never sold implicitly.
+    // nothing else is sold to pay a claim.
     require!(
         state.brs_balance >= amount,
         MutavError::InsufficientLiquidBalance

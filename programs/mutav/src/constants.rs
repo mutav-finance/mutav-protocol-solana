@@ -57,14 +57,16 @@ pub const REDEEM_SEED: &[u8] = b"redeem";
 // (ADR 0019). Never reuse it: see `RETIRED_SEEDS`.
 
 /// Seed prefixes reserved for later PDAs (spec §14.2). No pilot PDA may use
-/// them: phase 2's instant exit, and the per-adapter `AdapterState` at
+/// them: phase 2's instant exit, the per-adapter `AdapterState` at
 /// `["adapter_state", config, adapter_program_id]` (ADR 0018), built with the
-/// first adapter upgrade. (`"notice"` is used by the pilot `ClaimNotice`.)
-pub const RESERVED_SEED_PREFIXES: [&[u8]; 4] = [
+/// first adapter upgrade, and the claim notice (`["notice", guarantee,
+/// notice_ref_hash]`), built with the claim-notice gate.
+pub const RESERVED_SEED_PREFIXES: [&[u8]; 5] = [
     b"exit_buffer",
     b"exit_limit",
     b"instant_exit",
     b"adapter_state",
+    b"notice",
 ];
 
 /// Seeds of PDAs retired before the freeze (ADR 0019). No PDA may ever use
@@ -357,7 +359,8 @@ mod tests {
                 &b"exit_buffer"[..],
                 b"exit_limit",
                 b"instant_exit",
-                b"adapter_state"
+                b"adapter_state",
+                b"notice"
             ]
         );
     }
