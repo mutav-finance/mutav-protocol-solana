@@ -172,8 +172,12 @@ jobs:
       - name: Upgrade vault
         if: env.HAS_SECRETS == 'true'
         id: vault
+        # Inputs reach the script as env values, never as interpolated code.
+        env:
+          MULTISIG: ${{ inputs.multisig }}
+          VAULT_INDEX: ${{ inputs.vault_index }}
         run: |
-          vault="$(bun -e "import { squadsVaultAddress } from './scripts/devnet/lib/squads'; console.log(await squadsVaultAddress('${{ inputs.multisig }}', ${{ inputs.vault_index }}))")"
+          vault="$(bun -e "import { address } from '@solana/kit'; import { parseVaultIndex, squadsVaultAddress } from './scripts/devnet/lib/squads'; console.log(await squadsVaultAddress(address(process.env.MULTISIG), parseVaultIndex(process.env.VAULT_INDEX)))")"
           echo "vault=${vault}" >> "$GITHUB_OUTPUT"
 
       # 2–4. Buffer with authority set to the upgrade vault; its hash must
@@ -195,10 +199,13 @@ jobs:
       # outgrew ProgramData) as an unsigned proposal payload.
       - name: Upgrade proposal payload
         if: env.HAS_SECRETS == 'true'
+        env:
+          MULTISIG: ${{ inputs.multisig }}
+          VAULT_INDEX: ${{ inputs.vault_index }}
         run: |
           bun scripts/release/upgrade-proposal.ts --url "$RELEASE_RPC" --confirm-cluster "${{ inputs.cluster }}" \
             --program "$PROGRAM_ID" --buffer "${{ steps.buffer.outputs.buffer }}" \
-            --multisig "${{ inputs.multisig }}" --vault-index "${{ inputs.vault_index }}" \
+            --multisig "$MULTISIG" --vault-index "$VAULT_INDEX" \
             --so release/mutav.so --out upgrade-proposal.json
 
       # 5. Verify-PDA write, exported for the same vault transaction.

@@ -40,7 +40,18 @@ export type SquadsMultisig = {
   members: { key: Address; permissions: number }[];
 };
 
+/** A vault index from the command line: a decimal integer in [0, 255]; absent means 0. */
+export function parseVaultIndex(v: string | undefined): number {
+  if (v === undefined) return 0;
+  if (!/^\d{1,3}$/.test(v) || Number(v) > 255) throw new Error(`vault index must be an integer in [0, 255], got "${v}"`);
+  return Number(v);
+}
+
 export async function squadsVaultAddress(multisig: Address, vaultIndex = 0): Promise<Address> {
+  // The seed is one byte: 256 or NaN would silently wrap to another vault.
+  if (!Number.isInteger(vaultIndex) || vaultIndex < 0 || vaultIndex > 255) {
+    throw new Error(`vault index must be an integer in [0, 255], got ${vaultIndex}`);
+  }
   const utf8 = getUtf8Encoder();
   const [vault] = await getProgramDerivedAddress({
     programAddress: SQUADS_V4_PROGRAM,
