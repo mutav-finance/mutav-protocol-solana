@@ -160,7 +160,7 @@ bun scripts/devnet/verify.ts --config $CFG --url $RPC --confirm-cluster devnet
 - the upgrade authority is the upgrade multisig's vault;
 - `feature_flags == 0`;
 - admin, operator, pauser and the allowlist root are as configured;
-- every other `VaultConfig` field equals the config file, field by field (c, fee take, every cap including the settlement floor, price bounds, `income_take_bps == 0`, 6 decimals, mint, token program, money accounts, capital wallet);
+- every other `VaultConfig` field equals the config file, field by field (c, fee take, every cap including `max_nav_move_bps`, 6 decimals, mint, token program, money accounts, capital wallet);
 - on devnet, the locked devnet values (`scripts/devnet/lib/compare.ts`); a `max_claim_per_period` raised for a large claim payment is reported until it is lowered again;
 - the treasury and payments accounts hold the reserve mint and are not owned by the operator;
 - the reserve mint is owned by `reserveTokenProgram` and has 6 decimals;

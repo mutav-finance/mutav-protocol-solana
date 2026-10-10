@@ -2,11 +2,10 @@
  * Task 12, post-deploy checks (read-only):
  *
  * - upgrade authority == the config's `upgradeAuthority`;
- * - `feature_flags == 0` and `buffer_earmark == 0`;
+ * - `feature_flags == 0`;
  * - admin, operator, pauser and the allowlist root as configured;
  * - every other `VaultConfig` field equals the config file (c, fee take,
- *   every cap including the settlement floor, price bounds, income take 0,
- *   decimals 6, mint, token program, money accounts, capital wallet);
+ *   every cap including the NAV-move guard, decimals 6, mint, token program, money accounts, capital wallet);
  * - on devnet, the locked devnet values (lib/compare.ts `DEVNET_LOCKED`);
  * - the treasury and payments accounts hold the reserve mint and are not
  *   owned by the operator;
