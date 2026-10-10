@@ -25,9 +25,9 @@ Every account's padding is sized to hold every carve already planned for it, and
 | `VaultConfig` | 512 | Phase-2 `ExitParams` (275) and the ADR 0012 config fields (57: `claims_tail_secs`, `payment_term_secs`, `optional_categories`, `backstop_amount`, `backstop_commitment_hash`) | 332 | 180 |
 | `Caps` (nested) | 32 | Later caps for PC-43 (`max_guarantees`, a concentration limit, new cover per period) | ≥ 24 | 8 |
 | `VaultState` | 256 | Phase-2 `InstantExitState` (88), the buffer earmark (8), the claim-notice counter (4) and the ADR 0012 counters (16) | 116 | 140 |
-| `Guarantee` | **192** (was 64) | The ADR 0012 lifecycle fields: `contract_cap_hash`, `landlord_mandate_hash`, `exoneration_effective_ts`, `keys_returned_ts`, `claims_tail_until_ts` | 88 | 104 |
+| `Guarantee` | **204** (was 64; 192 plus the 12 bytes of the display fields removed by decision 8) | The ADR 0012 lifecycle fields: `contract_cap_hash`, `landlord_mandate_hash`, `exoneration_effective_ts`, `keys_returned_ts`, `claims_tail_until_ts` | 88 | 116 |
 | `ClaimFiling` | **192** | The ADR 0012 claim fields (49: `category`, `accrued_until_ts`, `request_complete_ts`, `debt_calc_hash`) and the settlement fields the filing does not already carry (65: `flags`, `landlord_mandate_hash`, `quitacao_hash`) | 114 | 78 |
-| `RedeemRequest` | 64 | The ADR 0010 partial-fill fields (`shares_filled`, `assets_filled`, `fill_count`, `last_fill_at`; the remainder is `shares − shares_filled`, so a zero carve reads as "nothing filled", R3) | 26 | 38 |
+| `RedeemRequest` | 56 (64 before the `shares_filled` carve, decision 6) | The rest of the ADR 0010 partial-fill fields (`assets_claimed`, `fill_count`, `last_fill_at`); the remainder `shares − shares_filled` and the claimable amount are derived, never stored | 18 | 38 |
 | `DepositRequest`, `IncomeReceipt` | 64 | None planned | 0 | 64 |
 
 The former `Payout` carve (74 bytes) repeated `category` and `request_complete_ts`, which the merged filing carries once, so the filing needs 114 bytes. Its padding is 192 so that about 78 bytes stay free after the freeze; the test requires at least 64 spare.
@@ -38,11 +38,11 @@ The former `Payout` carve (74 bytes) repeated `category` and `request_complete_t
 |---|---|---|
 | `VaultConfig` | 1,181 bytes (was 2,756) | 512, plus `Caps` 106 bytes with its own `_reserved` 32 |
 | `VaultState` | 688 bytes (was 480) | 256 |
-| `Guarantee` | 377 bytes | 192 |
+| `Guarantee` | 377 bytes | 204 |
 | `ClaimFiling` | 380 bytes | 192 |
 | `IncomeReceipt` | 143 bytes | 64 |
 | `DepositRequest` | 155 bytes | 64 |
-| `RedeemRequest` | 155 bytes | 64 |
+| `RedeemRequest` | 155 bytes | 56 |
 
 `AgencyExposure`, `Payout`, `HolderState` and `FeeReceipt` no longer exist (decisions 2–4).
 
@@ -67,7 +67,7 @@ ADR 0016's devnet caps are otherwise unchanged; the claim cap now reads "R$20k p
 - **`HolderState` (A9).** Removed, with both `init_if_needed` sites (`request_deposit`, `claim_shares`). The phase-2 holding period needs a per-wallet stamp; that returns with phase 2. A later rule that needs to know whether a wallet holds shares (exit stays open for de-listed holders) reads the share balance instead. The `"holder"` seed is retired.
 - **Take on issuer income (A10; amends ADR 0017).** `income_take_bps` and `income_take_total` are removed: all issuer income builds the reserve. `ConfigUpdated` id 17 is retired. `sweep_income` keeps the `treasury_account` account, address-checked and never written, until the interface PR drops it. `IncomeSwept` carries `amount` and `inbox_after` (no `gross`, `take`, `net`). A take, if MUTAV ever decides one (spec §12 Q47), returns as a carve.
 - **Dead errors, events and fields (A11).** Removed errors no instruction can raise: `StalePrice`, `PriceDeviation`, `AdapterNotWhitelisted`, `AdapterCapExceeded`, `SettlementFloorBreached`, `WorsensCoverage`, `ClaimNoticePending`, `NoticeNotResolved` (and `AgencyCapExceeded`, decision 3). Removed events no instruction emits: `AdapterWhitelisted`, `AdapterRemoved`, `ClaimNoticeFlagged`, `ClaimNoticeClosed`, `Allocated`, `Deallocated`. Removed event fields that were always constant: `StateRefreshed.buffer_earmark`, `free_capital`, `tesouro_price`, `price_stale`; `RedeemFilled.shares_remaining`, `partial`; `RedeemsFulfilled.head_partial`; `RedeemCancelled.assets_claimable`; `AssetsClaimed.closed`. **Error codes are renumbered now** (they follow enum order); from the devnet deploy the list is append-only, and each later feature appends its own errors.
-- **Partial-fill fields and the claim-notice counter (A12; amends ADR 0010).** `caps.min_fill_assets` (id 109, retired), the partial-fill request fields and `VaultState.pending_notices` with its inert checks in `fulfil_deposits` and `fulfil_redeems` are removed. `RedeemRequest` is now `shares`, `assets_out`, `nav_at_fill`, `requested_at`, `filled_at`, `status` (`PENDING = 0`, `FILLED = 1`). The pilot fills whole requests only (the first head that does not fit stops the batch); `claim_assets` and `cancel_redeem` close the request. ADR 0010 partial fills return as a carve (26 bytes: `shares_filled`, `assets_filled`, `fill_count`, `last_fill_at`, with the remainder derived as `shares − shares_filled` so that zero is the pilot behaviour) in the first post-hackathon upgrade, and the claim-notice counter (4 bytes) with the notice instructions, before outside capital.
+- **Partial-fill fields and the claim-notice counter (A12; amends ADR 0010).** `caps.min_fill_assets` (id 109, retired), the partial-fill request fields and `VaultState.pending_notices` with its inert checks in `fulfil_deposits` and `fulfil_redeems` are removed. `RedeemRequest` is now `shares`, `assets_out`, `nav_at_fill`, `requested_at`, `filled_at`, `status` (`PENDING = 0`, `FILLED = 1`). The pilot fills whole requests only (the first head that does not fit stops the batch); `claim_assets` and `cancel_redeem` close the request. ADR 0010 partial fills return in the first post-hackathon upgrade: `shares_filled` is carved now and written on every whole fill (decision 6), and the rest (18 bytes: `assets_claimed`, `fill_count`, `last_fill_at`) is carved then, with the remainder `shares − shares_filled` derived, never stored, and the claim-notice counter (4 bytes) with the notice instructions, before outside capital.
 - **`FeeReceipt` folded into `IncomeReceipt` (A13).** One receipt type for every booked inflow, told apart by `kind`: `ISSUER_STATEMENT = 0`, `FEE = 1`, `UNSOLICITED = 2`, `BACKSTOP = 3` (the last two reserved for later instructions; `is_supported` accepts only 0 and 1). The reference field is `ref_hash`. The separate seed prefixes stay, `["fee", config, invoice_ref_hash]` and `["income", config, income_ref_hash]`, so an invoice and a statement can never collide.
 
 **Zero means unset for the ADR 0012 carves.** When the ADR 0012 lifecycle is carved, `ClaimFiling.category = 0` and every zero hash or timestamp in the `Guarantee` carve mean "unset / legacy": a filing or guarantee created before that upgrade. The upgrade must read them that way (R3), never as a real category or date; `CAT_UNSPECIFIED = 0` already is never accepted by `file_claim`.
@@ -93,11 +93,24 @@ Each carved field is written zero and read by no instruction of this binary; zer
 | `max_reinstate_age` | `Caps` | How long after closing a guarantee may be reinstated (30 days on devnet) | Wave 2 (`reinstate_guarantee`) |
 | `approved_amount` | `ClaimFiling` | The amount the reserve admin approved for a claim above `max_claim_per_call` | Wave 2 (`approve_claim`) |
 
+One carve is written from day one: **`RedeemRequest.shares_filled: u64`** (8 bytes, from the front of `_reserved`). It is `0` while the request is pending and `shares` after the whole fill, and the remainder is derived, `shares − shares_filled`. So when ADR 0010 partial fills ship, every live request already reads correctly (a pending one with every share remaining, a filled one with none) without a patch rule, and no stored remainder can disagree with `shares`. Partial fills then only add `assets_claimed`, `fill_count` and `last_fill_at`.
+
 The `"unsolicited"` seed is reserved for the unsolicited-funds token account, created later. The unsolicited dust threshold is an off-chain setting (runbook and app), not a carve.
 
 ### 7. Retired seeds and ids are never reused
 
 `RETIRED_SEEDS = ["agency", "payout", "holder"]` and `RETIRED_FIELD_IDS` (13, 17, 102, 105, 106, 109, 200–205, 300–319) are guarded by unit tests: no pilot seed may equal or prefix a retired or reserved seed, and no `ConfigUpdated` field may take a retired id. A stale client can therefore never address a new account, or misread a new field, through an old seed or id.
+
+### 8. Data minimization: no personal data on-chain
+
+Only the guarantee financial data the reserve maths needs goes on-chain: covers, amounts paid and provisioned, statuses and timestamps. Personal and commercial data stays with the operator platform.
+
+- **Removed:** `Guarantee.rent`, `default_multiplier_bps` and `exit_multiplier_bps`. They were display-only, never used in maths, and the rent is commercial data about a private lease. They leave `register_guarantee`'s arguments, `GuaranteeRegistered` (`rent`) and the rule `rent > 0`; their 12 bytes return to `Guarantee._reserved` (204). The covers stay: they are the valor afiançado the reserve backs.
+- **`Guarantee.id`** is an opaque random id assigned by the operator platform, never a contract number, lease reference or anything derived from personal data.
+- **`Guarantee.agency_id`** is an opaque per-agency id assigned by the operator platform, never a CNPJ, a name or a hash of either. The mapping to the agency stays with the operator; per-agency figures on public pages are shown by that opaque id unless the agency agrees to be named.
+- **`refs_hash`, `notice_ref_hash`, `pix_e2e_hash`** (and the ADR 0012 hashes when they ship) are salted or keyed hashes, domain-separated per field, whose salts and keys stay with the operator. A party given the document and its salt can verify the commitment; nobody can confirm a guessed lease, notice or PIX id without it.
+
+The program cannot check any of this: it is an operator obligation, stated here and in the spec (§3.5) so that the platform and the audit hold the operator to it.
 
 ## Consequences
 
