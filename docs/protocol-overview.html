@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MUTAV Protocol Overview</title>
+<meta name="description" content="MUTAV: an on-chain reserve on Solana that backs rental guarantees in Brazil. Protocol overview for Colosseum judges.">
+<style>
+:root{
+  --bg:#f7f5f1; --surface:#ffffff; --surface-2:#f0ece4; --ink:#1b1916; --ink-2:#55504a; --ink-3:#8a837a;
+  --line:#e2dcd2; --accent:#b8740a; --accent-soft:#f6e6c8; --copper:#a4532e;
+  --ok:#2f7d4f; --ok-soft:#dcefe2; --warn:#a15c00; --warn-soft:#fbe9cf; --risk:#a33a2a; --risk-soft:#f7dcd6;
+  --blue:#2f5f9e; --blue-soft:#dde7f4; --code-bg:#f0ece4;
+  --radius:10px; --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+  --bg:#121110; --surface:#1b1a18; --surface-2:#242220; --ink:#efebe5; --ink-2:#b9b2a8; --ink-3:#857e75;
+  --line:#312e2a; --accent:#e8a020; --accent-soft:#3a2c12; --copper:#d4845a;
+  --ok:#6cc08f; --ok-soft:#1c2e23; --warn:#e8a020; --warn-soft:#352812; --risk:#ec8a78; --risk-soft:#3a1f1a;
+  --blue:#82aee6; --blue-soft:#1b2838; --code-bg:#242220;
+  color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121110; --surface:#1b1a18; --surface-2:#242220; --ink:#efebe5; --ink-2:#b9b2a8; --ink-3:#857e75;
+  --line:#312e2a; --accent:#e8a020; --accent-soft:#3a2c12; --copper:#d4845a;
+  --ok:#6cc08f; --ok-soft:#1c2e23; --warn:#e8a020; --warn-soft:#352812; --risk:#ec8a78; --risk-soft:#3a1f1a;
+  --blue:#82aee6; --blue-soft:#1b2838; --code-bg:#242220;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 var(--sans);overflow-x:hidden}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.84em;background:var(--code-bg);padding:.1em .35em;border-radius:4px;overflow-wrap:anywhere}
+pre{font-family:var(--mono);font-size:13px;background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;overflow-x:auto;line-height:1.6;margin:16px 0}
+pre code{background:none;padding:0;font-size:inherit;overflow-wrap:normal}
+pre.formula{border-left:3px solid var(--accent);color:var(--ink)}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px}
+/* cover */
+header.cover{background:var(--surface);border-bottom:1px solid var(--line)}
+header.cover .wrap{padding-top:40px;padding-bottom:32px}
+.eyebrow{font:600 12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 clamp(28px,5vw,42px)/1.12 var(--sans);margin:14px 0 10px;letter-spacing:-.015em}
+.lede{color:var(--ink-2);font-size:18px;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{font:500 12px/1 var(--sans);border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);padding:6px 10px;border-radius:999px}
+.chip.hot{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:600}
+.disclaimer{margin:18px 0 0;font-size:13px;color:var(--ink-3)}
+.theme-btn{float:right;font:500 12px var(--sans);background:none;border:1px solid var(--line);color:var(--ink-2);border-radius:999px;padding:6px 10px;cursor:pointer}
+/* contents */
+nav.contents{margin:28px 0 8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
+nav.contents .toc-h{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin:0 0 8px;font-family:var(--mono)}
+nav.contents ol{list-style:none;margin:0;padding:0;columns:2 280px;column-gap:28px}
+nav.contents li{break-inside:avoid;margin:3px 0}
+nav.contents a{text-decoration:none;color:var(--ink)}
+nav.contents a:hover{color:var(--accent)}
+.tnum{display:inline-block;min-width:26px;font:600 12px var(--mono);color:var(--accent)}
+/* body */
+main section.level2{padding:36px 0 4px}
+h2{font-size:24px;line-height:1.25;margin:0 0 12px;letter-spacing:-.01em}
+h2 .num{font:600 13px var(--mono);color:var(--accent);margin-right:10px;vertical-align:3px}
+h3{font-size:17px;margin:26px 0 8px}
+p{margin:0 0 14px}
+main ul,main ol{padding-left:22px;margin:0 0 14px}
+main li{margin:5px 0}
+.summary{font-size:17px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0;padding:16px 18px}
+.pull{font-size:18px;font-style:italic;color:var(--ink-2);border-left:3px solid var(--accent);padding-left:14px}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;line-height:1.5}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);margin:12px 0 18px}
+.tbl th,.tbl td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:600;background:var(--surface-2)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl td code{white-space:nowrap;overflow-wrap:normal}
+.muted{color:var(--ink-3)}
+/* stat tiles */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0 18px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+.stat .k{font:600 11px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.stat .v{font:700 24px/1.2 var(--sans);color:var(--ink);margin:6px 0 4px;letter-spacing:-.01em}
+.stat .d{font-size:13px;line-height:1.45;color:var(--ink-2)}
+.stat.core{background:var(--accent-soft);border-color:transparent}
+.stat.core .v,.stat.core .k{color:var(--accent)}
+/* safety cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin:14px 0 18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.card h3{margin:0 0 6px;font-size:16px}
+.card p{margin:0;font-size:14.5px;color:var(--ink-2)}
+.card p + p{margin-top:8px}
+.card.key{border-left:3px solid var(--ok)}
+/* routes */
+.routes{list-style:none;padding:0!important;margin:12px 0 18px!important;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.routes li{margin:0;padding:10px 14px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 12px}
+.routes li:last-child{border-bottom:none}
+.routes a{font:600 14px var(--mono);min-width:120px}
+.routes span{color:var(--ink-2);font-size:14.5px;flex:1 1 240px}
+.status{display:inline-block;font:700 10.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:5px 8px;border-radius:999px;vertical-align:2px}
+.status.live{background:var(--ok-soft);color:var(--ok)}
+.status.pending{background:var(--warn-soft);color:var(--warn)}
+.addr{font:13px var(--mono);overflow-wrap:anywhere;word-break:break-all}
+.cta{display:block;margin:20px 0 4px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:0 var(--radius) var(--radius) 0;padding:14px 18px;font-size:15px;color:var(--ink-2)}
+/* figures */
+figure.fig{margin:22px 0 24px}
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px;overflow-x:auto}
+.diagram svg{display:block;width:100%;min-width:620px;height:auto}
+figcaption{font-size:13.5px;color:var(--ink-2);margin-top:8px;line-height:1.5}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:6px}
+.legend i.money{border-color:var(--accent)}
+.legend i.rec{border-color:var(--ink-3);border-top-style:dashed}
+.legend i.auth{border-color:var(--blue);border-top-style:dashed}
+.d-box{fill:var(--surface-2);stroke:var(--line)} .d-core{fill:var(--accent-soft);stroke:var(--accent)}
+.d-wallet{fill:var(--surface);stroke:var(--ink-3)} .d-gov{fill:var(--blue-soft);stroke:var(--blue)}
+.d-t{fill:var(--ink);font:600 13px var(--sans)} .d-s{fill:var(--ink-2);font:11.5px var(--sans)} .d-m{fill:var(--ink-2);font:11px var(--mono)}
+.d-zone{fill:var(--ink-3);font:700 11px var(--mono);letter-spacing:.08em}
+.d-band{fill:var(--surface-2);opacity:.6} .d-band2{fill:var(--accent-soft);opacity:.35}
+.d-bound{stroke:var(--accent);stroke-width:1.3;stroke-dasharray:6 4;fill:none}
+.d-prog{fill:var(--accent);font:700 11px var(--mono);letter-spacing:.06em}
+.s-acc,.s-ink,.s-blue{fill:none;stroke-width:1.6}
+.s-acc{stroke:var(--accent)} .s-ink{stroke:var(--ink-3)} .s-blue{stroke:var(--blue)}
+.dash{stroke-dasharray:5 4}
+.mk-acc{fill:var(--accent)} .mk-ink{fill:var(--ink-3)} .mk-blue{fill:var(--blue)}
+.d-halo{paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
+footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;color:var(--ink-3);font-size:13px}
+@media (max-width:560px){
+  body{font-size:15.5px}
+  .theme-btn{float:none;margin-bottom:12px}
+  h2{font-size:21px}
+  nav.contents ol{columns:1}
+  .stat .v{font-size:21px}
+}
+@page{size:A4;margin:16mm 15mm 18mm}
+@media print{
+  html:root:not([data-print]){
+  --bg:#f7f5f1; --surface:#ffffff; --surface-2:#f0ece4; --ink:#1b1916; --ink-2:#55504a; --ink-3:#8a837a;
+  --line:#e2dcd2; --accent:#b8740a; --accent-soft:#f6e6c8; --copper:#a4532e;
+  --ok:#2f7d4f; --ok-soft:#dcefe2; --warn:#a15c00; --warn-soft:#fbe9cf; --risk:#a33a2a; --risk-soft:#f7dcd6;
+  --blue:#2f5f9e; --blue-soft:#dde7f4; --code-bg:#f0ece4;
+  color-scheme:light;
+  }
+  body{background:#fff;font-size:10.5pt;line-height:1.5}
+  .theme-btn{display:none}
+  .wrap{max-width:none;padding:0}
+  header.cover{background:#fff;border-bottom:none}
+  .diagram{overflow:visible}
+  .diagram svg{min-width:0}
+  .stat,.card,figure.fig,.routes li{break-inside:avoid}
+  h2,h3{break-after:avoid}
+  a{color:inherit;text-decoration:none}
+}
+</style>
+</head>
+<body>
+<header class="cover">
+  <div class="wrap">
+    <button class="theme-btn" id="themeBtn" type="button">Toggle theme</button>
+    <div class="eyebrow">Colosseum Crypto World's Fair · Solana</div>
+    <h1>MUTAV Protocol Overview</h1>
+    <p class="lede">An on-chain reserve on Solana that backs rental guarantees (<em>fiança</em>) in Brazil.</p>
+    <div class="meta">
+      <span class="chip hot">Devnet design · 2026-10-10</span>
+      <span class="chip">5-minute read</span>
+      <span class="chip">Live app: reserve.mutav.finance</span>
+    </div>
+    <p class="disclaimer">Not legal advice. Not an offer of securities. Unaudited software. Parameters shown are devnet values.</p>
+  </div>
+</header>
+<main class="wrap">
+<nav class="contents" aria-label="Contents"><h2 class="toc-h">Contents</h2><ol>
+<li><a href="#problem"><span class="tnum">1</span>The problem</a></li>
+<li><a href="#how"><span class="tnum">2</span>How MUTAV works</a></li>
+<li><a href="#numbers"><span class="tnum">3</span>The reserve in numbers</a></li>
+<li><a href="#safety"><span class="tnum">4</span>Why it is safe</a></li>
+<li><a href="#live"><span class="tnum">5</span>What's live</a></li>
+<li><a href="#built"><span class="tnum">6</span>Built with</a></li>
+<li><a href="#next"><span class="tnum">7</span>What's next</a></li>
+</ol></nav>
+
+<section class="level2" id="summary">
+<p class="summary">MUTAV is an institutional <em>fiador</em>. It gives Brazilian tenants a paid rental guarantee through the real-estate agencies that already run their leases, so no personal guarantor or cash deposit is needed. Every guarantee is backed by a BRL reserve held by a Solana program. The program records the cover of every active guarantee, refuses any capital movement that would leave that cover under-backed, and never blocks a claim payment for solvency reasons. Anyone can recompute the reserve's health from public state. The reserve is operational infrastructure that keeps the guarantees healthy. It is not a yield product.</p>
+</section>
+
+<section class="level2" id="problem">
+<h2><span class="num">1</span>The problem: rental guarantees in Brazil</h2>
+<p>Brazilian rental law lets a landlord ask for exactly one guarantee per lease (Lei 8.245/91, art. 37). That one guarantee is the landlord's only protection. In 2024 Brazil had <strong>17.8 million rented households</strong> (IBGE, PNAD Contínua).</p>
+<p>The usual options fail someone. A personal guarantor needs a friend or relative with a paid-off property. A cash deposit locks up to three months of rent for the whole lease. Fintech guarantors are cheap and fast, but their reserves are opaque. One of them, QuintoCred, stopped writing contracts in June 2025 and left about <strong>45,000 contracts and 3,000 partner agencies</strong> without a guarantor.</p>
+<p>We interviewed seven agency leaders in the South of Brazil. <strong>Five of the seven front the landlord's rent themselves</strong> while they wait for the guarantor to pay. They cite unilateral cancellation, waits of 60 to 90 days, partial payments and no visibility.</p>
+<p class="pull">Agencies don't distrust guarantees. They distrust guarantors, because they can't see the reserve or the payment clock.</p>
+<p>MUTAV makes the reserve public and bound by rules. A segregated bank account shows a balance once a month and cannot stop its owner in between. A program can: capital leaves only from surplus over the cover it backs, and every guarantee, provision and claim payment is an on-chain record anyone can check.</p>
+</section>
+
+<section class="level2" id="how">
+<h2><span class="num">2</span>How MUTAV works</h2>
+<p>Agencies never sign on-chain. They work in the MUTAV platform as they do today. MUTAV runs every chain touchpoint as the <strong>operator</strong>, and a separate <strong>Reserve Admin</strong> sets the limits the operator works within.</p>
+<ol>
+<li><strong>Register.</strong> When a lease is signed, the operator registers the guarantee with its cover: the R$ ceiling of the <em>fiança</em>. The solvency gate refuses the registration if the reserve can't back the new cover.</li>
+<li><strong>Guarantee fees.</strong> The tenant pays the guarantee fee with the rent. Each agency pays MUTAV one bill a month. The operator books it with <code>contribute_fees</code>: the net amount goes to the reserve and raises the value of every share, and MUTAV's take goes to a separate treasury account. Fees never mint shares.</li>
+<li><strong>Claims.</strong> When a tenant defaults, the agency sends a payment request. The operator files a claim on-chain, and the program sets the amount aside as a provision at once. Then <code>pay_claim</code> sends BRS to MUTAV's payments account, MUTAV pays the agency by Pix, and the agency pays the landlord. Each claim is one event, such as one month's rent.</li>
+<li><strong>Capital.</strong> Capital providers hold reserve shares. Deposits and redemptions go through a first-in, first-out queue and are filled at the on-chain share value. Redemptions are paid only from surplus over what the guarantees need. During the pilot the reserve runs on MUTAV's own capital and is not open to public investment.</li>
+</ol>
+
+<figure class="fig" id="fig-flow">
+<div class="diagram">
+<svg viewBox="0 0 800 520" role="img" aria-labelledby="flowTitle flowDesc" xmlns="http://www.w3.org/2000/svg">
+<title id="flowTitle">MUTAV money and record flow</title>
+<desc id="flowDesc">Off-chain, the tenant pays the guarantee fee to the agency, and the agency pays MUTAV a monthly bill. MUTAV, as operator, records guarantees and claims in the program's registry and sends net guarantee fees to the reserve. The reserve pays claims within caps to MUTAV's payments account, and MUTAV pays the agency by Pix, which pays the landlord. Capital providers deposit into and exit from the reserve through a queue. The Reserve Admin multisig sets caps and approves large claims; the pauser and guardians can only pause.</desc>
+<defs>
+<marker id="aAcc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acc" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="aInk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ink" d="M0,0 L10,5 L0,10 z"/></marker>
+<marker id="aBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-blue" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<!-- bands -->
+<rect class="d-band" x="0" y="8" width="800" height="152" rx="8"/>
+<text class="d-zone" x="16" y="28">OFF-CHAIN · MUTAV PLATFORM AND PIX</text>
+<rect class="d-band2" x="0" y="174" width="800" height="340" rx="8"/>
+<text class="d-zone" x="16" y="194">ON-CHAIN · SOLANA</text>
+
+<!-- off-chain boxes -->
+<rect class="d-wallet" x="20" y="48" width="140" height="78" rx="8"/>
+<text class="d-t" x="90" y="80" text-anchor="middle">Tenant</text>
+<text class="d-s" x="90" y="98" text-anchor="middle">and landlord</text>
+
+<rect class="d-box" x="250" y="48" width="150" height="78" rx="8"/>
+<text class="d-t" x="325" y="80" text-anchor="middle">Agency</text>
+<text class="d-s" x="325" y="98" text-anchor="middle">runs the lease</text>
+
+<rect class="d-box" x="490" y="48" width="170" height="78" rx="8"/>
+<text class="d-t" x="575" y="76" text-anchor="middle">MUTAV · Operator</text>
+<text class="d-s" x="575" y="94" text-anchor="middle">contracts, agencies,</text>
+<text class="d-s" x="575" y="109" text-anchor="middle">guarantees and claims</text>
+
+<!-- off-chain arrows -->
+<line class="s-acc" x1="162" y1="72" x2="246" y2="72" marker-end="url(#aAcc)"/>
+<text class="d-s" x="204" y="64" text-anchor="middle">guarantee fee</text>
+<line class="s-acc" x1="248" y1="104" x2="164" y2="104" marker-end="url(#aAcc)"/>
+<text class="d-s" x="204" y="122" text-anchor="middle">rent covered</text>
+
+<line class="s-acc" x1="402" y1="72" x2="486" y2="72" marker-end="url(#aAcc)"/>
+<text class="d-s" x="444" y="64" text-anchor="middle">monthly bill</text>
+<line class="s-acc" x1="488" y1="104" x2="404" y2="104" marker-end="url(#aAcc)"/>
+<text class="d-s" x="444" y="122" text-anchor="middle">Pix payment</text>
+
+<!-- program boundary -->
+<rect class="d-bound" x="232" y="214" width="370" height="146" rx="10"/>
+<text class="d-prog" x="246" y="232">MUTAV PROGRAM</text>
+
+<rect class="d-core" x="250" y="246" width="160" height="96" rx="8"/>
+<text class="d-t" x="330" y="276" text-anchor="middle">Reserve</text>
+<text class="d-s" x="330" y="294" text-anchor="middle">BRS, tracked internally</text>
+<text class="d-s" x="330" y="310" text-anchor="middle">solvency gate</text>
+<text class="d-m" x="330" y="328" text-anchor="middle">c × cover + buffer</text>
+
+<rect class="d-box" x="426" y="246" width="160" height="96" rx="8"/>
+<text class="d-t" x="506" y="276" text-anchor="middle">Guarantee registry</text>
+<text class="d-s" x="506" y="294" text-anchor="middle">cover per lease,</text>
+<text class="d-s" x="506" y="310" text-anchor="middle">claims, provisions</text>
+
+<rect class="d-wallet" x="22" y="252" width="160" height="84" rx="8"/>
+<text class="d-t" x="102" y="282" text-anchor="middle">Capital providers</text>
+<text class="d-s" x="102" y="300" text-anchor="middle">allowlisted wallets</text>
+<text class="d-s" x="102" y="316" text-anchor="middle">pilot: MUTAV only</text>
+
+<rect class="d-wallet" x="640" y="252" width="140" height="70" rx="8"/>
+<text class="d-t" x="710" y="282" text-anchor="middle">MUTAV payments</text>
+<text class="d-s" x="710" y="300" text-anchor="middle">account (BRS)</text>
+
+<!-- operator to program -->
+<line class="s-ink dash" x1="560" y1="128" x2="530" y2="242" marker-end="url(#aInk)"/>
+<text class="d-s d-halo" x="552" y="186">register, file claim</text>
+<line class="s-acc" x1="510" y1="128" x2="372" y2="242" marker-end="url(#aAcc)"/>
+<text class="d-s d-halo" x="434" y="178" text-anchor="end">guarantee fees (net)</text>
+
+<!-- capital queue -->
+<line class="s-acc" x1="184" y1="282" x2="246" y2="282" marker-end="url(#aAcc)"/>
+<text class="d-s" x="215" y="274" text-anchor="middle">deposit</text>
+<line class="s-acc" x1="248" y1="310" x2="186" y2="310" marker-end="url(#aAcc)"/>
+<text class="d-s" x="215" y="328" text-anchor="middle">exit</text>
+
+<!-- claim payment path -->
+<polyline class="s-acc" points="330,344 330,392 710,392 710,326" marker-end="url(#aAcc)"/>
+<text class="d-s d-halo" x="520" y="386" text-anchor="middle">claim payment, within caps (pay_claim)</text>
+<polyline class="s-acc" points="710,250 710,88 664,88" marker-end="url(#aAcc)"/>
+<text class="d-s d-halo" x="704" y="178" text-anchor="end">to Pix</text>
+
+<!-- governance -->
+<rect class="d-gov" x="232" y="432" width="300" height="64" rx="8"/>
+<text class="d-t" x="382" y="458" text-anchor="middle">Reserve Admin · Squads multisig</text>
+<text class="d-s" x="382" y="476" text-anchor="middle">caps, coverage ratio, large-claim approval</text>
+<line class="s-blue dash" x1="382" y1="430" x2="382" y2="364" marker-end="url(#aBlue)"/>
+<text class="d-s d-halo" x="372" y="420" text-anchor="end">time-locked</text>
+
+<rect class="d-gov" x="580" y="432" width="200" height="64" rx="8"/>
+<text class="d-t" x="680" y="458" text-anchor="middle">Pauser and guardians</text>
+<text class="d-s" x="680" y="476" text-anchor="middle">pause only</text>
+<line class="s-blue dash" x1="610" y1="430" x2="580" y2="364" marker-end="url(#aBlue)"/>
+</svg>
+</div>
+<figcaption>Figure 1. Agencies work off-chain. MUTAV, as operator, records every guarantee and claim on-chain and books guarantee fees into the reserve. Claims are paid from the reserve to MUTAV's payments account and on to the agency by Pix. The Reserve Admin and the pauser set limits; they don't run the guarantee cycle.</figcaption>
+<div class="legend"><span><i class="money"></i>money (BRS on-chain, BRL by Pix)</span><span><i class="rec"></i>records</span><span><i class="auth"></i>authority</span></div>
+</figure>
+
+<p>MUTAV also has a partnership with Nora, the issuer of BRS. Nora shares issuer revenue with its partners, and MUTAV routes that income into the reserve with <code>sweep_income</code>. It is booked apart from guarantee fees and never enters the coverage math.</p>
+</section>
+
+<section class="level2" id="numbers">
+<h2><span class="num">3</span>The reserve in numbers</h2>
+<p>The reserve does not hold the full cover of every lease. It holds a share of it, the coverage ratio <code>c</code>, plus a stress buffer for the claims that could be filed next. Filed claims are always held in full.</p>
+<pre class="formula"><code>coverage_required = max( c × remaining cover,
+                         provisions + min(stress buffer, unprovisioned cover) )</code></pre>
+<p>The gate checks this before new guarantees and redemptions. It never checks it before a claim payment. If claims push the reserve below target, new guarantees and redemptions stop until capital comes in or the book runs off. Claims keep being paid.</p>
+<p class="muted">Devnet values. Every cap is set by the Reserve Admin and changes only through the time-locked multisig.</p>
+<div class="stats">
+  <div class="stat core"><div class="k">Coverage ratio</div><div class="v">c = 0.10</div><div class="d">The program floor. It can't be set lower.</div></div>
+  <div class="stat"><div class="k">Stress buffer</div><div class="v">≈ R$19k</div><div class="d">Sized from the book: the three largest rents plus one exit payment.</div></div>
+  <div class="stat"><div class="k">Reserve asset</div><div class="v">BRS only</div><div class="d">Nora's BRL stablecoin, with a 100% settlement floor.</div></div>
+  <div class="stat"><div class="k">Maximum reserve</div><div class="v">R$300k</div><div class="d">At c = 0.10 this backs about R$3M of cover.</div></div>
+  <div class="stat"><div class="k">Cover per guarantee</div><div class="v">R$40k</div><div class="d">Ceiling for one lease.</div></div>
+  <div class="stat"><div class="k">Claim payments</div><div class="v">R$10k / R$20k</div><div class="d">Per call, and per sliding 30-day window.</div></div>
+  <div class="stat"><div class="k">Capital requests</div><div class="v">R$1k–R$100k</div><div class="d">Per deposit or redemption request.</div></div>
+  <div class="stat"><div class="k">Cover per agency</div><div class="v">R$10M</div><div class="d">Set well above the reserve's capacity, so it never binds.</div></div>
+</div>
+<p>A claim above the per-call cap needs the Reserve Admin's approval of the amount with <code>approve_claim</code>. Approved payments still count toward the 30-day cap.</p>
+</section>
+
+<section class="level2" id="safety">
+<h2><span class="num">4</span>Why it is safe</h2>
+<div class="cards">
+  <div class="card key"><h3>Operator and admin are separate</h3>
+  <p>The operator runs contracts, agencies and the whole guarantee and claim cycle. The Reserve Admin looks after the reserve's financial health and security through ceilings. It does not judge contracts. A separate pauser can stop the reserve and revoke the operator at once.</p>
+  <p>Roles change hands in two steps: the new key must accept, so a typo can't appoint a dead address.</p></div>
+
+  <div class="card key"><h3>Claims are never blocked by the solvency gate</h3>
+  <p>The gate protects the reserve from capital moving out. It never refuses a claim payment, and a pause doesn't stop claims either. Only the filed claim, the caps, liquid BRS or a frozen reserve can stop one.</p>
+  <p>MUTAV can also pay the agency by Pix from its bank first, and the reserve then reimburses MUTAV's payments account. Landlords are paid on time even while a large claim waits for approval.</p></div>
+
+  <div class="card key"><h3>A compromised operator has a hard ceiling</h3>
+  <p>The most a stolen operator key can cost is the admin-set claim caps. Claim payments are the only irreversible operator action. Everything else can be undone by another operator action: a registration by a void close, a close by reinstating the guarantee, a filed claim by withdrawing it.</p>
+  <p>Recovery: freeze, appoint a new operator, reconcile the platform's records with on-chain events, and correct with ordinary operator actions.</p></div>
+
+  <div class="card"><h3>Multisig with time locks</h3>
+  <p>The Reserve Admin is a Squads v4 multisig. Two multisigs with the same members hold authority: the admin multisig has a short time lock, and the upgrade multisig a long one. Every admin action is time-locked except pausing.</p>
+  <p>Up to three guardian keys, set by the admin, can pause and do nothing else.</p></div>
+
+  <div class="card"><h3>Donations can't move the share value</h3>
+  <p>The program tracks the amounts it moved, not raw token balances. BRS sent straight to a reserve account doesn't change the share value. Anyone can sweep it into a separate account for unsolicited money.</p>
+  <p>No money gets stuck: the Reserve Admin returns it to the sender or books it into the reserve. Guarantee fees and income wait until the first deposit is filled, so they can't be lost to share rounding.</p></div>
+
+  <div class="card"><h3>Transparent by default</h3>
+  <p>Every guarantee, provision, claim payment and capital movement is an on-chain account or event. Anyone can call <code>refresh</code> to recompute coverage and share value. The <a href="https://reserve.mutav.finance/reserve">/reserve</a> page shows it all with no wallet, including tracked against actual balances.</p>
+  <p>Holders can always exit. An investor removed from the allowlist can still redeem existing shares.</p></div>
+</div>
+<p>Two more guards: fills are refused while a sharp move in the share value is unexplained by verified inflows, and every account carries reserved space so later features need no migration.</p>
+</section>
+
+<section class="level2" id="live">
+<h2><span class="num">5</span>What's live</h2>
+<p><span class="status live">Live</span> The pilot app at <a href="https://reserve.mutav.finance">reserve.mutav.finance</a>. Until the reserve is initialized on devnet, its pages show a "being deployed" notice instead of numbers.</p>
+<ul class="routes">
+<li><a href="https://reserve.mutav.finance">/</a><span>The story, who does what, and the protocol diagram.</span></li>
+<li><a href="https://reserve.mutav.finance/reserve">/reserve</a><span>Public transparency: health, coverage, claims, money flows, the capital queue and every account on Solana Explorer. No wallet needed.</span></li>
+<li><a href="https://reserve.mutav.finance/operator">/operator</a><span>Operator console. During the pilot MUTAV's team signs by hand with the operator wallet.</span></li>
+<li><a href="https://reserve.mutav.finance/investor">/investor</a><span>Capital-provider view, gated by the on-chain allowlist.</span></li>
+<li><a href="https://reserve.mutav.finance/admin">/admin</a><span>Reserve Admin: Squads proposals to create, approve and execute after the time lock.</span></li>
+<li><a href="https://reserve.mutav.finance/demo">/demo</a><span>A guided walkthrough with the solvency-gate preview.</span></li>
+<li><a href="https://reserve.mutav.finance/simulator">/simulator</a><span>Reserve simulator: size the reserve and see coverage required.</span></li>
+</ul>
+<p><span class="status pending">Deploying</span> The devnet program. Its ID is declared; the other addresses are set at deploy.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>What</th><th>Address</th></tr></thead>
+<tbody>
+<tr><td>Program <code>mutav</code></td><td class="addr">8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9</td></tr>
+<tr><td>BRS mint (Nora, devnet)</td><td class="addr">BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4</td></tr>
+<tr><td>Reserve, multisig and roles</td><td class="muted">Set at deploy</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="level2" id="built">
+<h2><span class="num">6</span>Built with</h2>
+<div class="tbl-wrap"><table class="tbl">
+<tbody>
+<tr><td><strong>Anchor</strong></td><td>The <code>mutav</code> program: custody, shares, the guarantee registry, the solvency gate, the capital queue, roles and claim payments. Tested with LiteSVM.</td></tr>
+<tr><td><strong>Codama</strong></td><td>A TypeScript client generated from the program's IDL, with reads and a math mirror of the program. It composes transactions and never signs.</td></tr>
+<tr><td><strong>Squads v4</strong></td><td>The Reserve Admin and upgrade authority, with time locks.</td></tr>
+<tr><td><strong>BRS by Nora</strong></td><td>A 1:1 BRL stablecoin on Solana. The reserve holds BRS only.</td></tr>
+<tr><td><strong>Next.js</strong></td><td>The pilot app. It holds no keys: connected wallets sign.</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="level2" id="next">
+<h2><span class="num">7</span>What's next</h2>
+<ul>
+<li>A security audit, then a capped mainnet pilot with real guarantees.</li>
+<li>The operator moves from the hand-signed console to MUTAV's platform backend, with a key held in a key-management service.</li>
+<li>Partial fills at the head of the capital queue. The pilot fills whole requests only.</li>
+<li>A cumulative baseline for the share-value guard, and a tighter bound for the real pilot.</li>
+<li>Price protection for capital requests: a minimum amount out.</li>
+<li>The claim-notice gate, which holds capital fills while a missed-rent notice is open, before any outside capital.</li>
+<li>The full <em>fiança</em> lifecycle: exoneration notice, claims tail and settlement records. Space is already reserved in the accounts.</li>
+<li>More reserve assets, such as tokenized Brazilian treasury bonds, through capped adapters.</li>
+<li>Under discussion: a permissionless exit if the queue waits too long.</li>
+</ul>
+<a class="cta" href="technical-reference.html">For accounts, instructions, invariants and formulas, read the <strong>technical reference</strong>.</a>
+</section>
+
+</main>
+<footer><div class="wrap">MUTAV protocol overview · devnet design of 2026-10-10 · Apache-2.0 · Unaudited software.</div></footer>
+<script>
+(function(){
+  var root=document.documentElement;
+  try{var t=localStorage.getItem('mutav-theme'); if(t==='dark'||t==='light') root.setAttribute('data-theme',t);}catch(e){}
+  var btn=document.getElementById('themeBtn');
+  if(btn) btn.addEventListener('click',function(){
+    var dark=false;
+    try{dark=window.matchMedia('(prefers-color-scheme: dark)').matches;}catch(e){}
+    var cur=root.getAttribute('data-theme') || (dark?'dark':'light');
+    var next=cur==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next);
+    try{localStorage.setItem('mutav-theme',next);}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>
