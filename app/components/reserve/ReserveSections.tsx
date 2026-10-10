@@ -24,7 +24,7 @@ import {
   type ReserveView,
 } from "@/lib/view";
 import { navPerShare } from "@mutav-finance/mutav-protocol-solana";
-import { AgencyCapChart, ClaimSpeedChart, CoverChart, FlowChart, NavBasisChart, SolvencyChart } from "@/components/charts/Charts";
+import { AgencyCoverChart, ClaimSpeedChart, CoverChart, FlowChart, NavBasisChart, SolvencyChart } from "@/components/charts/Charts";
 import { RoleTag } from "@/components/RoleTag";
 import { ACCOUNT_ROLES, FLOW_ROLES, type AccountRole } from "@/lib/roles";
 
@@ -77,14 +77,14 @@ export function Health({ r }: { r: ReserveView }) {
         <MetricCard label="Stable assets" value={fmtBrs(sol.stableAssets)} unit="BRS held by the reserve (brs_balance; BRS only in the pilot)" tooltip="Internal accounting of the reserve token account. Excludes pending deposits and assets owed to filled redemptions." />
         <MetricCard label="Coverage required" value={fmtBrs(sol.coverageRequired)} unit={`${fmtBps(r.config.coverageRatioBps)} of remaining cover`} tooltip="The coverage ratio c is the share of remaining cover the reserve must hold in stable assets (at least 10%): coverage required is ceil(c × remaining cover of every active guarantee), and never less than the open claim provisions." />
         <MetricCard label="Surplus" value={fmtBrs(sol.surplus)} unit="stable assets − coverage required" />
-        <MetricCard label="Free capital" value={fmtBrs(sol.freeCapital)} unit="what new guarantees and redemptions may use" tooltip="Surplus minus the instant-exit earmark, which is always zero in the pilot." />
+        <MetricCard label="Free capital" value={fmtBrs(sol.freeCapital)} unit="what new guarantees and redemptions may use" tooltip="Stable assets above coverage required." />
         <MetricCard label="NAV per share" value={fmtNav(s.navPerShare)} unit={`published at last refresh · now ${fmtNav(navNow)}`} tooltip="Net assets (stable assets − open claim provisions) ÷ shares outstanding. The published value updates on refresh; 'now' recomputes it from the current accounts." />
         <MetricCard label="Shares outstanding" value={fmtShares(s.sharesOutstanding)} unit="reserve shares" />
         <MetricCard label="Open provisions" value={fmtBrs(s.provisions)} unit="filed, unpaid claims (lower NAV now)" />
         <MetricCard label="Active guarantees" value={String(s.activeGuarantees)} unit={`${fmtBrs(s.remainingCoverTotal)} remaining cover`} />
       </div>
       <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-3)", margin: 0 }}>
-        Assets: BRS {fmtBrs(s.brsBalance, 0)}{sol.tesouroValue > 0n ? <> · through adapters {fmtBrs(sol.tesouroValue, 0)}</> : " (100% BRS, pilot)"} · income inbox {fmtBrs(r.incomeInbox.amount, 0)}, not yet counted. The reserve holds BRS, expandable through adapters.{" "}
+        Assets: BRS {fmtBrs(s.brsBalance, 0)} (100% BRS, pilot) · income inbox {fmtBrs(r.incomeInbox.amount, 0)}, not yet counted. The reserve holds BRS, expandable through adapters.{" "}
         <Link href="/admin#allocation" className="ext-link">How assets are managed and added →</Link>
       </p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
@@ -104,7 +104,7 @@ export function Health({ r }: { r: ReserveView }) {
 
 export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   const rows = coverageRows(l.guarantees);
-  const agencies = agencyRows(l.exposures, r.config.caps.maxCoverPerAgency);
+  const agencies = agencyRows(l.guarantees);
   const sum = activeRemainingCover(rows);
   const matches = sum === r.state.remainingCoverTotal;
   return (
@@ -115,7 +115,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       {(rows.some((g) => g.active) || agencies.length > 0) && (
         <div className="grid-2">
           <CoverChart rows={rows} />
-          <AgencyCapChart rows={agencies} cap={r.config.caps.maxCoverPerAgency} />
+          <AgencyCoverChart rows={agencies} />
         </div>
       )}
       {rows.length === 0 ? (
@@ -141,15 +141,13 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       {agencies.length === 0 ? (
         <Empty>No agency exposure yet.</Empty>
       ) : (
-        <Table label="Per-agency exposure" head={["Agency", ["Outstanding cover", "num"], ["Of agency cap", "num"], ["Active", "num"], ["Claims paid", "num"], "Account"]}>
+        <Table label="Per-agency exposure" head={["Agency", ["Outstanding cover", "num"], ["Active", "num"], ["Claims paid", "num"]]}>
           {agencies.map((a) => (
-            <tr key={a.address}>
+            <tr key={a.agencyId}>
               <td><Mono>{short(a.agencyId)}</Mono></td>
               <Num>{fmtBrs(a.outstandingCover)}</Num>
-              <Num>{fmtBps(a.capUsedBps, 1)}</Num>
               <Num>{a.activeGuarantees}</Num>
               <Num>{fmtBrs(a.claimsPaidTotal)}</Num>
-              <td><Explorer value={a.address} /></td>
             </tr>
           ))}
         </Table>
@@ -161,32 +159,23 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
 // ── Claims timeline ─────────────────────────────────────────────────────────
 
 export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
-  const rows = claimsTimeline(l, r.config.payoutSlaSecs, r.now);
+  const rows = claimsTimeline(l);
   if (rows.length === 0) return <Empty>No claims filed yet.</Empty>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-    <ClaimSpeedChart rows={rows} slaSecs={r.config.payoutSlaSecs} now={r.now} />
-    <Table label="Claims timeline" head={["Guarantee", "Leg", ["Amount", "num"], "Filed", "Paid", ["Filed → paid", "num"], "Settled (PIX)", ["Paid → settled", "num"], "PIX E2E hash", "Late"]}>
+    <ClaimSpeedChart rows={rows} now={r.now} />
+    <Table label="Claims timeline" head={["Guarantee", "Leg", ["Amount", "num"], "Filed", "Paid", ["Filed → paid", "num"], "Settled (PIX)", ["Paid → settled", "num"], "PIX E2E hash"]}>
       {rows.map((c) => (
         <tr key={c.filing}>
           <td><Explorer value={c.guarantee} label={short(c.guaranteeId)} /></td>
           <td><Mono>{c.leg}</Mono></td>
           <Num>{fmtBrs(c.amount ?? c.provision)}</Num>
           <td><Explorer value={c.filing} label={fmtTime(c.filedAt)} /></td>
-          <td>{c.payout && c.paidAt !== null ? <Explorer value={c.payout} label={fmtTime(c.paidAt)} /> : <Mono dim>—</Mono>}</td>
+          <td>{c.paidAt !== null ? <Explorer value={c.filing} label={fmtTime(c.paidAt)} /> : <Mono dim>—</Mono>}</td>
           <Num>{c.fileToPay !== null ? fmtDuration(c.fileToPay) : "—"}</Num>
           <td><Mono dim={c.settledAt === null}>{c.settledAt !== null ? fmtTime(c.settledAt) : "pending"}</Mono></td>
           <Num>{c.payToSettle !== null ? fmtDuration(c.payToSettle) : "—"}</Num>
           <td><Mono dim>{c.pixE2eHash ? short(c.pixE2eHash) : "—"}</Mono></td>
-          <td>
-            {c.lateOnChain ? (
-              <Mono style={{ color: "var(--color-error)" }}>late</Mono>
-            ) : c.overdue ? (
-              <Mono style={{ color: "var(--color-copper)" }} >past SLA (refresh records it)</Mono>
-            ) : (
-              <Mono dim>on time</Mono>
-            )}
-          </td>
         </tr>
       ))}
     </Table>
@@ -314,7 +303,7 @@ export function Disclosures({ r }: { r: ReserveView }) {
         "Claim payments are never blocked by solvency",
         <>
           The solvency gate stops new guarantees and redemptions when free capital runs out; it never stops <Mono>pay_claim</Mono>. Claim payments are capped per call
-          ({fmtBrs(r.config.caps.maxClaimPerCall)}) and per period ({fmtBrs(r.config.caps.maxClaimPerPeriod)} per {fmtDuration(r.config.caps.claimPeriodSecs)}).
+          ({fmtBrs(r.config.caps.maxClaimPerCall)}) and per period ({fmtBrs(r.config.caps.maxClaimPerPeriod)} in any 31 days).
         </>,
       )}
       {item(

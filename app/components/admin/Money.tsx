@@ -8,14 +8,13 @@
  */
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { MAX_INCOME_TAKE_BPS } from "@mutav-finance/mutav-protocol-solana";
 import { Section } from "@/components/Section";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { RoleLine, RoleTag } from "@/components/RoleTag";
 import { Grid, TextField, useLive } from "@/components/demo/shared";
 import { AdminAction, Cards, DataTable, ExternalTag, Facts, PLANNED, Sub, WhatThis, type Mode } from "@/components/admin/shared";
-import { ConfigCard, bpsField, brsField, secsField } from "@/components/admin/ConfigCard";
+import { ConfigCard, bpsField, brsField } from "@/components/admin/ConfigCard";
 import { capsError, MAX_FEE_TAKE_BPS } from "@/lib/admin";
 import { fmtBrs, fmtShares, fmtTime, parseBrs } from "@/lib/format";
 import { claimCap } from "@/lib/operator";
@@ -104,7 +103,7 @@ function Fees({ mode }: { mode: Mode }) {
   );
 }
 
-function Income({ mode }: { mode: Mode }) {
+function Income() {
   const { reserve, ledger } = useLive();
   const s = incomeSummary(reserve, ledger.income, 3);
   return (
@@ -131,16 +130,6 @@ function Income({ mode }: { mode: Mode }) {
           ))}
         </DataTable>
       )}
-      <Cards>
-        <ConfigCard
-          title="Income take"
-          mode={mode}
-          fields={[bpsField("incomeTakeBps", "Income take (bps)", reserve.config.incomeTakeBps, MAX_INCOME_TAKE_BPS)]}
-          build={(v) => ({ kind: "set_config", incomeTakeBps: v.incomeTakeBps as number })}
-          bound={`≤ MAX_INCOME_TAKE_BPS = ${MAX_INCOME_TAKE_BPS} · fails closed`}
-          does="MUTAV's share of each swept Nora statement, sent to the treasury; the rest builds the reserve. The program cap is 0 until spec §12 Q47 decides it, so set_config refuses any non-zero take and every swept real goes to the reserve. Raising the cap is a program upgrade."
-        />
-      </Cards>
     </Sub>
   );
 }
@@ -163,22 +152,14 @@ function Redemptions({ mode }: { mode: Mode }) {
         <AdminAction title="Fulfil redemptions" label="fulfil_redeems" mode={mode} request={{ kind: "fulfil_redeems", count: Math.max(1, Number(count) || 1), maxAssets: parseBrs(maxAssets) ?? (1n << 64n) - 1n }}>
           <Facts
             now={m(`${q.redeems.length} waiting · free capital ${fmtBrs(reserve.solvency.freeCapital, 0)}`)}
-            bound={m(`each fill ≤ free capital · partial fills ≥ ${fmtBrs(reserve.config.caps.minFillAssets, 0)} · up to 8 per call`)}
-            does="Pays redemptions in FIFO order at NAV, from free capital only (the solvency gate). Frozen in under-coverage and while paused or halted; the head may be filled partially."
+            bound={m("each fill ≤ free capital · whole requests only · up to 8 per call")}
+            does="Pays redemptions in FIFO order at NAV, from free capital only (the solvency gate). Frozen in under-coverage and while paused or halted; a head that does not fit stops the batch."
           />
           <Grid>
             <TextField id="adm-red" label="Count" value={count} onChange={setCount} numeric />
             <TextField id="adm-max" label="Max BRS (blank = no limit)" value={maxAssets} onChange={setMaxAssets} numeric />
           </Grid>
         </AdminAction>
-        <ConfigCard
-          title="Partial-fill floor"
-          mode={mode}
-          fields={[brsField("minFillAssets", "Partial-fill floor (BRS)", reserve.config.caps.minFillAssets)]}
-          build={(v) => ({ kind: "set_config", caps: { minFillAssets: v.minFillAssets as bigint } })}
-          bound="BRS amount"
-          does="The smallest piece fulfil_redeems may fill at the head of the queue when free capital cannot pay it whole (ADR 0010)."
-        />
       </Cards>
     </Sub>
   );
@@ -200,16 +181,16 @@ function Claims({ mode }: { mode: Mode }) {
       </Contexts>
       <Cards>
         <ConfigCard
-          title="Claim-payment caps and payout SLA"
+          title="Claim-payment caps"
           mode={mode}
-          fields={[brsField("maxClaimPerCall", "Max per call (BRS)", c.caps.maxClaimPerCall), brsField("maxClaimPerPeriod", "Max per period (BRS)", c.caps.maxClaimPerPeriod), secsField("claimPeriodSecs", "Period (seconds)", c.caps.claimPeriodSecs, 1n), secsField("payoutSlaSecs", "Payout SLA (seconds)", c.payoutSlaSecs)]}
+          fields={[brsField("maxClaimPerCall", "Max per call (BRS)", c.caps.maxClaimPerCall), brsField("maxClaimPerPeriod", "Max per 31 days (BRS)", c.caps.maxClaimPerPeriod)]}
           build={(v) => {
             const caps: Record<string, bigint> = {};
-            for (const k of ["maxClaimPerCall", "maxClaimPerPeriod", "claimPeriodSecs"]) if (v[k] !== undefined) caps[k] = v[k] as bigint;
-            return { kind: "set_config", caps, payoutSlaSecs: v.payoutSlaSecs as bigint | undefined };
+            for (const k of ["maxClaimPerCall", "maxClaimPerPeriod"]) if (v[k] !== undefined) caps[k] = v[k] as bigint;
+            return { kind: "set_config", caps };
           }}
-          bound="period > 0 · SLA ≥ 0"
-          does="Bound what the operator key can pay: per pay_claim and per rolling window. They bound a compromised key, not MUTAV's liability; a payment above them is the admin path below. The payout SLA is how long a paid claim may wait for its PIX settlement before refresh records it late."
+          bound="BRS amounts"
+          does="Bound what the operator key can pay: per pay_claim and over any 31 days (a sliding window, ADR 0019). They bound a compromised key, not MUTAV's liability; a payment above them is the admin path below. The payout SLA lives in the operator platform, not in the program."
         />
       </Cards>
       <DataTable label="Planned claim path" head={["Instruction", "Signer", "What it will do", "Status"]}>
@@ -242,7 +223,7 @@ export function Money({ mode }: { mode: Mode }) {
       <Divider>In</Divider>
       <Deposits mode={mode} />
       <Fees mode={mode} />
-      <Income mode={mode} />
+      <Income />
       <Divider>Out</Divider>
       <Redemptions mode={mode} />
       <Claims mode={mode} />

@@ -1,48 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { claimCap, claimCapRefusal, claimWork, DUTIES, instructionName, payoutsDue } from "../operator";
+import { claimCap, claimCapRefusal, claimWork, DUTIES, instructionName } from "../operator";
 import { instructionsBy } from "../roles";
 import type { ClaimRow } from "../view";
 import { BRL, config } from "./fixtures";
 
-const c = config(); // 10,000 per call, 20,000 per 30-day period
+const c = config(); // 10,000 per call, 20,000 per 31 days
 
-describe("claim-payment cap window", () => {
-  it("counts what was paid in an open window", () => {
-    const cap = claimCap(c, { claimPeriodStart: 1_000n, claimPeriodPaid: 12_500n * BRL }, 2_000n);
-    expect(cap).toMatchObject({ paid: 12_500n * BRL, remaining: 7_500n * BRL, rolled: false, windowEnd: 1_000n + 2_592_000n, maxNextPayment: 7_500n * BRL });
+describe("claim-payment cap window (31 daily buckets, ADR 0019)", () => {
+  const DAY = 86_400n;
+  const d0 = 20_000n;
+  const ring = (entries: [bigint, bigint][]) => {
+    const b = Array(31).fill(0n) as bigint[];
+    for (const [day, v] of entries) b[Number(day % 31n)] = v;
+    return b;
+  };
+
+  it("counts what was paid in the last 31 days", () => {
+    const s = { claimDayBuckets: ring([[d0, 12_500n * BRL]]), claimDayAnchor: d0 };
+    const cap = claimCap(c, s, (d0 + 30n) * DAY);
+    expect(cap).toMatchObject({ paid: 12_500n * BRL, remaining: 7_500n * BRL, maxNextPayment: 7_500n * BRL });
   });
 
-  it("treats an ended window as rolled, as pay_claim will", () => {
-    const cap = claimCap(c, { claimPeriodStart: 1_000n, claimPeriodPaid: 20_000n * BRL }, 1_000n + 2_592_000n);
-    expect(cap).toMatchObject({ paid: 0n, remaining: 20_000n * BRL, rolled: true, maxNextPayment: 10_000n * BRL });
-  });
-
-  it("has no window before the first payment", () => {
-    expect(claimCap(c, { claimPeriodStart: 0n, claimPeriodPaid: 0n }, 5n)).toMatchObject({ windowStart: null, windowEnd: null, remaining: 20_000n * BRL });
+  it("drops a day once it leaves the window, as pay_claim will", () => {
+    const s = { claimDayBuckets: ring([[d0, 20_000n * BRL]]), claimDayAnchor: d0 };
+    expect(claimCap(c, s, (d0 + 31n) * DAY)).toMatchObject({ paid: 0n, remaining: 20_000n * BRL, maxNextPayment: 10_000n * BRL });
   });
 
   it("previews which cap a payment would hit", () => {
-    const cap = claimCap(c, { claimPeriodStart: 1n, claimPeriodPaid: 15_000n * BRL }, 2n);
+    const cap = claimCap(c, { claimDayBuckets: ring([[d0, 15_000n * BRL]]), claimDayAnchor: d0 }, d0 * DAY);
     expect(claimCapRefusal(cap, 11_000n * BRL)).toBe("ClaimCallCapExceeded");
     expect(claimCapRefusal(cap, 6_000n * BRL)).toBe("ClaimPeriodCapExceeded");
     expect(claimCapRefusal(cap, 5_000n * BRL)).toBeNull();
   });
 });
 
-describe("payouts against the SLA", () => {
-  const row = (filing: string, stage: ClaimRow["stage"], paidAt: bigint | null, lateOnChain = false, overdue = false) =>
-    ({ filing, guaranteeId: "g", leg: "default", amount: 1n, stage, paidAt, lateOnChain, overdue }) as ClaimRow;
-
-  it("lists paid, unsettled payouts by due date, with time left and late flags", () => {
-    const due = payoutsDue([row("A", "paid", 500n), row("B", "settled", 100n), row("C", "paid", 100n), row("D", "filed", null)], 300n, 450n);
-    expect(due.map((d) => [d.filing, d.dueAt, d.secondsLeft, d.late])).toEqual([
-      ["C", 400n, -50n, true],
-      ["A", 800n, 350n, false],
-    ]);
-  });
+describe("operator work", () => {
+  const row = (filing: string, stage: ClaimRow["stage"], paidAt: bigint | null) =>
+    ({ filing, guaranteeId: "g", leg: "default", amount: 1n, stage, paidAt }) as ClaimRow;
 
   it("counts the operator's open work", () => {
-    expect(claimWork([row("A", "filed", null), row("B", "paid", 1n, false, true), row("C", "settled", 1n, true)])).toEqual({ toPay: 1, toSettle: 1, late: 2 });
+    expect(claimWork([row("A", "filed", null), row("B", "paid", 1n), row("C", "settled", 1n)])).toEqual({ toPay: 1, toSettle: 1 });
   });
 });
 

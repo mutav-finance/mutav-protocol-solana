@@ -2,8 +2,7 @@
 
 /**
  * The permissionless `refresh` instruction, sent from any connected wallet.
- * It recomputes and publishes NAV, coverage and mode on-chain, and records
- * late flags on pending claim payments past their SLA.
+ * It recomputes and publishes NAV, coverage and mode on-chain.
  */
 import { Button } from "@/components/ui/button";
 import { TxStatus } from "@/components/TxStatus";

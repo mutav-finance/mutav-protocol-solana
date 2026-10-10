@@ -7,7 +7,7 @@
  * instruction once mutav-app's backend sends it with the KMS-held key; where
  * the spec does not document a trigger it says so instead of inventing one.
  */
-import type { VaultConfig, VaultState } from "@mutav-finance/mutav-protocol-solana";
+import { CLAIM_WINDOW_DAYS, claimWindowPaid, type VaultConfig, type VaultState } from "@mutav-finance/mutav-protocol-solana";
 import type { ClaimRow } from "./view";
 
 export type OperatorInstruction = "register_guarantee" | "close_guarantee" | "contribute_fees" | "sweep_income" | "file_claim" | "pay_claim" | "settle_payout";
@@ -57,13 +57,13 @@ export const DUTIES: Duty[] = [
     ix: "pay_claim",
     today: "Pay a filed claim from the reserve to the payments account.",
     later: "Triggered by the MUTAV platform after the filing.",
-    bound: "≤ max per call; ≤ what is left of the per-period cap; ≤ the filing's provision plus the leg's unprovisioned cover; liquid BRS only; destination fixed to the payments account. Never solvency-gated.",
+    bound: "≤ max per call; ≤ what is left of the cap over the last 31 days; ≤ the filing's provision plus the leg's unprovisioned cover; liquid BRS only; destination fixed to the payments account. Never solvency-gated.",
   },
   {
     ix: "settle_payout",
     today: "Record the PIX settlement (hash of the end-to-end id) once the agency has been paid.",
     later: "Triggered by the PIX confirmation after MUTAV offramps BRS → BRL and pays the agency.",
-    bound: "Payout pending; the PIX hash is non-zero. Settling after paid_at + payout SLA marks it late, on-chain and for good.",
+    bound: "Claim paid and not yet settled; the PIX hash is non-zero. The program sets no deadline: the payout SLA is the operator platform's (ADR 0019).",
   },
 ];
 
@@ -71,37 +71,30 @@ export const DUTIES: Duty[] = [
 
 export type ClaimCap = {
   perCall: bigint;
+  /** The cap over any 31 UTC days (ADR 0019). */
   perPeriod: bigint;
   periodSecs: bigint;
-  /** Window start as stored; null before the first payment. */
-  windowStart: bigint | null;
-  windowEnd: bigint | null;
-  /** Paid in the current window. Zero once the stored window has ended: the next pay_claim rolls it. */
+  /** Paid in the last 31 days, as the next pay_claim would count it. */
   paid: bigint;
   remaining: bigint;
-  /** The stored window has ended; the next pay_claim starts a new one. */
-  rolled: boolean;
   /** Largest single pay_claim the caps allow now. */
   maxNextPayment: bigint;
 };
 
-export function claimCap(c: Pick<VaultConfig, "caps">, s: Pick<VaultState, "claimPeriodStart" | "claimPeriodPaid">, now: bigint): ClaimCap {
-  const { maxClaimPerCall: perCall, maxClaimPerPeriod: perPeriod, claimPeriodSecs: periodSecs } = c.caps;
-  const started = s.claimPeriodStart > 0n;
-  const windowEnd = started ? s.claimPeriodStart + periodSecs : null;
-  // spec §5.4 pay_claim rule 4: roll the window if now ≥ start + period.
-  const rolled = !started || now >= windowEnd!;
-  const paid = rolled ? 0n : s.claimPeriodPaid;
+export function claimCap(
+  c: Pick<VaultConfig, "caps">,
+  s: Pick<VaultState, "claimDayBuckets" | "claimDayAnchor">,
+  now: bigint,
+): ClaimCap {
+  const { maxClaimPerCall: perCall, maxClaimPerPeriod: perPeriod } = c.caps;
+  const paid = claimWindowPaid(s, now);
   const remaining = perPeriod > paid ? perPeriod - paid : 0n;
   return {
     perCall,
     perPeriod,
-    periodSecs,
-    windowStart: started ? s.claimPeriodStart : null,
-    windowEnd,
+    periodSecs: BigInt(CLAIM_WINDOW_DAYS) * 86_400n,
     paid,
     remaining,
-    rolled,
     maxNextPayment: remaining < perCall ? remaining : perCall,
   };
 }
@@ -113,27 +106,11 @@ export function claimCapRefusal(cap: ClaimCap, amount: bigint): "ClaimCallCapExc
   return null;
 }
 
-// ── Payouts against the SLA ─────────────────────────────────────────────────
-
-export type PayoutDue = { filing: string; guaranteeId: string; leg: string; amount: bigint; paidAt: bigint; dueAt: bigint; secondsLeft: bigint; late: boolean };
-
-/** Paid, unsettled claims: when each settlement is due (paid_at + SLA) and how long is left. Most urgent first. */
-export function payoutsDue(rows: ClaimRow[], slaSecs: bigint, now: bigint): PayoutDue[] {
-  return rows
-    .filter((c) => c.stage === "paid" && c.paidAt !== null)
-    .map((c) => {
-      const dueAt = c.paidAt! + slaSecs;
-      return { filing: c.filing, guaranteeId: c.guaranteeId, leg: c.leg, amount: c.amount ?? 0n, paidAt: c.paidAt!, dueAt, secondsLeft: dueAt - now, late: c.lateOnChain || now > dueAt };
-    })
-    .sort((a, b) => Number(a.dueAt - b.dueAt));
-}
-
-/** Claims the operator still has to act on: filed and unpaid, paid and unsettled, and late ones. */
+/** Claims the operator still has to act on: filed and unpaid, paid and unsettled. */
 export function claimWork(rows: ClaimRow[]) {
   return {
     toPay: rows.filter((c) => c.stage === "filed").length,
     toSettle: rows.filter((c) => c.stage === "paid").length,
-    late: rows.filter((c) => c.lateOnChain || c.overdue).length,
   };
 }
 

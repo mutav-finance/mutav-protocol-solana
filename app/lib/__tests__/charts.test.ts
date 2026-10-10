@@ -39,13 +39,13 @@ describe("chart shaping", () => {
   });
 
   it("measures claim speed from on-chain timestamps, including pending time so far", () => {
-    const base = { guarantee: "G", guaranteeId: "g", leg: "default", noticeRefHash: "", provision: 0n, amount: 0n, pixE2eHash: null, lateOnChain: false, overdue: false } as const;
+    const base = { guarantee: "G", guaranteeId: "g", leg: "default", noticeRefHash: "", provision: 0n, amount: 0n, pixE2eHash: null } as const;
     const rows = [
-      { ...base, filing: "F2", filedAt: 200n, paidAt: 260n, settledAt: null, stage: "paid", fileToPay: 60n, payToSettle: null, payout: "P2" },
-      { ...base, filing: "F1", filedAt: 100n, paidAt: 110n, settledAt: 140n, stage: "settled", fileToPay: 10n, payToSettle: 30n, payout: "P1" },
-      { ...base, filing: "F3", filedAt: 300n, paidAt: null, settledAt: null, stage: "filed", fileToPay: null, payToSettle: null, payout: null },
+      { ...base, filing: "F2", filedAt: 200n, paidAt: 260n, settledAt: null, stage: "paid", fileToPay: 60n, payToSettle: null },
+      { ...base, filing: "F1", filedAt: 100n, paidAt: 110n, settledAt: 140n, stage: "settled", fileToPay: 10n, payToSettle: 30n },
+      { ...base, filing: "F3", filedAt: 300n, paidAt: null, settledAt: null, stage: "filed", fileToPay: null, payToSettle: null },
     ] as ClaimRow[];
-    const s = claimSpeed(rows, 50n, 400n);
+    const s = claimSpeed(rows, 400n);
     expect(s.claims.map((c) => [c.filing, c.fileToPay, c.payToSettle, c.pending])).toEqual([
       ["F1", 10n, 30n, false],
       ["F2", 60n, 140n, true],
@@ -53,19 +53,15 @@ describe("chart shaping", () => {
     ]);
     expect(s.payAxis).toBe(60n);
     expect(s.settleAxis).toBe(140n);
-    expect(claimSpeed(rows.slice(1, 2), 500n, 400n).settleAxis).toBe(500n);
   });
 
   it("totals flows by kind with the role that moved them", () => {
-    const { bars, axis } = flowBars({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, incomeNetToReserve: 1_500n, incomeTakeToTreasury: 0n, claimsPaid: 2_500n, depositsIn: 0n, redemptionsOut: 0n });
+    const { bars, axis } = flowBars({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, incomeNetToReserve: 1_500n, claimsPaid: 2_500n, depositsIn: 0n, redemptionsOut: 0n });
     expect(axis).toBe(2_500n);
     expect(bars.find((b) => b.key === "claims")).toMatchObject({ direction: "out", by: "operator", source: "state" });
     expect(bars.find((b) => b.key === "deposits")).toMatchObject({ direction: "in", by: "admin", requestedBy: "investor", source: "events" });
     expect(bars.find((b) => b.key === "take")).toMatchObject({ direction: "outside" });
-    // ADR 0017: issuer income flows in, swept by the operator; with a 0 take there is no take bar.
+    // ADR 0017: issuer income flows in, swept by the operator; there is no take on it (ADR 0019).
     expect(bars.find((b) => b.key === "income")).toMatchObject({ direction: "in", by: "operator", amount: 1_500n, source: "state" });
-    expect(bars.find((b) => b.key === "income-take")).toBeUndefined();
-    const withTake = flowBars({ feesNetToReserve: 0n, feeTakeToTreasury: 0n, incomeNetToReserve: 750n, incomeTakeToTreasury: 250n, claimsPaid: 0n, depositsIn: 0n, redemptionsOut: 0n });
-    expect(withTake.bars.find((b) => b.key === "income-take")).toMatchObject({ direction: "outside", amount: 250n });
   });
 });

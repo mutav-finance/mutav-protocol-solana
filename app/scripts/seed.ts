@@ -122,20 +122,15 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     // so localnet mirrors devnet.
     coverageRatioBps: 1_000,
     feeTakeBps: 2_000,
-    payoutSlaSecs: 172_800,
     caps: {
       maxTvl: "300000000000",
       maxCoverPerGuarantee: "40000000000",
-      maxCoverPerAgency: "10000000000000",
       maxClaimPerCall: "10000000000",
       maxClaimPerPeriod: "20000000000",
-      claimPeriodSecs: 2_592_000,
-      minSettlementBps: 10_000,
       minRequest: "1000000000",
       maxRequest: "100000000000",
-      minFillAssets: "500000000",
+      maxNavMoveBps: 10_000,
     },
-    price: { tesouroPriceAccount: "11111111111111111111111111111111", p0: 1_000_000_000, t0: 0, yMaxBps: 1_500, maxStalenessSecs: 86_400, maxDeviationBps: 200, maxNavMoveBps: 10_000 },
     allowlist,
   });
   await p.send(rpc, s("admin"), [await p.composeInitialize(cfg, { upgradeAuthority: s("admin"), payer: s("admin") })]);

@@ -56,18 +56,9 @@ export type AdminTx =
       coverageRatioBps?: number;
       /** MUTAV's take from each guarantee fee, `≤ MAX_FEE_TAKE_BPS` (3_000). */
       feeTakeBps?: number;
-      caps?: Partial<Record<"maxTvl" | "maxCoverPerGuarantee" | "maxCoverPerAgency" | "maxClaimPerCall" | "maxClaimPerPeriod" | "minRequest" | "maxRequest" | "minFillAssets" | "claimPeriodSecs", bigint>>;
-      /** `payout_sla_secs`: payment → PIX settlement before a payout is late (≥ 0). */
-      payoutSlaSecs?: bigint;
-      /**
-       * `caps.min_settlement_bps`, the settlement floor (ADR 0018), 0–10_000.
-       * The program stores its complement `caps.max_allocated_bps`.
-       */
-      minSettlementBps?: number;
-      /** TESOURO price parameters (spec §7); blank fields carry over. */
-      price?: PriceDraft;
-      /** MUTAV's take from issuer income (ADR 0017); `≤ MAX_INCOME_TAKE_BPS`, 0 until spec §12 Q47. */
-      incomeTakeBps?: number;
+      caps?: Partial<Record<"maxTvl" | "maxCoverPerGuarantee" | "maxClaimPerCall" | "maxClaimPerPeriod" | "minRequest" | "maxRequest", bigint>>;
+      /** `caps.max_nav_move_bps`, the NAV-move guard (spec §7), 0–10_000. */
+      maxNavMoveBps?: number;
     }
   | { kind: "set_allowlist_root"; owners: string[] }
   /** Replace the operator and pauser keys (distinct from the admin and each other). */
