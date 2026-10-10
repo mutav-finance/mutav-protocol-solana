@@ -10,7 +10,6 @@ const BRL = 1_000_000n;
 
 /** The on-chain VaultConfig a correct initialize from `cfg` would leave. */
 function onChainFrom(cfg: DeployConfig): VaultConfig {
-  const { minSettlementBps, ...caps } = cfg.caps;
   const b = blankConfig();
   return {
     ...b,
@@ -24,11 +23,8 @@ function onChainFrom(cfg: DeployConfig): VaultConfig {
     feeTakeBps: cfg.feeTakeBps,
     paymentsAccount: cfg.paymentsAccount,
     treasuryAccount: cfg.treasuryAccount,
-    payoutSlaSecs: cfg.payoutSlaSecs,
     mutavCapitalWallet: cfg.mutavCapitalWallet,
-    incomeTakeBps: 0,
-    caps: { ...b.caps, ...caps, maxAllocatedBps: 10_000 - minSettlementBps },
-    price: { ...b.price, ...cfg.price },
+    caps: { ...b.caps, ...cfg.caps },
   };
 }
 
@@ -47,14 +43,9 @@ describe('compareConfig (on-chain vs the deploy config)', () => {
     ['caps.max_cover_per_guarantee', (c) => (c.caps.maxCoverPerGuarantee += 1n)],
     ['caps.max_claim_per_call', (c) => (c.caps.maxClaimPerCall += 1n)],
     ['caps.max_claim_per_period', (c) => (c.caps.maxClaimPerPeriod += 1n)],
-    ['caps.claim_period_secs', (c) => (c.caps.claimPeriodSecs += 1n)],
-    ['caps.min_settlement_bps', (c) => (c.caps.maxAllocatedBps = 500)],
     ['caps.min_request', (c) => (c.caps.minRequest += 1n)],
     ['caps.max_request', (c) => (c.caps.maxRequest += 1n)],
-    ['caps.min_fill_assets', (c) => (c.caps.minFillAssets += 1n)],
-    ['price.max_nav_move_bps', (c) => (c.price.maxNavMoveBps = 100)],
-    ['price.max_staleness_secs', (c) => (c.price.maxStalenessSecs = 1n)],
-    ['income_take_bps', (c) => (c.incomeTakeBps = 100)],
+    ['caps.max_nav_move_bps', (c) => (c.caps.maxNavMoveBps = 100)],
     ['reserve_decimals', (c) => (c.reserveDecimals = 9)],
     ['reserve_mint', (c) => (c.reserveMint = testAddress(50))],
     ['reserve_token_program', (c) => (c.reserveTokenProgram = testAddress(51))],
@@ -90,12 +81,9 @@ describe('checkDevnetLocked', () => {
       'caps.max_cover_per_guarantee': 40_000n * BRL,
       'caps.max_claim_per_call': 10_000n * BRL,
       'caps.max_claim_per_period': 20_000n * BRL,
-      'caps.claim_period_secs': 2_592_000n,
       'caps.min_request': 1_000n * BRL,
       'caps.max_request': 100_000n * BRL,
-      'caps.min_settlement_bps': 10_000n,
-      'price.max_nav_move_bps': 10_000n,
-      income_take_bps: 0n,
+      'caps.max_nav_move_bps': 10_000n,
       reserve_decimals: 6n,
     });
   });
@@ -103,11 +91,11 @@ describe('checkDevnetLocked', () => {
   test('a drifted value fails, naming the field', () => {
     const c = onChainFrom(devnetCfg());
     c.caps.maxTvl = 500_000n * BRL;
-    c.caps.maxAllocatedBps = 1;
+    c.caps.maxNavMoveBps = 1;
     const f = checkDevnetLocked(c);
     expect(f).toHaveLength(2);
     expect(f[0]).toStartWith('caps.max_tvl:');
-    expect(f[1]).toStartWith('caps.min_settlement_bps:');
+    expect(f[1]).toStartWith('caps.max_nav_move_bps:');
   });
 
   test('a raised claim cap per period says it must be lowered after the large payment', () => {

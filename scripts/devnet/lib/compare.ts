@@ -1,12 +1,12 @@
 /**
  * verify.ts: the on-chain `VaultConfig` against the deploy config, field by
  * field, and on devnet against the locked devnet values. Table-driven so
- * fields can be added or removed with the program's layout (PRs 1–2 add
- * `stress_buffer`, the unsolicited dust threshold and guardians, and remove
- * the per-agency cap and the payout SLA). Pure over decoded data.
+ * fields can be added or removed with the program's layout (PR 2 adds
+ * `stress_buffer`, the unsolicited dust threshold and guardians to the
+ * config interface). Pure over decoded data.
  */
 import { getAddressDecoder, type Address } from '@solana/kit';
-import { minSettlementBps, type VaultConfig } from '../../../clients/js/src';
+import type { VaultConfig } from '../../../clients/js/src';
 import { RESERVE_DECIMALS } from './checks';
 import type { DeployConfig } from './config';
 
@@ -24,29 +24,13 @@ export type FieldCheck = {
 export const CONFIG_FIELDS: FieldCheck[] = [
   { field: 'coverage_ratio_bps', onChain: (c) => v(c.coverageRatioBps), expected: (f) => v(f.coverageRatioBps) },
   { field: 'fee_take_bps', onChain: (c) => v(c.feeTakeBps), expected: (f) => v(f.feeTakeBps) },
-  // TODO(PR 1): the payout SLA is removed from the program; drop this row.
-  { field: 'payout_sla_secs', onChain: (c) => v(c.payoutSlaSecs), expected: (f) => v(f.payoutSlaSecs) },
   { field: 'caps.max_tvl', onChain: (c) => v(c.caps.maxTvl), expected: (f) => v(f.caps.maxTvl) },
   { field: 'caps.max_cover_per_guarantee', onChain: (c) => v(c.caps.maxCoverPerGuarantee), expected: (f) => v(f.caps.maxCoverPerGuarantee) },
-  // TODO(PR 1): the per-agency cap is removed from the program; drop this row.
-  { field: 'caps.max_cover_per_agency', onChain: (c) => v(c.caps.maxCoverPerAgency), expected: (f) => v(f.caps.maxCoverPerAgency) },
   { field: 'caps.max_claim_per_call', onChain: (c) => v(c.caps.maxClaimPerCall), expected: (f) => v(f.caps.maxClaimPerCall) },
   { field: 'caps.max_claim_per_period', onChain: (c) => v(c.caps.maxClaimPerPeriod), expected: (f) => v(f.caps.maxClaimPerPeriod) },
-  { field: 'caps.claim_period_secs', onChain: (c) => v(c.caps.claimPeriodSecs), expected: (f) => v(f.caps.claimPeriodSecs) },
-  // Stored as its complement `max_allocated_bps` (ADR 0018); compared as the floor.
-  { field: 'caps.min_settlement_bps', onChain: (c) => v(minSettlementBps(c)), expected: (f) => v(f.caps.minSettlementBps) },
   { field: 'caps.min_request', onChain: (c) => v(c.caps.minRequest), expected: (f) => v(f.caps.minRequest) },
   { field: 'caps.max_request', onChain: (c) => v(c.caps.maxRequest), expected: (f) => v(f.caps.maxRequest) },
-  { field: 'caps.min_fill_assets', onChain: (c) => v(c.caps.minFillAssets), expected: (f) => v(f.caps.minFillAssets) },
-  { field: 'price.tesouro_price_account', onChain: (c) => c.price.tesouroPriceAccount, expected: (f) => f.price.tesouroPriceAccount },
-  { field: 'price.p0', onChain: (c) => v(c.price.p0), expected: (f) => v(f.price.p0) },
-  { field: 'price.t0', onChain: (c) => v(c.price.t0), expected: (f) => v(f.price.t0) },
-  { field: 'price.y_max_bps', onChain: (c) => v(c.price.yMaxBps), expected: (f) => v(f.price.yMaxBps) },
-  { field: 'price.max_staleness_secs', onChain: (c) => v(c.price.maxStalenessSecs), expected: (f) => v(f.price.maxStalenessSecs) },
-  { field: 'price.max_deviation_bps', onChain: (c) => v(c.price.maxDeviationBps), expected: (f) => v(f.price.maxDeviationBps) },
-  { field: 'price.max_nav_move_bps', onChain: (c) => v(c.price.maxNavMoveBps), expected: (f) => v(f.price.maxNavMoveBps) },
-  // Never set from the file (ADR 0017, spec §12 Q47 stays 0).
-  { field: 'income_take_bps', onChain: (c) => v(c.incomeTakeBps), expected: () => 0n },
+  { field: 'caps.max_nav_move_bps', onChain: (c) => v(c.caps.maxNavMoveBps), expected: (f) => v(f.caps.maxNavMoveBps) },
   { field: 'reserve_decimals', onChain: (c) => v(c.reserveDecimals), expected: () => v(RESERVE_DECIMALS) },
   { field: 'reserve_mint', onChain: (c) => c.reserveMint, expected: (f) => f.reserveMint },
   { field: 'reserve_token_program', onChain: (c) => c.reserveTokenProgram, expected: (f) => f.reserveTokenProgram },
@@ -79,9 +63,9 @@ export type LockedValue = {
 /**
  * The locked devnet values (handoff "Devnet values"). A devnet deploy must
  * hold every one of them.
- * TODO(PR 1): `max_cover_per_agency` and `payout_sla_secs` are removed, so
- * they are not locked here. TODO(PR 2): add `stress_buffer` (R$19k) and the
- * unsolicited dust threshold (R$10) once `VaultConfig` carries them.
+ * The claim window is the program constant `CLAIM_WINDOW_DAYS` (31), so it
+ * is not a config value. TODO(PR 2): add `stress_buffer` (R$19k) and the
+ * unsolicited dust threshold (R$10) once `initialize` / `set_config` set them.
  */
 export const DEVNET_LOCKED: LockedValue[] = [
   { field: 'coverage_ratio_bps', onChain: (c) => v(c.coverageRatioBps), value: 1_000n },
@@ -95,12 +79,9 @@ export const DEVNET_LOCKED: LockedValue[] = [
     value: 20_000n * BRL,
     whenRaised: 'the cap is raised (e.g. for a large claim payment); lower it back to the locked value with set_config once that payment is made',
   },
-  { field: 'caps.claim_period_secs', onChain: (c) => v(c.caps.claimPeriodSecs), value: 2_592_000n },
   { field: 'caps.min_request', onChain: (c) => v(c.caps.minRequest), value: 1_000n * BRL },
   { field: 'caps.max_request', onChain: (c) => v(c.caps.maxRequest), value: 100_000n * BRL },
-  { field: 'caps.min_settlement_bps', onChain: (c) => v(minSettlementBps(c)), value: 10_000n },
-  { field: 'price.max_nav_move_bps', onChain: (c) => v(c.price.maxNavMoveBps), value: 10_000n },
-  { field: 'income_take_bps', onChain: (c) => v(c.incomeTakeBps), value: 0n },
+  { field: 'caps.max_nav_move_bps', onChain: (c) => v(c.caps.maxNavMoveBps), value: 10_000n },
   { field: 'reserve_decimals', onChain: (c) => v(c.reserveDecimals), value: v(RESERVE_DECIMALS) },
 ];
 
