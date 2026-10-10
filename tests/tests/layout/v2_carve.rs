@@ -269,7 +269,10 @@ fn v1_requests_read_as_v2_with_the_remainder_derived() {
     assert_eq!(v2.status, mutav::constants::REDEEM_PENDING);
     assert_eq!((v2.shares, v2.shares_filled), (4_000 * BRL, 0));
     assert_eq!(v2.shares_remaining(), v2.shares);
-    assert_eq!((v2.assets_claimed, v2.fill_count, v2.last_fill_at), (0, 0, 0));
+    assert_eq!(
+        (v2.assets_claimed, v2.fill_count, v2.last_fill_at),
+        (0, 0, 0)
+    );
     assert_eq!(v2._reserved, [0; 38]);
     // After the whole fill: shares_filled == shares, nothing remaining.
     f.fulfil_redeems(1, u64::MAX, &[seq]).unwrap();
@@ -277,5 +280,8 @@ fn v1_requests_read_as_v2_with_the_remainder_derived() {
     assert_eq!(v2.status, mutav::constants::REDEEM_FILLED);
     assert_eq!(v2.shares_filled, v2.shares);
     assert_eq!(v2.shares_remaining(), 0);
-    assert_eq!((v2.assets_claimed, v2.fill_count, v2.last_fill_at), (0, 0, 0));
+    assert_eq!(
+        (v2.assets_claimed, v2.fill_count, v2.last_fill_at),
+        (0, 0, 0)
+    );
 }
