@@ -1,26 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getAddressDecoder, type Address } from '@solana/kit';
+import { example, filled } from './fixtures';
 import { parseConfig } from '../devnet/lib/config';
 import { assertOutsideRepo, REPO_ROOT } from '../devnet/lib/cli';
 
-const example = () => JSON.parse(readFileSync(join(import.meta.dir, '..', 'devnet', 'devnet.example.json'), 'utf8'));
-
-/** A distinct, valid test address per index. */
-export const testAddress = (i: number): Address => getAddressDecoder().decode(new Uint8Array(32).fill(i + 1));
-
-/** The example with every founder input filled by a distinct test address. */
-export function filled() {
-  let i = 0;
-  const fill = (v: any): any => {
-    if (typeof v === 'string' && v.startsWith('<FILL')) return testAddress(i++);
-    if (Array.isArray(v)) return v.map((x) => fill(x));
-    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fill(x)]));
-    return v;
-  };
-  return fill(example());
-}
 
 describe('devnet.example.json', () => {
   test('lists every founder input and refuses to load unfilled', () => {

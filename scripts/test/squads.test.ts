@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { address, getAddressEncoder, type Address } from '@solana/kit';
+import { address } from '@solana/kit';
+import { A, B, C, multisigBytes } from './fixtures';
 import {
   checkSquadsAccount,
   checkSquadsMultisig,
@@ -11,47 +12,6 @@ import {
   SQUADS_V4_PROGRAM,
 } from '../devnet/lib/squads';
 
-const enc = getAddressEncoder();
-const A: Address = address('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM');
-const B: Address = address('2JgjeWXmFMtYhbqFrBy4xR4yLTeRKt9Qs5MvVr9ZJmKz');
-const C: Address = address('7Np41oeYqPefeNQEHSv1UDhYrehxin3NStELsSKCT4K2');
-
-/** Fixture bytes in the Squads v4 Multisig layout. */
-function multisigBytes(o: {
-  configAuthority?: Address;
-  threshold?: number;
-  timeLock?: number;
-  rentCollector?: Address | null;
-  members?: [Address, number][];
-}): Uint8Array {
-  const members = o.members ?? [
-    [A, 7],
-    [B, 7],
-    [C, 7],
-  ];
-  const parts: number[] = [...MULTISIG_DISCRIMINATOR];
-  const push32 = (a: Address) => parts.push(...enc.encode(a));
-  const le = (v: bigint, n: number) => {
-    for (let i = 0; i < n; i++) parts.push(Number((v >> BigInt(8 * i)) & 0xffn));
-  };
-  push32(C); // create_key
-  push32(o.configAuthority ?? DEFAULT_PUBKEY);
-  le(BigInt(o.threshold ?? 2), 2);
-  le(BigInt(o.timeLock ?? 86_400), 4);
-  le(17n, 8); // transaction_index
-  le(3n, 8); // stale_transaction_index
-  if (o.rentCollector) {
-    parts.push(1);
-    push32(o.rentCollector);
-  } else parts.push(0);
-  parts.push(254); // bump
-  le(BigInt(members.length), 4);
-  for (const [k, p] of members) {
-    push32(k);
-    parts.push(p);
-  }
-  return new Uint8Array(parts);
-}
 
 describe('decodeSquadsMultisig', () => {
   test('decodes every field', () => {
