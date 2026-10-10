@@ -18,6 +18,30 @@ export function programDataUpgradeAuthority(data: Uint8Array): Address | null {
   return getAddressDecoder().decode(data.subarray(13, 45));
 }
 
+/** Every cap is sized for BRS base units (6 dp); a 9-dp mint would shrink them 1000x. */
+export const RESERVE_DECIMALS = 6;
+
+/**
+ * The reserve mint as read from the chain: owned by the configured token
+ * program, an initialised mint, with 6 decimals. Returns the failures.
+ */
+export function checkReserveMint(
+  account: { owner: Address; data: Uint8Array } | null,
+  cfg: { reserveMint: Address; reserveTokenProgram: Address },
+): string[] {
+  if (!account) return [`reserve mint ${cfg.reserveMint} not found`];
+  const out: string[] = [];
+  if (account.owner !== cfg.reserveTokenProgram) {
+    out.push(`reserve mint ${cfg.reserveMint} is owned by ${account.owner}, not reserveTokenProgram ${cfg.reserveTokenProgram}`);
+  }
+  // SPL Token / Token-2022 base Mint layout: decimals at 44, is_initialized at 45.
+  if (account.data.length < 82) return [...out, `reserve mint ${cfg.reserveMint} is not a mint (${account.data.length} bytes)`];
+  if (account.data[45] !== 1) out.push(`reserve mint ${cfg.reserveMint} is not initialised`);
+  const decimals = account.data[44]!;
+  if (decimals !== RESERVE_DECIMALS) out.push(`reserve mint ${cfg.reserveMint} has decimals ${decimals}, expected ${RESERVE_DECIMALS}`);
+  return out;
+}
+
 export type Expected = {
   upgradeAuthority: Address;
   admin: Address;

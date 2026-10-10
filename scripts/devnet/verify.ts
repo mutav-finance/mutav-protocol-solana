@@ -12,7 +12,7 @@
  */
 import { buildAllowlist, fetchReserve } from '../../clients/js/src';
 import { assertConfigCluster, guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
-import { postDeployChecks } from './lib/checks';
+import { checkReserveMint, postDeployChecks, RESERVE_DECIMALS } from './lib/checks';
 import { programDataAddress } from './lib/compose';
 import { loadConfig } from './lib/config';
 import { accountData, accountInfo, rpcFor, type ReadRpc } from './lib/rpc';
@@ -49,6 +49,10 @@ export async function main(args: Args) {
     pauser: cfg.pauser,
     allowlistRoot: (await buildAllowlist(cfg.allowlist)).root,
   });
+  if (r.config.data.reserveDecimals !== RESERVE_DECIMALS) {
+    failures.push(`reserve_decimals is ${r.config.data.reserveDecimals}, expected ${RESERVE_DECIMALS}`);
+  }
+  failures.push(...checkReserveMint(await accountInfo(rpc, cfg.reserveMint), cfg));
   failures.push(...(await multisigChecks(rpc, cfg)));
   if (failures.length) {
     for (const f of failures) console.error(`FAIL ${f}`);

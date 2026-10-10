@@ -10,16 +10,17 @@
  * proposal is for the upgrade multisig; it sets `VaultConfig.admin` to the
  * admin multisig's vault (`squads`).
  *
- * Writes caps and params from the config file. Reads the chain (ProgramData)
- * only to check the upgrade authority first. Signs nothing.
+ * Writes caps and params from the config file. Reads the chain first: the
+ * reserve mint (owned by `reserveTokenProgram`, 6 decimals) and ProgramData
+ * (the upgrade authority). Signs nothing.
  */
 import { createNoopSigner, type Address } from '@solana/kit';
 import { assertConfigCluster, guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
 import { composeInitialize, programDataAddress } from './lib/compose';
 import { loadConfig, type DeployConfig } from './lib/config';
-import { programDataUpgradeAuthority } from './lib/checks';
+import { checkReserveMint, programDataUpgradeAuthority } from './lib/checks';
 import { toPayload, writePayload } from './lib/proposal';
-import { accountData, rpcFor } from './lib/rpc';
+import { accountData, accountInfo, rpcFor } from './lib/rpc';
 import { squadsVaultAddress } from './lib/squads';
 
 export async function assertAdminIsVault(cfg: DeployConfig) {
@@ -43,7 +44,10 @@ export async function main(args: Args) {
   await assertAdminIsVault(cfg);
   const vault = await assertUpgradeAuthorityIsVault(cfg);
   const multisig = cfg.upgradeSquads.multisig;
-  const pd = await accountData(rpcFor(url), await programDataAddress(cfg.programId));
+  const rpc = rpcFor(url);
+  const mintFailures = checkReserveMint(await accountInfo(rpc, cfg.reserveMint), cfg);
+  if (mintFailures.length) throw new Error(`refusing to initialize:\n  ${mintFailures.join('\n  ')}`);
+  const pd = await accountData(rpc, await programDataAddress(cfg.programId));
   if (!pd) throw new Error(`program ${cfg.programId} is not deployed at ${url}`);
   const ua = programDataUpgradeAuthority(pd);
   if (ua !== cfg.upgradeAuthority) throw new Error(`upgrade authority is ${ua}, expected ${cfg.upgradeAuthority}; run deploy.ts first`);
