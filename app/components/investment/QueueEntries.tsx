@@ -3,9 +3,8 @@
 /**
  * "What is waiting": the wallet's queue entries as a status-first table
  * (ui-reference pattern 9), six columns, ready rows first. The request time
- * moves under the request link instead of taking a column. Claim buttons live
- * in the action panel; rows keep cancels (and any other action the panel does
- * not show), so every action appears once. A verify footer closes the block.
+ * moves under the request link instead of taking a column. Each row carries
+ * its own actions (cancel, claim). A verify footer closes the block.
  */
 import Link from "next/link";
 import { Explorer } from "@/components/Explorer";
@@ -14,7 +13,7 @@ import { Action } from "@/components/demo/shared";
 import { fmtTime } from "@/lib/format";
 import type { InvestorView } from "@/lib/server/investor";
 import type { InvestorRequest } from "@/lib/view";
-import { ACTION_LABEL, Block, StatusOf, claimOf, lineOf, rowActions, sideName, waitingOf } from "./shared";
+import { ACTION_LABEL, Block, StatusOf, claimOf, lineOf, sideName, waitingOf } from "./shared";
 
 /** Ready first, then waiting in line (front of the line first), then the rest, newest first. */
 function sortRows(rows: InvestorRequest[]): InvestorRequest[] {
@@ -28,7 +27,7 @@ function sortRows(rows: InvestorRequest[]): InvestorRequest[] {
 }
 
 function RowActions({ x, connected }: { x: InvestorRequest; connected: boolean }) {
-  const actions = rowActions(x);
+  const actions = x.actions;
   if (actions.length === 0) return <Mono dim>—</Mono>;
   return (
     <div className="flex flex-wrap gap-2">
@@ -70,7 +69,7 @@ function Rows({ rows, connected }: { rows: InvestorRequest[]; connected: boolean
               <dd className="m-0 text-right">{waitingOf(x)}</dd>
               <dd className="m-0 text-right">{claimOf(x)}</dd>
             </dl>
-            {rowActions(x).length > 0 && <RowActions x={x} connected={connected} />}
+            {x.actions.length > 0 && <RowActions x={x} connected={connected} />}
           </li>
         ))}
       </ul>
@@ -150,7 +149,7 @@ export function QueueEntries({ rows, owner, connected, inv }: { rows: InvestorRe
     <Block
       id="queue-h"
       flush
-      title="Your queue entries"
+      title="Your requests"
       info="Requests wait in queue order until the Reserve Admin fulfils them. Cancels and claims need only the request's owner and are never paused. Hover a row for its queue seq."
       aside={
         <Link href="/reserve/capital" className="ext-link font-mono text-xs">

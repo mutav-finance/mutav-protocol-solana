@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * The reads behind /dashboard and /investment: the shared /api/ledger poll and
+ * The reads behind /investment: the shared /api/ledger poll and
  * the connected wallet's /api/investor view (balances, allowlist state), with
- * the wallet's queue entries and position derived from them. No new data.
+ * the wallet's queue entries derived from them. No new data.
  */
 import { useWallet } from "@/components/WalletProvider";
 import { usePoll } from "@/lib/client/use-poll";
 import type { InvestorView } from "@/lib/server/investor";
 import { investorRequests, type Ledger, type ReserveView } from "@/lib/view";
-import { MOCK, splitPosition } from "./shared";
+import { MOCK } from "./shared";
 
 export function useInvestor() {
   const { address } = useWallet();
@@ -29,7 +29,6 @@ export function useInvestor() {
     inv,
     invData,
     mine,
-    position: d && owner ? splitPosition(d.reserve, invData, mine) : null,
     refresh: async () => {
       await Promise.all([poll.refresh(), inv.refresh()]);
     },

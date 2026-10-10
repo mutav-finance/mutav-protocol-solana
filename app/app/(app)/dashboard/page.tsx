@@ -1,11 +1,6 @@
-import type { Metadata } from "next";
-import { DashboardPage } from "@/components/dashboard/DashboardPage";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "The capital provider's dashboard for the MUTAV pilot reserve: allowlist status, position, queue entries and requests.",
-};
-
+/** /dashboard was folded into /investment (requests, cancels and claims); old links keep working. */
 export default function Page() {
-  return <DashboardPage />;
+  permanentRedirect("/investment");
 }

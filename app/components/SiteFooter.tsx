@@ -12,7 +12,6 @@ export function SiteFooter() {
           {[
             ["/reserve", "Transparency"],
             ["/operator", "Operator"],
-            ["/dashboard", "Dashboard"],
             ["/investment", "Investment"],
             ["/demo", "Demo"],
             ["/admin", "Admin"],

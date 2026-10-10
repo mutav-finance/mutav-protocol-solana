@@ -1,22 +1,22 @@
 "use client";
 
 /**
- * /investment — where an allowlisted capital provider sends a new deposit or
- * redemption request. Everyone can read it; only a wallet on the on-chain
- * allowlist can send (same gate and same requests as before, moved here from
- * /dashboard, which keeps the position, the queue entries and the claims).
+ * /investment — the capital provider's page (the Investor role): send a new
+ * deposit or redemption request, then follow, cancel and claim it. Everyone
+ * can read it; only a wallet on the on-chain allowlist can send requests.
+ * Cancels and claims need only the request's owner (spec §5.5).
  * The pilot runs on MUTAV's own capital and is not open to public investment.
  *
- * Layout: centred header, one strip of three reserve figures, then the request card,
- * centred and narrow like a swap form.
+ * Layout: centred header, one strip of three reserve figures, the request
+ * card (centred and narrow like a swap form), then the wallet's requests.
  */
 import type { ReactNode } from "react";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { Mono } from "@/components/Mono";
 import { ReadError } from "@/components/Section";
 import { LiveProvider } from "@/components/demo/shared";
-import { AccessGate } from "@/components/dashboard/AccessGate";
-import { useInvestor } from "@/components/dashboard/useInvestor";
+import { QueueEntries } from "./QueueEntries";
+import { useInvestor } from "./useInvestor";
 import { fmtBrs, fmtNav } from "@/lib/format";
 import type { ReserveView } from "@/lib/view";
 import { RequestCard } from "./RequestCard";
@@ -85,12 +85,10 @@ function Skeleton() {
 }
 
 export function InvestmentPage() {
-  const { address, connected, poll, d, inv, invData, refresh } = useInvestor();
+  const { connected, owner, poll, d, inv, invData, mine, refresh } = useInvestor();
   const pad = { paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" };
   return (
     <main className="flex w-full flex-1 flex-col gap-6 py-8" style={pad}>
-      {d && <AccessGate key={`${address ?? "none"}-${invData?.allowlist.state ?? "?"}`} connected={connected} state={invData?.allowlist.state ?? null} />}
-
       <header className="flex flex-col items-center gap-2 text-center">
         <h1 className="font-display text-(--color-text) m-0 text-3xl font-bold tracking-tight">Investment</h1>
         <p className="font-body text-(--color-text-2) m-0 max-w-[60ch] text-sm text-balance">
@@ -107,6 +105,9 @@ export function InvestmentPage() {
             <Stats r={d.reserve} />
             {inv.error && !inv.data && <ReadError error={inv.error} />}
             <RequestCard inv={invData} connected={connected} />
+          </div>
+          <div className="mx-auto w-full max-w-[960px]">
+            <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} />
           </div>
         </LiveProvider>
       )}

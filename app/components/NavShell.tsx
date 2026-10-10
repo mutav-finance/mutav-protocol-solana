@@ -13,8 +13,6 @@ import { ClusterBadge } from "@/components/ClusterBadge";
 import { Button } from "@/components/ui/button";
 
 const LINKS = [
-  { href: "/", label: "home" },
-  { href: "/dashboard", label: "dashboard" },
   { href: "/investment", label: "investment" },
   { href: "/reserve", label: "transparency" },
   { href: "/operator", label: "operator" },

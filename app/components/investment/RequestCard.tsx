@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Action, Note, useLive } from "@/components/demo/shared";
-import { LABEL, TRACKING } from "@/components/dashboard/shared";
+import { LABEL, TRACKING } from "./shared";
 import { BRS_DECIMALS, SHARE_DECIMALS, fmtBrs, fmtShares, fmtUnits, parseBrs } from "@/lib/format";
 import type { InvestorView } from "@/lib/server/investor";
 
@@ -142,7 +142,12 @@ export function RequestCard({ inv, connected }: { inv: InvestorView | null; conn
             <Action label="Request redemption" disabled={!canRequest} request={amount ? { kind: "request_redeem", shares: amount } : null} />
           )}
         </div>
-        {paused && <Note tone="warn">Requests are paused by the Reserve Admin. Cancels and claims stay open on the Dashboard.</Note>}
+        {!paused && !canRequest && (
+          <p className="font-mono text-(--color-text-3) m-0 text-center text-2xs">
+            {!connected ? "Connect the allowlisted wallet to send requests." : state === null ? "Checking the allowlist…" : "This wallet is not on the allowlist."}
+          </p>
+        )}
+        {paused && <Note tone="warn">Requests are paused by the Reserve Admin. Cancels and claims below stay open.</Note>}
         {outside && <Note tone="warn">Outside the per-request limits: the program will refuse it.</Note>}
       </div>
       <HowItWorks />
@@ -158,11 +163,11 @@ function HowItWorks() {
       <ul className="font-body text-(--color-text-2) m-0 mt-3 flex list-none flex-col gap-2 p-0 text-xs leading-relaxed">
         <li>
           <span className="text-(--color-text) font-medium">Deposit.</span> BRS waits in escrow, in queue order. The Reserve Admin fulfils it at the NAV of that moment;
-          then you claim the shares on the Dashboard.
+          then you claim the shares below.
         </li>
         <li>
           <span className="text-(--color-text) font-medium">Redemption.</span> Shares wait in escrow, in queue order. They are filled from free capital, never while the
-          reserve is under-covered; then you claim the BRS on the Dashboard.
+          reserve is under-covered; then you claim the BRS below.
         </li>
         <li>
           <span className="text-(--color-text) font-medium">Cancel and claim</span> need only the request&apos;s owner and are never paused. Your wallet signs every
