@@ -128,12 +128,15 @@ export async function dryRun(programKeypair?: string) {
     });
 
     // The same config shape as devnet.example.json, filled for this run.
+    const standIn = { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, members: [vault!.address], threshold: 1, timeLockFloorSecs: 0 };
     const cfg: DeployConfig = parseConfig({
       cluster: 'localnet',
       programId,
       reserveMint: mint,
       reserveTokenProgram: TOKEN_PROGRAM,
-      squads: { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, timeLockFloorSecs: 86_400 },
+      // One throwaway key stands in for both Squads vaults (no Squads program locally).
+      squads: standIn,
+      upgradeSquads: standIn,
       admin: vault!.address,
       upgradeAuthority: vault!.address,
       operator: op1!.address,

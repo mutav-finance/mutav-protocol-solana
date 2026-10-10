@@ -152,12 +152,15 @@ export async function forkHappyPath(programKeypair?: string) {
     step('initialize with the real BRS mint (mint guard)');
     const treasury = await setTokenBalance(treasuryOwner!.address, BRS_DEVNET_MINT, 0n);
     const payments = await setTokenBalance(paymentsOwner!.address, BRS_DEVNET_MINT, 0n);
+    const standIn = { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, members: [vault!.address], threshold: 1, timeLockFloorSecs: 0 };
     const cfg = parseConfig({
       cluster: 'localnet',
       programId,
       reserveMint: BRS_DEVNET_MINT,
       reserveTokenProgram: TOKEN_PROGRAM,
-      squads: { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, timeLockFloorSecs: 86_400 },
+      // One throwaway key stands in for both Squads vaults (no Squads program locally).
+      squads: standIn,
+      upgradeSquads: standIn,
       admin: vault!.address,
       upgradeAuthority: vault!.address,
       operator: operator!.address,

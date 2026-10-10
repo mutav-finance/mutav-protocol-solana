@@ -1,29 +1,22 @@
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { getAddressDecoder, type Address } from '@solana/kit';
 import { parseConfig } from '../devnet/lib/config';
 import { assertOutsideRepo, REPO_ROOT } from '../devnet/lib/cli';
 
 const example = () => JSON.parse(readFileSync(join(import.meta.dir, '..', 'devnet', 'devnet.example.json'), 'utf8'));
 
+/** A distinct, valid test address per index. */
+export const testAddress = (i: number): Address => getAddressDecoder().decode(new Uint8Array(32).fill(i + 1));
+
 /** The example with every founder input filled by a distinct test address. */
-function filled() {
-  const keys = [
-    '9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM',
-    '2JgjeWXmFMtYhbqFrBy4xR4yLTeRKt9Qs5MvVr9ZJmKz',
-    '7Np41oeYqPefeNQEHSv1UDhYrehxin3NStELsSKCT4K2',
-    '4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T',
-    '8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR',
-    'GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR',
-    '3Kz9wqPfaLTJQ1uCqNTTVGGu6jKG5TpKqJK3w1fzYG1k',
-    '5ZWj7a1f8tWkjBESHKgrLmXshuXxqeY9SYcfbshpAqPG',
-  ];
-  const numbers: Record<string, number> = { timeLockFloorSecs: 86_400, feeTakeBps: 2_000 };
+export function filled() {
   let i = 0;
-  const fill = (v: any, key = ''): any => {
-    if (typeof v === 'string' && v.startsWith('<FILL')) return numbers[key] ?? keys[i++ % keys.length];
+  const fill = (v: any): any => {
+    if (typeof v === 'string' && v.startsWith('<FILL')) return testAddress(i++);
     if (Array.isArray(v)) return v.map((x) => fill(x));
-    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fill(x, k)]));
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fill(x)]));
     return v;
   };
   return fill(example());
@@ -37,9 +30,32 @@ describe('devnet.example.json', () => {
     } catch (e) {
       msg = (e as Error).message;
     }
-    for (const field of ['squads.multisig', 'admin', 'upgradeAuthority', 'operator', 'pauser', 'treasuryAccount', 'paymentsAccount', 'mutavCapitalWallet', 'allowlist[0]', 'feeTakeBps', 'squads.timeLockFloorSecs']) {
+    for (const field of [
+      'squads.multisig',
+      'squads.members[0]',
+      'squads.members[1]',
+      'upgradeSquads.multisig',
+      'upgradeSquads.members[0]',
+      'upgradeSquads.members[1]',
+      'admin',
+      'upgradeAuthority',
+      'operator',
+      'pauser',
+      'treasuryAccount',
+      'paymentsAccount',
+      'mutavCapitalWallet',
+      'allowlist[0]',
+    ]) {
       expect(msg).toContain(field);
     }
+  });
+
+  test('two 2-of-2 multisigs with the devnet time-lock floors (admin 5 min, upgrade 1 h)', () => {
+    const c = parseConfig(filled());
+    expect([c.squads.threshold, c.squads.members.length, c.squads.timeLockFloorSecs]).toEqual([2, 2, 300]);
+    expect([c.upgradeSquads.threshold, c.upgradeSquads.members.length, c.upgradeSquads.timeLockFloorSecs]).toEqual([2, 2, 3_600]);
+    expect(c.squads.multisig).not.toBe(c.upgradeSquads.multisig);
+    expect(c.feeTakeBps).toBe(2_000);
   });
 
   test('loads once filled; the NAV-move bound is high for the demo', () => {
@@ -79,6 +95,45 @@ describe('parseConfig bounds mirror the program', () => {
   test('distinct money accounts', () => bad((c) => (c.paymentsAccount = c.treasuryAccount), 'differ'));
   test('addresses', () => bad((c) => (c.operator = 'not-an-address'), 'operator'));
   test('empty allowlist', () => bad((c) => (c.allowlist = []), 'allowlist'));
+});
+
+describe('parseConfig multisigs', () => {
+  const bad = (f: (c: any) => void, msg: string) => {
+    const c = filled();
+    f(c);
+    expect(() => parseConfig(c)).toThrow(msg);
+  };
+  test('both multisigs are required', () => {
+    bad((c) => delete c.upgradeSquads, 'upgradeSquads.multisig');
+    bad((c) => delete c.squads.members, 'squads.members');
+  });
+  test('threshold in [1, members]', () => {
+    bad((c) => (c.squads.threshold = 0), 'squads.threshold');
+    bad((c) => (c.upgradeSquads.threshold = 3), 'upgradeSquads.threshold');
+  });
+  test('members are distinct addresses', () => {
+    bad((c) => (c.squads.members = [c.squads.members[0], c.squads.members[0]]), 'squads.members');
+    bad((c) => (c.upgradeSquads.members = ['nope', c.upgradeSquads.members[0]]), 'upgradeSquads.members[0]');
+  });
+  test('devnet floors: admin >= 300 s, upgrade >= 3600 s', () => {
+    bad((c) => (c.squads.timeLockFloorSecs = 299), 'squads.timeLockFloorSecs');
+    bad((c) => (c.upgradeSquads.timeLockFloorSecs = 3_599), 'upgradeSquads.timeLockFloorSecs');
+  });
+  test('devnet needs two different multisigs, each at least 2-of-N', () => {
+    bad((c) => (c.upgradeSquads.multisig = c.squads.multisig), 'different multisigs');
+    bad((c) => (c.upgradeAuthority = c.admin), 'different');
+    bad((c) => (c.squads.threshold = 1), 'squads.threshold');
+  });
+  test('localnet (the dry run) may use one stand-in for both, with any floor', () => {
+    const c = filled();
+    c.cluster = 'localnet';
+    c.upgradeSquads = { ...c.squads, timeLockFloorSecs: 0 };
+    c.squads.timeLockFloorSecs = 0;
+    c.squads.threshold = 1;
+    c.upgradeSquads.threshold = 1;
+    c.upgradeAuthority = c.admin;
+    expect(parseConfig(c).upgradeSquads.multisig).toBe(parseConfig(c).squads.multisig);
+  });
 });
 
 describe('keypair paths', () => {
