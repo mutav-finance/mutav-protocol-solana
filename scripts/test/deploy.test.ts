@@ -98,6 +98,12 @@ describe('deploy.ts preflight (refuses before any CLI run)', () => {
     expect(calls).toEqual([]);
   });
 
+  test.each([0o644, 0o640, 0o604, 0o660])('payer file with mode %o (group/other bits)', async (mode) => {
+    const { deps, calls, opts } = await setup();
+    await expect(deploy({ ...opts, payer: payerFile(mode) }, deps)).rejects.toThrow('chmod 600');
+    expect(calls).toEqual([]);
+  });
+
   test('a localnet config against devnet', async () => {
     const { deps, calls, opts, cfg } = await setup();
     cfg.cluster = 'localnet';

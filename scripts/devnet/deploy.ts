@@ -3,12 +3,13 @@
  * upgrade multisig's Squads vault.
  *
  *   bun scripts/devnet/deploy.ts --config <deploy.json> --url <rpc> [--confirm-cluster devnet] \
- *     --payer <deployer keypair path, outside the repo> \
+ *     --payer <deployer keypair path, outside the repo, chmod 600> \
  *     --upgrade-authority <upgrade multisig vault> \
  *     [--program-keypair target/deploy/mutav-keypair.json] [--so target/deploy/mutav.so]
  *
  * Before any CLI runs it checks:
  * - the cluster (genesis hash) matches the config's;
+ * - the payer file has no group or other permission bits;
  * - `--upgrade-authority` equals the config's `upgradeAuthority`, which
  *   equals the vault derived from `upgradeSquads.multisig` + `vaultIndex`
  *   (and `admin` the vault of `squads`), so a typo cannot hand the program
@@ -28,6 +29,7 @@
  * For the real devnet deploy, build with `solana-verify build` first (see
  * .github/workflows/release.yml) so the deployed hash is reproducible.
  */
+import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { address, type Address } from '@solana/kit';
 import { MUTAV_PROGRAM_ADDRESS } from '../../clients/js/src';
@@ -68,6 +70,14 @@ export type DeployOptions = {
   localStandIn?: boolean;
 };
 
+/** Keypair files must be readable by their owner only. */
+export function assertOwnerOnly(path: string, what: string) {
+  const mode = statSync(path).mode & 0o777;
+  if (mode & 0o077) {
+    throw new Error(`${what} (${path}) has mode ${mode.toString(8)}: group or other can read it; run chmod 600 ${path}`);
+  }
+}
+
 /** The vaults the config names are the ones its multisigs derive, and both multisigs pass the launch checks. */
 async function preflightSquads(o: DeployOptions, url: string, deps: DeployDeps) {
   const { cfg } = o;
@@ -89,6 +99,7 @@ export async function deploy(o: DeployOptions, deps: DeployDeps = defaultDeps): 
   assertConfigCluster(guarded, cfg.cluster);
   const { url } = guarded;
   const payer = assertOutsideRepo(o.payer, '--payer');
+  assertOwnerOnly(payer, '--payer');
   const programKeypair = assertOutsideRepo(o.programKeypair ?? join(REPO_ROOT, 'target', 'deploy', 'mutav-keypair.json'), '--program-keypair');
   const so = o.so ?? join(REPO_ROOT, 'target', 'deploy', 'mutav.so');
 
