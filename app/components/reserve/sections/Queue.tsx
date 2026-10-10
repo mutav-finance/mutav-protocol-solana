@@ -124,13 +124,12 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
   const q = capitalQueue(r.state, l);
   const capital = r.config.mutavCapitalWallet;
   return (
-    <div className="flex flex-col gap-8 lg:gap-12">
+    <div className="flex flex-col gap-6">
       <Summary deposits={q.deposits} redeems={q.redeems} capital={capital} />
 
-      {/* Section divider image: a headline only, never behind numbers. Needs "queue-line" in IMAGE_SLOTS (see report); until then it renders the placeholder. */}
-      <ImageSlot slot="queue-line" aspect="6:1" opacity={0.12} className="min-h-[120px]">
-        <div className="flex h-full min-h-[120px] flex-col justify-end p-6">
-          <p className="font-display text-(--color-text) m-0 text-xl font-bold leading-snug">One line, oldest first. MUTAV&apos;s own capital waits in it too.</p>
+      <ImageSlot slot="queue-line" aspect="8:1" opacity={0.12} className="h-14">
+        <div className="flex h-full items-center px-6">
+          <p className="font-body text-(--color-text) m-0 text-sm font-medium">One line, oldest first. MUTAV&apos;s own capital waits in it too.</p>
         </div>
       </ImageSlot>
 

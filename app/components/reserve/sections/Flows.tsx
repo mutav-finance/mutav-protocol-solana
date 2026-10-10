@@ -192,17 +192,16 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
   ];
 
   return (
-    <div className="flex flex-col gap-8 lg:gap-12">
-      {/* [B] Hero: what the reserve earned, beside the image tile that carries the page's one rule. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="bg-(--color-surface) flex flex-col justify-center gap-2 border p-6 lg:col-span-8">
+    <div className="flex flex-col gap-8">
+      <div className="bg-(--color-surface) border">
+        <div className="flex flex-col gap-2 p-6">
           <Label>Earned net · since launch</Label>
           <Mono style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{signed(earned)}</Mono>
           <span className="font-body text-(--color-text-2) text-sm">Guarantee fees + issuer income − claim payments</span>
         </div>
-        <ImageSlot slot={FLOWS_SLOT} aspect="4:3" className="min-h-[160px] lg:col-span-4">
-          <div className="flex h-full min-h-[160px] flex-col justify-end p-6">
-            <p className="font-display text-(--color-text) m-0 text-xl font-bold leading-snug">A deposit is not income.</p>
+        <ImageSlot slot={FLOWS_SLOT} aspect="8:1" opacity={0.12} className="h-14 border-t">
+          <div className="flex h-full items-center px-6">
+            <p className="font-body text-(--color-text) m-0 text-sm font-medium">A deposit is not income.</p>
           </div>
         </ImageSlot>
       </div>

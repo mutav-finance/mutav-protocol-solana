@@ -222,10 +222,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   const row = (g: CoverageRow) => <GuaranteeRow key={g.address} g={g} axis={coverAxis} agency={<AgencyCell id={g.agencyId} />} />;
 
   return (
-    <div className="flex flex-col gap-12">
-      {/* [B+C] Hero: the answer in one tile, with the image slot beside it (never behind the numbers). */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <div className="bg-(--color-surface) flex flex-col gap-6 border p-6 lg:col-span-8">
+    <div className="flex flex-col gap-8">
+      <div className="bg-(--color-surface) flex flex-col gap-6 border p-6">
           <div className="flex flex-col gap-2">
             <p className={LABEL} style={LABEL_STYLE}>Remaining cover</p>
             <Mono style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{fmtBrs(sum)}</Mono>
@@ -259,13 +257,16 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
               color={provision > 0n ? "var(--color-copper)" : undefined}
             />
           </div>
-        </div>
-        <ImageSlot slot="reserve-coverage" aspect="4:3" className="hidden min-h-[200px] lg:col-span-4 lg:block" />
       </div>
 
-      {/* [E] Per guarantee: six columns; rent, open claims, registration and the account open per row. */}
-      <div className="flex flex-col gap-6">
-        <BlockHead title="By guarantee" note="Largest remaining cover first. Open a row for rent, claims and the account." aside={<LegLegend />} />
+      <div className="flex flex-col gap-4">
+        <ImageSlot slot="reserve-coverage" aspect="8:1" opacity={0.12} className="h-14">
+          <div className="flex h-full items-end justify-between gap-4 px-6 pb-3">
+            <h3 className="font-display text-(--color-text) m-0 text-base font-bold">By guarantee</h3>
+            <LegLegend />
+          </div>
+        </ImageSlot>
+        <p className="font-body text-(--color-text-2) m-0 text-sm">Largest remaining cover first. Open a row for rent, claims and the account.</p>
         {rows.length === 0 ? (
           <Empty>No guarantees registered yet. Each one appears here once the Operator registers it.</Empty>
         ) : (

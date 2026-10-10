@@ -6,7 +6,7 @@
  *   1. Health: the coverage ratio as the hero, then one strip of four figures.
  *   2. What never changes: the two spec promises, under a decorative band.
  *   3. Footnotes: verify it yourself, and the glossary (collapsed).
- * The per-view figures live in the shell's stats strip.
+ * Other views are the tabs; this page does not repeat their figures.
  */
 import Link from "next/link";
 import { useReserve } from "@/components/reserve/ReserveShell";
@@ -29,20 +29,20 @@ export function Overview() {
       <HealthSection d={d} />
 
       {/* 2 · the promises; the band is decorative and carries no figures */}
-      <section aria-labelledby="promises-h" className="flex flex-col pt-6 pb-6">
-        <ImageSlot slot="overview-promises" aspect="8:1" opacity={0.12} className="h-20 md:h-28">
-          <div className="flex h-full items-end px-6 pb-4">
-            <h2 id="promises-h" className="font-display text-(--color-text) m-0 text-2xl font-bold tracking-tight">
+      <section aria-labelledby="promises-h" className="flex flex-col pt-2 pb-2">
+        <ImageSlot slot="overview-promises" aspect="8:1" opacity={0.12} className="h-14">
+          <div className="flex h-full items-end px-6 pb-3">
+            <h2 id="promises-h" className="font-display text-(--color-text) m-0 text-base font-bold tracking-tight">
               What never changes
             </h2>
           </div>
         </ImageSlot>
         <ul className="m-0 grid grid-cols-1 gap-px border border-t-0 p-0 md:grid-cols-2" style={{ background: "var(--color-border)" }}>
           {PROMISES.map(([text, note, href, cta]) => (
-            <li key={href} className="bg-(--color-surface) flex list-none flex-col gap-2 p-6">
-              <span className="font-display text-(--color-text) text-base font-bold">{text}</span>
-              <span className="font-body text-(--color-text-2) text-sm">{note}</span>
-              <Link href={href} className="ext-link font-body mt-2 text-xs">
+            <li key={href} className="bg-(--color-surface) flex list-none flex-col gap-1 px-6 py-4">
+              <span className="font-body text-(--color-text) text-sm font-medium">{text}</span>
+              <span className="font-body text-(--color-text-2) text-xs">{note}</span>
+              <Link href={href} className="ext-link font-body text-xs">
                 {cta} →
               </Link>
             </li>

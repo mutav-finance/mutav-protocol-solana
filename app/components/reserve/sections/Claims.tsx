@@ -38,9 +38,9 @@ const slowest = (xs: (bigint | null)[]): bigint | null => xs.reduce<bigint | nul
 /** The spec promise as a wide image band (section divider, no numbers on it). */
 function GuardBand() {
   return (
-    <ImageSlot slot="reserve-claims" aspect="6:1" className="min-h-[120px] w-full">
-      <div className="flex h-full min-h-[120px] flex-col justify-end p-6">
-        <p className="font-display text-(--color-text) m-0 text-xl font-bold leading-snug">Claim payments are never blocked by solvency or by a pause.</p>
+    <ImageSlot slot="reserve-claims" aspect="8:1" opacity={0.12} className="h-14 w-full">
+      <div className="flex h-full items-center px-6">
+        <p className="font-body text-(--color-text) m-0 text-sm font-medium">Claim payments are never blocked by solvency or by a pause.</p>
       </div>
     </ImageSlot>
   );

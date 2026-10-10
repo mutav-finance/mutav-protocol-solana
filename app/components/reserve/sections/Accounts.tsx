@@ -121,7 +121,7 @@ export function Accounts({ r }: { r: ReserveView }) {
   ];
 
   return (
-    <div className="flex flex-col gap-12">
+    <div className="flex flex-col gap-8">
       {/* [B] Hero: who signs. One strip, 1px dividers, full addresses. */}
       <div className="flex flex-col gap-3">
         <h3 id="accounts-signers" className={LABEL} style={LABEL_STYLE}>
@@ -145,12 +145,11 @@ export function Accounts({ r }: { r: ReserveView }) {
 
       {/* [E] Detail: the program, then every account it uses, grouped by job. */}
       <div className="flex flex-col gap-3">
-        <ImageSlot slot={DIVIDER_SLOT} aspect="6:1" className="min-h-[96px]">
-          <div className="flex h-full min-h-[96px] flex-col justify-end gap-1 px-6 py-4">
-            <h3 id="accounts-all" className="font-display text-(--color-text) m-0 text-lg font-bold">
+        <ImageSlot slot={DIVIDER_SLOT} aspect="8:1" opacity={0.12} className="h-14">
+          <div className="flex h-full items-center px-6">
+            <h3 id="accounts-all" className="font-body text-(--color-text) m-0 text-sm font-medium">
               Every account
             </h3>
-            <p className="font-body text-(--color-text-2) m-0 text-sm">Each one derives from the program below. Open a group to check it.</p>
           </div>
         </ImageSlot>
 

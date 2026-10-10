@@ -11,15 +11,15 @@ import type { ReactNode } from "react";
 
 /** Slot → public path. `null` shows the placeholder; set a path to place the final photo. */
 export const IMAGE_SLOTS = {
-  "reserve-coverage": null,
-  "reserve-claims": null,
-  "reserve-disclosures": null,
-  "reserve-risks": null,
-  "overview-promises": null,
-  "flows-capital": null,
-  "queue-line": null,
-  "accounts-verify": null,
-  "dashboard-header": null,
+  "reserve-coverage": "/img/reserve-coverage.jpg",
+  "reserve-claims": "/img/reserve-claims.jpg",
+  "reserve-disclosures": "/img/reserve-disclosures.jpg",
+  "reserve-risks": "/img/reserve-risks.jpg",
+  "overview-promises": "/img/overview-promises.jpg",
+  "flows-capital": "/img/flows-capital.jpg",
+  "queue-line": "/img/queue-line.jpg",
+  "accounts-verify": "/img/accounts-verify.jpg",
+  "dashboard-header": "/img/dashboard-header.jpg",
 } satisfies Record<string, string | null>;
 
 export type ImageSlotName = keyof typeof IMAGE_SLOTS;

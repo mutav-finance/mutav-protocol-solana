@@ -28,13 +28,11 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/reserve — overview: promises, health, a summary card per tab", async ({ page }) => {
+  test("/reserve — overview: promises, health, persistent tabs", async ({ page }) => {
     await page.goto("/reserve");
-    await page.getByRole("button", { name: "Open transparency menu" }).click();
     const views = page.getByRole("navigation", { name: "Transparency views" });
     for (const tab of ["Overview", "Coverage", "Claims", "Flows", "Queue", "Risks", "Accounts"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(views).toBeHidden();
+    await expect(views.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText("Claim payments are never blocked by solvency.")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
     await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();

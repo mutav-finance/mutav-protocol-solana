@@ -109,10 +109,9 @@ function FreezeHero({ r }: { r: ReserveView }) {
   const frozen = r.token.reserveFrozen;
   const state = frozen ? "var(--color-error)" : "var(--color-text)";
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-      <article
+    <article
         aria-labelledby="risk-freeze-h"
-        className="bg-(--color-surface) flex flex-col gap-6 border p-6 lg:col-span-8 lg:p-8"
+        className="bg-(--color-surface) flex flex-col gap-6 border p-6"
         style={frozen ? { borderColor: "var(--color-error)" } : undefined}
       >
         <div className="flex flex-col gap-2">
@@ -137,9 +136,6 @@ function FreezeHero({ r }: { r: ReserveView }) {
           </dd>
         </dl>
       </article>
-      {/* Decorative, beside the hero and never behind it; wide screens only so the hero stays first on phones. */}
-      <ImageSlot slot="reserve-risks" aspect="4:3" className="hidden min-h-[240px] lg:col-span-4 lg:block" />
-    </div>
   );
 }
 
@@ -173,7 +169,13 @@ function ClaimLimits({ r }: { r: ReserveView }) {
 function PilotTerms() {
   return (
     <section aria-labelledby="risk-pilot-h" className="flex flex-col gap-4">
-      <BlockHead id="risk-pilot-h" title="What this pilot is, and is not" />
+      <ImageSlot slot="reserve-risks" aspect="8:1" opacity={0.12} className="h-14">
+        <div className="flex h-full items-end px-6 pb-3">
+          <h3 id="risk-pilot-h" className="font-display text-(--color-text) m-0 text-base font-bold">
+            What this pilot is, and is not
+          </h3>
+        </div>
+      </ImageSlot>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <article className="bg-(--color-surface) relative flex flex-col gap-3 overflow-hidden border p-6">
           {/* Decorative image slot; this tile carries no numbers. */}
