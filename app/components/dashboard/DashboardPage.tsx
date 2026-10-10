@@ -9,7 +9,8 @@
  * public investment; its allowlisted capital provider is MUTAV's capital wallet.
  *
  * The page answers three questions in order: what do I hold (the position
- * hero), what can I do now (the sticky action panel), what is waiting (the
+ * hero), what can I do now (the sticky action panel: access and claims; new
+ * requests live on /investment), what is waiting (the
  * queue entries). Layout: header band, then an 8-column reading column beside
  * a 4-column action panel (ui-reference §1, Morpho / Aave / Kamino). Below
  * 1024px the panel stacks right under the hero. Same reads and requests as
@@ -17,16 +18,12 @@
  */
 import { ImageSlot, type ImageSlotName } from "@/components/ImageSlot";
 import { ReadError } from "@/components/Section";
-import { useWallet } from "@/components/WalletProvider";
 import { LiveProvider } from "@/components/demo/shared";
-import { usePoll } from "@/lib/client/use-poll";
-import type { InvestorView } from "@/lib/server/investor";
-import { investorRequests, type Ledger, type ReserveView } from "@/lib/view";
 import { AccessGate } from "./AccessGate";
 import { ActionPanel } from "./ActionPanel";
 import { PositionHero } from "./PositionHero";
 import { QueueEntries } from "./QueueEntries";
-import { MOCK, splitPosition } from "./shared";
+import { useInvestor } from "./useInvestor";
 
 /** Header image slot (decorative, behind the title only). */
 const HEADER_SLOT: ImageSlotName = "dashboard-header";
@@ -47,16 +44,7 @@ function Skeleton() {
 }
 
 export function DashboardPage() {
-  const { address } = useWallet();
-  const poll = usePoll<{ reserve: ReserveView; ledger: Ledger }>("/api/ledger", 10_000);
-  const d = poll.data;
-  const previewOwner = !address && MOCK && d ? d.reserve.config.mutavCapitalWallet : null;
-  const owner = address ?? previewOwner;
-  const connected = !!address;
-  const inv = usePoll<InvestorView>(`/api/investor${owner ? `?owner=${owner}` : ""}`, 10_000);
-  const invData = inv.data && inv.data.owner === owner ? inv.data : null;
-  const mine = d && owner ? investorRequests(owner, d.reserve.state, d.ledger) : [];
-  const position = d && owner ? splitPosition(d.reserve, invData, mine) : null;
+  const { address, connected, owner, poll, d, inv, invData, mine, position, refresh } = useInvestor();
   const pad = { paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" };
 
   return (
@@ -81,9 +69,7 @@ export function DashboardPage() {
           value={{
             reserve: d.reserve,
             ledger: d.ledger,
-            refresh: async () => {
-              await Promise.all([poll.refresh(), inv.refresh()]);
-            },
+            refresh,
           }}
         >
           {/* DOM order hero → panel → detail, so phones stack the panel under the hero; on lg the panel spans both rows and sticks. */}

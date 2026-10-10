@@ -49,7 +49,7 @@ function Deposits({ mode }: { mode: Mode }) {
   return (
     <Sub id="money-deposits" title="Capital deposits" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
-        <Context who="investor" figure={m(`${q.deposits.length} waiting · ${fmtBrs(reserve.state.pendingDepositsTotal, 0)}`)} href="/dashboard">
+        <Context who="investor" figure={m(`${q.deposits.length} waiting · ${fmtBrs(reserve.state.pendingDepositsTotal, 0)}`)} href="/investment">
           request_deposit escrows BRS in the FIFO queue (allowlisted wallets; in the pilot, MUTAV&apos;s capital wallet).
         </Context>
       </Contexts>
@@ -155,7 +155,7 @@ function Redemptions({ mode }: { mode: Mode }) {
   return (
     <Sub id="money-redemptions" title="Redemptions" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
-        <Context who="investor" figure={m(`${q.redeems.length} waiting · ${fmtShares(reserve.state.pendingRedeemShares)} shares`)} href="/dashboard">
+        <Context who="investor" figure={m(`${q.redeems.length} waiting · ${fmtShares(reserve.state.pendingRedeemShares)} shares`)} href="/investment">
           request_redeem escrows shares in the FIFO queue; the owner later claims the BRS with claim_assets.
         </Context>
       </Contexts>

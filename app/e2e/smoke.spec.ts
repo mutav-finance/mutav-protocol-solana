@@ -139,15 +139,25 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     const gate = page.getByRole("dialog", { name: "Connect your wallet" });
     await expect(gate).toContainText("Connect the allowlisted wallet to send requests.");
     await expect(gate.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
-    // Behind the dialog the page stays read-only.
-    await expect(page.getByRole("button", { name: "Request deposit" })).toBeDisabled();
-    await page.getByRole("tab", { name: "Redeem" }).focus();
-    await page.keyboard.press("Enter");
-    await expect(page.getByRole("button", { name: "Request redemption" })).toBeDisabled();
+    // Requests moved to /investment; the dashboard links there.
+    await expect(page.getByRole("link", { name: "Deposit or redeem →" })).toHaveAttribute("href", "/investment");
     const seeded = await (await request.get("/api/reserve")).json();
     const capital = (await (await request.get(`/api/investor?owner=${seeded.config.mutavCapitalWallet}`)).json()).allowlist.state;
     const operator = (await (await request.get(`/api/investor?owner=${seeded.config.operator}`)).json()).allowlist.state;
     expect([capital, operator]).toEqual(["allowlisted", "not-listed"]);
+    await noBannedWords(page);
+  });
+
+  test("/investment — swap-style request card, read-only without a wallet", async ({ page }) => {
+    await page.goto("/investment");
+    await expect(page.getByRole("heading", { name: "Investment", level: 1 })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Connect your wallet" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Reserve figures" })).toContainText("NAV per share");
+    // Behind the dialog the page stays read-only.
+    await expect(page.getByRole("button", { name: "Request deposit" })).toBeDisabled();
+    await page.getByRole("button", { name: "Switch to redeem" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("button", { name: "Request redemption" })).toBeDisabled();
     await noBannedWords(page);
   });
 
