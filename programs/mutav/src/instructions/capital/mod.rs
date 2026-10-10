@@ -6,8 +6,8 @@
 //! Copyright (c) 2026 Solana Foundation. See `NOTICE`.
 //! Changes: Merkle allowlist, request-size limits, strict FIFO queues by
 //! `seq` with a skip proof, admin fulfilment at the NAV at fulfil, gated by
-//! pause, claim notices, the NAV-move guard, `free_capital` and
-//! `liquid_budget`; owner-only debits; `HolderState` stamps.
+//! pause, the NAV-move guard, `free_capital` and
+//! `liquid_budget`; owner-only debits.
 
 pub mod cancel_deposit;
 pub mod cancel_redeem;

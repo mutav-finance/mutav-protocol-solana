@@ -1,35 +1,18 @@
-//! Golden layouts of the guarantee-book accounts (plan Tasks 3–5, carried
-//! from 2a): size pins, frozen v1 offset tables, v1 bytes decoding under the
-//! current structs, and frozen discriminators.
+//! Golden layouts of the guarantee-book and receipt accounts: size pins,
+//! frozen v1 offset tables, v1 bytes decoding under the current structs, and
+//! frozen discriminators.
 
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, Discriminator, Space};
 use mutav::{
     constants::*,
-    state::{ClaimFiling, FeeReceipt, Guarantee, IncomeReceipt, Payout},
+    state::{ClaimFiling, Guarantee, IncomeReceipt},
 };
 
-use crate::{pattern, ser, spans, v1::*, zeroed};
-
-macro_rules! guarantee_fields {
-    ($t:ty) => {
-        spans!($t;
-            "version" => version, "bump" => bump, "id" => id, "agency_id" => agency_id,
-            "refs_hash" => refs_hash, "rent" => rent,
-            "default_multiplier_bps" => default_multiplier_bps,
-            "exit_multiplier_bps" => exit_multiplier_bps,
-            "default_cover" => default_cover, "exit_cover" => exit_cover,
-            "default_paid" => default_paid, "exit_paid" => exit_paid,
-            "provision_default" => provision_default, "provision_exit" => provision_exit,
-            "open_claims" => open_claims, "status" => status,
-            "registered_at" => registered_at, "closed_at" => closed_at,
-            "_reserved" => _reserved,
-        )
-    };
-}
+use crate::{pattern, ser, v1::*, zeroed};
 
 /// Re-decodes v1 bytes under the current account type and checks nothing
 /// moved.
-fn v1_round_trip<
+pub fn v1_round_trip<
     V: AnchorDeserialize + anchor_lang::AnchorSerialize,
     T: AccountDeserialize + anchor_lang::AnchorSerialize + Discriminator,
 >(
@@ -45,27 +28,15 @@ fn v1_round_trip<
 }
 
 #[test]
-fn book_sizes_are_pinned() {
+fn guarantee_layout_is_frozen() {
     assert_eq!(8 + Guarantee::INIT_SPACE, GUARANTEE_SIZE);
     assert_eq!(GUARANTEE_SIZE, 377);
+    assert_eq!(8 + GUARANTEE_V1_LEN, GUARANTEE_SIZE);
     assert_eq!(8 + ser(&zeroed::<Guarantee>()).len(), GUARANTEE_SIZE);
-    assert_eq!(8 + ser(&zeroed::<GuaranteeV1>()).len(), GUARANTEE_SIZE);
-}
-
-#[test]
-fn book_offsets_match_v1() {
     assert_eq!(guarantee_fields!(GuaranteeV1), GUARANTEE_V1.to_vec());
     assert_eq!(guarantee_fields!(Guarantee), GUARANTEE_V1.to_vec());
-}
-
-#[test]
-fn book_v1_bytes_decode_under_the_current_structs() {
     v1_round_trip::<GuaranteeV1, Guarantee>(GUARANTEE_SIZE);
-}
-
-#[test]
-fn book_discriminators_are_frozen() {
-    // sha256("account:<Name>")[..8], computed independently and committed.
+    // sha256("account:Guarantee")[..8], computed independently and committed.
     assert_eq!(
         Guarantee::DISCRIMINATOR,
         &[198, 16, 124, 172, 230, 249, 200, 37]
@@ -73,55 +44,40 @@ fn book_discriminators_are_frozen() {
 }
 
 #[test]
-fn fee_receipt_layout_is_frozen() {
-    assert_eq!(8 + FeeReceipt::INIT_SPACE, FEE_RECEIPT_SIZE);
-    assert_eq!(FEE_RECEIPT_SIZE, 138);
-    assert_eq!(8 + ser(&zeroed::<FeeReceipt>()).len(), FEE_RECEIPT_SIZE);
-    assert_eq!(8 + ser(&zeroed::<FeeReceiptV1>()).len(), FEE_RECEIPT_SIZE);
-    let fields = |t: Vec<(&'static str, usize, usize)>| t;
+fn claim_filing_layout_is_frozen() {
+    assert_eq!(8 + ClaimFiling::INIT_SPACE, CLAIM_FILING_SIZE);
+    assert_eq!(CLAIM_FILING_SIZE, 316);
+    assert_eq!(8 + CLAIM_FILING_V1_LEN, CLAIM_FILING_SIZE);
+    assert_eq!(8 + ser(&zeroed::<ClaimFiling>()).len(), CLAIM_FILING_SIZE);
     assert_eq!(
-        fields(spans!(FeeReceiptV1;
-            "version" => version, "bump" => bump, "invoice_ref_hash" => invoice_ref_hash,
-            "gross" => gross, "take" => take, "net" => net, "slot" => slot,
-            "_reserved" => _reserved)),
-        FEE_RECEIPT_V1.to_vec()
+        claim_filing_fields!(ClaimFilingV1),
+        CLAIM_FILING_V1.to_vec()
     );
+    assert_eq!(claim_filing_fields!(ClaimFiling), CLAIM_FILING_V1.to_vec());
+    v1_round_trip::<ClaimFilingV1, ClaimFiling>(CLAIM_FILING_SIZE);
     assert_eq!(
-        fields(spans!(FeeReceipt;
-            "version" => version, "bump" => bump, "invoice_ref_hash" => invoice_ref_hash,
-            "gross" => gross, "take" => take, "net" => net, "slot" => slot,
-            "_reserved" => _reserved)),
-        FEE_RECEIPT_V1.to_vec()
-    );
-    v1_round_trip::<FeeReceiptV1, FeeReceipt>(FEE_RECEIPT_SIZE);
-    assert_eq!(
-        FeeReceipt::DISCRIMINATOR,
-        &[135, 174, 32, 77, 183, 44, 26, 107]
+        ClaimFiling::DISCRIMINATOR,
+        &[177, 42, 215, 113, 249, 140, 198, 201]
     );
 }
 
 #[test]
 fn income_receipt_layout_is_frozen() {
     assert_eq!(8 + IncomeReceipt::INIT_SPACE, INCOME_RECEIPT_SIZE);
-    assert_eq!(INCOME_RECEIPT_SIZE, 142);
+    assert_eq!(INCOME_RECEIPT_SIZE, 143);
+    assert_eq!(8 + INCOME_RECEIPT_V1_LEN, INCOME_RECEIPT_SIZE);
     assert_eq!(
         8 + ser(&zeroed::<IncomeReceipt>()).len(),
         INCOME_RECEIPT_SIZE
     );
     assert_eq!(
-        8 + ser(&zeroed::<IncomeReceiptV1>()).len(),
-        INCOME_RECEIPT_SIZE
+        income_receipt_fields!(IncomeReceiptV1),
+        INCOME_RECEIPT_V1.to_vec()
     );
-    macro_rules! fields {
-        ($t:ty) => {
-            spans!($t;
-                "version" => version, "bump" => bump, "income_ref_hash" => income_ref_hash,
-                "period" => period, "gross" => gross, "take" => take, "net" => net,
-                "slot" => slot, "_reserved" => _reserved)
-        };
-    }
-    assert_eq!(fields!(IncomeReceiptV1), INCOME_RECEIPT_V1.to_vec());
-    assert_eq!(fields!(IncomeReceipt), INCOME_RECEIPT_V1.to_vec());
+    assert_eq!(
+        income_receipt_fields!(IncomeReceipt),
+        INCOME_RECEIPT_V1.to_vec()
+    );
     v1_round_trip::<IncomeReceiptV1, IncomeReceipt>(INCOME_RECEIPT_SIZE);
     // sha256("account:IncomeReceipt")[..8], computed independently.
     assert_eq!(
@@ -131,70 +87,22 @@ fn income_receipt_layout_is_frozen() {
 }
 
 #[test]
-fn claim_filing_layout_is_frozen() {
-    assert_eq!(8 + ClaimFiling::INIT_SPACE, CLAIM_FILING_SIZE);
-    assert_eq!(CLAIM_FILING_SIZE, 220);
-    assert_eq!(8 + ser(&zeroed::<ClaimFiling>()).len(), CLAIM_FILING_SIZE);
-    assert_eq!(8 + ser(&zeroed::<ClaimFilingV1>()).len(), CLAIM_FILING_SIZE);
-    macro_rules! fields {
-        ($t:ty) => {
-            spans!($t;
-                "version" => version, "bump" => bump, "guarantee" => guarantee, "leg" => leg,
-                "notice_ref_hash" => notice_ref_hash, "provision" => provision,
-                "filed_at" => filed_at, "status" => status, "_reserved" => _reserved)
-        };
-    }
-    assert_eq!(fields!(ClaimFilingV1), CLAIM_FILING_V1.to_vec());
-    assert_eq!(fields!(ClaimFiling), CLAIM_FILING_V1.to_vec());
-    v1_round_trip::<ClaimFilingV1, ClaimFiling>(CLAIM_FILING_SIZE);
+fn receipt_kinds_are_pinned() {
     assert_eq!(
-        ClaimFiling::DISCRIMINATOR,
-        &[177, 42, 215, 113, 249, 140, 198, 201]
+        (
+            INCOME_KIND_NORA_STATEMENT,
+            INCOME_KIND_FEE,
+            INCOME_KIND_UNSOLICITED,
+            INCOME_KIND_BACKSTOP
+        ),
+        (0, 1, 2, 3)
     );
 }
 
 #[test]
-fn payout_layout_is_frozen() {
-    assert_eq!(8 + Payout::INIT_SPACE, PAYOUT_SIZE);
-    assert_eq!(PAYOUT_SIZE, 293);
-    assert_eq!(8 + ser(&zeroed::<Payout>()).len(), PAYOUT_SIZE);
-    assert_eq!(8 + ser(&zeroed::<PayoutV1>()).len(), PAYOUT_SIZE);
-    macro_rules! fields {
-        ($t:ty) => {
-            spans!($t;
-                "version" => version, "bump" => bump, "guarantee" => guarantee, "leg" => leg,
-                "amount" => amount, "notice_ref_hash" => notice_ref_hash,
-                "payments_account" => payments_account, "status" => status,
-                "paid_at" => paid_at, "pix_e2e_hash" => pix_e2e_hash,
-                "settled_at" => settled_at, "_reserved" => _reserved)
-        };
-    }
-    assert_eq!(fields!(PayoutV1), PAYOUT_V1.to_vec());
-    assert_eq!(fields!(Payout), PAYOUT_V1.to_vec());
-    v1_round_trip::<PayoutV1, Payout>(PAYOUT_SIZE);
+fn claim_statuses_are_pinned() {
     assert_eq!(
-        Payout::DISCRIMINATOR,
-        &[69, 45, 245, 131, 218, 101, 158, 228]
+        (CLAIM_FILED, CLAIM_PAID, CLAIM_WITHDRAWN, CLAIM_SETTLED),
+        (0, 1, 2, 3)
     );
-}
-
-/// L-1 (ADR 0019): the padding of `Guarantee`, `ClaimFiling` and `Payout`
-/// still holds the ADR 0012 lifecycle carve (spec §3.5–§3.7, §14.2), so the
-/// lifecycle ships later as a carve, without a migration of live records.
-#[test]
-fn padding_holds_the_adr_0012_carve() {
-    // Bytes the ADR 0012 fields need, from the spec §14.2 table.
-    const GUARANTEE_CARVE: usize = 32 + 32 + 8 + 8 + 8;
-    const CLAIM_FILING_CARVE: usize = 1 + 8 + 8 + 32;
-    const PAYOUT_CARVE: usize = 1 + 1 + 8 + 32 + 32;
-    assert_eq!(
-        (GUARANTEE_CARVE, CLAIM_FILING_CARVE, PAYOUT_CARVE),
-        (88, 49, 74)
-    );
-    let g = zeroed::<Guarantee>()._reserved.len();
-    let c = zeroed::<ClaimFiling>()._reserved.len();
-    let p = zeroed::<Payout>()._reserved.len();
-    assert!(g >= GUARANTEE_CARVE, "Guarantee padding {g}");
-    assert!(c >= CLAIM_FILING_CARVE, "ClaimFiling padding {c}");
-    assert!(p >= PAYOUT_CARVE, "Payout padding {p}");
 }

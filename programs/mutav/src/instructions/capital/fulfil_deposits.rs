@@ -61,10 +61,6 @@ pub fn handle_fulfil_deposits(ctx: Context<FulfilDeposits>, count: u8) -> Result
 
     // Rules, in the spec's order. Under-coverage is allowed (ADR 0008).
     require!(!config.paused, MutavError::Paused);
-    // TODO(plan: claim notices deferred) — no pilot instruction raises
-    // `pending_notices` yet, so this gate always passes; it stays in place for
-    // `flag_claim_notice`.
-    require!(state.pending_notices == 0, MutavError::ClaimNoticePending);
     require!(!state.fulfil_halted, MutavError::FulfilHalted);
     let before = solvency_snapshot(config, state)?;
 

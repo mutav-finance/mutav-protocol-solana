@@ -10,13 +10,13 @@ use crate::{
     errors::MutavError,
     events::DepositRequested,
     instructions::capital::{require_allowlisted, require_request_size},
-    state::{DepositRequest, HolderState, VaultConfig, VaultState},
+    state::{DepositRequest, VaultConfig, VaultState},
 };
 
 #[event_cpi]
 #[derive(Accounts)]
 pub struct RequestDeposit<'info> {
-    /// The investor. Pays the request's and `HolderState`'s rent.
+    /// The investor. Pays the request's rent.
     #[account(mut)]
     pub owner: Signer<'info>,
 
@@ -39,16 +39,6 @@ pub struct RequestDeposit<'info> {
         bump,
     )]
     pub deposit_request: Box<Account<'info, DepositRequest>>,
-
-    #[account(
-        init_if_needed,
-        payer = owner,
-        space = HOLDER_STATE_SIZE,
-        seeds = [HOLDER_SEED, config.key().as_ref(), owner.key().as_ref()],
-        bump,
-        constraint = holder_state.is_supported() @ MutavError::UnsupportedVersion,
-    )]
-    pub holder_state: Box<Account<'info, HolderState>>,
 
     /// The owner's BRS account. Owner, never delegate (spec §5).
     #[account(
@@ -113,10 +103,6 @@ pub fn handle_request_deposit(
     r.assets = assets;
     r.requested_at = now;
     r.status = DEPOSIT_PENDING;
-
-    ctx.accounts
-        .holder_state
-        .stamp(ctx.bumps.holder_state, owner, now);
 
     emit_cpi!(DepositRequested {
         config: ctx.accounts.config.key(),

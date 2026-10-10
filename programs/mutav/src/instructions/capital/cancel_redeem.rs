@@ -63,10 +63,10 @@ pub struct CancelRedeem<'info> {
 
 pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
     // Never paused. Only this request changes; `redeem_head` is not moved
-    // here. Neither reads nor writes `buffer_earmark`.
+    // here.
     let r = &ctx.accounts.redeem_request;
-    require!(r.shares_remaining > 0, MutavError::InvalidRequestStatus);
-    let (seq, returned, owner) = (r.seq, r.shares_remaining, r.owner);
+    require!(r.status == REDEEM_PENDING, MutavError::InvalidRequestStatus);
+    let (seq, returned, owner) = (r.seq, r.shares, r.owner);
 
     let config_key = ctx.accounts.config.key();
     let authority_seeds: &[&[u8]] = &[
@@ -95,25 +95,17 @@ pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
         .checked_sub(returned)
         .ok_or(MutavError::MathOverflow)?;
 
-    let r = &mut ctx.accounts.redeem_request;
-    r.shares_remaining = 0;
-    r.status = REDEEM_CANCELLED;
-    let claimable = r.assets_claimable;
-
     emit_cpi!(RedeemCancelled {
         config: config_key,
         ts: Clock::get()?.unix_timestamp,
         owner,
         seq,
         shares_returned: returned,
-        assets_claimable: claimable,
     });
 
-    // Filled assets stay claimable; with nothing left the account closes now.
-    if claimable == 0 {
-        ctx.accounts
-            .redeem_request
-            .close(ctx.accounts.owner.to_account_info())?;
-    }
+    // A pending request has nothing claimable: the account closes now.
+    ctx.accounts
+        .redeem_request
+        .close(ctx.accounts.owner.to_account_info())?;
     Ok(())
 }

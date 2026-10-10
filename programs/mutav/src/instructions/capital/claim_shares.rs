@@ -10,7 +10,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::SharesClaimed,
-    state::{DepositRequest, HolderState, VaultConfig},
+    state::{DepositRequest, VaultConfig},
 };
 
 #[event_cpi]
@@ -33,16 +33,6 @@ pub struct ClaimShares<'info> {
     )]
     pub deposit_request: Box<Account<'info, DepositRequest>>,
 
-    #[account(
-        init_if_needed,
-        payer = owner,
-        space = HOLDER_STATE_SIZE,
-        seeds = [HOLDER_SEED, config.key().as_ref(), owner.key().as_ref()],
-        bump,
-        constraint = holder_state.is_supported() @ MutavError::UnsupportedVersion,
-    )]
-    pub holder_state: Box<Account<'info, HolderState>>,
-
     #[account(mut, address = config.share_mint @ MutavError::InvalidMint)]
     pub share_mint: Box<InterfaceAccount<'info, Mint>>,
 
@@ -59,7 +49,6 @@ pub struct ClaimShares<'info> {
     pub vault_authority: UncheckedAccount<'info>,
 
     pub share_token_program: Program<'info, Token>,
-    pub system_program: Program<'info, System>,
 }
 
 pub fn handle_claim_shares(ctx: Context<ClaimShares>) -> Result<()> {
@@ -94,9 +83,6 @@ pub fn handle_claim_shares(ctx: Context<ClaimShares>) -> Result<()> {
     }
 
     let now = Clock::get()?.unix_timestamp;
-    ctx.accounts
-        .holder_state
-        .stamp(ctx.bumps.holder_state, owner, now);
 
     // The request closes on exit (`close = owner`), rent to the owner.
     emit_cpi!(SharesClaimed {

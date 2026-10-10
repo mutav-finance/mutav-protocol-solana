@@ -36,8 +36,8 @@ fn contribute_splits_take_to_treasury_and_net_to_reserve() {
 
     let r = f.fee_receipt(&invoice);
     assert_eq!(
-        (r.version, r.invoice_ref_hash),
-        (PROGRAM_LAYOUT_VERSION, invoice)
+        (r.version, r.kind, r.ref_hash, r.period),
+        (PROGRAM_LAYOUT_VERSION, INCOME_KIND_FEE, invoice, 0)
     );
     assert_ne!(r.bump, 0);
     assert_eq!(
@@ -293,27 +293,20 @@ fn revoked_operator_cannot_contribute() {
 
 #[test]
 fn contribute_works_while_paused_and_in_under_coverage() {
-    // Never paused, never solvency-gated (ADR 0009). It also reads neither the
-    // price nor `buffer_earmark` (spec §4 ratchet scope).
+    // Never paused, never solvency-gated (ADR 0009).
     let mut f = Fixture::new();
     let pauser = f.pauser.insecure_clone();
     f.send(f.pause_ix(&pauser.pubkey()), &pauser).unwrap();
     f.contribute(1_000 * BRL).0.expect("paused");
 
-    let mut c = f.config();
-    c.feature_flags = INSTANT_EXIT;
-    f.write_config(&c);
     let mut s = f.state();
     s.mode = MODE_UNDER_COVERED;
     s.remaining_cover_total = 1_000_000 * BRL;
-    s.tesouro_units = 7; // a TESOURO position with no fresh price
-    s.buffer_earmark = 123;
     f.write_state(&s);
     let (res, _) = f.contribute(1_000 * BRL);
-    res.expect("under-covered, stale price, injected earmark");
+    res.expect("under-covered");
     let s = f.state();
     assert_eq!(s.brs_balance, 1_600 * BRL);
-    assert_eq!(s.buffer_earmark, 123);
     assert_eq!(s.mode, MODE_UNDER_COVERED);
 }
 

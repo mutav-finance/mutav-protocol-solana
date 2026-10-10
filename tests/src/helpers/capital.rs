@@ -11,7 +11,7 @@ use litesvm::types::TransactionResult;
 use mutav::{
     allowlist,
     constants::*,
-    state::{DepositRequest, HolderState, RedeemRequest},
+    state::{DepositRequest, RedeemRequest},
 };
 use solana_keypair::Keypair;
 use solana_signer::Signer;
@@ -30,11 +30,6 @@ pub fn deposit_pda(config: &Pubkey, seq: u64) -> Pubkey {
 /// `RedeemRequest`: `["redeem", config, seq]`.
 pub fn redeem_pda(config: &Pubkey, seq: u64) -> Pubkey {
     pda(&[REDEEM_SEED, config.as_ref(), &seq.to_le_bytes()])
-}
-
-/// `HolderState`: `["holder", config, owner]`.
-pub fn holder_pda(config: &Pubkey, owner: &Pubkey) -> Pubkey {
-    pda(&[HOLDER_SEED, config.as_ref(), owner.as_ref()])
 }
 
 /// A Merkle tree over wallets, with the program's encoding
@@ -167,7 +162,6 @@ impl Fixture {
                 config,
                 state: self.pdas.state,
                 deposit_request: deposit_pda(&config, seq),
-                holder_state: holder_pda(&config, owner),
                 source: *source,
                 pending_deposits: self.pdas.pending_deposits,
                 reserve_mint: self.reserve_mint,
@@ -233,12 +227,10 @@ impl Fixture {
                 owner: *owner,
                 config,
                 deposit_request: deposit_pda(&config, seq),
-                holder_state: holder_pda(&config, owner),
                 share_mint: self.pdas.share_mint,
                 owner_shares: *owner_shares,
                 vault_authority: self.pdas.authority,
                 share_token_program: TOKEN_PROGRAM,
-                system_program: anchor_lang::solana_program::system_program::ID,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -493,16 +485,6 @@ impl Fixture {
         Some(RedeemRequest::try_deserialize(&mut acc.data.as_slice()).expect("decode redeem"))
     }
 
-    pub fn holder(&self, owner: &Pubkey) -> Option<HolderState> {
-        let acc = self
-            .svm
-            .get_account(&holder_pda(&self.pdas.config, owner))?;
-        if acc.data.is_empty() {
-            return None;
-        }
-        Some(HolderState::try_deserialize(&mut acc.data.as_slice()).expect("decode holder"))
-    }
-
     /// Serializes `r` over the redeem request of its seq.
     pub fn write_redeem_request(&mut self, r: &RedeemRequest) {
         use anchor_lang::Discriminator;
@@ -523,7 +505,7 @@ impl Fixture {
 
     /// Asserts the capital invariants of spec §4 over every request ever
     /// created: 4 (token balances cover the tracked amounts), 5 (shares
-    /// outstanding), 8, 9 and 11 (redemption queue).
+    /// outstanding), 8 and 9 (redemption queue).
     pub fn assert_capital_invariants(&self, at: &str) {
         let s = self.state();
         let mut unclaimed_shares = 0u64;
@@ -540,14 +522,11 @@ impl Fixture {
         let (mut remaining, mut claimable) = (0u64, 0u64);
         for seq in 0..s.next_redeem_seq {
             if let Some(r) = self.redeem_request(seq) {
-                remaining += r.shares_remaining;
-                claimable += r.assets_claimable;
-                if r.status != REDEEM_CANCELLED {
-                    assert_eq!(
-                        r.shares_filled + r.shares_remaining,
-                        r.shares_requested,
-                        "{at}: invariant 11, seq {seq}"
-                    );
+                if r.status == REDEEM_PENDING {
+                    remaining += r.shares;
+                    assert_eq!(r.assets_out, 0, "{at}: pending seq {seq}");
+                } else {
+                    claimable += r.assets_out;
                 }
             }
         }

@@ -93,7 +93,8 @@ fn run(seed: u64, steps: usize) {
         open: Vec::new(),
     };
     let mut now = clock(&f.svm).unix_timestamp.max(1_750_000_000);
-    let period = f.config().caps.claim_period_secs;
+    // Past the 31-day claim window (ADR 0019).
+    let period = 31 * 86_400;
 
     for step in 0..steps {
         let ctx = format!("seed {seed:#x} step {step}");

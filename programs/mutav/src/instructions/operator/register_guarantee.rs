@@ -88,8 +88,7 @@ pub fn handle_register_guarantee(
         MutavError::GuaranteeCapExceeded
     );
 
-    // Rule 4: solvency post-condition, against the earmark computed before
-    // the registration (invariant 16).
+    // Rule 4: solvency post-condition.
     let cover_total_after = state
         .remaining_cover_total
         .checked_add(new_cover)
@@ -99,9 +98,8 @@ pub fn handle_register_guarantee(
         config.coverage_ratio_bps,
         state.provisions,
     )?;
-    let needed = (coverage_after as u128) + (before.earmark_eff as u128);
     require!(
-        needed <= before.stable_assets as u128,
+        coverage_after <= before.stable_assets,
         MutavError::InsufficientFreeCapital
     );
 
@@ -123,14 +121,10 @@ pub fn handle_register_guarantee(
 
     state.remaining_cover_total = cover_total_after;
     state.coverage_required = coverage_after;
-    state.stable_assets = before.stable_assets;
     state.active_guarantees = state
         .active_guarantees
         .checked_add(1)
         .ok_or(MutavError::MathOverflow)?;
-    // Ratchet (spec §4): the registration fit in `free_capital`, so the
-    // effective earmark after it equals the one before.
-    state.buffer_earmark = before.earmark_eff;
 
     emit_cpi!(GuaranteeRegistered {
         config: config.key(),

@@ -27,7 +27,7 @@ use litesvm_token::{CreateAccount, CreateMint};
 use mutav::{
     constants::*,
     errors::MutavError,
-    state::{CapsInput, PriceInput, VaultConfig, VaultState},
+    state::{CapsInput, VaultConfig, VaultState},
     InitializeArgs,
 };
 use solana_instruction::error::InstructionError;
@@ -260,23 +260,8 @@ pub fn test_caps() -> CapsInput {
         max_cover_per_guarantee: 30_000 * BRL,
         max_claim_per_call: 10_000 * BRL,
         max_claim_per_period: 20_000 * BRL,
-        claim_period_secs: 30 * 86_400,
-        min_settlement_bps: 5_000,
         min_request: 1_000 * BRL,
         max_request: 30_000 * BRL,
-        min_fill_assets: 500 * BRL,
-    }
-}
-
-/// Test price bounds (placeholders; spec §12 Q2, Q21).
-pub fn test_price() -> PriceInput {
-    PriceInput {
-        tesouro_price_account: Pubkey::new_unique(),
-        p0: 1_000_000,
-        t0: 0,
-        y_max_bps: 1_500,
-        max_staleness_secs: 86_400,
-        max_deviation_bps: 200,
         max_nav_move_bps: 100,
     }
 }
@@ -424,7 +409,6 @@ impl Fixture {
             coverage_ratio_bps: 10_000,
             fee_take_bps: 2_000,
             caps: test_caps(),
-            price: test_price(),
         }
     }
 
@@ -480,7 +464,6 @@ impl Fixture {
 
 /// `SetConfigArgs` that reproduce the current config exactly.
 pub fn set_config_args(c: &VaultConfig) -> mutav::SetConfigArgs {
-    use mutav::state::ExitInput;
     mutav::SetConfigArgs {
         coverage_ratio_bps: c.coverage_ratio_bps,
         fee_take_bps: c.fee_take_bps,
@@ -491,41 +474,10 @@ pub fn set_config_args(c: &VaultConfig) -> mutav::SetConfigArgs {
             max_cover_per_guarantee: c.caps.max_cover_per_guarantee,
             max_claim_per_call: c.caps.max_claim_per_call,
             max_claim_per_period: c.caps.max_claim_per_period,
-            claim_period_secs: c.caps.claim_period_secs,
-            min_settlement_bps: c.caps.min_settlement_bps(),
             min_request: c.caps.min_request,
             max_request: c.caps.max_request,
-            min_fill_assets: c.caps.min_fill_assets,
+            max_nav_move_bps: c.caps.max_nav_move_bps,
         },
-        price: PriceInput {
-            tesouro_price_account: c.price.tesouro_price_account,
-            p0: c.price.p0,
-            t0: c.price.t0,
-            y_max_bps: c.price.y_max_bps,
-            max_staleness_secs: c.price.max_staleness_secs,
-            max_deviation_bps: c.price.max_deviation_bps,
-            max_nav_move_bps: c.price.max_nav_move_bps,
-        },
-        exit: ExitInput {
-            buffer_target_bps: c.exit.buffer_target_bps,
-            buffer_headroom_bps: c.exit.buffer_headroom_bps,
-            buffer_release_after_secs: c.exit.buffer_release_after_secs,
-            curve_version: c.exit.curve_version,
-            h_min_bps: c.exit.h_min_bps,
-            h_peg_bps: c.exit.h_peg_bps,
-            h_max_bps: c.exit.h_max_bps,
-            pressure_epoch_secs: c.exit.pressure_epoch_secs,
-            min_instant_assets: c.exit.min_instant_assets,
-            max_instant_per_tx: c.exit.max_instant_per_tx,
-            max_instant_per_wallet: c.exit.max_instant_per_wallet,
-            max_instant_per_period: c.exit.max_instant_per_period,
-            instant_period_secs: c.exit.instant_period_secs,
-            min_hold_secs: c.exit.min_hold_secs,
-            max_price_age_secs: c.exit.max_price_age_secs,
-            allowlist_root: c.exit.allowlist_root,
-            barred: c.exit.barred,
-        },
-        income_take_bps: c.income_take_bps,
     }
 }
 
@@ -705,7 +657,6 @@ impl Fixture {
         let mut args = set_config_args(&c);
         args.fee_take_bps = c.fee_take_bps + 1;
         args.caps.max_tvl = c.caps.max_tvl + 1;
-        args.exit.buffer_target_bps = 500;
         let set_config = self.set_config_ix(&admin.pubkey(), args, &c.treasury_account);
 
         let new_payments = self.token_account(&Pubkey::new_unique());

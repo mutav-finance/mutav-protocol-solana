@@ -2,10 +2,9 @@
 //! only). `refresh` records `mode` and runs the guard; the gated instructions
 //! also check under-coverage inline.
 //!
-//! Built later (plan, "Built later"): TESOURO pricing (accrual cap,
-//! staleness, deviation) and the ratchet-scope test that needs a stale
-//! price; `allocate` (Task 9). With BRS only, a coverage shortfall comes from
-//! a higher coverage ratio (or, in Task 10, an issuer freeze).
+//! The pilot reserve holds BRS only (ADR 0018, ADR 0019), so a coverage
+//! shortfall comes from a higher coverage ratio, a claim payment below
+//! `c = 1`, or an issuer freeze.
 
 use mutav::{
     constants::*,
@@ -19,14 +18,9 @@ use mutav_tests::helpers::*;
 fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
     Solvency::compute(&SolvencyInputs {
         brs_balance: s.brs_balance,
-        tesouro_units: s.tesouro_units,
-        tesouro_price: s.tesouro_price,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
         provisions: s.provisions,
-        buffer_earmark: s.buffer_earmark,
-        feature_flags: c.feature_flags,
-        head_starved: false,
     })
     .unwrap()
 }
@@ -218,27 +212,6 @@ fn the_gates_check_under_coverage_inline_before_any_refresh() {
 }
 
 #[test]
-fn in_under_coverage_the_earmark_is_zero_and_refresh_stores_zero() {
-    let Book { mut f, .. } = book();
-    let mut c = f.config();
-    c.feature_flags = INSTANT_EXIT;
-    f.write_config(&c);
-    let mut s = f.state();
-    s.buffer_earmark = 4_000 * BRL;
-    f.write_state(&s);
-    assert_eq!(solvency(&f.config(), &f.state()).earmark_eff, 4_000 * BRL);
-    let mut c = f.config();
-    c.coverage_ratio_bps = 16_000;
-    f.write_config(&c);
-    let sol = solvency(&f.config(), &f.state());
-    assert!(sol.under_covered());
-    assert_eq!((sol.surplus, sol.earmark_eff), (0, 0));
-    let meta = f.refresh().unwrap();
-    assert_eq!(f.state().buffer_earmark, 0, "ratchet stores 0");
-    assert_eq!(events::<StateRefreshed>(&meta)[0].buffer_earmark, 0);
-}
-
-#[test]
 fn refresh_publishes_the_math_modules_values() {
     let Book { mut f, g, .. } = book();
     f.file_claim(Claim::on(&g, 1_500 * BRL)).unwrap();
@@ -248,45 +221,21 @@ fn refresh_publishes_the_math_modules_values() {
     let (c, s) = (f.config(), f.state());
     let sol = solvency(&c, &s);
     let nav = nav_per_share(sol.net_assets, s.shares_outstanding).unwrap();
-    assert_eq!(s.stable_assets, sol.stable_assets);
     assert_eq!(s.coverage_required, sol.coverage_required);
     assert_eq!(s.nav_per_share, nav);
     assert_eq!(s.last_refresh_ts, 1_760_000_500);
     assert_eq!(s.last_refresh_slot, clock(&f.svm).slot);
     let ev = &events::<StateRefreshed>(&meta)[0];
     assert_eq!(
-        (
-            ev.stable_assets,
-            ev.coverage_required,
-            ev.surplus,
-            ev.free_capital
-        ),
-        (
-            sol.stable_assets,
-            sol.coverage_required,
-            sol.surplus,
-            sol.free_capital
-        )
+        (ev.stable_assets, ev.coverage_required, ev.surplus),
+        (sol.stable_assets, sol.coverage_required, sol.surplus)
     );
     assert_eq!(
-        (ev.buffer_earmark, ev.provisions, ev.nav_per_share, ev.mode),
-        (0, 1_500 * BRL, nav, MODE_NORMAL)
+        (ev.provisions, ev.nav_per_share, ev.mode),
+        (1_500 * BRL, nav, MODE_NORMAL)
     );
-    assert_eq!((ev.tesouro_price, ev.price_stale), (0, false));
     assert_eq!((ev.config, ev.ts), (f.pdas.config, 1_760_000_500));
     assert!(events::<ModeChanged>(&meta).is_empty());
-}
-
-#[test]
-fn refresh_fails_closed_on_a_tesouro_position() {
-    // TODO(plan: TESOURO pricing built later, Tasks 8–9) — no price source is
-    // read yet, so `refresh` refuses rather than value TESOURO at zero or at
-    // a stale price.
-    let Book { mut f, .. } = book();
-    let mut s = f.state();
-    s.tesouro_units = 1;
-    f.write_state(&s);
-    assert_mutav_err(f.refresh(), MutavError::StalePrice);
 }
 
 // ---------------------------------------------------------------------------
@@ -429,14 +378,9 @@ fn admin_clears_the_halt_and_resets_the_baseline() {
     let s = f.state();
     let sol = Solvency::compute(&SolvencyInputs {
         brs_balance: s.brs_balance,
-        tesouro_units: s.tesouro_units,
-        tesouro_price: s.tesouro_price,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: f.config().coverage_ratio_bps,
         provisions: s.provisions,
-        buffer_earmark: s.buffer_earmark,
-        feature_flags: f.config().feature_flags,
-        head_starved: false,
     })
     .unwrap();
     let nav = mutav::pricing::published_nav(sol.net_assets, s.shares_outstanding).unwrap();

@@ -27,8 +27,8 @@ use mutav::{
     allowlist,
     constants::*,
     math::{assets_for, conversion_nav, mul_div, shares_for, Rounding},
-    solvency::{head_starved, nav_per_share, Solvency, SolvencyInputs},
-    state::{CapsInput, PriceInput},
+    solvency::{nav_per_share, Solvency, SolvencyInputs},
+    state::CapsInput,
     InitializeArgs, RegisterGuaranteeArgs,
 };
 use serde_json::{json, Value};
@@ -89,10 +89,6 @@ impl Rng {
 }
 
 fn s(x: u64) -> Value {
-    Value::String(x.to_string())
-}
-
-fn si(x: i64) -> Value {
     Value::String(x.to_string())
 }
 
@@ -172,11 +168,9 @@ fn conversion_vectors(rng: &mut Rng) -> Value {
 fn solvency_case(i: &SolvencyInputs) -> Value {
     let out = match Solvency::compute(i) {
         Ok(o) => json!({
-            "tesouroValue": s(o.tesouro_value),
             "stableAssets": s(o.stable_assets),
             "coverageRequired": s(o.coverage_required),
             "surplus": s(o.surplus),
-            "earmarkEff": s(o.earmark_eff),
             "freeCapital": s(o.free_capital),
             "liquidBudget": s(o.liquid_budget),
             "netAssets": s(o.net_assets),
@@ -188,14 +182,9 @@ fn solvency_case(i: &SolvencyInputs) -> Value {
     json!({
         "input": {
             "brsBalance": s(i.brs_balance),
-            "tesouroUnits": s(i.tesouro_units),
-            "tesouroPrice": s(i.tesouro_price),
             "remainingCoverTotal": s(i.remaining_cover_total),
             "coverageRatioBps": i.coverage_ratio_bps,
             "provisions": s(i.provisions),
-            "bufferEarmark": s(i.buffer_earmark),
-            "featureFlags": s(i.feature_flags),
-            "headStarved": i.head_starved,
         },
         "output": out,
     })
@@ -204,33 +193,18 @@ fn solvency_case(i: &SolvencyInputs) -> Value {
 fn solvency_vectors(rng: &mut Rng) -> Value {
     let base = SolvencyInputs {
         brs_balance: 60_000,
-        tesouro_units: 40_000,
-        tesouro_price: 1_005_000_000,
         remaining_cover_total: 80_000,
         coverage_ratio_bps: 10_000,
         provisions: 2_000,
-        buffer_earmark: 5_000,
-        feature_flags: INSTANT_EXIT,
-        head_starved: false,
     };
     let mut cases = vec![
         base,
-        // The pilot: flag clear, so the earmark has no effect.
-        SolvencyInputs {
-            feature_flags: 0,
-            ..base
-        },
-        // Starved head releases the earmark.
-        SolvencyInputs {
-            head_starved: true,
-            ..base
-        },
         // Under-covered.
         SolvencyInputs {
             remaining_cover_total: 200_000,
             ..base
         },
-        // Liquidity term binds.
+        // Provisions bind.
         SolvencyInputs {
             provisions: 58_000,
             ..base
@@ -248,62 +222,27 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
         },
         // Overflow paths.
         SolvencyInputs {
-            brs_balance: MAX,
-            tesouro_units: 1,
-            tesouro_price: PRICE_SCALE,
+            remaining_cover_total: MAX,
+            coverage_ratio_bps: 10_001,
             ..base
         },
         SolvencyInputs {
             brs_balance: MAX,
-            tesouro_units: 0,
             provisions: MAX,
             remaining_cover_total: MAX,
             ..base
         },
         SolvencyInputs::default(),
     ];
-    for k in 0..300 {
-        let tesouro_units = if k % 3 == 0 { 0 } else { rng.amount() };
+    for _ in 0..300 {
         cases.push(SolvencyInputs {
             brs_balance: rng.amount(),
-            tesouro_units,
-            tesouro_price: rng.next() % (3 * PRICE_SCALE),
             remaining_cover_total: rng.amount(),
             coverage_ratio_bps: rng.bps(),
             provisions: rng.amount(),
-            buffer_earmark: rng.amount(),
-            feature_flags: rng.next() % 4,
-            head_starved: rng.next() % 4 == 0,
         });
     }
     Value::Array(cases.iter().map(solvency_case).collect())
-}
-
-fn starvation_vectors() -> Value {
-    let cases: &[(i64, Option<i64>, i64)] = &[
-        (1_000, Some(0), 999),
-        (1_000, Some(0), 1_000),
-        (1_000, Some(0), 0),
-        (1_000, None, 10),
-        (i64::MIN, Some(i64::MAX), 1),
-        (i64::MAX, Some(i64::MIN), 1),
-        (1_700_000_000, Some(1_699_000_000), 86_400),
-        (1_700_000_000, Some(1_699_999_000), 86_400),
-        (5, Some(10), -1),
-    ];
-    Value::Array(
-        cases
-            .iter()
-            .map(|&(now, at, after)| {
-                json!({
-                    "now": si(now),
-                    "headRequestedAt": at.map(si).unwrap_or(Value::Null),
-                    "bufferReleaseAfterSecs": si(after),
-                    "starved": head_starved(now, at, after),
-                })
-            })
-            .collect(),
-    )
 }
 
 // ---------------------------------------------------------------------------
@@ -349,10 +288,8 @@ fn pda_vectors(rng: &mut Rng) -> Value {
             "guarantee": guarantee.to_string(),
             "feeReceipt": pda(&[FEE_SEED, c, &invoice]).to_string(),
             "claimFiling": pda(&[CLAIM_SEED, guarantee.as_ref(), &notice]).to_string(),
-            "payout": pda(&[PAYOUT_SEED, guarantee.as_ref(), &notice]).to_string(),
             "depositRequest": pda(&[DEPOSIT_SEED, c, &seq.to_le_bytes()]).to_string(),
             "redeemRequest": pda(&[REDEEM_SEED, c, &seq.to_le_bytes()]).to_string(),
-            "holderState": pda(&[HOLDER_SEED, c, owner.as_ref()]).to_string(),
             "incomeReceipt": pda(&[INCOME_SEED, c, &INCOME_REF_HASH]).to_string(),
             // ADR 0017: the vault authority's associated token account for
             // the reserve mint, under the classic SPL Token program.
@@ -405,19 +342,8 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         max_cover_per_guarantee: 30_000_000_000,
         max_claim_per_call: 10_000_000_000,
         max_claim_per_period: 20_000_000_000,
-        claim_period_secs: 2_592_000,
-        min_settlement_bps: 10_000,
         min_request: 1_000_000_000,
         max_request: 30_000_000_000,
-        min_fill_assets: 500_000_000,
-    };
-    let price = PriceInput {
-        tesouro_price_account: Pubkey::default(),
-        p0: 1_000_000,
-        t0: -5,
-        y_max_bps: 1_500,
-        max_staleness_secs: 86_400,
-        max_deviation_bps: 200,
         max_nav_move_bps: 10_000,
     };
     let init = InitializeArgs {
@@ -427,28 +353,16 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         mutav_capital_wallet: rng.pubkey(),
         coverage_ratio_bps: 10_000,
         fee_take_bps: 2_000,
-        caps: caps.clone(),
-        price: price.clone(),
+        caps,
     };
     let caps_json = json!({
         "maxTvl": s(caps.max_tvl),
         "maxCoverPerGuarantee": s(caps.max_cover_per_guarantee),
         "maxClaimPerCall": s(caps.max_claim_per_call),
         "maxClaimPerPeriod": s(caps.max_claim_per_period),
-        "claimPeriodSecs": si(caps.claim_period_secs),
-        "minSettlementBps": caps.min_settlement_bps,
         "minRequest": s(caps.min_request),
         "maxRequest": s(caps.max_request),
-        "minFillAssets": s(caps.min_fill_assets),
-    });
-    let price_json = json!({
-        "tesouroPriceAccount": price.tesouro_price_account.to_string(),
-        "p0": s(price.p0),
-        "t0": si(price.t0),
-        "yMaxBps": price.y_max_bps,
-        "maxStalenessSecs": si(price.max_staleness_secs),
-        "maxDeviationBps": price.max_deviation_bps,
-        "maxNavMoveBps": price.max_nav_move_bps,
+        "maxNavMoveBps": caps.max_nav_move_bps,
     });
     let hexes = |v: &[[u8; 32]]| v.iter().map(|p| hex(p)).collect::<Vec<_>>();
     Value::Array(vec![
@@ -462,7 +376,6 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
                 "coverageRatioBps": init.coverage_ratio_bps,
                 "feeTakeBps": init.fee_take_bps,
                 "caps": caps_json,
-                "price": price_json,
             }}),
             mutav::instruction::Initialize { args: init }.data(),
         ),
@@ -594,12 +507,10 @@ fn build() -> Value {
     json!({
         "_comment": "Generated by tests/tests/client_vectors.rs (MUTAV_WRITE_VECTORS=1). Do not edit by hand.",
         "constants": {
-            "priceScale": s(PRICE_SCALE),
             "navScale": s(NAV_SCALE),
             "virtualOffset": s(VIRTUAL_OFFSET),
             "bpsDenominator": BPS_DENOMINATOR,
             "minCoverageRatioBps": MIN_COVERAGE_RATIO_BPS,
-            "maxIncomeTakeBps": MAX_INCOME_TAKE_BPS,
             "instantExit": s(INSTANT_EXIT),
             "modeNormal": MODE_NORMAL,
             "modeUnderCovered": MODE_UNDER_COVERED,
@@ -609,7 +520,6 @@ fn build() -> Value {
         "mulDiv": mul_div_vectors(&mut rng),
         "conversion": conversion_vectors(&mut rng),
         "solvency": solvency_vectors(&mut rng),
-        "headStarved": starvation_vectors(),
         "pdas": pda_vectors(&mut rng),
         "allowlist": allowlist_vectors(&mut rng),
         "instructions": instruction_vectors(&mut rng),

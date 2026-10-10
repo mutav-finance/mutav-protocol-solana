@@ -10,7 +10,7 @@ use anchor_lang::{prelude::*, AccountDeserialize, Discriminator};
 use mutav::{constants::VAULT_STATE_SIZE, state::VaultState};
 use mutav_tests::helpers::*;
 
-use super::{pattern, ser, span, spans, v1::*, vault_state_fields, zeroed, Sentinel, STATE_BOOLS};
+use super::{pattern, ser, span, spans, state_bools, v1::*, zeroed, Sentinel};
 
 /// Phase-2 instant-exit counters (spec §13.2). Zero is the correct starting
 /// value of every field.
@@ -54,10 +54,6 @@ pub struct VaultStateV2 {
     pub bump: u8,
     pub mode: u8,
     pub brs_balance: u64,
-    pub tesouro_units: u64,
-    pub tesouro_price: u64,
-    pub tesouro_price_ts: i64,
-    pub stable_assets: u64,
     pub remaining_cover_total: u64,
     pub coverage_required: u64,
     pub provisions: u64,
@@ -66,15 +62,11 @@ pub struct VaultStateV2 {
     pub pending_deposits_total: u64,
     pub pending_redeem_shares: u64,
     pub claimable_assets_total: u64,
-    pub buffer_earmark: u64,
-    pub pending_notices: u32,
     pub active_guarantees: u32,
     pub next_deposit_seq: u64,
     pub deposit_head: u64,
     pub next_redeem_seq: u64,
     pub redeem_head: u64,
-    pub claim_period_start: i64,
-    pub claim_period_paid: u64,
     pub fees_in_total: u64,
     pub fee_take_total: u64,
     pub claims_paid_total: u64,
@@ -82,15 +74,16 @@ pub struct VaultStateV2 {
     pub last_refresh_ts: i64,
     pub last_refresh_slot: u64,
     pub income_total: u64,
-    pub income_take_total: u64,
     pub inflow_nav: u64,
+    pub claim_day_buckets: [u64; 31],
+    pub claim_day_anchor: i64,
     // -- carved from `_reserved` --
     pub instant_exit: InstantExitState,
     pub _reserved: [u8; V2_PAD],
 }
 
 /// `_reserved` of v1, and what is left after the 88-byte carve.
-const V1_PAD: usize = 236;
+const V1_PAD: usize = 256;
 const V2_PAD: usize = V1_PAD - 88;
 
 /// Decodes v2 from account bytes (discriminator skipped).
@@ -121,13 +114,15 @@ fn carve_sizes_are_pinned() {
 fn v2_keeps_every_v1_offset() {
     let mut v1 = VAULT_STATE_V1.to_vec();
     v1.pop();
-    assert_eq!(vault_state_fields!(VaultStateV2), v1);
+    let mut v2 = vault_state_fields!(VaultStateV2);
+    v2.pop(); // `_reserved` moved behind the carve
+    assert_eq!(v2, v1);
 }
 
 #[test]
 fn v1_bytes_read_as_v2_with_zero_carve() {
     // A v1 account: every v1 field set, padding zero (as the pilot writes).
-    let mut bytes = pattern(VAULT_STATE_SIZE - 8, STATE_BOOLS);
+    let mut bytes = pattern(VAULT_STATE_SIZE - 8, &state_bools());
     let (at, len) = (VAULT_STATE_V1.last().unwrap().1, V1_PAD);
     bytes[at..at + len].fill(0);
     let v1 = VaultStateV1::deserialize(&mut bytes.as_slice()).unwrap();
@@ -136,8 +131,7 @@ fn v1_bytes_read_as_v2_with_zero_carve() {
     assert_eq!(v2._reserved, [0; V2_PAD]);
     assert_eq!(ser(&v2), bytes, "v2 re-serializes the v1 bytes unchanged");
     assert_eq!(v2.brs_balance, v1.brs_balance);
-    assert_eq!(v2.buffer_earmark, v1.buffer_earmark);
-    assert_eq!(v2.pending_notices, v1.pending_notices);
+    assert_eq!(v2.inflow_nav, v1.inflow_nav);
     assert_eq!(v2.fulfil_halted, v1.fulfil_halted);
     assert_eq!(v2.last_refresh_slot, v1.last_refresh_slot);
 }
@@ -149,7 +143,6 @@ fn pilot_accounts_read_as_v2() {
     let mut f = Fixture::new();
     let mut s = f.state();
     s.brs_balance = 123;
-    s.buffer_earmark = 0;
     s.last_refresh_slot = 99;
     f.write_state(&s);
     // Building the list funds the reserve for the operator instructions.
@@ -169,8 +162,7 @@ fn pilot_accounts_read_as_v2() {
     assert_eq!(v2.fees_in_total, cur.fees_in_total);
     assert_eq!(v2.remaining_cover_total, cur.remaining_cover_total);
     assert_eq!(v2.claims_paid_total, cur.claims_paid_total);
-    assert_eq!(v2.claim_period_start, cur.claim_period_start);
-    assert_eq!(v2.pending_notices, cur.pending_notices);
+    assert_eq!(v2.claim_day_buckets, cur.claim_day_buckets);
     assert_eq!(v2.shares_outstanding, cur.shares_outstanding);
     assert_eq!(v2.next_redeem_seq, cur.next_redeem_seq);
     assert_eq!(v2.last_refresh_slot, cur.last_refresh_slot);

@@ -74,9 +74,8 @@ fn register_creates_the_guarantee_and_books_the_cover() {
     let s = f.state();
     assert_eq!(s.remaining_cover_total, 30_000 * BRL);
     assert_eq!(s.coverage_required, 30_000 * BRL);
-    assert_eq!(s.stable_assets, 50_000 * BRL);
+    assert_eq!(s.brs_balance, 50_000 * BRL);
     assert_eq!(s.active_guarantees, 1);
-    assert_eq!(s.buffer_earmark, 0);
 
     let ev = events::<GuaranteeRegistered>(&meta);
     assert_eq!(ev.len(), 1);
@@ -208,26 +207,6 @@ fn register_is_refused_in_under_coverage() {
 }
 
 #[test]
-fn register_fails_closed_with_tesouro_units_until_pricing_lands() {
-    // Every instruction that reads `stable_assets` needs a fresh TESOURO
-    // price when `tesouro_units > 0` (spec §5, §7). TESOURO pricing is built
-    // later (plan, "Built later"), so the gate refuses with `StalePrice`.
-    let mut f = Fixture::new();
-    f.fund_reserve(10_000 * BRL);
-    let mut s = f.state();
-    s.tesouro_units = 1;
-    f.write_state(&s);
-    assert_mutav_err(
-        f.register(guarantee_args(agency(), BRL, 0)),
-        MutavError::StalePrice,
-    );
-}
-
-// ---------------------------------------------------------------------------
-// close_guarantee
-// ---------------------------------------------------------------------------
-
-#[test]
 fn close_releases_the_remaining_cover() {
     let mut f = Fixture::new();
     f.fund_reserve(60_000 * BRL);
@@ -340,7 +319,6 @@ fn close_works_while_paused_and_in_under_coverage() {
     let mut s = f.state();
     s.mode = MODE_UNDER_COVERED;
     s.brs_balance = 0;
-    s.tesouro_units = 5; // no price needed: close reads neither price nor earmark
     f.write_state(&s);
     f.close_guarantee(a2.id).expect("under-covered");
     assert_eq!(f.state().remaining_cover_total, 0);

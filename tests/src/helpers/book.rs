@@ -10,7 +10,7 @@ use litesvm::types::TransactionResult;
 use litesvm_token::MintTo;
 use mutav::{
     constants::*,
-    state::{ClaimFiling, FeeReceipt, Guarantee, Payout},
+    state::{ClaimFiling, Guarantee, IncomeReceipt},
     RegisterGuaranteeArgs,
 };
 use solana_keypair::Keypair;
@@ -32,7 +32,7 @@ pub fn guarantee_pda(config: &Pubkey, id: &[u8; 32]) -> Pubkey {
     pda(&[GUARANTEE_SEED, config.as_ref(), id])
 }
 
-/// `FeeReceipt`: `["fee", config, invoice_ref_hash]`.
+/// The fee's `IncomeReceipt`: `["fee", config, invoice_ref_hash]`.
 pub fn fee_receipt_pda(config: &Pubkey, invoice_ref_hash: &[u8; 32]) -> Pubkey {
     pda(&[FEE_SEED, config.as_ref(), invoice_ref_hash])
 }
@@ -40,11 +40,6 @@ pub fn fee_receipt_pda(config: &Pubkey, invoice_ref_hash: &[u8; 32]) -> Pubkey {
 /// `ClaimFiling`: `["claim", guarantee, notice_ref_hash]`.
 pub fn claim_pda(guarantee: &Pubkey, notice_ref_hash: &[u8; 32]) -> Pubkey {
     pda(&[CLAIM_SEED, guarantee.as_ref(), notice_ref_hash])
-}
-
-/// `Payout`: `["payout", guarantee, notice_ref_hash]`.
-pub fn payout_pda(guarantee: &Pubkey, notice_ref_hash: &[u8; 32]) -> Pubkey {
-    pda(&[PAYOUT_SEED, guarantee.as_ref(), notice_ref_hash])
 }
 
 /// One claim: the guarantee (id and agency), leg, amount and notice.
@@ -206,12 +201,12 @@ impl Fixture {
         (self.send(ix, &op), invoice)
     }
 
-    pub fn fee_receipt(&self, invoice_ref_hash: &[u8; 32]) -> FeeReceipt {
+    pub fn fee_receipt(&self, invoice_ref_hash: &[u8; 32]) -> IncomeReceipt {
         let acc = self
             .svm
             .get_account(&fee_receipt_pda(&self.pdas.config, invoice_ref_hash))
             .expect("fee receipt");
-        FeeReceipt::try_deserialize(&mut acc.data.as_slice()).expect("decode fee receipt")
+        IncomeReceipt::try_deserialize(&mut acc.data.as_slice()).expect("decode fee receipt")
     }
 
     /// Injects `shares` outstanding, as fulfilled deposits (Task 6) would
@@ -238,12 +233,10 @@ impl Fixture {
     }
 
     /// NAV per share (`NAV_SCALE`) computed from the current state with the
-    /// spec §4 formulas, as `refresh` (Task 10) publishes it. No TESOURO in
-    /// these tests.
+    /// spec §4 formulas, as `refresh` (Task 10) publishes it.
     pub fn nav(&self) -> u64 {
         use mutav::solvency::{nav_per_share, net_assets};
         let s = self.state();
-        assert_eq!(s.tesouro_units, 0);
         nav_per_share(
             net_assets(s.brs_balance, s.provisions),
             s.shares_outstanding,
@@ -385,14 +378,11 @@ impl Fixture {
                 state: self.pdas.state,
                 guarantee,
                 claim_filing: claim_pda(&guarantee, &c.notice),
-                payout: payout_pda(&guarantee, &c.notice),
                 reserve: self.pdas.reserve,
                 payments_account: *payments,
                 vault_authority: self.pdas.authority,
                 reserve_mint: self.reserve_mint,
                 token_program: self.token_program,
-                payer: self.payer.pubkey(),
-                system_program: anchor_lang::solana_program::system_program::ID,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -419,7 +409,7 @@ impl Fixture {
                 operator: *signer,
                 config,
                 guarantee,
-                payout: payout_pda(&guarantee, &c.notice),
+                claim_filing: claim_pda(&guarantee, &c.notice),
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -458,13 +448,10 @@ impl Fixture {
         ClaimFiling::try_deserialize(&mut acc.data.as_slice()).expect("decode claim filing")
     }
 
-    pub fn payout(&self, c: &Claim) -> Payout {
-        let g = guarantee_pda(&self.pdas.config, &c.id);
-        let acc = self
-            .svm
-            .get_account(&payout_pda(&g, &c.notice))
-            .expect("payout");
-        Payout::try_deserialize(&mut acc.data.as_slice()).expect("decode payout")
+    /// The claim filing of `c`, which records the payment and its
+    /// settlement (the former `Payout`, ADR 0019).
+    pub fn payout(&self, c: &Claim) -> ClaimFiling {
+        self.claim_filing(c)
     }
 
     /// Serializes `x` over the claim filing of `c`.
@@ -474,15 +461,6 @@ impl Fixture {
         anchor_lang::AnchorSerialize::serialize(x, &mut data).unwrap();
         let g = guarantee_pda(&self.pdas.config, &c.id);
         self.write_raw(&claim_pda(&g, &c.notice), &data);
-    }
-
-    /// Serializes `x` over the payout of `c`.
-    pub fn write_payout(&mut self, c: &Claim, x: &Payout) {
-        use anchor_lang::Discriminator;
-        let mut data = Payout::DISCRIMINATOR.to_vec();
-        anchor_lang::AnchorSerialize::serialize(x, &mut data).unwrap();
-        let g = guarantee_pda(&self.pdas.config, &c.id);
-        self.write_raw(&payout_pda(&g, &c.notice), &data);
     }
 
     /// Operator instructions for the pilot list, each valid in this order on

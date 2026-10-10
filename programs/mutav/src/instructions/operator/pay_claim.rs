@@ -1,6 +1,6 @@
 //! `pay_claim` (spec §5.4): pays a filed claim to the whitelisted payments
 //! account. **Never solvency-gated, no mode check, not paused** (spec §1
-//! principle 4). It reads neither the TESOURO price nor `buffer_earmark`.
+//! principle 4).
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
@@ -12,7 +12,7 @@ use crate::{
     errors::MutavError,
     events::ClaimPaid,
     solvency::coverage_required,
-    state::{ClaimFiling, Guarantee, Payout, VaultConfig, VaultState},
+    state::{ClaimFiling, Guarantee, VaultConfig, VaultState},
 };
 
 #[event_cpi]
@@ -53,15 +53,6 @@ pub struct PayClaim<'info> {
     )]
     pub claim_filing: UncheckedAccount<'info>,
 
-    #[account(
-        init,
-        payer = payer,
-        space = PAYOUT_SIZE,
-        seeds = [PAYOUT_SEED, guarantee.key().as_ref(), notice_ref_hash.as_ref()],
-        bump,
-    )]
-    pub payout: Box<Account<'info, Payout>>,
-
     #[account(mut, seeds = [RESERVE_SEED, config.key().as_ref()], bump)]
     pub reserve: Box<InterfaceAccount<'info, TokenAccount>>,
 
@@ -82,11 +73,6 @@ pub struct PayClaim<'info> {
 
     #[account(address = config.reserve_token_program @ MutavError::InvalidTokenProgram)]
     pub token_program: Interface<'info, TokenInterface>,
-
-    #[account(mut)]
-    pub payer: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
 pub fn handle_pay_claim(
@@ -130,23 +116,14 @@ pub fn handle_pay_claim(
         MutavError::ClaimCallCapExceeded
     );
 
-    // Rule 4: roll the window, then the per-period cap.
+    // Rule 4: the sliding window (ADR 0019). The payments of the last
+    // `CLAIM_WINDOW_DAYS` UTC days, this one included, stay within the cap.
     let now = Clock::get()?.unix_timestamp;
+    let day = now.div_euclid(SECONDS_PER_DAY);
     let state = &mut ctx.accounts.state;
-    if now
-        >= state
-            .claim_period_start
-            .saturating_add(caps.claim_period_secs)
-    {
-        state.claim_period_start = now;
-        state.claim_period_paid = 0;
-    }
-    let period_paid = state
-        .claim_period_paid
-        .checked_add(amount)
-        .ok_or(MutavError::MathOverflow)?;
+    state.roll_claim_window(day);
     require!(
-        period_paid <= caps.max_claim_per_period,
+        state.claim_window_paid() + amount as u128 <= caps.max_claim_per_period as u128,
         MutavError::ClaimPeriodCapExceeded
     );
 
@@ -194,9 +171,12 @@ pub fn handle_pay_claim(
         .open_claims
         .checked_sub(1)
         .ok_or(MutavError::MathOverflow)?;
-    // In place (R6): only the status byte changes; padding is re-written
-    // from the decoded value.
+    // The payment, recorded on the filing in place (R6): the padding is
+    // re-written from the decoded value. A paid filing is never paid again.
     filing.status = CLAIM_PAID;
+    filing.paid_amount = amount;
+    filing.paid_at = now;
+    filing.payments_account = ctx.accounts.payments_account.key();
     filing.try_serialize(&mut &mut filing_info.try_borrow_mut_data()?[..])?;
 
     state.provisions = state
@@ -213,25 +193,14 @@ pub fn handle_pay_claim(
         ctx.accounts.config.coverage_ratio_bps,
         state.provisions,
     )?;
-    state.claim_period_paid = period_paid;
+    let bucket = state.claim_bucket_mut(day);
+    *bucket = bucket.checked_add(amount).ok_or(MutavError::MathOverflow)?;
     state.claims_paid_total = state
         .claims_paid_total
         .checked_add(amount)
         .ok_or(MutavError::MathOverflow)?;
 
-    let guarantee_key = ctx.accounts.guarantee.key();
     let payments_account = ctx.accounts.payments_account.key();
-    let p = &mut ctx.accounts.payout;
-    p.version = PROGRAM_LAYOUT_VERSION;
-    p.bump = ctx.bumps.payout;
-    p.guarantee = guarantee_key;
-    p.leg = leg;
-    p.amount = amount;
-    p.notice_ref_hash = notice_ref_hash;
-    p.payments_account = payments_account;
-    p.status = PAYOUT_PENDING;
-    p.paid_at = now;
-
     emit_cpi!(ClaimPaid {
         config: config_key,
         ts: now,

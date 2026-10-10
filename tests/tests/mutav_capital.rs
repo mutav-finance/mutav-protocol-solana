@@ -51,8 +51,8 @@ fn mutav_capital_wallet_deposits_and_redeems_through_the_queue() {
     let r = f.redeem_request(mine).unwrap();
     assert_eq!(r.status, REDEEM_FILLED);
     f.claim_assets(&m, mine).unwrap();
-    assert_eq!(f.balance(&m.brs), r.assets_filled);
-    assert!(r.assets_filled > 20_000 * BRL, "priced at NAV > 1.0");
+    assert_eq!(f.balance(&m.brs), r.assets_out);
+    assert!(r.assets_out > 20_000 * BRL, "priced at NAV > 1.0");
     f.assert_capital_invariants("mutav capital");
 }
 

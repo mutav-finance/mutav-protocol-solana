@@ -70,25 +70,16 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
     }
 
     // 2. The spec §4 quantities.
-    // TODO(plan: TESOURO pricing built later, Tasks 8–9) — the spec records
-    // and flags a stale price instead of failing; with no price source yet,
-    // a TESOURO position fails closed with `StalePrice` here too.
     let state = &ctx.accounts.state;
-    require!(state.tesouro_units == 0, MutavError::StalePrice);
     let sol = Solvency::compute(&SolvencyInputs {
         brs_balance: if reserve_frozen { 0 } else { state.brs_balance },
-        tesouro_units: state.tesouro_units,
-        tesouro_price: state.tesouro_price,
         remaining_cover_total: state.remaining_cover_total,
         coverage_ratio_bps: config.coverage_ratio_bps,
         provisions: state.provisions,
-        buffer_earmark: state.buffer_earmark,
-        feature_flags: config.feature_flags,
-        head_starved: false,
     })?;
     let nav = published_nav(sol.net_assets, state.shares_outstanding)?;
 
-    let max_nav_move_bps = config.price.max_nav_move_bps;
+    let max_nav_move_bps = config.caps.max_nav_move_bps;
     let state = &mut ctx.accounts.state;
 
     // 3. NAV-move guard (spec §7): measured against the last published NAV,
@@ -109,15 +100,12 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
     // 4. Mode (spec §6).
     let (from, to) = (state.mode, sol.mode());
 
-    state.stable_assets = sol.stable_assets;
     state.coverage_required = sol.coverage_required;
     state.nav_per_share = nav;
     state.mode = to;
-    // Ratchet (spec §4): `refresh` holds no queue head.
-    state.buffer_earmark = sol.earmark_eff;
     state.last_refresh_ts = now;
     state.last_refresh_slot = clock.slot;
-    let (provisions, tesouro_price) = (state.provisions, state.tesouro_price);
+    let provisions = state.provisions;
 
     if from != to {
         emit_cpi!(ModeChanged {
@@ -134,13 +122,9 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
         stable_assets: sol.stable_assets,
         coverage_required: sol.coverage_required,
         surplus: sol.surplus,
-        buffer_earmark: sol.earmark_eff,
-        free_capital: sol.free_capital,
         provisions,
         nav_per_share: nav,
         mode: to,
-        tesouro_price,
-        price_stale: false,
     });
     Ok(())
 }
