@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { AccountsTab } from "@/components/reserve/ReserveTabs";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Accounts · Transparency", description: "Every account the MUTAV pilot reserve uses, with who signs what, linked to Solana Explorer." };
-
+/** Merged into /reserve/verify (Transparency v2). */
 export default function Page() {
-  return <AccountsTab />;
+  permanentRedirect("/reserve/verify");
 }

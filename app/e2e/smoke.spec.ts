@@ -9,6 +9,11 @@ async function noBannedWords(page: Page) {
 }
 
 test.describe("smoke: every route renders against a seeded localnet", () => {
+  // /reserve opens "How to read this page" on a first visit; the smoke reads past it (one test covers it).
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("mutav-transparency-intro-v1", "1"));
+  });
+
   test("/ — story, live strip from the chain, diagram, shared nav", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("backed by a reserve anyone can verify");
@@ -28,19 +33,32 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/reserve — overview: promises, health, persistent tabs", async ({ page }) => {
+  test("/reserve — overview: hero, where the capital sits, promises, persistent tabs", async ({ page }) => {
     await page.goto("/reserve");
     const views = page.getByRole("navigation", { name: "Transparency views" });
-    for (const tab of ["Overview", "Coverage", "Claims", "Flows", "Queue", "Risks", "Accounts"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
+    for (const tab of ["Overview", "Coverage", "Claims", "Capital", "Risks", "Verify"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
     await expect(views.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
-    await expect(page.getByText("Claim payments are never blocked by solvency.")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
     await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();
+    await expect(page.getByText("R$ 28,300.00").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Where the capital sits" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
+    await expect(page.getByText("Claim payments are never blocked by solvency.")).toBeVisible();
     await expect(page.getByText("The pilot runs on MUTAV's own capital and is not open to public investment")).toBeVisible();
     await noBannedWords(page);
   });
 
-  test("/reserve tabs — coverage, claims, flows, queue, risks, accounts", async ({ page }) => {
+  test("/reserve — first visit opens How to read this page", async ({ page }) => {
+    await page.addInitScript(() => localStorage.removeItem("mutav-transparency-intro-v1"));
+    await page.goto("/reserve");
+    const intro = page.getByRole("dialog", { name: /Every number on this page is read from Solana/ });
+    await expect(intro).toBeVisible();
+    await intro.getByRole("button", { name: "Skip" }).click();
+    await expect(intro).toHaveCount(0);
+    await page.getByRole("button", { name: "How to read this page" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+
+  test("/reserve tabs — coverage, claims, capital, risks, verify", async ({ page }) => {
     await page.goto("/reserve/coverage");
     await expect(page.getByText("2 active guarantees")).toBeVisible();
     await expect(page.getByRole("table", { name: "Remaining cover by guarantee" }).locator("tbody tr")).toHaveCount(2);
@@ -54,24 +72,27 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByText("Claim payments are never blocked by solvency or by a pause.")).toBeVisible();
     await noBannedWords(page);
 
-    await page.goto("/reserve/flows");
+    await page.goto("/reserve/capital");
     const flows = page.getByRole("table", { name: "Money flows" });
     await expect(flows).toContainText("Guarantee fee");
     await expect(flows).toContainText("Claim payment");
     await expect(flows).toContainText("Deposit");
-    await noBannedWords(page);
-
-    await page.goto("/reserve/queue");
     await expect(page.getByRole("heading", { name: "Capital queue" })).toBeVisible();
     await noBannedWords(page);
 
-    await page.goto("/reserve/disclosures");
+    await page.goto("/reserve/risks");
     await expect(page.getByText("BRS is issued by Nora, and Nora can freeze it")).toBeVisible();
     await noBannedWords(page);
 
-    await page.goto("/reserve/accounts");
+    await page.goto("/reserve/verify");
     await expect(page.getByText("8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9")).toBeVisible();
     await noBannedWords(page);
+
+    // The v1 routes still land on their v2 tab.
+    for (const [from, to] of [["flows", "capital"], ["queue", "capital"], ["disclosures", "risks"], ["accounts", "verify"]]) {
+      await page.goto(`/reserve/${from}`);
+      await expect(page).toHaveURL(new RegExp(`/reserve/${to}$`));
+    }
   });
 
   test("/demo — six steps and a live gate preview", async ({ page }) => {

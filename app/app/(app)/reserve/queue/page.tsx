@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { QueueTab } from "@/components/reserve/ReserveTabs";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Queue · Transparency", description: "The FIFO capital queue of the MUTAV pilot reserve: pending deposits and redemptions." };
-
+/** Merged into /reserve/capital (Transparency v2). */
 export default function Page() {
-  return <QueueTab />;
+  permanentRedirect("/reserve/capital");
 }

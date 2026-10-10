@@ -153,7 +153,7 @@ export function QueueEntries({ rows, owner, connected, inv }: { rows: InvestorRe
       title="Your queue entries"
       info="Requests wait in queue order until the Reserve Admin fulfils them. Cancels and claims need only the request's owner and are never paused. Hover a row for its queue seq."
       aside={
-        <Link href="/reserve/queue" className="ext-link font-mono text-xs">
+        <Link href="/reserve/capital" className="ext-link font-mono text-xs">
           Full queue →
         </Link>
       }

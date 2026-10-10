@@ -61,6 +61,43 @@ export function navBasis(s: Pick<Solvency, "stableAssets" | "netAssets">): NavBa
   return { stableAssets: s.stableAssets, netAssets: s.netAssets, provisions };
 }
 
+// ── Where the capital sits ──────────────────────────────────────────────────
+
+/**
+ * Stable assets split by what they are committed to: open claim provisions,
+ * the rest of coverage required, the buffer earmark, and free capital. The
+ * held parts sum to stable assets; `shortfall` is required and not held.
+ */
+export type CapitalSplit = {
+  stableAssets: bigint;
+  /** Held against filed, unpaid claims (capped at what is held). */
+  provisions: bigint;
+  /** Held against the rest of coverage required, beyond provisions. */
+  restRequired: bigint;
+  /** Surplus held back by the buffer earmark (zero unless the flag is on). */
+  earmark: bigint;
+  freeCapital: bigint;
+  /** Coverage required beyond stable assets (≥ 0). */
+  shortfall: bigint;
+  /** Axis for a chart: the larger of stable assets and coverage required. */
+  axis: bigint;
+};
+
+export function capitalSplit(s: Pick<Solvency, "stableAssets" | "coverageRequired" | "earmarkEff" | "freeCapital">, provisions: bigint): CapitalSplit {
+  const held = s.stableAssets;
+  const p = provisions < held ? provisions : held;
+  const backing = s.coverageRequired < held ? s.coverageRequired : held;
+  return {
+    stableAssets: held,
+    provisions: p,
+    restRequired: backing > p ? backing - p : 0n,
+    earmark: s.earmarkEff,
+    freeCapital: s.freeCapital,
+    shortfall: s.coverageRequired > held ? s.coverageRequired - held : 0n,
+    axis: held > s.coverageRequired ? held : s.coverageRequired,
+  };
+}
+
 // ── Remaining cover by guarantee ────────────────────────────────────────────
 
 export type CoverBar = { address: string; id: string; defaultLeft: bigint; exitLeft: bigint; total: bigint };

@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { FlowsTab } from "@/components/reserve/ReserveTabs";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Flows · Transparency", description: "Money into and out of the MUTAV pilot reserve: guarantee fees, issuer income, claim payments and capital." };
-
+/** Merged into /reserve/capital (Transparency v2). */
 export default function Page() {
-  return <FlowsTab />;
+  permanentRedirect("/reserve/capital");
 }

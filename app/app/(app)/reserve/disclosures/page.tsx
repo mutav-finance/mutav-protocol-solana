@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { DisclosuresTab } from "@/components/reserve/ReserveTabs";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Risks · Transparency", description: "The risks and limits of the MUTAV pilot reserve: BRS freeze, claim-payment caps, and who may provide capital." };
-
+/** Merged into /reserve/risks (Transparency v2). */
 export default function Page() {
-  return <DisclosuresTab />;
+  permanentRedirect("/reserve/risks");
 }

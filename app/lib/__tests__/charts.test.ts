@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "../charts";
+import { capitalSplit, claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "../charts";
 import type { ClaimRow, CoverageRow } from "../view";
 import { BRL } from "./fixtures";
 
@@ -67,5 +67,16 @@ describe("chart shaping", () => {
     expect(bars.find((b) => b.key === "income-take")).toBeUndefined();
     const withTake = flowBars({ feesNetToReserve: 0n, feeTakeToTreasury: 0n, incomeNetToReserve: 750n, incomeTakeToTreasury: 250n, claimsPaid: 0n, depositsIn: 0n, redemptionsOut: 0n });
     expect(withTake.bars.find((b) => b.key === "income-take")).toMatchObject({ direction: "outside", amount: 250n });
+  });
+
+  it("splits covered stable assets into provisions, the rest of required, earmark and free capital", () => {
+    const s = capitalSplit({ stableAssets: 58_700n * BRL, coverageRequired: 3_500n * BRL, earmarkEff: 200n * BRL, freeCapital: 55_000n * BRL }, 3_200n * BRL);
+    expect(s).toMatchObject({ provisions: 3_200n * BRL, restRequired: 300n * BRL, earmark: 200n * BRL, freeCapital: 55_000n * BRL, shortfall: 0n, axis: 58_700n * BRL });
+    expect(s.provisions + s.restRequired + s.earmark + s.freeCapital).toBe(s.stableAssets);
+  });
+
+  it("commits every held unit and reports the shortfall when under-covered", () => {
+    const s = capitalSplit({ stableAssets: 3_100n * BRL, coverageRequired: 3_500n * BRL, earmarkEff: 0n, freeCapital: 0n }, 3_200n * BRL);
+    expect(s).toMatchObject({ provisions: 3_100n * BRL, restRequired: 0n, freeCapital: 0n, shortfall: 400n * BRL, axis: 3_500n * BRL });
   });
 });

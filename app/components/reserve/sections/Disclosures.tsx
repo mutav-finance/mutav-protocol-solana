@@ -83,7 +83,7 @@ export function VerifyStrip({ r, accountsLink = true }: { r: ReserveView; accoun
           Verify it yourself
         </h2>
         {accountsLink && (
-          <Link href="/reserve/accounts" className="ext-link font-body text-xs">
+          <Link href="/reserve/verify" className="ext-link font-body text-xs">
             Every account →
           </Link>
         )}
