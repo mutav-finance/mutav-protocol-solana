@@ -12,7 +12,7 @@ use crate::{
     errors::MutavError,
     events::ClaimPaid,
     solvency::coverage_required,
-    state::{AgencyExposure, ClaimFiling, Guarantee, Payout, VaultConfig, VaultState},
+    state::{ClaimFiling, Guarantee, Payout, VaultConfig, VaultState},
 };
 
 #[event_cpi]
@@ -42,14 +42,6 @@ pub struct PayClaim<'info> {
         constraint = guarantee.is_supported() @ MutavError::UnsupportedVersion,
     )]
     pub guarantee: Box<Account<'info, Guarantee>>,
-
-    #[account(
-        mut,
-        seeds = [AGENCY_SEED, config.key().as_ref(), guarantee.agency_id.as_ref()],
-        bump = agency_exposure.bump,
-        constraint = agency_exposure.is_supported() @ MutavError::UnsupportedVersion,
-    )]
-    pub agency_exposure: Box<Account<'info, AgencyExposure>>,
 
     /// CHECK: the `ClaimFiling` at `["claim", guarantee, notice_ref_hash]`.
     /// Decoded in the handler, so a missing filing fails with
@@ -223,16 +215,6 @@ pub fn handle_pay_claim(
     )?;
     state.claim_period_paid = period_paid;
     state.claims_paid_total = state
-        .claims_paid_total
-        .checked_add(amount)
-        .ok_or(MutavError::MathOverflow)?;
-
-    let agency = &mut ctx.accounts.agency_exposure;
-    agency.outstanding_cover = agency
-        .outstanding_cover
-        .checked_sub(amount)
-        .ok_or(MutavError::MathOverflow)?;
-    agency.claims_paid_total = agency
         .claims_paid_total
         .checked_add(amount)
         .ok_or(MutavError::MathOverflow)?;

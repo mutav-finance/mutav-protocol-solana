@@ -45,7 +45,7 @@ fn mutav_capital_wallet_deposits_and_redeems_through_the_queue() {
         MutavError::InsufficientFreeCapital,
     );
     // Run-off frees capital; then MUTAV is filled at the NAV of its fill.
-    f.close_guarantee(g1.id, g1.agency_id).unwrap();
+    f.close_guarantee(g1.id).unwrap();
     f.fulfil_redeems(1, u64::MAX, &[mine])
         .expect("filled after run-off");
     let r = f.redeem_request(mine).unwrap();
@@ -147,8 +147,7 @@ fn pause_blocks_capital_flows_and_new_guarantees_only() {
     f.pay_claim(c2).expect("pay_claim");
     f.settle_payout(c1, unique_hash()).expect("settle_payout");
     f.settle_payout(c2, unique_hash()).expect("settle_payout");
-    f.close_guarantee(g.id, g.agency_id)
-        .expect("close_guarantee");
+    f.close_guarantee(g.id).expect("close_guarantee");
     f.advance_queue_heads(4, &[r_cancel, r_fill, r_live], &[d_cancel, d_fill])
         .expect("advance_queue_heads");
     f.cancel_redeem(&a, r_live).expect("cancel_redeem");

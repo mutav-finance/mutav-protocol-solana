@@ -148,7 +148,6 @@ macro_rules! caps_fields {
     ($t:ty) => {
         spans!($t;
             "max_tvl" => max_tvl, "max_cover_per_guarantee" => max_cover_per_guarantee,
-            "max_cover_per_agency" => max_cover_per_agency,
             "max_claim_per_call" => max_claim_per_call,
             "max_claim_per_period" => max_claim_per_period,
             "claim_period_secs" => claim_period_secs,

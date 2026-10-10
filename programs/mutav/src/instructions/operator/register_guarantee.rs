@@ -8,7 +8,7 @@ use crate::{
     events::GuaranteeRegistered,
     instructions::operator::solvency_snapshot,
     solvency::coverage_required,
-    state::{AgencyExposure, Guarantee, VaultConfig, VaultState},
+    state::{Guarantee, VaultConfig, VaultState},
 };
 
 /// Arguments of `register_guarantee`, in the spec's order (the wire format is
@@ -56,16 +56,6 @@ pub struct RegisterGuarantee<'info> {
     )]
     pub guarantee: Box<Account<'info, Guarantee>>,
 
-    #[account(
-        init_if_needed,
-        payer = payer,
-        space = AGENCY_EXPOSURE_SIZE,
-        seeds = [AGENCY_SEED, config.key().as_ref(), args.agency_id.as_ref()],
-        bump,
-        constraint = agency_exposure.is_supported() @ MutavError::UnsupportedVersion,
-    )]
-    pub agency_exposure: Box<Account<'info, AgencyExposure>>,
-
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -78,7 +68,6 @@ pub fn handle_register_guarantee(
 ) -> Result<()> {
     let config = &ctx.accounts.config;
     let state = &mut ctx.accounts.state;
-    let agency = &mut ctx.accounts.agency_exposure;
 
     // Rule 1: not paused, normal mode (stored, and checked inline, spec §6).
     require!(!config.paused, MutavError::Paused);
@@ -93,21 +82,13 @@ pub fn handle_register_guarantee(
         .ok_or(MutavError::MathOverflow)?;
     require!(new_cover > 0 && args.rent > 0, MutavError::InvalidParameter);
 
-    // Rules 3 and 4: caps.
+    // Rule 3: the per-guarantee cap. There is no per-agency cap (ADR 0019).
     require!(
         new_cover <= config.caps.max_cover_per_guarantee,
         MutavError::GuaranteeCapExceeded
     );
-    let agency_after = agency
-        .outstanding_cover
-        .checked_add(new_cover)
-        .ok_or(MutavError::MathOverflow)?;
-    require!(
-        agency_after <= config.caps.max_cover_per_agency,
-        MutavError::AgencyCapExceeded
-    );
 
-    // Rule 5: solvency post-condition, against the earmark computed before
+    // Rule 4: solvency post-condition, against the earmark computed before
     // the registration (invariant 16).
     let cover_total_after = state
         .remaining_cover_total
@@ -139,17 +120,6 @@ pub fn handle_register_guarantee(
     g.exit_cover = args.exit_cover;
     g.status = GUARANTEE_ACTIVE;
     g.registered_at = now;
-
-    if agency.version == 0 {
-        agency.version = PROGRAM_LAYOUT_VERSION;
-        agency.bump = ctx.bumps.agency_exposure;
-        agency.agency_id = args.agency_id;
-    }
-    agency.outstanding_cover = agency_after;
-    agency.active_guarantees = agency
-        .active_guarantees
-        .checked_add(1)
-        .ok_or(MutavError::MathOverflow)?;
 
     state.remaining_cover_total = cover_total_after;
     state.coverage_required = coverage_after;

@@ -99,11 +99,6 @@ impl VaultConfig {
             a.max_cover_per_guarantee,
         );
         ch.set(
-            field::CAPS_MAX_COVER_PER_AGENCY,
-            &mut c.max_cover_per_agency,
-            a.max_cover_per_agency,
-        );
-        ch.set(
             field::CAPS_MAX_CLAIM_PER_CALL,
             &mut c.max_claim_per_call,
             a.max_claim_per_call,
@@ -274,7 +269,6 @@ pub struct AdapterEntry {
 pub struct Caps {
     pub max_tvl: u64,
     pub max_cover_per_guarantee: u64,
-    pub max_cover_per_agency: u64,
     pub max_claim_per_call: u64,
     pub max_claim_per_period: u64,
     pub claim_period_secs: i64,
@@ -290,7 +284,7 @@ pub struct Caps {
     pub max_request: u64,
     pub min_fill_assets: u64,
     /// Zeroed. Later caps (PC-43) are carved here.
-    pub _reserved: [u8; 32],
+    pub _reserved: [u8; 40],
 }
 
 impl Caps {
@@ -351,7 +345,6 @@ pub struct ExitParams {
 pub struct CapsInput {
     pub max_tvl: u64,
     pub max_cover_per_guarantee: u64,
-    pub max_cover_per_agency: u64,
     pub max_claim_per_call: u64,
     pub max_claim_per_period: u64,
     pub claim_period_secs: i64,
@@ -437,7 +430,7 @@ mod tests {
     #[test]
     fn apply_never_touches_padding() {
         let mut c = zeroed();
-        c.caps._reserved = [7; 32];
+        c.caps._reserved = [7; 40];
         c.price._reserved = [8; 32];
         c.exit._reserved = [9; 32];
         let mut ch = ConfigChanges::default();
@@ -463,7 +456,7 @@ mod tests {
             },
             &mut ch,
         );
-        assert_eq!(c.caps._reserved, [7; 32]);
+        assert_eq!(c.caps._reserved, [7; 40]);
         assert_eq!(c.price._reserved, [8; 32]);
         assert_eq!(c.exit._reserved, [9; 32]);
         assert_eq!(ch.0.len(), 6);

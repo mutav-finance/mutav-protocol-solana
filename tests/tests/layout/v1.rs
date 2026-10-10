@@ -2,7 +2,7 @@
 //! pattern). These are copies of the pilot account structs as deployed. They
 //! must never change: a diff here means a live account would be misread.
 //!
-//! Accounts added in later tasks (`Guarantee`, `AgencyExposure`,
+//! Accounts added in later tasks (`Guarantee`,
 //! `ClaimFiling`, `Payout`, `DepositRequest`, `RedeemRequest`, `HolderState`,
 //! `FeeReceipt`, `ClaimNotice`, `IncomeReceipt`) get their `…V1` copy and
 //! offset table here in the task that adds them. The ADR 0017 fields of
@@ -32,7 +32,6 @@ pub struct AdapterEntryV1 {
 pub struct CapsV1 {
     pub max_tvl: u64,
     pub max_cover_per_guarantee: u64,
-    pub max_cover_per_agency: u64,
     pub max_claim_per_call: u64,
     pub max_claim_per_period: u64,
     pub claim_period_secs: i64,
@@ -40,7 +39,7 @@ pub struct CapsV1 {
     pub min_request: u64,
     pub max_request: u64,
     pub min_fill_assets: u64,
-    pub _reserved: [u8; 32],
+    pub _reserved: [u8; 40],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -209,7 +208,7 @@ pub const VAULT_CONFIG_V1: OffsetTable = &[
     ("adapters[7].max_share_bps", 296 + 7 * 177 + 113, 2),
     ("adapters[7]._reserved", 296 + 7 * 177 + 115, 62),
     ("caps.max_tvl", 1712, 8),
-    ("caps._reserved", 1712 + 74, 32),
+    ("caps._reserved", 1712 + 66, 40),
     ("price.tesouro_price_account", 1818, 32),
     ("price._reserved", 1818 + 62, 32),
     ("paused", 1912, 1),
@@ -224,15 +223,14 @@ pub const VAULT_CONFIG_V1: OffsetTable = &[
 pub const CAPS_V1: OffsetTable = &[
     ("max_tvl", 0, 8),
     ("max_cover_per_guarantee", 8, 8),
-    ("max_cover_per_agency", 16, 8),
-    ("max_claim_per_call", 24, 8),
-    ("max_claim_per_period", 32, 8),
-    ("claim_period_secs", 40, 8),
-    ("max_allocated_bps", 48, 2),
-    ("min_request", 50, 8),
-    ("max_request", 58, 8),
-    ("min_fill_assets", 66, 8),
-    ("_reserved", 74, 32),
+    ("max_claim_per_call", 16, 8),
+    ("max_claim_per_period", 24, 8),
+    ("claim_period_secs", 32, 8),
+    ("max_allocated_bps", 40, 2),
+    ("min_request", 42, 8),
+    ("max_request", 50, 8),
+    ("min_fill_assets", 58, 8),
+    ("_reserved", 66, 40),
 ];
 
 pub const PRICE_PARAMS_V1: OffsetTable = &[
@@ -305,17 +303,6 @@ pub struct GuaranteeV1 {
     pub _reserved: [u8; 192],
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
-pub struct AgencyExposureV1 {
-    pub version: u8,
-    pub bump: u8,
-    pub agency_id: [u8; 32],
-    pub outstanding_cover: u64,
-    pub active_guarantees: u32,
-    pub claims_paid_total: u64,
-    pub _reserved: [u8; 64],
-}
-
 pub const GUARANTEE_V1: OffsetTable = &[
     ("version", 0, 1),
     ("bump", 1, 1),
@@ -336,16 +323,6 @@ pub const GUARANTEE_V1: OffsetTable = &[
     ("registered_at", 161, 8),
     ("closed_at", 169, 8),
     ("_reserved", 177, 192),
-];
-
-pub const AGENCY_EXPOSURE_V1: OffsetTable = &[
-    ("version", 0, 1),
-    ("bump", 1, 1),
-    ("agency_id", 2, 32),
-    ("outstanding_cover", 34, 8),
-    ("active_guarantees", 42, 4),
-    ("claims_paid_total", 46, 8),
-    ("_reserved", 54, 64),
 ];
 
 // ---------------------------------------------------------------------------

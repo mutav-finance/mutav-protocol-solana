@@ -315,7 +315,9 @@ fn pda_vectors(rng: &mut Rng) -> Value {
     let reserve_mint = rng.pubkey();
     let owner = rng.pubkey();
     let id = rng.bytes32();
-    let agency_id = rng.bytes32();
+    // Was the `AgencyExposure` seed input (retired, ADR 0019). Still drawn so
+    // the vectors after it do not move.
+    let _ = rng.bytes32();
     let invoice = rng.bytes32();
     let notice = rng.bytes32();
     let seq: u64 = 42;
@@ -329,7 +331,6 @@ fn pda_vectors(rng: &mut Rng) -> Value {
             "reserveMint": reserve_mint.to_string(),
             "owner": owner.to_string(),
             "guaranteeId": hex(&id),
-            "agencyId": hex(&agency_id),
             "invoiceRefHash": hex(&invoice),
             "noticeRefHash": hex(&notice),
             "seq": s(seq),
@@ -346,7 +347,6 @@ fn pda_vectors(rng: &mut Rng) -> Value {
             "claims": pda(&[CLAIMS_SEED, c]).to_string(),
             "eventAuthority": pda(&[b"__event_authority"]).to_string(),
             "guarantee": guarantee.to_string(),
-            "agencyExposure": pda(&[AGENCY_SEED, c, &agency_id]).to_string(),
             "feeReceipt": pda(&[FEE_SEED, c, &invoice]).to_string(),
             "claimFiling": pda(&[CLAIM_SEED, guarantee.as_ref(), &notice]).to_string(),
             "payout": pda(&[PAYOUT_SEED, guarantee.as_ref(), &notice]).to_string(),
@@ -403,7 +403,6 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
     let caps = CapsInput {
         max_tvl: 100_000_000_000,
         max_cover_per_guarantee: 30_000_000_000,
-        max_cover_per_agency: 60_000_000_000,
         max_claim_per_call: 10_000_000_000,
         max_claim_per_period: 20_000_000_000,
         claim_period_secs: 2_592_000,
@@ -434,7 +433,6 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
     let caps_json = json!({
         "maxTvl": s(caps.max_tvl),
         "maxCoverPerGuarantee": s(caps.max_cover_per_guarantee),
-        "maxCoverPerAgency": s(caps.max_cover_per_agency),
         "maxClaimPerCall": s(caps.max_claim_per_call),
         "maxClaimPerPeriod": s(caps.max_claim_per_period),
         "claimPeriodSecs": si(caps.claim_period_secs),

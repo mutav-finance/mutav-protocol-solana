@@ -76,8 +76,8 @@ pub mod mutav {
         instructions::admin::revoke_operator::handle_revoke_operator(ctx)
     }
 
-    /// Register a guarantee: solvency-gated, per-guarantee and per-agency
-    /// capped. Operator.
+    /// Register a guarantee: solvency-gated and capped per guarantee.
+    /// Operator.
     pub fn register_guarantee(
         ctx: Context<RegisterGuarantee>,
         args: RegisterGuaranteeArgs,

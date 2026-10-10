@@ -40,7 +40,8 @@ fn noise(seed: u64, n: usize) -> Vec<u8> {
 fn inject_noise(f: &mut Fixture, seed: u64) {
     let mut c = f.config();
     c._reserved.copy_from_slice(&noise(seed, CONFIG_PAD));
-    c.caps._reserved.copy_from_slice(&noise(seed + 1, 32));
+    let n = c.caps._reserved.len();
+    c.caps._reserved.copy_from_slice(&noise(seed + 1, n));
     c.price._reserved.copy_from_slice(&noise(seed + 2, 32));
     c.exit._reserved.copy_from_slice(&noise(seed + 3, 32));
     for (i, a) in c.adapters.iter_mut().enumerate() {

@@ -1,13 +1,13 @@
-//! Guarantee caps (spec §5.2 rules 3 and 4, §8; plan Task 3):
-//! `max_cover_per_guarantee` and `max_cover_per_agency` at the boundary, and
-//! the order in which `register_guarantee` checks its rules.
+//! Guarantee caps (spec §5.2 rule 3, §8; plan Task 3):
+//! `max_cover_per_guarantee` at the boundary, and the order in which
+//! `register_guarantee` checks its rules. There is no per-agency cap
+//! (ADR 0019).
 
 use mutav::errors::MutavError;
 use mutav_tests::helpers::*;
 
-// Test caps (spec §8 proposed values): R$30k per guarantee, R$60k per agency.
+// Test caps (spec §8 proposed values): R$30k per guarantee.
 const PER_GUARANTEE: u64 = 30_000 * BRL;
-const PER_AGENCY: u64 = 60_000 * BRL;
 
 #[test]
 fn per_guarantee_cap_at_the_boundary() {
@@ -35,38 +35,19 @@ fn per_guarantee_cap_at_the_boundary() {
 }
 
 #[test]
-fn per_agency_cap_at_the_boundary() {
+fn one_agency_is_bounded_only_by_free_capital() {
+    // ADR 0019: guarantees of one agency are capped one by one, never
+    // together. Five at the per-guarantee cap (R$150k, above the former
+    // R$60k per-agency test cap) all register while free capital lasts.
     let mut f = Fixture::new();
-    f.fund_reserve(200_000 * BRL);
+    f.fund_reserve(5 * PER_GUARANTEE);
     let ag = unique_hash();
-    let first = guarantee_args(ag, PER_GUARANTEE, 0);
-    f.register(first.clone()).unwrap();
-    f.register(guarantee_args(ag, PER_AGENCY - PER_GUARANTEE - BRL, 0))
-        .unwrap();
-    // R$1.00 left for this agency.
-    assert_mutav_err(
-        f.register(guarantee_args(ag, BRL + 1, 0)),
-        MutavError::AgencyCapExceeded,
-    );
-    f.register(guarantee_args(ag, BRL, 0))
-        .expect("exactly the cap");
-    assert_eq!(f.agency(&ag).outstanding_cover, PER_AGENCY);
+    for _ in 0..5 {
+        f.register(guarantee_args(ag, PER_GUARANTEE, 0)).unwrap();
+    }
     assert_mutav_err(
         f.register(guarantee_args(ag, 1, 0)),
-        MutavError::AgencyCapExceeded,
-    );
-
-    // Another agency is unaffected.
-    f.register(guarantee_args(unique_hash(), PER_GUARANTEE, 0))
-        .expect("other agency");
-
-    // Closing releases room under the agency cap.
-    f.close_guarantee(first.id, ag).unwrap();
-    f.register(guarantee_args(ag, PER_GUARANTEE, 0))
-        .expect("room after close");
-    assert_mutav_err(
-        f.register(guarantee_args(ag, 1, 0)),
-        MutavError::AgencyCapExceeded,
+        MutavError::InsufficientFreeCapital,
     );
 }
 
@@ -76,7 +57,6 @@ fn caps_follow_set_config() {
     f.fund_reserve(200_000 * BRL);
     let mut args = set_config_args(&f.config());
     args.caps.max_cover_per_guarantee = 5_000 * BRL;
-    args.caps.max_cover_per_agency = 8_000 * BRL;
     f.set_config(args).unwrap();
     let ag = unique_hash();
     assert_mutav_err(
@@ -84,33 +64,24 @@ fn caps_follow_set_config() {
         MutavError::GuaranteeCapExceeded,
     );
     f.register(guarantee_args(ag, 5_000 * BRL, 0)).unwrap();
-    assert_mutav_err(
-        f.register(guarantee_args(ag, 3_000 * BRL + 1, 0)),
-        MutavError::AgencyCapExceeded,
-    );
-    f.register(guarantee_args(ag, 3_000 * BRL, 0)).unwrap();
+    f.register(guarantee_args(ag, 5_000 * BRL, 0)).unwrap();
 }
 
 #[test]
 fn rules_are_checked_in_spec_order() {
     // Rule 1 (pause) before rule 2 (parameters) before rule 3 (per guarantee)
-    // before rule 4 (per agency) before rule 5 (solvency).
+    // before rule 4 (solvency).
     let mut f = Fixture::new();
     let ag = unique_hash();
-    f.fund_reserve(PER_AGENCY);
+    f.fund_reserve(2 * PER_GUARANTEE);
     f.register(guarantee_args(ag, PER_GUARANTEE, 0)).unwrap();
     f.register(guarantee_args(ag, PER_GUARANTEE, 0)).unwrap();
-    // No free capital left and the agency is at its cap.
+    // No free capital left.
 
-    // Over the per-guarantee cap, the agency cap and free capital.
+    // Over the per-guarantee cap and free capital.
     assert_mutav_err(
         f.register(guarantee_args(ag, PER_GUARANTEE + 1, 0)),
         MutavError::GuaranteeCapExceeded,
-    );
-    // Over the agency cap and free capital.
-    assert_mutav_err(
-        f.register(guarantee_args(ag, 1, 0)),
-        MutavError::AgencyCapExceeded,
     );
     // Over free capital only.
     assert_mutav_err(

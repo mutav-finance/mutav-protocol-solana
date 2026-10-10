@@ -19,6 +19,17 @@ fn agency() -> [u8; 32] {
 // register_guarantee
 // ---------------------------------------------------------------------------
 
+fn retired_agency_pda(
+    config: &anchor_lang::prelude::Pubkey,
+    agency_id: &[u8; 32],
+) -> anchor_lang::prelude::Pubkey {
+    anchor_lang::prelude::Pubkey::find_program_address(
+        &[RETIRED_SEEDS[0], config.as_ref(), agency_id],
+        &mutav::ID,
+    )
+    .0
+}
+
 #[test]
 fn register_creates_the_guarantee_and_books_the_cover() {
     let mut f = Fixture::new();
@@ -54,11 +65,11 @@ fn register_creates_the_guarantee_and_books_the_cover() {
     );
     assert_eq!((g.registered_at, g.closed_at), (1_700_000_000, 0));
 
-    let a = f.agency(&ag);
-    assert_eq!(a.version, PROGRAM_LAYOUT_VERSION);
-    assert_eq!(a.agency_id, ag);
-    assert_eq!(a.outstanding_cover, 30_000 * BRL);
-    assert_eq!((a.active_guarantees, a.claims_paid_total), (1, 0));
+    // No per-agency account (ADR 0019): the retired seed stays empty.
+    assert!(f
+        .svm
+        .get_account(&retired_agency_pda(&f.pdas.config, &ag))
+        .is_none());
 
     let s = f.state();
     assert_eq!(s.remaining_cover_total, 30_000 * BRL);
@@ -82,20 +93,18 @@ fn register_creates_the_guarantee_and_books_the_cover() {
 }
 
 #[test]
-fn a_second_guarantee_of_the_same_agency_adds_to_its_exposure() {
+fn guarantees_of_one_agency_are_not_capped_together() {
+    // ADR 0019: only the per-guarantee cap applies. Three guarantees of one
+    // agency at the per-guarantee cap all register.
     let mut f = Fixture::new();
-    f.fund_reserve(60_000 * BRL);
+    f.fund_reserve(90_000 * BRL);
     let ag = agency();
-    f.register(guarantee_args(ag, 10_000 * BRL, 5_000 * BRL))
-        .unwrap();
-    f.register(guarantee_args(ag, 0, 7_000 * BRL)).unwrap();
-    let a = f.agency(&ag);
-    assert_eq!(
-        (a.outstanding_cover, a.active_guarantees),
-        (22_000 * BRL, 2)
-    );
-    assert_eq!(f.state().active_guarantees, 2);
-    assert_eq!(f.state().remaining_cover_total, 22_000 * BRL);
+    for _ in 0..3 {
+        f.register(guarantee_args(ag, 20_000 * BRL, 10_000 * BRL))
+            .unwrap();
+    }
+    assert_eq!(f.state().active_guarantees, 3);
+    assert_eq!(f.state().remaining_cover_total, 90_000 * BRL);
 }
 
 #[test]
@@ -229,7 +238,7 @@ fn close_releases_the_remaining_cover() {
     f.register(a2.clone()).unwrap();
 
     set_time(&mut f.svm, 1_800_000_000);
-    let meta = f.close_guarantee(a1.id, ag).expect("close");
+    let meta = f.close_guarantee(a1.id).expect("close");
     let g = f.guarantee(&a1.id);
     assert_eq!(g.status, GUARANTEE_CLOSED);
     assert_eq!(g.closed_at, 1_800_000_000);
@@ -240,8 +249,6 @@ fn close_releases_the_remaining_cover() {
     assert_eq!(s.remaining_cover_total, 5_000 * BRL);
     assert_eq!(s.coverage_required, 5_000 * BRL);
     assert_eq!(s.active_guarantees, 1);
-    let a = f.agency(&ag);
-    assert_eq!((a.outstanding_cover, a.active_guarantees), (5_000 * BRL, 1));
 
     let ev = events::<GuaranteeClosed>(&meta);
     assert_eq!(ev.len(), 1);
@@ -265,17 +272,13 @@ fn close_releases_only_what_is_left_after_payments() {
     let mut s = f.state();
     s.remaining_cover_total -= 5_000 * BRL;
     f.write_state(&s);
-    let mut a = f.agency(&ag);
-    a.outstanding_cover -= 5_000 * BRL;
-    f.write_agency(&a);
 
-    let meta = f.close_guarantee(args.id, ag).unwrap();
+    let meta = f.close_guarantee(args.id).unwrap();
     assert_eq!(
         events::<GuaranteeClosed>(&meta)[0].released_cover,
         25_000 * BRL
     );
     assert_eq!(f.state().remaining_cover_total, 0);
-    assert_eq!(f.agency(&ag).outstanding_cover, 0);
 }
 
 #[test]
@@ -283,11 +286,8 @@ fn close_twice_fails() {
     let mut f = Fixture::new();
     let ag = agency();
     let args = f.funded_guarantee(ag, 1_000 * BRL);
-    f.close_guarantee(args.id, ag).unwrap();
-    assert_mutav_err(
-        f.close_guarantee(args.id, ag),
-        MutavError::GuaranteeNotActive,
-    );
+    f.close_guarantee(args.id).unwrap();
+    assert_mutav_err(f.close_guarantee(args.id), MutavError::GuaranteeNotActive);
 }
 
 #[test]
@@ -299,29 +299,15 @@ fn close_fails_with_open_claims() {
     let mut g = f.guarantee(&args.id);
     g.open_claims = 1;
     f.write_guarantee(&g);
-    assert_mutav_err(f.close_guarantee(args.id, ag), MutavError::OpenClaims);
+    assert_mutav_err(f.close_guarantee(args.id), MutavError::OpenClaims);
     assert_eq!(f.guarantee(&args.id).status, GUARANTEE_ACTIVE);
 }
 
 #[test]
 fn close_unknown_guarantee_fails() {
     let mut f = Fixture::new();
-    let res = f.close_guarantee(unique_hash(), agency());
+    let res = f.close_guarantee(unique_hash());
     assert_anchor_err(res, anchor_lang::error::ErrorCode::AccountNotInitialized);
-}
-
-#[test]
-fn close_needs_the_guarantees_own_agency() {
-    let mut f = Fixture::new();
-    f.fund_reserve(10_000 * BRL);
-    let (ag, other) = (agency(), agency());
-    let args = guarantee_args(ag, 1_000 * BRL, 0);
-    f.register(args.clone()).unwrap();
-    f.register(guarantee_args(other, 1_000 * BRL, 0)).unwrap();
-    assert_anchor_err(
-        f.close_guarantee(args.id, other),
-        anchor_lang::error::ErrorCode::ConstraintSeeds,
-    );
 }
 
 #[test]
@@ -334,7 +320,7 @@ fn close_rejects_a_non_operator() {
         f.pauser.insecure_clone(),
         Keypair::new(),
     ] {
-        let ix = f.close_guarantee_ix(&k.pubkey(), args.id, ag);
+        let ix = f.close_guarantee_ix(&k.pubkey(), args.id);
         assert_mutav_err(f.send(ix, &k), MutavError::Unauthorized);
     }
 }
@@ -349,14 +335,14 @@ fn close_works_while_paused_and_in_under_coverage() {
     let a2 = f.funded_guarantee(ag, 1_000 * BRL);
     let pauser = f.pauser.insecure_clone();
     f.send(f.pause_ix(&pauser.pubkey()), &pauser).unwrap();
-    f.close_guarantee(a1.id, ag).expect("paused");
+    f.close_guarantee(a1.id).expect("paused");
 
     let mut s = f.state();
     s.mode = MODE_UNDER_COVERED;
     s.brs_balance = 0;
     s.tesouro_units = 5; // no price needed: close reads neither price nor earmark
     f.write_state(&s);
-    f.close_guarantee(a2.id, ag).expect("under-covered");
+    f.close_guarantee(a2.id).expect("under-covered");
     assert_eq!(f.state().remaining_cover_total, 0);
 }
 
@@ -377,7 +363,7 @@ fn revoke_operator_blocks_operator_instructions_until_set_roles() {
 
     let reg = f.register_guarantee_ix(&old.pubkey(), guarantee_args(ag, BRL, 0));
     assert_mutav_err(f.send(reg, &old), MutavError::Unauthorized);
-    let close = f.close_guarantee_ix(&old.pubkey(), live.id, ag);
+    let close = f.close_guarantee_ix(&old.pubkey(), live.id);
     assert_mutav_err(f.send(close.clone(), &old), MutavError::Unauthorized);
 
     // The admin appoints a new operator; the old key stays refused.
@@ -391,7 +377,7 @@ fn revoke_operator_blocks_operator_instructions_until_set_roles() {
     assert_mutav_err(f.send(close, &old), MutavError::Unauthorized);
     let reg = f.register_guarantee_ix(&new_op.pubkey(), guarantee_args(ag, BRL, 0));
     f.send(reg, &new_op).expect("new operator registers");
-    let close = f.close_guarantee_ix(&new_op.pubkey(), live.id, ag);
+    let close = f.close_guarantee_ix(&new_op.pubkey(), live.id);
     f.send(close, &new_op).expect("new operator closes");
 }
 
@@ -420,10 +406,7 @@ fn a_newer_or_unknown_vault_state_is_refused() {
             f.register(guarantee_args(ag, BRL, 0)),
             MutavError::UnsupportedVersion,
         );
-        assert_mutav_err(
-            f.close_guarantee(live.id, ag),
-            MutavError::UnsupportedVersion,
-        );
+        assert_mutav_err(f.close_guarantee(live.id), MutavError::UnsupportedVersion);
         assert_eq!(f.raw(&f.pdas.state), before);
     }
 }
@@ -442,30 +425,8 @@ fn a_newer_or_unknown_guarantee_is_refused() {
         g.version = version;
         g.status = status;
         f.write_guarantee(&g);
-        assert_mutav_err(
-            f.close_guarantee(args.id, ag),
-            MutavError::UnsupportedVersion,
-        );
+        assert_mutav_err(f.close_guarantee(args.id), MutavError::UnsupportedVersion);
     }
-}
-
-#[test]
-fn a_newer_agency_exposure_is_refused() {
-    let mut f = Fixture::new();
-    let ag = agency();
-    let args = f.funded_guarantee(ag, 1_000 * BRL);
-    f.fund_reserve(1_000 * BRL);
-    let mut a = f.agency(&ag);
-    a.version = PROGRAM_LAYOUT_VERSION + 1;
-    f.write_agency(&a);
-    assert_mutav_err(
-        f.register(guarantee_args(ag, BRL, 0)),
-        MutavError::UnsupportedVersion,
-    );
-    assert_mutav_err(
-        f.close_guarantee(args.id, ag),
-        MutavError::UnsupportedVersion,
-    );
 }
 
 // ---------------------------------------------------------------------------
@@ -473,28 +434,21 @@ fn a_newer_agency_exposure_is_refused() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn guarantee_and_agency_padding_is_zero_at_init_and_preserved() {
+fn guarantee_padding_is_zero_at_init_and_preserved() {
     let mut f = Fixture::new();
     f.fund_reserve(10_000 * BRL);
     let ag = agency();
     let args = guarantee_args(ag, 1_000 * BRL, 0);
     f.register(args.clone()).unwrap();
     assert_eq!(f.guarantee(&args.id)._reserved, [0; 192]);
-    assert_eq!(f.agency(&ag)._reserved, [0; 64]);
 
     let mut g = f.guarantee(&args.id);
     g._reserved = [0xa5; 192];
     f.write_guarantee(&g);
-    let mut a = f.agency(&ag);
-    a._reserved = [0x5a; 64];
-    f.write_agency(&a);
 
-    // An update through `init_if_needed` and a close, both in place.
-    f.register(guarantee_args(ag, 1_000 * BRL, 0)).unwrap();
-    assert_eq!(f.agency(&ag)._reserved, [0x5a; 64]);
-    f.close_guarantee(args.id, ag).unwrap();
+    // A close updates the account in place.
+    f.close_guarantee(args.id).unwrap();
     assert_eq!(f.guarantee(&args.id)._reserved, [0xa5; 192]);
-    assert_eq!(f.agency(&ag)._reserved, [0x5a; 64]);
 }
 
 // ---------------------------------------------------------------------------
@@ -515,15 +469,15 @@ fn remaining_cover_total_matches_the_book_after_any_sequence() {
         let close = !book.is_empty() && x % 3 == 0;
         if close {
             let i = (x / 3) as usize % book.len();
-            let (id, ag) = book.swap_remove(i);
-            f.close_guarantee(id, ag)
+            let (id, _) = book.swap_remove(i);
+            f.close_guarantee(id)
                 .unwrap_or_else(|e| panic!("step {step} close: {:?}", e.err));
         } else {
             let ag = agencies[(x / 7) as usize % agencies.len()];
             let d = (x >> 8) % 8_000 * BRL;
             let e = (x >> 24) % 4_000 * BRL + 1;
             let args = guarantee_args(ag, d, e);
-            // Refusals (agency cap) are fine; they must change nothing.
+            // Refusals (caps, free capital) are fine; they must change nothing.
             if f.register(args.clone()).is_ok() {
                 book.push((args.id, ag));
             }
@@ -537,22 +491,5 @@ fn remaining_cover_total_matches_the_book_after_any_sequence() {
         assert_eq!(s.remaining_cover_total, total, "step {step}");
         assert_eq!(s.coverage_required, total, "step {step} (c = 1.0)");
         assert_eq!(s.active_guarantees as usize, book.len(), "step {step}");
-        for ag in &agencies {
-            let mine: Vec<_> = book.iter().filter(|(_, a)| a == ag).collect();
-            let sum: u64 = mine
-                .iter()
-                .map(|(id, _)| remaining_cover(&f.guarantee(id)))
-                .sum();
-            if mine.is_empty() && f.svm.get_account(&agency_pda(&f.pdas.config, ag)).is_none() {
-                continue;
-            }
-            let a = f.agency(ag);
-            assert_eq!(a.outstanding_cover, sum, "step {step} agency");
-            assert_eq!(
-                a.active_guarantees as usize,
-                mine.len(),
-                "step {step} agency"
-            );
-        }
     }
 }

@@ -159,7 +159,7 @@ fn file_claim_rejects_bad_parameters() {
 #[test]
 fn file_claim_needs_an_active_guarantee() {
     let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
-    f.close_guarantee(g.id, g.agency_id).unwrap();
+    f.close_guarantee(g.id).unwrap();
     assert_mutav_err(
         f.file_claim(Claim::on(&g, BRL)),
         MutavError::GuaranteeNotActive,
@@ -204,11 +204,9 @@ fn a_filed_claim_blocks_close_until_paid() {
     let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
     let c = Claim::on(&g, 3_000 * BRL);
     f.file_claim(c).unwrap();
-    assert_mutav_err(f.close_guarantee(g.id, g.agency_id), MutavError::OpenClaims);
+    assert_mutav_err(f.close_guarantee(g.id), MutavError::OpenClaims);
     f.pay_claim(c).unwrap();
-    let meta = f
-        .close_guarantee(g.id, g.agency_id)
-        .expect("close after payment");
+    let meta = f.close_guarantee(g.id).expect("close after payment");
     let ev = events::<mutav::events::GuaranteeClosed>(&meta);
     assert_eq!(ev[0].released_cover, 7_000 * BRL);
     assert_eq!(f.state().remaining_cover_total, 0);
@@ -248,12 +246,6 @@ fn pay_claim_pays_the_payments_account_and_releases_the_provision() {
     assert_eq!(
         (s.claim_period_start, s.claim_period_paid),
         (1_770_000_000, 5_000 * BRL)
-    );
-
-    let a = f.agency(&g.agency_id);
-    assert_eq!(
-        (a.outstanding_cover, a.claims_paid_total),
-        (25_000 * BRL, 5_000 * BRL)
     );
 
     let p = f.payout(&c);

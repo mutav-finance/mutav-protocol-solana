@@ -60,7 +60,7 @@ fn initialize_creates_the_reserve() {
     assert_eq!(c.exit.buffer_target_bps, 0);
     assert_eq!(c.exit.barred, [Pubkey::default(); 4]);
     assert_eq!(c.exit._reserved, [0; 32]);
-    assert_eq!(c.caps._reserved, [0; 32]);
+    assert_eq!(c.caps._reserved, [0; 40]);
     assert_eq!(c.price._reserved, [0; 32]);
     assert_eq!(c.adapters.len(), MAX_ADAPTERS);
     assert!(c.adapters.iter().all(|a| a.program_id == Pubkey::default()

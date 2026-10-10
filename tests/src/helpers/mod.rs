@@ -258,7 +258,6 @@ pub fn test_caps() -> CapsInput {
     CapsInput {
         max_tvl: 100_000 * BRL,
         max_cover_per_guarantee: 30_000 * BRL,
-        max_cover_per_agency: 60_000 * BRL,
         max_claim_per_call: 10_000 * BRL,
         max_claim_per_period: 20_000 * BRL,
         claim_period_secs: 30 * 86_400,
@@ -490,7 +489,6 @@ pub fn set_config_args(c: &VaultConfig) -> mutav::SetConfigArgs {
         caps: CapsInput {
             max_tvl: c.caps.max_tvl,
             max_cover_per_guarantee: c.caps.max_cover_per_guarantee,
-            max_cover_per_agency: c.caps.max_cover_per_agency,
             max_claim_per_call: c.caps.max_claim_per_call,
             max_claim_per_period: c.caps.max_claim_per_period,
             claim_period_secs: c.caps.claim_period_secs,

@@ -27,8 +27,8 @@ pub const CLAIMS_SEED: &[u8] = b"claims";
 
 /// `Guarantee`: `["guarantee", config, id]` (spec §3.5).
 pub const GUARANTEE_SEED: &[u8] = b"guarantee";
-/// `AgencyExposure`: `["agency", config, agency_id]` (spec §3.4).
-pub const AGENCY_SEED: &[u8] = b"agency";
+// `"agency"` was the seed of `AgencyExposure`, retired with the per-agency
+// cap before the freeze (ADR 0019). Never reuse it: see `RETIRED_SEEDS`.
 
 /// `FeeReceipt`: `["fee", config, invoice_ref_hash]` (spec §3.11).
 pub const FEE_SEED: &[u8] = b"fee";
@@ -58,6 +58,10 @@ pub const RESERVED_SEED_PREFIXES: [&[u8]; 4] = [
     b"instant_exit",
     b"adapter_state",
 ];
+
+/// Seeds of PDAs retired before the freeze (ADR 0019). No PDA may ever use
+/// them again, so a stale client can never address a new account by mistake.
+pub const RETIRED_SEEDS: [&[u8]; 1] = [b"agency"];
 
 // ---------------------------------------------------------------------------
 // Program constants (spec §8, §14).
@@ -165,7 +169,6 @@ pub const NOTICE_CLOSED_WITHDRAWN: u8 = 2;
 pub const VAULT_CONFIG_SIZE: usize = 2_756;
 pub const VAULT_STATE_SIZE: usize = 480;
 pub const GUARANTEE_SIZE: usize = 377;
-pub const AGENCY_EXPOSURE_SIZE: usize = 126;
 pub const FEE_RECEIPT_SIZE: usize = 138;
 pub const CLAIM_FILING_SIZE: usize = 220;
 pub const PAYOUT_SIZE: usize = 293;
@@ -205,7 +208,8 @@ pub mod field {
 
     pub const CAPS_MAX_TVL: u16 = 100;
     pub const CAPS_MAX_COVER_PER_GUARANTEE: u16 = 101;
-    pub const CAPS_MAX_COVER_PER_AGENCY: u16 = 102;
+    // 102 was `caps.max_cover_per_agency`, retired with the per-agency cap
+    // before the freeze (ADR 0019). Never reuse it.
     pub const CAPS_MAX_CLAIM_PER_CALL: u16 = 103;
     pub const CAPS_MAX_CLAIM_PER_PERIOD: u16 = 104;
     pub const CAPS_CLAIM_PERIOD_SECS: u16 = 105;
@@ -246,7 +250,7 @@ pub mod field {
 
 /// `ConfigUpdated` field ids of fields retired before the freeze (ADR 0019).
 /// No field may ever take one of them.
-pub const RETIRED_FIELD_IDS: &[u16] = &[13];
+pub const RETIRED_FIELD_IDS: &[u16] = &[13, 102];
 
 /// One row of the field-id table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -298,10 +302,6 @@ pub const CONFIG_FIELDS: &[ConfigField] = &[
     f(
         field::CAPS_MAX_COVER_PER_GUARANTEE,
         "caps.max_cover_per_guarantee",
-    ),
-    f(
-        field::CAPS_MAX_COVER_PER_AGENCY,
-        "caps.max_cover_per_agency",
     ),
     f(field::CAPS_MAX_CLAIM_PER_CALL, "caps.max_claim_per_call"),
     f(
@@ -396,6 +396,14 @@ mod tests {
             INCOME_SEED,
         ];
         for seed in pilot {
+            for retired in RETIRED_SEEDS {
+                assert!(
+                    !seed.starts_with(retired) && !retired.starts_with(seed),
+                    "{:?} collides with retired {:?}",
+                    std::str::from_utf8(seed),
+                    std::str::from_utf8(retired)
+                );
+            }
             for reserved in RESERVED_SEED_PREFIXES {
                 assert!(
                     !seed.starts_with(reserved) && !reserved.starts_with(seed),

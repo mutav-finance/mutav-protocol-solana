@@ -37,8 +37,6 @@ pub enum MutavError {
     TvlCapExceeded,
     #[msg("Per-guarantee cap exceeded")]
     GuaranteeCapExceeded,
-    #[msg("Per-agency cap exceeded")]
-    AgencyCapExceeded,
     #[msg("Guarantee is not active")]
     GuaranteeNotActive,
     #[msg("Guarantee has open claims")]
