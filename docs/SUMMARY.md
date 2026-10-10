@@ -65,6 +65,7 @@
 ## Decisions and sources
 
 * [Decisions](meta/decisions.md)
+* [Open questions and possible improvements](meta/open-questions.md)
 * [Sources](meta/sources.md)
 
 ## Reference documents
@@ -88,4 +89,12 @@
   * [ADR 0016: Coverage ratio below 1.0, with a 0.10 floor and a provisions term](decisions/0016-coverage-ratio-below-one.md)
   * [ADR 0017: BRS income intake: an income inbox and `sweep_income`](decisions/0017-brs-income-intake.md)
   * [ADR 0018: BRS-only pilot reserve; assets expand through adapters](decisions/0018-brs-only-pilot-reserve.md)
+  * [ADR 0020: Operator/admin separation and operator-compromise recovery](decisions/0020-operator-admin-separation-and-recovery.md)
+  * [ADR 0021: Claims: approval, amendment and exact payment](decisions/0021-claims-approval-amendment-exact-payment.md)
+  * [ADR 0022: Coverage: stress buffer and underwater reserve](decisions/0022-coverage-stress-buffer-underwater-reserve.md)
+  * [ADR 0023: Capital flows and exit rights](decisions/0023-capital-flows-and-exit-rights.md)
+  * [ADR 0024: Unsolicited money and backstop contributions](decisions/0024-unsolicited-money-and-backstop.md)
+  * [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](decisions/0025-exit-fallback-cooldown-exit.md)
+  * [ADR 0026: Program simplification for the freeze](decisions/0026-program-simplification-for-the-freeze.md)
+  * [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing (proposed)](decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)
 * [Litepaper](litepaper.md)
