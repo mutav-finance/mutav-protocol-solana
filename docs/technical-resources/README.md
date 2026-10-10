@@ -30,7 +30,7 @@ flowchart LR
   end
   subgraph Program["mutav program"]
     C[VaultConfig / VaultState]
-    G[Guarantee, ClaimFiling,<br/>Payout records]
+    G[Guarantee and<br/>ClaimFiling records]
     Q[Deposit and redeem<br/>requests]
   end
   subgraph Accounts["Token accounts owned by the vault authority PDA"]
@@ -45,7 +45,7 @@ flowchart LR
   O -->|guarantees, fees, income, claims| G
   P -->|pause| C
   I -->|requests, cancels, claims| Q
-  X -->|refresh, advance_queue_heads, skim| C
+  X -->|refresh, advance_queue_head, skim| C
   R -->|pay_claim| PAY[MUTAV payments account]
 ```
 
@@ -62,6 +62,7 @@ The operator runs the guarantee and claim cycle. The reserve admin sets ceilings
 | Rounding | Always in the reserve's favour: down for what the reserve pays or mints, up for what it requires or is owed. |
 | "Pinned at implementation" | A name, offset or code the decisions do not fix. The code and the generated client are the reference once it lands. |
 | "Set at deploy" | An address or value chosen during the devnet deploy. |
+| Open items | Undecided values and deferred features are collected in [Open questions and possible improvements](../meta/open-questions.md). |
 
 ## What these pages do not cover
 
@@ -92,5 +93,7 @@ The operator runs the guarantee and claim cycle. The reserve admin sets ceilings
 - [ADR 0001: Record architecture decisions](../decisions/0001-record-architecture-decisions.md)
 - [ADR 0002: Core program and capped adapters](../decisions/0002-core-program-and-capped-adapters.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR 0019: v1 layout for the devnet release
-- Pending ADR: Operator/admin separation and operator-compromise recovery
+- ADR 0019: v1 layout for the devnet release
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed)

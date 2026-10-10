@@ -8,16 +8,17 @@ No wallet, account or permission is needed to read any of it.
 
 | What | Where it lives | What it tells you |
 |---|---|---|
-| Reserve configuration | `VaultConfig` account | Roles (admin, operator, pauser, guardians), caps, coverage ratio, stress buffer, fee take, the treasury and payments accounts, the allowlist root. |
+| Reserve configuration | `VaultConfig` account | Roles (admin, operator, pauser, guardians), pending role handovers and their expiry, caps, coverage ratio, stress buffer, fee take, the treasury and payments accounts, the allowlist root. |
 | Reserve state | `VaultState` account | Tracked BRS balance, remaining cover, provisions, coverage required, shares outstanding, NAV, mode, pause and halt flags, queue heads, the claim window. |
 | Every guarantee | One `Guarantee` account per lease | Agency, rent, default and exit cover, amounts paid per leg, status, and hashes of the lease and instrument. |
-| Every claim | One `ClaimFiling` account per claim | Guarantee, leg, filed amount (the provision), any admin-approved amount, status (filed, paid, withdrawn), timestamps. |
-| Every claim payment and its settlement | `Payout` account, `ClaimPaid` and `PayoutSettled` events | Amount, destination (MUTAV's payments account), and a hash of the Pix end-to-end ID once MUTAV pays the agency. |
-| Guarantee fees | One fee receipt per agency bill, `FeesContributed` event | Gross amount, MUTAV's take, net amount into the reserve. |
-| Issuer income | One income receipt per Nora statement, `IncomeSwept` event | Gross, take (0 in v1), net, and the inbox balance after the sweep. |
+| Every claim | One `ClaimFiling` account per claim | Guarantee, leg, filed amount (the provision), any admin-approved amount, status (filed, paid, withdrawn, settled), timestamps. Every amendment emits `ClaimAmended`. |
+| Every claim payment and its settlement | The same `ClaimFiling` account, `ClaimPaid` and `PayoutSettled` events | Amount paid, destination (MUTAV's payments account), and a hash of the Pix end-to-end ID once MUTAV pays the agency. |
+| Guarantee fees | One `IncomeReceipt` of kind `FEE` per agency bill, `FeesContributed` event | Gross amount, MUTAV's take, net amount into the reserve. |
+| Issuer income | One `IncomeReceipt` of kind `NORA_STATEMENT` per Nora statement, `IncomeSwept` event | Gross and net (MUTAV takes nothing from issuer income), and the inbox balance after the sweep. |
+| Unsolicited money and backstop | `IncomeReceipt` of kind `UNSOLICITED` or `BACKSTOP`, `UnsolicitedSkimmed` and the admin's booking and return events | Every untracked amount moved aside, booked into the reserve or returned to its source. |
 | Capital movements | Deposit and redemption request accounts, fill events | Every request in queue order, the NAV of each fill, shares minted and burned. |
 | Token balances | The reserve's token accounts, owned by the program's vault authority | The actual BRS and share balances, which you can compare with the tracked totals. |
-| Configuration changes | `ConfigUpdated`, `RolesUpdated`, `Paused` and related events | Every change to a parameter or role, with the old and new value. |
+| Configuration changes | `ConfigUpdated` (one per changed field), the role-handover events, `Paused` and related events | Every change to a parameter or role, with the old and new value. |
 | Governance | Squads v4 multisig accounts | Members, threshold, time lock, and every pending and executed proposal. |
 | Program code authority | The program's upgrade authority | The upgrade multisig vault, which has a long time lock. |
 
@@ -66,7 +67,7 @@ Some things stay off-chain by design. Knowing them tells you what the on-chain d
 |---|---|---|
 | Personal data of tenants and landlords | Privacy. The program holds no personal data. | None |
 | Lease documents and the signed fiança instrument | Privacy and size. | Hashes on the guarantee account |
-| Pricing and underwriting | Business decisions made in the MUTAV platform. | The registered cover |
+| Pricing and tenant assessment | Business decisions made in the MUTAV platform. | The registered cover |
 | Whether a claim is valid | Decided by MUTAV as operator from the agency's evidence. | The filed claim and its provision |
 | The contractual payment deadline | Tracked by the MUTAV platform. The program records timestamps, not deadlines. | Filed, paid and settled timestamps |
 | The Pix payment to the agency | It happens in the Brazilian payment system. | A hash of the Pix end-to-end ID |
@@ -79,7 +80,6 @@ Some things stay off-chain by design. Knowing them tells you what the on-chain d
 - [Pilot app spec, `/reserve`](../../app/docs/spec.md#reserve-public-transparency)
 - [Client README](../../clients/js/README.md)
 - Program code: [`programs/mutav/src/events.rs`](../../programs/mutav/src/events.rs), [`programs/mutav/src/state/`](../../programs/mutav/src/state/), [`programs/mutav/src/instructions/public/refresh.rs`](../../programs/mutav/src/instructions/public/refresh.rs)
-- Devnet release decisions: adversarial review decisions log (unsolicited money, payout SLA removal, operator-activity feed) (internal notes, 2026-10-10)
 - Squads v4: <https://github.com/Squads-Protocol/v4>
 - Solana explorer: <https://explorer.solana.com/?cluster=devnet>
 
@@ -90,6 +90,8 @@ Some things stay off-chain by design. Knowing them tells you what the on-chain d
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: 0019 v1 layout for the devnet release (payout SLA removal, agency-cap removal)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Unsolicited money and backstop contributions
+- ADR 0019: v1 layout for the devnet release (agency-cap removal)
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md) (operator-activity feed)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md) (claim statuses on one account, payout SLA removal)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (fee receipts as an income-receipt kind)

@@ -18,9 +18,9 @@ sequenceDiagram
     Op->>Op: Review and approve off-chain
     Op->>Pg: file_claim (provision booked, NAV drops)
     opt Amount above max_claim_per_call
-        Ad->>Pg: approve_claim (exact amount)<br/>plus set_config raise if the period cap would not fit
+        Ad->>Pg: approve_claim (exact amount)<br/>plus set_config raise if the window cap would not fit
     end
-    Op->>Pg: pay_claim (exactly the provision)
+    Op->>Pg: pay_claim(notice_ref_hash, expected_amount)
     Pg->>Pa: BRS
     Pa-->>Ag: MUTAV pays by Pix
     Op->>Pg: settle_payout (Pix end-to-end hash)
@@ -31,26 +31,36 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> FILED: file_claim
-    FILED --> FILED: amend_claim (resets any approval)
+    FILED --> FILED: amend_claim to a new amount (resets any approval)
     FILED --> FILED: approve_claim (admin, above per-call cap)
     FILED --> PAID: pay_claim (exactly the provision)
-    FILED --> WITHDRAWN: withdraw_claim
-    WITHDRAWN --> FILED: re-file on the same notice<br/>(approval, provision and filed_at reset)
-    PAID --> [*]
+    FILED --> WITHDRAWN: amend_claim to 0
+    WITHDRAWN --> FILED: refile_claim<br/>(approval, provision and filed_at reset)
+    PAID --> SETTLED: settle_payout
+    SETTLED --> [*]
 ```
 
-`ClaimFiling` lives at `["claim", guarantee, notice_ref_hash]`. Its statuses are `FILED = 0`, `PAID = 1` and `WITHDRAWN = 2`. A paid notice cannot be paid again: `pay_claim` creates the `Payout` account for that notice, and a second payment fails at account creation.
+`ClaimFiling` lives at `["claim", guarantee, notice_ref_hash]`. It holds the whole life of one claim: the filing, any approval, the payment and its settlement. There is no separate payout account. Its status is a `u8`, append-only:
+
+| Value | Status | Meaning |
+|---|---|---|
+| 0 | `FILED` | Provisioned, awaiting payment |
+| 1 | `PAID` | Paid by the reserve to `payments_account`; no longer amendable |
+| 2 | `WITHDRAWN` | Provision released; may be filed again only through `refile_claim` |
+| 3 | `SETTLED` | Payment recorded as delivered off-chain; terminal |
+
+A notice can be paid only once: `pay_claim` requires `FILED`, and a `PAID` or `SETTLED` filing never returns to `FILED`.
 
 ## Instructions
 
 | Instruction | Signer | What it does | Pause | Solvency gate |
 |---|---|---|---|---|
-| `file_claim(leg, amount, notice_ref_hash)` | Operator | Books a provision of `amount` on the leg. NAV reflects the claim at once. Requires an active guarantee and `amount ≤ leg_cover − leg_paid − leg_provision` | Runs | Never |
-| `amend_claim(notice_ref_hash, new_amount)` | Operator | Lowers or raises a filed claim. Lowering releases the difference. Raising books more, within the leg's unprovisioned cover. Resets any approval. Emits `ClaimAmended { old, new }` | Runs | Never |
-| `withdraw_claim(notice_ref_hash)` | Operator | Releases the provision and marks the filing `WITHDRAWN`. The notice can be filed again | Runs | Never |
-| `approve_claim(notice_ref_hash, amount)` | Reserve admin | Records `approved_amount` on a filed claim above the per-call cap. The admin approves the amount that may leave the reserve, not the claim's validity | Runs | Never |
-| `pay_claim(leg, amount, notice_ref_hash)` | Operator | Pays exactly the filing's provision to the payments account | Runs | Never |
-| `settle_payout(notice_ref_hash, pix_e2e_hash)` | Operator | Records the hash of the Pix end-to-end ID once MUTAV has paid the agency | Runs | Never |
+| `file_claim(leg, amount, notice_ref_hash)` | Operator | Books a provision of `amount` on the leg. NAV reflects the claim at once. Requires an active guarantee and `amount ≤ leg_cover − leg_paid − leg_provision`. No cap applies at filing | Runs | Never |
+| `amend_claim(notice_ref_hash, new_amount)` | Operator | Lowers or raises a `FILED` claim. Lowering releases the difference. Raising books more, within the leg's unprovisioned cover. `new_amount = 0` withdraws the claim: status `WITHDRAWN`, the whole provision released, event `ClaimWithdrawn`. Any amendment resets `approved_amount` to 0. Refused on `PAID` and `SETTLED`. Emits `ClaimAmended { old, new }` | Runs | Never |
+| `refile_claim(leg, amount, notice_ref_hash)` | Operator | Same arguments as `file_claim`. Accepts only a `WITHDRAWN` filing and returns it to `FILED`, resetting `approved_amount`, `provision` and `filed_at`. An old approval is never reused | Runs | Never |
+| `approve_claim(notice_ref_hash, amount)` | Reserve admin | Records `approved_amount` on a `FILED` claim above the per-call cap. The admin approves the amount that may leave the reserve, not the claim's validity | Runs | Never |
+| `pay_claim(notice_ref_hash, expected_amount)` | Operator | Pays exactly the filing's provision to the payments account. Refuses unless `expected_amount` equals the provision | Runs | Never |
+| `settle_payout(notice_ref_hash, pix_e2e_hash)` | Operator | Records the hash of the Pix end-to-end ID on the filing once MUTAV has paid the agency; status `SETTLED` | Runs | Never |
 
 Legs: `LEG_DEFAULT = 0` (rent and charges in arrears) and `LEG_EXIT = 1` (end-of-occupation debts). Each guarantee stores both leg covers as absolute amounts at registration, and they never change.
 
@@ -60,7 +70,7 @@ Legs: `LEG_DEFAULT = 0` (rent and charges in arrears) and `LEG_EXIT = 1` (end-of
 
 - If the amount owed is smaller than filed, the operator runs `amend_claim` down, then pays.
 - If the amount owed grew (for example another month of arrears), the operator runs `amend_claim` up, within the leg's unprovisioned cover, then pays.
-- If the filing was a mistake, the operator runs `withdraw_claim`.
+- If the filing was a mistake, the operator runs `amend_claim` to 0, which withdraws it. A withdrawn notice can be filed again with `refile_claim`.
 
 Because a payment equals its own provision, it can never spend cover that another open filing on the same leg has provisioned. Every open filing on a leg is always payable, and a guarantee can always reach zero open claims.
 
@@ -68,47 +78,47 @@ Because a payment equals its own provision, it can never spend cover that anothe
 
 In order:
 
-1. The filing is `FILED` and its leg matches.
-2. `amount == filing.provision`.
-3. `amount ≤ max_claim_per_call`, or `amount == approved_amount` on this filing.
-4. The sliding-window total plus `amount` ≤ `max_claim_per_period`. Approved payments count.
-5. The destination is `config.payments_account`.
-6. `reserve` is not frozen and `brs_balance ≥ amount`.
+1. The filing is `FILED`.
+2. `expected_amount == filing.provision`. The payment amount is the provision.
+3. The provision is `≤ max_claim_per_call`, or `approved_amount == provision` on this filing.
+4. The payments of the last 31 days plus this one stay `≤ max_claim_per_period`. Approved payments count.
+5. The [ADR 0014](../decisions/0014-pay-claim-bound-with-concurrent-filings.md) bound on the leg, which an exact payment always meets.
+6. The destination is `config.payments_account`.
+7. `reserve` is not frozen and `brs_balance ≥ amount`.
 
-There is no solvency, mode, pause or NAV-guard check. The cached `coverage_required` write saturates, so it can never make a payment fail.
+There is no solvency, mode, pause or NAV-guard check. The stress-buffer term and the cached `coverage_required` write saturate, so they can never make a payment fail.
 
-**Effects:** BRS moves from `reserve` to the payments account. The leg's paid amount rises, the provision is released, `open_claims` falls, and the filing becomes `PAID`. `remaining_cover_total` and `brs_balance` fall by the amount. The claim window and lifetime counters rise. A `Payout { PENDING }` account is created, and `ClaimPaid` is emitted.
+**Effects:** BRS moves from `reserve` to the payments account. The leg's paid amount rises, the provision is released, `open_claims` falls, and the filing becomes `PAID` with `payments_account`, `paid_at` and `paid_amount` written on it. `remaining_cover_total` and `brs_balance` fall by the amount. Today's claim bucket and the lifetime counters rise, and `ClaimPaid` is emitted.
 
 ## Caps
 
 | Cap | Devnet value | Rule |
 |---|---|---|
 | `max_claim_per_call` | R$10,000 | Largest payment without an admin approval |
-| `max_claim_per_period` | R$20,000 | Most paid in any sliding window of `claim_period_secs`, approved payments included |
-| `claim_period_secs` | 30 days | Window length. Bounded above by 90 days, so the window always rolls |
+| `max_claim_per_period` | R$20,000 | Most paid in any sliding 31-day window, approved payments included |
 
-`set_config` requires `max_claim_per_call > 0` and `max_claim_per_period ≥ max_claim_per_call`.
+`set_config` requires `max_claim_per_call > 0` and `max_claim_per_period ≥ max_claim_per_call`. The window length is fixed by the program; there is no period-length parameter.
 
-### Sliding 30-day window
+### Sliding 31-day window
 
-The window keeps two buckets of length `claim_period_secs`: the current one and the previous one. A payment is checked against the current bucket plus the previous bucket, weighted by the share of it still inside the trailing window.
+`VaultState` keeps 31 daily buckets: a ring of 31 totals indexed by day number (`claim_day_buckets`), plus the day of the last write (`claim_day_anchor`). A bucket older than 31 days is cleared before it is reused.
 
 ```text
-elapsed   = now − claim_period_start                                  // after rolling buckets
-estimate  = prev_paid × (period − elapsed) / period + current_paid    // rounded up
-require     estimate + amount ≤ max_claim_per_period
+require  sum(payments of the last 31 days) + amount ≤ max_claim_per_period
 ```
 
-No 30-day span pays more than `max_claim_per_period`. The previous bucket's weight rounds up, in the reserve's favour. Exact field names and rounding are pinned at implementation.
+The rule is exact, with no weighting or estimate. Every 30-day span lies inside some 31-day window of whole days, so no 30-day span ever pays out more than the cap. A property test checks this, including across bucket reuse and a cap change in the middle of a window.
 
 ### Claims above the per-call cap
 
 1. The operator files the claim as usual. The provision is booked at once.
 2. The reserve admin proposes `approve_claim(notice_ref_hash, amount)` in the Squads multisig. The approval binds the exact amount.
 3. If the payment would not fit in the sliding window, the same proposal also raises `max_claim_per_period` with `set_config`. A later `set_config` lowers it back.
-4. After the time lock, the operator calls `pay_claim` for exactly that amount.
+4. After the time lock, the operator calls `pay_claim` with `expected_amount` equal to that amount.
 
-There is no separate threshold parameter: the threshold is `max_claim_per_call`. Amending the claim resets the approval, so a new amount needs a new approval. Re-filing a withdrawn notice also starts with no approval.
+There is no separate threshold parameter: the threshold is `max_claim_per_call`. Amending the claim resets the approval, so a new amount needs a new approval. Re-filing a withdrawn notice with `refile_claim` also starts with no approval.
+
+Until `approve_claim` ships, the reserve cannot pay above `max_claim_per_call`. Such a claim is still filed and provisioned in full (`file_claim` has no interim cap); MUTAV pays it bank-first, and the reserve reimburses `payments_account` once the approval exists.
 
 ### What the caps bound
 
@@ -117,8 +127,8 @@ The claim caps bound what the operator key can move out of the reserve. They do 
 | Operator action | Undone by |
 |---|---|
 | `register_guarantee` | `close_guarantee(VOID)` |
-| `close_guarantee` | `reinstate_guarantee`, within `max_reinstate_age` |
-| `file_claim` | `withdraw_claim` |
+| `close_guarantee` | `reinstate_guarantee`, within `max_reinstate_age` (30 days) |
+| `file_claim` | `amend_claim` to 0 (`WITHDRAWN`) |
 | `amend_claim` | Another `amend_claim` |
 
 Claim payments land only in MUTAV's own payments account.
@@ -127,7 +137,7 @@ Claim payments land only in MUTAV's own payments account.
 
 MUTAV may pay the agency by Pix from its own bank account first. The reserve then reimburses MUTAV's payments account through the normal `pay_claim`. This keeps landlords paid on time when:
 
-- a claim above the per-call cap waits for the admin's time-locked approval;
+- a claim above the per-call cap waits for the admin's time-locked approval (24 hours in the real pilot), or for `approve_claim` to ship;
 - the sliding window is full;
 - the reserve's BRS account is frozen or liquid BRS is short.
 
@@ -135,7 +145,9 @@ The reimbursement follows every rule above: exact amount, caps, approval and the
 
 ## Settlement
 
-`settle_payout` records `pix_e2e_hash`, the hash of the Pix end-to-end ID, and moves the `Payout` from `PENDING` to `SETTLED`. It is a settlement record only. The program keeps no payout deadline. Payment deadlines (review, information requests, approval and execution) live in the MUTAV platform.
+`settle_payout` records `pix_e2e_hash`, the hash of the Pix end-to-end ID, and `settled_at` on the `ClaimFiling`, and moves it from `PAID` to `SETTLED`. It is a settlement record only. The program keeps no payout deadline. The service level (review, information requests, approval and execution, with the contractual term plus a 48-hour target) lives in the MUTAV platform. The reserve's only on-chain promise: within the caps, `pay_claim` is never refused for solvency or pause.
+
+While MUTAV holds both the operator and admin roles, the Pix hash is the only settlement record. Once the roles are held by separate companies, an attestation of the registry and of claim settlements becomes required ([ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md)).
 
 ## Recorded on-chain for every claim
 
@@ -144,20 +156,19 @@ The reimbursement follows every rule above: exact amount, caps, approval and the
 | Filed amount and filing time | `ClaimFiling.provision`, `filed_at`; event `ClaimFiled` |
 | Amendments | Event `ClaimAmended { old, new }` |
 | Approved amount | `ClaimFiling.approved_amount` |
-| Withdrawal | `ClaimFiling.status = WITHDRAWN` |
-| Payment | `Payout` account; event `ClaimPaid` |
-| Settlement | `Payout.pix_e2e_hash`, `settled_at`; event `PayoutSettled` |
+| Withdrawal | `ClaimFiling.status = WITHDRAWN`; event `ClaimWithdrawn` |
+| Payment | `ClaimFiling.payments_account`, `paid_at`, `paid_amount`, status `PAID`; event `ClaimPaid` |
+| Settlement | `ClaimFiling.pix_e2e_hash`, `settled_at`, status `SETTLED`; event `PayoutSettled` |
 
 ## Not in this release
 
-- Claim notices (`ClaimNotice`), which would hold capital fills while a missed rent is known but not yet filed, are built before any outside capital. Until then the runbook is to file the claim before any fill.
+- Claim notices (`ClaimNotice`), which would hold capital fills while a missed rent is known but not yet filed, are built before any outside capital, together with the exit fallback ([ADR 0025](../decisions/0025-exit-fallback-cooldown-exit.md)). Until then the runbook is to file the claim before any fill.
 - The fuller *fiança* lifecycle (exoneration, lease end, claims tail, claim categories, a settlement receipt hash) arrives as carves into reserved account space.
 
 ## Sources
 
 - [Specification §5.4 Claims and payouts](../spec.md#54-claims-and-payouts-operator), [§8 Caps](../spec.md#8-caps)
-- Devnet release design decisions of 2026-10-10: `approve_claim`, `amend_claim`, `withdraw_claim`, exact payment, sliding window, bank-first payment, payout deadline removed from the program (MUTAV internal decision log)
-- Program: [`programs/mutav/src/instructions/operator/`](../../programs/mutav/src/instructions/operator/) (`file_claim.rs`, `pay_claim.rs`, `settle_payout.rs`), [`programs/mutav/src/state/claim.rs`](../../programs/mutav/src/state/claim.rs), [`programs/mutav/src/state/payout.rs`](../../programs/mutav/src/state/payout.rs)
+- Program: [`programs/mutav/src/instructions/operator/`](../../programs/mutav/src/instructions/operator/) (`file_claim.rs`, `pay_claim.rs`, `settle_payout.rs`), [`programs/mutav/src/state/claim.rs`](../../programs/mutav/src/state/claim.rs)
 - [Pix, Banco Central do Brasil](https://www.bcb.gov.br/estabilidadefinanceira/pix)
 
 ## Decisions
@@ -165,8 +176,9 @@ The reimbursement follows every rule above: exact amount, caps, approval and the
 - [ADR 0003: Payments operated by MUTAV](../decisions/0003-payments-operated-by-mutav.md) (settlement deadline flag superseded: removed from the program)
 - [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0006: Per-lease absolute coverage](../decisions/0006-per-lease-absolute-coverage.md)
-- [ADR 0012: *Fiança*-aligned guarantee lifecycle](../decisions/0012-fianca-aligned-guarantee-lifecycle.md) (admin path amended by the pending claims ADR)
+- [ADR 0012: *Fiança*-aligned guarantee lifecycle](../decisions/0012-fianca-aligned-guarantee-lifecycle.md) (admin path superseded by ADR 0021)
 - [ADR 0014: `pay_claim` bound with concurrent filings](../decisions/0014-pay-claim-bound-with-concurrent-filings.md) (superseded in effect by exact payment)
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: 0019 v1 layout for the devnet release (payout deadline removed, `approved_amount` carved)
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (`Payout` merged into `ClaimFiling`)
+- ADR 0019: v1 layout for the devnet release (payout deadline removed, claim fields and window buckets carved)

@@ -125,7 +125,7 @@ Only the provisions cited in the spec or the litepaper are listed. The program r
 | Devnet mint | Nora's devnet BRS, `BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4`, classic SPL Token, 6 decimals ([explorer](https://explorer.solana.com/address/BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4?cluster=devnet)) |
 | Mainnet mint | Set at deploy |
 | Issuer income | Nora's revenue share reaches the reserve through the income inbox and `sweep_income` ([ADR 0017](../decisions/0017-brs-income-intake.md)). Its terms are open (spec §12 Q48) |
-| First adapter candidate | Etherfuse stablebonds (TESOURO), pending a BRS path ([ADR 0018](../decisions/0018-brs-only-pilot-reserve.md)): <https://etherfuse.com/products/stablebonds>, <https://docs.etherfuse.com/price-feeds.md> |
+| First adapter candidate | Etherfuse stablebonds (TESOURO), pending a BRS path ([ADR 0018](../decisions/0018-brs-only-pilot-reserve.md)) and the items open with Etherfuse ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md), [Open questions](open-questions.md#open-questions)): <https://etherfuse.com/products/stablebonds>, <https://docs.etherfuse.com/price-feeds> |
 
 ## Comparable programs studied for design patterns
 
@@ -133,15 +133,19 @@ MUTAV studied other Solana programs for patterns only. No code from them is copi
 
 | Program | What was studied | Where it shows up in MUTAV |
 |---|---|---|
-| OnRe (`onre-finance/onre-sol`, read at commit `c049083`). Documentation: <https://docs.onre.finance/>, including the token configuration and reference pages. Code: <https://github.com/onre-finance/onre-sol> | A Solana program that mints a token at NAV and redeems through asynchronous requests, with a Squads-held admin authority, supply caps, per-purpose token accounts and reserved-byte account layouts | Partial fills per request ([ADR 0010](../decisions/0010-partial-fills-at-queue-head.md)); the convex exit haircut and reserved layouts ([ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)); two-step role handover; computing fees and rounding once per request; keeping cancel and claim open under pause; refusing zero-output fills |
+| OnRe (`onre-finance/onre-sol`, read at commit `c049083`). Documentation: <https://docs.onre.finance/>, including the token configuration and reference pages. Code: <https://github.com/onre-finance/onre-sol> | A Solana program that mints a token at NAV and redeems through asynchronous requests, with a Squads-held admin authority, supply caps, per-purpose token accounts and reserved-byte account layouts | Partial fills per request ([ADR 0010](../decisions/0010-partial-fills-at-queue-head.md)); the convex exit haircut and reserved layouts ([ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)); two-step role handover ([ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md)); computing fees and rounding once per request, keeping cancel and claim open under pause and refusing zero-output fills ([ADR 0023](../decisions/0023-capital-flows-and-exit-rights.md)) |
 | OnRe public audits | Public audit reports by Ackee Blockchain (November 2025), OtterSec (August 2026) and Quantstamp | Reviewed by issue class as an input to the devnet release design |
 | `solana-foundation/vault` (MIT) | Account and authority skeleton and the async deposit and redemption core | Adapted, with the unrestricted asset withdrawal removed ([`NOTICE`](../../NOTICE)) |
-| Request, cooldown and permissionless-exit patterns under timelocked governance (Ethena cooldowns, Marinade delayed-unstake tickets, the Maker governance security module) | How holders can always leave before a governance change takes effect | The exit fallback (Pending ADR: Exit fallback) |
+| Request, cooldown and permissionless-exit patterns under timelocked governance (Ethena cooldowns, Marinade delayed-unstake tickets, the Maker governance security module) | How holders can always leave before a governance change takes effect | The exit fallback ([ADR 0025](../decisions/0025-exit-fallback-cooldown-exit.md)) |
+| Kamino kVault and klend, Jupiter JLP, Sanctum Infinity, Voltr, Meteora's keeper | Multi-asset reserves: one token account and one config record per asset, targets and bands, rate-limited moves, a pinned price calculator, disable-only emergency powers | The proposed adapter model, liquidity floor, bands and emergency path ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md), which lists every link) |
+| Solana incident write-ups (Drift 2026, Mango, Solend, Cashio, SPL token-lending forks) | Losses that came from a corrupted NAV input or from admin powers with no time lock | The asymmetric time lock and the bounded TESOURO price ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)) |
+| OpenZeppelin `AccessControlDefaultAdminRules`; Anchor's `init_if_needed` warning; `coral-xyz/sealevel-attacks`; Neodyme's common pitfalls; Borsh enum encoding; OWASP Smart Contract Top 10 (2026) | Two-step admin transfer, safe account initialization, append-only enum evolution, access-control checks | The role handover ([ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md)) and the program simplification ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)) |
 
 ## Related sections
 
 - [Introduction](../introduction/README.md)
-- [Decisions](../meta/decisions.md)
+- [Decisions](decisions.md)
+- [Open questions and possible improvements](open-questions.md)
 
 ## Sources
 
@@ -150,7 +154,8 @@ MUTAV studied other Solana programs for patterns only. No code from them is copi
 - [`docs/spec.md`](../spec.md) §2.2, §3.13, §12 and §15, for the legal provisions cited.
 - [`Anchor.toml`](../../Anchor.toml) and [`Cargo.toml`](../../Cargo.toml), for the toolchain versions.
 - The `mutav-finance/mutav` repository (`docs/`, `research/`), for business context.
-- Workspace design notes on the devnet release (not in this repository), for the comparable-program study and the OWASP pass.
+- The ADRs 0020 to 0027 in [`docs/decisions/`](../decisions/), which cite the comparable programs, audits and incident reports they draw on.
+- The multi-asset research report `reports/Multi asset vaults on Solana.md` in the MUTAV workspace (not in this repository), summarized in [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md).
 
 ## Decisions
 
@@ -158,5 +163,6 @@ MUTAV studied other Solana programs for patterns only. No code from them is copi
 - [ADR 0012 Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md): the legal references.
 - [ADR 0017 BRS income intake](../decisions/0017-brs-income-intake.md) and [ADR 0018 BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md): the issuer.
 - [ADR 0010](../decisions/0010-partial-fills-at-queue-head.md) and [ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md): patterns from comparable programs.
-- Pending ADR: Operator/admin separation and operator-compromise recovery (two-step handover).
-- Pending ADR: Exit fallback.
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md): the two-step handover.
+- [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md): the exit patterns.
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md): the multi-asset references (proposed).

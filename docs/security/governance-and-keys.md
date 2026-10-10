@@ -6,13 +6,13 @@ The core security rule is the split between the operator and the reserve admin. 
 
 | Role | Holder | May do | Cannot do |
 |---|---|---|---|
-| **Reserve admin** | Admin multisig vault (Squads v4, short time lock) | Set caps, coverage ratio, stress buffer and other config; propose roles and a new admin; set guardians, the payments account and the allowlist root; fill the deposit and redemption queues (with `nav_bounds`); approve claim amounts above the per-call cap; refund pending deposits; classify, book and return unsolicited money; book backstop money; clear a NAV halt; pause and unpause; revoke the operator. | Register, close or reinstate guarantees; file, amend, withdraw or pay claims. |
+| **Reserve admin** | Admin multisig vault (Squads v4, short time lock) | Set caps, coverage ratio, stress buffer and other config (sparse `set_config`); propose roles and a new admin, and cancel a pending handover; appoint guardians in one step; set the payments account, the treasury account and the allowlist root; fill the deposit and redemption queues (with `nav_bounds`); approve claim amounts above the per-call cap; cancel a pending deposit back to its owner; classify, book and return unsolicited money; book backstop money; clear a NAV halt; pause and unpause; revoke the operator. After the first adapter upgrade, it also moves assets between the reserve and adapters ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)). | Register, close or reinstate guarantees; file, amend, re-file or pay claims. |
 | **Program upgrade authority** | Upgrade multisig vault (Squads v4, long time lock), same members as the admin multisig | Sign `initialize` and program upgrades. | Anything inside the reserve. It is not `VaultConfig.admin`. |
-| **Operator** | Hot key | Register, close (VOID or RELEASED) and reinstate guarantees; book guarantee fees (`contribute_fees`) and issuer income (`sweep_income`); file, amend, withdraw and pay claims; record settlement (`settle_payout`). | Move money anywhere except a claim payment to the payments account; change caps or roles; fill queues; book unsolicited money. |
-| **Pauser** | Separate key | `pause` and `revoke_operator`, with no time lock. | Unpause, appoint, change config. |
-| **Guardians** | Up to 3 keys, set by the admin | `pause` only. | Revoke, unpause or change anything. |
+| **Operator** | Hot key | Register, close (VOID or RELEASED) and reinstate guarantees; book guarantee fees (`contribute_fees`) and issuer income (`sweep_income`); file, amend (an amendment to 0 withdraws the filing), re-file and pay claims; record settlement (`settle_payout`). | Move money anywhere except a claim payment to the payments account; change caps or roles; fill queues; book unsolicited money. |
+| **Pauser** | Separate key | `pause` and `revoke_operator`, with no time lock. After the first adapter upgrade, also the risk-reducing adapter actions listed for guardians. | Unpause, appoint, change config. |
+| **Guardians** | Up to 3 keys, appointed by the admin in one step | `pause`. After the first adapter upgrade, also `disable_adapter`, `impair_adapter` (the haircut can only rise) and `emergency_deallocate` (impaired adapters only, proceeds pinned to `reserve`). | Revoke, unpause, lower a haircut, raise a limit, or move value anywhere except back into `reserve`. |
 | **Capital provider** | Own wallet | Request deposits (allowlisted), request redemptions (open to holders), cancel, claim. | Act for another wallet. Delegates are never used. |
-| **Anyone** | Any signer | `refresh`, `advance_queue_heads`, `skim`. These need no judgment and move no tracked money. | Book or return money. |
+| **Anyone** | Any signer | `refresh`, `advance_queue_head`, `skim`. These need no judgment and move no tracked money. | Book or return money. |
 
 The full instruction-by-role matrix is in the [specification](../spec.md#2-roles-and-keys) and the technical reference.
 
@@ -20,8 +20,8 @@ The full instruction-by-role matrix is in the [specification](../spec.md#2-roles
 
 The operator key is a hot key. The design limits what it can do on its own:
 
-- Every registry action is reversible by another operator action: `register_guarantee` by `close_guarantee(VOID)`, a close by `reinstate_guarantee` (within `max_reinstate_age`), `file_claim` by `withdraw_claim`, an amount by `amend_claim`.
-- Only `pay_claim` is irreversible. It pays only to MUTAV's payments account, within the admin's per-call and sliding 30-day caps. A larger payment needs an admin `approve_claim` for that exact amount.
+- Every registry action is reversible by another operator action: `register_guarantee` by `close_guarantee(VOID)`, a close by `reinstate_guarantee` (within `max_reinstate_age`), ``file_claim` by `amend_claim(0)`, which sets the filing to `WITHDRAWN`, an amount by another `amend_claim`.
+- Only `pay_claim` is irreversible. It pays only to MUTAV's payments account, within the admin's per-call cap and the cap per sliding 31-day window. A larger payment needs an admin `approve_claim` for that exact amount.
 - Queue fills are admin actions and carry admin-set `nav_bounds`, so an operator change to the registry cannot move value through a fill.
 
 The maximum financial loss from a compromised operator is therefore the admin-set claim caps.
@@ -49,21 +49,23 @@ flowchart TB
     M1 & M2 --> UM["Upgrade multisig<br/>long time lock"]
     AM -->|"VaultConfig.admin"| CFG["VaultConfig"]
     UM -->|"upgrade authority"| PRG["mutav program"]
-    AM -->|"propose_roles"| PEND["pending operator / pauser"]
+    AM -->|"propose_role"| PEND["pending operator / pauser<br/>(72 h expiry)"]
     PEND -->|"accept_role (new key signs)"| CFG
     PK["Pauser key"] -->|"pause, revoke_operator"| CFG
-    GK["Guardian keys (≤ 3)"] -->|"pause"| CFG
+    GK["Guardian keys (up to 3)"] -->|"pause"| CFG
 ```
 
 ## Role changes
 
 | Change | How | Notes |
 |---|---|---|
-| Operator or pauser | Admin `propose_roles`, then the new key signs `accept_role`. | A typo can never appoint a dead address. Pending keys expire. |
-| Reserve admin | Admin `propose_admin`, then the new admin signs `accept_admin`. | Squads members are rotated through a Squads proposal while both old and new keys are live. |
-| Remove the operator | Pauser or admin `revoke_operator`. | Immediate. Sets the operator to the default key and clears pending role keys. |
-| Guardians | Admin sets up to 3 pause-only keys. | The default key never counts as a guardian. |
+| Operator or pauser | Admin `propose_role(role, key)`, then the new key signs `accept_role(role)`. | A typo can never appoint a dead address. Each role has its own pending key, which expires 72 hours after the proposal. Acceptance re-checks that the roles are distinct and not the default key. |
+| Reserve admin | Admin `propose_admin(key)`, then the new admin signs `accept_admin`. | Its own pending key and expiry. Squads members are rotated through a Squads proposal while both old and new keys are live. |
+| Cancel a handover | Admin `cancel_pending(role)`. | Clears the pending key for that role. |
+| Remove the operator | Pauser or admin `revoke_operator`. | Immediate. Sets the operator to the default key and clears the pending operator and pauser keys. |
+| Guardians | Admin appoints up to 3 keys in one step; the guardian does not accept. | Refuses the default key and every current role key (admin, operator, pauser). A mistyped guardian costs nothing the admin cannot fix in the next proposal. |
 | Payments account | Admin `set_payments_account`. | BRS mint, distinct from the treasury, not owned by the operator, the capital wallet or the vault authority. |
+| Treasury account | Admin `set_treasury_account`. | The token account is inspected; it may not be owned by the operator. |
 
 All roles are distinct keys. The operator and pauser can never equal the admin or each other.
 
@@ -114,7 +116,6 @@ No signing key exists in the program, the client or the pilot app.
 - [`scripts/check-no-keys.sh`](../../scripts/check-no-keys.sh), [`scripts/devnet/`](../../scripts/devnet/)
 - Code: [`programs/mutav/src/instructions/admin/`](../../programs/mutav/src/instructions/admin/), [`programs/mutav/src/state/config.rs`](../../programs/mutav/src/state/config.rs)
 - Technical reference §2.5 and §3, devnet release design (branch `docs/protocol-reference`, PR #32)
-- Pre-devnet design decisions log, 2026-10-09 to 2026-10-10 (internal notes)
 - [Squads v4 documentation](https://docs.squads.so/)
 
 ## Decisions
@@ -122,6 +123,8 @@ No signing key exists in the program, the client or the pilot app.
 - [ADR 0002: One core program plus adapter programs with capped sub-authorities](../decisions/0002-core-program-and-capped-adapters.md)
 - [ADR 0003: Claim payments operated by MUTAV through a whitelisted payments account](../decisions/0003-payments-operated-by-mutav.md)
 - [ADR 0009: Separate MUTAV money flows](../decisions/0009-separate-mutav-money-flows.md)
-- Pending ADR: Operator/admin separation and operator-compromise recovery (two-step handover, pause-only guardians, two multisigs, `revoke_operator` clearing pending keys)
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: Exit fallback
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; who moves assets and the emergency path are decided)

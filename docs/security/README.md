@@ -26,7 +26,7 @@ The model rests on six rules.
 | 2 | **A compromised operator can lose at most the claim caps.** | Every registry action the operator takes can be reversed by another operator action. Only `pay_claim` is irreversible, and it is bounded by admin-set caps and lands in MUTAV's own payments account. |
 | 3 | **Claim payments are never solvency-gated.** | Within the caps, `pay_claim` goes through whatever the reserve's coverage, mode, pause state or NAV guard. The solvency gate applies to capital flows and new guarantees. |
 | 4 | **Internal accounting.** | The program counts only money it moved itself. A transfer into a reserve account does not move NAV until an authorised instruction books it. |
-| 5 | **No arbitrary outflows.** | BRS leaves the reserve only to a fixed list of destinations: the payments account, the treasury (fee take), the claims escrow on to its owner, a refunded depositor, or the original sender of unsolicited money. |
+| 5 | **No arbitrary outflows.** | BRS leaves the reserve only to a fixed list of destinations: the payments account, the treasury (fee take), the claims escrow on to its owner, a cancelled deposit back to its owner, or the original sender of unsolicited money (from the separate `unsolicited` account). |
 | 6 | **No keys in the audited surface.** | The program, the client and the pilot app hold no signing keys. Wallets and multisigs sign. |
 
 ```mermaid
@@ -45,9 +45,9 @@ flowchart LR
     U -->|program upgrades| M
     O -->|guarantees, fees, income,<br/>claims, settlement| M
     P -->|pause, revoke_operator| M
-    G -->|pause| M
+    G -->|pause; risk-reducing adapter<br/>actions after the adapter upgrade| M
     I -->|requests, cancels, claims| M
-    X -->|refresh, advance_queue_heads, skim| M
+    X -->|refresh, advance_queue_head, skim| M
     M -->|claim payments only| PA["MUTAV payments account"]
     M -->|fee take| T["MUTAV treasury"]
 ```
@@ -57,7 +57,7 @@ flowchart LR
 | Layer | Protection | Page |
 |---|---|---|
 | Program rules | Invariants, the solvency gate, caps, the NAV-move guard, admin `nav_bounds` on fills, internal accounting, strict account validation. | [Invariants](invariants.md) |
-| Authority | Two-step role handover, distinct keys, Squads multisigs with time locks, pause-only guardians. | [Governance and keys](governance-and-keys.md) |
+| Authority | Two-step role handover with expiring pending keys, distinct keys, two Squads multisigs with time locks, guardians limited to risk-reducing actions. | [Governance and keys](governance-and-keys.md) |
 | Operations | Pause, operator revocation, reconciliation against on-chain events, bank-first claim payments, the unsolicited money runbook. | [Incident response](incident-response.md) |
 | Verification | LiteSVM tests, property tests, golden layout fixtures, CI gates, verified builds, the review cycle and an independent audit before mainnet. | [Reviews and audits](reviews-and-audits.md) |
 
@@ -78,7 +78,6 @@ Follow [`SECURITY.md`](../../SECURITY.md). Use a private GitHub security advisor
 - [Specification §1 Principles](../spec.md#1-principles), [§2 Roles and keys](../spec.md#2-roles-and-keys), [§4 Invariants and formulas](../spec.md#4-invariants-and-formulas)
 - [`SECURITY.md`](../../SECURITY.md)
 - Technical reference, devnet release design, 2026-10-10 (`docs/technical-reference.html` on branch `docs/protocol-reference`, PR #32)
-- Pre-devnet design decisions log, 2026-10-09 to 2026-10-10 (internal notes; the security report is published after its fixes land)
 - Program code: [`programs/mutav/src/`](../../programs/mutav/src/)
 
 ## Decisions
@@ -87,5 +86,8 @@ Follow [`SECURITY.md`](../../SECURITY.md). Use a private GitHub security advisor
 - [ADR 0004: NAV computed on-chain with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
 - [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0008: One capital flow for everyone; pause never blocks claims](../decisions/0008-uniform-capital-flow-and-pause-scope.md)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; the emergency path is decided)

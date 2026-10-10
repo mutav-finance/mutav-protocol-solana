@@ -22,7 +22,7 @@ Rules for both multisigs:
 - **No config authority.** `config_authority` is the default key, so members, threshold and time lock change only through the multisig's own time-locked proposals.
 - **The time lock counts from approval.**
 - **No multisig config change during an upgrade window,** because it makes in-flight proposals stale.
-- **Pause is not time-locked.** The pauser and guardians can stop capital flows at any time, including during a pending upgrade.
+- **Pause is not time-locked.** The pauser and guardians can pause capital flows and new guarantees at any time, including during a pending upgrade.
 - On devnet both are 2-of-2 with two devnet wallets standing in for the founders. Hardware-wallet keys replace them before real money.
 
 The deploy scripts check each multisig before use: owner program is Squads v4, the exact member set, the exact threshold, and a time lock at or above the floor (300 seconds for admin and 3,600 seconds for upgrade on devnet).
@@ -68,12 +68,12 @@ The first devnet deploy freezes layout v1.
 
 **Before the freeze**, these edits land together and the golden fixtures (`tests/fixtures/layout/v1/`) are regenerated once more:
 
-- larger padding for `Guarantee` (192), `ClaimFiling` (128) and `Payout` (128);
-- removal of the payout SLA fields and of the per-agency cap with the `AgencyExposure` account;
+- larger padding for `Guarantee` (192) and `ClaimFiling`, which also absorbs the former `Payout` record;
+- removal of the payout SLA fields, of the per-agency cap with the `AgencyExposure` account, and of the state listed in [ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md) (`HolderState`, `FeeReceipt`, `Payout`, the phase-2 exit parameters and earmark, the global TESOURO price fields, the cached `stable_assets`, the income take, partial-fill fields, `pending_notices`, the inline adapter slots and `claim_period_secs`);
 - the carves listed in [Accounts](accounts.md#fields-carved-for-the-devnet-release);
 - account-list changes, such as the seeds-checked `reserve` in `register_guarantee` and `clear_fulfil_halt`;
-- the `reason` argument of `close_guarantee` and the `nav_bounds` arguments of both fill instructions;
-- the new instructions, events and errors.
+- the `reason` argument of `close_guarantee`, the `nav_bounds` arguments of both fill instructions, the `expected_amount` argument of `pay_claim`, the sparse `set_config(Vec<ConfigParam>)` and `advance_queue_head(queue, max)`;
+- the new instructions, events and errors, and the removal of dead errors, events and always-false fields, renumbered once before the freeze.
 
 **After the freeze**, every change is either a carve from padding or a new account, checked against the v1 fixtures. Existing instructions, events and errors keep their shape.
 
@@ -88,20 +88,22 @@ The first devnet deploy freezes layout v1.
 | Padding zero at init | Every `init` leaves `_reserved` all zero |
 | Version guard | An account with `version = 2` or an unknown status is refused by every instruction that reads it |
 | Feature flags | `set_config` refuses any bit outside `SUPPORTED_FEATURES` (0 in v1) |
+| Reserved room | The remaining padding holds every planned carve: phase-2 exit fields (275 + 88 bytes), the fiança-lifecycle fields, partial-fill and price-protection request fields |
 
 ## Client and IDL compatibility
 
 | Change | Allowed |
 |---|---|
 | New instruction, account type, event or error (appended) | Yes. Publish the client as a minor version |
+| New `ConfigParam` variant (appended) | Yes. Variants are never removed or reordered, because Borsh encodes an enum by variant index |
 | Field carved from `_reserved` | Yes. Existing sizes and offsets unchanged. Regenerate the client |
 | Changing an existing instruction's arguments or accounts | No. Add a `_v2` instruction |
 | Changing an existing event's fields | No. Add a new event |
 | Reordering, retyping or removing fields or errors; changing an account's size | No |
 
 - The IDL lives in a Program Metadata account written by the upgrade authority, inside the same proposal as the upgrade.
-- The `idl-compat` CI job diffs the IDL against the last release and fails on any "No" row.
-- Errors are numbered from 6000 in enum order and are append-only. `ConfigUpdated` field ids are append-only; the payout-SLA id is never reused.
+- The `idl-compat` CI job diffs the IDL against the last release and fails on any "No" row, including a removed or reordered `ConfigParam` variant.
+- Errors are numbered from 6000 in enum order and are append-only. `ConfigUpdated` field ids are append-only; retired ids, such as the payout SLA's, are never reused. Retired seeds (`agency`, `payout`, `holder`) are never reused.
 - Indexers decode accounts by discriminator and skip unknown events. `mutav-app` deploys decoders that tolerate the new fields and events before the program changes.
 
 ## Release workflow
@@ -134,7 +136,7 @@ The release workflow never executes an upgrade. Members execute after the time l
 
 ## Rollback
 
-- **Fast.** The pauser or a guardian pauses. An admin proposal clears any feature flag.
+- **Fast.** The pauser or a guardian pauses. An admin proposal clears any feature flag. With adapters, guardians and the pauser can also disable or impair an adapter at once ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)).
 - **Slow.** A time-locked upgrade back to the previous verified binary, whose artefact and hash are kept in the release notes. This is safe because older binaries preserve `_reserved` bytes they do not understand (R6) and refuse accounts a later migration rewrote (R1b).
 
 ## Planned carves after the freeze
@@ -143,14 +145,15 @@ These arrive without migration, as carves or new accounts:
 
 | Item | Where it goes |
 |---|---|
-| Partial fills at the queue head | Fields already in `RedeemRequest` |
+| Partial fills at the queue head | Carved from `RedeemRequest` padding, held by the padding test |
 | Cumulative baseline for the NAV-move guard | Carved from padding |
 | Requester price protection (`min_assets_out`) | Carved from request padding |
 | Exit fallback fill path | Uses `max_queue_wait_secs`, already carved |
-| Claim-notice gate | `pending_notices` already exists; `ClaimNotice` is a new account |
-| Fiança lifecycle fields | The grown `Guarantee`, `ClaimFiling` and `Payout` padding |
-| Adapters and a second reserve asset | `AdapterEntry` slots in config, an `AdapterState` PDA |
-| Phase-2 instant exit | `ExitParams`, `InstantExitState` carved from `VaultState`; `SUPPORTED_FEATURES` stays 0 until then |
+| Claim-notice gate | A counter carved from `VaultState` padding; `ClaimNotice` is a new account. Built with the exit fallback |
+| Fiança lifecycle fields | The grown `Guarantee` and `ClaimFiling` padding |
+| Adapters and a second reserve asset | `adapter_count` and `adapter_bitmap`, already carved at 0, and one `AdapterState` PDA per adapter ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)) |
+| Phase-2 instant exit | Exit parameters carved from `VaultConfig` and `InstantExitState` from `VaultState`; `SUPPORTED_FEATURES` stays 0 until then |
+| A take on issuer income | A carve, once a take is decided (spec §12 Q47) |
 
 ## Sources
 
@@ -159,7 +162,6 @@ These arrive without migration, as carves or new accounts:
 - Compatibility: [`scripts/idl-compat.ts`](../../scripts/idl-compat.ts), [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 - Deploy: [`scripts/devnet/`](../../scripts/devnet/) and the [repository README](../../README.md#deploying)
 - Sizes and seeds: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs); fixtures in [`tests/fixtures/layout/`](../../tests/fixtures/layout/)
-- Decision log of 2026-10-09 and 2026-10-10 (internal notes, to be published as the pending ADRs below)
 - [Squads v4 documentation](https://docs.squads.so/), [solana-verify](https://github.com/Ellipsis-Labs/solana-verifiable-build), [Solana programs: deploying and upgrading](https://solana.com/docs/programs/deploying)
 
 ## Decisions
@@ -168,6 +170,8 @@ These arrive without migration, as carves or new accounts:
 - [ADR 0011: Phase-2 instant exit, earmark-aware solvency and upgrade readiness](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md) (padding sized for its fields)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md) (adapter slots and the settlement floor)
-- Pending ADR: 0019 v1 layout for the devnet release (padding, SLA removal, agency-cap removal, carved fields)
-- Pending ADR: Operator/admin separation and operator-compromise recovery (two multisigs, two-step handover, guardians)
-- Pending ADR: Exit fallback
+- ADR 0019: v1 layout for the devnet release (padding, removals and carved fields)
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md) (two multisigs, two-step handover, guardians)
+- [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; decided points noted in the ADR)

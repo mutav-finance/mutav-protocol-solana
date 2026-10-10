@@ -2,14 +2,14 @@
 
 Every parameter of the reserve for the devnet release, with its value and who sets it.
 
-Amounts are in R$ and in BRS base units (6 decimals, 1 BRS = R$1). "Admin" means the reserve admin multisig, acting through a time-locked Squads proposal. Most admin parameters change with `set_config`, which emits one `ConfigUpdated { field, old, new }` per changed field.
+Amounts are in R$ and in BRS base units (6 decimals, 1 BRS = R$1). "Admin" means the reserve admin multisig, acting through a time-locked Squads proposal. Most admin parameters change with a sparse `set_config(params)`: each call lists only the fields it changes (at most 16, no duplicates), the program validates the whole resulting config, and it emits one `ConfigUpdated { field, old, new }` per changed field. Money accounts, the allowlist, roles and guardians have their own instructions.
 
 ## Who can change what
 
 | Who | How | Changes |
 |---|---|---|
 | Program upgrade authority (upgrade multisig) | `initialize`, once | Reserve mint, first roles, first parameters |
-| Reserve admin (admin multisig) | `set_config` and dedicated instructions, under the admin time lock | Coverage ratio, stress buffer, caps, fee take, NAV bound, settlement floor, accounts, allowlist, guardians, roles (two-step) |
+| Reserve admin (admin multisig) | `set_config` and dedicated instructions (`set_payments_account`, `set_treasury_account`, `set_allowlist_root`, role and guardian instructions), under the admin time lock | Coverage ratio, stress buffer, caps, fee take, NAV bound, reinstatement window, exit-fallback wait, accounts, allowlist, guardians, roles (two-step) |
 | Program upgrade | A time-locked program upgrade | Program constants and bounds |
 | Runbook | Operating procedure, not enforced by the program | Return window and dust threshold for unsolicited money |
 
@@ -17,8 +17,8 @@ Amounts are in R$ and in BRS base units (6 decimals, 1 BRS = R$1). "Admin" means
 
 | Parameter | Field | Devnet value | Base units | Set by |
 |---|---|---|---|---|
-| Coverage ratio `c` | `coverage_ratio_bps` | 0.10 | 1,000 bps | Admin. Floor 1,000 bps (program constant). Upper bound pinned at implementation |
-| Stress buffer | `caps.stress_buffer` | R$19,000 | 19,000,000,000 | Admin. Sized from the book (three largest rents plus one exit payment). Bounds pinned at implementation |
+| Coverage ratio `c` | `coverage_ratio_bps` | 0.10 | 1,000 bps | Admin. Floor 1,000 bps (program constant), cap 10,000 bps |
+| Stress buffer | `caps.stress_buffer` | R$19,000 | 19,000,000,000 | Admin. Sized from the book (three largest rents plus one exit payment). Bounded in `validate_params` |
 
 ## Reserve size and guarantees
 
@@ -27,7 +27,7 @@ Amounts are in R$ and in BRS base units (6 decimals, 1 BRS = R$1). "Admin" means
 | Maximum reserve | `caps.max_tvl` | R$300,000 | 300,000,000,000 | Admin. Must be > 0 |
 | Cover per guarantee | `caps.max_cover_per_guarantee` | R$40,000 | 40,000,000,000 | Admin |
 | Cover per agency | None | No per-agency cap in this release | n/a | n/a |
-| Reinstatement window | `max_reinstate_age` | Set at deploy (not fixed yet; 30 days given as an example) | seconds | Admin |
+| Reinstatement window | `caps.max_reinstate_age` | 30 days | 2,592,000 s | Admin |
 
 At `c = 0.10`, a R$300,000 reserve backs about R$3,000,000 of cover.
 
@@ -36,8 +36,8 @@ At `c = 0.10`, a R$300,000 reserve backs about R$3,000,000 of cover.
 | Parameter | Field | Devnet value | Base units | Set by |
 |---|---|---|---|---|
 | Claim payment per call | `caps.max_claim_per_call` | R$10,000 | 10,000,000,000 | Admin. Must be > 0 |
-| Claim payments per sliding window | `caps.max_claim_per_period` | R$20,000 | 20,000,000,000 | Admin. Must be ≥ the per-call cap. Raised temporarily for a large approved claim |
-| Window length | `caps.claim_period_secs` | 30 days | 2,592,000 s | Admin. Must be > 0 and ≤ 90 days |
+| Claim payments per sliding 31-day window | `caps.max_claim_per_period` | R$20,000 | 20,000,000,000 | Admin. Must be ≥ the per-call cap. Raised temporarily for a large approved claim |
+| Window length | None | 31 daily buckets | n/a | Program constant `CLAIM_WINDOW_DAYS = 31`; no parameter |
 | Approval threshold | (same as `max_claim_per_call`) | R$10,000 | n/a | No separate parameter |
 | Payout deadline | None | Not in the program. Kept in the MUTAV platform | n/a | n/a |
 
@@ -47,19 +47,18 @@ At `c = 0.10`, a R$300,000 reserve backs about R$3,000,000 of cover.
 |---|---|---|---|---|
 | Smallest request | `caps.min_request` | R$1,000 | 1,000,000,000 | Admin. Must be > 0. A full exit may be below it |
 | Largest request | `caps.max_request` | R$100,000 | 100,000,000,000 | Admin. Must be ≥ `min_request` |
-| Smallest partial fill | `caps.min_fill_assets` | R$500 | 500,000,000 | Admin. Unused while the pilot fills whole requests only |
 | Requests per fill call | `count` | 1 to 8 | n/a | Program constant `MAX_FULFIL_BATCH = 8` |
-| Exit fallback wait | `max_queue_wait_secs` | 0 (off) | seconds | Admin. Field reserved now, feature built before outside capital |
+| Exit fallback wait | `caps.max_queue_wait_secs` | 0 (off) | seconds | Admin. Field carved now, feature built before outside capital. The upgrade time lock must be at least this wait once it is non-zero |
 
 ## Assets, fees and income
 
 | Parameter | Field | Devnet value | Base units | Set by |
 |---|---|---|---|---|
 | Reserve mint | `reserve_mint` | Nora devnet BRS `BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4`, 6 decimals | n/a | Upgrade authority at `initialize`. Immutable |
-| Settlement floor | `caps.min_settlement_bps` (stored as `max_allocated_bps`) | 100% | 10,000 bps (stored 0) | Admin |
+| Settlement floor | None in v1 | 100% (BRS only; no adapter slots or allocation instructions) | n/a | Returns with the first adapter upgrade ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)) |
 | Guarantee-fee take | `fee_take_bps` | 20% | 2,000 bps | Admin. Program maximum 3,000 bps |
-| Issuer-income take | `income_take_bps` | 0 | 0 bps | Admin. Program maximum 0 until decided (TBD, spec §12 Q47) |
-| Treasury account | `treasury_account` | Set at deploy | n/a | Admin. A MUTAV BRS account; not owned by the operator, the capital wallet or the vault authority |
+| Issuer-income take | None in v1 | 0 | n/a | No field. A take returns as a carve after a commercial decision (spec §12 Q47) |
+| Treasury account | `treasury_account` | Set at deploy | n/a | Admin (`set_treasury_account`). A MUTAV BRS account; not owned by the operator, the capital wallet or the vault authority |
 | Payments account | `payments_account` | Set at deploy | n/a | Admin (`set_payments_account`). Same ownership rules; different from the treasury |
 | MUTAV capital wallet | `mutav_capital_wallet` | Set at deploy | n/a | Admin. Disclosed; no special treatment |
 
@@ -67,8 +66,7 @@ At `c = 0.10`, a R$300,000 reserve backs about R$3,000,000 of cover.
 
 | Parameter | Field | Devnet value | Base units | Set by |
 |---|---|---|---|---|
-| NAV-move bound | `price.max_nav_move_bps` | 100% | 10,000 bps | Admin. Kept at 100% on devnet so a claim against a small demo reserve does not halt fills; lowered for the real pilot |
-| Price staleness | `price.max_staleness_secs` | Placeholder (no priced asset held) | 86,400 s | Admin. Upper bound pinned at implementation |
+| NAV-move bound | `caps.max_nav_move_bps` | 100% | 10,000 bps | Admin. Kept at 100% on devnet so a claim against a small demo reserve does not halt fills; lowered for the real pilot (value open) |
 | Feature flags | `feature_flags` | None | 0 | Admin. Only flags in `SUPPORTED_FEATURES` (0 in this release) |
 
 ## Unsolicited money (runbook)
@@ -76,7 +74,7 @@ At `c = 0.10`, a R$300,000 reserve backs about R$3,000,000 of cover.
 | Parameter | Value | Set by |
 |---|---|---|
 | Return window | 30 days from arrival. After it, the admin books the money | Runbook |
-| Dust threshold | R$10. Below it, the admin books directly | Runbook. Whether it is also enforced on-chain is pinned at implementation |
+| Dust threshold | R$10. Below it, the admin books directly | Runbook and app setting. There is no on-chain field |
 
 ## Roles and governance
 
@@ -86,9 +84,11 @@ At `c = 0.10`, a R$300,000 reserve backs about R$3,000,000 of cover.
 | Upgrade multisig | Same members as the admin multisig | Set at deploy |
 | Admin time lock | 5 minutes on devnet; 24 hours on the real pilot | Squads multisig configuration |
 | Upgrade time lock | 1 hour on devnet; 7 days on the real pilot | Squads multisig configuration |
-| Operator | A key generated at deploy | Upgrade authority at `initialize`; then admin `propose_roles` and the new key's `accept_role` |
+| Operator | A key generated at deploy | Upgrade authority at `initialize`; then admin `propose_role` and the new key's `accept_role` within 72 hours |
 | Pauser | A separate key generated at deploy | Same as operator |
-| Guardians | 1 on devnet (program maximum 3). Pause only | Admin |
+| Guardians | 1 on devnet, separate from the pauser (program maximum 3). Pause only | Admin, in one step |
+| Pending handover expiry | 72 hours per role (operator, pauser, admin) | Program |
+| Admin rotation | `propose_admin`, then `accept_admin` by the new admin | Admin |
 | Allowlist root | Set after deploy | Admin (`set_allowlist_root`) |
 
 ## Program constants
@@ -99,35 +99,35 @@ Changed only by a program upgrade.
 |---|---|---|
 | `MIN_COVERAGE_RATIO_BPS` | 1,000 | Floor on `c` (0.10) |
 | `MAX_FEE_TAKE_BPS` | 3,000 | Maximum guarantee-fee take (30%) |
-| `MAX_INCOME_TAKE_BPS` | 0 | Maximum issuer-income take. Fails closed until decided |
 | `BPS_DENOMINATOR` | 10,000 | 100% |
-| `NAV_SCALE`, `PRICE_SCALE` | 10⁹ | Fixed-point scale of NAV per share and prices |
+| `NAV_SCALE` | 10⁹ | Fixed-point scale of NAV per share |
 | `VIRTUAL_OFFSET` | 1 | One share is worth 1 BRS at launch |
 | `SHARE_DECIMALS` | 6 | Share mint decimals |
 | `MAX_FULFIL_BATCH` | 8 | Most requests per fill call |
-| `MAX_ADAPTERS` | 8 | Adapter slots reserved in `VaultConfig` |
+| `MAX_ADAPTERS` | 8 | Most adapters the `adapter_bitmap` can mark; `adapter_count` and the bitmap are 0 |
 | `SUPPORTED_FEATURES` | 0 | No optional feature can be switched on |
 | Maximum guardians | 3 | Pause-only keys |
-| Maximum `claim_period_secs` | 90 days | Keeps the claim window rolling |
+| `CLAIM_WINDOW_DAYS` | 31 | Daily buckets in the sliding claim window |
+| Maximum `coverage_ratio_bps` | 10,000 | Cap on `c` (1.0) |
 | `PROGRAM_LAYOUT_VERSION` | 1 | Layout version written by every account init |
 
 ## Sources
 
-- [Specification §8 Caps](../spec.md#8-caps), [§12 Open questions](../spec.md#12-open-questions) (Q3, Q4, Q15, Q34, Q47)
-- Devnet release design decisions of 2026-10-10: devnet values, time locks, guardians, unsolicited-money runbook values (MUTAV internal decision log)
-- Program: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs), [`programs/mutav/src/state/config.rs`](../../programs/mutav/src/state/config.rs) (`Caps`, `PriceParams`)
+- [Specification §8 Caps](../spec.md#8-caps), [§12 Open questions](../spec.md#12-open-questions) (Q3, Q4, Q34, Q47); open items are tracked in [Open questions](../meta/open-questions.md)
+- Program: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs), [`programs/mutav/src/state/config.rs`](../../programs/mutav/src/state/config.rs) (`Caps`)
 - [Squads v4 documentation](https://docs.squads.so/)
 
 ## Decisions
 
-- [ADR 0016: Coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md) (c floor; its per-agency cap is removed by pending ADR 0019 and the coverage ADR)
+- [ADR 0016: Coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md) (c floor; its per-agency cap is removed by ADR 0019 and ADR 0022)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md) (income take)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md) (settlement floor)
 - [ADR 0007: Fee take direct to treasury](../decisions/0007-fee-take-direct-to-treasury.md)
-- Pending ADR: 0019 v1 layout for the devnet release (payout deadline and per-agency cap removed; `stress_buffer`, `max_reinstate_age`, window and exit-fallback fields carved)
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: Operator/admin separation and operator-compromise recovery (two-step roles, guardians, two multisigs)
-- Pending ADR: Exit rights (full exit below `min_request`)
-- Pending ADR: Exit fallback (`max_queue_wait_secs`)
-- Pending ADR: Unsolicited money and backstop contributions
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md) (two-step roles, guardians, two multisigs, `max_reinstate_age`)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md) (31-day window)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016; cap on `c`)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md) (full exit below `min_request`)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md) (runbook values)
+- [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (sparse `set_config`; removed fields)
+- ADR 0019: v1 layout for the devnet release (payout deadline and per-agency cap removed; `stress_buffer`, `max_reinstate_age`, window and exit-fallback fields carved)

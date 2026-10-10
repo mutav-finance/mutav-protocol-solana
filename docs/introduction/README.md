@@ -49,7 +49,7 @@ Pages in this section:
 | [Transparency](transparency.md) | What anyone can check on-chain and on the public `/reserve` page. |
 | [Glossary](glossary.md) | Brazilian legal terms, protocol terms and role names. |
 
-The binding sources behind every page are the [specification](../spec.md) and the [architecture decision records](../decisions/). Where a page and those files differ, the spec and the ADRs win, except where a page names a "Pending ADR": those decisions supersede older spec text until the spec is updated. Decisions taken for the devnet release that are not yet written as an ADR are named on each page as "Pending ADR".
+The binding sources behind every page are the [specification](../spec.md) and the [architecture decision records](../decisions/). Where a page and those files differ, the spec and the ADRs win. ADRs 0019 to 0027 record the devnet release design and supersede older spec text until the spec is updated. Items that are still undecided are listed in the [open questions register](../meta/open-questions.md).
 
 ## Where things live
 
@@ -68,7 +68,6 @@ The binding sources behind every page are the [specification](../spec.md) and th
 - [Repository README](../../README.md)
 - [Pilot app spec](../../app/docs/spec.md)
 - Program declaration: [`programs/mutav/src/lib.rs`](../../programs/mutav/src/lib.rs)
-- Devnet release decisions: pre-devnet refactor handoff, "Locked decisions" (internal notes, 2026-10-10)
 
 ## Decisions
 
@@ -76,5 +75,5 @@ The binding sources behind every page are the [specification](../spec.md) and th
 - [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0016: Coverage ratio below 1.0](../decisions/0016-coverage-ratio-below-one.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)

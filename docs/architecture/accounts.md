@@ -23,21 +23,19 @@ flowchart TD
   AUTH --> INBOX["Income inbox: ATA of vault authority for BRS"]
   CFG --> G["Guarantee: guarantee, config, id"]
   G --> CF["ClaimFiling: claim, guarantee, notice_ref_hash"]
-  G --> PO["Payout: payout, guarantee, notice_ref_hash"]
-  CFG --> FR["FeeReceipt: fee, config, invoice_ref_hash"]
-  CFG --> IR["IncomeReceipt: income, config, ref_hash"]
+  CFG --> FR["IncomeReceipt, kind FEE: fee, config, invoice_ref_hash"]
+  CFG --> IR["IncomeReceipt, other kinds: income, config, ref_hash"]
   CFG --> DR["DepositRequest: deposit, config, seq"]
   CFG --> RR["RedeemRequest: redeem, config, seq"]
-  CFG --> HS["HolderState: holder, config, owner"]
 ```
 
 ## Reserve-level accounts
 
 | Account | Seeds | Purpose |
 |---|---|---|
-| `VaultConfig` | `["config", reserve_mint]` | Configuration, roles, caps, accounts, allowlist root. One per reserve. Written only by admin instructions, `pause`, `revoke_operator` and the role-acceptance instructions |
-| `VaultState` | `["state", config]` | Internal accounting, queue sequences and heads, the claim window, lifetime counters, mode and halt flags |
-| Vault authority | `["authority", config]` | No data. Owns every reserve token account. Mint and freeze authority of the share mint. Never passed into an adapter CPI |
+| `VaultConfig` | `["config", reserve_mint]` | Configuration, roles and pending handovers, guardians, caps, accounts, allowlist root. One per reserve. Written only by admin instructions, `pause`, `revoke_operator` and the role-acceptance instructions |
+| `VaultState` | `["state", config]` | Internal accounting, queue sequences and heads, the 31-day claim window, lifetime counters, mode and halt flags |
+| Vault authority | `["authority", config]` | No data. Owns every reserve token account. Mint and freeze authority of the share mint |
 | Share mint | `["share_mint", config]` | Classic SPL Token mint, 6 decimals. Shares are minted only in `claim_shares`. The freeze authority is unused in v1 and kept so share-transfer restrictions stay possible without a new mint |
 
 ## Token accounts
@@ -50,48 +48,47 @@ All are ordinary SPL Token accounts owned by the vault authority. Money is split
 | `pending_deposits` | `["pending_deposits", config]` | BRS | Escrowed deposit requests | `pending_deposits_total` |
 | `pending_redemptions` | `["pending_redemptions", config]` | Share | Escrowed redeem requests | `pending_redeem_shares` |
 | `claims` | `["claims", config]` | BRS | BRS owed to holders on filled redemptions | `claimable_assets_total` |
-| `unsolicited` | `["unsolicited", config]` (proposed seed, pinned at implementation) | BRS | Untracked BRS that arrived outside a booking path. The only account money can be returned from | Not tracked |
+| `unsolicited` | `["unsolicited", config]` | BRS | Untracked BRS moved out of the live accounts by `skim` or out of the inbox by `classify_unsolicited`, until the admin books or returns it. Created at `initialize` | Not tracked |
 | Income inbox | Associated token account of the vault authority for BRS | BRS | The issuer's monthly revenue share, waiting for `sweep_income` | Not tracked |
 
-Untracked balances never count toward stable assets, NAV or coverage. `reserve` is a PDA, not the associated token account, so a mistaken send to the vault authority's "wallet" address lands in the income inbox, outside NAV.
+Untracked balances never count toward stable assets, NAV or coverage. `reserve` is a PDA, not the associated token account, so a mistaken send to the vault authority's "wallet" address lands in the income inbox, outside NAV. The inbox's only exits are `reserve` (`sweep_income`) and `unsolicited` (`classify_unsolicited`); nothing is ever returned from the inbox or from `reserve`.
 
 ## Record accounts
 
 | Account | Seeds | Created by | Closed? | Purpose |
 |---|---|---|---|---|
 | `Guarantee` | `["guarantee", config, id]` | `register_guarantee` | Never | One per lease. Covers, paid and provisioned amounts per leg, status. A second registration of the same `id` fails at creation |
-| `ClaimFiling` | `["claim", guarantee, notice_ref_hash]` | `file_claim` | Never | One filed claim: its leg, provision, approval and status. A withdrawn filing can be filed again under the same notice |
-| `Payout` | `["payout", guarantee, notice_ref_hash]` | `pay_claim` | Never | One paid notice. Makes payment idempotent per notice. Holds the Pix settlement hash |
-| `FeeReceipt` | `["fee", config, invoice_ref_hash]` | `contribute_fees` | Never | Each agency bill's guarantee fee counts once |
-| `IncomeReceipt` | `["income", config, ref_hash]` | `sweep_income`, `book_unsolicited`, backstop booking | Never | Each booked inflow counts once. Carries a `kind` |
-| `DepositRequest` | `["deposit", config, seq]`, `seq` as `u64` little-endian | `request_deposit` | On claim, cancel or refund; rent to the owner | One FIFO deposit request |
-| `RedeemRequest` | `["redeem", config, seq]`, `seq` as `u64` little-endian | `request_redeem` | When nothing is left to claim; rent to the owner | One FIFO redeem request |
-| `HolderState` | `["holder", config, owner]` | `request_deposit` or `claim_shares` | Never | One per investor wallet |
+| `ClaimFiling` | `["claim", guarantee, notice_ref_hash]` | `file_claim` | Never | One claim: its leg, provision, approval, payment and settlement, and status. Makes payment idempotent per notice. A withdrawn filing can be filed again under the same notice with `refile_claim` |
+| `IncomeReceipt` | `["fee", config, invoice_ref_hash]` for kind `FEE`; `["income", config, ref_hash]` for the other kinds | `contribute_fees` (`FEE`), `sweep_income` (`NORA_STATEMENT`), `book_unsolicited` (`UNSOLICITED`, `BACKSTOP`) | Never | Each booked inflow counts once. The separate `fee` prefix keeps an invoice reference and a statement reference from ever colliding |
+| `DepositRequest` | `["deposit", config, seq]`, `seq` as `u64` little-endian | `request_deposit` | On claim or cancel (by the owner or the admin); rent to the owner | One FIFO deposit request |
+| `RedeemRequest` | `["redeem", config, seq]`, `seq` as `u64` little-endian | `request_redeem` | On claim, cancel or a 0-asset fill; rent to the owner | One FIFO redeem request |
 
-**Removed for this release.** The `AgencyExposure` account, its `["agency", config, agency_id]` seed and the per-agency cap are gone. `Guarantee.agency_id` stays, and the app derives per-agency figures from guarantee accounts. A future concentration limit would return as a new account.
+**Removed before the freeze** ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md), ADR 0019: v1 layout for the devnet release):
+
+- `Payout` merged into `ClaimFiling` ([ADR 0021](../decisions/0021-claims-approval-amendment-exact-payment.md)).
+- `FeeReceipt` became `IncomeReceipt` with `kind = FEE`.
+- `HolderState`: exit uses the owner's share balance ([ADR 0023](../decisions/0023-capital-flows-and-exit-rights.md)).
+- `AgencyExposure` and the per-agency cap ([ADR 0022](../decisions/0022-coverage-stress-buffer-underwater-reserve.md)). `Guarantee.agency_id` stays, and the app derives per-agency figures from guarantee accounts. A future concentration limit would return as a new account.
+
+The retired seeds `agency`, `payout` and `holder` are never reused.
 
 **Reserved seed prefixes**, never used by a v1 PDA: `exit_buffer`, `exit_limit`, `instant_exit`, `adapter_state`. The `notice` prefix is held for the planned `ClaimNotice`.
 
 ## Sizes and padding
 
-Target sizes for the devnet release, discriminator included. The remaining `_reserved` after each carve is pinned by the layout test.
+Every account carries reserved space so later features are carved from padding or added as new accounts. Exact sizes, discriminator included, and the `_reserved` left after each carve are pinned by the layout test and the golden v1 fixtures.
 
-| Account | Size (bytes) | Padding budget | Notes |
-|---|---|---|---|
-| `VaultConfig` | 2,756 | 512 | Carves for this release listed below. The payout-SLA bytes return to padding |
-| `VaultState` | 480 | 256 | Carves the sliding claim window. The late-payout counter's bytes return to padding. Phase 2 later carves `InstantExitState` (88 bytes) |
-| `Guarantee` | 377 | 192 | Grown from 64 before the freeze, to hold the fiança-lifecycle fields (88 bytes) without migration |
-| `ClaimFiling` | 220 | 128 | Grown from 64. Carves `approved_amount`. Room for the lifecycle fields (49 bytes) |
-| `Payout` | 293 | 128 | Grown from 64. The `late` byte returns to padding. Room for the lifecycle fields (74 bytes) |
-| `FeeReceipt` | 138 | 64 | |
-| `IncomeReceipt` | 142 | 64 | Carves `kind: u8` |
-| `DepositRequest` | 155 | 64 | |
-| `RedeemRequest` | 181 | 64 | Partial-fill fields are real fields from v1, because live request accounts cannot be migrated |
-| `HolderState` | 114 | 64 | |
-| Nested `Caps`, `PriceParams`, `ExitParams` | inside `VaultConfig` | 32 each | `Caps` carves `stress_buffer` |
-| Nested `AdapterEntry` (×8) | inside `VaultConfig` | 64 each | Carves `max_share_bps`; 62 bytes left. All zero in v1 |
+| Account | Padding | Notes |
+|---|---|---|
+| `VaultConfig` | 512 | Holds the role, guardian and adapter carves listed below. The payout-SLA bytes and the removed exit, price, income-take and inline-adapter fields are gone |
+| `VaultState` | Pinned by the layout test | The 31 daily claim buckets and their day index take 256 bytes. Room is held for phase 2's `InstantExitState` (88 bytes) |
+| `Guarantee` | 192 | Grown before the freeze to hold the fiança-lifecycle fields (88 bytes) without migration |
+| `ClaimFiling` | Pinned by the layout test | Holds the payment and settlement fields from the former `Payout`, plus room for the lifecycle claim fields (49 bytes) and payout fields (74 bytes) |
+| `IncomeReceipt` | 64 | Carries `kind` |
+| `DepositRequest`, `RedeemRequest` | 64 each | The padding test holds the room for partial-fill fields and requester price protection |
+| Nested `Caps` | inside `VaultConfig` | Carves `stress_buffer`, `max_queue_wait_secs`, `max_reinstate_age` |
 
-Padding is sized at about three times the known later need. Rent is about 6,960 lamports per byte.
+Rent is about 6,960 lamports per byte.
 
 ## Fields carved for the devnet release
 
@@ -99,21 +96,22 @@ Every carved field reads zero as the safe default on an account written before t
 
 | Account | Field | Type | Meaning | Zero means |
 |---|---|---|---|---|
-| `VaultConfig` | `pending_operator`, `pending_pauser` | `Pubkey` ×2 | Keys proposed by `propose_roles` | No pending handover |
-| `VaultConfig` | `pending_admin` | `Pubkey` | Admin proposed by `propose_admin` | No pending handover |
-| `VaultConfig` | `pending_expires_at` | `i64` | When pending keys stop being acceptable | No pending handover |
-| `VaultConfig` | `guardians` | `[Pubkey; 3]` | Pause-only keys | Empty slot |
-| `VaultConfig` | `max_reinstate_age` | `i64` | How long after a close `reinstate_guarantee` is allowed. Admin-set | Set at deploy |
-| `VaultConfig` | `max_queue_wait_secs` | `i64` | Wait after which the exit fallback may fill the head redemption | Off. Shipped at 0 |
+| `VaultConfig` | `pending_operator`, `pending_pauser` | `Pubkey` ×2 | Keys proposed by `propose_role` | No pending handover |
+| `VaultConfig` | `pending_operator_expires_at`, `pending_pauser_expires_at` | `i64` ×2 | When each pending key stops being acceptable, 72 hours after the proposal | No pending handover |
+| `VaultConfig` | `pending_admin`, `pending_admin_expires_at` | `Pubkey`, `i64` | Admin proposed by `propose_admin`, and its expiry | No pending handover |
+| `VaultConfig` | `guardians` | `[Pubkey; 3]` | Guardian keys, appointed by the admin in one step | Empty slot |
+| `VaultConfig` | `adapter_count`, `adapter_bitmap` | `u8` ×2 | Number and slots of whitelisted adapters, each described by its own `AdapterState` account | BRS only |
 | `Caps` | `stress_buffer` | `u64` | R$ amount added on top of provisions in `coverage_required` | No stress term |
-| `VaultState` | Previous claim-window bucket (about 16 bytes) | `u64`, `i64` | The previous bucket's paid total and what is needed to weight it | Empty previous bucket |
+| `Caps` | `max_reinstate_age` | `i64` | How long after a close `reinstate_guarantee` is allowed. 30 days on devnet | No reinstatement |
+| `Caps` | `max_queue_wait_secs` | `i64` | Wait after which the exit fallback may fill the head redemption | Off. Shipped at 0 |
+| `VaultState` | `claim_day_buckets`, `claim_day_anchor` | `[u64; 31]`, `i64` | Payment totals per day for the last 31 days, and the day of the last write | No payments in the window |
 | `ClaimFiling` | `approved_amount` | `u64` | Amount the admin approved with `approve_claim` | No approval; the per-call cap applies |
-| `ClaimFiling` | `status` constant `WITHDRAWN = 2` | `u8` | Filing withdrawn by the operator | n/a (new constant) |
-| `IncomeReceipt` | `kind` | `u8` | `NORA_STATEMENT` (0), `UNSOLICITED`, `BACKSTOP` | An issuer statement |
+| `ClaimFiling` | `payments_account`, `paid_at`, `paid_amount`, `pix_e2e_hash`, `settled_at` | | Payment and settlement record, formerly on `Payout` | Not paid, not settled |
+| `IncomeReceipt` | `kind` | `u8` | `NORA_STATEMENT` (0), `FEE` (1), `UNSOLICITED` (2), `BACKSTOP` (3) | An issuer statement |
 
-Names, types and offsets of the carved fields are pinned by the layout test at implementation. The types above are indicative.
+Names, types and offsets are pinned by the layout test.
 
-Fields **removed** before the freeze: `VaultConfig.payout_sla_secs`, `VaultState.late_payouts`, `Payout.late`, `Caps.max_cover_per_agency`. The `ConfigUpdated` field id of the payout SLA is never reused.
+Fields **removed** before the freeze: `VaultConfig.payout_sla_secs`, `VaultState.late_payouts`, the `late` flag, `Caps.max_cover_per_agency`, `Caps.claim_period_secs`, the phase-2 `ExitParams` and the buffer earmark, the global TESOURO `PriceParams` and `tesouro_units`, `tesouro_price` and `tesouro_price_ts`, the cached `stable_assets`, `income_take_bps` and `income_take_total`, `min_fill_assets` and the partial-fill request fields, `pending_notices`, the inline `adapters[8]` and `max_allocated_bps`. Retired `ConfigUpdated` field ids are never reused.
 
 ## Account contents
 
@@ -122,47 +120,42 @@ Fields **removed** before the freeze: `VaultConfig.payout_sla_secs`, `VaultState
 | Group | Fields |
 |---|---|
 | Header | `version`, `bump`, `authority_bump` |
-| Roles | `admin`, `operator`, `pauser`, the pending keys, `guardians` |
+| Roles | `admin`, `operator`, `pauser`, the pending keys and their expiry times, `guardians` |
 | Mint | `reserve_mint`, `reserve_token_program`, `reserve_decimals` (immutable after `initialize`; 6), `share_mint` |
-| Economics | `coverage_ratio_bps` (c, at least 1,000), `fee_take_bps` (at most 3,000), `income_take_bps` (0) |
+| Economics | `coverage_ratio_bps` (c, from 1,000 to 10,000), `fee_take_bps` (at most 3,000) |
 | Accounts | `payments_account`, `treasury_account` (distinct, owned by none of the vault authority, the operator or the capital wallet), `mutav_capital_wallet` |
 | Allowlist | `investor_allowlist_root` |
-| Limits | `caps`: `max_tvl`, `max_cover_per_guarantee`, `max_claim_per_call`, `max_claim_per_period`, `claim_period_secs` (at most 90 days), `max_allocated_bps` (stored complement of `min_settlement_bps`), `min_request`, `max_request`, `min_fill_assets`, `stress_buffer` |
-| Price | `price`: bounds for a later priced asset, and `max_nav_move_bps` for the NAV-move guard |
-| Flags | `paused`, `feature_flags` (0 in v1), `max_reinstate_age`, `max_queue_wait_secs` |
-| Later | `adapters` (8 entries, all zero), `exit` (phase-2 instant exit, all zero) |
+| Limits | `caps`: `max_tvl`, `max_cover_per_guarantee`, `max_claim_per_call`, `max_claim_per_period` (per 31-day window), `min_request`, `max_request`, `max_nav_move_bps`, `stress_buffer`, `max_queue_wait_secs`, `max_reinstate_age` |
+| Flags | `paused`, `feature_flags` (0 in v1, fail-closed) |
+| Later | `adapter_count` and `adapter_bitmap` (0) |
 
 ### `VaultState`
 
 | Group | Fields |
 |---|---|
-| Health | `mode` (`NORMAL` 0, `UNDER_COVERED` 1), `stable_assets`, `remaining_cover_total`, `coverage_required`, `provisions`, `fulfil_halted`, `last_refresh_ts`, `last_refresh_slot` |
-| Tracked balances | `brs_balance`, `pending_deposits_total`, `pending_redeem_shares`, `claimable_assets_total`, `tesouro_units` and price fields (0 in v1) |
+| Health | `mode` (`NORMAL` 0, `UNDER_COVERED` 1), `remaining_cover_total`, `coverage_required`, `provisions`, `fulfil_halted`, `last_refresh_ts`, `last_refresh_slot`. Stable assets are computed at every gate, not stored |
+| Tracked balances | `brs_balance`, `pending_deposits_total`, `pending_redeem_shares`, `claimable_assets_total` |
 | Shares and NAV | `shares_outstanding`, `nav_per_share`, `inflow_nav` |
 | Queues | `next_deposit_seq`, `deposit_head`, `next_redeem_seq`, `redeem_head` |
-| Claim window | `claim_period_start`, `claim_period_paid`, the previous bucket |
-| Counters | `active_guarantees`, `fees_in_total`, `fee_take_total`, `claims_paid_total`, `income_total`, `income_take_total` |
-| Later | `buffer_earmark` (always 0), `pending_notices` (0 until the claim-notice gate is built) |
+| Claim window | `claim_day_buckets`, `claim_day_anchor` |
+| Counters | `active_guarantees`, `fees_in_total`, `fee_take_total`, `claims_paid_total`, `income_total` |
 
 ### `Guarantee`
 
 `id`, `agency_id`, `refs_hash`; `rent`; `default_multiplier_bps`, `exit_multiplier_bps` (display only); `default_cover`, `exit_cover` (absolute leg sub-limits, never changed after registration); `default_paid`, `exit_paid`; `provision_default`, `provision_exit`; `open_claims`; `status` (`ACTIVE` 0, `CLOSED` 1); `registered_at`, `closed_at` (0 while active, reset by `reinstate_guarantee`).
 
-### `ClaimFiling` and `Payout`
+### `ClaimFiling`
 
-- `ClaimFiling`: `guarantee`, `leg` (`DEFAULT` 0 for rent arrears, `EXIT` 1 for end-of-occupation debts), `notice_ref_hash`, `provision`, `filed_at`, `status` (`FILED` 0, `PAID` 1, `WITHDRAWN` 2), `approved_amount`.
-- `Payout`: `guarantee`, `leg`, `amount`, `notice_ref_hash`, `payments_account` at payment time, `status` (`PENDING` 0, `SETTLED` 1), `paid_at`, `settled_at`, `pix_e2e_hash`.
+`guarantee`, `leg` (`DEFAULT` 0 for rent arrears, `EXIT` 1 for end-of-occupation debts), `notice_ref_hash`, `provision`, `filed_at`, `status` (`FILED` 0, `PAID` 1, `WITHDRAWN` 2, `SETTLED` 3), `approved_amount`, `payments_account` at payment time, `paid_at`, `paid_amount`, `pix_e2e_hash`, `settled_at`.
 
-### Requests and holders
+### Requests
 
-- `DepositRequest`: `owner`, `seq`, `assets`, `shares_out`, `nav_at_fulfil`, `requested_at`, `fulfilled_at`, `status` (`PENDING` 0, `FULFILLED` 1).
-- `RedeemRequest`: `owner`, `seq`, `shares_requested` (immutable), `shares_remaining`, `shares_filled`, `assets_filled`, `assets_claimable`, `fill_count`, `last_fill_nav`, `requested_at`, `last_fill_at`, `status` (`PENDING` 0, `PARTIALLY_FILLED` 1, `FILLED` 2, `CANCELLED` 3).
-- `HolderState`: `owner`, `last_shares_in_ts`.
+- `DepositRequest`: `owner`, `seq`, `assets`, `shares_out`, `nav_at_fulfil`, `requested_at`, `fulfilled_at`, `status` (`PENDING`, `FULFILLED`).
+- `RedeemRequest`: `owner`, `seq`, `shares`, `assets_out`, `nav_at_fill`, `requested_at`, `filled_at`, `status` (`PENDING`, `FILLED`). Whole fills only.
 
 ### Receipts
 
-- `FeeReceipt`: `invoice_ref_hash`, `gross`, `take` (to treasury), `net` (to reserve), `slot`.
-- `IncomeReceipt`: `income_ref_hash`, `period` (`YYYYMM`), `gross`, `take`, `net`, `slot`, `kind`.
+- `IncomeReceipt`: `kind`, `ref_hash` (the invoice or statement commitment), `period` (`YYYYMM`, 0 for a fee), `gross`, `take` (the guarantee-fee take to the treasury; 0 for every other kind), `net` (to `reserve`), `slot`.
 
 ## Sources
 
@@ -171,7 +164,6 @@ Fields **removed** before the freeze: `VaultConfig.payout_sla_secs`, `VaultState
 - Seeds and sizes: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs)
 - Structs: [`programs/mutav/src/state/`](../../programs/mutav/src/state/)
 - Layout fixtures: [`tests/fixtures/layout/`](../../tests/fixtures/layout/)
-- Decision log of 2026-10-09 and 2026-10-10 (internal notes, to be published as the pending ADRs below)
 - [Solana documentation: program-derived addresses](https://solana.com/docs/core/pda)
 - [Anchor account space](https://www.anchor-lang.com/docs/references/space)
 
@@ -183,9 +175,11 @@ Fields **removed** before the freeze: `VaultConfig.payout_sla_secs`, `VaultState
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: 0019 v1 layout for the devnet release (padding, SLA removal, agency-cap removal, carved fields)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
-- Pending ADR: Unsolicited money and backstop contributions
-- Pending ADR: Exit fallback
+- ADR 0019: v1 layout for the devnet release (padding, removals and carved fields)
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)

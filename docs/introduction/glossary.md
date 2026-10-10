@@ -25,11 +25,12 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 | Term | Meaning |
 |---|---|
 | Bank-first payment | MUTAV pays the agency by Pix from its own bank account first, and the reserve then reimburses MUTAV's payments account through `pay_claim`. Keeps payments on time while an approval waits or a reserve account is frozen. |
-| Claim | A payment request booked on-chain by the operator with `file_claim` (a `ClaimFiling` account). Each claim is one event, such as one month's rent or one exit payment. Status: filed, paid or withdrawn. |
-| Claim amendment | The operator changes a filed claim's amount with `amend_claim`. Lowering it releases the difference; raising it books more, up to the leg's unprovisioned cover. Any approval resets. |
+| Claim | A payment request booked on-chain by the operator with `file_claim` (a `ClaimFiling` account). Each claim is one event, such as one month's rent or one exit payment. The same account records its payment and settlement. Status: `FILED`, `PAID`, `WITHDRAWN` or `SETTLED`. |
+| Claim amendment | The operator changes a filed claim's amount with `amend_claim`. Lowering it releases the difference; raising it books more, up to the leg's unprovisioned cover. Amending to 0 withdraws the claim. Any approval resets. |
 | Claim approval | `approve_claim`, a reserve-admin action. Needed when a claim is above `max_claim_per_call`. It binds the exact amount that may leave the reserve. It does not judge whether the claim is valid. |
 | Claim payment | `pay_claim`: BRS sent from the reserve to MUTAV's payments account. It pays exactly the filed provision. Never refused by the solvency gate or a pause. |
-| Claim withdrawal | The operator releases a filed claim's provision with `withdraw_claim`. The same notice can be filed again later, starting from scratch. |
+| Claim withdrawal | The operator releases a filed claim's whole provision with `amend_claim` to 0. The claim becomes `WITHDRAWN`. |
+| Re-file (`refile_claim`) | The operator files a `WITHDRAWN` claim again on the same notice. It starts from scratch: provision, filing time and any approval are reset. |
 | Close (`close_guarantee`) | The operator ends a guarantee with a reason: `VOID` (nothing paid, no open claim) or `RELEASED` (no open claim). Releases the remaining cover. The account stays readable. |
 | Cover | The R$ ceiling a guarantee can pay, split into two legs. Covers never change after registration. |
 | Default leg / exit leg | The two sub-limits of one guarantee's cover: rent and charges in arrears (default), and the tenant's debts at the end of the lease (exit). |
@@ -39,7 +40,7 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 | Reinstate (`reinstate_guarantee`) | The operator undoes a close, within an admin-set maximum age (`max_reinstate_age`). Used to correct a wrongful close. |
 | Remaining cover | Cover not yet paid on a guarantee, summed over both legs. |
 | Settlement (`settle_payout`) | The operator records that MUTAV paid the agency, with the Pix end-to-end hash. |
-| Sliding claim window | The 30-day limit on total claim payments (`max_claim_per_period`). It is sliding, so no 30-day span exceeds the cap. Approved payments count toward it. |
+| Sliding claim window | The limit on total claim payments (`max_claim_per_period`) over any 31-day window, kept as 31 daily totals. A payment goes through only if the last 31 days plus this payment stay within the cap, so no 30-day span exceeds it. Approved payments count toward it. |
 | Unprovisioned cover | Remaining cover minus provisions: cover that could still be claimed. |
 
 ## Reserve and economics
@@ -48,7 +49,7 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 |---|---|
 | Backstop | MUTAV's own BRS, booked into the reserve by the admin with receipt kind `BACKSTOP`. It mints no shares, so it raises NAV for every holder. Used to recapitalise the reserve. |
 | BRS | A BRL stablecoin on Solana issued by Nora. The reserve's only asset in v1. Classic SPL token, 6 decimals. |
-| Coverage ratio (`c`) | The share of all remaining cover the reserve must hold. Program floor 0.10. Devnet value 0.10. |
+| Coverage ratio (`c`) | The share of all remaining cover the reserve must hold. Program floor 0.10, program maximum 1.0. Devnet value 0.10. |
 | Coverage required | What the reserve must hold: `max(c × remaining cover, provisions + min(stress buffer, unprovisioned cover))`. Gates new guarantees and redemptions, never claim payments. |
 | Fee take | MUTAV's share of each guarantee fee (`fee_take_bps`), sent straight to the treasury account. Program maximum 30%. Devnet value 20%. |
 | Free capital | Stable assets above coverage required. Backs new guarantees and redemptions. |
@@ -67,7 +68,7 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 | Stress buffer | An admin-set R$ amount for the claims that could be filed next, held on top of provisions. Sized from the book, for example the three largest rents plus one exit payment. Devnet value R$19k. |
 | Treasury account | MUTAV's BRS token account that receives the fee take. Not part of the reserve. |
 | Under-coverage | Stable assets below coverage required. New guarantees and redemptions stop; claims keep being paid. Public label: "reserve below target; MUTAV backstop active". |
-| Unsolicited money | BRS or other tokens that arrived outside a booking path. Held in a separate `unsolicited` account. The admin returns it to the original sender or books it (receipt kind `UNSOLICITED`). Dust below R$10 is booked directly. |
+| Unsolicited money | BRS or other tokens that arrived outside a booking path. Held in a separate `unsolicited` account. The admin returns it to the original sender (within 30 days of a request) or books it (receipt kind `UNSOLICITED`). Dust below R$10 is booked directly; that threshold is an off-chain runbook value. |
 
 ## Capital
 
@@ -79,7 +80,7 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 | Exit fallback | After a maximum queue wait (`max_queue_wait_secs`), anyone can fill the head redemption under the same rules. The parameter is reserved and off for devnet; it is built before outside capital. |
 | Full exit | Redeeming every share a wallet holds. Allowed below `min_request`, from the owner's canonical share account only. |
 | Open exit | Any wallet that already holds shares can redeem, even after removal from the allowlist. |
-| Refund (`refund_deposit`) | The admin returns a pending deposit to its owner's own BRS account and unblocks the queue. |
+| Cancel deposit (`cancel_deposit`) | The owner, or the admin, cancels a pending deposit. The BRS goes back to the owner's own BRS account, and the queue moves on. |
 | Reserve share | An SPL token for a pro-rata share of net assets. Minted on deposit fills, burned on redemption fills. |
 | Whole fills | The pilot fills each request in full or not at all. Partial fills at the queue head are planned. |
 
@@ -87,8 +88,8 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 
 | Term | Meaning |
 |---|---|
-| Anyone | Any signer. May run the permissionless cranks `refresh`, `advance_queue_heads` and `skim`. |
-| Guardian | One of up to three keys, set by the admin, that can only pause. Cannot revoke, unpause or change anything. Devnet: 1 guardian. |
+| Anyone | Any signer. May run the permissionless cranks `refresh`, `advance_queue_head` and `skim`. |
+| Guardian | One of up to three keys, appointed by the admin in one step, that can only pause. Cannot revoke, unpause or change anything. Devnet: 1 guardian. With the first adapter upgrade, guardians may also take the risk-reducing adapter actions of ADR 0027. |
 | Operator | MUTAV's hot key that runs contracts, agencies and the whole guarantee and claim cycle. Every operator registry action can be reversed by another operator action. Only `pay_claim` is irreversible, and it is bounded by the admin's caps. |
 | Operator-compromise recovery | Freeze (the pauser revokes the operator), appoint a new operator, reconcile the platform's records with on-chain events, and correct with ordinary operator actions. |
 | Pause | Stops only capital flows and new guarantees. Never stops claims and never traps holders' money. Only the admin unpauses. |
@@ -96,7 +97,7 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 | Reserve admin | A Squads v4 multisig that looks after the reserve's financial health and security through ceilings: caps, coverage ratio, stress buffer, roles, accounts, the allowlist, capital fills, claim approvals above the per-call cap, unsolicited money, unpause. It does not judge contracts. |
 | Squads | A multisig program on Solana. Its vault address is the reserve admin and, through a second multisig, the upgrade authority. |
 | Time lock | The delay between approval and execution of a multisig proposal. Devnet: 5 minutes for the admin multisig, 1 hour for the upgrade multisig. Real pilot: 24 hours and 7 days. |
-| Two-step handover | A new operator, pauser or admin key must accept its role before it takes effect, so a typo can't appoint a dead address. Pending handovers expire, and revoking the operator clears them. |
+| Two-step handover | A new operator, pauser or admin key must accept its role before it takes effect, so a typo can't appoint a dead address. Pending handovers expire after 72 hours, and revoking the operator clears the pending operator and pauser keys. |
 | Two multisigs | The admin multisig (short time lock) and the upgrade multisig (long time lock), with the same members. |
 
 ## Solana terms
@@ -119,7 +120,6 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 - [Specification §2 Roles and keys](../spec.md#2-roles-and-keys), [§2.2 MUTAV as fiador](../spec.md#22-mutav-as-fiador-off-chain-duties-adr-0012), [§3 Accounts](../spec.md#3-accounts), [§4 Invariants and formulas](../spec.md#4-invariants-and-formulas), [§8 Caps](../spec.md#8-caps), [§12 Open questions](../spec.md#12-open-questions)
 - [Litepaper, Appendix A Glossary](../litepaper.md#a-glossary)
 - Program code: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs), [`programs/mutav/src/state/`](../../programs/mutav/src/state/), [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs)
-- Devnet release decisions: pre-devnet refactor handoff, "Locked decisions", and the adversarial review decisions log (internal notes, 2026-10-10)
 - Lei 8.245/91: <https://www.planalto.gov.br/ccivil_03/leis/l8245.htm>
 - Código Civil: <https://www.planalto.gov.br/ccivil_03/leis/2002/l10406compilada.htm>
 - Solana documentation (accounts, PDAs, CPI): <https://solana.com/docs/core>
@@ -137,10 +137,12 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 - [ADR 0016: Coverage ratio below 1.0](../decisions/0016-coverage-ratio-below-one.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: 0019 v1 layout for the devnet release
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
-- Pending ADR: Exit rights (open exit, full exit below minimum, refunds)
-- Pending ADR: Unsolicited money and backstop contributions
-- Pending ADR: Exit fallback
+- ADR 0019: v1 layout for the devnet release
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (proposed; guardian emergency actions decided)

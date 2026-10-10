@@ -20,7 +20,7 @@ The full table of contents is in [SUMMARY.md](SUMMARY.md).
 | Document | Role |
 |---|---|
 | [Specification](spec.md) | The program's business rules. Any change to economic behaviour needs an ADR. |
-| [Architecture decision records](meta/decisions.md) | Every accepted and proposed ADR, the pending ADRs and the dated decision log for the devnet release. Where a page names a "Pending ADR", that decision supersedes older spec text until the spec is updated. |
+| [Architecture decision records](meta/decisions.md) | Every accepted and proposed ADR and the dated decision log for the devnet release. Where an ADR from 0019 onward differs from older spec text, the ADR wins until the spec is updated. Undecided items are in the [open questions register](meta/open-questions.md). |
 | [Litepaper](litepaper.md) | The design and the business case in one document. |
 | [Plan](plan.md) and [provenance](provenance.md) | The build plan and the separation of hackathon work, prior MUTAV work and third-party code. |
 
@@ -35,3 +35,5 @@ The full table of contents is in [SUMMARY.md](SUMMARY.md).
 - [Decisions index](meta/decisions.md)
 - [ADR 0005: Solvency gate scope](decisions/0005-solvency-gate-scope.md)
 - [ADR 0018: BRS-only pilot reserve](decisions/0018-brs-only-pilot-reserve.md)
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](decisions/0022-coverage-stress-buffer-underwater-reserve.md)

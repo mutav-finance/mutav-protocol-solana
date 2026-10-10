@@ -22,7 +22,7 @@ No. Contracts, agencies, notices and Pix payments appear on-chain only as 32-byt
 
 ### Why BRS only?
 
-The pilot reserve holds a single asset with a 100% settlement floor, so every claim can be paid from liquid BRS. Other assets can be added later through capped adapters by a program upgrade. See [ADR 0018](../decisions/0018-brs-only-pilot-reserve.md).
+The pilot reserve holds a single asset with a 100% settlement floor, so every claim can be paid from liquid BRS. Other assets can be added later through adapters by a program upgrade, behind a BRS liquidity floor that keeps claims payable. See [ADR 0018](../decisions/0018-brs-only-pilot-reserve.md) and the proposed [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md).
 
 ### Where are the addresses?
 
@@ -36,15 +36,15 @@ No. `pay_claim` is never checked against solvency, mode, pause or the NAV guard.
 
 ### What does pause stop?
 
-Only capital flows (`request_deposit`, `request_redeem`, `fulfil_deposits`, `fulfil_redeems`) and new guarantees (`register_guarantee`). Every claim instruction, guarantee fees, issuer income, owner cancels and claims, the cranks and admin configuration keep running. Pause never traps a holder's money and never blocks a claim. The pauser and up to 3 guardians can pause with no time lock; the admin can too, through its multisig's time lock. Only the admin unpauses.
+Only capital flows (`request_deposit`, `request_redeem`, `fulfil_deposits`, `fulfil_redeems`) and new guarantees (`register_guarantee`). Every claim instruction, guarantee changes other than new registrations, guarantee fees, issuer income, cancels and claims, unsolicited-money instructions, the cranks, role instructions and admin configuration keep running. Pause never traps a holder's money and never blocks a claim. The pauser and up to 3 guardians can pause with no time lock; the admin can too, through its multisig's time lock. Only the admin unpauses.
 
 ### What is the most a compromised operator key can cost?
 
-The admin-set claim caps. Claim payments are the only irreversible operator action, and they land in MUTAV's own payments account. Every other change can be undone by another operator action: a registration by `close_guarantee(VOID)`, a close by `reinstate_guarantee`, a filing by `withdraw_claim`. See the [operator-compromise runbook](deployment-and-operations.md#operator-compromise).
+The admin-set claim caps. Claim payments are the only irreversible operator action, and they land in MUTAV's own payments account. Every other change can be undone by another operator action: a registration by `close_guarantee(VOID)`, a close by `reinstate_guarantee` (within 30 days), a filing by `amend_claim(0)`, which withdraws it. See the [operator-compromise runbook](deployment-and-operations.md#operator-compromise).
 
 ### Who can move BRS out of the reserve's accounts?
 
-BRS leaves only to: MUTAV's payments account (claim payments), the treasury (MUTAV's take of guarantee fees), the `claims` escrow and on to its owner (redemptions), the owner of a pending deposit (cancel or refund), and, from the `unsolicited` account only, the original sender of money that arrived outside a booking path.
+BRS leaves only to: MUTAV's payments account (claim payments), the treasury (MUTAV's take of guarantee fees), the `claims` escrow and on to its owner (redemptions), the owner of a pending deposit (`cancel_deposit`, by the owner or the admin), and, from the `unsolicited` account only, the original sender of money that arrived outside a booking path.
 
 ### Why can't a direct transfer change the share price?
 
@@ -53,6 +53,10 @@ The program prices shares from tracked balances, not raw token balances. BRS sen
 ### What happens if the issuer freezes a reserve account?
 
 A frozen reserve counts as 0 BRS in every solvency computation that reads it. New guarantees, fills and `clear_fulfil_halt` refuse with `ReserveFrozen`, and `refresh` emits `ReserveFrozenDetected`. A freeze also blocks `pay_claim`; MUTAV then pays by Pix and is reimbursed after. The reserve's money is split across separate token accounts so one freeze does not trap everything.
+
+### What happens to a claim above the per-call cap?
+
+It is filed and provisioned in full. The admin approves the exact amount with `approve_claim` through its time lock, and the operator then pays exactly the provision with `pay_claim`. Approved payments count toward the cap per sliding 31-day window; for an unusually large claim the admin raises that cap in the same proposal. MUTAV may pay the agency first from its bank account and be reimbursed. See [Program reference](program-reference.md).
 
 ### How are upgrades controlled?
 
@@ -70,7 +74,7 @@ Claims arrive one event at a time: one month's rent per default claim, one exit 
 
 ### What happens when the reserve is under-covered?
 
-New guarantees and redemptions stop until capital comes in or guarantees run off. Claims keep being paid. Deposit fills stay open, because they recapitalise the reserve, unless net assets are 0, in which case MUTAV's backstop money is booked without minting shares.
+New guarantees and redemptions stop until capital comes in or guarantees run off. Claims keep being paid. Deposit fills stay open, because they recapitalise the reserve, unless net assets are 0 with shares outstanding: then they refuse with `ReserveUnderwater`, and the recovery is MUTAV's backstop, booked by the admin with receipt kind `BACKSTOP` and no shares minted.
 
 ### Why did fills stop with `FulfilHalted`?
 
@@ -84,11 +88,11 @@ NAV per share moved more than `max_nav_move_bps` in a way verified inflows do no
 
 ### Can I exit if I am removed from the allowlist?
 
-Yes. Entry is allowlisted; exit is open. A wallet that already holds shares can `request_redeem` without a proof. A pending deposit from that wallet is returned by the admin with `refund_deposit`.
+Yes. Entry is allowlisted; exit is open. A wallet that already holds shares can `request_redeem` without a proof. A pending deposit from that wallet can be cancelled by the owner or by the admin with `cancel_deposit`, which returns the BRS to the owner's own token account.
 
 ### Can I redeem a balance below the minimum request?
 
-Yes, if you redeem everything. A full exit from your canonical share account skips `min_request`. Partial exits keep the minimum.
+Yes, if you redeem everything. A full exit from your canonical share account skips `min_request`, as long as the shares are worth more than 0. Partial exits keep the minimum.
 
 ### Why did my request fail with "account already in use"?
 
@@ -100,11 +104,11 @@ The admin fills in strict FIFO order, and v1 fills whole requests only. Each fil
 
 ### Can shares be transferred?
 
-On devnet the share mint is a classic SPL Token mint. Transfer-restricted shares are decided before mainnet `initialize`.
+On devnet the share mint is a classic SPL Token mint. Shares will be transfer-restricted on mainnet; the mechanism is chosen before mainnet `initialize`.
 
 ### Is there a deadline for claim payments in the program?
 
-No. The program records each payment and its Pix settlement, but the payment deadline lives in the MUTAV platform and the guarantee contract. The program's only promise is that, within the caps, `pay_claim` is never refused for solvency.
+No. The program records each payment and its Pix settlement on the claim's `ClaimFiling`, but the payment deadline lives in the MUTAV platform and the guarantee contract. The program's only promise is that, within the caps, `pay_claim` is never refused for solvency or pause.
 
 ## Integration
 
@@ -138,8 +142,10 @@ No. From the first devnet deploy, existing instructions, accounts and events kee
 - [ADR 0015: Admin clears the fulfil halt](../decisions/0015-admin-clear-fulfil-halt.md)
 - [ADR 0016: Coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
-- Pending ADR: Exit rights (open exit, full exit below minimum, refunds)
-- Pending ADR: Unsolicited money and backstop contributions
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed)

@@ -57,14 +57,14 @@ MUTAV argues for Solana on fit, not necessity. The business model does not depen
 
 | The program does | The program does not |
 |---|---|
-| Hold the reserve in BRS and track every amount it moves | Price guarantees or underwrite tenants |
+| Hold the reserve in BRS and track every amount it moves | Price guarantees or assess tenants |
 | Record each guarantee's cover and each claim's provision | Decide whether a claim is valid |
 | Gate new guarantees and capital exits on a solvency check | Hold personal data or lease documents (only their hashes) |
 | Pay claims to MUTAV's payments account within admin-set caps | Pay agencies or landlords directly. MUTAV pays them by Pix. |
 | Mint and burn reserve shares at an on-chain NAV | Promise a return to capital providers |
 | Enforce role separation, caps, pause scope and time locks | Track the contractual payment deadline. That lives in the MUTAV platform. |
 
-Pricing, underwriting, claim review and the payment deadline stay in the MUTAV platform, which acts on-chain through the operator key.
+Pricing, tenant assessment, claim review and the payment deadline stay in the MUTAV platform, which acts on-chain through the operator key.
 
 ## The pilot
 
@@ -88,5 +88,5 @@ The devnet release is the first step. It runs under a low ceiling of hard on-cha
 - [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: 0019 v1 layout for the devnet release (removes the on-chain payout SLA)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md) (removes the on-chain payout SLA)

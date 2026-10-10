@@ -4,7 +4,7 @@ The MUTAV reserve is the money that backs MUTAV's rental guarantees. MUTAV is an
 
 The reserve is operational infrastructure. Its job is to keep the guarantees healthy and to pay claims on time. It is not a yield product, and nothing in this section should be read as an investment offer.
 
-This section describes the reserve as designed for the devnet release (decisions of 2026-10-10). Where a value is chosen at deploy or still open, the page says so.
+This section describes the reserve as designed for the devnet release ([ADRs 0020 to 0027](../meta/decisions.md)). Where a value is chosen at deploy or still open, the page says so; open items are tracked in [Open questions](../meta/open-questions.md).
 
 ## What the reserve does
 
@@ -80,22 +80,22 @@ All reserve token accounts are ordinary SPL Token accounts owned by the vault au
 | `pending_redemptions` | `["pending_redemptions", config]` | Shares escrowed by redeem requests | No (shares, not BRS) |
 | `claims` | `["claims", config]` | BRS owed to holders on filled redemptions | No |
 | Income inbox | Associated token account of the vault authority for BRS | Issuer income waiting to be swept | No, until `sweep_income` books a statement |
-| `unsolicited` | `["unsolicited", config]` (seed pinned at implementation) | Money that arrived outside a booking path | No, until the admin books it |
+| `unsolicited` | `["unsolicited", config]` | Money that arrived outside a booking path | No, until the admin books it |
 
 ## Who acts on the reserve
 
 | Role | Key | Reserve duties |
 |---|---|---|
-| Operator | Hot key (devnet: generated at deploy) | Registers and closes guarantees, books guarantee fees and issuer income, files, amends, withdraws and pays claims, records settlement |
-| Reserve admin | Squads v4 multisig vault, time-locked | Sets caps, the coverage ratio and the stress buffer; approves claim amounts above the per-call cap; fills the capital queues; books or returns unsolicited money; books MUTAV's backstop |
-| Pauser and guardians | Separate keys | Pause capital flows and new guarantees. The pauser can also revoke the operator |
-| Anyone | Any signer | `refresh`, `advance_queue_heads`, `skim` |
+| Operator | Hot key (devnet: generated at deploy) | Registers, closes and reinstates guarantees, books guarantee fees and issuer income, files, amends (including to 0, a withdrawal), re-files and pays claims, records settlement |
+| Reserve admin | Squads v4 multisig vault, time-locked | Sets caps, the coverage ratio and the stress buffer; approves claim amounts above the per-call cap; fills the capital queues; books or returns unsolicited money; books MUTAV's backstop; appoints roles and guardians |
+| Pauser and guardians | Separate keys | Pause capital flows and new guarantees. The pauser can also revoke the operator. Up to three guardians, one on devnet |
+| Anyone | Any signer | `refresh`, `advance_queue_head`, `skim` |
 
 ## Pages in this section
 
 1. [Coverage model](coverage-model.md): how much the reserve must hold, the solvency gate, under-coverage and the backstop.
-2. [Claims and payments](claims-and-payments.md): filing, approval, amendment, withdrawal and exact payment of claims, within per-call and sliding 30-day caps.
-3. [Assets and income](assets-and-income.md): the BRS-only reserve, the settlement floor, adapters later, guarantee fees and issuer income.
+2. [Claims and payments](claims-and-payments.md): filing, approval, amendment, withdrawal and exact payment of claims, within per-call and sliding 31-day caps.
+3. [Assets and income](assets-and-income.md): the BRS-only reserve, the settlement floor, adapters and the liquidity floor later, guarantee fees and issuer income.
 4. [Unsolicited money](unsolicited-money.md): how money that arrives outside a booking path is held, returned or booked.
 5. [Parameters](parameters.md): every devnet parameter, its value and who sets it.
 
@@ -113,7 +113,6 @@ All reserve token accounts are ordinary SPL Token accounts owned by the vault au
 
 - [Specification §1 Principles](../spec.md#1-principles), [§2.1 Money flows](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017), [§3.3 Vault authority and token accounts](../spec.md#33-vault-authority-and-token-accounts)
 - [Litepaper](../litepaper.md)
-- Devnet release design decisions of 2026-10-10 (MUTAV internal decision log)
 - Program seeds: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs)
 - Solvency math: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs)
 
@@ -127,6 +126,8 @@ All reserve token accounts are ordinary SPL Token accounts owned by the vault au
 - [ADR 0016: Coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
-- Pending ADR: Unsolicited money and backstop contributions
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (proposed)

@@ -11,11 +11,11 @@ Each guarantee is the on-chain record of one **limited fiança** (CC 823). Its R
 | Default leg | Rent and charges in arrears while the lease runs | `default_cover` |
 | Exit leg | The tenant's debts at the end of occupation | `exit_cover` |
 
-Both covers are absolute R$ amounts set at registration. The rent multipliers behind them are stored for display only and never enter the program's math. No instruction changes the covers after registration. A change, such as a rent increase that should raise the cover, needs a signed addendum and an instruction that is not yet specified (TBD, spec §12 Q22).
+Both covers are absolute R$ amounts set at registration. The rent multipliers behind them are stored for display only and never enter the program's math. No instruction changes the covers after registration. A change, such as a rent increase that should raise the cover, needs a signed addendum and an instruction that is not yet specified (spec §12 Q22, listed in the [open questions](../meta/open-questions.md#open-questions)).
 
 ## From lease to registration
 
-1. **Off-chain.** The agency activates the lease in the MUTAV platform. MUTAV underwrites it. The landlord signs the guarantee instrument with MUTAV, or the agency signs under a special power from the landlord. The tenant's fee contract is separate.
+1. **Off-chain.** The agency activates the lease in the MUTAV platform. MUTAV assesses it. The landlord signs the guarantee instrument with MUTAV, or the agency signs under a special power from the landlord. The tenant's fee contract is separate.
 2. **On-chain.** The operator calls `register_guarantee(id, agency_id, refs_hash, rent, default_multiplier_bps, exit_multiplier_bps, default_cover, exit_cover)`.
 
 The program accepts the registration only if all of these hold:
@@ -68,7 +68,7 @@ A guarantee with an open claim cannot close. Every filed claim must be paid or w
 
 ## Reinstating a guarantee
 
-`reinstate_guarantee` undoes a close. It moves a `CLOSED` guarantee back to `ACTIVE` and restores its remaining cover. It is an operator action, allowed only within `max_reinstate_age` of the close. That age is set by the reserve admin (devnet value set at deploy). It is not paused, not solvency-gated and not subject to the claim caps. The event `GuaranteeReinstated` shows it in the operator-activity feed.
+`reinstate_guarantee` undoes a close. It moves a `CLOSED` guarantee back to `ACTIVE` and restores its remaining cover. It is an operator action, allowed only within `max_reinstate_age` of the close. That age is set by the reserve admin (30 days on devnet). It is not paused, not solvency-gated and not subject to the claim caps. The event `GuaranteeReinstated` shows it in the operator-activity feed.
 
 Its main use is recovery. If an operator key were ever compromised, a new operator corrects the registry with ordinary operator actions: a false registration is closed as `VOID`, and a wrongful close is reinstated. Claim payments are the only operator action that cannot be undone, and the admin's claim caps bound them.
 
@@ -99,7 +99,7 @@ Only amounts, timestamps and commitments (hashes) cross from the platform to the
 
 - the tenant's and the landlord's identity, and the property address;
 - the lease and the signed instrument (only their hash is on-chain);
-- underwriting and pricing of the guarantee fee;
+- tenant assessment and pricing of the guarantee fee;
 - the agency's monthly bills and payment records;
 - payment-request evidence and the review record.
 
@@ -107,7 +107,7 @@ Because a commitment is public, MUTAV can later prove which document an on-chain
 
 ## Planned: the full fiança lifecycle
 
-The devnet release records `ACTIVE` and `CLOSED` only. The fuller lifecycle of ADR 0012 is planned work. It adds the exoneration notice (LI 40 X), the record of the keys being returned (LI 39), a claims tail after the guarantee's liability ends, extinction when the ceiling is exhausted, commitments to the signed cap schedule and to the landlord's mandate, and claim categories. Space for these fields is already reserved in the `Guarantee` account, so they arrive without migrating live accounts. The claims-tail length is TBD (spec §12 Q35).
+The devnet release records `ACTIVE` and `CLOSED` only. The fuller lifecycle of ADR 0012 is planned work. It adds the exoneration notice (LI 40 X), the record of the keys being returned (LI 39), a claims tail after the guarantee's liability ends, extinction when the ceiling is exhausted, commitments to the signed cap schedule and to the landlord's mandate, and claim categories. Space for these fields is already reserved in the `Guarantee` account, so they arrive without migrating live accounts. The claims-tail length is open (spec §12 Q35, listed in the [open questions](../meta/open-questions.md#open-questions)).
 
 ```mermaid
 stateDiagram-v2
@@ -131,7 +131,6 @@ stateDiagram-v2
 - [Litepaper §6 Architecture on Solana](../litepaper.md#6-architecture-on-solana) and [§7 Guarantee lifecycle](../litepaper.md#7-guarantee-lifecycle)
 - Code: [`programs/mutav/src/state/guarantee.rs`](../../programs/mutav/src/state/guarantee.rs), [`programs/mutav/src/instructions/operator/register_guarantee.rs`](../../programs/mutav/src/instructions/operator/register_guarantee.rs), [`programs/mutav/src/instructions/operator/close_guarantee.rs`](../../programs/mutav/src/instructions/operator/close_guarantee.rs)
 - Technical reference, devnet release design of 2026-10-10, §5.2 and §7.1 (branch `docs/protocol-reference`, `docs/technical-reference.html`)
-- Devnet release decisions: pre-devnet refactor handoff, "Locked decisions", and the adversarial review decisions log, including the per-agency cap removal and the revised operator recovery model (internal notes, 2026-10-10)
 
 ## Decisions
 
@@ -140,6 +139,6 @@ stateDiagram-v2
 - [ADR 0008: One capital flow for everyone; FIFO deposits; pause never blocks claims](../decisions/0008-uniform-capital-flow-and-pause-scope.md)
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md) (the lifecycle is planned; space is reserved now)
 - [ADR 0016: Coverage ratio below 1.0, with a 0.10 floor and a provisions term](../decisions/0016-coverage-ratio-below-one.md)
-- Pending ADR: 0019 v1 layout for the devnet release (padding for the ADR 0012 fields, per-agency cap and `AgencyExposure` removed)
-- Pending ADR: Operator/admin separation and operator-compromise recovery (`close_guarantee` reasons, `reinstate_guarantee`, `max_reinstate_age`)
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
+- ADR 0019: v1 layout for the devnet release (padding for the ADR 0012 fields, per-agency cap and `AgencyExposure` removed)
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md) (`close_guarantee` reasons, `reinstate_guarantee`, `max_reinstate_age`, frozen-reserve check in registration)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016; removes the per-agency cap from the devnet caps)

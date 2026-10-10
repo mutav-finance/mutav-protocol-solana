@@ -13,9 +13,9 @@ An agency works in the MUTAV platform, as it does with any guarantor today. It n
 | What the agency does (off-chain, in the platform) | What MUTAV records on-chain (operator) |
 |---|---|
 | Activates a lease and sends the signed guarantee instrument | `register_guarantee`: one `Guarantee` account per lease, with its cover |
-| Collects the guarantee fee with the rent, and pays MUTAV one consolidated bill a month | `contribute_fees`: one `FeeReceipt` per paid bill, split between the reserve and MUTAV's treasury |
+| Collects the guarantee fee with the rent, and pays MUTAV one consolidated bill a month | `contribute_fees`: one income receipt of kind `FEE` per paid bill, split between the reserve and MUTAV's treasury |
 | Sends a payment request (*pedido de pagamento*) with evidence when the tenant defaults | `file_claim`: a `ClaimFiling` that sets the amount aside as a provision at once |
-| Receives the claim payment by Pix and pays the landlord under the landlord's mandate | `pay_claim` (reserve to MUTAV's payments account), then `settle_payout` (the Pix record) |
+| Receives the claim payment by Pix and pays the landlord under the landlord's mandate | `pay_claim` (reserve to MUTAV's payments account), then `settle_payout` (the Pix record on the same `ClaimFiling`) |
 | Reports the end of the lease | `close_guarantee`: the cover is released |
 
 One designed option touches the chain from the agency's side: paying the monthly bill in BRS through a Solana Pay link. Even then the agency only signs a token transfer to MUTAV. It never calls the program. See [Guarantee fees](fees.md).
@@ -53,7 +53,7 @@ flowchart LR
 - **Every claim is set aside the moment it is filed.** The filed amount becomes a provision. Filed claims are always held in full in the reserve's coverage requirement.
 - **The payment clock is public.** Every filing, payment and Pix settlement is an on-chain account or event with a timestamp.
 - **MUTAV can pay first.** MUTAV may pay the agency by Pix from its own bank account first, and the reserve then reimburses MUTAV's payments account. Agencies are paid on time even while a large claim waits for the admin's approval.
-- **A compromised operator key has a hard ceiling.** The most a stolen operator key can cost is the admin-set claim caps, and those payments can only reach MUTAV's own payments account. Every other change it could make can be undone by another operator action.
+- **A compromised operator key has a hard ceiling.** The most a misused operator key can cost is the admin-set claim caps, and those payments can only reach MUTAV's own payments account. Every other change it could make can be undone by another operator action.
 
 ## What the agency can check
 
@@ -92,7 +92,6 @@ Anyone, with no wallet, can read the public `/reserve` page of the pilot app at 
 - [Repository README](../../README.md)
 - Operator instructions: [`programs/mutav/src/instructions/operator/`](../../programs/mutav/src/instructions/operator/)
 - Protocol overview and technical reference, devnet release design of 2026-10-10 (branch `docs/protocol-reference`, `docs/protocol-overview.html` and `docs/technical-reference.html`)
-- Devnet release decisions: pre-devnet refactor handoff, "Locked decisions", and the adversarial review decisions log (internal notes, 2026-10-10)
 
 ## Decisions
 
@@ -100,6 +99,6 @@ Anyone, with no wallet, can read the public `/reserve` page of the pilot app at 
 - [ADR 0005: Solvency gate scope: capital flows and new guarantees, never claim payments](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0009: Guarantee fees, MUTAV operation and MUTAV's reserve share are separate flows](../decisions/0009-separate-mutav-money-flows.md)
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: 0019 v1 layout for the devnet release (payout SLA and per-agency cap removed)
+- ADR 0019: v1 layout for the devnet release (per-agency cap removed)
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md) (payout SLA removed from the program)

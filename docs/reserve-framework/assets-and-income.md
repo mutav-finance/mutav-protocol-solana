@@ -11,7 +11,7 @@ In this release the reserve holds one asset: BRS, a BRL token on Solana issued b
 | Token program | Classic SPL Token |
 | Decimals | 6. `initialize` refuses a reserve mint with any other number of decimals |
 | Mint and freeze authority | Held by the issuer. A single issuer key can freeze any BRS account |
-| Mainnet mint | Set at deploy. Its authorities are to be confirmed with the issuer (TBD, spec §12 Q34) |
+| Mainnet mint | Set at deploy. Its authorities are to be confirmed with the issuer (spec §12 Q34, see [Open questions](../meta/open-questions.md#open-questions)) |
 
 The reserve mint is fixed in `VaultConfig` at `initialize` and never changes.
 
@@ -21,25 +21,29 @@ The reserve mint is fixed in `VaultConfig` at `initialize` and never changes.
 
 ## Settlement floor
 
-`min_settlement_bps` is the minimum share of stable assets held in the settlement token (liquid BRS, the token fees come in and claims go out in). All adapters together may use only the share above it.
+`min_settlement_bps` is the minimum share of stable assets held in the settlement token (liquid BRS, the token fees come in and claims go out in). All adapters together may use only the share above it ([ADR 0018](../decisions/0018-brs-only-pilot-reserve.md)).
 
-| Field | Devnet and pilot value | Stored as |
-|---|---|---|
-| `min_settlement_bps` | `10_000` (100%): BRS only, nothing can be allocated | `caps.max_allocated_bps = 10_000 − min_settlement_bps = 0`, so a zeroed field means "nothing allocated" |
+In the devnet release and the pilot the floor is **100%**: the reserve is BRS only. v1 stores no floor field and no adapter slots. The binary has no allocation instruction, and `VaultConfig` carries only `adapter_count` and `adapter_bitmap`, both 0 ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)). The floor returns as a stored value with the first adapter upgrade.
 
 ## More assets later, through adapters
 
-The layout keeps room for other reserve assets, such as tokenized Brazilian treasury bonds. TESOURO is the first candidate, pending a direct path between BRS and TESOURO. No adapter ships in this release: `whitelist_adapter`, `remove_adapter`, `allocate` and `deallocate` are not in the binary.
+The layout keeps room for other reserve assets, such as tokenized Brazilian treasury bonds. TESOURO, from Etherfuse, is the first candidate, pending a BRS route in and out of it. No adapter ships in this release: `whitelist_adapter`, `remove_adapter`, `allocate` and `deallocate` are not in the binary. The rules for a second asset are proposed in [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md); the points marked decided below are settled, the rest is a proposal. The TESOURO cap stays 0 until the open items with Etherfuse are closed (lead time, price account, authorities, the redeeming party, a BRS route; see [Open questions](../meta/open-questions.md#open-questions)).
 
-Adding an asset takes five steps:
+| Topic | Rule (ADR 0027) |
+|---|---|
+| Adapter record | One `AdapterState` PDA per adapter at `["adapter_state", config, program_id]`, holding the pinned adapter program and its last upgrade slot, the asset mint, the limits, the price source, the position and any in-transit entry. A new adapter starts at cap 0 |
+| Valuation | MUTAV values each position itself: tracked units times a bounded price. The adapter moves tokens and never reports a value. After every adapter CPI the program reloads the vault token accounts and requires the exact expected deltas |
+| Every adapter at every gate | `refresh` and every instruction that computes stable assets must pass the `AdapterState` of every adapter in the bitmap. A frozen or unreadable asset counts as 0 without blocking the others |
+| BRS liquidity floor | `brs_floor = max(ceil(min_settlement_bps × stable_assets / 10_000), obligations_floor)`. The recommended obligations floor is `provisions + max_claim_per_period × max(1, ceil(exit_lead_time_secs / 31 days))` |
+| Where the floor applies | `allocate` refuses a move that leaves BRS below the floor. **Decided:** `fulfil_redeems` refuses a fill that would take BRS below the floor while any adapter holds value. `pay_claim` never reads the floor |
+| Limits per adapter | `target_bps` with a band, an absolute `cap` and `max_share_bps`. Moves go toward the target only; no permissionless instruction moves BRS into an adapter |
+| Who moves assets | **Decided:** the reserve admin, through the time-locked Squads multisig, executes `allocate` and `deallocate`. No allocator role is added. Asynchronous moves are booked in transit at a haircut, capped by `max_in_transit` |
+| Slippage | A caller `min_out` plus a program bound `max_slippage_bps` from the bounded price |
+| TESOURO price | Etherfuse's `BondPrice` in BRL as primary, inside a rate band and an accrual corridor, with its own staleness limit and admin floor and cap. A second feed is a cross-check only. Without a fresh price, deposits and allocations fail closed, the gates use the last price with a haircut that grows with age, and `pay_claim` never reads a price |
+| Risk-adding changes | Raising limits, adding an adapter or changing a price source wait for a program-enforced delay of at least `max_queue_wait_secs` (once non-zero), on top of the admin time lock. Risk-reducing changes are fast |
+| Emergency path | **Decided:** guardians, the pauser and the admin may at once call `disable_adapter`, `impair_adapter` (the haircut can only rise), `pause` and `emergency_deallocate` (impaired adapters only, proceeds pinned to `reserve`, bounded by `min_out` and `max_emergency_discount_bps`). Undoing any of it goes through the admin time lock |
 
-1. **Upgrade** the program with the adapter instructions and deploy the asset's adapter program, after its own review.
-2. **Whitelist the adapter** with its limits: an absolute `cap` (BRS-equivalent), a share limit (`AdapterEntry.max_share_bps`) and its own price feed in an `AdapterState` PDA at `["adapter_state", config, program_id]`.
-3. **Lower `min_settlement_bps`** below 100% with `set_config`.
-4. **Allocate** within every gate: the settlement floor after the move, the adapter's cap and share limit, the solvency gate, and liquid BRS left ≥ provisions.
-5. **Refresh** (anyone) re-values the reserve at each adapter's bounded price.
-
-Each adapter acts through its own capped sub-authority. The vault authority and the share mint authority are never passed into an adapter CPI.
+The vault authority and the share mint authority are never passed into an adapter CPI.
 
 ## Guarantee fees
 
@@ -53,7 +57,7 @@ net  = amount − take                           → reserve (NAV rises, no shar
 | Rule | Detail |
 |---|---|
 | Signer | Operator, who also signs the BRS transfer from its own account |
-| Once per invoice | A `FeeReceipt` at `["fee", config, invoice_ref_hash]` must not exist yet |
+| Once per invoice | An `IncomeReceipt` with kind `FEE` at `["fee", config, invoice_ref_hash]` must not exist yet. The `"fee"` seed prefix keeps invoice and statement references apart |
 | Take | `fee_take_bps` = 2,000 (20%) on devnet; program maximum 3,000 (30%). Goes straight to the treasury; the program holds no fee balance |
 | Pause and solvency | Never paused, never solvency-gated. Money coming in is always accepted |
 | No shares yet | Refused while `shares_outstanding == 0`. The first deposit must be filled first |
@@ -70,7 +74,7 @@ The issuer shares part of its revenue with partners under a commercial agreement
 `initialize` creates the vault authority's associated token account for BRS: the **income inbox**. MUTAV gives this address to the issuer as its payee address.
 
 - The inbox is not reserve money. Nothing in it counts toward NAV, stable assets or coverage until it is swept.
-- Its only exits are `reserve` (through `sweep_income`), the treasury (the income take, 0 in this release) and the `unsolicited` account (through the admin's `classify_unsolicited`).
+- Its only exits are `reserve` (through `sweep_income`) and the `unsolicited` account (through the admin's `classify_unsolicited`, once every issuer statement for the period is swept).
 - Income is never returned to a sender. Returns leave only from the `unsolicited` account.
 - `reserve` stays a PDA, not the associated token account, so a send to the vault authority's address lands in the inbox and never in the live reserve.
 
@@ -80,8 +84,7 @@ Each month the operator sweeps the amount on the issuer's statement.
 
 ```text
 sweep_income(income_ref_hash, period, amount)
-take = floor(amount × income_take_bps / 10_000)   // 0 in this release
-net  = amount − take                              → reserve
+amount                                          → reserve (no take)
 ```
 
 | Rule | Detail |
@@ -91,16 +94,16 @@ net  = amount − take                              → reserve
 | Source | The inbox must be the vault authority's associated token account for BRS. `amount ≤` inbox balance |
 | Freeze | Refused if the inbox or `reserve` is frozen |
 | Once per statement | An `IncomeReceipt` at `["income", config, income_ref_hash]` must not exist yet. Several statements in one month each have their own reference |
-| Post-CPI check | `reserve` rose by exactly `net` and the inbox fell by exactly `amount` |
+| Post-CPI check | `reserve` rose by exactly `amount` and the inbox fell by exactly `amount` |
 | Pause and solvency | Never paused, never solvency-gated, no mode check |
 | No shares yet | Refused while `shares_outstanding == 0`. The income waits in the inbox |
-| Record | `IncomeReceipt` with kind `NORA_STATEMENT`; event `IncomeSwept { income_ref_hash, period, gross, take, net, inbox_after }` |
+| Record | `IncomeReceipt` with kind `NORA_STATEMENT`; event `IncomeSwept { income_ref_hash, period, amount, inbox_after }` |
 
 Anything in the inbox that is not on a statement stays there, untracked, until the admin classifies it as unsolicited.
 
-### Income take is 0
+### No take on issuer income
 
-`income_take_bps` is MUTAV's take from issuer income, separate from the guarantee-fee take. It is **0**: all issuer income builds the reserve. The program cap `MAX_INCOME_TAKE_BPS` is also 0, so `set_config` refuses any non-zero take until an upgrade sets a cap (TBD, spec §12 Q47).
+MUTAV takes nothing from issuer income: all of it builds the reserve. v1 has no income-take field, and `sweep_income` takes no treasury account ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)). A take, separate from the guarantee-fee take, would return as a carve only after a commercial decision (spec §12 Q47, see [Open questions](../meta/open-questions.md#open-questions)).
 
 ### How income is shown
 
@@ -114,18 +117,20 @@ Allowlisted capital providers, including MUTAV's own capital wallet, deposit BRS
 
 | Inflow | Instruction | Signer | Mints shares | Record | Counts in `inflow_nav` |
 |---|---|---|---|---|---|
-| Guarantee fee (net) | `contribute_fees` | Operator | No | `FeeReceipt` | Yes |
-| Issuer income (net) | `sweep_income` | Operator | No | `IncomeReceipt` kind `NORA_STATEMENT` | Yes |
+| Guarantee fee (net) | `contribute_fees` | Operator | No | `IncomeReceipt` kind `FEE` | Yes |
+| Issuer income | `sweep_income` | Operator | No | `IncomeReceipt` kind `NORA_STATEMENT` | Yes |
 | Capital deposit | `fulfil_deposits` | Reserve admin | Yes, at NAV | `DepositRequest` | No (priced at NAV) |
 | Unsolicited money | `book_unsolicited` | Reserve admin | No | `IncomeReceipt` kind `UNSOLICITED` | Yes |
-| MUTAV backstop | Backstop booking | Reserve admin | No | `IncomeReceipt` kind `BACKSTOP` | Yes |
+| MUTAV backstop | `book_unsolicited` | Reserve admin | No | `IncomeReceipt` kind `BACKSTOP` | Yes |
+
+Receipt kinds are `NORA_STATEMENT` (0), `FEE` (1), `UNSOLICITED` (2) and `BACKSTOP` (3). Every booking path except a capital deposit is refused while `shares_outstanding == 0`.
 
 ## Sources
 
 - [Specification §2.1 Money flows](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017), [§3.3 Vault authority and token accounts](../spec.md#33-vault-authority-and-token-accounts), [§5.3 Guarantee fees](../spec.md#53-guarantee-fees-operator), [§5.3a Issuer income](../spec.md#53a-issuer-income-operator), [§5.7 Reserve allocation](../spec.md#57-reserve-allocation-admin-through-adapters), [§12 Open questions](../spec.md#12-open-questions)
-- Devnet release design decisions of 2026-10-10: fee take 2,000, inflows refused while no shares exist, receipt kinds (MUTAV internal decision log)
 - Program: [`programs/mutav/src/instructions/operator/contribute_fees.rs`](../../programs/mutav/src/instructions/operator/contribute_fees.rs), [`programs/mutav/src/instructions/operator/sweep_income.rs`](../../programs/mutav/src/instructions/operator/sweep_income.rs), [`programs/mutav/src/token_guard.rs`](../../programs/mutav/src/token_guard.rs), [`programs/mutav/src/state/income.rs`](../../programs/mutav/src/state/income.rs)
 - [SPL Token program](https://spl.solana.com/token), [Token-2022 extensions](https://spl.solana.com/token-2022/extensions)
+- Multi-asset research: `reports/Multi asset vaults on Solana.md` (workspace report cited by ADR 0027)
 
 ## Decisions
 
@@ -134,5 +139,7 @@ Allowlisted capital providers, including MUTAV's own capital wallet, deposit BRS
 - [ADR 0009: Separate MUTAV money flows](../decisions/0009-separate-mutav-money-flows.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: Unsolicited money and backstop contributions (receipt kinds, `classify_unsolicited`)
-- Pending ADR: Operator/admin separation and operator-compromise recovery (fees and income refused while no shares exist)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md) (fees and income refused while no shares exist)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md) (receipt kinds, `classify_unsolicited`)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (no income take, `FeeReceipt` folded into `IncomeReceipt`, adapter slots removed)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (proposed; decided: admin moves assets, emergency path, floor on `fulfil_redeems`)

@@ -6,8 +6,8 @@ Every path by which money enters and leaves the reserve, who signs it, and what 
 
 - **Internal accounting.** The program tracks the amounts it moved, not raw token balances. Money that arrives outside a booking path changes nothing until an authorised instruction books it. A direct transfer cannot move NAV.
 - **Separate flows never mix.** Guarantee fees, MUTAV's take, MUTAV's own capital and issuer income each have their own instruction, account and counter.
-- **Fixed exits.** BRS leaves the reserve's accounts only to: MUTAV's payments account, the treasury (fee take), the `claims` escrow and on to its owner, the owner of a returned pending deposit, or, from `unsolicited` only, the original sender.
-- **No inflow while no shares exist.** Guarantee fees, issuer income and bookings that raise NAV without minting shares are refused while `shares_outstanding == 0`. The money waits until the first deposit is filled.
+- **Fixed exits.** BRS leaves the reserve's accounts only to: MUTAV's payments account, the `claims` escrow and on to its owner, the owner of a cancelled pending deposit, or, from `unsolicited` only, the original sender. The guarantee-fee take goes from the operator's account straight to the treasury and never enters the reserve.
+- **No inflow while no shares exist.** `contribute_fees`, `sweep_income` and `book_unsolicited` are refused while `shares_outstanding == 0`. Fees wait with the operator and income waits in the inbox until the first deposit is filled ([ADR 0023](../decisions/0023-capital-flows-and-exit-rights.md)).
 
 ## Overview
 
@@ -33,7 +33,7 @@ flowchart LR
 
   INV -->|"request_deposit"| PD
   PD -->|"fulfil_deposits (admin)"| R
-  PD -->|"cancel_deposit (owner), refund_deposit (admin)"| INV
+  PD -->|"cancel_deposit (owner or admin)"| INV
   R -->|"fulfil_redeems (admin)"| CL
   CL -->|"claim_assets (owner)"| INV
   OPA -->|"contribute_fees: net"| R
@@ -47,7 +47,7 @@ flowchart LR
   R -->|"skim (anyone): untracked surplus"| UN
   MB -.->|"sent in"| UN
   UN -->|"book_unsolicited: UNSOLICITED or BACKSTOP (admin)"| R
-  UN -->|"return_unsolicited (admin)"| SND
+  UN -->|"return_unsolicited (admin), to the source only"| SND
 ```
 
 Shares move separately: `claim_shares` mints shares to the owner, `request_redeem` escrows them in `pending_redemptions`, a redemption fill burns them, and `cancel_redeem` returns unfilled shares.
@@ -58,20 +58,19 @@ Shares move separately: `claim_shares` mints shares to the owner, `request_redee
 |---|---|---|---|---|---|
 | Capital deposit | `request_deposit`, then `fulfil_deposits` | Investor, then admin | Investor's BRS account | `pending_deposits`, then `reserve` | Yes, at the fill's NAV |
 | Guarantee fee | `contribute_fees(invoice_ref_hash, amount)` | Operator | Operator's BRS account | Net to `reserve`, take to the treasury | Never |
-| Issuer income | `sweep_income(income_ref_hash, period, amount)` | Operator | Income inbox | Net to `reserve`, take (0) to the treasury | Never |
-| Unsolicited money | `skim` or `classify_unsolicited`, then `book_unsolicited` | Anyone or admin, then admin | Any tracked account or the inbox | `unsolicited`, then `reserve` | Never |
-| Backstop | Backstop booking (route pinned at implementation) | Admin | MUTAV's BRS | `reserve` | Never |
+| Issuer income | `sweep_income(income_ref_hash, period, amount)` | Operator | Income inbox | The whole amount to `reserve`; no take | Never |
+| Unsolicited money | `skim` or `classify_unsolicited`, then `book_unsolicited(kind = UNSOLICITED)` | Anyone or admin, then admin | `reserve`, `pending_deposits`, `claims` or the inbox | `unsolicited`, then `reserve` | Never |
+| Backstop | MUTAV sends BRS to `unsolicited`, then `book_unsolicited(kind = BACKSTOP)` | Admin | MUTAV's BRS | `unsolicited`, then `reserve` | Never |
 
 ## Outflows
 
 | Flow | Instruction | Signer | From | To | Bound |
 |---|---|---|---|---|---|
-| Claim payment | `pay_claim` | Operator | `reserve` | MUTAV payments account | Exactly the filing's provision. Per-call cap unless approved. Sliding 30-day cap. Liquid BRS. Never solvency-gated |
+| Claim payment | `pay_claim` | Operator | `reserve` | MUTAV payments account | Exactly the filing's provision. Per-call cap unless approved. Sliding 31-day window cap. Liquid BRS. Never solvency-gated |
 | Redemption | `fulfil_redeems`, then `claim_assets` | Admin, then owner | `reserve` | `claims`, then the owner | Free capital and liquid budget. Strict FIFO. Inside the admin's `nav_bounds` |
 | Fee take | `contribute_fees` | Operator | Operator's BRS account | Treasury | `fee_take_bps` (at most 30%) |
-| Deposit cancel or refund | `cancel_deposit`, `refund_deposit` | Owner, admin | `pending_deposits` | The owner's own BRS account | The escrowed amount |
-| Return to sender | `return_unsolicited` | Admin | `unsolicited` | The source of the original transfer | Screened; within the runbook window |
-| Foreign tokens | `return_foreign` | Admin | A foreign token account, or SOL above rent-exempt | A destination | Classic SPL tokens only. Never BRS, the share mint or an adapter mint |
+| Deposit cancel | `cancel_deposit` | Owner or admin | `pending_deposits` | The owner's own BRS associated token account | The escrowed amount |
+| Return to sender | `return_unsolicited(source, amount, destination, ref_hash)` | Admin | `unsolicited` (BRS), surplus in `pending_redemptions` (shares), a foreign token account, or lamports above rent-exempt | The source of the original transfer | Screened; within the runbook window. Never from the income inbox or `reserve`. Foreign tokens: classic SPL Token mints only, never BRS, the share mint or an adapter mint |
 
 ## Capital: deposits and redemptions
 
@@ -95,12 +94,12 @@ sequenceDiagram
 ```
 
 - **Entry is allowlisted, exit is open.** A wallet that holds shares can redeem without a proof.
-- **Strict FIFO, whole fills.** The admin fills up to 8 requests per call from the queue head. In the devnet release a head that does not fit the budget stops the batch. Partial fills are deferred.
+- **Strict FIFO, whole fills.** The admin fills up to 8 requests per call from the queue head (`count` from 1 to 8 for deposits). In the devnet release a head that does not fit the budget stops the batch. Partial fills come in the first upgrade after the hackathon.
 - **Pricing.** Each fill is priced at the NAV of that fill and rounds in the reserve's favour. Every deposit fill must mint more than 0 shares.
 - **Gates.** Redemption fills need normal mode and fit within free capital and liquid BRS. Deposit fills are allowed in under-coverage (they recapitalise the reserve), stop at `max_tvl`, and are refused with `ReserveUnderwater` when net assets are 0 while shares are outstanding, so new money never pays for old losses.
-- **Fills carry `nav_bounds`**, a NAV range composed by `/admin` with the proposal.
-- **Dust.** A full exit (all of the owner's shares) may be below `min_request`. A head redemption worth 0 fills as a 0-asset fill: the shares are burned and the request closes.
-- **Refunds.** A pending deposit from a wallet removed from the allowlist is returned by `refund_deposit`, which unblocks the queue.
+- **Fills carry `nav_bounds`**, a NAV range composed by `/admin` with the proposal. A fill outside it is refused with `NavOutOfBounds`. The NAV-move guard also runs inline in both fills and refuses with `FulfilHalted`.
+- **Dust.** A full exit (all of the owner's shares in the canonical share associated token account) may be below `min_request`. A head redemption worth 0 fills as a 0-asset fill: the shares are burned and the request closes.
+- **Admin cancels.** A pending deposit from a wallet removed from the allowlist, or an unreachable owner, is returned by the admin with `cancel_deposit`, to the owner's own account, which unblocks the queue.
 
 MUTAV's own capital uses the same queues and gets no special treatment.
 
@@ -113,7 +112,7 @@ take = floor(amount × fee_take_bps / 10,000)   → treasury account
 net  = amount − take                           → reserve   (NAV rises, no shares minted)
 ```
 
-- A `FeeReceipt` keyed by `invoice_ref_hash` makes each bill count once.
+- An `IncomeReceipt` with `kind = FEE`, keyed by `invoice_ref_hash` under its own `fee` seed prefix, makes each bill count once.
 - The treasury account is MUTAV's operating revenue. It is never part of the reserve or NAV.
 - Fees are never paused and never solvency-gated. They are refused while no shares exist.
 - Devnet `fee_take_bps`: 2,000 (20%). Program maximum: 3,000.
@@ -124,7 +123,7 @@ The BRS issuer shares revenue with its partners. MUTAV gives the issuer the rese
 
 Each month the operator sweeps exactly the amount on the issuer's statement with `sweep_income`:
 
-- net to `reserve`, take to the treasury (`income_take_bps` is 0, and the program caps it at 0 until the take is decided);
+- the whole amount goes to `reserve`; v1 has no take on issuer income, and a take returns as a carve only when one is decided (spec §12 Q47, see [open questions](../meta/open-questions.md#open-questions));
 - an `IncomeReceipt` with `kind = NORA_STATEMENT` makes each statement count once;
 - post-transfer balance deltas are checked; a frozen inbox or reserve is refused;
 - refused while no shares exist.
@@ -147,18 +146,19 @@ sequenceDiagram
   opt amount above max_claim_per_call
     Admin->>Program: approve_claim(notice_ref_hash, amount)
   end
-  Op->>Program: pay_claim(leg, amount, notice_ref_hash)
-  Note over Program: BRS to the payments account, Payout PENDING
+  Op->>Program: pay_claim(notice_ref_hash, expected_amount)
+  Note over Program: exactly the provision to the payments account, filing PAID
   Platform->>Agency: Pix
   Op->>Program: settle_payout(notice_ref_hash, pix_e2e_hash)
+  Note over Program: filing SETTLED
 ```
 
 - **Destination.** Claim payments go only to MUTAV's payments account. MUTAV pays the agency by Pix, and the agency pays the landlord.
-- **Exact payment.** `pay_claim` pays exactly the filing's provision. To settle for less, the operator first lowers the filing with `amend_claim`, then pays.
-- **Caps.** Up to `max_claim_per_call` (R$10k on devnet) the operator pays alone. Above it, the admin approves the exact amount with `approve_claim`. Every payment, approved or not, counts toward `max_claim_per_period` over a sliding 30-day window (R$20k on devnet). For an unusually large claim, the admin raises the period cap in the same proposal and lowers it again later.
+- **Exact payment.** `pay_claim` pays exactly the filing's provision and refuses unless `expected_amount` equals it. To settle for less, the operator first lowers the filing with `amend_claim`, then pays.
+- **Caps.** Up to `max_claim_per_call` (R$10k on devnet) the operator pays alone. Above it, the admin approves the exact amount with `approve_claim`. Every payment, approved or not, counts toward `max_claim_per_period` over a sliding 31-day window of daily buckets (R$20k on devnet), so no 30-day span exceeds the cap. For an unusually large claim, the admin raises the period cap in the same proposal and lowers it again later.
 - **Never solvency-gated.** Only the filing checks, the cover bound, the caps, liquid BRS or a frozen reserve can stop a payment. Pause does not.
-- **Bank-first.** MUTAV may pay the agency from its own bank account first. The reserve then reimburses the payments account through `pay_claim`. This keeps payments on time while an approval waits on the time lock, or while a frozen reserve blocks the payment.
-- **No SLA in the program.** Payment deadlines live in the MUTAV platform. `settle_payout` only records the Pix settlement hash.
+- **Bank-first.** MUTAV may pay the agency from its own bank account first. The reserve then reimburses the payments account through `pay_claim`. This keeps payments on time while an approval waits on the time lock, or while a frozen reserve blocks the payment. Until `approve_claim` ships, every claim above `max_claim_per_call` is paid this way.
+- **No service level in the program.** Payment deadlines live in the MUTAV platform. `settle_payout` only records the Pix settlement hash on the filing.
 
 ## Unsolicited money and backstop
 
@@ -168,14 +168,13 @@ Money can arrive outside a booking path: BRS sent straight into a tracked accoun
 |---|---|---|---|
 | Sweep aside | `skim(account)` on `reserve`, `pending_deposits` or `claims` | Anyone (run by a monitor) | Moves balance minus tracked total into `unsolicited`. Books nothing. Refuses frozen accounts |
 | Classify | `classify_unsolicited(amount)` | Admin | Moves non-statement money from the income inbox into `unsolicited`, after the operator has swept the statements |
-| Book | `book_unsolicited(amount, ref_hash)` | Admin | Moves BRS from `unsolicited` into `reserve` as an inflow. `IncomeReceipt.kind = UNSOLICITED`. NAV rises; no shares minted |
-| Return | `return_unsolicited(amount, destination, ref_hash)` | Admin | Returns BRS from `unsolicited` to the source of the original transfer, after screening. The transaction signature is committed in `ref_hash` |
-| Foreign | `return_foreign(mint, amount, destination)` | Admin | Returns classic SPL tokens of other mints, and SOL above rent-exempt |
-| Surplus shares | Return or burn (instruction pinned at implementation) | Admin | Handles shares sent into `pending_redemptions` outside a request |
+| Book | `book_unsolicited(amount, ref_hash, kind)` | Admin | Moves BRS from `unsolicited` into `reserve` as an inflow. `kind` is `UNSOLICITED` or `BACKSTOP`, written on an `IncomeReceipt`. NAV rises; no shares minted. Refused while no shares exist |
+| Return | `return_unsolicited(source, amount, destination, ref_hash)` | Admin | `Source` is `Unsolicited` (BRS from the PDA), `PendingRedemptionsSurplus` (shares above escrowed requests), `Foreign` (classic SPL Token mints other than BRS, the share mint or an adapter mint) or `Lamports` (SOL above rent-exempt). Only to the source of the original transfer, after screening; `ref_hash` commits to its transaction signature |
+| Burn surplus shares | Burn of surplus escrowed shares | Admin | Instead of returning them, burns shares in `pending_redemptions` above escrowed requests. NAV per share rises for every holder |
 
-Runbook: screen the source. If the sender is identified and asks within 30 days, return it. Otherwise book it. Dust below R$10 is booked directly. The app never lists foreign tokens.
+None of these instructions is pause-gated. Runbook: screen the source. If the sender is identified and asks within 30 days, return it. Otherwise book it. Dust below R$10 is booked directly; the threshold lives in the runbook and the app, not on-chain. The app never lists foreign tokens.
 
-**Backstop.** When the reserve is underwater (net assets 0 with shares outstanding), deposit fills stop. MUTAV recapitalises by sending its own BRS, which the admin books with `kind = BACKSTOP`. No shares are minted, so the money raises NAV for every holder. The exact booking instruction is pinned at implementation.
+**Backstop.** When the reserve is underwater (net assets 0 with shares outstanding), deposit fills stop. MUTAV recapitalises by sending its own BRS, which the admin books with `book_unsolicited(kind = BACKSTOP)`. No shares are minted, so the money raises NAV for every holder.
 
 ## What moves the numbers
 
@@ -188,7 +187,7 @@ Runbook: screen the source. If the sender is identified and asks within 30 days,
 | Booked unsolicited or backstop | Rises | | Rises | |
 | `file_claim` | | Rise | Falls | |
 | `amend_claim` | | Rise or fall | Moves the other way | |
-| `withdraw_claim` | | Fall | Rises back | |
+| `amend_claim` to 0 (withdraw) | | Fall | Rises back | |
 | `pay_claim` | Falls by the payment | Fall by the same amount | Unchanged | |
 | `skim`, direct transfer | | | Unchanged | |
 
@@ -200,7 +199,6 @@ Every fee, income and booking inflow is also counted in `inflow_nav`, so the NAV
 - [Litepaper, §7 Guarantee lifecycle](../litepaper.md#7-guarantee-lifecycle) and [§9 Capital flows](../litepaper.md#9-capital-flows)
 - Instructions: [`contribute_fees.rs`](../../programs/mutav/src/instructions/operator/contribute_fees.rs), [`sweep_income.rs`](../../programs/mutav/src/instructions/operator/sweep_income.rs), [`pay_claim.rs`](../../programs/mutav/src/instructions/operator/pay_claim.rs), [`fulfil_deposits.rs`](../../programs/mutav/src/instructions/capital/fulfil_deposits.rs), [`fulfil_redeems.rs`](../../programs/mutav/src/instructions/capital/fulfil_redeems.rs)
 - Solvency math: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs)
-- Decision log of 2026-10-09 and 2026-10-10 (internal notes, to be published as the pending ADRs below)
 
 ## Decisions
 
@@ -213,7 +211,8 @@ Every fee, income and booking inflow is also counted in `inflow_nav`, so the NAV
 - [ADR 0010: Partial fills at the head of the redemption queue](../decisions/0010-partial-fills-at-queue-head.md) (deferred; the devnet release fills whole requests)
 - [ADR 0014: `pay_claim` bound with concurrent filings on one leg](../decisions/0014-pay-claim-bound-with-concurrent-filings.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
-- Pending ADR: Exit rights (open exit, full exit below minimum, refunds)
-- Pending ADR: Unsolicited money and backstop contributions
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)

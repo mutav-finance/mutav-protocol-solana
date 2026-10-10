@@ -23,15 +23,15 @@ What lives where in this repo, and why it lives there. The split follows two rul
 | Module | Responsibility |
 |---|---|
 | [`lib.rs`](../../programs/mutav/src/lib.rs) | Thin dispatch. Each handler lives under `instructions/`, grouped by the role allowed to call it |
-| [`instructions/admin/`](../../programs/mutav/src/instructions/admin/) | `initialize`, configuration, roles and handover, guardians, payments account, allowlist root, pause and unpause, `revoke_operator`, `clear_fulfil_halt` |
+| [`instructions/admin/`](../../programs/mutav/src/instructions/admin/) | `initialize`, configuration, roles and handover, guardians, payments and treasury accounts, allowlist root, pause and unpause, `revoke_operator`, `clear_fulfil_halt`, claim approval and the unsolicited-money instructions |
 | [`instructions/operator/`](../../programs/mutav/src/instructions/operator/) | The guarantee and claim cycle, guarantee fees and issuer income |
 | [`instructions/capital/`](../../programs/mutav/src/instructions/capital/) | Deposit and redemption requests, fills, cancels and claims |
-| [`instructions/public/`](../../programs/mutav/src/instructions/public/) | Permissionless cranks: `refresh`, `advance_queue_heads` |
-| [`instructions/reserve/`](../../programs/mutav/src/instructions/reserve/) | Reserved for `allocate` and `deallocate` through adapters. Empty in the devnet release |
+| [`instructions/public/`](../../programs/mutav/src/instructions/public/) | Permissionless cranks: `refresh`, `advance_queue_head`, `skim` |
+| [`instructions/reserve/`](../../programs/mutav/src/instructions/reserve/) | Reserved for the adapter instructions of the first adapter upgrade (`allocate`, `deallocate` and the emergency actions, [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)). Empty in the devnet release |
 | [`state/`](../../programs/mutav/src/state/) | Account structs, one file per account family, each with a compile-time size assertion |
 | [`solvency.rs`](../../programs/mutav/src/solvency.rs) | Pure functions for stable assets, coverage required, surplus, free capital, liquid budget and net assets |
 | [`math.rs`](../../programs/mutav/src/math.rs) | Fixed-point math in `u128`, checked, rounded in the reserve's favour |
-| [`pricing.rs`](../../programs/mutav/src/pricing.rs) | Price safety. BRS is valued at par. A priced asset fails closed until its pricing is built |
+| [`pricing.rs`](../../programs/mutav/src/pricing.rs) | Price safety. BRS is valued at par. A priced asset fails closed until its per-adapter pricing is built |
 | [`allowlist.rs`](../../programs/mutav/src/allowlist.rs) | Domain-separated Merkle proofs for allowlisted entry |
 | [`token_guard.rs`](../../programs/mutav/src/token_guard.rs) | The mint guard and token-account checks. Every check fails closed |
 | [`constants.rs`](../../programs/mutav/src/constants.rs) | PDA seeds, program constants, pinned account sizes and the `ConfigUpdated` field ids. Append-only |
@@ -40,17 +40,17 @@ What lives where in this repo, and why it lives there. The split follows two rul
 
 ### Instructions by role
 
-The devnet release adds instructions to the existing set. New instructions follow the same role grouping. Names marked *pinned at implementation* may change before the freeze.
+The devnet release adds instructions to the existing set and removes a few that the decisions replaced. New instructions follow the same role grouping.
 
 | Group | Signer | Instructions |
 |---|---|---|
-| Admin and roles | Upgrade authority (`initialize` only), admin multisig | `initialize`, `set_config`, `propose_roles` / `accept_role`, `propose_admin` / `accept_admin`, `set_guardians`, `set_payments_account`, `set_allowlist_root`, `clear_fulfil_halt`, `unpause` |
+| Admin and roles | Upgrade authority (`initialize` only), admin multisig | `initialize`, `set_config` (sparse params), `set_payments_account`, `set_treasury_account`, `set_allowlist_root`, `propose_role` and `cancel_pending` (admin) with `accept_role` (the new key), `propose_admin` (admin) with `accept_admin` (the new admin), the one-step guardian appointment, `clear_fulfil_halt`, `unpause` |
 | Emergency | Pauser, guardians, admin | `pause` (all three), `revoke_operator` (pauser or admin) |
 | Guarantees, fees, income | Operator | `register_guarantee`, `close_guarantee(reason)`, `reinstate_guarantee`, `contribute_fees`, `sweep_income` |
-| Claims | Operator, with admin approval above the per-call cap | `file_claim`, `amend_claim`, `withdraw_claim`, `pay_claim`, `settle_payout` (operator); `approve_claim` (admin) |
-| Capital | Investor, admin | `request_deposit`, `cancel_deposit`, `claim_shares`, `request_redeem`, `cancel_redeem`, `claim_assets` (investor); `fulfil_deposits`, `fulfil_redeems`, `refund_deposit` (admin) |
-| Unsolicited money | Anyone, admin | `skim` (anyone); `classify_unsolicited`, `book_unsolicited` and the backstop booking, `return_unsolicited`, `return_foreign`, return or burn of surplus escrowed shares (admin) |
-| Public | Anyone | `refresh`, `advance_queue_heads` |
+| Claims | Operator, with admin approval above the per-call cap | `file_claim`, `amend_claim` (an amount of 0 withdraws), `refile_claim`, `pay_claim`, `settle_payout` (operator); `approve_claim` (admin) |
+| Capital | Investor, admin | `request_deposit`, `cancel_deposit`, `claim_shares`, `request_redeem`, `cancel_redeem`, `claim_assets` (investor); `fulfil_deposits`, `fulfil_redeems`, and `cancel_deposit` on the owner's behalf (admin) |
+| Unsolicited money | Anyone, admin | `skim` (anyone); `classify_unsolicited`, `book_unsolicited(kind)` for `UNSOLICITED` or `BACKSTOP`, `return_unsolicited(source, ...)` for BRS, surplus escrowed shares, foreign classic SPL tokens or lamports, and the burn of surplus escrowed shares (admin) |
+| Public | Anyone | `refresh`, `advance_queue_head(queue, max)` |
 
 See [Roles and trust](roles-and-trust.md) for the full matrix and the pause scope.
 
@@ -59,7 +59,7 @@ See [Roles and trust](roles-and-trust.md) for the full matrix and the pause scop
 - **One program, one reserve per mint.** `VaultConfig` is seeded by the reserve mint, so each currency gets its own reserve, coverage and NAV.
 - **Pure math, separate from accounts.** `solvency.rs` and `math.rs` take plain numbers. The client mirrors them exactly in bigint, and shared test vectors keep the two in step.
 - **Handlers grouped by signer.** A reviewer reads one folder to see everything one role can do.
-- **No adapters in the devnet release.** The reserve holds BRS only. Adapters arrive by program upgrade, each with a capped sub-authority; the vault authority PDA is never passed into an adapter CPI.
+- **No adapters in the devnet release.** The reserve holds BRS only, and `adapter_count` and the adapter bitmap are 0. Adapters arrive by program upgrade, each described by its own `AdapterState` account. The adapter moves tokens; MUTAV values the position itself from a bounded price and checks every balance after the CPI ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md), proposed).
 
 ## The TypeScript client
 
@@ -69,11 +69,11 @@ See [Roles and trust](roles-and-trust.md) for the full matrix and the pause scop
 |---|---|
 | `generated/` | Codama output from the Anchor IDL: one builder per instruction, account decoders, event and error types, the program address, IDL-described PDAs |
 | `pdas` | `findReserveAddresses(reserveMint)`, request PDAs by sequence, the income inbox address |
-| `reads` | `fetchReserve` (config and state in one `getMultipleAccounts` snapshot), guarantee, filing, payout and receipt scans, queue positions, inbox balance |
-| `math` | Bigint mirror of the program: share conversion, NAV, coverage required, free capital, liquid budget, net assets, take split, the published-NAV and NAV-guard mirrors |
+| `reads` | `fetchReserve` (config and state in one `getMultipleAccounts` snapshot), guarantee, claim filing and receipt scans, queue positions, inbox and `unsolicited` balances |
+| `math` | Bigint mirror of the program: share conversion, NAV, coverage required (with the stress buffer), free capital, liquid budget, net assets, guarantee-fee take split, the published-NAV and NAV-guard mirrors |
 | `preview` | Deposit and redemption fill previews that apply the program's checks in program order, and a refresh preview that honours a frozen reserve |
 | `allowlist` | Merkle leaves and nodes, `buildAllowlist`, `verifyAllowlistProof` |
-| `config` | `minSettlementBps` (reads the stored complement) and `capsInputFromConfig`, so a `set_config` carries every field from chain |
+| `config` | Helpers that read the on-chain config and compose sparse `set_config` params for only the fields a proposal changes |
 
 CI regenerates the client and fails on any diff, runs the math parity tests against vectors exported from the program, and scans the source for signing APIs.
 
@@ -91,7 +91,7 @@ A typical integration reads with `fetchReserve`, previews with the math mirror, 
 | `/reserve` | Everyone, no wallet | Health, coverage, claims timeline, money flows, the capital queue, tracked against actual balances per account, an operator-activity feed, every account on the explorer |
 | `/operator` | Operator | One form per operator instruction with its on-chain bound and the gate preview. On devnet MUTAV's team signs by hand with the operator wallet |
 | `/investor` | Investors | Allowlist status, position, queue entries, new requests, "redeem all" |
-| `/admin` | Admin multisig members | Squads proposal builders: create, approve, execute after the time lock, reject and cancel. Includes the `approve_claim` flow and the unsolicited-money to-do list |
+| `/admin` | Admin multisig members | Squads proposal builders: create, approve, execute after the time lock, reject and cancel. Includes the `approve_claim` flow (bundling a period-cap raise when needed), `nav_bounds` for fills, role handovers with their expiry, and the unsolicited-money to-do list |
 | `/demo` | Judges, team | A guided walkthrough with the solvency-gate preview |
 | `/simulator` | Everyone | Static reserve simulator (`public/simulator.html`) |
 
@@ -146,7 +146,7 @@ The platform holds everything the program should not:
 
 - the contract registry and the audit trail, kept where the operator key cannot write;
 - agency onboarding, the monthly guarantee-fee billing and its reconciliation;
-- claim review, information requests, approval and execution, with the payment SLA (contractual deadline plus a 48-hour target);
+- claim review, information requests, approval and execution, with the payment service level (contractual term plus a 48-hour target), which the program does not hold;
 - the indexer, which decodes accounts and events by discriminator and skips unknown events;
 - later, the operator key behind KMS-backed Convex actions, sending the same instructions the `/operator` console sends by hand today.
 
@@ -161,7 +161,6 @@ After an operator compromise, the platform's registry is what the new operator r
 - Program modules under [`programs/mutav/src/`](../../programs/mutav/src/)
 - Client: [`clients/js/README.md`](../../clients/js/README.md)
 - CI: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), [`release.yml`](../../.github/workflows/release.yml), [`fork.yml`](../../.github/workflows/fork.yml)
-- Decision log of 2026-10-09 and 2026-10-10 (internal notes, to be published as the pending ADRs below)
 - [Codama](https://github.com/codama-idl/codama), [`@solana/kit`](https://github.com/anza-xyz/kit), [LiteSVM](https://github.com/LiteSVM/litesvm), [Surfpool](https://github.com/txtx/surfpool)
 
 ## Decisions
@@ -170,7 +169,9 @@ After an operator compromise, the platform's registry is what the new operator r
 - [ADR 0011: Phase-2 instant exit, earmark-aware solvency and upgrade readiness](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: Exit rights
-- Pending ADR: Unsolicited money and backstop contributions
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; decided points noted in the ADR)

@@ -35,7 +35,7 @@ Copy [`scripts/devnet/devnet.example.json`](../../scripts/devnet/devnet.example.
 | `squads` | Admin multisig: address, vault index, exact members, threshold 2, time-lock floor 300 s |
 | `upgradeSquads` | Upgrade multisig: same members, threshold 2, time-lock floor 3,600 s |
 | Roles and accounts | `admin` and `upgradeAuthority` (the two vaults), `operator`, `pauser`, guardians, `mutavCapitalWallet`, `treasuryAccount`, `paymentsAccount` |
-| Parameters | `coverageRatioBps` 1,000, `feeTakeBps` 2,000, `caps` (including the stress buffer; the dust threshold too if it is enforced on-chain), `price` (placeholders; `maxNavMoveBps` 10,000) |
+| Parameters | `coverageRatioBps` 1,000, `feeTakeBps` 2,000, `caps` (including `maxNavMoveBps` 10,000, the stress buffer R$19k, `max_reinstate_age` 30 days and `max_queue_wait_secs` 0). There is no price section and no dust threshold: the R$10 dust threshold is a runbook value. |
 | `allowlist` | The capital wallet and any devnet capital-provider wallets |
 
 Values without `<FILL>` are the locked devnet values. `verify.ts` checks them on-chain. See [Configuration and reference](configuration-and-reference.md#devnet-parameters).
@@ -68,7 +68,7 @@ sequenceDiagram
 | 1. Deploy | `bun scripts/devnet/deploy.ts --config <cfg> --url <rpc> --confirm-cluster devnet --payer <path> --upgrade-authority <upgrade vault>` | Runs the guards below, then `solana program deploy` with the deployer as temporary upgrade authority, then `set-upgrade-authority` to the upgrade vault. If the handover fails, it prints the exact retry command and exits non-zero. It re-reads ProgramData to confirm. Build with `solana-verify build` first so the hash is reproducible. |
 | 2. Initialize | `bun scripts/devnet/init.ts --config <cfg> --url <rpc> --confirm-cluster devnet --out init.json` | Writes `initialize` as an unsigned proposal for the upgrade multisig, whose vault signs and pays rent. Send the vault about 0.1 SOL first. Reads the chain first: the reserve mint must be owned by the configured token program and have 6 decimals. |
 | 3. Allowlist | `bun scripts/devnet/allowlist.ts --config <cfg> --proofs proofs.json --out allowlist.json` | Builds the Merkle tree, writes every owner's proof for the app to serve, and the `set_allowlist_root` proposal. |
-| 4. Roles and caps | `roles.ts`, `caps.ts` | Optional. Role changes are two-step: the admin proposes, the new key accepts before the handover expires. `set_config` proposals carry every other field from chain. |
+| 4. Roles and caps | `roles.ts`, `caps.ts` | Optional. Role changes are two-step: the admin proposes, the new key accepts before the handover expires. `set_config` proposals are sparse: they carry only the fields they change, and the proposal memo lists them. |
 | 5. Verify | `bun scripts/devnet/verify.ts --config <cfg> --url <rpc> --confirm-cluster devnet` | Read-only post-deploy checks, below. |
 
 Members create, approve and execute each proposal from the admin console or the Squads app. The time lock counts from approval.
@@ -87,9 +87,9 @@ Members create, approve and execute each proposal from the admin console or the 
 ### Post-deploy checks (`verify.ts`)
 
 - Upgrade authority equals the configured upgrade vault.
-- `feature_flags == 0` and `buffer_earmark == 0`.
-- Admin, operator, pauser, guardians and the allowlist root are as configured.
-- Every other `VaultConfig` field equals the config file: `c`, fee take, every cap including the settlement floor and stress buffer, price bounds, income take 0, decimals 6, mint, token program, money accounts, capital wallet.
+- `feature_flags == 0`.
+- Admin, operator, pauser, guardians and the allowlist root are as configured, and no handover is pending.
+- Every other `VaultConfig` field equals the config file: `c`, fee take, every cap, `max_nav_move_bps`, the stress buffer, `max_reinstate_age` and `max_queue_wait_secs`, decimals 6, mint, token program, money accounts, capital wallet.
 - On devnet, the locked devnet values.
 - Treasury and payments accounts hold the reserve mint and are not owned by the operator.
 - Both multisigs: Squads v4 owner, no config authority, exact members and threshold, time lock at or above the floor.
@@ -133,8 +133,8 @@ The exit fallback (any signer may fill the head redemption after `max_queue_wait
 
 | Crank | Who runs it | When |
 |---|---|---|
-| `refresh` | Anyone; the MUTAV app in practice | Regularly, so the published NAV, mode and coverage stay current. Cadence TBD. Fills evaluate the NAV guard inline, so they do not depend on a fresh `refresh`. |
-| `advance_queue_heads` | Anyone; the MUTAV app in practice | Before every admin fill, so the batch starts at a live head. Moves no money. |
+| `refresh` | Anyone; the MUTAV app in practice | Regularly, so the published NAV, mode and coverage stay current. The cadence is not yet set ([open questions](../meta/open-questions.md#possible-improvements)). Fills evaluate the NAV guard inline, so they do not depend on a fresh `refresh`. |
+| `advance_queue_head(queue, max)` | Anyone; the MUTAV app in practice | Before every admin fill, once per queue, so the batch starts at a live head. Moves no money. |
 | `skim` | Anyone; a monitor | Whenever a tracked account holds more than its tracked total. Moves the surplus into `unsolicited`. |
 
 ### Monitoring and alerts
@@ -146,8 +146,9 @@ The exit fallback (any signer may fill the head redemption after `max_queue_wait
 | Frozen reserve account | `ReserveFrozenDetected { token_account }` | Contact the issuer. A frozen reserve blocks `pay_claim`, so MUTAV pays agencies by Pix from its own bank and the reserve reimburses the payments account later. |
 | Untracked balance | Token balance above the tracked total, or a non-zero inbox outside a statement | `skim`, then the unsolicited-money runbook. |
 | Payments account owner change | Watcher on the payments token account | Investigate before the next `pay_claim`. |
-| Operator activity | Feed of registrations, closes, filings, amendments, withdrawals and payments in the last 24 h | Early detection of unexpected operator actions. |
+| Operator activity | Feed of registrations, closes, reinstatements, filings, amendments (withdrawals included) and payments in the last 24 h | Early detection of unexpected operator actions. |
 | Pending proposals | Scan of every live Squads proposal of both multisigs | Reject or cancel stale or unexpected proposals. A `set_config` proposal must not carry stale values over a newer one. |
+| Pending handovers | `pending_operator`, `pending_pauser` and `pending_admin` with their expiry | Expect only handovers the admin proposed; cancel any other with `cancel_pending`. |
 
 ## Runbooks
 
@@ -155,29 +156,29 @@ The exit fallback (any signer may fill the head redemption after `max_queue_wait
 
 ```mermaid
 flowchart LR
-  F[Freeze<br/>pauser: revoke_operator,<br/>pause if needed] --> A[Appoint<br/>admin: propose_roles<br/>new key: accept_role]
+  F[Freeze<br/>pauser: revoke_operator,<br/>pause if needed] --> A[Appoint<br/>admin: propose_role<br/>new key: accept_role]
   A --> R[Reconcile<br/>platform records vs<br/>on-chain events]
-  R --> C[Correct<br/>close_guarantee VOID,<br/>reinstate_guarantee,<br/>withdraw_claim]
+  R --> C[Correct<br/>close_guarantee VOID,<br/>reinstate_guarantee,<br/>amend_claim 0]
   C --> L[Resume<br/>admin signs fills again]
 ```
 
-1. **Freeze.** The pauser runs `revoke_operator` at once, and `pause` if needed. Operator instructions fail from the next slot. Pending role keys are cleared.
-2. **Appoint.** The admin proposes a new operator with `propose_roles`; the new key accepts with `accept_role`. If the pauser key is also suspect, replace it in the same proposal.
+1. **Freeze.** The pauser runs `revoke_operator` at once, and `pause` if needed. Operator instructions fail from the next slot. The pending operator and pauser keys are cleared.
+2. **Appoint.** The admin proposes a new operator with `propose_role(OPERATOR, key)`; the new key accepts with `accept_role(OPERATOR)` within 72 hours. If the pauser key is also suspect, propose a new pauser in the same Squads proposal.
 3. **Reconcile.** The new operator compares the platform's contract registry with on-chain events since the compromise.
-4. **Correct with ordinary operator actions.** Unknown registrations: `close_guarantee(VOID)`. Wrongful closes: `reinstate_guarantee`, within `max_reinstate_age`. Unknown filings: `withdraw_claim`. There is no admin rollback instruction.
+4. **Correct with ordinary operator actions.** Unknown registrations: `close_guarantee(VOID)`. Wrongful closes: `reinstate_guarantee`, within `max_reinstate_age`. Unknown filings: `amend_claim(0)`, which sets them to `WITHDRAWN`. Wrong amounts: `amend_claim`. There is no admin rollback instruction.
 5. **Accept the bounded loss.** Claim payments are irreversible. They are bounded by the admin's claim caps and land in MUTAV's own payments account.
 6. The admin signs no redemption fill until reconciliation is done.
 
 ### Pauser compromise
 
-A pauser key can revoke the operator, which stops claim payments until the admin's time lock lets a new `propose_roles` through. Replace the pauser in that same proposal. Bank-first payment by Pix covers agencies in the meantime.
+A pauser key can revoke the operator, which stops claim payments until the admin's time lock lets a new `propose_role` through and the new operator accepts. Replace the pauser in that same Squads proposal. Bank-first payment by Pix covers agencies in the meantime.
 
 ### Claims above the per-call cap
 
-1. The operator files the claim. NAV reflects it at once.
-2. MUTAV may pay the agency by Pix from its own bank first.
-3. The admin proposal runs `approve_claim(notice, amount)` with the exact amount, plus a `set_config` raise of `max_claim_per_period` if the payment would not fit in the sliding window.
-4. After the time lock, the operator runs `pay_claim` for exactly the provision. A later `set_config` lowers the window cap back.
+1. The operator files the claim for the full amount; `file_claim` has no per-call limit. NAV reflects it at once.
+2. MUTAV may pay the agency by Pix from its own bank first. Until `approve_claim` ships, this bank-first payment is the path for every claim above the per-call cap.
+3. The admin proposal runs `approve_claim(notice, amount)` with the exact amount, plus a `set_config` raise of `max_claim_per_period` if the payment would not fit in the 31-day window.
+4. After the time lock, the operator runs `pay_claim(notice, expected_amount)` for exactly the provision, which reimburses the payments account. A later `set_config` lowers the window cap back.
 
 To settle for less than filed, the operator amends the claim down first. An amendment resets the approval.
 
@@ -185,13 +186,14 @@ To settle for less than filed, the operator amends the claim down first. An amen
 
 1. Run `skim` on tracked accounts; the admin runs `classify_unsolicited` for inbox money that is on no issuer statement.
 2. Screen the source.
-3. If the sender is identified and asks within 30 days, the admin returns the money to the original source with `return_unsolicited`.
-4. Otherwise the admin books it with `book_unsolicited` (kind `UNSOLICITED`). Amounts below the dust threshold (R$10 on devnet) are booked directly.
-5. Foreign classic SPL tokens and excess SOL go back with `return_foreign`. They are never listed in the app.
+3. If the sender is identified and asks within 30 days, the admin returns the money to the original source with `return_unsolicited` (source `Unsolicited`).
+4. Otherwise the admin books it with `book_unsolicited` (kind `UNSOLICITED`). Amounts below R$10 are booked directly; the threshold is a runbook and app value, not an on-chain field.
+5. Foreign classic SPL tokens go back with `return_unsolicited` (source `Foreign`), SOL above the rent-exempt minimum with source `Lamports`. Foreign tokens are never listed in the app.
+6. Surplus shares in `pending_redemptions` go back with source `PendingRedemptionsSurplus`, or the admin burns them.
 
 ### Underwater reserve
 
-When net assets reach 0 with shares outstanding, deposit fills are refused. MUTAV sends its own backstop BRS and the admin books it into the reserve with `book_unsolicited`, kind `BACKSTOP`. How the backstop transfer reaches the `unsolicited` account before booking is pinned at implementation. No shares are minted, so the money raises NAV for every holder.
+When net assets reach 0 with shares outstanding, deposit fills are refused. MUTAV sends its own backstop BRS and the admin books it into the reserve with `book_unsolicited`, kind `BACKSTOP`. How the backstop transfer reaches the `unsolicited` account before booking is an [open question](../meta/open-questions.md#open-questions). No shares are minted, so the money raises NAV for every holder.
 
 ### Stuck queue head
 
@@ -199,11 +201,15 @@ v1 fills whole requests only. A redemption head larger than the available budget
 
 ### Capital provider removed from the allowlist
 
-Exit stays open: a wallet that holds shares can still `request_redeem`. A pending deposit from that wallet is returned with the admin's `refund_deposit(seq)`.
+Exit stays open: a wallet that holds shares can still `request_redeem`. A pending deposit from that wallet is returned to the owner's own token account with `cancel_deposit`, signed by the owner or the admin.
 
 ### Claim notices are not built yet
 
-The gate that holds capital fills while a missed-rent notice is open exists but is inert. Until claim notices are built, the operator files the claim before any capital fill.
+The gate that holds capital fills while a missed-rent notice is open is not in v1; it is built with the exit fallback, before outside capital ([ADR 0025](../decisions/0025-exit-fallback-cooldown-exit.md)). Until then, the operator files the claim before any capital fill.
+
+### Adapter emergency
+
+Not in the pilot binary. With the first adapter upgrade, guardians, the pauser and the admin can disable an adapter, raise its haircut and sell an impaired position back into `reserve` at once; undoing any of it goes through the admin time lock. See [Incident response](../security/incident-response.md#adapter-emergency) and [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md).
 
 ## Sources
 
@@ -224,10 +230,12 @@ The gate that holds capital fills while a missed-rent notice is open exists but 
 - [ADR 0011: Phase-2 instant exit and upgrade readiness](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)
 - [ADR 0015: Admin clears the fulfil halt](../decisions/0015-admin-clear-fulfil-halt.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR 0019: v1 layout for the devnet release
-- Pending ADR: Operator/admin separation and operator-compromise recovery (roles, recovery model, pause scope, two multisigs and time locks)
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
-- Pending ADR: Exit rights (open exit, full exit below minimum, refunds)
-- Pending ADR: Unsolicited money and backstop contributions
-- Pending ADR: Exit fallback
+- ADR 0019: v1 layout for the devnet release
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; who moves assets and the emergency path are decided)

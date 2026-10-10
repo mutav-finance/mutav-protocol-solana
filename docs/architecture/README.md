@@ -13,12 +13,12 @@ MUTAV is an institutional fiador for Brazilian rental leases. One Solana program
 | [Roles and trust](roles-and-trust.md) | Operator, reserve admin, pauser, guardians, investors and anyone. Who can move money, and the bound on a compromised operator |
 | [Accounts](accounts.md) | Every PDA with its seeds, purpose, size and padding, and the fields carved for this release |
 | [Money flows](money-flows.md) | Every path by which money enters and leaves the reserve |
-| [State machines](state-machines.md) | Guarantee, claim filing, payout, and deposit and redemption requests |
+| [State machines](state-machines.md) | Guarantee, claim filing (with its payment and settlement), and deposit and redemption requests |
 | [Upgrades and layout](upgrades-and-layout.md) | The two multisigs and their time locks, the layout freeze, carves, IDL compatibility and the release workflow |
 
 ## The system at a glance
 
-Agencies, tenants and landlords never sign on-chain. They work in the MUTAV platform. MUTAV acts on-chain through the **operator** key, which runs the guarantee and claim cycle. A separate **reserve admin**, a Squads v4 multisig, sets the ceilings the operator works within and fills the capital queues. A **pauser** and up to three **guardians** can stop capital flows at once. Investors hold reserve shares from their own wallets. Anyone can run the cranks that recompute the reserve's health.
+Agencies, tenants and landlords never sign on-chain. They work in the MUTAV platform. MUTAV acts on-chain through the **operator** key, which runs the guarantee and claim cycle. A separate **reserve admin**, a Squads v4 multisig, sets the ceilings the operator works within and fills the capital queues. A **pauser** and up to three **guardians** can pause capital flows and new guarantees at once. Investors hold reserve shares from their own wallets. Anyone can run the cranks that recompute the reserve's health.
 
 ```mermaid
 flowchart LR
@@ -70,7 +70,7 @@ flowchart LR
 | `mutav` program | [`programs/mutav/`](../../programs/mutav/) (Anchor) | Custody of the reserve, the share mint, on-chain NAV, the guarantee registry, the solvency gate, the deposit and redemption queues, roles, claim payments | Signs only through its own PDAs |
 | TypeScript client | [`clients/js/`](../../clients/js/), published as `@mutav-finance/mutav-protocol-solana` | Codama instruction builders and account decoders generated from the IDL, plus PDAs, reads, an exact math mirror and previews | No. It composes; wallets and multisigs sign |
 | Pilot web app | [`app/`](../../app/), live at [reserve.mutav.finance](https://reserve.mutav.finance) | Transparency page, operator console, investor view, admin proposal builder, guided demo, simulator | No. Connected wallets sign |
-| MUTAV platform | [`mutav-finance/mutav-app`](https://github.com/mutav-finance/mutav-app), a separate repo | Contracts, agencies, claim review and the payment SLA, agency billing, the indexer. Later it sends operator instructions with a KMS-backed key | The operator key, once the operator moves off the hand-signed console |
+| MUTAV platform | [`mutav-finance/mutav-app`](https://github.com/mutav-finance/mutav-app), a separate repo | Contracts, agencies, claim review and the payment service level, agency billing, the indexer. Later it sends operator instructions with a KMS-backed key | The operator key, once the operator moves off the hand-signed console |
 | Admin multisig | Squads v4 | Holds `VaultConfig.admin`. Every admin action waits for its time lock | Members' own wallets |
 | Upgrade multisig | Squads v4 | Holds the program upgrade authority and signs `initialize` | Members' own wallets |
 | BRS issuer | Nora | Issues BRS, the BRL token the reserve holds. Holds the BRS freeze authority. Pays a monthly revenue share into the reserve's income inbox | Outside MUTAV |
@@ -79,7 +79,7 @@ flowchart LR
 
 Only amounts, timestamps and commitments (hashes) cross from the platform to the chain. No names, documents or addresses of tenants, landlords or agencies go on-chain. A lease is referenced by `id`, `agency_id` and `refs_hash`. A claim is referenced by `notice_ref_hash`. A Pix settlement is referenced by `pix_e2e_hash`.
 
-The program prices nothing, underwrites nothing and decides no claim. Those duties stay in the MUTAV platform. The program enforces the ceilings: the cover of each guarantee, the claim caps, the coverage the reserve must hold, and the destinations money may go to.
+The program prices nothing, assesses no tenant and decides no claim. Those duties stay in the MUTAV platform. The program enforces the ceilings: the cover of each guarantee, the claim caps, the coverage the reserve must hold, and the destinations money may go to.
 
 ## Repo boundaries and dependency direction
 
@@ -134,7 +134,6 @@ On a real-money pilot, hardware-wallet keys replace the devnet stand-ins, and th
 - [Pilot app spec](../../app/docs/spec.md)
 - Program entry point: [`programs/mutav/src/lib.rs`](../../programs/mutav/src/lib.rs)
 - Client package: [`clients/js/package.json`](../../clients/js/package.json)
-- Decision log of 2026-10-09 and 2026-10-10 (internal notes, to be published as the pending ADRs below)
 - [Squads v4 documentation](https://docs.squads.so/)
 - [Anchor](https://www.anchor-lang.com/) and [Codama](https://github.com/codama-idl/codama)
 
@@ -145,5 +144,7 @@ On a real-money pilot, hardware-wallet keys replace the devnet stand-ins, and th
 - [ADR 0004: NAV computed on-chain with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
 - [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: 0019 v1 layout for the devnet release
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; who moves assets, the emergency path and the floor on `fulfil_redeems` are decided)
+- ADR 0019: v1 layout for the devnet release

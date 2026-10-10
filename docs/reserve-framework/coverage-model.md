@@ -16,8 +16,8 @@ coverage_required = max( ceil(c × remaining_cover_total / 10_000),
 | Term | Meaning | Set by |
 |---|---|---|
 | `remaining_cover_total` | Cover not yet paid across every guarantee that is not closed | Operator actions (register, close, reinstate, pay) |
-| `c` (`coverage_ratio_bps`) | Share of remaining cover the reserve must hold. Program floor 0.10 (`MIN_COVERAGE_RATIO_BPS = 1_000`) | Reserve admin, through `set_config` |
-| `provisions` | Sum of open claim provisions | Operator actions (file, amend, withdraw, pay) |
+| `c` (`coverage_ratio_bps`) | Share of remaining cover the reserve must hold. Program floor 0.10 (`MIN_COVERAGE_RATIO_BPS = 1_000`), upper cap 1.0 (10,000 bps) | Reserve admin, through `set_config` |
+| `provisions` | Sum of open claim provisions | Operator actions (file, amend, including amend to 0, re-file, pay) |
 | `stress_buffer` | A R$ amount for the claims that could be filed next | Reserve admin, through `set_config` |
 | `unprovisioned_cover` | Cover not yet paid and not already provisioned | Derived |
 
@@ -48,17 +48,19 @@ The reserve admin sizes `stress_buffer` from the live book and resizes it with `
 
 - **Rule used for devnet:** the three largest monthly rents in the book plus one exit payment.
 - **Devnet value:** R$19,000.
-- **Bounds:** `set_config` refuses an out-of-range value. The upper bound is pinned at implementation.
-- **On the claim path** the stress-buffer term saturates, so the cached `coverage_required` write can never make a claim payment fail.
+- **Bounds:** `set_config` validates the whole resulting config and refuses an out-of-range value. The exact upper bound is set in the program's `validate_params`.
+- **On the claim path** the stress-buffer term and the cached `coverage_required` write saturate, so they can never make a claim payment fail.
+
+The formula applies wherever `coverage_required` is used: the `register_guarantee` gate, `refresh`, `fulfil_redeems`, and the recompute after `file_claim`, `amend_claim`, `refile_claim`, `pay_claim`, `close_guarantee` and `reinstate_guarantee`.
 
 The buffer gates new guarantees and redemptions. It never gates a claim payment.
 
 ## Solvency quantities
 
 ```text
-stable_assets  = brs_balance (+ adapter value, 0 in this release)   // tracked balances; 0 for a frozen reserve
+stable_assets  = brs_balance (+ adapter value, 0 in this release)   // computed at every gate; 0 for a frozen reserve
 surplus        = max(0, stable_assets − coverage_required)
-free_capital   = surplus                                            // phase-2 earmark is 0 in this release
+free_capital   = surplus                                            // no phase-2 earmark in v1
 liquid_budget  = max(0, brs_balance − provisions)
 net_assets     = max(0, stable_assets − provisions)
 ```
@@ -71,11 +73,11 @@ net_assets     = max(0, stable_assets − provisions)
 
 | Instruction | Gate |
 |---|---|
-| `register_guarantee` | Mode normal, reserve not frozen, and `coverage_required` after the new cover ≤ `stable_assets` (fits in the free capital computed before it) |
-| `fulfil_redeems` | Mode normal, and each fill within `min(free_capital, liquid_budget)` |
+| `register_guarantee` | Mode normal, reserve not frozen (the instruction loads `reserve`; a frozen one counts as 0 and refuses with `ReserveFrozen`), and `coverage_required` after the new cover ≤ `stable_assets` |
+| `fulfil_redeems` | Mode normal, and each fill within `min(free_capital, liquid_budget)`. With adapters (ADR 0027, decided point), also never below the BRS liquidity floor while any adapter holds value |
 | `fulfil_deposits` | Not solvency-gated. Allowed in under-coverage, because new capital is the recapitalisation path. Refused when the reserve is underwater (below) |
-| `file_claim`, `amend_claim`, `withdraw_claim`, `approve_claim`, `pay_claim`, `settle_payout` | Never gated |
-| `contribute_fees`, `sweep_income`, `close_guarantee`, `reinstate_guarantee`, owner cancels and claims, `refresh`, `advance_queue_heads`, `skim` | Never gated |
+| `file_claim`, `amend_claim`, `refile_claim`, `approve_claim`, `pay_claim`, `settle_payout` | Never gated |
+| `contribute_fees`, `sweep_income`, `close_guarantee`, `reinstate_guarantee`, owner cancels and claims, `refresh`, `advance_queue_head`, `skim` | Never gated |
 
 ## Reserve modes
 
@@ -115,7 +117,7 @@ The reserve is underwater when `net_assets` is 0 while shares are outstanding: o
 
 - `fulfil_deposits` refuses with `ReserveUnderwater`. New money never pays for old losses.
 - Claims keep being paid while liquid BRS is there. A filed claim already sits inside the provisions.
-- **Recovery is MUTAV's backstop.** MUTAV sends its own BRS, and the reserve admin books it into the reserve with receipt kind `BACKSTOP`. No shares are minted, so the booking raises NAV for every holder. See [Unsolicited money](unsolicited-money.md#backstop-contributions).
+- **Recovery is MUTAV's backstop.** MUTAV sends its own BRS, and the reserve admin books it into the reserve with `book_unsolicited`, receipt kind `BACKSTOP`. No shares are minted, so the booking raises NAV for every holder. See [Unsolicited money](unsolicited-money.md#backstop-contributions).
 
 ### Frozen reserve
 
@@ -123,11 +125,11 @@ The issuer of BRS can freeze any BRS account. A frozen `reserve` counts as 0 BRS
 
 ## Inflows and the share value
 
-Inflows that raise NAV without minting shares are guarantee fees (`contribute_fees`), issuer income (`sweep_income`) and admin bookings of unsolicited or backstop money. Two rules keep them safe:
+Inflows that raise NAV without minting shares are guarantee fees (`contribute_fees`), issuer income (`sweep_income`) and admin bookings of unsolicited or backstop money (`book_unsolicited`). These rules keep them safe:
 
 - **No inflow while no shares exist.** All of these are refused while `shares_outstanding == 0`, so the first deposit always mints at a meaningful price. Every deposit fill must mint more than 0 shares.
 - **NAV-move guard, net of verified inflows.** Each inflow adds `ceil(net × 10^9 / shares_outstanding)` to `inflow_nav`. The guard compares the published NAV net of `inflow_nav` with its baseline. It runs in `refresh` and inline in both fill instructions, and a trip halts fills until the admin runs `clear_fulfil_halt`. On devnet the bound is 100% (`max_nav_move_bps = 10_000`); see [Parameters](parameters.md).
-- **Price bounds on fills.** `fulfil_deposits` and `fulfil_redeems` take NAV bounds `(min, max)` composed when the admin proposal is built, and refuse with `NavOutOfBounds` if the live NAV is outside them.
+- **Price bounds on fills.** `fulfil_deposits` and `fulfil_redeems` take `nav_bounds (min, max)` composed when the admin proposal is built, and refuse with `NavOutOfBounds` if the live NAV is outside them.
 
 ## Not in this release
 
@@ -137,7 +139,6 @@ Inflows that raise NAV without minting shares are guarantee fees (`contribute_fe
 ## Sources
 
 - [Specification §4 Invariants and formulas](../spec.md#4-invariants-and-formulas), [§6 Under-coverage mode](../spec.md#6-under-coverage-mode), [§7 Price safety](../spec.md#7-price-safety)
-- Devnet release design decisions of 2026-10-10: coverage formula, stress buffer, underwater handling and backstop (MUTAV internal decision log)
 - Solvency math: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), constants in [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs)
 - [Litepaper, reserve sizing and under-coverage](../litepaper.md)
 
@@ -148,9 +149,10 @@ Inflows that raise NAV without minting shares are guarantee fees (`contribute_fe
 - [ADR 0006: Per-lease absolute coverage](../decisions/0006-per-lease-absolute-coverage.md)
 - [ADR 0008: Uniform capital flow and pause scope](../decisions/0008-uniform-capital-flow-and-pause-scope.md) (deposit fills allowed in under-coverage)
 - [ADR 0015: Admin clears the fulfil halt](../decisions/0015-admin-clear-fulfil-halt.md)
-- [ADR 0016: Coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md) (c floor 0.10; formula amended by the pending ADR below)
+- [ADR 0016: Coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md) (c floor 0.10; formula amended by ADR 0022)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md) (NAV-move guard net of inflows)
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
-- Pending ADR: Unsolicited money and backstop contributions
-- Pending ADR: Operator/admin separation and operator-compromise recovery (inflows refused while no shares exist)
-- Pending ADR: Claims: approval, amendment, exact payment, sliding window (NAV bounds on fills)
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md) (frozen reserve in registration and halt clearing)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md) (inflows refused while no shares exist, inline guard, `nav_bounds`)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (proposed; floor on `fulfil_redeems` decided)

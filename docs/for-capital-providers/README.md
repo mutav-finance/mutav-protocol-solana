@@ -40,7 +40,7 @@ MUTAV touches the reserve in separate roles. The program keeps each flow on its 
 | MUTAV's fee take | Same call, separate transfer | MUTAV's treasury account | Never; not part of the reserve |
 | Issuer partnership income | `sweep_income` (operator) | `reserve` | Never |
 | MUTAV as capital provider | `request_deposit` / `request_redeem` from the capital wallet | `pending_deposits`, then `reserve` | Yes, at NAV, like any holder |
-| MUTAV backstop | Admin booking, receipt kind `BACKSTOP` | `reserve` | Never |
+| MUTAV backstop | `book_unsolicited` (admin), receipt kind `BACKSTOP` | `reserve` | Never |
 
 Fees, income and backstop money raise the value of every share pro rata. MUTAV benefits from them only through the shares it bought, like every holder.
 
@@ -49,10 +49,10 @@ Fees, income and backstop money raise the value of every share pro rata. MUTAV b
 | Role | Key | What it does for capital |
 |---|---|---|
 | Capital provider (owner) | Own wallet | Requests deposits and redemptions; cancels; claims shares and BRS. |
-| Reserve admin | Squads v4 multisig, time-locked | Fills the deposit and redemption queues in FIFO order; sets caps; refunds pending deposits; books unsolicited money and backstops; clears a NAV halt. |
-| Operator | Separate key | Books guarantee fees and issuer income; files and pays claims. Cannot fill queues, mint shares or send reserve BRS anywhere but MUTAV's payments account. |
-| Pauser and guardians | Separate keys | Pause. A pause stops new requests and fills, never cancels or claims. |
-| Anyone | Any signer | `refresh` (recomputes NAV), `advance_queue_heads`, `skim`. |
+| Reserve admin | Squads v4 multisig, time-locked | Fills the deposit and redemption queues in FIFO order, inside `nav_bounds` it fixes when proposing; sets caps; can cancel a pending deposit back to its owner; books unsolicited money and backstops; clears a NAV halt. |
+| Operator | Separate key | Books guarantee fees and issuer income; files, amends and pays claims. Cannot fill queues, mint shares or send reserve BRS anywhere but MUTAV's payments account. The most a misused operator key can cost the reserve is the admin-set claim caps. |
+| Pauser and guardians | Separate keys | Pause (the pauser can also revoke the operator). A pause stops new requests, fills and new guarantees, never cancels, claims or claim payments. Up to three guardians, one on devnet. |
+| Anyone | Any signer | `refresh` (recomputes NAV), `advance_queue_head`, `skim`. |
 
 ## Devnet values that matter to capital providers
 
@@ -66,15 +66,16 @@ Amounts are in BRS. All of them are set by the reserve admin through the time-lo
 | Stress buffer | R$19,000 |
 | NAV-move bound (`max_nav_move_bps`) | 100% on devnet; lowered for the real pilot |
 | Fee take (`fee_take_bps`) | 20% |
-| Take from issuer income | 0 |
+| Take from issuer income | None; v1 has no income-take field (spec §12 Q47 stays 0) |
 | Settlement floor | 100% BRS |
+| Exit fallback wait (`max_queue_wait_secs`) | 0 (off) |
 | Admin multisig time lock | 5 minutes on devnet; 24 hours on the real pilot |
 | Upgrade multisig time lock | 1 hour on devnet; 7 days on the real pilot |
 | Program, reserve and role addresses | Set at deploy |
 
 ## Pages in this section
 
-1. [Deposits and redemptions](deposits-and-redemptions.md): the FIFO queues, fills, cancels, claims, refunds and exit rights.
+1. [Deposits and redemptions](deposits-and-redemptions.md): the FIFO queues, fills, cancels, claims and exit rights.
 2. [Share value](share-value.md): how NAV per share is computed, rounded and guarded.
 3. [Risks](risks.md): what can lower the share value and how the design bounds each risk.
 
@@ -95,7 +96,6 @@ Amounts are in BRS. All of them are set by the reserve admin through the time-lo
 - [Pilot app spec](../../app/docs/spec.md) (the `/investor` view and the "not open to public investment" rule)
 - [README](../../README.md)
 - Program: [`programs/mutav/src/state/config.rs`](../../programs/mutav/src/state/config.rs), [`programs/mutav/src/allowlist.rs`](../../programs/mutav/src/allowlist.rs)
-- Pre-devnet decisions log (2026-10-10): devnet values, exit rights, unsolicited money, time locks
 
 ## Decisions
 
@@ -105,8 +105,8 @@ Amounts are in BRS. All of them are set by the reserve admin through the time-lo
 - [ADR 0016: coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- Pending ADR: Operator/admin separation and operator-compromise recovery
-- Pending ADR: Exit rights (open exit, full exit below minimum, refunds)
-- Pending ADR: Unsolicited money and backstop contributions
-- Pending ADR: Coverage: stress buffer and underwater reserve (amends 0016)
-- Pending ADR: Exit fallback
+- [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
+- [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md)
+- [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
+- [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
