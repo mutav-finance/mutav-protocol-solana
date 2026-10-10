@@ -192,7 +192,6 @@ pub struct GuaranteeRegistered {
     pub id: [u8; 32],
     pub agency_id: [u8; 32],
     pub refs_hash: [u8; 32],
-    pub rent: u64,
     pub default_cover: u64,
     pub exit_cover: u64,
 }

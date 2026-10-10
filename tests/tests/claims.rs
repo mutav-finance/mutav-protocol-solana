@@ -779,11 +779,11 @@ fn claim_padding_is_preserved_in_place() {
     x._reserved = [0x3c; 192];
     f.write_claim_filing(&c, &x);
     let mut gg = f.guarantee(&g.id);
-    gg._reserved = [0xc3; 192];
+    gg._reserved = [0xc3; 204];
     f.write_guarantee(&gg);
     f.pay_claim(c).unwrap();
     assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 192]);
-    assert_eq!(f.guarantee(&g.id)._reserved, [0xc3; 192]);
+    assert_eq!(f.guarantee(&g.id)._reserved, [0xc3; 204]);
     let mut p = f.payout(&c);
     p._reserved = [0x77; 192];
     f.write_claim_filing(&c, &p);

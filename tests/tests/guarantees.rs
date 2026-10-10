@@ -49,11 +49,6 @@ fn register_creates_the_guarantee_and_books_the_cover() {
         (g.id, g.agency_id, g.refs_hash),
         (args.id, ag, args.refs_hash)
     );
-    assert_eq!(g.rent, args.rent);
-    assert_eq!(
-        (g.default_multiplier_bps, g.exit_multiplier_bps),
-        (30_000, 60_000)
-    );
     assert_eq!(
         (g.default_cover, g.exit_cover),
         (20_000 * BRL, 10_000 * BRL)
@@ -86,8 +81,8 @@ fn register_creates_the_guarantee_and_books_the_cover() {
         (args.id, ag, args.refs_hash)
     );
     assert_eq!(
-        (e.rent, e.default_cover, e.exit_cover),
-        (args.rent, 20_000 * BRL, 10_000 * BRL)
+        (e.default_cover, e.exit_cover),
+        (20_000 * BRL, 10_000 * BRL)
     );
 }
 
@@ -125,20 +120,16 @@ fn duplicate_id_fails() {
 }
 
 #[test]
-fn zero_cover_or_zero_rent_is_invalid() {
+fn zero_cover_is_invalid() {
     let mut f = Fixture::new();
     f.fund_reserve(10_000 * BRL);
     assert_mutav_err(
         f.register(guarantee_args(agency(), 0, 0)),
         MutavError::InvalidParameter,
     );
-    let mut args = guarantee_args(agency(), 1_000 * BRL, 0);
-    args.rent = 0;
-    assert_mutav_err(f.register(args), MutavError::InvalidParameter);
-    // The smallest valid guarantee: one base unit of cover, one of rent.
-    let mut args = guarantee_args(agency(), 0, 1);
-    args.rent = 1;
-    f.register(args).expect("one base unit");
+    // The smallest valid guarantee: one base unit of cover.
+    f.register(guarantee_args(agency(), 0, 1))
+        .expect("one base unit");
 }
 
 #[test]
@@ -418,15 +409,15 @@ fn guarantee_padding_is_zero_at_init_and_preserved() {
     let ag = agency();
     let args = guarantee_args(ag, 1_000 * BRL, 0);
     f.register(args.clone()).unwrap();
-    assert_eq!(f.guarantee(&args.id)._reserved, [0; 192]);
+    assert_eq!(f.guarantee(&args.id)._reserved, [0; 204]);
 
     let mut g = f.guarantee(&args.id);
-    g._reserved = [0xa5; 192];
+    g._reserved = [0xa5; 204];
     f.write_guarantee(&g);
 
     // A close updates the account in place.
     f.close_guarantee(args.id).unwrap();
-    assert_eq!(f.guarantee(&args.id)._reserved, [0xa5; 192]);
+    assert_eq!(f.guarantee(&args.id)._reserved, [0xa5; 204]);
 }
 
 // ---------------------------------------------------------------------------

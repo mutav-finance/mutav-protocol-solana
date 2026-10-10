@@ -18,11 +18,6 @@ pub struct RegisterGuaranteeArgs {
     pub id: [u8; 32],
     pub agency_id: [u8; 32],
     pub refs_hash: [u8; 32],
-    pub rent: u64,
-    /// Display only.
-    pub default_multiplier_bps: u16,
-    /// Display only.
-    pub exit_multiplier_bps: u16,
     pub default_cover: u64,
     pub exit_cover: u64,
 }
@@ -80,7 +75,7 @@ pub fn handle_register_guarantee(
         .default_cover
         .checked_add(args.exit_cover)
         .ok_or(MutavError::MathOverflow)?;
-    require!(new_cover > 0 && args.rent > 0, MutavError::InvalidParameter);
+    require!(new_cover > 0, MutavError::InvalidParameter);
 
     // Rule 3: the per-guarantee cap. There is no per-agency cap (ADR 0019).
     require!(
@@ -111,9 +106,6 @@ pub fn handle_register_guarantee(
     g.id = args.id;
     g.agency_id = args.agency_id;
     g.refs_hash = args.refs_hash;
-    g.rent = args.rent;
-    g.default_multiplier_bps = args.default_multiplier_bps;
-    g.exit_multiplier_bps = args.exit_multiplier_bps;
     g.default_cover = args.default_cover;
     g.exit_cover = args.exit_cover;
     g.status = GUARANTEE_ACTIVE;
@@ -132,7 +124,6 @@ pub fn handle_register_guarantee(
         id: args.id,
         agency_id: args.agency_id,
         refs_hash: args.refs_hash,
-        rent: args.rent,
         default_cover: args.default_cover,
         exit_cover: args.exit_cover,
     });

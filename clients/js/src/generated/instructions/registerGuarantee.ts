@@ -14,8 +14,6 @@ import {
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU16Decoder,
-  getU16Encoder,
   getU64Decoder,
   getU64Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
@@ -108,11 +106,6 @@ export type RegisterGuaranteeInstructionData = {
   id: ReadonlyUint8Array;
   agencyId: ReadonlyUint8Array;
   refsHash: ReadonlyUint8Array;
-  rent: bigint;
-  /** Display only. */
-  defaultMultiplierBps: number;
-  /** Display only. */
-  exitMultiplierBps: number;
   defaultCover: bigint;
   exitCover: bigint;
 };
@@ -121,11 +114,6 @@ export type RegisterGuaranteeInstructionDataArgs = {
   id: ReadonlyUint8Array;
   agencyId: ReadonlyUint8Array;
   refsHash: ReadonlyUint8Array;
-  rent: number | bigint;
-  /** Display only. */
-  defaultMultiplierBps: number;
-  /** Display only. */
-  exitMultiplierBps: number;
   defaultCover: number | bigint;
   exitCover: number | bigint;
 };
@@ -137,9 +125,6 @@ export function getRegisterGuaranteeInstructionDataEncoder(): FixedSizeEncoder<R
       ["id", fixEncoderSize(getBytesEncoder(), 32)],
       ["agencyId", fixEncoderSize(getBytesEncoder(), 32)],
       ["refsHash", fixEncoderSize(getBytesEncoder(), 32)],
-      ["rent", getU64Encoder()],
-      ["defaultMultiplierBps", getU16Encoder()],
-      ["exitMultiplierBps", getU16Encoder()],
       ["defaultCover", getU64Encoder()],
       ["exitCover", getU64Encoder()],
     ]),
@@ -153,9 +138,6 @@ export function getRegisterGuaranteeInstructionDataDecoder(): FixedSizeDecoder<R
     ["id", fixDecoderSize(getBytesDecoder(), 32)],
     ["agencyId", fixDecoderSize(getBytesDecoder(), 32)],
     ["refsHash", fixDecoderSize(getBytesDecoder(), 32)],
-    ["rent", getU64Decoder()],
-    ["defaultMultiplierBps", getU16Decoder()],
-    ["exitMultiplierBps", getU16Decoder()],
     ["defaultCover", getU64Decoder()],
     ["exitCover", getU64Decoder()],
   ]);
@@ -194,9 +176,6 @@ export type RegisterGuaranteeAsyncInput<
   id: RegisterGuaranteeInstructionDataArgs["id"];
   agencyId: RegisterGuaranteeInstructionDataArgs["agencyId"];
   refsHash: RegisterGuaranteeInstructionDataArgs["refsHash"];
-  rent: RegisterGuaranteeInstructionDataArgs["rent"];
-  defaultMultiplierBps: RegisterGuaranteeInstructionDataArgs["defaultMultiplierBps"];
-  exitMultiplierBps: RegisterGuaranteeInstructionDataArgs["exitMultiplierBps"];
   defaultCover: RegisterGuaranteeInstructionDataArgs["defaultCover"];
   exitCover: RegisterGuaranteeInstructionDataArgs["exitCover"];
 };
@@ -397,9 +376,6 @@ export type RegisterGuaranteeInput<
   id: RegisterGuaranteeInstructionDataArgs["id"];
   agencyId: RegisterGuaranteeInstructionDataArgs["agencyId"];
   refsHash: RegisterGuaranteeInstructionDataArgs["refsHash"];
-  rent: RegisterGuaranteeInstructionDataArgs["rent"];
-  defaultMultiplierBps: RegisterGuaranteeInstructionDataArgs["defaultMultiplierBps"];
-  exitMultiplierBps: RegisterGuaranteeInstructionDataArgs["exitMultiplierBps"];
   defaultCover: RegisterGuaranteeInstructionDataArgs["defaultCover"];
   exitCover: RegisterGuaranteeInstructionDataArgs["exitCover"];
 };

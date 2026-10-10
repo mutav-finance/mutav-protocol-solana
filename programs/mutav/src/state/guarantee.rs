@@ -17,17 +17,15 @@ use crate::{
 pub struct Guarantee {
     pub version: u8,
     pub bump: u8,
-    /// Guarantee reference from the platform.
+    /// Opaque random id assigned by the operator platform. Never a contract
+    /// number or any other personal or commercial reference (spec §3.5).
     pub id: [u8; 32],
+    /// Opaque per-agency id assigned by the operator platform. Never a CNPJ or
+    /// a name; the mapping stays with the operator (spec §3.5).
     pub agency_id: [u8; 32],
-    /// Commitment to the lease, guarantee contract and landlord mandate.
+    /// Salted commitment to the lease, guarantee contract and landlord
+    /// mandate; the salt stays with the operator (spec §3.5).
     pub refs_hash: [u8; 32],
-    /// Monthly rent at registration (display and audit).
-    pub rent: u64,
-    /// Display only. Never used in maths.
-    pub default_multiplier_bps: u16,
-    /// Display only. Never used in maths.
-    pub exit_multiplier_bps: u16,
     /// Absolute default (rent-arrears) cover.
     pub default_cover: u64,
     /// Absolute exit (property-recovery) cover.
@@ -47,8 +45,10 @@ pub struct Guarantee {
     pub closed_at: i64,
     /// Zeroed. Never read or written by logic. The 192-byte pilot budget
     /// (spec §14.2) holds the ADR 0012 lifecycle fields (88 bytes) without a
-    /// migration; it was grown from 64 before the layout freeze (ADR 0019).
-    pub _reserved: [u8; 192],
+    /// migration; it was grown from 64 before the layout freeze, and the 12
+    /// bytes of the removed display fields (`rent`, `default_multiplier_bps`,
+    /// `exit_multiplier_bps`) returned to it (ADR 0019).
+    pub _reserved: [u8; 204],
 }
 
 const _: () = assert!(8 + Guarantee::INIT_SPACE == GUARANTEE_SIZE);

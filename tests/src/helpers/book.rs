@@ -97,9 +97,6 @@ pub fn guarantee_args(
         id: unique_hash(),
         agency_id,
         refs_hash: unique_hash(),
-        rent: 2_000 * BRL,
-        default_multiplier_bps: 30_000,
-        exit_multiplier_bps: 60_000,
         default_cover,
         exit_cover,
     }

@@ -1984,15 +1984,12 @@
         "args": {
           "agencyId": "1f68abc44d01c53ce51e659810dded13b03df701c905e88d285b5b3e6fd4cc58",
           "defaultCover": "10500000000",
-          "defaultMultiplierBps": 30000,
           "exitCover": "3500000000",
-          "exitMultiplierBps": 10000,
           "id": "c32ec64948451a9b5cf9ff735f99b4b5fdfe565a09a95494c54afff651d4bd1a",
-          "refsHash": "0a5dbe2c237e30a7e308cbb5d696c3d3c4c23edfa3a31d98272597cc0b812e0c",
-          "rent": "3500000000"
+          "refsHash": "0a5dbe2c237e30a7e308cbb5d696c3d3c4c23edfa3a31d98272597cc0b812e0c"
         }
       },
-      "data": "36a00d81c857a337c32ec64948451a9b5cf9ff735f99b4b5fdfe565a09a95494c54afff651d4bd1a1f68abc44d01c53ce51e659810dded13b03df701c905e88d285b5b3e6fd4cc580a5dbe2c237e30a7e308cbb5d696c3d3c4c23edfa3a31d98272597cc0b812e0c00c39dd000000000307510270049d9710200000000c39dd000000000",
+      "data": "36a00d81c857a337c32ec64948451a9b5cf9ff735f99b4b5fdfe565a09a95494c54afff651d4bd1a1f68abc44d01c53ce51e659810dded13b03df701c905e88d285b5b3e6fd4cc580a5dbe2c237e30a7e308cbb5d696c3d3c4c23edfa3a31d98272597cc0b812e0c0049d9710200000000c39dd000000000",
       "name": "registerGuarantee"
     },
     {

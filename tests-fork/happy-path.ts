@@ -230,8 +230,7 @@ export async function forkHappyPath(programKeypair?: string) {
       getRegisterGuaranteeInstruction(
         {
           ...op, state: a.state, guarantee, payer: operator!,
-          id, agencyId, refsHash: bytes32('refs'), rent: 1_000n * BRL, defaultMultiplierBps: 10_000,
-          exitMultiplierBps: 5_000, defaultCover: 1_000n * BRL, exitCover: 500n * BRL,
+          id, agencyId, refsHash: bytes32('refs'), defaultCover: 1_000n * BRL, exitCover: 500n * BRL,
         },
         po,
       ),
