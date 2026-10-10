@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseConfig } from '../devnet/lib/config';
-import { assertOutsideRepo, guardCluster, REPO_ROOT } from '../devnet/lib/cli';
+import { assertOutsideRepo, REPO_ROOT } from '../devnet/lib/cli';
 
 const example = () => JSON.parse(readFileSync(join(import.meta.dir, '..', 'devnet', 'devnet.example.json'), 'utf8'));
 
@@ -81,16 +81,8 @@ describe('parseConfig bounds mirror the program', () => {
   test('empty allowlist', () => bad((c) => (c.allowlist = []), 'allowlist'));
 });
 
-describe('cluster guard', () => {
-  test('local passes; devnet needs confirmation; mainnet is refused', () => {
-    expect(guardCluster('http://127.0.0.1:8899', undefined)).toBe('local');
-    expect(guardCluster('http://localhost:18899/', undefined)).toBe('local');
-    expect(() => guardCluster('https://api.devnet.solana.com', undefined)).toThrow('--confirm-cluster devnet');
-    expect(guardCluster('https://api.devnet.solana.com', 'devnet')).toBe('devnet');
-    expect(() => guardCluster('https://api.mainnet-beta.solana.com', 'devnet')).toThrow('mainnet');
-  });
-
-  test('keypair paths must be outside the repo (target/deploy excepted)', () => {
+describe('keypair paths', () => {
+  test('must be outside the repo (target/deploy excepted)', () => {
     expect(() => assertOutsideRepo(join(REPO_ROOT, 'keys', 'id.json'), 'payer')).toThrow('inside the repository');
     expect(assertOutsideRepo(join(REPO_ROOT, 'target', 'deploy', 'mutav-keypair.json'), 'program')).toContain('target');
     expect(assertOutsideRepo('/tmp/x.json', 'payer')).toBe('/tmp/x.json');

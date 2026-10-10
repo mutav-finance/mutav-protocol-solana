@@ -14,7 +14,7 @@
  * only to check the upgrade authority first. Signs nothing.
  */
 import { createNoopSigner, type Address } from '@solana/kit';
-import { guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
+import { assertConfigCluster, guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
 import { composeInitialize, programDataAddress } from './lib/compose';
 import { loadConfig, type DeployConfig } from './lib/config';
 import { programDataUpgradeAuthority } from './lib/checks';
@@ -29,8 +29,9 @@ export async function assertAdminIsVault(cfg: DeployConfig) {
 
 export async function main(args: Args) {
   const cfg = loadConfig(req(args, 'config'));
-  const url = req(args, 'url');
-  guardCluster(url, opt(args, 'confirm-cluster'));
+  const guarded = await guardCluster(opt(args, 'url'), opt(args, 'confirm-cluster'));
+  assertConfigCluster(guarded, cfg.cluster);
+  const { url } = guarded;
   await assertAdminIsVault(cfg);
   const multisig = (opt(args, 'multisig') as Address | undefined) ?? cfg.squads.multisig;
   const vault = await squadsVaultAddress(multisig, cfg.squads.vaultIndex);

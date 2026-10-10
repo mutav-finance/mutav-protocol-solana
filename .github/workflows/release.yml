@@ -151,6 +151,15 @@ jobs:
         if: env.HAS_SECRETS == 'true'
         run: bun install --frozen-lockfile
 
+      # Refuses a moniker, an empty or local URL and any genesis hash but
+      # devnet's; exports the normalised URL as RELEASE_RPC (masked) for every
+      # later step, which never reads the raw secret.
+      - name: Cluster guard
+        if: env.HAS_SECRETS == 'true'
+        env:
+          RPC: ${{ secrets.RELEASE_RPC_URL }}
+        run: bun scripts/release/guard-rpc.ts --confirm-cluster "${{ inputs.cluster }}"
+
       # The payer key exists only on the runner's disk for this job.
       - name: Buffer payer
         if: env.HAS_SECRETS == 'true'
@@ -172,12 +181,10 @@ jobs:
       - name: Write buffer
         if: env.HAS_SECRETS == 'true'
         id: buffer
-        env:
-          RPC: ${{ secrets.RELEASE_RPC_URL }}
         run: |
-          buffer="$(solana program write-buffer release/mutav.so --url "$RPC" --keypair "$RUNNER_TEMP/payer.json" --output json | jq -r .buffer)"
-          solana program set-buffer-authority "$buffer" --new-buffer-authority "${{ steps.vault.outputs.vault }}" --url "$RPC" --keypair "$RUNNER_TEMP/payer.json"
-          got="$(solana-verify get-buffer-hash "$buffer" --url "$RPC")"
+          buffer="$(solana program write-buffer release/mutav.so --url "$RELEASE_RPC" --keypair "$RUNNER_TEMP/payer.json" --output json | jq -r .buffer)"
+          solana program set-buffer-authority "$buffer" --new-buffer-authority "${{ steps.vault.outputs.vault }}" --url "$RELEASE_RPC" --keypair "$RUNNER_TEMP/payer.json"
+          got="$(solana-verify get-buffer-hash "$buffer" --url "$RELEASE_RPC")"
           if [ "$got" != "${{ needs.build.outputs.hash }}" ]; then
             echo "::error::buffer hash $got != executable hash ${{ needs.build.outputs.hash }}"
             exit 1
@@ -188,10 +195,8 @@ jobs:
       # outgrew ProgramData) as an unsigned proposal payload.
       - name: Upgrade proposal payload
         if: env.HAS_SECRETS == 'true'
-        env:
-          RPC: ${{ secrets.RELEASE_RPC_URL }}
         run: |
-          bun scripts/release/upgrade-proposal.ts --url "$RPC" --confirm-cluster "${{ inputs.cluster }}" \
+          bun scripts/release/upgrade-proposal.ts --url "$RELEASE_RPC" --confirm-cluster "${{ inputs.cluster }}" \
             --program "$PROGRAM_ID" --buffer "${{ steps.buffer.outputs.buffer }}" \
             --multisig "${{ inputs.multisig }}" --vault-index "${{ inputs.vault_index }}" \
             --so release/mutav.so --out upgrade-proposal.json
@@ -199,13 +204,11 @@ jobs:
       # 5. Verify-PDA write, exported for the same vault transaction.
       - name: Verify-PDA transaction
         if: env.HAS_SECRETS == 'true'
-        env:
-          RPC: ${{ secrets.RELEASE_RPC_URL }}
         run: |
           solana-verify export-pda-tx "https://github.com/${{ github.repository }}" \
             --program-id "$PROGRAM_ID" --uploader "${{ steps.vault.outputs.vault }}" \
             --library-name mutav --commit-hash "$(git rev-parse HEAD)" --encoding base58 \
-            --url "$RPC" > verify-pda-tx.b58
+            --url "$RELEASE_RPC" > verify-pda-tx.b58
 
       - name: Remove the payer key
         if: always() && env.HAS_SECRETS == 'true'

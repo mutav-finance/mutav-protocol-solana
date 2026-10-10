@@ -10,7 +10,7 @@
  *   bun scripts/devnet/verify.ts --config <deploy.json> --url <rpc> [--confirm-cluster devnet]
  */
 import { buildAllowlist, fetchReserve } from '../../clients/js/src';
-import { guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
+import { assertConfigCluster, guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
 import { postDeployChecks } from './lib/checks';
 import { programDataAddress } from './lib/compose';
 import { loadConfig } from './lib/config';
@@ -19,8 +19,9 @@ import { checkSquadsMultisig, decodeSquadsMultisig } from './lib/squads';
 
 export async function main(args: Args) {
   const cfg = loadConfig(req(args, 'config'));
-  const url = req(args, 'url');
-  guardCluster(url, opt(args, 'confirm-cluster'));
+  const guarded = await guardCluster(opt(args, 'url'), opt(args, 'confirm-cluster'));
+  assertConfigCluster(guarded, cfg.cluster);
+  const { url } = guarded;
   const rpc = rpcFor(url);
   const pd = await accountData(rpc, await programDataAddress(cfg.programId));
   if (!pd) throw new Error(`program ${cfg.programId} is not deployed at ${url}`);

@@ -26,8 +26,7 @@ import { run } from './lib/local';
 import { accountData, rpcFor } from './lib/rpc';
 
 export async function main(args: Args): Promise<{ programId: Address }> {
-  const url = req(args, 'url');
-  guardCluster(url, opt(args, 'confirm-cluster'));
+  const { url } = await guardCluster(opt(args, 'url'), opt(args, 'confirm-cluster'));
   const payer = assertOutsideRepo(req(args, 'payer'), '--payer');
   const programKeypair = assertOutsideRepo(
     opt(args, 'program-keypair') ?? join(REPO_ROOT, 'target', 'deploy', 'mutav-keypair.json'),

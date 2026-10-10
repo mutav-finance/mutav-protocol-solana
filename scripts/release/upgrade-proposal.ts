@@ -77,8 +77,8 @@ export async function composeUpgrade(p: {
 }
 
 export async function main(args: Args) {
-  const url = req(args, 'url');
-  guardCluster(url, opt(args, 'confirm-cluster'));
+  // The payload names the cluster, never the RPC URL (it may carry an API key).
+  const { url, cluster } = await guardCluster(opt(args, 'url'), opt(args, 'confirm-cluster'));
   const programId = address(req(args, 'program'));
   const multisig = address(req(args, 'multisig'));
   const vaultIndex = Number(opt(args, 'vault-index') ?? 0);
@@ -94,7 +94,7 @@ export async function main(args: Args) {
     programDataLen: Number(pd.value.space),
   });
   if (ixs.length > 1) console.log('new .so is larger than ProgramData: ExtendProgramChecked bundled first');
-  writePayload(req(args, 'out'), toPayload({ title: `MUTAV: upgrade ${programId} from buffer ${req(args, 'buffer')}`, cluster: url, multisig, vaultIndex, vault }, ixs));
+  writePayload(req(args, 'out'), toPayload({ title: `MUTAV: upgrade ${programId} from buffer ${req(args, 'buffer')}`, cluster, multisig, vaultIndex, vault }, ixs));
 }
 
 if (import.meta.main) await main(parseArgs());
