@@ -45,8 +45,9 @@ pub struct ClaimFiling {
     /// approved. Written zero and not read by this binary.
     pub approved_amount: u64,
     /// Zeroed. Never read or written by logic. Holds the ADR 0012 claim and
-    /// settlement fields (49 + 74 bytes) without a migration (spec §14.2).
-    pub _reserved: [u8; 128],
+    /// settlement fields (114 bytes) with room to spare after the freeze,
+    /// without a migration (spec §14.2, ADR 0019).
+    pub _reserved: [u8; 192],
 }
 
 const _: () = assert!(8 + ClaimFiling::INIT_SPACE == CLAIM_FILING_SIZE);

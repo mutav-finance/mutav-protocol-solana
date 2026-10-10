@@ -46,7 +46,7 @@ fn guarantee_layout_is_frozen() {
 #[test]
 fn claim_filing_layout_is_frozen() {
     assert_eq!(8 + ClaimFiling::INIT_SPACE, CLAIM_FILING_SIZE);
-    assert_eq!(CLAIM_FILING_SIZE, 316);
+    assert_eq!(CLAIM_FILING_SIZE, 380);
     assert_eq!(8 + CLAIM_FILING_V1_LEN, CLAIM_FILING_SIZE);
     assert_eq!(8 + ser(&zeroed::<ClaimFiling>()).len(), CLAIM_FILING_SIZE);
     assert_eq!(

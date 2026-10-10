@@ -246,7 +246,7 @@ pub struct ClaimFilingV1 {
     pub pix_e2e_hash: [u8; 32],
     pub settled_at: i64,
     pub approved_amount: u64,
-    pub _reserved: [u8; 128],
+    pub _reserved: [u8; 192],
 }
 
 pub const CLAIM_FILING_V1: OffsetTable = &[
@@ -264,11 +264,11 @@ pub const CLAIM_FILING_V1: OffsetTable = &[
     ("pix_e2e_hash", 132, 32),
     ("settled_at", 164, 8),
     ("approved_amount", 172, 8),
-    ("_reserved", 180, 128),
+    ("_reserved", 180, 192),
 ];
 
 /// Serialized size of `ClaimFilingV1` (the account adds 8).
-pub const CLAIM_FILING_V1_LEN: usize = 308;
+pub const CLAIM_FILING_V1_LEN: usize = 372;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct IncomeReceiptV1 {

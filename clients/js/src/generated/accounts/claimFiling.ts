@@ -86,7 +86,8 @@ export type ClaimFiling = {
   approvedAmount: bigint;
   /**
    * Zeroed. Never read or written by logic. Holds the ADR 0012 claim and
-   * settlement fields (49 + 74 bytes) without a migration (spec §14.2).
+   * settlement fields (114 bytes) with room to spare after the freeze,
+   * without a migration (spec §14.2, ADR 0019).
    */
   reserved: ReadonlyUint8Array;
 };
@@ -125,7 +126,8 @@ export type ClaimFilingArgs = {
   approvedAmount: number | bigint;
   /**
    * Zeroed. Never read or written by logic. Holds the ADR 0012 claim and
-   * settlement fields (49 + 74 bytes) without a migration (spec §14.2).
+   * settlement fields (114 bytes) with room to spare after the freeze,
+   * without a migration (spec §14.2, ADR 0019).
    */
   reserved: ReadonlyUint8Array;
 };
@@ -149,7 +151,7 @@ export function getClaimFilingEncoder(): FixedSizeEncoder<ClaimFilingArgs> {
       ["pixE2eHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["settledAt", getI64Encoder()],
       ["approvedAmount", getU64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 128)],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 192)],
     ]),
     (value) => ({ ...value, discriminator: CLAIM_FILING_DISCRIMINATOR }),
   );
@@ -173,7 +175,7 @@ export function getClaimFilingDecoder(): FixedSizeDecoder<ClaimFiling> {
     ["pixE2eHash", fixDecoderSize(getBytesDecoder(), 32)],
     ["settledAt", getI64Decoder()],
     ["approvedAmount", getU64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 128)],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 192)],
   ]);
 }
 
@@ -239,5 +241,5 @@ export async function fetchAllMaybeClaimFiling(
 }
 
 export function getClaimFilingSize(): number {
-  return 316;
+  return 380;
 }

@@ -254,11 +254,18 @@ fn padding_holds_every_planned_carve() {
     assert!(padding_of(VAULT_STATE_V1) >= 88 + 8 + 4 + 16);
     // ADR 0012 lifecycle fields.
     assert!(padding_of(GUARANTEE_V1) >= 32 + 32 + 8 + 8 + 8);
-    // ADR 0012 claim fields (49) and settlement fields (74).
-    assert!(padding_of(CLAIM_FILING_V1) >= (1 + 8 + 8 + 32) + (1 + 1 + 8 + 32 + 32));
-    // ADR 0010 partial fills: `shares_remaining`, `shares_filled`,
-    // `assets_filled`, `fill_count`, `last_fill_at`.
-    assert!(padding_of(REDEEM_REQUEST_V1) >= 8 + 8 + 8 + 2 + 8);
+    // ADR 0012 claim fields (`category`, `accrued_until_ts`,
+    // `request_complete_ts`, `debt_calc_hash`: 49) and the settlement fields
+    // of the former `Payout` that the filing does not already carry
+    // (`flags`, `landlord_mandate_hash`, `quitacao_hash`: 65), with at least
+    // 64 bytes to spare after the freeze.
+    const ADR_0012_CLAIM: usize = (1 + 8 + 8 + 32) + (1 + 32 + 32);
+    assert_eq!(ADR_0012_CLAIM, 114);
+    assert!(padding_of(CLAIM_FILING_V1) >= ADR_0012_CLAIM + 64);
+    // ADR 0010 partial fills: `shares_filled`, `assets_filled`, `fill_count`,
+    // `last_fill_at`. The remainder is `shares − shares_filled`, so a zero
+    // carve reads as "nothing filled" (R3); no `shares_remaining` is stored.
+    assert!(padding_of(REDEEM_REQUEST_V1) >= 8 + 8 + 2 + 8);
     // The current structs carry the same padding as the tables.
     assert_eq!(
         zeroed::<VaultConfig>()._reserved.len(),
