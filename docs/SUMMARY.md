@@ -72,6 +72,8 @@
   * [Redemption economics: partial head fills and phase-2 instant exit](research/redemption-economics.md)
   * [Upgrade readiness: adding partial fills and instant exit to a live reserve](research/upgrade-readiness.md)
   * [Eviction and exit costs in South Brazil](research/brazil-eviction-and-exit-costs.md)
+  * [Function-by-function vault comparison](research/vault-function-comparison.md)
+  * [On-chain exposure and claims registries](research/onchain-exposure-and-claims-registries.md)
 
 ## Decisions and sources
 

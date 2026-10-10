@@ -20,11 +20,8 @@ Nothing here is legal or investment advice. Business and legal research (pricing
 | [Redemption economics: partial head fills and phase-2 instant exit](redemption-economics.md) | 2026-10-02 | How partial fills at the queue head and a buffer-backed instant exit would work, priced against comparable protocols, with the earmark that keeps claims first | Curated; largely superseded (whole fills in the pilot, phase-2 state removed for the freeze, cooldown exit) |
 | [Upgrade readiness: adding partial fills and instant exit to a live reserve](upgrade-readiness.md) | 2026-10-01 to 2026-10-02 | What the v1 layout, events and governance must reserve so later features land by upgrade without migrating live accounts | Curated; largely superseded (v1 layout, two multisigs with time locks, simplification) |
 | [Eviction and exit costs in South Brazil](brazil-eviction-and-exit-costs.md) | 2026-10-02 | How often leases in South Brazil end in eviction, how long and how much an eviction costs, and the exit costs of an ordinary move-out, from DataJud and public sources | Curated; claim sizing since refined (per-event claims, stress buffer) |
-
-## Coming next
-
-- **Function-by-function vault comparison.** MUTAV's instructions set against comparable Solana vault programs, one function at a time.
-- **On-chain exposure and claims registries.** How other protocols publish exposure and claims on-chain, and what MUTAV's registry should expose.
+| [Function-by-function vault comparison](vault-function-comparison.md) | 2026-10-10 | OnRe, Kamino kVault, the Solana Foundation vault standard, SVS and Voltr compared with MUTAV instruction by instruction, with the patterns MUTAV adopted before the layout freeze | Current; inputs to ADRs 0019–0027 |
+| [On-chain exposure and claims registries](onchain-exposure-and-claims-registries.md) | 2026-10-10 | Cover, credit, guarantee and lease registries on-chain and in Brazil: record models, capital requirements, losses, privacy, failures, and what MUTAV's guarantee registry should adopt or avoid | Current |
 
 ## Sources
 
