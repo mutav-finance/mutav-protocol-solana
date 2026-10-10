@@ -37,7 +37,6 @@ export function postDeployChecks(
   const ua = programDataUpgradeAuthority(programData);
   if (ua !== e.upgradeAuthority) out.push(`upgrade authority is ${ua ?? 'none (immutable)'}, expected ${e.upgradeAuthority}`);
   if (config.featureFlags !== 0n) out.push(`feature_flags is ${config.featureFlags}, expected 0`);
-  if (state.bufferEarmark !== 0n) out.push(`buffer_earmark is ${state.bufferEarmark}, expected 0`);
   if (config.admin !== e.admin) out.push(`admin is ${config.admin}, expected ${e.admin}`);
   if (e.operator && config.operator !== e.operator) out.push(`operator is ${config.operator}, expected ${e.operator}`);
   if (e.pauser && config.pauser !== e.pauser) out.push(`pauser is ${config.pauser}, expected ${e.pauser}`);

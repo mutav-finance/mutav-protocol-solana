@@ -88,9 +88,7 @@ export async function composeInitialize(
       mutavCapitalWallet: cfg.mutavCapitalWallet,
       coverageRatioBps: cfg.coverageRatioBps,
       feeTakeBps: cfg.feeTakeBps,
-      payoutSlaSecs: cfg.payoutSlaSecs,
       caps: cfg.caps,
-      price: cfg.price,
     },
     opts(cfg),
   );
@@ -113,10 +111,9 @@ export async function composeSetRoles(cfg: DeployConfig, admin: TransactionSigne
 }
 
 /**
- * `set_config` writing the file's caps, price bounds, coverage ratio, take
- * rate and SLA, and keeping every other field as it is on-chain (`current`).
- * `feature_flags`, `exit` and `income_take_bps` are carried over unchanged,
- * never set here.
+ * `set_config` writing the file's caps, coverage ratio and take rate, and
+ * keeping every other field as it is on-chain (`current`). `feature_flags`
+ * and the capital wallet are carried over unchanged, never set here.
  */
 export async function composeSetCaps(
   cfg: DeployConfig,
@@ -124,7 +121,6 @@ export async function composeSetCaps(
   admin: TransactionSigner,
 ): Promise<Instruction> {
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
-  const { reserved: _r, ...exit } = current.exit;
   return getSetConfigInstruction(
     {
       admin,
@@ -136,15 +132,9 @@ export async function composeSetCaps(
       program: cfg.programId,
       coverageRatioBps: cfg.coverageRatioBps,
       feeTakeBps: cfg.feeTakeBps,
-      payoutSlaSecs: cfg.payoutSlaSecs,
       featureFlags: current.featureFlags,
       mutavCapitalWallet: current.mutavCapitalWallet,
       caps: cfg.caps,
-      price: cfg.price,
-      exit,
-      // Carried over: the take on issuer income is never set from the file
-      // (ADR 0017; the program caps it at 0 until §12 Q47 is decided).
-      incomeTakeBps: current.incomeTakeBps,
     },
     opts(cfg),
   );
