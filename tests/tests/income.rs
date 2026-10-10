@@ -147,7 +147,7 @@ fn sweep_moves_the_statement_into_the_reserve_and_raises_nav() {
         (rec.version, rec.kind, rec.ref_hash, rec.period),
         (
             PROGRAM_LAYOUT_VERSION,
-            INCOME_KIND_NORA_STATEMENT,
+            INCOME_KIND_ISSUER_STATEMENT,
             r,
             202_610
         )

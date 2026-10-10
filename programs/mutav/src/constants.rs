@@ -155,7 +155,7 @@ pub const CLAIM_WITHDRAWN: u8 = 2;
 pub const CLAIM_SETTLED: u8 = 3;
 
 /// `IncomeReceipt.kind` (ADR 0019).
-pub const INCOME_KIND_NORA_STATEMENT: u8 = 0;
+pub const INCOME_KIND_ISSUER_STATEMENT: u8 = 0;
 pub const INCOME_KIND_FEE: u8 = 1;
 /// Reserved for the unsolicited-funds instructions of a later upgrade.
 pub const INCOME_KIND_UNSOLICITED: u8 = 2;

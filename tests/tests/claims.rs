@@ -463,8 +463,8 @@ fn pay_claim_rejects_zero() {
 
 #[test]
 fn pay_claim_needs_liquid_brs() {
-    // TESOURO is never sold implicitly (rule 6). Liquid BRS below the amount
-    // is injected (the reserve token account still holds it).
+    // Rule 6: a claim is paid from liquid BRS only. Liquid BRS below the
+    // amount is injected (the reserve token account still holds it).
     let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
     let c = Claim::on(&g, 5_000 * BRL);
     f.file_claim(c).unwrap();
@@ -506,9 +506,9 @@ fn pay_claim_rejects_a_non_operator() {
     }
 }
 
-/// Demo step: "`pay_claim` succeeds while under-covered". A TESOURO
-/// mark-down (injected as lost capital) leaves the reserve under-covered and
-/// paused; the claim is still paid.
+/// Demo step: "`pay_claim` succeeds while under-covered". Cover injected far
+/// above the stable assets leaves the reserve under-covered and paused; the
+/// claim is still paid.
 #[test]
 fn demo_pay_claim_succeeds_while_under_covered() {
     let (mut f, g) = book(30_000 * BRL, 30_000 * BRL, 0);

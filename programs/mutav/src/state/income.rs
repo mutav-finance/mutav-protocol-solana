@@ -5,7 +5,7 @@
 
 use anchor_lang::prelude::*;
 
-use crate::constants::{INCOME_KIND_FEE, INCOME_KIND_NORA_STATEMENT, INCOME_RECEIPT_SIZE};
+use crate::constants::{INCOME_KIND_FEE, INCOME_KIND_ISSUER_STATEMENT, INCOME_RECEIPT_SIZE};
 
 /// Seeds: `["income", config, ref_hash]` for issuer statements and
 /// `["fee", config, ref_hash]` for guarantee fees (separate prefixes, so an
@@ -15,7 +15,7 @@ use crate::constants::{INCOME_KIND_FEE, INCOME_KIND_NORA_STATEMENT, INCOME_RECEI
 pub struct IncomeReceipt {
     pub version: u8,
     pub bump: u8,
-    /// `INCOME_KIND_NORA_STATEMENT` (`sweep_income`) or `INCOME_KIND_FEE`
+    /// `INCOME_KIND_ISSUER_STATEMENT` (`sweep_income`) or `INCOME_KIND_FEE`
     /// (`contribute_fees`). `INCOME_KIND_UNSOLICITED` and
     /// `INCOME_KIND_BACKSTOP` are reserved for a later upgrade.
     pub kind: u8,
@@ -40,6 +40,6 @@ impl IncomeReceipt {
     /// Version guard (spec §14.2 R1b): a kind this binary writes.
     pub fn is_supported(&self) -> bool {
         self.version <= crate::constants::PROGRAM_LAYOUT_VERSION
-            && matches!(self.kind, INCOME_KIND_NORA_STATEMENT | INCOME_KIND_FEE)
+            && matches!(self.kind, INCOME_KIND_ISSUER_STATEMENT | INCOME_KIND_FEE)
     }
 }

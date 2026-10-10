@@ -54,7 +54,7 @@ export type IncomeReceipt = {
   version: number;
   bump: number;
   /**
-   * `INCOME_KIND_NORA_STATEMENT` (`sweep_income`) or `INCOME_KIND_FEE`
+   * `INCOME_KIND_ISSUER_STATEMENT` (`sweep_income`) or `INCOME_KIND_FEE`
    * (`contribute_fees`). `INCOME_KIND_UNSOLICITED` and
    * `INCOME_KIND_BACKSTOP` are reserved for a later upgrade.
    */
@@ -78,7 +78,7 @@ export type IncomeReceiptArgs = {
   version: number;
   bump: number;
   /**
-   * `INCOME_KIND_NORA_STATEMENT` (`sweep_income`) or `INCOME_KIND_FEE`
+   * `INCOME_KIND_ISSUER_STATEMENT` (`sweep_income`) or `INCOME_KIND_FEE`
    * (`contribute_fees`). `INCOME_KIND_UNSOLICITED` and
    * `INCOME_KIND_BACKSTOP` are reserved for a later upgrade.
    */

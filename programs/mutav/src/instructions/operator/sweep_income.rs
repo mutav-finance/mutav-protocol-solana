@@ -160,7 +160,7 @@ pub fn handle_sweep_income(
     let r = &mut ctx.accounts.income_receipt;
     r.version = PROGRAM_LAYOUT_VERSION;
     r.bump = ctx.bumps.income_receipt;
-    r.kind = INCOME_KIND_NORA_STATEMENT;
+    r.kind = INCOME_KIND_ISSUER_STATEMENT;
     r.ref_hash = income_ref_hash;
     r.period = period;
     r.gross = amount;

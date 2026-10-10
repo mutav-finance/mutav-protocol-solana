@@ -90,7 +90,7 @@ fn income_receipt_layout_is_frozen() {
 fn receipt_kinds_are_pinned() {
     assert_eq!(
         (
-            INCOME_KIND_NORA_STATEMENT,
+            INCOME_KIND_ISSUER_STATEMENT,
             INCOME_KIND_FEE,
             INCOME_KIND_UNSOLICITED,
             INCOME_KIND_BACKSTOP

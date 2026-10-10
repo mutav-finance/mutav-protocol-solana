@@ -138,5 +138,5 @@ fn income_receipt_padding_is_zero_at_init_and_never_written() {
     assert_eq!(&raw[raw.len() - 64..], &[0; 64]);
     let receipt = f.income_receipt(&r);
     assert_eq!(receipt._reserved, [0; 64]);
-    assert_eq!(receipt.kind, mutav::constants::INCOME_KIND_NORA_STATEMENT);
+    assert_eq!(receipt.kind, mutav::constants::INCOME_KIND_ISSUER_STATEMENT);
 }

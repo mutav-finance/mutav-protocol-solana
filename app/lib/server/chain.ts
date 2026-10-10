@@ -153,7 +153,7 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
     scan(env, INCOME_RECEIPT_DISCRIMINATOR, (b) => getIncomeReceiptDecoder().decode(b)),
   ]);
   // Guarantee fees and issuer income share one receipt type, told apart by
-  // `kind` (ADR 0019): 1 = FEE under the "fee" seed, 0 = NORA_STATEMENT.
+  // `kind` (ADR 0019): 1 = FEE under the "fee" seed, 0 = ISSUER_STATEMENT.
   const feesAll = receiptsAll.filter((r) => r.data.kind === 1);
   const incomeAll = receiptsAll.filter((r) => r.data.kind === 0);
 
