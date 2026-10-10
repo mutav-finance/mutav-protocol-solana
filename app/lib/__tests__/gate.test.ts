@@ -3,7 +3,7 @@ import { computeSolvency, coverageRequired } from "@mutav-finance/mutav-protocol
 import { previewRegisterGuarantee } from "../gate";
 import { BRL, config, state } from "./fixtures";
 
-const g = (cover: bigint) => ({ rent: 3_000n * BRL, defaultCover: cover, exitCover: 0n });
+const g = (cover: bigint) => ({ defaultCover: cover, exitCover: 0n });
 
 describe("register_guarantee gate preview", () => {
   const funded = state({ brsBalance: 50_000n * BRL, remainingCoverTotal: 40_000n * BRL });
@@ -36,8 +36,8 @@ describe("register_guarantee gate preview", () => {
     const s = state({ brsBalance: 12n, remainingCoverTotal: 0n });
     // ceil(1.2 × 10) = 12 fits; ceil(1.2 × 11) = 14 does not.
     expect(coverageRequired(11n, 12_000, 0n)).toBe(14n);
-    expect(previewRegisterGuarantee(c, s, { rent: 1n, defaultCover: 10n, exitCover: 0n }).fits).toBe(true);
-    expect(previewRegisterGuarantee(c, s, { rent: 1n, defaultCover: 11n, exitCover: 0n }).refusal).toBe("InsufficientFreeCapital");
+    expect(previewRegisterGuarantee(c, s, { defaultCover: 10n, exitCover: 0n }).fits).toBe(true);
+    expect(previewRegisterGuarantee(c, s, { defaultCover: 11n, exitCover: 0n }).refusal).toBe("InsufficientFreeCapital");
   });
 
   it("below c = 1, sizes coverage at c × cover (c = 10%, ADR 0016)", () => {
@@ -66,7 +66,7 @@ describe("register_guarantee gate preview", () => {
 
   it("checks caps before solvency, in program order", () => {
     expect(previewRegisterGuarantee(config(), funded, g(30_000n * BRL + 1n)).refusal).toBe("GuaranteeCapExceeded");
-    expect(previewRegisterGuarantee(config(), funded, { ...g(1n), rent: 0n }).refusal).toBe("InvalidParameter");
+    expect(previewRegisterGuarantee(config(), funded, g(0n)).refusal).toBe("InvalidParameter");
   });
 
   it("refuses while paused, in under-coverage mode, or under-covered inline", () => {

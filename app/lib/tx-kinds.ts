@@ -9,9 +9,6 @@ export type OperatorTx =
       id: string;
       agencyId: string;
       refsHash: string;
-      rent: bigint;
-      defaultMultiplierBps: number;
-      exitMultiplierBps: number;
       defaultCover: bigint;
       exitCover: bigint;
     }

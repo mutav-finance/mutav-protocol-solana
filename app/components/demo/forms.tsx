@@ -118,7 +118,7 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
   const defaultCover = rentBase && multOk ? (rentBase * BigInt(Math.round(dm * 100))) / 100n : 0n;
   const exitCover = rentBase && multOk ? (rentBase * BigInt(Math.round(em * 100))) / 100n : 0n;
   const preview = useMemo(
-    () => (rentBase ? previewRegisterGuarantee(reserve.config, reserve.state, { rent: rentBase, defaultCover, exitCover }) : null),
+    () => (rentBase ? previewRegisterGuarantee(reserve.config, reserve.state, { defaultCover, exitCover }) : null),
     [reserve, rentBase, defaultCover, exitCover],
   );
   useEffect(() => onRefusedPreview?.(preview ? !preview.fits : false), [preview, onRefusedPreview]);
@@ -130,9 +130,6 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
       id: await REF.guaranteeId(lease.trim()),
       agencyId: await REF.agencyId(agency.trim()),
       refsHash: await REF.refsHash(lease.trim()),
-      rent: rentBase,
-      defaultMultiplierBps: Math.round(dm * 10_000),
-      exitMultiplierBps: Math.round(em * 10_000),
       defaultCover,
       exitCover,
     };
@@ -362,7 +359,7 @@ export function SettleList() {
 
 export function BlockedPreview() {
   const { reserve, ledger } = useLive();
-  const reg = previewRegisterGuarantee(reserve.config, reserve.state, { rent: 1_000_000_000n, defaultCover: 3_000_000_000n, exitCover: 1_000_000_000n });
+  const reg = previewRegisterGuarantee(reserve.config, reserve.state, { defaultCover: 3_000_000_000n, exitCover: 1_000_000_000n });
   const heads = ledger.redeems
     .filter((r) => r.data.status === 0)
     .sort((a, b) => Number(a.data.seq - b.data.seq))

@@ -8,7 +8,7 @@ const b32 = (n: number) => new Uint8Array(32).fill(n);
 const guarantee = (address: string, over: Partial<Guarantee>): Row<Guarantee> => ({
   address,
   data: {
-    id: b32(1), agencyId: b32(9), refsHash: b32(0), rent: 3_000n * BRL, defaultMultiplierBps: 30_000, exitMultiplierBps: 10_000,
+    id: b32(1), agencyId: b32(9), refsHash: b32(0),
     defaultCover: 9_000n * BRL, exitCover: 3_000n * BRL, defaultPaid: 0n, exitPaid: 0n, provisionDefault: 0n, provisionExit: 0n,
     openClaims: 0, status: 0, registeredAt: 100n, closedAt: 0n, ...over,
   } as unknown as Guarantee,

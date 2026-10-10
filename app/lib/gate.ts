@@ -24,7 +24,6 @@ export type GateRefusal =
   | "InsufficientFreeCapital";
 
 export type GateInput = {
-  rent: bigint;
   defaultCover: bigint;
   exitCover: bigint;
 };
@@ -67,7 +66,7 @@ export function previewRegisterGuarantee(config: ConfigView, state: StateView, g
   if (config.paused) return refuse("Paused");
   if (state.mode !== MODE_NORMAL) return refuse("UnderCovered");
   if (before.underCovered) return refuse("UnderCovered");
-  if (newCover <= 0n || g.rent <= 0n) return refuse("InvalidParameter");
+  if (newCover <= 0n) return refuse("InvalidParameter");
   if (newCover > config.caps.maxCoverPerGuarantee) return refuse("GuaranteeCapExceeded");
   if (needed > before.stableAssets) return refuse("InsufficientFreeCapital");
   return { ...base, fits: true, refusal: null };

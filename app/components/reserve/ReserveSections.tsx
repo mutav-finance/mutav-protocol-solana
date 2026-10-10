@@ -121,12 +121,11 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       {rows.length === 0 ? (
         <Empty>No guarantees registered yet.</Empty>
       ) : (
-        <Table label="Remaining cover by guarantee" head={["Guarantee", "Agency", ["Rent", "num"], ["Default leg left", "num"], ["Exit leg left", "num"], ["Provision", "num"], ["Open claims", "num"], "Status", "Registered"]}>
+        <Table label="Remaining cover by guarantee" head={["Guarantee", "Agency", ["Default leg left", "num"], ["Exit leg left", "num"], ["Provision", "num"], ["Open claims", "num"], "Status", "Registered"]}>
           {rows.map((g) => (
             <tr key={g.address}>
               <td><Explorer value={g.address} label={short(g.id)} /></td>
               <td><Mono dim>{short(g.agencyId)}</Mono></td>
-              <Num>{fmtBrs(g.rent)}</Num>
               <Num>{fmtBrs(g.defaultRemaining)}</Num>
               <Num>{fmtBrs(g.exitRemaining)}</Num>
               <Num color={g.provision > 0n ? "var(--color-copper)" : undefined}>{fmtBrs(g.provision)}</Num>

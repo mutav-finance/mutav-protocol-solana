@@ -25,7 +25,7 @@ export type Duty = {
 export const DUTIES: Duty[] = [
   {
     ix: "register_guarantee",
-    today: "Register the lease an agency signed up in the platform, with its rent and its default and exit cover.",
+    today: "Register the lease an agency signed up in the platform, with its default and exit cover.",
     later: "Triggered by the MUTAV platform when a lease is registered.",
     bound: "Not paused, mode Normal; cover ≤ max per guarantee; agency total ≤ max per agency; the new cover must fit in free capital (solvency gate).",
   },

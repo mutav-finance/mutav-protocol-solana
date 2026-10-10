@@ -106,7 +106,6 @@ export type CoverageRow = {
   address: string;
   id: string;
   agencyId: string;
-  rent: bigint;
   defaultRemaining: bigint;
   exitRemaining: bigint;
   remaining: bigint;
@@ -125,7 +124,6 @@ export function coverageRows(guarantees: Row<Guarantee>[]): CoverageRow[] {
         address,
         id: bytesToHex(new Uint8Array(g.id)),
         agencyId: bytesToHex(new Uint8Array(g.agencyId)),
-        rent: g.rent,
         defaultRemaining,
         exitRemaining,
         remaining: defaultRemaining + exitRemaining,
