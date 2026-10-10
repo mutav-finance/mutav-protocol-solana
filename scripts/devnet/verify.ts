@@ -4,6 +4,13 @@
  * - upgrade authority == the config's `upgradeAuthority`;
  * - `feature_flags == 0` and `buffer_earmark == 0`;
  * - admin, operator, pauser and the allowlist root as configured;
+ * - every other `VaultConfig` field equals the config file (c, fee take,
+ *   every cap including the settlement floor, price bounds, income take 0,
+ *   decimals 6, mint, token program, money accounts, capital wallet);
+ * - on devnet, the locked devnet values (lib/compare.ts `DEVNET_LOCKED`);
+ * - the treasury and payments accounts hold the reserve mint and are not
+ *   owned by the operator;
+ * - the reserve mint: owned by `reserveTokenProgram`, 6 decimals;
  * - both Squads multisigs (admin and upgrade): owned by the Squads v4
  *   program, `config_authority == Pubkey::default()`, exactly the configured
  *   members (each able to vote) and threshold, `time_lock >=` the floor.
@@ -12,11 +19,11 @@
  */
 import { buildAllowlist, fetchReserve } from '../../clients/js/src';
 import { assertConfigCluster, guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
-import { checkReserveMint, postDeployChecks, RESERVE_DECIMALS } from './lib/checks';
+import { checkReserveMint, postDeployChecks } from './lib/checks';
 import { programDataAddress } from './lib/compose';
-import { loadConfig } from './lib/config';
+import { checkDevnetLocked, checkMoneyAccounts, compareConfig } from './lib/compare';
+import { loadConfig, type DeployConfig } from './lib/config';
 import { accountData, accountInfo, rpcFor, type ReadRpc } from './lib/rpc';
-import type { DeployConfig } from './lib/config';
 import { checkSquadsAccount, squadsVaultAddress } from './lib/squads';
 
 /** Both multisigs as configured, and each vault where the config says it is. */
@@ -49,10 +56,16 @@ export async function main(args: Args) {
     pauser: cfg.pauser,
     allowlistRoot: (await buildAllowlist(cfg.allowlist)).root,
   });
-  if (r.config.data.reserveDecimals !== RESERVE_DECIMALS) {
-    failures.push(`reserve_decimals is ${r.config.data.reserveDecimals}, expected ${RESERVE_DECIMALS}`);
-  }
   failures.push(...checkReserveMint(await accountInfo(rpc, cfg.reserveMint), cfg));
+  failures.push(...compareConfig(r.config.data, cfg));
+  if (cfg.cluster === 'devnet') failures.push(...checkDevnetLocked(r.config.data));
+  failures.push(
+    ...checkMoneyAccounts(
+      { treasury: await accountInfo(rpc, r.config.data.treasuryAccount), payments: await accountInfo(rpc, r.config.data.paymentsAccount) },
+      cfg,
+      r.config.data.operator,
+    ),
+  );
   failures.push(...(await multisigChecks(rpc, cfg)));
   if (failures.length) {
     for (const f of failures) console.error(`FAIL ${f}`);
