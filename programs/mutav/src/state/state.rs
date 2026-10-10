@@ -73,7 +73,9 @@ impl VaultState {
     /// Moves the claim window to `day` (ADR 0019): the buckets of the days
     /// that left the window are cleared. A `day` before the anchor (a clock
     /// step back) keeps the anchor, so a bucket is never reused early.
-    pub fn roll_claim_window(&mut self, day: i64) {
+    /// Returns the effective day, `max(day, anchor)`: the day whose bucket a
+    /// payment made now must be written to.
+    pub fn roll_claim_window(&mut self, day: i64) -> i64 {
         let day = day.max(self.claim_day_anchor);
         let gap = day - self.claim_day_anchor;
         if gap >= CLAIM_WINDOW_DAYS as i64 {
@@ -84,6 +86,7 @@ impl VaultState {
             }
         }
         self.claim_day_anchor = day;
+        day
     }
 
     /// Claim payments in the window, after `roll_claim_window`.
@@ -91,7 +94,7 @@ impl VaultState {
         self.claim_day_buckets.iter().map(|b| *b as u128).sum()
     }
 
-    /// The bucket of `day` (the current day after `roll_claim_window`).
+    /// The bucket of `day`: the effective day `roll_claim_window` returned.
     pub fn claim_bucket_mut(&mut self, day: i64) -> &mut u64 {
         &mut self.claim_day_buckets[day.rem_euclid(CLAIM_WINDOW_DAYS as i64) as usize]
     }
@@ -125,6 +128,56 @@ mod tests {
         // A long gap clears everything.
         s.roll_claim_window(d0 + 1_000);
         assert_eq!(s.claim_window_paid(), 0);
+    }
+
+    #[test]
+    fn a_payment_after_a_clock_step_back_sits_in_the_anchor_bucket() {
+        // Roll to d, then pay with the clock at d − 1: the payment counts on
+        // day d, and leaves the window on day d + 31.
+        let mut s = zeroed();
+        let d = 20_000;
+        assert_eq!(s.roll_claim_window(d), d);
+        let e = s.roll_claim_window(d - 1);
+        assert_eq!(e, d);
+        *s.claim_bucket_mut(e) += 9;
+        assert_eq!(s.claim_day_buckets[(d % 31) as usize], 9);
+        assert_eq!(s.roll_claim_window(d + 30), d + 30);
+        assert_eq!(s.claim_window_paid(), 9);
+        s.roll_claim_window(d + 31);
+        assert_eq!(s.claim_window_paid(), 0);
+    }
+
+    proptest::proptest! {
+        #![proptest_config(proptest::prelude::ProptestConfig {
+            cases: 256,
+            failure_persistence: None,
+            ..proptest::prelude::ProptestConfig::default()
+        })]
+
+        /// The ring of 31 daily buckets equals a naive oracle that keeps every
+        /// `(day, amount)` payment and sums those of the last 31 days (the
+        /// effective day and the 30 before it), including gaps of 31 days or
+        /// more and clock steps back (ADR 0019).
+        #[test]
+        fn the_ring_matches_a_naive_oracle(
+            steps in proptest::collection::vec((-40i64..=80, 0u64..=1_000_000), 1..64),
+        ) {
+            let mut s = zeroed();
+            let mut oracle: Vec<(i64, u64)> = Vec::new();
+            let mut day = 20_000i64;
+            for (delta, amount) in steps {
+                day += delta;
+                let e = s.roll_claim_window(day);
+                let expected: u128 = oracle
+                    .iter()
+                    .filter(|(d, _)| *d > e - CLAIM_WINDOW_DAYS as i64)
+                    .map(|(_, a)| *a as u128)
+                    .sum();
+                proptest::prop_assert_eq!(s.claim_window_paid(), expected);
+                *s.claim_bucket_mut(e) += amount;
+                oracle.push((e, amount));
+            }
+        }
     }
 
     #[test]

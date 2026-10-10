@@ -119,9 +119,10 @@ pub fn handle_pay_claim(
     // Rule 4: the sliding window (ADR 0019). The payments of the last
     // `CLAIM_WINDOW_DAYS` UTC days, this one included, stay within the cap.
     let now = Clock::get()?.unix_timestamp;
-    let day = now.div_euclid(SECONDS_PER_DAY);
     let state = &mut ctx.accounts.state;
-    state.roll_claim_window(day);
+    // The effective day: a clock step back keeps the anchor's day, and the
+    // payment is booked there.
+    let day = state.roll_claim_window(now.div_euclid(SECONDS_PER_DAY));
     require!(
         state.claim_window_paid() + amount as u128 <= caps.max_claim_per_period as u128,
         MutavError::ClaimPeriodCapExceeded
