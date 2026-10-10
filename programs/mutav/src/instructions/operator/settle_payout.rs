@@ -1,4 +1,6 @@
-//! `settle_payout` (spec §5.4): records the PIX settlement of a payout.
+//! `settle_payout` (spec §5.4): records the PIX settlement of a payout. The
+//! program sets no settlement deadline: the payout SLA belongs to the
+//! operator platform (ADR 0019).
 
 use anchor_lang::prelude::*;
 
@@ -47,14 +49,9 @@ pub fn handle_settle_payout(
     require!(pix_e2e_hash != [0; 32], MutavError::InvalidParameter);
 
     let now = Clock::get()?.unix_timestamp;
-    let deadline = p
-        .paid_at
-        .saturating_add(ctx.accounts.config.payout_sla_secs);
-    let late = now > deadline;
     p.status = PAYOUT_SETTLED;
     p.pix_e2e_hash = pix_e2e_hash;
     p.settled_at = now;
-    p.late = late as u8;
 
     emit_cpi!(PayoutSettled {
         config: ctx.accounts.config.key(),
@@ -62,7 +59,6 @@ pub fn handle_settle_payout(
         guarantee_id: ctx.accounts.guarantee.id,
         notice_ref_hash,
         pix_e2e_hash,
-        late,
     });
     Ok(())
 }

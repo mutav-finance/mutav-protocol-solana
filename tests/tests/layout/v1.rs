@@ -97,14 +97,13 @@ pub struct VaultConfigV1 {
     pub adapters: [AdapterEntryV1; 8],
     pub caps: CapsV1,
     pub price: PriceParamsV1,
-    pub payout_sla_secs: i64,
     pub paused: bool,
     pub feature_flags: u64,
     pub mutav_capital_wallet: Pubkey,
     pub exit: ExitParamsV1,
     // ADR 0017, carved before the layout freeze.
     pub income_take_bps: u16,
-    pub _reserved: [u8; 510],
+    pub _reserved: [u8; 518],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -137,7 +136,6 @@ pub struct VaultStateV1 {
     pub fees_in_total: u64,
     pub fee_take_total: u64,
     pub claims_paid_total: u64,
-    pub late_payouts: u32,
     pub fulfil_halted: bool,
     pub last_refresh_ts: i64,
     pub last_refresh_slot: u64,
@@ -145,7 +143,7 @@ pub struct VaultStateV1 {
     pub income_total: u64,
     pub income_take_total: u64,
     pub inflow_nav: u64,
-    pub _reserved: [u8; 232],
+    pub _reserved: [u8; 236],
 }
 
 /// Golden field-offset tables: `(field, offset, size)`, offsets within the
@@ -182,14 +180,13 @@ pub const VAULT_STATE_V1: OffsetTable = &[
     ("fees_in_total", 171, 8),
     ("fee_take_total", 179, 8),
     ("claims_paid_total", 187, 8),
-    ("late_payouts", 195, 4),
-    ("fulfil_halted", 199, 1),
-    ("last_refresh_ts", 200, 8),
-    ("last_refresh_slot", 208, 8),
-    ("income_total", 216, 8),
-    ("income_take_total", 224, 8),
-    ("inflow_nav", 232, 8),
-    ("_reserved", 240, 232),
+    ("fulfil_halted", 195, 1),
+    ("last_refresh_ts", 196, 8),
+    ("last_refresh_slot", 204, 8),
+    ("income_total", 212, 8),
+    ("income_take_total", 220, 8),
+    ("inflow_nav", 228, 8),
+    ("_reserved", 236, 236),
 ];
 
 pub const VAULT_CONFIG_V1: OffsetTable = &[
@@ -215,14 +212,13 @@ pub const VAULT_CONFIG_V1: OffsetTable = &[
     ("caps._reserved", 1712 + 74, 32),
     ("price.tesouro_price_account", 1818, 32),
     ("price._reserved", 1818 + 62, 32),
-    ("payout_sla_secs", 1912, 8),
-    ("paused", 1920, 1),
-    ("feature_flags", 1921, 8),
-    ("mutav_capital_wallet", 1929, 32),
-    ("exit.buffer_target_bps", 1961, 2),
-    ("exit._reserved", 1961 + 243, 32),
-    ("income_take_bps", 2236, 2),
-    ("_reserved", 2238, 510),
+    ("paused", 1912, 1),
+    ("feature_flags", 1913, 8),
+    ("mutav_capital_wallet", 1921, 32),
+    ("exit.buffer_target_bps", 1953, 2),
+    ("exit._reserved", 1953 + 243, 32),
+    ("income_take_bps", 2228, 2),
+    ("_reserved", 2230, 518),
 ];
 
 pub const CAPS_V1: OffsetTable = &[
@@ -438,8 +434,7 @@ pub struct PayoutV1 {
     pub paid_at: i64,
     pub pix_e2e_hash: [u8; 32],
     pub settled_at: i64,
-    pub late: u8,
-    pub _reserved: [u8; 128],
+    pub _reserved: [u8; 129],
 }
 
 pub const CLAIM_FILING_V1: OffsetTable = &[
@@ -466,8 +461,7 @@ pub const PAYOUT_V1: OffsetTable = &[
     ("paid_at", 108, 8),
     ("pix_e2e_hash", 116, 32),
     ("settled_at", 148, 8),
-    ("late", 156, 1),
-    ("_reserved", 157, 128),
+    ("_reserved", 156, 129),
 ];
 
 // ---------------------------------------------------------------------------

@@ -424,7 +424,6 @@ impl Fixture {
             mutav_capital_wallet: self.mutav_capital_wallet.pubkey(),
             coverage_ratio_bps: 10_000,
             fee_take_bps: 2_000,
-            payout_sla_secs: 10 * 86_400,
             caps: test_caps(),
             price: test_price(),
         }
@@ -486,7 +485,6 @@ pub fn set_config_args(c: &VaultConfig) -> mutav::SetConfigArgs {
     mutav::SetConfigArgs {
         coverage_ratio_bps: c.coverage_ratio_bps,
         fee_take_bps: c.fee_take_bps,
-        payout_sla_secs: c.payout_sla_secs,
         feature_flags: c.feature_flags,
         mutav_capital_wallet: c.mutav_capital_wallet,
         caps: CapsInput {

@@ -275,16 +275,6 @@ pub struct PayoutSettled {
     pub guarantee_id: [u8; 32],
     pub notice_ref_hash: [u8; 32],
     pub pix_e2e_hash: [u8; 32],
-    pub late: bool,
-}
-
-#[event]
-pub struct PayoutLate {
-    pub config: Pubkey,
-    pub ts: i64,
-    pub guarantee_id: [u8; 32],
-    pub notice_ref_hash: [u8; 32],
-    pub paid_at: i64,
 }
 
 #[event]

@@ -78,7 +78,6 @@ pub struct VaultStateV2 {
     pub fees_in_total: u64,
     pub fee_take_total: u64,
     pub claims_paid_total: u64,
-    pub late_payouts: u32,
     pub fulfil_halted: bool,
     pub last_refresh_ts: i64,
     pub last_refresh_slot: u64,
@@ -87,8 +86,12 @@ pub struct VaultStateV2 {
     pub inflow_nav: u64,
     // -- carved from `_reserved` --
     pub instant_exit: InstantExitState,
-    pub _reserved: [u8; 144],
+    pub _reserved: [u8; V2_PAD],
 }
+
+/// `_reserved` of v1, and what is left after the 88-byte carve.
+const V1_PAD: usize = 236;
+const V2_PAD: usize = V1_PAD - 88;
 
 /// Decodes v2 from account bytes (discriminator skipped).
 fn v2(account: &[u8]) -> VaultStateV2 {
@@ -99,18 +102,18 @@ fn v2(account: &[u8]) -> VaultStateV2 {
 #[test]
 fn carve_sizes_are_pinned() {
     assert_eq!(ser(&InstantExitState::default()).len(), 88);
-    assert_eq!(ser(&zeroed::<VaultStateV2>()._reserved).len(), 144);
+    assert_eq!(ser(&zeroed::<VaultStateV2>()._reserved).len(), V2_PAD);
     assert_eq!(8 + ser(&zeroed::<VaultStateV2>()).len(), VAULT_STATE_SIZE);
     // The carve starts where v1 `_reserved` starts.
     let (_, reserved_at, reserved_len) = *VAULT_STATE_V1.last().unwrap();
-    assert_eq!(reserved_len, 232);
+    assert_eq!(reserved_len, V1_PAD);
     assert_eq!(
         span::<VaultStateV2>(|x| x.instant_exit = Sentinel::sentinel()),
         (reserved_at, 88)
     );
     assert_eq!(
         spans!(VaultStateV2; "_reserved" => _reserved),
-        vec![("_reserved", reserved_at + 88, 144)]
+        vec![("_reserved", reserved_at + 88, V2_PAD)]
     );
 }
 
@@ -125,12 +128,12 @@ fn v2_keeps_every_v1_offset() {
 fn v1_bytes_read_as_v2_with_zero_carve() {
     // A v1 account: every v1 field set, padding zero (as the pilot writes).
     let mut bytes = pattern(VAULT_STATE_SIZE - 8, STATE_BOOLS);
-    let (at, len) = (VAULT_STATE_V1.last().unwrap().1, 232);
+    let (at, len) = (VAULT_STATE_V1.last().unwrap().1, V1_PAD);
     bytes[at..at + len].fill(0);
     let v1 = VaultStateV1::deserialize(&mut bytes.as_slice()).unwrap();
     let v2 = VaultStateV2::deserialize(&mut bytes.as_slice()).unwrap();
     assert_eq!(v2.instant_exit, InstantExitState::default());
-    assert_eq!(v2._reserved, [0; 144]);
+    assert_eq!(v2._reserved, [0; V2_PAD]);
     assert_eq!(ser(&v2), bytes, "v2 re-serializes the v1 bytes unchanged");
     assert_eq!(v2.brs_balance, v1.brs_balance);
     assert_eq!(v2.buffer_earmark, v1.buffer_earmark);
@@ -147,7 +150,6 @@ fn pilot_accounts_read_as_v2() {
     let mut s = f.state();
     s.brs_balance = 123;
     s.buffer_earmark = 0;
-    s.late_payouts = 2;
     s.last_refresh_slot = 99;
     f.write_state(&s);
     // Building the list funds the reserve for the operator instructions.
@@ -160,7 +162,7 @@ fn pilot_accounts_read_as_v2() {
     let raw = f.raw(&f.pdas.state);
     let v2 = v2(&raw);
     assert_eq!(v2.instant_exit, InstantExitState::default());
-    assert_eq!(v2._reserved, [0; 144]);
+    assert_eq!(v2._reserved, [0; V2_PAD]);
     // Every v1 field reads the same through the v2 struct.
     let cur = f.state();
     assert_eq!(v2.brs_balance, cur.brs_balance);
@@ -169,7 +171,6 @@ fn pilot_accounts_read_as_v2() {
     assert_eq!(v2.claims_paid_total, cur.claims_paid_total);
     assert_eq!(v2.claim_period_start, cur.claim_period_start);
     assert_eq!(v2.pending_notices, cur.pending_notices);
-    assert_eq!(v2.late_payouts, cur.late_payouts);
     assert_eq!(v2.shares_outstanding, cur.shares_outstanding);
     assert_eq!(v2.next_redeem_seq, cur.next_redeem_seq);
     assert_eq!(v2.last_refresh_slot, cur.last_refresh_slot);
@@ -180,7 +181,7 @@ fn pilot_accounts_read_as_v2() {
     let fixture = std::fs::read(super::fixtures_dir().join("vault_state.bin")).unwrap();
     let v2 = self::v2(&fixture);
     assert_eq!(v2.instant_exit, InstantExitState::default());
-    assert_eq!(v2._reserved, [0; 144]);
+    assert_eq!(v2._reserved, [0; V2_PAD]);
 }
 
 #[test]

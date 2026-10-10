@@ -39,7 +39,6 @@ pub struct InitializeArgs {
     pub mutav_capital_wallet: Pubkey,
     pub coverage_ratio_bps: u16,
     pub fee_take_bps: u16,
-    pub payout_sla_secs: i64,
     pub caps: CapsInput,
     pub price: PriceInput,
 }
@@ -168,7 +167,6 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
     validate_params(
         args.coverage_ratio_bps,
         args.fee_take_bps,
-        args.payout_sla_secs,
         &args.caps,
         &args.price,
     )?;
@@ -204,7 +202,6 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
     config.fee_take_bps = args.fee_take_bps;
     config.payments_account = ctx.accounts.payments_account.key();
     config.treasury_account = ctx.accounts.treasury_account.key();
-    config.payout_sla_secs = args.payout_sla_secs;
     config.mutav_capital_wallet = args.mutav_capital_wallet;
     // Initial values are announced by `VaultInitialized`, not `ConfigUpdated`.
     let mut ignored = ConfigChanges::default();

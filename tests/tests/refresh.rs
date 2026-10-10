@@ -1,11 +1,11 @@
-//! `refresh` (spec §5.8; plan Task 10): late-payout flags, freeze detection,
+//! `refresh` (spec §5.8; plan Task 10): freeze detection,
 //! `StateRefreshed` and the earmark ratchet (carried from 2a). Mode and the
 //! NAV-move guard are in `under_coverage.rs`.
 
 use mutav::{
     constants::*,
     errors::MutavError,
-    events::{ModeChanged, PayoutLate, PayoutSettled, ReserveFrozenDetected, StateRefreshed},
+    events::{ModeChanged, ReserveFrozenDetected, StateRefreshed},
     solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
     RegisterGuaranteeArgs,
@@ -13,7 +13,6 @@ use mutav::{
 use mutav_tests::helpers::*;
 
 const T0: i64 = 1_760_000_000;
-const SLA: i64 = 10 * 86_400;
 
 fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
     Solvency::compute(&SolvencyInputs {
@@ -50,87 +49,28 @@ fn paid_claim(f: &mut Fixture, g: &RegisterGuaranteeArgs, amount: u64) -> Claim 
 }
 
 // ---------------------------------------------------------------------------
-// Late payouts
+// Payouts (ADR 0019: no payout SLA in the program)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn a_pending_payout_past_the_sla_is_flagged_once_and_counted() {
-    let (mut f, g) = reserve();
-    let late = paid_claim(&mut f, &g, 1_000 * BRL);
-    set_time(&mut f.svm, T0 + 1);
-    let on_time = paid_claim(&mut f, &g, 500 * BRL);
-
-    // At exactly paid_at + SLA nothing is late yet.
-    set_time(&mut f.svm, T0 + SLA);
-    let meta = f.refresh_with(&[late, on_time]).unwrap();
-    assert!(events::<PayoutLate>(&meta).is_empty());
-    assert_eq!(f.payout(&late).late, 0);
-
-    set_time(&mut f.svm, T0 + SLA + 1);
-    let meta = f.refresh_with(&[late, on_time]).unwrap();
-    assert_eq!(f.payout(&late).late, 1);
-    assert_eq!(f.payout(&on_time).late, 0);
-    assert_eq!(f.state().late_payouts, 1);
-    let ev = events::<PayoutLate>(&meta);
-    assert_eq!(ev.len(), 1);
-    assert_eq!(
-        (
-            ev[0].config,
-            ev[0].guarantee_id,
-            ev[0].notice_ref_hash,
-            ev[0].paid_at
-        ),
-        (f.pdas.config, g.id, late.notice, T0)
-    );
-    assert_eq!(ev[0].ts, T0 + SLA + 1);
-
-    // Flagged once: a later refresh does not count it again.
-    set_time(&mut f.svm, T0 + SLA + 2);
-    let meta = f.refresh_with(&[late, on_time]).unwrap();
-    assert_eq!(events::<PayoutLate>(&meta).len(), 1, "only the second one");
-    assert_eq!(f.state().late_payouts, 2);
-    let meta = f.refresh_with(&[late, on_time]).unwrap();
-    assert!(events::<PayoutLate>(&meta).is_empty());
-    assert_eq!(f.state().late_payouts, 2);
-
-    // Settling a flagged payout keeps it late.
-    let meta = f.settle_payout(late, unique_hash()).unwrap();
-    assert!(events::<PayoutSettled>(&meta)[0].late);
-    assert_eq!(f.payout(&late).late, 1);
-}
-
-#[test]
-fn a_settled_payout_is_never_flagged() {
+fn refresh_leaves_a_long_pending_payout_untouched() {
     let (mut f, g) = reserve();
     let c = paid_claim(&mut f, &g, 1_000 * BRL);
+    let before = f.raw(&payout_pda(
+        &guarantee_pda(&f.pdas.config, &g.id),
+        &c.notice,
+    ));
+    set_time(&mut f.svm, T0 + 365 * 86_400);
+    f.refresh().unwrap();
+    let after = f.raw(&payout_pda(
+        &guarantee_pda(&f.pdas.config, &g.id),
+        &c.notice,
+    ));
+    assert_eq!(before, after, "refresh writes no payout");
+    assert_eq!(f.payout(&c).status, PAYOUT_PENDING);
+    // Settlement is still recorded, however late.
     f.settle_payout(c, unique_hash()).unwrap();
-    set_time(&mut f.svm, T0 + 3 * SLA);
-    let meta = f.refresh_with(&[c]).unwrap();
-    assert!(events::<PayoutLate>(&meta).is_empty());
-    assert_eq!((f.payout(&c).late, f.state().late_payouts), (0, 0));
-}
-
-#[test]
-fn payout_pairs_must_match() {
-    let (mut f, g) = reserve();
-    let c = paid_claim(&mut f, &g, 1_000 * BRL);
-    let g2 = guarantee_args(unique_hash(), 5_000 * BRL, 0);
-    f.register(g2.clone()).unwrap();
-    set_time(&mut f.svm, T0 + SLA + 1);
-    // A payout paired with another guarantee.
-    let config = f.pdas.config;
-    let wrong = (
-        guarantee_pda(&config, &g2.id),
-        payout_pda(&guarantee_pda(&config, &g.id), &c.notice),
-    );
-    let ix = f.refresh_ix(&[wrong]);
-    let payer = f.payer.insecure_clone();
-    assert_mutav_err(f.send(ix, &payer), MutavError::InvalidParameter);
-    // A non-payout account in the payout slot.
-    let g1 = guarantee_pda(&config, &g.id);
-    let ix = f.refresh_ix(&[(g1, g1)]);
-    assert_mutav_err(f.send(ix, &payer), MutavError::InvalidParameter);
-    assert_eq!(f.payout(&c).late, 0);
+    assert_eq!(f.payout(&c).status, PAYOUT_SETTLED);
 }
 
 // ---------------------------------------------------------------------------

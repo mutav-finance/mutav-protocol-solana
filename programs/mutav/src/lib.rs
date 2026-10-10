@@ -35,7 +35,7 @@ pub mod mutav {
     }
 
     /// Update caps, price bounds, exit parameters, fee take, coverage ratio,
-    /// payout SLA, feature flags, treasury and the MUTAV capital wallet. Admin.
+    /// feature flags, treasury and the MUTAV capital wallet. Admin.
     pub fn set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result<()> {
         instructions::admin::set_config::handle_set_config(ctx, args)
     }

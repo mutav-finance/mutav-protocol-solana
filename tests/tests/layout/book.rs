@@ -197,7 +197,7 @@ fn payout_layout_is_frozen() {
                 "amount" => amount, "notice_ref_hash" => notice_ref_hash,
                 "payments_account" => payments_account, "status" => status,
                 "paid_at" => paid_at, "pix_e2e_hash" => pix_e2e_hash,
-                "settled_at" => settled_at, "late" => late, "_reserved" => _reserved)
+                "settled_at" => settled_at, "_reserved" => _reserved)
         };
     }
     assert_eq!(fields!(PayoutV1), PAYOUT_V1.to_vec());

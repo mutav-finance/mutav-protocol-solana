@@ -109,7 +109,7 @@ macro_rules! vault_state_fields {
             "claim_period_start" => claim_period_start,
             "claim_period_paid" => claim_period_paid, "fees_in_total" => fees_in_total,
             "fee_take_total" => fee_take_total, "claims_paid_total" => claims_paid_total,
-            "late_payouts" => late_payouts, "fulfil_halted" => fulfil_halted,
+            "fulfil_halted" => fulfil_halted,
             "last_refresh_ts" => last_refresh_ts, "last_refresh_slot" => last_refresh_slot,
             "income_total" => income_total, "income_take_total" => income_take_total,
             "inflow_nav" => inflow_nav,
@@ -134,7 +134,7 @@ macro_rules! vault_config_fields {
             "caps.max_tvl" => caps.max_tvl, "caps._reserved" => caps._reserved,
             "price.tesouro_price_account" => price.tesouro_price_account,
             "price._reserved" => price._reserved,
-            "payout_sla_secs" => payout_sla_secs, "paused" => paused,
+            "paused" => paused,
             "feature_flags" => feature_flags, "mutav_capital_wallet" => mutav_capital_wallet,
             "exit.buffer_target_bps" => exit.buffer_target_bps,
             "exit._reserved" => exit._reserved,
@@ -217,11 +217,11 @@ pub fn pattern(len: usize, bools: &[usize]) -> Vec<u8> {
 
 fn config_bools() -> Vec<usize> {
     let mut b: Vec<usize> = (0..MAX_ADAPTERS).map(|i| 296 + i * 177 + 112).collect();
-    b.push(1920); // paused
+    b.push(1912); // paused
     b
 }
 
-const STATE_BOOLS: &[usize] = &[199]; // fulfil_halted
+const STATE_BOOLS: &[usize] = &[195]; // fulfil_halted
 
 fn fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures/layout/v1")

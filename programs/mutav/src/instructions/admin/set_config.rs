@@ -27,7 +27,6 @@ use crate::{
 pub struct SetConfigArgs {
     pub coverage_ratio_bps: u16,
     pub fee_take_bps: u16,
-    pub payout_sla_secs: i64,
     pub feature_flags: u64,
     pub mutav_capital_wallet: Pubkey,
     pub caps: CapsInput,
@@ -85,7 +84,6 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
     validate_params(
         args.coverage_ratio_bps,
         args.fee_take_bps,
-        args.payout_sla_secs,
         &args.caps,
         &args.price,
     )?;
@@ -120,11 +118,6 @@ pub fn handle_set_config(ctx: Context<SetConfig>, args: SetConfigArgs) -> Result
         field::TREASURY_ACCOUNT,
         &mut config.treasury_account,
         treasury,
-    );
-    ch.set(
-        field::PAYOUT_SLA_SECS,
-        &mut config.payout_sla_secs,
-        args.payout_sla_secs,
     );
     ch.set(
         field::FEATURE_FLAGS,

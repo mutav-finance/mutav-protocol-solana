@@ -29,7 +29,6 @@ fn value_bytes(c: &VaultConfig, id: u16) -> [u8; 32] {
         PAYMENTS_ACCOUNT => c.payments_account.field_bytes(),
         TREASURY_ACCOUNT => c.treasury_account.field_bytes(),
         INVESTOR_ALLOWLIST_ROOT => c.investor_allowlist_root.field_bytes(),
-        PAYOUT_SLA_SECS => c.payout_sla_secs.field_bytes(),
         PAUSED => c.paused.field_bytes(),
         FEATURE_FLAGS => c.feature_flags.field_bytes(),
         MUTAV_CAPITAL_WALLET => c.mutav_capital_wallet.field_bytes(),
@@ -81,7 +80,6 @@ fn change_in_set_config(a: &mut SetConfigArgs, id: u16) -> bool {
     match id {
         COVERAGE_RATIO_BPS => a.coverage_ratio_bps += 1,
         FEE_TAKE_BPS => a.fee_take_bps += 1,
-        PAYOUT_SLA_SECS => a.payout_sla_secs += 1,
         MUTAV_CAPITAL_WALLET => a.mutav_capital_wallet = Pubkey::new_unique(),
         CAPS_MAX_TVL => a.caps.max_tvl += 1,
         CAPS_MAX_COVER_PER_GUARANTEE => a.caps.max_cover_per_guarantee += 1,

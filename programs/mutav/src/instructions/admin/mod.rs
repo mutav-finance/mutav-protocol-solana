@@ -44,7 +44,6 @@ pub(crate) fn validate_roles(admin: &Pubkey, operator: &Pubkey, pauser: &Pubkey)
 pub(crate) fn validate_params(
     coverage_ratio_bps: u16,
     fee_take_bps: u16,
-    payout_sla_secs: i64,
     caps: &CapsInput,
     price: &PriceInput,
 ) -> Result<()> {
@@ -72,10 +71,7 @@ pub(crate) fn validate_params(
     );
     // A zero window would reset the per-period claim cap on every call.
     require!(caps.claim_period_secs > 0, MutavError::InvalidParameter);
-    require!(
-        payout_sla_secs >= 0 && price.max_staleness_secs >= 0,
-        MutavError::InvalidParameter
-    );
+    require!(price.max_staleness_secs >= 0, MutavError::InvalidParameter);
     Ok(())
 }
 

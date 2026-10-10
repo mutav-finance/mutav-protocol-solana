@@ -53,7 +53,6 @@ fn initialize_creates_the_reserve() {
     assert_eq!(c.caps.min_fill_assets, args.caps.min_fill_assets);
     assert_eq!(c.price.p0, args.price.p0);
     assert_eq!(c.price.max_nav_move_bps, args.price.max_nav_move_bps);
-    assert_eq!(c.payout_sla_secs, args.payout_sla_secs);
     assert!(!c.paused);
     assert_eq!(c.mutav_capital_wallet, args.mutav_capital_wallet);
     // Pilot defaults: no features, zeroed exit params, no adapters, zero padding.
@@ -70,7 +69,7 @@ fn initialize_creates_the_reserve() {
         && a._reserved == [0; 62]));
     // ADR 0017: no take from issuer income at launch.
     assert_eq!(c.income_take_bps, 0);
-    assert_eq!(c._reserved, [0; 510]);
+    assert_eq!(c._reserved, [0; 518]);
 
     // VaultState: empty.
     let acc = f.svm.get_account(&p.state).unwrap();
@@ -89,7 +88,7 @@ fn initialize_creates_the_reserve() {
         (s.income_total, s.income_take_total, s.inflow_nav),
         (0, 0, 0)
     );
-    assert_eq!(s._reserved, [0; 232]);
+    assert_eq!(s._reserved, [0; 236]);
 
     // Share mint: 6 dp, mint and freeze authority = vault authority, no supply.
     let m = mint_at(&f, &p.share_mint);
@@ -245,7 +244,6 @@ fn params_out_of_program_bounds_rejected() {
         Box::new(|a| a.price.y_max_bps = 10_001),
         Box::new(|a| a.caps.min_request = a.caps.max_request + 1),
         Box::new(|a| a.caps.claim_period_secs = 0),
-        Box::new(|a| a.payout_sla_secs = -1),
         Box::new(|a| a.price.max_staleness_secs = -1),
     ];
     for (i, case) in cases.iter().enumerate() {

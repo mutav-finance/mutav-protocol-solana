@@ -54,8 +54,6 @@ pub struct VaultConfig {
     pub adapters: [AdapterEntry; MAX_ADAPTERS],
     pub caps: Caps,
     pub price: PriceParams,
-    /// Settlement SLA for payouts.
-    pub payout_sla_secs: i64,
     /// Global pause flag.
     pub paused: bool,
     /// Bitmask of optional features. `0` in the pilot.
@@ -70,7 +68,7 @@ pub struct VaultConfig {
     /// reserve.
     pub income_take_bps: u16,
     /// Zeroed. Never read or written by logic.
-    pub _reserved: [u8; 510],
+    pub _reserved: [u8; 518],
 }
 
 const _: () = assert!(8 + VaultConfig::INIT_SPACE == VAULT_CONFIG_SIZE);

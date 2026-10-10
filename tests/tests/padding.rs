@@ -8,6 +8,10 @@ use mutav::{
 };
 use mutav_tests::helpers::*;
 
+/// Top-level `_reserved` length of `VaultConfig` and `VaultState`.
+const CONFIG_PAD: usize = 518;
+const STATE_PAD: usize = 236;
+
 /// Every `_reserved` region of `VaultConfig`, top-level and nested.
 fn config_padding(c: &VaultConfig) -> Vec<Vec<u8>> {
     let mut out = vec![
@@ -35,7 +39,7 @@ fn noise(seed: u64, n: usize) -> Vec<u8> {
 
 fn inject_noise(f: &mut Fixture, seed: u64) {
     let mut c = f.config();
-    c._reserved.copy_from_slice(&noise(seed, 510));
+    c._reserved.copy_from_slice(&noise(seed, CONFIG_PAD));
     c.caps._reserved.copy_from_slice(&noise(seed + 1, 32));
     c.price._reserved.copy_from_slice(&noise(seed + 2, 32));
     c.exit._reserved.copy_from_slice(&noise(seed + 3, 32));
@@ -45,7 +49,7 @@ fn inject_noise(f: &mut Fixture, seed: u64) {
     }
     f.write_config(&c);
     let mut s = f.state();
-    s._reserved.copy_from_slice(&noise(seed + 100, 232));
+    s._reserved.copy_from_slice(&noise(seed + 100, STATE_PAD));
     f.write_state(&s);
 }
 
@@ -57,7 +61,7 @@ fn init_leaves_padding_zero() {
         assert!(pad.iter().all(|b| *b == 0), "config padding region {i}");
     }
     assert_eq!(config_padding(&c).len(), 4 + MAX_ADAPTERS);
-    assert_eq!(f.state()._reserved, [0; 232]);
+    assert_eq!(f.state()._reserved, [0; STATE_PAD]);
 
     // `VaultState` starts empty: after the discriminator, only `version` and
     // `bump` are non-zero.
@@ -91,16 +95,16 @@ fn padding_survives_every_instruction() {
 
 #[test]
 fn padding_bytes_are_where_the_layout_says() {
-    // Raw-byte check, independent of the struct decode: the last 510 bytes of
-    // `VaultConfig` and the last 232 of `VaultState` are the `_reserved`
-    // arrays (after the ADR 0017 carve), and the injected noise sits exactly
+    // Raw-byte check, independent of the struct decode: the last `CONFIG_PAD` bytes of
+    // `VaultConfig` and the last `STATE_PAD` of `VaultState` are the `_reserved`
+    // arrays (after the carves), and the injected noise sits exactly
     // there.
     let mut f = Fixture::new();
     inject_noise(&mut f, 42);
     let c = f.raw(&f.pdas.config);
-    assert_eq!(&c[c.len() - 510..], noise(42, 510).as_slice());
+    assert_eq!(&c[c.len() - CONFIG_PAD..], noise(42, CONFIG_PAD).as_slice());
     let s = f.raw(&f.pdas.state);
-    assert_eq!(&s[s.len() - 232..], noise(142, 232).as_slice());
+    assert_eq!(&s[s.len() - STATE_PAD..], noise(142, STATE_PAD).as_slice());
 }
 
 #[test]

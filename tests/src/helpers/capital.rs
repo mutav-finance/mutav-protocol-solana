@@ -666,16 +666,15 @@ impl Fixture {
                 self.advance_queue_heads_ix(4, &[r0, r1], &[d0, d1]),
                 self.payer.insecure_clone(),
             ),
-            ("refresh", self.refresh_ix(&[]), self.payer.insecure_clone()),
+            ("refresh", self.refresh_ix(), self.payer.insecure_clone()),
         ]
     }
 }
 
 impl Fixture {
-    /// `refresh` (spec §5.8), with `payouts` as `(guarantee, payout)` pairs of
-    /// remaining accounts (Task 10).
-    pub fn refresh_ix(&self, payouts: &[(Pubkey, Pubkey)]) -> Instruction {
-        let mut metas = mutav::accounts::Refresh {
+    /// `refresh` (spec §5.8). It takes no remaining accounts.
+    pub fn refresh_ix(&self) -> Instruction {
+        let metas = mutav::accounts::Refresh {
             config: self.pdas.config,
             state: self.pdas.state,
             reserve: self.pdas.reserve,
@@ -686,10 +685,6 @@ impl Fixture {
             program: mutav::ID,
         }
         .to_account_metas(None);
-        for (g, p) in payouts {
-            metas.push(AccountMeta::new_readonly(*g, false));
-            metas.push(AccountMeta::new(*p, false));
-        }
         Instruction::new_with_bytes(mutav::ID, &mutav::instruction::Refresh {}.data(), metas)
     }
 
@@ -718,25 +713,11 @@ impl Fixture {
 
     /// `refresh` sent by a fresh, unrelated signer (it is permissionless).
     pub fn refresh(&mut self) -> TransactionResult {
-        self.refresh_with(&[])
-    }
-
-    /// `refresh` passing the payouts of `claims` (their guarantee and payout
-    /// accounts).
-    pub fn refresh_with(&mut self, claims: &[super::Claim]) -> TransactionResult {
         let anyone = Keypair::new();
         self.svm
             .airdrop(&anyone.pubkey(), 1_000_000_000)
             .expect("airdrop");
-        let config = self.pdas.config;
-        let pairs: Vec<(Pubkey, Pubkey)> = claims
-            .iter()
-            .map(|c| {
-                let g = super::guarantee_pda(&config, &c.id);
-                (g, super::payout_pda(&g, &c.notice))
-            })
-            .collect();
-        let ix = self.refresh_ix(&pairs);
+        let ix = self.refresh_ix();
         super::send_ix(&mut self.svm, ix, &[&anyone])
     }
 }

@@ -428,7 +428,6 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         mutav_capital_wallet: rng.pubkey(),
         coverage_ratio_bps: 10_000,
         fee_take_bps: 2_000,
-        payout_sla_secs: 172_800,
         caps: caps.clone(),
         price: price.clone(),
     };
@@ -464,7 +463,6 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
                 "mutavCapitalWallet": init.mutav_capital_wallet.to_string(),
                 "coverageRatioBps": init.coverage_ratio_bps,
                 "feeTakeBps": init.fee_take_bps,
-                "payoutSlaSecs": si(init.payout_sla_secs),
                 "caps": caps_json,
                 "price": price_json,
             }}),

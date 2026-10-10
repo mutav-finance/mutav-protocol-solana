@@ -196,7 +196,8 @@ pub mod field {
     pub const PAYMENTS_ACCOUNT: u16 = 10;
     pub const TREASURY_ACCOUNT: u16 = 11;
     pub const INVESTOR_ALLOWLIST_ROOT: u16 = 12;
-    pub const PAYOUT_SLA_SECS: u16 = 13;
+    // 13 was `payout_sla_secs`, retired before the freeze (ADR 0019): the
+    // payout SLA belongs to the operator platform. Never reuse it.
     pub const PAUSED: u16 = 14;
     pub const FEATURE_FLAGS: u16 = 15;
     pub const MUTAV_CAPITAL_WALLET: u16 = 16;
@@ -243,6 +244,10 @@ pub mod field {
     pub const EXIT_BARRED_0: u16 = 316;
 }
 
+/// `ConfigUpdated` field ids of fields retired before the freeze (ADR 0019).
+/// No field may ever take one of them.
+pub const RETIRED_FIELD_IDS: &[u16] = &[13];
+
 /// One row of the field-id table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ConfigField {
@@ -285,7 +290,6 @@ pub const CONFIG_FIELDS: &[ConfigField] = &[
     f(field::PAYMENTS_ACCOUNT, "payments_account"),
     f(field::TREASURY_ACCOUNT, "treasury_account"),
     f(field::INVESTOR_ALLOWLIST_ROOT, "investor_allowlist_root"),
-    f(field::PAYOUT_SLA_SECS, "payout_sla_secs"),
     f(field::PAUSED, "paused"),
     f(field::FEATURE_FLAGS, "feature_flags"),
     f(field::MUTAV_CAPITAL_WALLET, "mutav_capital_wallet"),
@@ -360,6 +364,17 @@ mod tests {
             for b in &CONFIG_FIELDS[i + 1..] {
                 assert_ne!(a.id, b.id, "{} and {} share an id", a.name, b.name);
             }
+        }
+    }
+
+    #[test]
+    fn retired_field_ids_are_never_reused() {
+        for f in CONFIG_FIELDS {
+            assert!(
+                !RETIRED_FIELD_IDS.contains(&f.id),
+                "{} reuses a retired id",
+                f.name
+            );
         }
     }
 

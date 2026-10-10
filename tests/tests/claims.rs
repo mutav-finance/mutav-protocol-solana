@@ -268,10 +268,10 @@ fn pay_claim_pays_the_payments_account_and_releases_the_provision() {
         (5_000 * BRL, c.notice, payments)
     );
     assert_eq!(
-        (p.paid_at, p.settled_at, p.pix_e2e_hash, p.late),
-        (1_770_000_000, 0, [0; 32], 0)
+        (p.paid_at, p.settled_at, p.pix_e2e_hash),
+        (1_770_000_000, 0, [0; 32])
     );
-    assert_eq!(p._reserved, [0; 128]);
+    assert_eq!(p._reserved, [0; 129]);
 
     let ev = events::<ClaimPaid>(&meta);
     assert_eq!(ev.len(), 1);
@@ -624,8 +624,7 @@ fn paid(capital: u64, amount: u64) -> (Fixture, Claim) {
 }
 
 /// Demo step: "`settle_payout` records the PIX e2e hash". MUTAV offramps
-/// BRS→BRL, pays the agency by PIX and records the end-to-end ID's hash
-/// within the SLA.
+/// BRS→BRL, pays the agency by PIX and records the end-to-end ID's hash.
 #[test]
 fn demo_settle_payout_records_pix_e2e_hash() {
     let (mut f, c) = paid(10_000 * BRL, 4_000 * BRL);
@@ -638,28 +637,29 @@ fn demo_settle_payout_records_pix_e2e_hash() {
     assert_eq!(p.status, PAYOUT_SETTLED);
     assert_eq!(p.pix_e2e_hash, pix);
     assert_eq!(p.settled_at, paid_at + 3 * 86_400);
-    assert_eq!(p.late, 0);
     let ev = events::<PayoutSettled>(&meta);
     assert_eq!(ev.len(), 1);
     let e = &ev[0];
     assert_eq!((e.config, e.ts), (f.pdas.config, paid_at + 3 * 86_400));
     assert_eq!(
-        (e.guarantee_id, e.notice_ref_hash, e.pix_e2e_hash, e.late),
-        (c.id, c.notice, pix, false)
+        (e.guarantee_id, e.notice_ref_hash, e.pix_e2e_hash),
+        (c.id, c.notice, pix)
     );
 }
 
+/// ADR 0019: the program sets no settlement deadline. A payout settled a
+/// year after payment records the same way as one settled the next day.
 #[test]
-fn settle_payout_flags_late_past_the_sla() {
-    // Test SLA: 10 days. Exactly at the SLA is on time; one second later is late.
-    let sla = 10 * 86_400;
-    for (delay, late) in [(sla, false), (sla + 1, true)] {
+fn settle_payout_has_no_deadline() {
+    for delay in [86_400, 365 * 86_400] {
         let (mut f, c) = paid(10_000 * BRL, BRL);
         let paid_at = f.payout(&c).paid_at;
         set_time(&mut f.svm, paid_at + delay);
-        let meta = f.settle_payout(c, unique_hash()).unwrap();
-        assert_eq!(f.payout(&c).late, late as u8, "delay {delay}");
-        assert_eq!(events::<PayoutSettled>(&meta)[0].late, late);
+        let pix = unique_hash();
+        let meta = f.settle_payout(c, pix).unwrap();
+        let p = f.payout(&c);
+        assert_eq!((p.status, p.settled_at), (PAYOUT_SETTLED, paid_at + delay));
+        assert_eq!(events::<PayoutSettled>(&meta)[0].pix_e2e_hash, pix);
     }
 }
 
@@ -805,8 +805,8 @@ fn claim_padding_is_preserved_in_place() {
     assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 128]);
     assert_eq!(f.guarantee(&g.id)._reserved, [0xc3; 192]);
     let mut p = f.payout(&c);
-    p._reserved = [0x77; 128];
+    p._reserved = [0x77; 129];
     f.write_payout(&c, &p);
     f.settle_payout(c, unique_hash()).unwrap();
-    assert_eq!(f.payout(&c)._reserved, [0x77; 128]);
+    assert_eq!(f.payout(&c)._reserved, [0x77; 129]);
 }

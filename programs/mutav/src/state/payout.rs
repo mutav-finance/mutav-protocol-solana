@@ -27,22 +27,20 @@ pub struct Payout {
     pub pix_e2e_hash: [u8; 32],
     /// `0` while pending.
     pub settled_at: i64,
-    /// `0`/`1`: settlement exceeded the SLA.
-    pub late: u8,
     /// Zeroed. Never read or written by logic. The 128-byte pilot budget
-    /// (spec §14.2) holds the ADR 0012 settlement fields (74 bytes) without a
-    /// migration; it was grown from 64 before the layout freeze (ADR 0019).
-    pub _reserved: [u8; 128],
+    /// (spec §14.2), plus the byte of the retired payout-SLA flag, holds the
+    /// ADR 0012 settlement fields (74 bytes) without a migration; it was
+    /// grown before the layout freeze (ADR 0019).
+    pub _reserved: [u8; 129],
 }
 
 const _: () = assert!(8 + Payout::INIT_SPACE == PAYOUT_SIZE);
 
 impl Payout {
-    /// Version guard (spec §14.2 R1b): known version, leg, status and flag.
+    /// Version guard (spec §14.2 R1b): known version, leg and status.
     pub fn is_supported(&self) -> bool {
         self.version <= PROGRAM_LAYOUT_VERSION
             && matches!(self.leg, LEG_DEFAULT | LEG_EXIT)
             && matches!(self.status, PAYOUT_PENDING | PAYOUT_SETTLED)
-            && self.late <= 1
     }
 }

@@ -43,7 +43,6 @@ pub struct VaultState {
     pub fees_in_total: u64,
     pub fee_take_total: u64,
     pub claims_paid_total: u64,
-    pub late_payouts: u32,
     pub fulfil_halted: bool,
     pub last_refresh_ts: i64,
     pub last_refresh_slot: u64,
@@ -61,7 +60,7 @@ pub struct VaultState {
     /// reset it to 0.
     pub inflow_nav: u64,
     /// Zeroed. Phase 2 carves `InstantExitState` (88 bytes) from the front.
-    pub _reserved: [u8; 232],
+    pub _reserved: [u8; 236],
 }
 
 const _: () = assert!(8 + VaultState::INIT_SPACE == VAULT_STATE_SIZE);
