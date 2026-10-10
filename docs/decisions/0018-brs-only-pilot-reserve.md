@@ -1,6 +1,7 @@
 # 0018 — BRS-only pilot reserve; assets expand through adapters
 
 - **Status:** Accepted for the pilot (Julia, 2026-10-07); builds on ADR 0017, which is still proposed. Narrows how ADR 0002 applies in the pilot and generalises its single-asset limits to per-reserve and per-adapter ones. No program change in this PR; the follow-up (#29, before the layout freeze) replaced `max_tesouro_share_bps` with the settlement floor, chose option (a) below, carved `AdapterEntry.max_share_bps` and reserved the `AdapterState` seeds.
+- **Amended by [ADR 0019](0019-v1-layout-for-the-devnet-release.md):** the inline `adapters[8]`, `max_allocated_bps` (the settlement-floor complement), `PriceParams` and `tesouro_*` fields are removed before the freeze; `VaultConfig` carves `adapter_count` and `adapter_bitmap` (0), per-adapter state lives in the `AdapterState` PDA, and there is no on-chain settlement floor until adapters ship.
 
 ## Context
 
