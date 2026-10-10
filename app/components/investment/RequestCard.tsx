@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Action, Note, useLive } from "@/components/demo/shared";
-import { Access } from "@/components/dashboard/ActionPanel";
 import { LABEL, TRACKING } from "@/components/dashboard/shared";
 import { BRS_DECIMALS, SHARE_DECIMALS, fmtBrs, fmtShares, fmtUnits, parseBrs } from "@/lib/format";
 import type { InvestorView } from "@/lib/server/investor";
@@ -46,7 +45,7 @@ function Field({ id, title, unit, value, onChange, foot, readOnly }: { id: strin
   );
 }
 
-export function RequestCard({ inv, owner, connected }: { inv: InvestorView | null; owner: string | null; connected: boolean }) {
+export function RequestCard({ inv, connected }: { inv: InvestorView | null; connected: boolean }) {
   const { reserve } = useLive();
   const caps = reserve.config.caps;
   const { sharesOutstanding } = reserve.state;
@@ -73,7 +72,6 @@ export function RequestCard({ inv, owner, connected }: { inv: InvestorView | nul
 
   return (
     <section aria-labelledby="request-h" className="bg-(--color-surface) flex w-full flex-col border">
-      <Access state={state} owner={owner} paused={paused} />
       <div className="flex flex-col gap-4 px-6 py-5">
         <h2 id="request-h" className="font-display text-(--color-text) m-0 text-center text-xl font-bold">
           {deposit ? "Deposit" : "Redeem"}
@@ -144,6 +142,7 @@ export function RequestCard({ inv, owner, connected }: { inv: InvestorView | nul
             <Action label="Request redemption" disabled={!canRequest} request={amount ? { kind: "request_redeem", shares: amount } : null} />
           )}
         </div>
+        {paused && <Note tone="warn">Requests are paused by the Reserve Admin. Cancels and claims stay open on the Dashboard.</Note>}
         {outside && <Note tone="warn">Outside the per-request limits: the program will refuse it.</Note>}
       </div>
       <HowItWorks />

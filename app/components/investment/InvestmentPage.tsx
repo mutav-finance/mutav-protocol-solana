@@ -7,7 +7,7 @@
  * /dashboard, which keeps the position, the queue entries and the claims).
  * The pilot runs on MUTAV's own capital and is not open to public investment.
  *
- * Layout: header, one strip of three reserve figures, then the request card,
+ * Layout: centred header, one strip of three reserve figures, then the request card,
  * centred and narrow like a swap form.
  */
 import type { ReactNode } from "react";
@@ -24,34 +24,34 @@ import { RequestCard } from "./RequestCard";
 /** One figure of the strip: an icon tile, a caps label with its definition, and the value. */
 function Stat({ icon, label, tip, value }: { icon: ReactNode; label: string; tip: string; value: string }) {
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      <span aria-hidden="true" className="bg-(--color-surface-2) text-(--color-text-2) inline-flex size-9 shrink-0 items-center justify-center border">
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span aria-hidden="true" className="text-(--color-text-2) inline-flex shrink-0">
         {icon}
       </span>
-      <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="flex min-w-0 flex-col gap-1">
         <span className="inline-flex items-center gap-1.5">
-          <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>
+          <span className="font-body text-(--color-text-2) text-[11px] font-medium whitespace-nowrap uppercase" style={{ letterSpacing: "0.01em" }}>
             {label}
           </span>
           <InfoTooltip label={`Info: ${label}`} width={240}>
             {tip}
           </InfoTooltip>
         </span>
-        <Mono style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{value}</Mono>
+        <Mono style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{value}</Mono>
       </span>
     </div>
   );
 }
 
 const svg = (d: string) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
     <path d={d} />
   </svg>
 );
 
 function Stats({ r }: { r: ReserveView }) {
   return (
-    <div role="group" aria-label="Reserve figures" className="bg-(--color-surface) grid grid-cols-1 gap-4 border px-6 py-4 sm:grid-cols-3">
+    <div role="group" aria-label="Reserve figures" className="bg-(--color-surface) grid grid-cols-1 gap-x-6 gap-y-4 border px-5 py-4 sm:grid-cols-3">
       <Stat
         icon={svg("M3 17l6-6 4 4 8-8M15 7h6v6")}
         label="NAV per share"
@@ -76,7 +76,7 @@ function Stats({ r }: { r: ReserveView }) {
 
 function Skeleton() {
   return (
-    <div aria-busy="true" aria-label="Reading the chain" className="mx-auto flex w-full max-w-[480px] flex-col gap-6">
+    <div aria-busy="true" aria-label="Reading the chain" className="mx-auto flex w-full max-w-[560px] flex-col gap-6">
       <span className="sr-only">Reading the chain…</span>
       <div className="bg-(--color-surface) h-[72px] border" />
       <div className="bg-(--color-surface) h-[480px] border" />
@@ -85,15 +85,15 @@ function Skeleton() {
 }
 
 export function InvestmentPage() {
-  const { address, connected, owner, poll, d, inv, invData, refresh } = useInvestor();
+  const { address, connected, poll, d, inv, invData, refresh } = useInvestor();
   const pad = { paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" };
   return (
     <main className="flex w-full flex-1 flex-col gap-6 py-8" style={pad}>
       {d && <AccessGate key={`${address ?? "none"}-${invData?.allowlist.state ?? "?"}`} connected={connected} state={invData?.allowlist.state ?? null} />}
 
-      <header className="flex flex-col gap-2">
+      <header className="flex flex-col items-center gap-2 text-center">
         <h1 className="font-display text-(--color-text) m-0 text-3xl font-bold tracking-tight">Investment</h1>
-        <p className="font-body text-(--color-text-2) m-0 max-w-[60ch] text-sm">
+        <p className="font-body text-(--color-text-2) m-0 max-w-[60ch] text-sm text-balance">
           Deposit BRS or redeem shares through the capital queue. The pilot runs on MUTAV&apos;s own capital and is not open to public investment.
         </p>
       </header>
@@ -103,10 +103,10 @@ export function InvestmentPage() {
 
       {d && (
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh }}>
-          <div className="mx-auto flex w-full max-w-[480px] flex-col gap-6">
+          <div className="mx-auto flex w-full max-w-[560px] flex-col gap-6">
             <Stats r={d.reserve} />
             {inv.error && !inv.data && <ReadError error={inv.error} />}
-            <RequestCard inv={invData} owner={owner} connected={connected} />
+            <RequestCard inv={invData} connected={connected} />
           </div>
         </LiveProvider>
       )}
