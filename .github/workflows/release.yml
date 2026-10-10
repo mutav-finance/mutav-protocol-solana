@@ -6,7 +6,8 @@
 # Squads members review, approve and execute the proposal after the time lock.
 #
 # Secrets (not set in this repo; the founder adds them per environment):
-#   RELEASE_RPC_URL           RPC endpoint of the target cluster
+#   RELEASE_RPC_URL           Full http(s) RPC URL of the target cluster; the
+#                             cluster guard checks its genesis hash (devnet only)
 #   RELEASE_BUFFER_PAYER      JSON keypair that pays for the buffer (holds SOL
 #                             only; it never holds program or admin authority)
 name: release

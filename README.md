@@ -120,23 +120,31 @@ Checks: `bun run typecheck && bun run test && NEXT_PUBLIC_CLUSTER=localnet bun r
 
 ## Deploying
 
-The scripts in `scripts/devnet/` compose instructions; they never open a key file and never sign. The upgrade authority and `VaultConfig.admin` belong to a Squads v4 vault. Every admin step is therefore written as an **unsigned Squads proposal** (`*.json`), and members create, approve and execute it from mutav-app `apps/admin` or the Squads app. Only `deploy.ts` touches keys: it passes keypair **paths**, kept outside the repo, to the Solana CLI. Each script refuses a non-local URL unless you pass `--confirm-cluster devnet`. They are not built for mainnet: mainnet goes through `.github/workflows/release.yml` and the spec §14.5 runbook.
+The scripts in `scripts/devnet/` compose instructions; they never open a key file and never sign. Two Squads v4 multisigs hold authority: the **admin** multisig (`squads`, its vault is `VaultConfig.admin`, time lock ≥ 5 min on devnet) and the **upgrade** multisig (`upgradeSquads`, its vault is the program upgrade authority, time lock ≥ 1 h on devnet). Every admin step is therefore written as an **unsigned Squads proposal** (`*.json`), and members create, approve and execute it from mutav-app `apps/admin` or the Squads app. Only `deploy.ts` touches keys: it passes keypair **paths**, kept outside the repo, to the Solana CLI, and refuses a payer file readable by group or other (`chmod 600`).
+
+Every script that reads the chain takes a full http(s) `--url` (cluster monikers such as `m` or `devnet`, and empty values, are refused) and checks the RPC's genesis hash: mainnet is always refused, a loopback URL counts as local, and any other URL needs `--confirm-cluster devnet` and devnet's genesis hash. The cluster must match the config's `cluster`. They are not built for mainnet: mainnet goes through `.github/workflows/release.yml` and the spec §14.5 runbook.
 
 ```sh
 # 0. Rehearse everything against a throwaway local validator.
 anchor build
 bun scripts/devnet/dry-run.ts --program-keypair ~/.config/solana/mutav/mutav-keypair.json
 
-# 1. Fill a copy of scripts/devnet/devnet.example.json outside the repo (every <FILL: …>).
+# 1. Fill a copy of scripts/devnet/devnet.example.json outside the repo (every <FILL: …>):
+#    both multisigs, their exact members, the vaults, roles and money accounts.
 CFG=~/mutav/devnet.json; RPC=https://api.devnet.solana.com
 
-# 2. Deploy, then hand the upgrade authority to the Squads vault.
-bun scripts/devnet/deploy.ts --url $RPC --confirm-cluster devnet \
+# 2. Deploy, then hand the upgrade authority to the upgrade multisig's vault.
+#    Refuses before any CLI call unless --upgrade-authority equals the config's
+#    upgradeAuthority and the vault derived from upgradeSquads, and both
+#    multisigs pass the checks below. A failed handover prints the retry command.
+bun scripts/devnet/deploy.ts --config $CFG --url $RPC --confirm-cluster devnet \
   --payer ~/.config/solana/mutav/deployer.json \
   --program-keypair ~/.config/solana/mutav/mutav-keypair.json \
-  --upgrade-authority <SQUADS_VAULT>
+  --upgrade-authority <UPGRADE_VAULT>
 
-# 3. Proposals (fund the vault with ~0.1 SOL first: it pays rent for initialize).
+# 3. Proposals. init.json is for the upgrade multisig (fund its vault with ~0.1 SOL
+#    first: it pays rent for initialize); the others are for the admin multisig.
+#    init.ts refuses a reserve mint without 6 decimals or under another token program.
 bun scripts/devnet/init.ts      --config $CFG --url $RPC --confirm-cluster devnet --out init.json
 bun scripts/devnet/allowlist.ts --config $CFG --proofs allowlist-proofs.json --out allowlist.json
 #    … execute both, then if needed:
@@ -149,10 +157,16 @@ bun scripts/devnet/verify.ts --config $CFG --url $RPC --confirm-cluster devnet
 
 `verify.ts` checks:
 
-- the upgrade authority is the configured vault;
+- the upgrade authority is the upgrade multisig's vault;
 - `feature_flags == 0`;
 - admin, operator, pauser and the allowlist root are as configured;
-- the Squads multisig has `config_authority == Pubkey::default()`, `time_lock ≥` the agreed floor, and a sane threshold.
+- every other `VaultConfig` field equals the config file, field by field (c, fee take, every cap including the settlement floor, price bounds, `income_take_bps == 0`, 6 decimals, mint, token program, money accounts, capital wallet);
+- on devnet, the locked devnet values (`scripts/devnet/lib/compare.ts`); a `max_claim_per_period` raised for a large claim payment is reported until it is lowered again;
+- the treasury and payments accounts hold the reserve mint and are not owned by the operator;
+- the reserve mint is owned by `reserveTokenProgram` and has 6 decimals;
+- both multisigs are owned by the Squads v4 program, autonomous (`config_authority == Pubkey::default()`), with exactly the configured members (each able to vote), exactly the configured threshold, and `time_lock ≥` the floor.
+
+`bun run check:no-keys` scans `clients/js/src`, `app/` and `scripts/` for key-handling and signing APIs; the known exceptions (localnet-only tooling, wallet-side signing) are listed in `scripts/no-keys-allowlist.txt`.
 
 After the deploy, dump the live `VaultConfig` and `VaultState` into `tests/fixtures/layout/v1/` (spec §14.7).
 
