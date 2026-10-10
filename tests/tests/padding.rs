@@ -106,13 +106,13 @@ fn request_padding_is_zero_at_init_and_preserved() {
     assert_eq!(&raw[raw.len() - 64..], &[0; 64]);
 
     // Preserved by fulfil (in-place update).
-    let tail = |f: &mut Fixture, addr: &anchor_lang::prelude::Pubkey, seed: u64| {
+    let tail = |f: &mut Fixture, addr: &anchor_lang::prelude::Pubkey, seed: u64, pad: usize| {
         let mut raw = f.raw(addr);
         let n = raw.len();
-        raw[n - 64..].copy_from_slice(&noise(seed, 64));
+        raw[n - pad..].copy_from_slice(&noise(seed, pad));
         f.write_raw(addr, &raw);
     };
-    tail(&mut f, &dep, 1);
+    tail(&mut f, &dep, 1, 64);
     f.fulfil_deposits(1, &[d]).unwrap();
     let raw = f.raw(&dep);
     assert_eq!(&raw[raw.len() - 64..], noise(1, 64).as_slice());
@@ -121,12 +121,13 @@ fn request_padding_is_zero_at_init_and_preserved() {
     let (r, seq) = f.request_redeem(&a, &list, 2_000 * BRL);
     r.unwrap();
     let red = redeem_pda(&config, seq);
+    // `RedeemRequest` keeps 56 bytes of padding after `shares_filled` (ADR 0019).
     let raw = f.raw(&red);
-    assert_eq!(&raw[raw.len() - 64..], &[0; 64]);
-    tail(&mut f, &red, 3);
+    assert_eq!(&raw[raw.len() - 56..], &[0; 56]);
+    tail(&mut f, &red, 3, 56);
     f.fulfil_redeems(1, u64::MAX, &[seq]).unwrap();
     let raw = f.raw(&red);
-    assert_eq!(&raw[raw.len() - 64..], noise(3, 64).as_slice());
+    assert_eq!(&raw[raw.len() - 56..], noise(3, 56).as_slice());
 }
 
 #[test]

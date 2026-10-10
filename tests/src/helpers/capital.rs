@@ -522,10 +522,15 @@ impl Fixture {
         let (mut remaining, mut claimable) = (0u64, 0u64);
         for seq in 0..s.next_redeem_seq {
             if let Some(r) = self.redeem_request(seq) {
+                remaining += r.shares_remaining();
                 if r.status == REDEEM_PENDING {
-                    remaining += r.shares;
-                    assert_eq!(r.assets_out, 0, "{at}: pending seq {seq}");
+                    assert_eq!(
+                        (r.assets_out, r.shares_filled),
+                        (0, 0),
+                        "{at}: pending seq {seq}"
+                    );
                 } else {
+                    assert_eq!(r.shares_filled, r.shares, "{at}: filled seq {seq}");
                     claimable += r.assets_out;
                 }
             }

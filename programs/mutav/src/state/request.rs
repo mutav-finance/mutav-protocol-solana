@@ -70,9 +70,14 @@ pub struct RedeemRequest {
     pub filled_at: i64,
     /// `REDEEM_PENDING` / `REDEEM_FILLED`.
     pub status: u8,
-    /// Zeroed. Never read or written by logic. Holds the ADR 0010
+    // -- carved from `_reserved` by ADR 0019 (8 bytes) --
+    /// Shares burned by fills: `0` while pending, `shares` after the whole
+    /// fill. The remainder is derived, `shares − shares_filled`, so the
+    /// partial fills of ADR 0010 only add their own counters later.
+    pub shares_filled: u64,
+    /// Zeroed. Never read or written by logic. Holds the rest of the ADR 0010
     /// partial-fill fields without a migration (ADR 0019).
-    pub _reserved: [u8; 64],
+    pub _reserved: [u8; 56],
 }
 
 const _: () = assert!(8 + RedeemRequest::INIT_SPACE == REDEEM_REQUEST_SIZE);
@@ -82,5 +87,10 @@ impl RedeemRequest {
     pub fn is_supported(&self) -> bool {
         self.version <= PROGRAM_LAYOUT_VERSION
             && matches!(self.status, REDEEM_PENDING | REDEEM_FILLED)
+    }
+
+    /// Shares still escrowed: `shares − shares_filled`.
+    pub fn shares_remaining(&self) -> u64 {
+        self.shares.saturating_sub(self.shares_filled)
     }
 }

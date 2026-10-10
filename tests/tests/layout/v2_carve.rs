@@ -200,13 +200,13 @@ fn v2_bytes_survive_a_v1_decode_and_rewrite() {
 }
 
 // ---------------------------------------------------------------------------
-// RedeemRequestV2: the ADR 0010 partial-fill carve (ADR 0019, M1)
+// RedeemRequestV2: the rest of the ADR 0010 partial-fill carve (ADR 0019, M1)
 // ---------------------------------------------------------------------------
 
-/// Test-only `RedeemRequest` with the ADR 0010 partial-fill fields carved
-/// from the front of `_reserved`. The remainder is derived, never stored:
-/// `shares_remaining = shares − shares_filled`, so a zero carve on a live
-/// pilot request reads as "nothing filled, all shares remaining" (R3).
+/// Test-only `RedeemRequest` with the rest of the ADR 0010 partial-fill
+/// fields carved from the front of `_reserved`. `shares_filled` is already a
+/// v1 field (written on every whole fill), so the remainder `shares −
+/// shares_filled` and the claimable amount are derived, never stored.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct RedeemRequestV2 {
     pub version: u8,
@@ -219,12 +219,12 @@ pub struct RedeemRequestV2 {
     pub requested_at: i64,
     pub filled_at: i64,
     pub status: u8,
-    // -- carved from `_reserved` --
     pub shares_filled: u64,
-    pub assets_filled: u64,
+    // -- carved from `_reserved` --
+    pub assets_claimed: u64,
     pub fill_count: u16,
     pub last_fill_at: i64,
-    pub _reserved: [u8; 64 - 26],
+    pub _reserved: [u8; 56 - 18],
 }
 
 impl RedeemRequestV2 {
@@ -236,43 +236,46 @@ impl RedeemRequestV2 {
 #[test]
 fn redeem_carve_starts_where_v1_padding_starts() {
     let (_, at, len) = *REDEEM_REQUEST_V1.last().unwrap();
-    assert_eq!(len, 64);
+    assert_eq!(len, 56);
     assert_eq!(
         8 + ser(&zeroed::<RedeemRequestV2>()).len(),
         mutav::constants::REDEEM_REQUEST_SIZE
     );
     assert_eq!(
-        span::<RedeemRequestV2>(|x| x.shares_filled = Sentinel::sentinel()),
+        span::<RedeemRequestV2>(|x| x.assets_claimed = Sentinel::sentinel()),
         (at, 8)
     );
     assert_eq!(
         span::<RedeemRequestV2>(|x| x.last_fill_at = Sentinel::sentinel()),
-        (at + 18, 8)
+        (at + 10, 8)
     );
 }
 
 #[test]
-fn a_pending_v1_request_reads_as_v2_with_every_share_remaining() {
+fn v1_requests_read_as_v2_with_the_remainder_derived() {
     let mut f = Fixture::new();
     let a = f.investor(20_000 * BRL);
     let list = f.allowlist(&[a.pubkey()]);
     f.deposit(&a, &list, 10_000 * BRL);
     let (res, seq) = f.request_redeem(&a, &list, 4_000 * BRL);
     res.unwrap();
-    let raw = f.raw(&redeem_pda(&f.pdas.config, seq));
-    assert_eq!(&raw[..8], mutav::state::RedeemRequest::DISCRIMINATOR);
-    let v2 = RedeemRequestV2::deserialize(&mut &raw[8..]).unwrap();
+    let read = |f: &Fixture| {
+        let raw = f.raw(&redeem_pda(&f.pdas.config, seq));
+        assert_eq!(&raw[..8], mutav::state::RedeemRequest::DISCRIMINATOR);
+        RedeemRequestV2::deserialize(&mut &raw[8..]).unwrap()
+    };
+    // Pending: nothing filled, every share remaining, carve zero.
+    let v2 = read(&f);
     assert_eq!(v2.status, mutav::constants::REDEEM_PENDING);
-    assert_eq!(
-        (
-            v2.shares_filled,
-            v2.assets_filled,
-            v2.fill_count,
-            v2.last_fill_at
-        ),
-        (0, 0, 0, 0)
-    );
+    assert_eq!((v2.shares, v2.shares_filled), (4_000 * BRL, 0));
     assert_eq!(v2.shares_remaining(), v2.shares);
-    assert_eq!(v2.shares, 4_000 * BRL);
+    assert_eq!((v2.assets_claimed, v2.fill_count, v2.last_fill_at), (0, 0, 0));
     assert_eq!(v2._reserved, [0; 38]);
+    // After the whole fill: shares_filled == shares, nothing remaining.
+    f.fulfil_redeems(1, u64::MAX, &[seq]).unwrap();
+    let v2 = read(&f);
+    assert_eq!(v2.status, mutav::constants::REDEEM_FILLED);
+    assert_eq!(v2.shares_filled, v2.shares);
+    assert_eq!(v2.shares_remaining(), 0);
+    assert_eq!((v2.assets_claimed, v2.fill_count, v2.last_fill_at), (0, 0, 0));
 }

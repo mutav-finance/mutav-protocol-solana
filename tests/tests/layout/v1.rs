@@ -344,7 +344,8 @@ pub struct RedeemRequestV1 {
     pub requested_at: i64,
     pub filled_at: i64,
     pub status: u8,
-    pub _reserved: [u8; 64],
+    pub shares_filled: u64,
+    pub _reserved: [u8; 56],
 }
 
 pub const REDEEM_REQUEST_V1: OffsetTable = &[
@@ -358,7 +359,8 @@ pub const REDEEM_REQUEST_V1: OffsetTable = &[
     ("requested_at", 66, 8),
     ("filled_at", 74, 8),
     ("status", 82, 1),
-    ("_reserved", 83, 64),
+    ("shares_filled", 83, 8),
+    ("_reserved", 91, 56),
 ];
 
 /// Serialized size of `RedeemRequestV1` (the account adds 8).

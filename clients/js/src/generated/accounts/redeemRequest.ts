@@ -70,7 +70,13 @@ export type RedeemRequest = {
   /** `REDEEM_PENDING` / `REDEEM_FILLED`. */
   status: number;
   /**
-   * Zeroed. Never read or written by logic. Holds the ADR 0010
+   * Shares burned by fills: `0` while pending, `shares` after the whole
+   * fill. The remainder is derived, `shares − shares_filled`, so the
+   * partial fills of ADR 0010 only add their own counters later.
+   */
+  sharesFilled: bigint;
+  /**
+   * Zeroed. Never read or written by logic. Holds the rest of the ADR 0010
    * partial-fill fields without a migration (ADR 0019).
    */
   reserved: ReadonlyUint8Array;
@@ -94,7 +100,13 @@ export type RedeemRequestArgs = {
   /** `REDEEM_PENDING` / `REDEEM_FILLED`. */
   status: number;
   /**
-   * Zeroed. Never read or written by logic. Holds the ADR 0010
+   * Shares burned by fills: `0` while pending, `shares` after the whole
+   * fill. The remainder is derived, `shares − shares_filled`, so the
+   * partial fills of ADR 0010 only add their own counters later.
+   */
+  sharesFilled: number | bigint;
+  /**
+   * Zeroed. Never read or written by logic. Holds the rest of the ADR 0010
    * partial-fill fields without a migration (ADR 0019).
    */
   reserved: ReadonlyUint8Array;
@@ -115,7 +127,8 @@ export function getRedeemRequestEncoder(): FixedSizeEncoder<RedeemRequestArgs> {
       ["requestedAt", getI64Encoder()],
       ["filledAt", getI64Encoder()],
       ["status", getU8Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 64)],
+      ["sharesFilled", getU64Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 56)],
     ]),
     (value) => ({ ...value, discriminator: REDEEM_REQUEST_DISCRIMINATOR }),
   );
@@ -135,7 +148,8 @@ export function getRedeemRequestDecoder(): FixedSizeDecoder<RedeemRequest> {
     ["requestedAt", getI64Decoder()],
     ["filledAt", getI64Decoder()],
     ["status", getU8Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 64)],
+    ["sharesFilled", getU64Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 56)],
   ]);
 }
 

@@ -262,10 +262,10 @@ fn padding_holds_every_planned_carve() {
     const ADR_0012_CLAIM: usize = (1 + 8 + 8 + 32) + (1 + 32 + 32);
     assert_eq!(ADR_0012_CLAIM, 114);
     assert!(padding_of(CLAIM_FILING_V1) >= ADR_0012_CLAIM + 64);
-    // ADR 0010 partial fills: `shares_filled`, `assets_filled`, `fill_count`,
-    // `last_fill_at`. The remainder is `shares − shares_filled`, so a zero
-    // carve reads as "nothing filled" (R3); no `shares_remaining` is stored.
-    assert!(padding_of(REDEEM_REQUEST_V1) >= 8 + 8 + 2 + 8);
+    // The rest of the ADR 0010 partial fills: `assets_claimed`, `fill_count`,
+    // `last_fill_at`. `shares_filled` is already a v1 field; the remainder
+    // (`shares − shares_filled`) and the claimable amount are derived.
+    assert!(padding_of(REDEEM_REQUEST_V1) >= 8 + 2 + 8);
     // The current structs carry the same padding as the tables.
     assert_eq!(
         zeroed::<VaultConfig>()._reserved.len(),

@@ -450,9 +450,10 @@ fn request_redeem_escrows_shares() {
         (PROGRAM_LAYOUT_VERSION, a.pubkey(), 0, REDEEM_PENDING)
     );
     assert_eq!(r.shares, 4_000 * BRL);
+    assert_eq!((r.shares_filled, r.shares_remaining()), (0, 4_000 * BRL));
     assert_eq!((r.assets_out, r.nav_at_fill, r.filled_at), (0, 0, 0));
     assert_eq!(r.requested_at, T0 + 10);
-    assert_eq!(r._reserved, [0; 64]);
+    assert_eq!(r._reserved, [0; 56]);
     let s = f.state();
     assert_eq!((s.next_redeem_seq, s.redeem_head), (1, 0));
     assert_eq!(s.pending_redeem_shares, 4_000 * BRL);
@@ -585,6 +586,7 @@ fn fulfil_redeems_fills_the_head_at_the_nav_of_the_fill() {
     let r = f.redeem_request(seq).unwrap();
     assert_eq!(r.status, REDEEM_FILLED);
     assert_eq!((r.shares, r.assets_out), (20_000 * BRL, value));
+    assert_eq!((r.shares_filled, r.shares_remaining()), (20_000 * BRL, 0));
     assert_eq!((r.nav_at_fill, r.filled_at), (nav, T0 + 500));
 
     let s = f.state();

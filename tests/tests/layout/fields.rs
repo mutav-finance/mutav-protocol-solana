@@ -186,6 +186,7 @@ macro_rules! redeem_request_fields {
             "requested_at" => requested_at,
             "filled_at" => filled_at,
             "status" => status,
+            "shares_filled" => shares_filled,
             "_reserved" => _reserved,
         )
     };

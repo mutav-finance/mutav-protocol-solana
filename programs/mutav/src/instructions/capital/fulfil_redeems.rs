@@ -176,6 +176,7 @@ pub fn handle_fulfil_redeems(
         // Whole fill at the NAV of this fill.
         let nav = conversion_nav(shares_outstanding, sol.net_assets)?;
         let shares = r.shares;
+        r.shares_filled = shares;
         r.assets_out = value;
         r.nav_at_fill = nav;
         r.filled_at = now;
