@@ -306,9 +306,9 @@ Seeds: `["claim", guarantee, notice_ref_hash]`. One per claim notice, from filin
 | `pix_e2e_hash` | `[u8; 32]` | Hash of the PIX end-to-end ID. Zero until settled |
 | `settled_at` | `i64` | `0` until settled |
 | `approved_amount` | `u64` | *Carve (ADR 0019), `0`.* The exact amount the reserve admin approved for a claim above `max_claim_per_call` (`approve_claim`, Wave 2). `0` = not approved. Read by no instruction of the devnet binary |
-| `_reserved` | `[u8; 128]` | Zeroed. Holds the ADR 0012 claim fields (49 bytes) and settlement fields (74 bytes) below without a migration (§14.2) |
+| `_reserved` | `[u8; 192]` | Zeroed. Holds the ADR 0012 claim fields (49 bytes) and the settlement fields the filing does not already carry (65 bytes) below without a migration, with about 78 bytes to spare (§14.2) |
 
-Size: **316 bytes** including the discriminator, pinned in `constants.rs`.
+Size: **380 bytes** including the discriminator, pinned in `constants.rs`.
 
 **Built later (ADR 0012), carved from the front of `_reserved`** (not in the devnet layout). `category` and `request_complete_ts` were budgeted once per former account; the merged account needs them once:
 
@@ -356,12 +356,12 @@ Seeds: `["deposit", config, seq]` and `["redeem", config, seq]`, `seq: u64` take
 | `nav_at_fill` | `u64` | NAV per share at the fill (`NAV_SCALE`) |
 | `requested_at`, `filled_at` | `i64`, `i64` | `filled_at = 0` until filled |
 | `status` | `u8` (`PENDING = 0`, `FILLED = 1`) | |
-| `_reserved` | `[u8; 64]` | Zeroed. Holds the ADR 0010 partial-fill fields (34 bytes) without a migration |
+| `_reserved` | `[u8; 64]` | Zeroed. Holds the ADR 0010 partial-fill fields (26 bytes) without a migration |
 
 Both are **155 bytes** including the discriminator, pinned in `constants.rs`.
 
 - **Close rule:** a `PENDING` request closes on `cancel_redeem` (shares back to the owner); a `FILLED` request closes on `claim_assets`. A fill never closes the account, because it always leaves `assets_out > 0`.
-- **Partial fills (ADR 0010, a later carve).** The first post-hackathon upgrade carves `shares_remaining: u64`, `shares_filled: u64`, `assets_filled: u64`, `fill_count: u16` and `last_fill_at: i64` (34 bytes) from `_reserved`, adds a `PARTIALLY_FILLED` status constant and lets `claim_assets` collect between fills. Requests live at that upgrade decode with the carve at zero; the upgrade must read a zero carve on a `PENDING` request as "nothing filled yet" (R3). Until then a head that does not fit the budget stops the batch (§5.5).
+- **Partial fills (ADR 0010, a later carve).** The first post-hackathon upgrade carves `shares_filled: u64`, `assets_filled: u64`, `fill_count: u16` and `last_fill_at: i64` (26 bytes) from `_reserved`, adds a `PARTIALLY_FILLED` status constant and lets `claim_assets` collect between fills. The remainder is derived, `shares_remaining = shares − shares_filled`, so a request live at that upgrade decodes with the carve at zero as "nothing filled, all shares remaining": zero is the pilot behaviour (R3), and no stored remainder can disagree with `shares`. Until then a head that does not fit the budget stops the batch (§5.5).
 
 ### 3.9 Adapters
 
@@ -437,7 +437,7 @@ Seeds: `["income", config, income_ref_hash]` for an issuer statement (created by
 | Field | Type | Meaning |
 |---|---|---|
 | `version`, `bump` | `u8`, `u8` | |
-| `kind` | `u8`: `NORA_STATEMENT = 0`, `FEE = 1`, `UNSOLICITED = 2`, `BACKSTOP = 3` | `sweep_income` writes `NORA_STATEMENT`, `contribute_fees` writes `FEE`. `UNSOLICITED` and `BACKSTOP` are reserved for later instructions; the devnet binary accepts only `0` and `1` (R1b) |
+| `kind` | `u8`: `ISSUER_STATEMENT = 0`, `FEE = 1`, `UNSOLICITED = 2`, `BACKSTOP = 3` | `sweep_income` writes `ISSUER_STATEMENT`, `contribute_fees` writes `FEE`. `UNSOLICITED` and `BACKSTOP` are reserved for later instructions; the devnet binary accepts only `0` and `1` (R1b) |
 | `ref_hash` | `[u8; 32]` | Commitment to Nora's statement (amount and reference) or to the fee invoice |
 | `period` | `u32` | The statement's month, `YYYYMM`. `0` for a fee |
 | `gross`, `take`, `net` | `u64` ×3 | Amount received, MUTAV's take (fees only; `0` for income), net into `reserve` |
@@ -515,7 +515,7 @@ assets_for(shares) = floor(shares × (net_assets + 1) / (shares_outstanding + V)
 11. A request is filled whole or not at all: a `FILLED` request has burned all of its `shares` and has `assets_out > 0`.
 12. Every fill is priced at the NAV of that fill and rounds in the reserve's favour, so a fill never lowers NAV per share. Every fill satisfies `assets ≤ budget` at the time of the fill.
 
-With the ADR 0010 carve (partial fills at the head, later), 8–11 become: `Σ shares_remaining = pending_redeem_shares`; `Σ assets_claimable = claimable_assets_total`; at most one request is partially filled, and it is the head; `shares_filled + shares_remaining = shares` until a cancel; a partial fill also satisfies `assets ≥ caps.min_fill_assets` and leaves a remainder worth at least `caps.min_request`.
+With the ADR 0010 carve (partial fills at the head, later; `shares_remaining = shares − shares_filled`), 8–11 become: `Σ shares_remaining = pending_redeem_shares`; `Σ assets_claimable = claimable_assets_total`; at most one request is partially filled, and it is the head; `shares_filled + shares_remaining = shares` until a cancel; a partial fill also satisfies `assets ≥ caps.min_fill_assets` and leaves a remainder worth at least `caps.min_request`.
 
 **Earmark invariants** (ADR 0011; **phase 2 only**, tested when the earmark is carved; the pilot binary has no earmark):
 
@@ -536,13 +536,13 @@ With the ADR 0010 carve (partial fills at the head, later), 8–11 become: `Σ s
 
 **Income invariants** (ADR 0017):
 
-24. NAV and `stable_assets` rise from issuer income only through `sweep_income`, by exactly the swept amount; a transfer into the inbox or into `reserve` moves neither. `income_total = Σ IncomeReceipt.net` over receipts of kind `NORA_STATEMENT`.
+24. NAV and `stable_assets` rise from issuer income only through `sweep_income`, by exactly the swept amount; a transfer into the inbox or into `reserve` moves neither. `income_total = Σ IncomeReceipt.net` over receipts of kind `ISSUER_STATEMENT`.
 25. With no outside transfers into `reserve`, `reserve.amount == brs_balance` after any sequence of pilot instructions (no drift).
 26. `inflow_nav` is the sum, over every `contribute_fees` and `sweep_income` since the last `refresh` or `clear_fulfil_halt`, of `ceil(net × NAV_SCALE / shares_outstanding)` at that inflow (`0` while no shares are outstanding), saturating at `u64::MAX`.
 
 **Claim-window invariant** (ADR 0019):
 
-27. After every `pay_claim`, `Σ claim_day_buckets` (the payments of the last 31 UTC days, this one included) `≤ caps.max_claim_per_period`. Because the window slides by day, no 31-day span can exceed the cap; the former tumbling window allowed up to twice the cap across a boundary.
+27. After every `pay_claim`, `Σ claim_day_buckets` (the payments of the last 31 UTC days, this one included) `≤ caps.max_claim_per_period`. Because the window slides by UTC day, the payments of **any 31 consecutive UTC days** stay within the cap, and so do those of **any 30 × 24 h span** (which touches at most 31 UTC days); a 31 × 24 h span can touch 32 days. The former tumbling window allowed up to twice the cap across a boundary.
 
 **Gated on `free_capital` (and `mode == Normal`):** `register_guarantee`, `fulfil_redeems`, `allocate`, `deallocate` (with the under-coverage exception in [§6](#6-under-coverage-mode)); in phase 2, `fund_exit_buffer`.
 
@@ -691,7 +691,7 @@ Proposed in [ADR 0017](decisions/0017-brs-income-intake.md), pending founder con
 #### `sweep_income(income_ref_hash, period, amount)`
 
 - **Signer:** operator. The program owns both token accounts, and the vault authority signs the transfers.
-- **Accounts:** `config`, `state`, `income_receipt` (init, kind `NORA_STATEMENT`) at seeds `["income", config, income_ref_hash]`, `income_inbox`, `reserve`, `treasury_account`, vault authority, BRS mint, token program, payer, system program. `treasury_account` is address-checked and never written: there is no take on issuer income (ADR 0019). It stays in the account list until the interface PR drops it.
+- **Accounts:** `config`, `state`, `income_receipt` (init, kind `ISSUER_STATEMENT`) at seeds `["income", config, income_ref_hash]`, `income_inbox`, `reserve`, `treasury_account`, vault authority, BRS mint, token program, payer, system program. `treasury_account` is address-checked and never written: there is no take on issuer income (ADR 0019). It stays in the account list until the interface PR drops it.
 - **Arguments:** `income_ref_hash` commits to Nora's statement; `period` is the statement's month as a `u32` `YYYYMM`; `amount` is the amount on the statement.
 - **Rules** (in order):
   1. `amount > 0`; `period` is a well-formed `YYYYMM` month (`InvalidParameter`).
@@ -703,7 +703,7 @@ Proposed in [ADR 0017](decisions/0017-brs-income-intake.md), pending founder con
   7. `treasury_account == config.treasury_account` (`InvalidTreasuryAccount`).
   8. After the transfer, `reserve.amount` rose by exactly `amount` and the inbox fell by exactly `amount` (`PostCpiCheckFailed`).
   9. **Not paused, never solvency-gated, no `mode` check, not gated by claim notices.** Money coming in is always accepted, as with `contribute_fees`.
-- **Effects:** no take (ADR 0019): the vault authority transfers `amount` from the inbox to `reserve`. `brs_balance += amount`; `income_total += amount`; `inflow_nav += ceil(amount × NAV_SCALE / shares_outstanding)` (`0` with no shares). Creates the `IncomeReceipt` (`kind = NORA_STATEMENT`, `gross = net = amount`, `take = 0`; [§3.14](#314-incomereceipt)). NAV rises immediately; it never mints shares. Anything in the inbox not on a statement stays there, untracked.
+- **Effects:** no take (ADR 0019): the vault authority transfers `amount` from the inbox to `reserve`. `brs_balance += amount`; `income_total += amount`; `inflow_nav += ceil(amount × NAV_SCALE / shares_outstanding)` (`0` with no shares). Creates the `IncomeReceipt` (`kind = ISSUER_STATEMENT`, `gross = net = amount`, `take = 0`; [§3.14](#314-incomereceipt)). NAV rises immediately; it never mints shares. Anything in the inbox not on a statement stays there, untracked.
 - **Not for:** returned claim payments, recoveries or reversals (PC-3, §12 Q5); MUTAV capital (`request_deposit`, ADR 0008); guarantee fees (`contribute_fees`, ADR 0009). An admin-only recovery of untracked BRS (`recognize_untracked`) is designed for a later upgrade, not this binary (ADR 0017).
 - **Errors:** `Unauthorized`, `InvalidParameter`, `InvalidMint`, `InvalidTokenProgram`, `InvalidIncomeSource`, `IncomeExceedsInbox`, `ReserveFrozen`, `InvalidTreasuryAccount`, `PostCpiCheckFailed`, `UnsupportedVersion`; account-already-in-use on a duplicate `income_ref_hash`.
 - **Event:** `IncomeSwept { income_ref_hash, period, amount, inbox_after }`. `inbox_after` is what stays in the inbox, untracked.
@@ -754,7 +754,7 @@ Proposed in [ADR 0017](decisions/0017-brs-income-intake.md), pending founder con
   1. The `ClaimFiling` exists and is `FILED` (`ClaimNotFiled`), `claim_filing.leg == leg` (`LegMismatch`) and, with ADR 0012, `claim_filing.category == category` (`CategoryMismatch`).
   2. `amount > 0`; `amount ≤ filing.provision + (leg_cover − leg_paid − leg_provision)`: this filing's own provision plus the leg's unprovisioned cover, so a payment never spends cover another open filing has provisioned and invariant 2 holds ([ADR 0014](decisions/0014-pay-claim-bound-with-concurrent-filings.md), proposed). With one open filing this equals the leg's remaining cover.
   3. `amount ≤ caps.max_claim_per_call`.
-  4. **Claim window** (ADR 0019): roll the 31-day ring to today (`day = now / 86_400`), clearing the buckets of days that left the window; then `Σ claim_day_buckets + amount ≤ caps.max_claim_per_period`: the payments of the last 31 UTC days, this one included (`ClaimPeriodCapExceeded`).
+  4. **Claim window** (ADR 0019): roll the 31-day ring to today (`day = now / 86_400`; a clock step back keeps the anchor's day, and the payment is booked on that effective day), clearing the buckets of days that left the window; then `Σ claim_day_buckets + amount ≤ caps.max_claim_per_period`: the payments of the last 31 UTC days, this one included (`ClaimPeriodCapExceeded`).
   5. Destination equals `config.payments_account`.
   6. `brs_balance ≥ amount` (liquid BRS; `InsufficientLiquidBalance`), and `reserve` is not frozen (`ReserveFrozen`).
   7. **No solvency check. No `mode` check. No pause check. No guarantee-status or tail check:** a claim filed in time stays payable in every state, and none of the ADR 0012 lifecycle rules can refuse it. A property test asserts that `pay_claim` is never refused because of solvency or under-coverage. Within the caps, `pay_claim` is never refused: that is the reserve's only on-chain service promise; the settlement SLA belongs to the operator platform (ADR 0019).
@@ -982,7 +982,7 @@ Outside `Caps`, in `VaultConfig`:
 
 Program constants: `MAX_FEE_TAKE_BPS = 3_000`, `MIN_COVERAGE_RATIO_BPS = 1_000` (c ≥ 0.10; ADR 0016), `CLAIM_WINDOW_DAYS = 31` and `SECONDS_PER_DAY = 86_400` (ADR 0019), `MAX_ADAPTERS = 8` (the width of `adapter_bitmap`; §12 Q33), `NAV_SCALE = 10^9` (decided 2026-10-06; `NAV_SCALE` is NAV 1.0), `VIRTUAL_OFFSET = 10^0 = 1` (§12 Q20, decided 2026-10-06), `INSTANT_EXIT = 1 << 0`, `SUPPORTED_FEATURES` (pilot `0`), `PROGRAM_LAYOUT_VERSION` (pilot `1`), `MAX_FULFIL_BATCH` (`8` until pinned from a Mollusk benchmark of `fulfil_redeems` through a Squads vault transaction, with three CPIs and one `emit_cpi!` per fill and the boxed `VaultConfig` decode). Built later: `MAX_INCOME_TAKE_BPS` (only if a take is ever decided, §12 Q47), `PRICE_SCALE = 10^9` (adapters), and with ADR 0012 `EXONERATION_NOTICE_SECS = 120 × 86_400` (LI 40 X), `MAX_CLAIMS_TAIL_SECS = 3 × 365 × 86_400`, `SUPPORTED_OPTIONAL_CATEGORIES = 0b1` and the claim-category and `ClaimFiling.flags` constants of §3.6 and §3.13.
 
-The operator claim caps (`max_claim_per_call`, `max_claim_per_period`) bound what a compromised operator key can take: at most `max_claim_per_period` in any 31 days. They do **not** bound MUTAV's legal liability, which the valor afiançado sets. Payments above them go through the admin path (ADR 0012), built later; until then MUTAV pays above-cap claims from its own bank first and the reserve reimburses within the caps. Size the per-period cap to the worst plausible 31 days of approved claims, so the admin path stays the exception.
+The operator claim caps (`max_claim_per_call`, `max_claim_per_period`) bound what a compromised operator key can take: at most `max_claim_per_period` in any 31 consecutive UTC days (so in any 30 × 24 h span). They do **not** bound MUTAV's legal liability, which the valor afiançado sets. Payments above them go through the admin path (ADR 0012), built later; until then MUTAV pays above-cap claims from its own bank first and the reserve reimburses within the caps. Size the per-period cap to the worst plausible 31 days of approved claims, so the admin path stays the exception.
 
 Instant-exit caps (per transaction, per wallet, global per period) live in `ExitParams`, a phase-2 carve, and apply only to the phase-2 instant exit ([§13.2](#132-parameters-exitparams)). The redemption queue keeps **no weekly cap**.
 
@@ -1382,8 +1382,8 @@ Anchor 1.2 decodes `#[account]` structs with Borsh and ignores trailing bytes. S
 | `Caps` (nested) | 106 | 32 | Later caps for PC-43 (≥ 24) | 8 |
 | `VaultState` | 688 | 256 | Phase-2 `InstantExitState` (88) and `buffer_earmark` (8); the claim-notice counter `pending_notices` (4); the ADR 0012 counters `admin_claims_paid_total`, `backstop_reimbursed_total` (16) | 140 |
 | `Guarantee` | 377 | **192** (grown from 64 before the freeze) | The ADR 0012 lifecycle fields (88) | 104. Room for `amend_guarantee` state (amendment count and last hash, 34 bytes) |
-| `ClaimFiling` | 316 | **128** | The ADR 0012 claim fields (49) and settlement fields (74, from the former `Payout`) | 5 (more in practice: the merged account needs `category` and `request_complete_ts` once) |
-| `RedeemRequest` | 155 | 64 | The ADR 0010 partial-fill fields (34) | 30 |
+| `ClaimFiling` | 380 | **192** | The ADR 0012 claim fields (49) and the settlement fields of the former `Payout` not already on the filing (65) | 78 |
+| `RedeemRequest` | 155 | 64 | The ADR 0010 partial-fill fields (26: `shares_filled`, `assets_filled`, `fill_count`, `last_fill_at`; remainder derived) | 38 |
 | `DepositRequest` | 155 | 64 | None | 64 |
 | `IncomeReceipt` | 143 | 64 | None | 64 |
 
@@ -1399,7 +1399,7 @@ Anchor 1.2 decodes `#[account]` structs with Borsh and ignores trailing bytes. S
 
 **Real fields in the devnet binary** (read by its code, all in the IDL): `VaultConfig.version`, `feature_flags`, `mutav_capital_wallet`, `caps` (including `max_nav_move_bps`); `VaultState` up to `claim_day_anchor`; `Guarantee` and `ClaimFiling` as in §3.5 and §3.6; the whole-fill `RedeemRequest`; `DepositRequest`; `IncomeReceipt` with `kind`.
 
-**Pinned sizes** (discriminator included, `constants.rs`, R7): `VaultConfig` 1,181 bytes (`_reserved` 512; `Caps` 106 with its own `_reserved` 32), `VaultState` 688 (`_reserved` 256), `Guarantee` 377 (`_reserved` 192), `ClaimFiling` 316 (`_reserved` 128), `IncomeReceipt` 143 (`_reserved` 64), `DepositRequest` 155 (`_reserved` 64), `RedeemRequest` 155 (`_reserved` 64). Carves come from padding, so no total ever changes again. **Carve order:** each later feature carves from the front of the padding it needs, in the order it ships; its offsets are fixed by that upgrade's own golden test.
+**Pinned sizes** (discriminator included, `constants.rs`, R7): `VaultConfig` 1,181 bytes (`_reserved` 512; `Caps` 106 with its own `_reserved` 32), `VaultState` 688 (`_reserved` 256), `Guarantee` 377 (`_reserved` 192), `ClaimFiling` 380 (`_reserved` 192), `IncomeReceipt` 143 (`_reserved` 64), `DepositRequest` 155 (`_reserved` 64), `RedeemRequest` 155 (`_reserved` 64). Carves come from padding, so no total ever changes again. **Carve order:** each later feature carves from the front of the padding it needs, in the order it ships; its offsets are fixed by that upgrade's own golden test.
 
 **Layout freeze** (checked before the first devnet deploy): every account's padding holds its planned carves (the test above); `Caps` carries its tail; every status, leg, mode and kind is a `u8` constant (`ClaimFiling` `FILED`/`PAID`/`WITHDRAWN`/`SETTLED`, `RedeemRequest` `PENDING`/`FILLED`, `IncomeReceipt` kinds); every account has `version`, `bump` and `_reserved`; the event set (including `ConfigUpdated`'s final form) and the error list are final for append-only use; the retired seeds and field ids are guarded by tests.
 
