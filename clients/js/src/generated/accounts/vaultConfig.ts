@@ -47,22 +47,10 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
-  getAdapterEntryDecoder,
-  getAdapterEntryEncoder,
   getCapsDecoder,
   getCapsEncoder,
-  getExitParamsDecoder,
-  getExitParamsEncoder,
-  getPriceParamsDecoder,
-  getPriceParamsEncoder,
-  type AdapterEntry,
-  type AdapterEntryArgs,
   type Caps,
   type CapsArgs,
-  type ExitParams,
-  type ExitParamsArgs,
-  type PriceParams,
-  type PriceParamsArgs,
 } from "../types";
 
 export const VAULT_CONFIG_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
@@ -110,27 +98,45 @@ export type VaultConfig = {
   treasuryAccount: Address;
   /** Merkle root of allowlisted investor wallets. */
   investorAllowlistRoot: ReadonlyUint8Array;
-  /** Whitelisted adapters. */
-  adapters: Array<AdapterEntry>;
   caps: Caps;
-  price: PriceParams;
-  /** Settlement SLA for payouts. */
-  payoutSlaSecs: bigint;
   /** Global pause flag. */
   paused: boolean;
-  /** Bitmask of optional features. `0` in the pilot. */
+  /**
+   * Bitmask of optional features. `0` in the pilot; bits outside
+   * `SUPPORTED_FEATURES` fail closed.
+   */
   featureFlags: bigint;
   /** MUTAV's allowlisted capital wallet, disclosed on-chain. */
   mutavCapitalWallet: Address;
-  /** Phase-2 instant-exit parameters. All zero in the pilot. */
-  exit: ExitParams;
   /**
-   * MUTAV's take from issuer income swept by `sweep_income`,
-   * `<= MAX_INCOME_TAKE_BPS`. `0` in the pilot: all income builds the
-   * reserve.
+   * Number of whitelisted adapters (each described by its `AdapterState`
+   * PDA, ADR 0018). `0` = BRS only.
    */
-  incomeTakeBps: number;
-  /** Zeroed. Never read or written by logic. */
+  adapterCount: number;
+  /** Bitmap of enabled adapter slots, `MAX_ADAPTERS` bits. `0` = none. */
+  adapterBitmap: number;
+  /**
+   * Proposed new admin, waiting for its own acceptance.
+   * `Pubkey::default()` = none pending.
+   */
+  pendingAdmin: Address;
+  /** When `pending_admin` expires (unix seconds). `0` = nothing pending. */
+  pendingAdminExpiresAt: bigint;
+  /** Proposed new operator, waiting for its own acceptance. Default = none. */
+  pendingOperator: Address;
+  /** When `pending_operator` expires. `0` = nothing pending. */
+  pendingOperatorExpiresAt: bigint;
+  /** Proposed new pauser, waiting for its own acceptance. Default = none. */
+  pendingPauser: Address;
+  /** When `pending_pauser` expires. `0` = nothing pending. */
+  pendingPauserExpiresAt: bigint;
+  /** Pause-only guardian keys. `Pubkey::default()` = empty slot. */
+  guardians: Array<Address>;
+  /**
+   * Zeroed. Never read or written by logic. Holds the planned carves
+   * (phase-2 exit parameters, the ADR 0012 config fields) without a
+   * migration (spec §14.2, ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -168,27 +174,45 @@ export type VaultConfigArgs = {
   treasuryAccount: Address;
   /** Merkle root of allowlisted investor wallets. */
   investorAllowlistRoot: ReadonlyUint8Array;
-  /** Whitelisted adapters. */
-  adapters: Array<AdapterEntryArgs>;
   caps: CapsArgs;
-  price: PriceParamsArgs;
-  /** Settlement SLA for payouts. */
-  payoutSlaSecs: number | bigint;
   /** Global pause flag. */
   paused: boolean;
-  /** Bitmask of optional features. `0` in the pilot. */
+  /**
+   * Bitmask of optional features. `0` in the pilot; bits outside
+   * `SUPPORTED_FEATURES` fail closed.
+   */
   featureFlags: number | bigint;
   /** MUTAV's allowlisted capital wallet, disclosed on-chain. */
   mutavCapitalWallet: Address;
-  /** Phase-2 instant-exit parameters. All zero in the pilot. */
-  exit: ExitParamsArgs;
   /**
-   * MUTAV's take from issuer income swept by `sweep_income`,
-   * `<= MAX_INCOME_TAKE_BPS`. `0` in the pilot: all income builds the
-   * reserve.
+   * Number of whitelisted adapters (each described by its `AdapterState`
+   * PDA, ADR 0018). `0` = BRS only.
    */
-  incomeTakeBps: number;
-  /** Zeroed. Never read or written by logic. */
+  adapterCount: number;
+  /** Bitmap of enabled adapter slots, `MAX_ADAPTERS` bits. `0` = none. */
+  adapterBitmap: number;
+  /**
+   * Proposed new admin, waiting for its own acceptance.
+   * `Pubkey::default()` = none pending.
+   */
+  pendingAdmin: Address;
+  /** When `pending_admin` expires (unix seconds). `0` = nothing pending. */
+  pendingAdminExpiresAt: number | bigint;
+  /** Proposed new operator, waiting for its own acceptance. Default = none. */
+  pendingOperator: Address;
+  /** When `pending_operator` expires. `0` = nothing pending. */
+  pendingOperatorExpiresAt: number | bigint;
+  /** Proposed new pauser, waiting for its own acceptance. Default = none. */
+  pendingPauser: Address;
+  /** When `pending_pauser` expires. `0` = nothing pending. */
+  pendingPauserExpiresAt: number | bigint;
+  /** Pause-only guardian keys. `Pubkey::default()` = empty slot. */
+  guardians: Array<Address>;
+  /**
+   * Zeroed. Never read or written by logic. Holds the planned carves
+   * (phase-2 exit parameters, the ADR 0012 config fields) without a
+   * migration (spec §14.2, ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -212,16 +236,20 @@ export function getVaultConfigEncoder(): FixedSizeEncoder<VaultConfigArgs> {
       ["paymentsAccount", getAddressEncoder()],
       ["treasuryAccount", getAddressEncoder()],
       ["investorAllowlistRoot", fixEncoderSize(getBytesEncoder(), 32)],
-      ["adapters", getArrayEncoder(getAdapterEntryEncoder(), { size: 8 })],
       ["caps", getCapsEncoder()],
-      ["price", getPriceParamsEncoder()],
-      ["payoutSlaSecs", getI64Encoder()],
       ["paused", getBooleanEncoder()],
       ["featureFlags", getU64Encoder()],
       ["mutavCapitalWallet", getAddressEncoder()],
-      ["exit", getExitParamsEncoder()],
-      ["incomeTakeBps", getU16Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 510)],
+      ["adapterCount", getU8Encoder()],
+      ["adapterBitmap", getU8Encoder()],
+      ["pendingAdmin", getAddressEncoder()],
+      ["pendingAdminExpiresAt", getI64Encoder()],
+      ["pendingOperator", getAddressEncoder()],
+      ["pendingOperatorExpiresAt", getI64Encoder()],
+      ["pendingPauser", getAddressEncoder()],
+      ["pendingPauserExpiresAt", getI64Encoder()],
+      ["guardians", getArrayEncoder(getAddressEncoder(), { size: 3 })],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 512)],
     ]),
     (value) => ({ ...value, discriminator: VAULT_CONFIG_DISCRIMINATOR }),
   );
@@ -246,16 +274,20 @@ export function getVaultConfigDecoder(): FixedSizeDecoder<VaultConfig> {
     ["paymentsAccount", getAddressDecoder()],
     ["treasuryAccount", getAddressDecoder()],
     ["investorAllowlistRoot", fixDecoderSize(getBytesDecoder(), 32)],
-    ["adapters", getArrayDecoder(getAdapterEntryDecoder(), { size: 8 })],
     ["caps", getCapsDecoder()],
-    ["price", getPriceParamsDecoder()],
-    ["payoutSlaSecs", getI64Decoder()],
     ["paused", getBooleanDecoder()],
     ["featureFlags", getU64Decoder()],
     ["mutavCapitalWallet", getAddressDecoder()],
-    ["exit", getExitParamsDecoder()],
-    ["incomeTakeBps", getU16Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 510)],
+    ["adapterCount", getU8Decoder()],
+    ["adapterBitmap", getU8Decoder()],
+    ["pendingAdmin", getAddressDecoder()],
+    ["pendingAdminExpiresAt", getI64Decoder()],
+    ["pendingOperator", getAddressDecoder()],
+    ["pendingOperatorExpiresAt", getI64Decoder()],
+    ["pendingPauser", getAddressDecoder()],
+    ["pendingPauserExpiresAt", getI64Decoder()],
+    ["guardians", getArrayDecoder(getAddressDecoder(), { size: 3 })],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 512)],
   ]);
 }
 
@@ -321,5 +353,5 @@ export async function fetchAllMaybeVaultConfig(
 }
 
 export function getVaultConfigSize(): number {
-  return 2756;
+  return 1181;
 }

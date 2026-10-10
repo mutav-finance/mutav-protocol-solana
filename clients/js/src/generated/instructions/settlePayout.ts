@@ -41,7 +41,7 @@ import {
   type ResolvedInstructionAccount,
   type ResolvedInstructionAccountMeta,
 } from "@solana/kit/program-client-core";
-import { findPayoutPda } from "../pdas";
+import { findClaimFilingPda } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 
 export const SETTLE_PAYOUT_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
@@ -59,7 +59,7 @@ export type SettlePayoutInstruction<
   TAccountOperator extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountGuarantee extends string | AccountMeta<string> = string,
-  TAccountPayout extends string | AccountMeta<string> = string,
+  TAccountClaimFiling extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -77,9 +77,9 @@ export type SettlePayoutInstruction<
       TAccountGuarantee extends string
         ? ReadonlyAccount<TAccountGuarantee>
         : TAccountGuarantee,
-      TAccountPayout extends string
-        ? WritableAccount<TAccountPayout>
-        : TAccountPayout,
+      TAccountClaimFiling extends string
+        ? WritableAccount<TAccountClaimFiling>
+        : TAccountClaimFiling,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -134,7 +134,7 @@ export type SettlePayoutAsyncInput<
   TAccountOperator extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
-  TAccountPayout extends InstructionAccountInput = InstructionAccountInput,
+  TAccountClaimFiling extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -142,7 +142,7 @@ export type SettlePayoutAsyncInput<
   operator: TAccountOperator;
   config: TAccountConfig;
   guarantee: TAccountGuarantee;
-  payout?: TAccountPayout;
+  claimFiling?: TAccountClaimFiling;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   noticeRefHash: SettlePayoutInstructionDataArgs["noticeRefHash"];
@@ -153,7 +153,7 @@ export async function getSettlePayoutInstructionAsync<
   TAccountOperator extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
-  TAccountPayout extends InstructionAccountInput,
+  TAccountClaimFiling extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -162,7 +162,7 @@ export async function getSettlePayoutInstructionAsync<
     TAccountOperator,
     TAccountConfig,
     TAccountGuarantee,
-    TAccountPayout,
+    TAccountClaimFiling,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -183,8 +183,8 @@ export async function getSettlePayoutInstructionAsync<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountPayout,
-      InstructionAccountInputAddress<TAccountPayout>
+      TAccountClaimFiling,
+      InstructionAccountInputAddress<TAccountClaimFiling>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -215,7 +215,11 @@ export async function getSettlePayoutInstructionAsync<
       isSigner: false,
       isWritable: false,
     },
-    payout: { value: input.payout ?? null, isSigner: false, isWritable: true },
+    claimFiling: {
+      value: input.claimFiling ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -236,8 +240,8 @@ export async function getSettlePayoutInstructionAsync<
   const args = { ...input };
 
   // Resolve default values.
-  if (!accounts.payout.value) {
-    accounts.payout.value = await findPayoutPda(
+  if (!accounts.claimFiling.value) {
+    accounts.claimFiling.value = await findClaimFilingPda(
       {
         guarantee: getAddressFromResolvedInstructionAccount(
           "guarantee",
@@ -257,7 +261,7 @@ export async function getSettlePayoutInstructionAsync<
       getAccountMeta("operator", accounts.operator),
       getAccountMeta("config", accounts.config),
       getAccountMeta("guarantee", accounts.guarantee),
-      getAccountMeta("payout", accounts.payout),
+      getAccountMeta("claimFiling", accounts.claimFiling),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -280,8 +284,8 @@ export async function getSettlePayoutInstructionAsync<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountPayout,
-      InstructionAccountInputAddress<TAccountPayout>
+      TAccountClaimFiling,
+      InstructionAccountInputAddress<TAccountClaimFiling>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -298,7 +302,7 @@ export type SettlePayoutInput<
   TAccountOperator extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
-  TAccountPayout extends InstructionAccountInput = InstructionAccountInput,
+  TAccountClaimFiling extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -306,7 +310,7 @@ export type SettlePayoutInput<
   operator: TAccountOperator;
   config: TAccountConfig;
   guarantee: TAccountGuarantee;
-  payout: TAccountPayout;
+  claimFiling: TAccountClaimFiling;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   noticeRefHash: SettlePayoutInstructionDataArgs["noticeRefHash"];
@@ -317,7 +321,7 @@ export function getSettlePayoutInstruction<
   TAccountOperator extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
-  TAccountPayout extends InstructionAccountInput,
+  TAccountClaimFiling extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -326,7 +330,7 @@ export function getSettlePayoutInstruction<
     TAccountOperator,
     TAccountConfig,
     TAccountGuarantee,
-    TAccountPayout,
+    TAccountClaimFiling,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -346,8 +350,8 @@ export function getSettlePayoutInstruction<
     InstructionAccountInputAddress<TAccountGuarantee>
   >,
   ResolvedInstructionAccountMeta<
-    TAccountPayout,
-    InstructionAccountInputAddress<TAccountPayout>
+    TAccountClaimFiling,
+    InstructionAccountInputAddress<TAccountClaimFiling>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -377,7 +381,11 @@ export function getSettlePayoutInstruction<
       isSigner: false,
       isWritable: false,
     },
-    payout: { value: input.payout ?? null, isSigner: false, isWritable: true },
+    claimFiling: {
+      value: input.claimFiling ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -402,7 +410,7 @@ export function getSettlePayoutInstruction<
       getAccountMeta("operator", accounts.operator),
       getAccountMeta("config", accounts.config),
       getAccountMeta("guarantee", accounts.guarantee),
-      getAccountMeta("payout", accounts.payout),
+      getAccountMeta("claimFiling", accounts.claimFiling),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -425,8 +433,8 @@ export function getSettlePayoutInstruction<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountPayout,
-      InstructionAccountInputAddress<TAccountPayout>
+      TAccountClaimFiling,
+      InstructionAccountInputAddress<TAccountClaimFiling>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -448,7 +456,7 @@ export type ParsedSettlePayoutInstruction<
     operator: TAccountMetas[0];
     config: TAccountMetas[1];
     guarantee: TAccountMetas[2];
-    payout: TAccountMetas[3];
+    claimFiling: TAccountMetas[3];
     eventAuthority: TAccountMetas[4];
     program: TAccountMetas[5];
   };
@@ -484,7 +492,7 @@ export function parseSettlePayoutInstruction<
       operator: getNextAccount(),
       config: getNextAccount(),
       guarantee: getNextAccount(),
-      payout: getNextAccount(),
+      claimFiling: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

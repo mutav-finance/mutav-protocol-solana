@@ -15,6 +15,8 @@ import {
   fetchEncodedAccounts,
   fixDecoderSize,
   fixEncoderSize,
+  getArrayDecoder,
+  getArrayEncoder,
   getBooleanDecoder,
   getBooleanEncoder,
   getBytesDecoder,
@@ -57,14 +59,11 @@ export type VaultState = {
   bump: number;
   /** `MODE_NORMAL` / `MODE_UNDER_COVERED`. */
   mode: number;
-  /** Tracked BRS in `reserve` (internal accounting). */
+  /**
+   * Tracked BRS in `reserve` (internal accounting). The reserve's stable
+   * assets: the pilot holds BRS only (ADR 0018).
+   */
   brsBalance: bigint;
-  /** Tracked TESOURO held through adapters, in TESOURO base units. */
-  tesouroUnits: bigint;
-  /** Last bounded TESOURO price (`PRICE_SCALE`). */
-  tesouroPrice: bigint;
-  tesouroPriceTs: bigint;
-  stableAssets: bigint;
   remainingCoverTotal: bigint;
   coverageRequired: bigint;
   provisions: bigint;
@@ -74,27 +73,19 @@ export type VaultState = {
   pendingDepositsTotal: bigint;
   pendingRedeemShares: bigint;
   claimableAssetsTotal: bigint;
-  /** Stored instant-exit earmark. Always `0` in the pilot. */
-  bufferEarmark: bigint;
-  pendingNotices: number;
   activeGuarantees: number;
   nextDepositSeq: bigint;
   depositHead: bigint;
   nextRedeemSeq: bigint;
   redeemHead: bigint;
-  claimPeriodStart: bigint;
-  claimPeriodPaid: bigint;
   feesInTotal: bigint;
   feeTakeTotal: bigint;
   claimsPaidTotal: bigint;
-  latePayouts: number;
   fulfilHalted: boolean;
   lastRefreshTs: bigint;
   lastRefreshSlot: bigint;
-  /** Lifetime net issuer income swept into `reserve` (`sweep_income`). */
+  /** Lifetime issuer income swept into `reserve` (`sweep_income`). */
   incomeTotal: bigint;
-  /** Lifetime take from issuer income sent to the treasury. */
-  incomeTakeTotal: bigint;
   /**
    * NAV per share (`NAV_SCALE`) added by verified inflows
    * (`contribute_fees`, `sweep_income`) since the last `refresh`: the sum
@@ -105,7 +96,18 @@ export type VaultState = {
    * reset it to 0.
    */
   inflowNav: bigint;
-  /** Zeroed. Phase 2 carves `InstantExitState` (88 bytes) from the front. */
+  /**
+   * Claim payments per UTC day over the last `CLAIM_WINDOW_DAYS`, a ring
+   * indexed by `day % CLAIM_WINDOW_DAYS` (ADR 0019).
+   */
+  claimDayBuckets: Array<bigint>;
+  /** The day (`unix_ts / 86_400`) the ring was last rolled to. `0` = never. */
+  claimDayAnchor: bigint;
+  /**
+   * Zeroed. Holds the planned carves (phase-2 `InstantExitState` 88 bytes
+   * and the buffer earmark, the claim-notice counter, the ADR 0012
+   * counters) without a migration (spec §14.2, ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -114,14 +116,11 @@ export type VaultStateArgs = {
   bump: number;
   /** `MODE_NORMAL` / `MODE_UNDER_COVERED`. */
   mode: number;
-  /** Tracked BRS in `reserve` (internal accounting). */
+  /**
+   * Tracked BRS in `reserve` (internal accounting). The reserve's stable
+   * assets: the pilot holds BRS only (ADR 0018).
+   */
   brsBalance: number | bigint;
-  /** Tracked TESOURO held through adapters, in TESOURO base units. */
-  tesouroUnits: number | bigint;
-  /** Last bounded TESOURO price (`PRICE_SCALE`). */
-  tesouroPrice: number | bigint;
-  tesouroPriceTs: number | bigint;
-  stableAssets: number | bigint;
   remainingCoverTotal: number | bigint;
   coverageRequired: number | bigint;
   provisions: number | bigint;
@@ -131,27 +130,19 @@ export type VaultStateArgs = {
   pendingDepositsTotal: number | bigint;
   pendingRedeemShares: number | bigint;
   claimableAssetsTotal: number | bigint;
-  /** Stored instant-exit earmark. Always `0` in the pilot. */
-  bufferEarmark: number | bigint;
-  pendingNotices: number;
   activeGuarantees: number;
   nextDepositSeq: number | bigint;
   depositHead: number | bigint;
   nextRedeemSeq: number | bigint;
   redeemHead: number | bigint;
-  claimPeriodStart: number | bigint;
-  claimPeriodPaid: number | bigint;
   feesInTotal: number | bigint;
   feeTakeTotal: number | bigint;
   claimsPaidTotal: number | bigint;
-  latePayouts: number;
   fulfilHalted: boolean;
   lastRefreshTs: number | bigint;
   lastRefreshSlot: number | bigint;
-  /** Lifetime net issuer income swept into `reserve` (`sweep_income`). */
+  /** Lifetime issuer income swept into `reserve` (`sweep_income`). */
   incomeTotal: number | bigint;
-  /** Lifetime take from issuer income sent to the treasury. */
-  incomeTakeTotal: number | bigint;
   /**
    * NAV per share (`NAV_SCALE`) added by verified inflows
    * (`contribute_fees`, `sweep_income`) since the last `refresh`: the sum
@@ -162,7 +153,18 @@ export type VaultStateArgs = {
    * reset it to 0.
    */
   inflowNav: number | bigint;
-  /** Zeroed. Phase 2 carves `InstantExitState` (88 bytes) from the front. */
+  /**
+   * Claim payments per UTC day over the last `CLAIM_WINDOW_DAYS`, a ring
+   * indexed by `day % CLAIM_WINDOW_DAYS` (ADR 0019).
+   */
+  claimDayBuckets: Array<number | bigint>;
+  /** The day (`unix_ts / 86_400`) the ring was last rolled to. `0` = never. */
+  claimDayAnchor: number | bigint;
+  /**
+   * Zeroed. Holds the planned carves (phase-2 `InstantExitState` 88 bytes
+   * and the buffer earmark, the claim-notice counter, the ADR 0012
+   * counters) without a migration (spec §14.2, ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -175,10 +177,6 @@ export function getVaultStateEncoder(): FixedSizeEncoder<VaultStateArgs> {
       ["bump", getU8Encoder()],
       ["mode", getU8Encoder()],
       ["brsBalance", getU64Encoder()],
-      ["tesouroUnits", getU64Encoder()],
-      ["tesouroPrice", getU64Encoder()],
-      ["tesouroPriceTs", getI64Encoder()],
-      ["stableAssets", getU64Encoder()],
       ["remainingCoverTotal", getU64Encoder()],
       ["coverageRequired", getU64Encoder()],
       ["provisions", getU64Encoder()],
@@ -187,26 +185,22 @@ export function getVaultStateEncoder(): FixedSizeEncoder<VaultStateArgs> {
       ["pendingDepositsTotal", getU64Encoder()],
       ["pendingRedeemShares", getU64Encoder()],
       ["claimableAssetsTotal", getU64Encoder()],
-      ["bufferEarmark", getU64Encoder()],
-      ["pendingNotices", getU32Encoder()],
       ["activeGuarantees", getU32Encoder()],
       ["nextDepositSeq", getU64Encoder()],
       ["depositHead", getU64Encoder()],
       ["nextRedeemSeq", getU64Encoder()],
       ["redeemHead", getU64Encoder()],
-      ["claimPeriodStart", getI64Encoder()],
-      ["claimPeriodPaid", getU64Encoder()],
       ["feesInTotal", getU64Encoder()],
       ["feeTakeTotal", getU64Encoder()],
       ["claimsPaidTotal", getU64Encoder()],
-      ["latePayouts", getU32Encoder()],
       ["fulfilHalted", getBooleanEncoder()],
       ["lastRefreshTs", getI64Encoder()],
       ["lastRefreshSlot", getU64Encoder()],
       ["incomeTotal", getU64Encoder()],
-      ["incomeTakeTotal", getU64Encoder()],
       ["inflowNav", getU64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 232)],
+      ["claimDayBuckets", getArrayEncoder(getU64Encoder(), { size: 31 })],
+      ["claimDayAnchor", getI64Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 256)],
     ]),
     (value) => ({ ...value, discriminator: VAULT_STATE_DISCRIMINATOR }),
   );
@@ -220,10 +214,6 @@ export function getVaultStateDecoder(): FixedSizeDecoder<VaultState> {
     ["bump", getU8Decoder()],
     ["mode", getU8Decoder()],
     ["brsBalance", getU64Decoder()],
-    ["tesouroUnits", getU64Decoder()],
-    ["tesouroPrice", getU64Decoder()],
-    ["tesouroPriceTs", getI64Decoder()],
-    ["stableAssets", getU64Decoder()],
     ["remainingCoverTotal", getU64Decoder()],
     ["coverageRequired", getU64Decoder()],
     ["provisions", getU64Decoder()],
@@ -232,26 +222,22 @@ export function getVaultStateDecoder(): FixedSizeDecoder<VaultState> {
     ["pendingDepositsTotal", getU64Decoder()],
     ["pendingRedeemShares", getU64Decoder()],
     ["claimableAssetsTotal", getU64Decoder()],
-    ["bufferEarmark", getU64Decoder()],
-    ["pendingNotices", getU32Decoder()],
     ["activeGuarantees", getU32Decoder()],
     ["nextDepositSeq", getU64Decoder()],
     ["depositHead", getU64Decoder()],
     ["nextRedeemSeq", getU64Decoder()],
     ["redeemHead", getU64Decoder()],
-    ["claimPeriodStart", getI64Decoder()],
-    ["claimPeriodPaid", getU64Decoder()],
     ["feesInTotal", getU64Decoder()],
     ["feeTakeTotal", getU64Decoder()],
     ["claimsPaidTotal", getU64Decoder()],
-    ["latePayouts", getU32Decoder()],
     ["fulfilHalted", getBooleanDecoder()],
     ["lastRefreshTs", getI64Decoder()],
     ["lastRefreshSlot", getU64Decoder()],
     ["incomeTotal", getU64Decoder()],
-    ["incomeTakeTotal", getU64Decoder()],
     ["inflowNav", getU64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 232)],
+    ["claimDayBuckets", getArrayDecoder(getU64Decoder(), { size: 31 })],
+    ["claimDayAnchor", getI64Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 256)],
   ]);
 }
 
@@ -317,5 +303,5 @@ export async function fetchAllMaybeVaultState(
 }
 
 export function getVaultStateSize(): number {
-  return 480;
+  return 688;
 }

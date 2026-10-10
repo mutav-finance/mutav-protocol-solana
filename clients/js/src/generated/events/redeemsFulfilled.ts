@@ -12,8 +12,6 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getBooleanDecoder,
-  getBooleanEncoder,
   getBytesEncoder,
   getConstantDecoder,
   getConstantEncoder,
@@ -49,7 +47,6 @@ export type RedeemsFulfilledEvent = {
   shares: bigint;
   assets: bigint;
   nav: bigint;
-  headPartial: boolean;
   idleFreeCapital: bigint;
 };
 
@@ -61,7 +58,6 @@ export type RedeemsFulfilledEventArgs = {
   shares: number | bigint;
   assets: number | bigint;
   nav: number | bigint;
-  headPartial: boolean;
   idleFreeCapital: number | bigint;
 };
 
@@ -76,7 +72,6 @@ export function getRedeemsFulfilledEventEncoder(): FixedSizeEncoder<RedeemsFulfi
       ["shares", getU64Encoder()],
       ["assets", getU64Encoder()],
       ["nav", getU64Encoder()],
-      ["headPartial", getBooleanEncoder()],
       ["idleFreeCapital", getU64Encoder()],
     ]),
     [getConstantEncoder(REDEEMS_FULFILLED_EVENT_DISCRIMINATOR)],
@@ -94,7 +89,6 @@ export function getRedeemsFulfilledEventDecoder(): FixedSizeDecoder<RedeemsFulfi
       ["shares", getU64Decoder()],
       ["assets", getU64Decoder()],
       ["nav", getU64Decoder()],
-      ["headPartial", getBooleanDecoder()],
       ["idleFreeCapital", getU64Decoder()],
     ]),
     [getConstantDecoder(REDEEMS_FULFILLED_EVENT_DISCRIMINATOR)],

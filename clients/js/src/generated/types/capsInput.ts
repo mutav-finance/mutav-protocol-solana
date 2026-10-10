@@ -8,8 +8,6 @@
 
 import {
   combineCodec,
-  getI64Decoder,
-  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
   getU16Decoder,
@@ -24,49 +22,32 @@ import {
 export type CapsInput = {
   maxTvl: bigint;
   maxCoverPerGuarantee: bigint;
-  maxCoverPerAgency: bigint;
   maxClaimPerCall: bigint;
   maxClaimPerPeriod: bigint;
-  claimPeriodSecs: bigint;
-  /**
-   * The settlement floor (ADR 0018), `<= 10_000`. Stored as its complement
-   * `Caps::max_allocated_bps`.
-   */
-  minSettlementBps: number;
   minRequest: bigint;
   maxRequest: bigint;
-  minFillAssets: bigint;
+  maxNavMoveBps: number;
 };
 
 export type CapsInputArgs = {
   maxTvl: number | bigint;
   maxCoverPerGuarantee: number | bigint;
-  maxCoverPerAgency: number | bigint;
   maxClaimPerCall: number | bigint;
   maxClaimPerPeriod: number | bigint;
-  claimPeriodSecs: number | bigint;
-  /**
-   * The settlement floor (ADR 0018), `<= 10_000`. Stored as its complement
-   * `Caps::max_allocated_bps`.
-   */
-  minSettlementBps: number;
   minRequest: number | bigint;
   maxRequest: number | bigint;
-  minFillAssets: number | bigint;
+  maxNavMoveBps: number;
 };
 
 export function getCapsInputEncoder(): FixedSizeEncoder<CapsInputArgs> {
   return getStructEncoder([
     ["maxTvl", getU64Encoder()],
     ["maxCoverPerGuarantee", getU64Encoder()],
-    ["maxCoverPerAgency", getU64Encoder()],
     ["maxClaimPerCall", getU64Encoder()],
     ["maxClaimPerPeriod", getU64Encoder()],
-    ["claimPeriodSecs", getI64Encoder()],
-    ["minSettlementBps", getU16Encoder()],
     ["minRequest", getU64Encoder()],
     ["maxRequest", getU64Encoder()],
-    ["minFillAssets", getU64Encoder()],
+    ["maxNavMoveBps", getU16Encoder()],
   ]);
 }
 
@@ -74,14 +55,11 @@ export function getCapsInputDecoder(): FixedSizeDecoder<CapsInput> {
   return getStructDecoder([
     ["maxTvl", getU64Decoder()],
     ["maxCoverPerGuarantee", getU64Decoder()],
-    ["maxCoverPerAgency", getU64Decoder()],
     ["maxClaimPerCall", getU64Decoder()],
     ["maxClaimPerPeriod", getU64Decoder()],
-    ["claimPeriodSecs", getI64Decoder()],
-    ["minSettlementBps", getU16Decoder()],
     ["minRequest", getU64Decoder()],
     ["maxRequest", getU64Decoder()],
-    ["minFillAssets", getU64Decoder()],
+    ["maxNavMoveBps", getU16Decoder()],
   ]);
 }
 

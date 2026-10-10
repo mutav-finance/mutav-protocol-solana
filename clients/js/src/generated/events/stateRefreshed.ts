@@ -12,8 +12,6 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getBooleanDecoder,
-  getBooleanEncoder,
   getBytesEncoder,
   getConstantDecoder,
   getConstantEncoder,
@@ -49,13 +47,9 @@ export type StateRefreshedEvent = {
   stableAssets: bigint;
   coverageRequired: bigint;
   surplus: bigint;
-  bufferEarmark: bigint;
-  freeCapital: bigint;
   provisions: bigint;
   navPerShare: bigint;
   mode: number;
-  tesouroPrice: bigint;
-  priceStale: boolean;
 };
 
 export type StateRefreshedEventArgs = {
@@ -64,13 +58,9 @@ export type StateRefreshedEventArgs = {
   stableAssets: number | bigint;
   coverageRequired: number | bigint;
   surplus: number | bigint;
-  bufferEarmark: number | bigint;
-  freeCapital: number | bigint;
   provisions: number | bigint;
   navPerShare: number | bigint;
   mode: number;
-  tesouroPrice: number | bigint;
-  priceStale: boolean;
 };
 
 /** Gets the encoder for {@link StateRefreshedEventArgs} event data. */
@@ -82,13 +72,9 @@ export function getStateRefreshedEventEncoder(): FixedSizeEncoder<StateRefreshed
       ["stableAssets", getU64Encoder()],
       ["coverageRequired", getU64Encoder()],
       ["surplus", getU64Encoder()],
-      ["bufferEarmark", getU64Encoder()],
-      ["freeCapital", getU64Encoder()],
       ["provisions", getU64Encoder()],
       ["navPerShare", getU64Encoder()],
       ["mode", getU8Encoder()],
-      ["tesouroPrice", getU64Encoder()],
-      ["priceStale", getBooleanEncoder()],
     ]),
     [getConstantEncoder(STATE_REFRESHED_EVENT_DISCRIMINATOR)],
   );
@@ -103,13 +89,9 @@ export function getStateRefreshedEventDecoder(): FixedSizeDecoder<StateRefreshed
       ["stableAssets", getU64Decoder()],
       ["coverageRequired", getU64Decoder()],
       ["surplus", getU64Decoder()],
-      ["bufferEarmark", getU64Decoder()],
-      ["freeCapital", getU64Decoder()],
       ["provisions", getU64Decoder()],
       ["navPerShare", getU64Decoder()],
       ["mode", getU8Decoder()],
-      ["tesouroPrice", getU64Decoder()],
-      ["priceStale", getBooleanDecoder()],
     ]),
     [getConstantDecoder(STATE_REFRESHED_EVENT_DISCRIMINATOR)],
   );

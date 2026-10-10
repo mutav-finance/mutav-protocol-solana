@@ -44,11 +44,7 @@ import {
   type ResolvedInstructionAccount,
   type ResolvedInstructionAccountMeta,
 } from "@solana/kit/program-client-core";
-import {
-  findHolderStatePda,
-  findPendingDepositsPda,
-  findStatePda,
-} from "../pdas";
+import { findPendingDepositsPda, findStatePda } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 
 export const REQUEST_DEPOSIT_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array(
@@ -67,7 +63,6 @@ export type RequestDepositInstruction<
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
   TAccountDepositRequest extends string | AccountMeta<string> = string,
-  TAccountHolderState extends string | AccountMeta<string> = string,
   TAccountSource extends string | AccountMeta<string> = string,
   TAccountPendingDeposits extends string | AccountMeta<string> = string,
   TAccountReserveMint extends string | AccountMeta<string> = string,
@@ -95,9 +90,6 @@ export type RequestDepositInstruction<
       TAccountDepositRequest extends string
         ? WritableAccount<TAccountDepositRequest>
         : TAccountDepositRequest,
-      TAccountHolderState extends string
-        ? WritableAccount<TAccountHolderState>
-        : TAccountHolderState,
       TAccountSource extends string
         ? WritableAccount<TAccountSource>
         : TAccountSource,
@@ -169,7 +161,6 @@ export type RequestDepositAsyncInput<
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountDepositRequest extends InstructionAccountInput =
     InstructionAccountInput,
-  TAccountHolderState extends InstructionAccountInput = InstructionAccountInput,
   TAccountSource extends InstructionAccountInput = InstructionAccountInput,
   TAccountPendingDeposits extends InstructionAccountInput =
     InstructionAccountInput,
@@ -182,12 +173,11 @@ export type RequestDepositAsyncInput<
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** The investor. Pays the request's and `HolderState`'s rent. */
+  /** The investor. Pays the request's rent. */
   owner: TAccountOwner;
   config: TAccountConfig;
   state?: TAccountState;
   depositRequest: TAccountDepositRequest;
-  holderState?: TAccountHolderState;
   /** The owner's BRS account. Owner, never delegate (spec §5). */
   source: TAccountSource;
   pendingDeposits?: TAccountPendingDeposits;
@@ -205,7 +195,6 @@ export async function getRequestDepositInstructionAsync<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountDepositRequest extends InstructionAccountInput,
-  TAccountHolderState extends InstructionAccountInput,
   TAccountSource extends InstructionAccountInput,
   TAccountPendingDeposits extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
@@ -220,7 +209,6 @@ export async function getRequestDepositInstructionAsync<
     TAccountConfig,
     TAccountState,
     TAccountDepositRequest,
-    TAccountHolderState,
     TAccountSource,
     TAccountPendingDeposits,
     TAccountReserveMint,
@@ -248,10 +236,6 @@ export async function getRequestDepositInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountDepositRequest,
       InstructionAccountInputAddress<TAccountDepositRequest>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountHolderState,
-      InstructionAccountInputAddress<TAccountHolderState>
     >,
     ResolvedInstructionAccountMeta<
       TAccountSource,
@@ -296,11 +280,6 @@ export async function getRequestDepositInstructionAsync<
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
     depositRequest: {
       value: input.depositRequest ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
-    holderState: {
-      value: input.holderState ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -356,21 +335,6 @@ export async function getRequestDepositInstructionAsync<
       { programAddress },
     );
   }
-  if (!accounts.holderState.value) {
-    accounts.holderState.value = await findHolderStatePda(
-      {
-        config: getAddressFromResolvedInstructionAccount(
-          "config",
-          accounts.config.value,
-        ),
-        owner: getAddressFromResolvedInstructionAccount(
-          "owner",
-          accounts.owner.value,
-        ),
-      },
-      { programAddress },
-    );
-  }
   if (!accounts.pendingDeposits.value) {
     accounts.pendingDeposits.value = await findPendingDepositsPda(
       {
@@ -397,7 +361,6 @@ export async function getRequestDepositInstructionAsync<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("depositRequest", accounts.depositRequest),
-      getAccountMeta("holderState", accounts.holderState),
       getAccountMeta("source", accounts.source),
       getAccountMeta("pendingDeposits", accounts.pendingDeposits),
       getAccountMeta("reserveMint", accounts.reserveMint),
@@ -427,10 +390,6 @@ export async function getRequestDepositInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountDepositRequest,
       InstructionAccountInputAddress<TAccountDepositRequest>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountHolderState,
-      InstructionAccountInputAddress<TAccountHolderState>
     >,
     ResolvedInstructionAccountMeta<
       TAccountSource,
@@ -469,7 +428,6 @@ export type RequestDepositInput<
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountDepositRequest extends InstructionAccountInput =
     InstructionAccountInput,
-  TAccountHolderState extends InstructionAccountInput = InstructionAccountInput,
   TAccountSource extends InstructionAccountInput = InstructionAccountInput,
   TAccountPendingDeposits extends InstructionAccountInput =
     InstructionAccountInput,
@@ -482,12 +440,11 @@ export type RequestDepositInput<
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** The investor. Pays the request's and `HolderState`'s rent. */
+  /** The investor. Pays the request's rent. */
   owner: TAccountOwner;
   config: TAccountConfig;
   state: TAccountState;
   depositRequest: TAccountDepositRequest;
-  holderState: TAccountHolderState;
   /** The owner's BRS account. Owner, never delegate (spec §5). */
   source: TAccountSource;
   pendingDeposits: TAccountPendingDeposits;
@@ -505,7 +462,6 @@ export function getRequestDepositInstruction<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountDepositRequest extends InstructionAccountInput,
-  TAccountHolderState extends InstructionAccountInput,
   TAccountSource extends InstructionAccountInput,
   TAccountPendingDeposits extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
@@ -520,7 +476,6 @@ export function getRequestDepositInstruction<
     TAccountConfig,
     TAccountState,
     TAccountDepositRequest,
-    TAccountHolderState,
     TAccountSource,
     TAccountPendingDeposits,
     TAccountReserveMint,
@@ -547,10 +502,6 @@ export function getRequestDepositInstruction<
   ResolvedInstructionAccountMeta<
     TAccountDepositRequest,
     InstructionAccountInputAddress<TAccountDepositRequest>
-  >,
-  ResolvedInstructionAccountMeta<
-    TAccountHolderState,
-    InstructionAccountInputAddress<TAccountHolderState>
   >,
   ResolvedInstructionAccountMeta<
     TAccountSource,
@@ -594,11 +545,6 @@ export function getRequestDepositInstruction<
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
     depositRequest: {
       value: input.depositRequest ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
-    holderState: {
-      value: input.holderState ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -658,7 +604,6 @@ export function getRequestDepositInstruction<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("depositRequest", accounts.depositRequest),
-      getAccountMeta("holderState", accounts.holderState),
       getAccountMeta("source", accounts.source),
       getAccountMeta("pendingDeposits", accounts.pendingDeposits),
       getAccountMeta("reserveMint", accounts.reserveMint),
@@ -688,10 +633,6 @@ export function getRequestDepositInstruction<
     ResolvedInstructionAccountMeta<
       TAccountDepositRequest,
       InstructionAccountInputAddress<TAccountDepositRequest>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountHolderState,
-      InstructionAccountInputAddress<TAccountHolderState>
     >,
     ResolvedInstructionAccountMeta<
       TAccountSource,
@@ -730,20 +671,19 @@ export type ParsedRequestDepositInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** The investor. Pays the request's and `HolderState`'s rent. */
+    /** The investor. Pays the request's rent. */
     owner: TAccountMetas[0];
     config: TAccountMetas[1];
     state: TAccountMetas[2];
     depositRequest: TAccountMetas[3];
-    holderState: TAccountMetas[4];
     /** The owner's BRS account. Owner, never delegate (spec §5). */
-    source: TAccountMetas[5];
-    pendingDeposits: TAccountMetas[6];
-    reserveMint: TAccountMetas[7];
-    tokenProgram: TAccountMetas[8];
-    systemProgram: TAccountMetas[9];
-    eventAuthority: TAccountMetas[10];
-    program: TAccountMetas[11];
+    source: TAccountMetas[4];
+    pendingDeposits: TAccountMetas[5];
+    reserveMint: TAccountMetas[6];
+    tokenProgram: TAccountMetas[7];
+    systemProgram: TAccountMetas[8];
+    eventAuthority: TAccountMetas[9];
+    program: TAccountMetas[10];
   };
   data: RequestDepositInstructionData;
 };
@@ -756,12 +696,12 @@ export function parseRequestDepositInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedRequestDepositInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 12) {
+  if (instruction.accounts.length < 11) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 12,
+        expectedAccountMetas: 11,
       },
     );
   }
@@ -778,7 +718,6 @@ export function parseRequestDepositInstruction<
       config: getNextAccount(),
       state: getNextAccount(),
       depositRequest: getNextAccount(),
-      holderState: getNextAccount(),
       source: getNextAccount(),
       pendingDeposits: getNextAccount(),
       reserveMint: getNextAccount(),

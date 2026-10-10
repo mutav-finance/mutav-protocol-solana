@@ -14,8 +14,6 @@ import {
   getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
-  getI64Decoder,
-  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
   getU16Decoder,
@@ -53,16 +51,8 @@ import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 import {
   getCapsInputDecoder,
   getCapsInputEncoder,
-  getExitInputDecoder,
-  getExitInputEncoder,
-  getPriceInputDecoder,
-  getPriceInputEncoder,
   type CapsInput,
   type CapsInputArgs,
-  type ExitInput,
-  type ExitInputArgs,
-  type PriceInput,
-  type PriceInputArgs,
 } from "../types";
 
 export const SET_CONFIG_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
@@ -117,27 +107,17 @@ export type SetConfigInstructionData = {
   discriminator: ReadonlyUint8Array;
   coverageRatioBps: number;
   feeTakeBps: number;
-  payoutSlaSecs: bigint;
   featureFlags: bigint;
   mutavCapitalWallet: Address;
   caps: CapsInput;
-  price: PriceInput;
-  exit: ExitInput;
-  /** MUTAV's take from issuer income (ADR 0017), `<= MAX_INCOME_TAKE_BPS`. */
-  incomeTakeBps: number;
 };
 
 export type SetConfigInstructionDataArgs = {
   coverageRatioBps: number;
   feeTakeBps: number;
-  payoutSlaSecs: number | bigint;
   featureFlags: number | bigint;
   mutavCapitalWallet: Address;
   caps: CapsInputArgs;
-  price: PriceInputArgs;
-  exit: ExitInputArgs;
-  /** MUTAV's take from issuer income (ADR 0017), `<= MAX_INCOME_TAKE_BPS`. */
-  incomeTakeBps: number;
 };
 
 export function getSetConfigInstructionDataEncoder(): FixedSizeEncoder<SetConfigInstructionDataArgs> {
@@ -146,13 +126,9 @@ export function getSetConfigInstructionDataEncoder(): FixedSizeEncoder<SetConfig
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["coverageRatioBps", getU16Encoder()],
       ["feeTakeBps", getU16Encoder()],
-      ["payoutSlaSecs", getI64Encoder()],
       ["featureFlags", getU64Encoder()],
       ["mutavCapitalWallet", getAddressEncoder()],
       ["caps", getCapsInputEncoder()],
-      ["price", getPriceInputEncoder()],
-      ["exit", getExitInputEncoder()],
-      ["incomeTakeBps", getU16Encoder()],
     ]),
     (value) => ({ ...value, discriminator: SET_CONFIG_DISCRIMINATOR }),
   );
@@ -163,13 +139,9 @@ export function getSetConfigInstructionDataDecoder(): FixedSizeDecoder<SetConfig
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["coverageRatioBps", getU16Decoder()],
     ["feeTakeBps", getU16Decoder()],
-    ["payoutSlaSecs", getI64Decoder()],
     ["featureFlags", getU64Decoder()],
     ["mutavCapitalWallet", getAddressDecoder()],
     ["caps", getCapsInputDecoder()],
-    ["price", getPriceInputDecoder()],
-    ["exit", getExitInputDecoder()],
-    ["incomeTakeBps", getU16Decoder()],
   ]);
 }
 
@@ -210,13 +182,9 @@ export type SetConfigAsyncInput<
   program: TAccountProgram;
   coverageRatioBps: SetConfigInstructionDataArgs["coverageRatioBps"];
   feeTakeBps: SetConfigInstructionDataArgs["feeTakeBps"];
-  payoutSlaSecs: SetConfigInstructionDataArgs["payoutSlaSecs"];
   featureFlags: SetConfigInstructionDataArgs["featureFlags"];
   mutavCapitalWallet: SetConfigInstructionDataArgs["mutavCapitalWallet"];
   caps: SetConfigInstructionDataArgs["caps"];
-  price: SetConfigInstructionDataArgs["price"];
-  exit: SetConfigInstructionDataArgs["exit"];
-  incomeTakeBps: SetConfigInstructionDataArgs["incomeTakeBps"];
 };
 
 export async function getSetConfigInstructionAsync<
@@ -399,13 +367,9 @@ export type SetConfigInput<
   program: TAccountProgram;
   coverageRatioBps: SetConfigInstructionDataArgs["coverageRatioBps"];
   feeTakeBps: SetConfigInstructionDataArgs["feeTakeBps"];
-  payoutSlaSecs: SetConfigInstructionDataArgs["payoutSlaSecs"];
   featureFlags: SetConfigInstructionDataArgs["featureFlags"];
   mutavCapitalWallet: SetConfigInstructionDataArgs["mutavCapitalWallet"];
   caps: SetConfigInstructionDataArgs["caps"];
-  price: SetConfigInstructionDataArgs["price"];
-  exit: SetConfigInstructionDataArgs["exit"];
-  incomeTakeBps: SetConfigInstructionDataArgs["incomeTakeBps"];
 };
 
 export function getSetConfigInstruction<

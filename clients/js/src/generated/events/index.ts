@@ -6,17 +6,11 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./adapterRemoved";
-export * from "./adapterWhitelisted";
-export * from "./allocated";
 export * from "./allowlistRootUpdated";
 export * from "./assetsClaimed";
 export * from "./claimFiled";
-export * from "./claimNoticeClosed";
-export * from "./claimNoticeFlagged";
 export * from "./claimPaid";
 export * from "./configUpdated";
-export * from "./deallocated";
 export * from "./depositCancelled";
 export * from "./depositRequested";
 export * from "./depositsFulfilled";
@@ -29,7 +23,6 @@ export * from "./modeChanged";
 export * from "./operatorRevoked";
 export * from "./paused";
 export * from "./paymentsAccountUpdated";
-export * from "./payoutLate";
 export * from "./payoutSettled";
 export * from "./queueHeadsAdvanced";
 export * from "./redeemCancelled";

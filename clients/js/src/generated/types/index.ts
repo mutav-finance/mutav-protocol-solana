@@ -6,10 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./adapterEntry";
 export * from "./caps";
 export * from "./capsInput";
-export * from "./exitInput";
-export * from "./exitParams";
-export * from "./priceInput";
-export * from "./priceParams";

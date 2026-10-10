@@ -81,7 +81,11 @@ export type Guarantee = {
   registeredAt: bigint;
   /** `0` while active. */
   closedAt: bigint;
-  /** Zeroed. Never read or written by logic. */
+  /**
+   * Zeroed. Never read or written by logic. The 192-byte pilot budget
+   * (spec §14.2) holds the ADR 0012 lifecycle fields (88 bytes) without a
+   * migration; it was grown from 64 before the layout freeze (ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -116,7 +120,11 @@ export type GuaranteeArgs = {
   registeredAt: number | bigint;
   /** `0` while active. */
   closedAt: number | bigint;
-  /** Zeroed. Never read or written by logic. */
+  /**
+   * Zeroed. Never read or written by logic. The 192-byte pilot budget
+   * (spec §14.2) holds the ADR 0012 lifecycle fields (88 bytes) without a
+   * migration; it was grown from 64 before the layout freeze (ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -143,7 +151,7 @@ export function getGuaranteeEncoder(): FixedSizeEncoder<GuaranteeArgs> {
       ["status", getU8Encoder()],
       ["registeredAt", getI64Encoder()],
       ["closedAt", getI64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 64)],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 192)],
     ]),
     (value) => ({ ...value, discriminator: GUARANTEE_DISCRIMINATOR }),
   );
@@ -171,7 +179,7 @@ export function getGuaranteeDecoder(): FixedSizeDecoder<Guarantee> {
     ["status", getU8Decoder()],
     ["registeredAt", getI64Decoder()],
     ["closedAt", getI64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 64)],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 192)],
   ]);
 }
 
@@ -234,5 +242,5 @@ export async function fetchAllMaybeGuarantee(
 }
 
 export function getGuaranteeSize(): number {
-  return 249;
+  return 377;
 }
