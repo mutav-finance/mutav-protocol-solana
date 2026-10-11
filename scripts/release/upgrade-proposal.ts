@@ -25,7 +25,7 @@ import { guardCluster, opt, parseArgs, req, type Args } from '../devnet/lib/cli'
 import { BPF_LOADER_UPGRADEABLE, programDataAddress, SYSTEM_PROGRAM } from '../devnet/lib/compose';
 import { toPayload, writePayload } from '../devnet/lib/proposal';
 import { rpcFor } from '../devnet/lib/rpc';
-import { squadsVaultAddress } from '../devnet/lib/squads';
+import { parseVaultIndex, squadsVaultAddress } from '../devnet/lib/squads';
 
 /** ProgramData header: u32 tag | u64 slot | Option<Pubkey> (1 + 32). */
 export const PROGRAM_DATA_HEADER = 45;
@@ -77,11 +77,11 @@ export async function composeUpgrade(p: {
 }
 
 export async function main(args: Args) {
-  const url = req(args, 'url');
-  guardCluster(url, opt(args, 'confirm-cluster'));
+  const vaultIndex = parseVaultIndex(opt(args, 'vault-index'));
+  // The payload names the cluster, never the RPC URL (it may carry an API key).
+  const { url, cluster } = await guardCluster(opt(args, 'url'), opt(args, 'confirm-cluster'));
   const programId = address(req(args, 'program'));
   const multisig = address(req(args, 'multisig'));
-  const vaultIndex = Number(opt(args, 'vault-index') ?? 0);
   const vault = await squadsVaultAddress(multisig, vaultIndex);
   const pd = await rpcFor(url).getAccountInfo(await programDataAddress(programId), { encoding: 'base64', dataSlice: { offset: 0, length: 0 } }).send();
   if (!pd.value) throw new Error(`ProgramData of ${programId} not found`);
@@ -94,7 +94,7 @@ export async function main(args: Args) {
     programDataLen: Number(pd.value.space),
   });
   if (ixs.length > 1) console.log('new .so is larger than ProgramData: ExtendProgramChecked bundled first');
-  writePayload(req(args, 'out'), toPayload({ title: `MUTAV: upgrade ${programId} from buffer ${req(args, 'buffer')}`, cluster: url, multisig, vaultIndex, vault }, ixs));
+  writePayload(req(args, 'out'), toPayload({ title: `MUTAV: upgrade ${programId} from buffer ${req(args, 'buffer')}`, cluster, multisig, vaultIndex, vault }, ixs));
 }
 
 if (import.meta.main) await main(parseArgs());

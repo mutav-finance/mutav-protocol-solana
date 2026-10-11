@@ -25,7 +25,7 @@ import {
   type SolanaRpcApi,
   type TransactionSigner,
 } from '@solana/kit';
-import { isLocalUrl } from './cli';
+import { isLocalUrl } from './cluster';
 
 /** Local clusters serve the test-cluster API (airdrops included). */
 export type LocalRpc = Rpc<SolanaRpcApi>;

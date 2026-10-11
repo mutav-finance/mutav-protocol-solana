@@ -47,6 +47,7 @@ import {
   getSettlePayoutInstruction,
   fetchClaimFiling,
   fetchGuarantee,
+  MUTAV_PROGRAM_ADDRESS,
 } from '../clients/js/src';
 import { opt, parseArgs } from '../scripts/devnet/lib/cli';
 import {
@@ -57,7 +58,7 @@ import {
 } from '../scripts/devnet/lib/compose';
 import { parseConfig } from '../scripts/devnet/lib/config';
 import { airdrop, assertNoProcess, LocalCluster, run, send, tempDir, type LocalRpc } from '../scripts/devnet/lib/local';
-import { main as deploy } from '../scripts/devnet/deploy';
+import { deploy } from '../scripts/devnet/deploy';
 
 export const BRS_DEVNET_MINT = address('BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4');
 const PORT = 38899;
@@ -140,24 +141,17 @@ export async function forkHappyPath(programKeypair?: string) {
     );
     for (const s of [vault!, operator!, investor!]) await airdrop(rpc, s.address, 10);
 
-    step('deploy into the fork');
-    const { programId } = await deploy({
-      url: URL,
-      payer: deployer,
-      'upgrade-authority': vault!.address,
-      ...(programKeypair ? { 'program-keypair': programKeypair } : {}),
-    });
-    const po = { programAddress: programId };
-
-    step('initialize with the real BRS mint (mint guard)');
     const treasury = await setTokenBalance(treasuryOwner!.address, BRS_DEVNET_MINT, 0n);
     const payments = await setTokenBalance(paymentsOwner!.address, BRS_DEVNET_MINT, 0n);
+    const standIn = { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, members: [vault!.address], threshold: 1, timeLockFloorSecs: 0 };
     const cfg = parseConfig({
       cluster: 'localnet',
-      programId,
+      programId: MUTAV_PROGRAM_ADDRESS,
       reserveMint: BRS_DEVNET_MINT,
       reserveTokenProgram: TOKEN_PROGRAM,
-      squads: { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, timeLockFloorSecs: 86_400 },
+      // One throwaway key stands in for both Squads vaults (no Squads program locally).
+      squads: standIn,
+      upgradeSquads: standIn,
       admin: vault!.address,
       upgradeAuthority: vault!.address,
       operator: operator!.address,
@@ -173,6 +167,19 @@ export async function forkHappyPath(programKeypair?: string) {
       },
       allowlist: [capital!.address, investor!.address],
     });
+    step('deploy into the fork');
+    const { programId } = await deploy({
+      url: URL,
+      confirmCluster: undefined,
+      payer: deployer,
+      upgradeAuthority: vault!.address,
+      cfg,
+      localStandIn: true,
+      ...(programKeypair ? { programKeypair } : {}),
+    });
+    const po = { programAddress: programId };
+
+    step('initialize with the real BRS mint (mint guard)');
     const sendAs = (s: TransactionSigner, ixs: Instruction[]) => send(rpc, s, ixs);
     await sendAs(vault!, [await composeInitialize(cfg, { upgradeAuthority: vault!, payer: vault! })]);
     const a = await findReserveAddresses(BRS_DEVNET_MINT, po);

@@ -1,0 +1,138 @@
+import { afterAll, describe, expect, test } from 'bun:test';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { Address } from '@solana/kit';
+import { MUTAV_PROGRAM_ADDRESS } from '../../clients/js/src';
+import { deploy, type DeployDeps } from '../devnet/deploy';
+import { DEVNET_GENESIS } from '../devnet/lib/cluster';
+import { programDataAddress } from '../devnet/lib/compose';
+import { parseConfig, type DeployConfig } from '../devnet/lib/config';
+import { squadsVaultAddress, SQUADS_V4_PROGRAM } from '../devnet/lib/squads';
+import { filled, multisigBytes, programData, testAddress } from './fixtures';
+
+// A placeholder payer file: deploy.ts only checks its mode and hands the path to the CLI.
+const dir = mkdtempSync(join(tmpdir(), 'mutav-deploy-'));
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
+const payerFile = (mode: number) => {
+  const p = join(dir, `payer-${mode.toString(8)}.json`);
+  writeFileSync(p, 'placeholder, not a key');
+  chmodSync(p, mode);
+  return p;
+};
+const BPF = 'BPFLoaderUpgradeab1e11111111111111111111111' as Address;
+
+async function setup(o: { ownerOverride?: Address; threshold?: number; authorityAfter?: Address | null; failHandover?: boolean } = {}) {
+  const cfg: DeployConfig = parseConfig(filled());
+  cfg.admin = await squadsVaultAddress(cfg.squads.multisig, cfg.squads.vaultIndex);
+  cfg.upgradeAuthority = await squadsVaultAddress(cfg.upgradeSquads.multisig, cfg.upgradeSquads.vaultIndex);
+  const ms = (m: DeployConfig['squads'], threshold = m.threshold) => ({
+    owner: o.ownerOverride ?? SQUADS_V4_PROGRAM,
+    data: multisigBytes({ threshold, timeLock: m.timeLockFloorSecs, members: m.members.map((k) => [k, 7] as [Address, number]) }),
+  });
+  const pdAddr = await programDataAddress(MUTAV_PROGRAM_ADDRESS);
+  const accounts = new Map<string, { owner: Address; data: Uint8Array }>([
+    [cfg.squads.multisig, ms(cfg.squads)],
+    [cfg.upgradeSquads.multisig, ms(cfg.upgradeSquads, o.threshold)],
+    [pdAddr, { owner: BPF, data: programData(o.authorityAfter === undefined ? cfg.upgradeAuthority : o.authorityAfter) }],
+  ]);
+  const calls: string[][] = [];
+  const deps: DeployDeps = {
+    genesis: { genesisHash: async () => DEVNET_GENESIS },
+    account: async (_url, a) => accounts.get(a) ?? null,
+    run: (cmd) => {
+      calls.push(cmd);
+      if (cmd[0] === 'solana-keygen') return `${MUTAV_PROGRAM_ADDRESS}\n`;
+      if (cmd[2] === 'set-upgrade-authority' && o.failHandover) throw new Error('blockhash not found');
+      return '';
+    },
+  };
+  const opts = {
+    url: 'https://api.devnet.solana.com',
+    confirmCluster: 'devnet',
+    payer: payerFile(0o600),
+    programKeypair: '/outside/mutav-keypair.json',
+    so: '/outside/mutav.so',
+    upgradeAuthority: cfg.upgradeAuthority as string,
+    cfg,
+  };
+  return { cfg, deps, calls, opts };
+}
+
+describe('deploy.ts preflight (refuses before any CLI run)', () => {
+  test('happy path: keygen, deploy, hand over, then ProgramData shows the vault', async () => {
+    const { deps, calls, opts, cfg } = await setup();
+    expect(await deploy(opts, deps)).toEqual({ programId: MUTAV_PROGRAM_ADDRESS });
+    expect(calls.map((c) => c.slice(0, 3).join(' '))).toEqual([
+      'solana-keygen pubkey /outside/mutav-keypair.json',
+      'solana program deploy',
+      'solana program set-upgrade-authority',
+    ]);
+    const handover = calls[2]!;
+    expect(handover[handover.indexOf('--new-upgrade-authority') + 1]).toBe(cfg.upgradeAuthority);
+    expect(handover[handover.indexOf('--url') + 1]).toBe('https://api.devnet.solana.com/');
+  });
+
+  test('--upgrade-authority different from the config', async () => {
+    const { deps, calls, opts } = await setup();
+    await expect(deploy({ ...opts, upgradeAuthority: testAddress(90) }, deps)).rejects.toThrow('upgradeAuthority');
+    expect(calls).toEqual([]);
+  });
+
+  test('config upgradeAuthority that is not the derived upgrade vault', async () => {
+    const { deps, calls, opts, cfg } = await setup();
+    cfg.upgradeSquads.vaultIndex = 1;
+    await expect(deploy(opts, deps)).rejects.toThrow('vault');
+    expect(calls).toEqual([]);
+  });
+
+  test('multisig not owned by the Squads v4 program', async () => {
+    const { deps, calls, opts } = await setup({ ownerOverride: testAddress(91) });
+    await expect(deploy(opts, deps)).rejects.toThrow('Squads v4');
+    expect(calls).toEqual([]);
+  });
+
+  test('multisig with the wrong threshold', async () => {
+    const { deps, calls, opts } = await setup({ threshold: 1 });
+    await expect(deploy(opts, deps)).rejects.toThrow('threshold');
+    expect(calls).toEqual([]);
+  });
+
+  test.each([0o644, 0o640, 0o604, 0o660])('payer file with mode %o (group/other bits)', async (mode) => {
+    const { deps, calls, opts } = await setup();
+    await expect(deploy({ ...opts, payer: payerFile(mode) }, deps)).rejects.toThrow('chmod 600');
+    expect(calls).toEqual([]);
+  });
+
+  test('a localnet config against devnet', async () => {
+    const { deps, calls, opts, cfg } = await setup();
+    cfg.cluster = 'localnet';
+    await expect(deploy(opts, deps)).rejects.toThrow('localnet');
+    expect(calls).toEqual([]);
+  });
+
+  test('a stand-in authority is refused off localnet', async () => {
+    const { deps, calls, opts } = await setup();
+    await expect(deploy({ ...opts, localStandIn: true }, deps)).rejects.toThrow('local');
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('deploy.ts handover', () => {
+  test('a failed set-upgrade-authority prints the exact retry command and fails', async () => {
+    const { deps, calls, opts, cfg } = await setup({ failHandover: true });
+    const err = await deploy(opts, deps).then(() => null, (e: Error) => e);
+    expect(err).not.toBeNull();
+    const msg = err!.message;
+    expect(msg).toContain('still holds the upgrade authority');
+    expect(msg).toContain(
+      `solana program set-upgrade-authority ${MUTAV_PROGRAM_ADDRESS} --upgrade-authority ${opts.payer} --new-upgrade-authority ${cfg.upgradeAuthority} --skip-new-upgrade-authority-signer-check --keypair ${opts.payer} --url https://api.devnet.solana.com/ --commitment confirmed`,
+    );
+    expect(calls).toHaveLength(3);
+  });
+
+  test('ProgramData not showing the vault after the handover fails with the retry command', async () => {
+    const { deps, opts } = await setup({ authorityAfter: testAddress(92) });
+    await expect(deploy(opts, deps)).rejects.toThrow('solana program set-upgrade-authority');
+  });
+});

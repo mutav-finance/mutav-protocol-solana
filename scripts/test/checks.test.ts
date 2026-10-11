@@ -1,22 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { address, getAddressEncoder, type Address } from '@solana/kit';
+import { address, type Address } from '@solana/kit';
+import { programData } from './fixtures';
 import { postDeployChecks, programDataUpgradeAuthority } from '../devnet/lib/checks';
 import { blankConfig, blankState } from '../../clients/js/test/fakes';
 
 const VAULT: Address = address('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM');
 const OTHER: Address = address('2JgjeWXmFMtYhbqFrBy4xR4yLTeRKt9Qs5MvVr9ZJmKz');
-
-/** ProgramData: u32 tag 3 | u64 slot | Option<Pubkey> | ELF bytes. */
-function programData(authority: Address | null): Uint8Array {
-  const b = new Uint8Array(45 + 16);
-  new DataView(b.buffer).setUint32(0, 3, true);
-  new DataView(b.buffer).setBigUint64(4, 123n, true);
-  if (authority) {
-    b[12] = 1;
-    b.set(getAddressEncoder().encode(authority), 13);
-  }
-  return b;
-}
 
 describe('programDataUpgradeAuthority', () => {
   test('reads the authority, or null when immutable', () => {

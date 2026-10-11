@@ -29,6 +29,7 @@ import {
   type TransactionSigner,
 } from '@solana/kit';
 import {
+  MUTAV_PROGRAM_ADDRESS,
   buildAllowlist,
   fetchReserve,
   fetchVaultConfig,
@@ -52,7 +53,7 @@ import {
 import { postDeployChecks } from './lib/checks';
 import { airdrop, assertNoProcess, LocalCluster, run, send, tempDir } from './lib/local';
 import { accountData } from './lib/rpc';
-import { main as deploy } from './deploy';
+import { deploy } from './deploy';
 
 const RPC_PORT = 28899;
 const URL = `http://127.0.0.1:${RPC_PORT}`;
@@ -119,21 +120,16 @@ export async function dryRun(programKeypair?: string) {
     const treasury = await ata(treasuryOwner!.address);
     const payments = await ata(paymentsOwner!.address);
 
-    step('deploy (scripts/devnet/deploy.ts)');
-    const { programId } = await deploy({
-      url: URL,
-      payer: deployer,
-      'upgrade-authority': vault!.address,
-      ...(programKeypair ? { 'program-keypair': programKeypair } : {}),
-    });
-
     // The same config shape as devnet.example.json, filled for this run.
+    const standIn = { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, members: [vault!.address], threshold: 1, timeLockFloorSecs: 0 };
     const cfg: DeployConfig = parseConfig({
       cluster: 'localnet',
-      programId,
+      programId: MUTAV_PROGRAM_ADDRESS,
       reserveMint: mint,
       reserveTokenProgram: TOKEN_PROGRAM,
-      squads: { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, timeLockFloorSecs: 86_400 },
+      // One throwaway key stands in for both Squads vaults (no Squads program locally).
+      squads: standIn,
+      upgradeSquads: standIn,
       admin: vault!.address,
       upgradeAuthority: vault!.address,
       operator: op1!.address,
@@ -154,6 +150,17 @@ export async function dryRun(programKeypair?: string) {
       },
       allowlist: [capital!.address, investor!.address],
     });
+    step('deploy (scripts/devnet/deploy.ts)');
+    const { programId } = await deploy({
+      url: URL,
+      confirmCluster: undefined,
+      payer: deployer,
+      upgradeAuthority: vault!.address,
+      cfg,
+      localStandIn: true,
+      ...(programKeypair ? { programKeypair } : {}),
+    });
+
     const sendAs = (signer: TransactionSigner, ixs: Instruction[]) => send(rpc, signer, ixs);
 
     step('initialize (signed by the upgrade authority = vault stand-in)');

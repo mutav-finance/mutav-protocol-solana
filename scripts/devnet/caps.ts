@@ -8,7 +8,7 @@
  */
 import { createNoopSigner } from '@solana/kit';
 import { fetchReserve } from '../../clients/js/src';
-import { guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
+import { assertConfigCluster, guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
 import { composeSetCaps } from './lib/compose';
 import { loadConfig } from './lib/config';
 import { toPayload, writePayload } from './lib/proposal';
@@ -17,8 +17,9 @@ import { assertAdminIsVault } from './init';
 
 export async function main(args: Args) {
   const cfg = loadConfig(req(args, 'config'));
-  const url = req(args, 'url');
-  guardCluster(url, opt(args, 'confirm-cluster'));
+  const guarded = await guardCluster(opt(args, 'url'), opt(args, 'confirm-cluster'));
+  assertConfigCluster(guarded, cfg.cluster);
+  const { url } = guarded;
   await assertAdminIsVault(cfg);
   const r = await fetchReserve(rpcFor(url), cfg.reserveMint, { programAddress: cfg.programId });
   const ix = await composeSetCaps(cfg, r.config.data, createNoopSigner(cfg.admin));

@@ -1,23 +1,34 @@
 {
-  "_comment": "Devnet deploy config. Copy to a path outside the repo (it names real wallets), fill every <FILL: ...>, and pass it with --config. Values without <FILL> are proposals (spec §8, ADR 0016: c = 0.10); the founder confirms them (spec §12 Q3).",
+  "_comment": "Devnet deploy config. Copy to a path outside the repo (it names real wallets), fill every <FILL: ...>, and pass it with --config. Never put a key in it: addresses only. Two Squads v4 multisigs (spec §12 Q15): `squads` is the admin multisig (its vault is VaultConfig.admin, time lock >= 5 min) and `upgradeSquads` holds the program upgrade authority (time lock >= 1 h). The scripts derive each vault from multisig + vaultIndex and require it to equal `admin` / `upgradeAuthority`; deploy.ts and verify.ts require each multisig to be owned by the Squads v4 program, autonomous, with exactly these members (each able to vote), exactly this threshold and a time lock at or above the floor. Values without <FILL> are the locked devnet values (c = 0.10, ADR 0016; fee take 2000); verify.ts checks them on-chain.",
   "cluster": "devnet",
   "programId": "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9",
   "reserveMint": "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4",
   "reserveTokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   "squads": {
-    "multisig": "<FILL: Squads v4 multisig address (members and threshold set at its creation)>",
+    "_comment": "Admin multisig: 2-of-2, time lock >= 300 s on devnet (24 h on the real pilot).",
+    "multisig": "<FILL: admin Squads v4 multisig address>",
     "vaultIndex": 0,
-    "timeLockFloorSecs": "<FILL: agreed time-lock floor in seconds (spec §12 Q15)>"
+    "members": ["<FILL: member 1 (Julia)>", "<FILL: member 2 (Draau stand-in on devnet)>"],
+    "threshold": 2,
+    "timeLockFloorSecs": 300
   },
-  "admin": "<FILL: the Squads vault (index above) — VaultConfig.admin>",
-  "upgradeAuthority": "<FILL: the vault that holds the upgrade authority — the same vault under Q15 option (a), the upgrade multisig's vault under (b)>",
+  "upgradeSquads": {
+    "_comment": "Upgrade multisig: same members, 2-of-2, time lock >= 3600 s on devnet (7 days on the real pilot).",
+    "multisig": "<FILL: upgrade Squads v4 multisig address>",
+    "vaultIndex": 0,
+    "members": ["<FILL: member 1 (Julia)>", "<FILL: member 2 (Draau stand-in on devnet)>"],
+    "threshold": 2,
+    "timeLockFloorSecs": 3600
+  },
+  "admin": "<FILL: the admin multisig's vault (index above): VaultConfig.admin>",
+  "upgradeAuthority": "<FILL: the upgrade multisig's vault (index above): the program upgrade authority>",
   "operator": "<FILL: operator pubkey — the KMS key from mutav-app, or a devnet test key>",
   "pauser": "<FILL: pauser pubkey>",
   "mutavCapitalWallet": "<FILL: MUTAV capital wallet (owns neither money account)>",
   "treasuryAccount": "<FILL: BRS token account receiving MUTAV's fee take>",
   "paymentsAccount": "<FILL: BRS token account receiving claim payments>",
   "coverageRatioBps": 1000,
-  "feeTakeBps": "<FILL: take rate in bps, at most 3000 (spec §12 Q4)>",
+  "feeTakeBps": 2000,
   "caps": {
     "_comment": "BRS base units (6 dp). Sized for c = 0.10 (ADR 0016): R$300k reserve, R$40k per guarantee, R$10k / R$20k claim payments per call / per 31 days (ADR 0019), requests R$1k–R$100k. maxNavMoveBps is 10000 (100%) on devnet on purpose: the guard nets out guarantee fees and swept income per share (ADR 0017), but a claim provision or payment against a small demo reserve is a real NAV move and would trip it and halt fulfilment. If it trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
     "maxTvl": 300000000000,

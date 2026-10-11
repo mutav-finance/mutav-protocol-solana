@@ -10,16 +10,33 @@ import { readFileSync } from 'node:fs';
 import { address, type Address } from '@solana/kit';
 import type { CapsInputArgs } from '../../../clients/js/src';
 
+/** A Squads v4 multisig as the deploy expects to find it on-chain. */
+export type MultisigConfig = {
+  multisig: Address;
+  vaultIndex: number;
+  /** Exactly these members, each with the vote permission. */
+  members: Address[];
+  /** Exactly this threshold. */
+  threshold: number;
+  /** The multisig's `time_lock` must be at least this. */
+  timeLockFloorSecs: number;
+};
+
+/** Devnet time-lock floors (governance decision: admin 5 min, upgrade 1 h). */
+export const DEVNET_TIME_LOCK_FLOORS = { admin: 300, upgrade: 3_600 } as const;
+
 export type DeployConfig = {
   cluster: 'localnet' | 'devnet';
   programId: Address;
   reserveMint: Address;
   reserveTokenProgram: Address;
-  /** Squads v4 multisig whose vault is `admin`. */
-  squads: { multisig: Address; vaultIndex: number; timeLockFloorSecs: number };
-  /** `VaultConfig.admin`: the Squads vault. */
+  /** Admin multisig: its vault is `VaultConfig.admin` (short time lock). */
+  squads: MultisigConfig;
+  /** Upgrade multisig: its vault is the program upgrade authority (long time lock; spec §12 Q15). */
+  upgradeSquads: MultisigConfig;
+  /** `VaultConfig.admin`: the admin multisig's vault. */
   admin: Address;
-  /** Program upgrade authority: the same vault, or the upgrade multisig's (spec §12 Q15). */
+  /** Program upgrade authority: the upgrade multisig's vault. */
   upgradeAuthority: Address;
   operator: Address;
   pauser: Address;
@@ -72,6 +89,22 @@ const addr = (v: unknown, path: string) => {
   }
 };
 
+function multisigConfig(raw: any, path: string): MultisigConfig {
+  const multisig = addr(raw?.multisig, `${path}.multisig`);
+  if (!Array.isArray(raw?.members) || raw.members.length === 0) throw new Error(`${path}.members must list the multisig's members`);
+  const members = raw.members.map((m: unknown, i: number) => addr(m, `${path}.members[${i}]`));
+  if (new Set(members).size !== members.length) throw new Error(`${path}.members must be distinct`);
+  const threshold = int(raw?.threshold, `${path}.threshold`, 65_535);
+  if (threshold < 1 || threshold > members.length) throw new Error(`${path}.threshold must be in [1, ${members.length}] (the member count)`);
+  return {
+    multisig,
+    vaultIndex: int(raw?.vaultIndex, `${path}.vaultIndex`, 255),
+    members,
+    threshold,
+    timeLockFloorSecs: int(raw?.timeLockFloorSecs, `${path}.timeLockFloorSecs`, 2 ** 32 - 1),
+  };
+}
+
 /** Parse and validate a config object. Throws listing every unfilled placeholder. */
 export function parseConfig(raw: any): DeployConfig {
   const missing: string[] = [];
@@ -85,11 +118,8 @@ export function parseConfig(raw: any): DeployConfig {
     programId: addr(raw.programId, 'programId'),
     reserveMint: addr(raw.reserveMint, 'reserveMint'),
     reserveTokenProgram: addr(raw.reserveTokenProgram, 'reserveTokenProgram'),
-    squads: {
-      multisig: addr(raw.squads?.multisig, 'squads.multisig'),
-      vaultIndex: int(raw.squads?.vaultIndex, 'squads.vaultIndex', 255),
-      timeLockFloorSecs: int(raw.squads?.timeLockFloorSecs, 'squads.timeLockFloorSecs', 2 ** 32 - 1),
-    },
+    squads: multisigConfig(raw.squads, 'squads'),
+    upgradeSquads: multisigConfig(raw.upgradeSquads, 'upgradeSquads'),
     admin: addr(raw.admin, 'admin'),
     upgradeAuthority: addr(raw.upgradeAuthority, 'upgradeAuthority'),
     operator: addr(raw.operator, 'operator'),
@@ -119,6 +149,22 @@ export function parseConfig(raw: any): DeployConfig {
   if (new Set(roles).size !== 3) throw new Error('admin, operator and pauser must be distinct');
   if (c.treasuryAccount === c.paymentsAccount) throw new Error('treasuryAccount and paymentsAccount must differ');
   if (c.allowlist.length === 0) throw new Error('allowlist is empty (a zero root allowlists nobody)');
+
+  // Governance (two multisigs, devnet time-lock floors). The localnet dry run
+  // stands one throwaway key in for both.
+  if (c.cluster === 'devnet') {
+    if (c.squads.multisig === c.upgradeSquads.multisig) throw new Error('squads and upgradeSquads must be different multisigs (admin and upgrade)');
+    if (c.admin === c.upgradeAuthority) throw new Error('admin and upgradeAuthority must be different vaults');
+    if (c.squads.timeLockFloorSecs < DEVNET_TIME_LOCK_FLOORS.admin) {
+      throw new Error(`squads.timeLockFloorSecs must be >= ${DEVNET_TIME_LOCK_FLOORS.admin} on devnet`);
+    }
+    if (c.upgradeSquads.timeLockFloorSecs < DEVNET_TIME_LOCK_FLOORS.upgrade) {
+      throw new Error(`upgradeSquads.timeLockFloorSecs must be >= ${DEVNET_TIME_LOCK_FLOORS.upgrade} on devnet`);
+    }
+    for (const k of ['squads', 'upgradeSquads'] as const) {
+      if (c[k].threshold < 2) throw new Error(`${k}.threshold must be >= 2 on devnet`);
+    }
+  }
   return c;
 }
 
