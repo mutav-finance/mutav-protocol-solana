@@ -190,595 +190,310 @@ ol.steps{margin:0;padding-left:22px}ol.steps li{margin:8px 0}
   a{color:inherit;text-decoration:none}
   .noprint{display:none}
 }
+
+.wf-nav .meter{margin-left:auto;font-family:var(--font-mono);font-size:.85em;border:1px solid var(--accent-dim);color:var(--accent);padding:.1em .5em}
+.wf-nav .meter + .badge{margin-left:.6em}
+.num td{font-family:var(--font-mono)}
 </style>
 </head>
 <body>
-
-<!-- (a) COVER -->
 <section class="cover">
  <div class="wrap">
-  <p class="kicker">MUTAV · Colosseum Crypto World's Fair · Technical demo storyboard</p>
-  <h1>One lease, <span class="amber">end to end</span>.<br>The chain is the proof.</h1>
-  <p class="lede">Ana needs a guarantor to rent in Passo Fundo. Her agency uses MUTAV. Her lease goes on Solana, a second lease is refused by the coverage gate, her missed rent is claimed, paid and settled, and anyone can check every step.</p>
+  <p class="kicker">MUTAV · Colosseum Crypto World's Fair · Product demo storyboard · v3</p>
+  <h1>One lease, <span class="amber">refused</span> and <span class="amber">repaid</span>.</h1>
+  <p class="lede">Ana's lease goes on Solana. The next one is refused by the coverage gate and nothing moves. Her missed rent is claimed, paid and settled while the reserve stays covered. Then the same reserve pays the capital that funds it: R$4,000 in, R$4,057.45 out.</p>
   <div class="meta">
    <div><span class="kicker">Runtime</span><b>2:45</b></div>
-   <div><span class="kicker">Hard limit</span><b>≤ 3:00</b></div>
-   <div><span class="kicker">Voiceover</span><b>303 words</b></div>
+   <div><span class="kicker">Voiceover</span><b>294 words</b></div>
+   <div><span class="kicker">Pace</span><b>~140–150 wpm</b></div>
    <div><span class="kicker">Deadline</span><b>Oct 12 · 23:59 BRT</b></div>
   </div>
   <div class="wow">
-   <div class="card"><div class="dots"><i></i><i></i><i></i></div>
-    <p class="kicker">Wow moment 1 · 0:45</p>
-    <h3>The <span class="amber">refusal</span></h3>
-    <p class="muted" style="margin:0">One more lease, the same size. The preview turns red. We send it anyway, and the program refuses it with <span class="mono">InsufficientFreeCapital</span>. MUTAV can't sign a guarantee the reserve can't back.</p>
-   </div>
-   <div class="card"><div class="dots"><i></i><i></i><i></i></div>
-    <p class="kicker">Wow moment 2 · 1:15</p>
-    <h3>Rent unpaid, <span class="amber">claim settled</span></h3>
-    <p class="muted" style="margin:0">Claim filed, paid and its PIX settlement recorded on-chain in minutes, against up to 30 days for seguro-fiança. The coverage gate never blocks a claim.</p>
-   </div>
+   <div class="card"><div class="dots"><i></i><i></i><i></i></div><p class="kicker">Centrepiece · 0:52</p><h3>The <span class="amber">refusal</span></h3><p class="muted" style="margin:0">Ana's lease fits. The next equal lease is R$1,000 short of required coverage; sent anyway, the program refuses it with <span class="mono">InsufficientFreeCapital</span>. The meter does not move.</p></div>
+   <div class="card"><div class="dots"><i></i><i></i><i></i></div><p class="kicker">Payoff · 2:02</p><h3>Fees in, <span class="amber">capital out</span></h3><p class="muted" style="margin:0">After the claim, the book's guarantee fees lift NAV per share above the deposit price, and a withdrawal is filled from free capital: R$4,000 in, R$4,057.45 out. In reais; never a rate.</p></div>
   </div>
-  <p class="dim mono" style="font-size:12px;margin-top:22px">Recorded on devnet at reserve.mutav.finance · Program 8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9 · Drafted 2026-10-11 from the PR #37 app code · Companion: script.md</p>
+  <p class="dim mono" style="font-size:12px;margin-top:22px">Recorded on Solana devnet at reserve.mutav.finance · numbers checked against ADR 0028 (c = 0.25) · Ana, agency names and lease references are fictional · Companion: script.md</p>
  </div>
 </section>
 
-<!-- (b) TIMELINE -->
 <section id="timeline">
  <div class="wrap">
   <p class="kicker">Structure</p>
-  <h2>Six beats, <span class="amber">2:45</span></h2>
-  <div class="tl" role="list">
-   <a role="listitem" href="#f1" style="width:9.1%"><span class="t">0:00</span><span class="n">Hook: Ana</span><span class="f">F1–F2</span></a>
-   <a role="listitem" href="#f3" style="width:18.2%"><span class="t">0:15</span><span class="n">The lease goes on-chain</span><span class="f">F3–F5</span></a>
-   <a role="listitem" class="hot" href="#f6" style="width:18.2%"><span class="t">0:45</span><span class="n">The refusal</span><span class="f">F6–F7</span></a>
-   <a role="listitem" class="hot" href="#f8" style="width:25.5%"><span class="t">1:15</span><span class="n">Rent goes unpaid: file → pay → settle</span><span class="f">F8–F10</span></a>
-   <a role="listitem" href="#f11" style="width:18.2%"><span class="t">1:57</span><span class="n">Anyone can verify · the flywheel</span><span class="f">F11–F12</span></a>
-   <a role="listitem" href="#f13" style="width:10.9%"><span class="t">2:27</span><span class="n">Close</span><span class="f">F13</span></a>
-  </div>
+  <h2>Seven beats, <span class="amber">2:45</span></h2>
+  <div class="tl" role="list"><a role="listitem" class="" href="#f1" style="width:6.1%"><span class="t">0:00</span><span class="n">Hook</span><span class="f">10 s</span></a><a role="listitem" class="" href="#f2" style="width:7.3%"><span class="t">0:10</span><span class="n">Agency side</span><span class="f">12 s</span></a><a role="listitem" class="" href="#f4" style="width:18.2%"><span class="t">0:22</span><span class="n">Ana's lease on-chain</span><span class="f">30 s</span></a><a role="listitem" class="hot" href="#f7" style="width:21.2%"><span class="t">0:52</span><span class="n">The refusal</span><span class="f">35 s</span></a><a role="listitem" class="" href="#f9" style="width:21.2%"><span class="t">1:27</span><span class="n">Rent goes unpaid</span><span class="f">35 s</span></a><a role="listitem" class="hot" href="#f12" style="width:20.0%"><span class="t">2:02</span><span class="n">Capital payoff</span><span class="f">33 s</span></a><a role="listitem" class="" href="#f15" style="width:6.1%"><span class="t">2:35</span><span class="n">Close</span><span class="f">10 s</span></a></div>
   <div class="scale"><span>0:00</span><span>0:30</span><span>1:00</span><span>1:30</span><span>2:00</span><span>2:30</span><span>2:45</span></div>
-  <p class="muted" style="margin-top:18px;max-width:860px">Amber beats are the two climaxes: give them room. Everything else follows one lease. Each beat is its own screen clip, and the voiceover is laid over the cut. Roles, Squads and the fee beat are cut from this version. The admin appears only as "a per-call cap the admin sets".</p>
+  <p class="muted" style="margin-top:18px;max-width:860px">Guarantee-led, ending on the capital payoff. A persistent devnet badge and coverage meter (required / held) stay on screen from F1 to F14. One Explorer shot only (F5); every other proof lives in the app.</p>
  </div>
 </section>
 
-<!-- (c) FRAMES -->
+<section id="numbers">
+ <div class="wrap">
+  <p class="kicker">The staged state</p>
+  <h2>Numbers that <span class="amber">all hold at once</span></h2>
+  <p class="muted" style="max-width:900px">Plan B, the chosen set. ADR 0028 values: c = 0.25 (required = max(⌈0.25 × remaining cover⌉, provisions)), max_tvl R$1M, R$120k per guarantee, claim caps R$15k per call and R$20k per 31 days, requests R$1k–R$100k, fee take 20%. Shares are minted 1:1 at the first fills (virtual offset 1), so NAV per share = net assets ÷ 44,000. Total devnet BRS needed ≈ R$46,040 (≈ R$46,396 with the optional sweep).</p>
+  <div class="tablewrap"><table class="num"><tr><th>Step</th><th>Action (who)</th><th>Stable assets</th><th>Coverage required</th><th>Free capital</th><th>NAV per share</th><th>Check</th></tr><tr><td>0</td><td>Deposits filled at NAV 1: wallet A R$40,000, wallet B R$4,000 (capital wallets; Squads fill)</td><td>R$44,000</td><td>—</td><td>—</td><td>1.000000</td><td>requests within R$1k–R$100k; TVL ≪ R$1M</td></tr><tr><td>1</td><td>Book: 8 leases × rent R$1,000 × (12 + 6) = R$18,000 cover each = R$144,000 (operator)</td><td>R$44,000</td><td>R$36,000</td><td>R$8,000</td><td>1.000000</td><td>R$18k ≤ R$120k per guarantee</td></tr><tr><td>2</td><td><b>Ana</b>: + R$18,000 cover (operator)</td><td>R$44,000</td><td>R$40,500</td><td>R$3,500</td><td>1.000000</td><td>(a) fits: needs R$4,500 of R$8,000</td></tr><tr><td>3</td><td><b>Next equal lease</b>: would need R$45,000 (operator)</td><td>R$44,000</td><td>R$40,500</td><td>R$3,500</td><td>1.000000</td><td>(a) refused: R$1,000 short; nothing changes</td></tr><tr><td>4</td><td>file_claim R$1,000 on Ana, default leg (operator)</td><td>R$44,000</td><td>R$40,500</td><td>R$3,500</td><td>0.977273</td><td>provision booked; required = max(25% × cover, provisions)</td></tr><tr><td>5</td><td>pay_claim R$1,000 (operator)</td><td>R$43,000</td><td>R$40,250</td><td>R$2,750</td><td>0.977273</td><td>(b) still covered; (e) ≤ R$15k/call, ≤ R$20k/31 days</td></tr><tr><td>6</td><td>contribute_fees R$2,040 gross: 17 lease-months × 12% × R$1,000; take R$408 → treasury, R$1,632 → reserve (operator)</td><td>R$44,632</td><td>R$40,250</td><td>R$4,382</td><td>1.014364</td><td>(c) NAV above the deposit NAV</td></tr><tr><td>7</td><td>Wallet B redeems 4,000 shares → <b>R$4,057.45</b> (Squads fill, then claim_assets)</td><td>R$40,574.55</td><td>R$40,250</td><td>R$324.55</td><td>1.014364</td><td>(d) R$4,057.45 ≤ free R$4,382; ≥ R$1k; whole fill; still covered</td></tr><tr><td>6b (optional)</td><td>sweep_income R$355.38: one month of issuer revenue at 70% of CDI (9.555% a year ÷ 12) on R$44,632, <i>simulated on devnet</i></td><td>R$44,987.38</td><td>R$40,250</td><td>R$4,737.38</td><td>1.022440</td><td>B would receive R$4,089.76</td></tr></table></div>
+  <div class="flag"><b>What cannot be true with a realistic single month.</b> At a 12% guarantee fee and a 20% take, one month of fees beats a one-month-rent claim only if the book has more than 10.4 leases (0.8 × 0.12 × N &gt; 1). With the BRS known to be in hand (≈ R$50k) the book holds at most 9 leases at c = 0.25. So the payoff uses <b>two months</b> of the book's fees in one step, captioned as such, rather than an inflated fee or a token claim. The optional issuer-revenue sweep adds a simulated month on top.</div>
+  <h3 style="margin:24px 0 12px">Plan A · the pilot product, if more sandbox BRS is available</h3>
+  <div class="tablewrap"><table class=""><tr><th>Item</th><th>Value</th></tr><tr><td>Product</td><td>Pilot product: rent R$2,200, cover 12× + 6× = R$39,600, R$9,900 required per lease</td></tr><tr><td>Capital</td><td>A R$107,000 (R$100,000 + R$7,000 requests), B R$10,000 → R$117,000</td></tr><tr><td>Book</td><td>10 leases → R$99,000 required, free R$18,000</td></tr><tr><td>Ana / next</td><td>Ana fits (free R$8,100 after); next needs R$118,800 > R$117,000 → R$1,800 short</td></tr><tr><td>Claim</td><td>R$2,200 → stable R$114,800, required R$108,350, still covered</td></tr><tr><td>Fees</td><td>21 lease-months × R$264 = R$5,544 gross, R$4,435.20 net → NAV 1.019104</td></tr><tr><td>Withdrawal</td><td>B: <b>R$10,000 in → R$10,191.04 out</b>; free capital R$10,885 covers it</td></tr><tr><td>Devnet BRS needed</td><td>≈ R$122,544, more than the ≈ R$50,000 known to be in hand (sandbox supply ≈ 139k). Needs extra sandbox BRS from Nora</td></tr></table></div>
+ </div>
+</section>
+
 <section id="frames">
  <div class="wrap">
   <p class="kicker">Storyboard</p>
   <h2>Shot by <span class="amber">shot</span></h2>
-  <p class="muted" style="max-width:860px">The wireframes are sketches of the real app layout in PR #37, not screenshots. Amber dashed boxes are what to zoom or click. Numbered dots give the click order. The numbers assume the devnet starting state in the checklist (c = 0.10).</p>
-
-  <!-- F1 -->
+  <p class="muted" style="max-width:860px">Wireframes sketch the restyled app (PR #45 routes), not screenshots. Amber dashed boxes mark what to zoom or click. Each frame's Retake note says what a redo consumes on-chain.</p>
   <article class="frame" id="f1">
-   <div class="fhead"><span class="fno">F1</span><h3>Cold open</h3><span class="tc">0:00 – 0:06 · 6 s</span><span class="route">title card (edit)</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-card"><div class="k">Passo Fundo · RS</div><div class="h">Ana needs a <span class="amber">guarantor</span></div><div class="s">No personal guarantor. No spare months of rent for a deposit.</div></div>
-   </div></div>
+   <div class="fhead"><span class="fno">F1</span><h3>Hook: the product, at once</h3><span class="tc">0:00 – 0:10 · 10 s</span><span class="route">/reserve (Overview)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Investment</span><span class="">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$36,000 / HELD R$44,000</span><span class="badge">NO WALLET</span></div><div class="wf-body"><div class="wf-tabs"><span class="on">Overview</span><span class="">Coverage</span><span class="">Claims</span><span class="">Capital</span><span class="">Risks</span><span class="">Verify</span></div><div class="hl"><span class="tag">ZOOM ≤1.3×</span><div class="wf-metrics"><div class="wf-metric">Stable assets<b>R$44,000</b></div><div class="wf-metric">Coverage required<b>R$36,000</b></div><div class="wf-metric">Free capital<b>R$8,000</b></div><div class="wf-metric">Active guarantees<b>8</b></div></div></div><div class="wf-bar"><span style="width:82%"></span><em style="left:100%"></em></div><div class="mono dim" style="font-size:.75em">● LIVE FROM DEVNET · every figure read from the program's accounts</div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>A typographic card made in the editor on the brand grid. No stock footage and no fake app screens.</dd>
-    <dt>VO</dt><dd class="vo">"Ana wants to rent an apartment in Passo Fundo."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">PASSO FUNDO · RS</span></dd>
-    <dt>On-chain proof</dt><dd class="muted">None (story hook).</dd>
-    <dt>Edit</dt><dd>Fade from black (6 frames). Hold the headline. Cut straight to F2 on the word "Fundo".</dd>
-    <dt>Retake</dt><dd>Made in the editor; nothing to reset.</dd>
+    <dt>On screen</dt><dd>Open on the public reserve page, already loaded: the Overview tab, the devnet badge and the coverage meter (R$36,000 required of R$44,000 held). No wallet connected.</dd>
+    <dt>VO</dt><dd class="vo">"This is MUTAV, a rent guarantor whose reserve lives on Solana. We built its program and this app during the hackathon."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Built in the hackathon: Solana program + reserve app</span></dd>
+    <dt>On-chain proof</dt><dd>Live figures from devnet program accounts.</dd>
+    <dt>Edit</dt><dd>No title card first: product on screen from frame 1. Slow push-in, ≤1.3× unless captured at 2×.</dd>
+    <dt>Retake</dt><dd>Read-only: repeat freely.</dd>
    </dl>
   </article>
-
-  <!-- F2 -->
   <article class="frame" id="f2">
-   <div class="fhead"><span class="fno">F2</span><h3>Her guarantee is issued</h3><span class="tc">0:06 – 0:15 · 9 s</span><span class="route">/operator · register_guarantee</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator#console</span><em>DEVNET</em></div>
-    <div class="wf-nav"><b>MUTAV</b><span>Reserve</span><span class="on">Operator</span><span>Investor</span><span>Admin</span><span class="badge">CONNECTED AS OPERATOR · ACTIONS ENABLED</span></div>
-    <div class="wf-body">
-     <div class="wf-tabs"><span class="on">register_guarantee</span><span>contribute_fees</span><span>sweep_income</span><span>file_claim</span><span>pay_claim</span><span>settle_payout</span><span>close_guarantee</span></div>
-     <div class="wf-bound"><div class="k"><span>Free capital (new cover must fit)</span><span>R$1,000.00</span></div><div class="k"><span>Max cover per guarantee</span><span>R$40,000</span></div><div class="k"><span>Coverage ratio</span><span>10.00%</span></div></div>
-     <div class="wf-fields hl"><span class="tag">ZOOM · TYPE</span>
-      <div class="wf-field">Lease reference<div>MTV-PF-0006</div></div>
-      <div class="wf-field">Agency<div>Imobiliária Exemplo</div></div>
-      <div class="wf-field">Monthly rent (BRS)<div>1500</div></div>
-      <div class="wf-field">Default cover (× rent)<div>3 · R$4,500</div></div>
-      <div class="wf-field">Exit cover (× rent)<div>1 · R$1,500</div></div>
-     </div>
-     <div class="wf-prev"><div class="h">PREVIEW · Fits: the program should accept it</div><div class="k"><span>New cover</span><span>R$6,000</span></div><div class="k"><span>Coverage required after</span><span>R$9,600 (10%)</span></div><div class="k"><span>Headroom after</span><span class="up">R$400</span></div></div>
-    </div>
-   </div></div>
+   <div class="fhead"><span class="fno">F2</span><h3>The agency side</h3><span class="tc">0:10 – 0:16 · 6 s</span><span class="route">app.mutav.finance (agency view)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>app.mutav.finance/agency</span></div><div class="wf-body"><div class="pill a" style="align-self:flex-start">AGENCY PLATFORM · BUILT BEFORE THE HACKATHON · NOT YET CONNECTED ON-CHAIN</div><div class="wf-title" style="font-size:1.2em">Contratos</div><table class="wf-table"><tr><th>Inquilino</th><th>Imóvel</th><th>Aluguel</th><th>Garantia</th></tr><tr><td>Ana (fictional)</td><td>Passo Fundo · RS</td><td class="mono">R$1.000</td><td><span class="pill">MUTAV</span></td></tr><tr><td>…</td><td>…</td><td class="mono">…</td><td>…</td></tr></table></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>1. Start on the register tab with the cursor in "Lease reference". 2. Type the opaque reference <span class="mono">MTV-PF-0006</span> and a <b>fictional</b> agency name; keep rent 1500, default 3, exit 1. 3. The green PREVIEW appears.</dd>
-    <dt>VO</dt><dd class="vo">"She has no personal guarantor and no spare months of rent for a deposit. Her agency offers MUTAV as her guarantor."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">MUTAV operator console · devnet</span></dd>
-    <dt>On-chain proof</dt><dd class="muted">The "Free capital R$1,000" bound is read from VaultState on-chain.</dd>
-    <dt>Edit</dt><dd>Speed up the typing 2×. Slow push-in (110% → 125%) on the fields.</dd>
-    <dt>Retake</dt><dd>Read-only until you click: repeat freely. If the page shows READ-ONLY, switch Phantom to the operator account and reload.</dd>
+    <dt>On screen</dt><dd>The agency's view in MUTAV's platform (mutav-app), with Ana's fictional lease. The label is visible for the whole shot.</dd>
+    <dt>VO</dt><dd class="vo">"Agencies use MUTAV's platform, built before the hackathon and not yet on-chain."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Agency platform · pre-hackathon · not on-chain yet</span></dd>
+    <dt>On-chain proof</dt><dd>None: off-chain, labelled as such.</dd>
+    <dt>Edit</dt><dd>Hard cut in, hard cut out. Keep the label on screen; it is an honesty label, not decoration.</dd>
+    <dt>Retake</dt><dd>Read-only: repeat freely.</dd>
    </dl>
   </article>
-
-  <!-- F3 -->
   <article class="frame" id="f3">
-   <div class="fhead"><span class="fno">F3</span><h3>The operator signs</h3><span class="tc">0:15 – 0:27 · 12 s</span><span class="route">/operator · register_guarantee</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator#console</span><em>DEVNET</em></div>
-    <div class="wf-body">
-     <div style="position:relative"><span class="wf-btn">register_guarantee</span><span class="mk" style="left:-.6em;top:-.8em">1</span></div>
-     <div class="wf-status hl"><span class="tag">ZOOM</span><span class="sq"></span><span class="up">Confirmed</span><span style="color:var(--accent)">4kQm…x9Tz ↗</span><span class="dim">Accounts touched (9)</span><span class="mk" style="right:-2em;top:-.4em">2</span></div>
-     <div class="hl"><span class="tag">HOW THE RESERVE MOVED</span><table class="wf-table">
-      <tr><th>Moved</th><th>Before</th><th>After</th></tr>
-      <tr><td>Coverage required</td><td class="mono">R$9,000.00</td><td class="mono up">R$9,600.00 ▲</td></tr>
-      <tr><td>Free capital</td><td class="mono">R$1,000.00</td><td class="mono down">R$400.00 ▼</td></tr>
-      <tr><td>Active guarantees</td><td class="mono">5</td><td class="mono up">6 ▲</td></tr>
-     </table></div>
-    </div>
-    <div class="wf-wallet"><b>Phantom · Devnet</b>Approve transaction<br>mutav · register_guarantee<div class="x"><span>Cancel</span><span class="p">Confirm</span></div></div>
-   </div></div>
+   <div class="fhead"><span class="fno">F3</span><h3>Architecture strip</h3><span class="tc">0:16 – 0:22 · 6 s</span><span class="route">card (made in the editor)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-card" style="padding:0 4%"><div class="k">How it fits together</div><div style="display:flex;align-items:center;gap:.5em;flex-wrap:wrap;margin-top:1em;font-family:var(--font-mono);font-size:.95em"><span class="pill">Agency platform</span>→<span class="pill a">Operator</span>→<span class="pill a">Program + BRS reserve</span>→<span class="pill">PIX record</span></div><div style="display:flex;gap:1em;flex-wrap:wrap;margin-top:1.4em;font-size:.8em" class="mono"><span><span class="pill a">■</span> built in hackathon</span><span><span class="pill">■</span> pre-existing</span><span><span class="pill r">■</span> simulated</span><span><span class="pill g">■</span> next</span></div><div class="s" style="font-size:.85em;margin-top:1em">PIX transfer: simulated on devnet · settlement record: on-chain · agency ↔ operator link: next</div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>1. Click <b>register_guarantee</b>. Phantom opens: Confirm. 2. "Confirmed" appears with the tx link, and the before/after table renders under it.</dd>
-    <dt>VO</dt><dd class="vo">"MUTAV's operator registers her lease on Solana: six thousand reais of cover. Forty-five hundred for unpaid rent, fifteen hundred to recover the property."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">register_guarantee · signed by the operator key</span></dd>
-    <dt>On-chain proof</dt><dd>A confirmed devnet transaction signature, plus the reserve numbers re-read from chain after confirmation.</dd>
-    <dt>Edit</dt><dd><b>Cut the Phantom wait</b>: keep 1 s of the pop-up, then jump to "Confirmed". Zoom 160% onto the "moved" table and hold 2 s.</dd>
-    <dt>Retake</dt><dd><b>Consumes R$600 of free capital and one lease reference.</b> To redo: <span class="mono">close_guarantee</span> VOID on that lease from the close tab (instant, operator only). Free capital returns to R$1,000. Register again with a new reference (<span class="mono">MTV-PF-0006b</span>): the old id's PDA still exists, and it stays on /reserve as a "closed" row.</dd>
+    <dt>On screen</dt><dd>A one-line architecture strip in brand style. Legend: built in hackathon (operator console, program, reserve app) / pre-existing (agency platform) / simulated (the PIX transfer) / next (the agency platform → operator link).</dd>
+    <dt>VO</dt><dd class="vo">"MUTAV's operator carries each lease to the program. Claims settle by PIX."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Built in hackathon · pre-existing · simulated · next</span></dd>
+    <dt>On-chain proof</dt><dd>None: a diagram.</dd>
+    <dt>Edit</dt><dd>Animate the arrows left to right, one per half-second. No other motion.</dd>
+    <dt>Retake</dt><dd>Made in the editor.</dd>
    </dl>
   </article>
-
-  <!-- F4 -->
   <article class="frame" id="f4">
-   <div class="fhead"><span class="fno">F4</span><h3>One account per lease, no personal data</h3><span class="tc">0:27 – 0:38 · 11 s</span><span class="route">Solana Explorer (devnet)</span></div>
-   <div class="wfbox"><div class="wf wf-ex">
-    <div class="wf-url"><i></i><i></i><i></i><span>explorer.solana.com/address/7Gq…Guarantee?cluster=devnet</span></div>
-    <div class="wf-body" style="color:#222">
-     <div class="exh">Account · Guarantee PDA</div>
-     <div class="exbox">
-      <div class="k"><span>Address</span><span>7Gq3…Lw2N</span></div>
-      <div class="k hl"><span class="tag">ZOOM</span><span>Assigned program id</span><span>8scC79…Qqv9 (MUTAV)</span></div>
-      <div class="k"><span>Seeds</span><span>["guarantee", config, id]</span></div>
-      <div class="k"><span>Data</span><span>Anchor-decoded if the IDL is published, raw bytes otherwise</span></div>
-     </div>
-     <div class="exbox hl" style="margin-top:.6em"><span class="tag">ZOOM · OPAQUE ID</span>
-      <div class="k"><span>id</span><span>0x5e1f…a9c3 (SHA-256 of the lease reference)</span></div>
-      <div class="k"><span>default_cover / exit_cover</span><span>4,500.000000 / 1,500.000000</span></div>
-      <div class="k"><span>registered_at</span><span>2026-10-12 10:14:07</span></div>
-     </div>
-    </div>
-   </div></div>
+   <div class="fhead"><span class="fno">F4</span><h3>Ana's lease: register</h3><span class="tc">0:22 – 0:34 · 12 s</span><span class="route">/operator · register_guarantee</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="">Investment</span><span class="on">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$36,000 / HELD R$44,000</span><span class="badge">OPERATOR WALLET</span></div><div class="wf-body"><div class="wf-tabs"><span class="on">register_guarantee</span><span class="">contribute_fees</span><span class="">sweep_income</span><span class="">file_claim</span><span class="">pay_claim</span><span class="">settle_payout</span><span class="">close_guarantee</span></div><div class="wf-fields hl"><span class="tag">JUMP-CUT TYPING</span><div class="wf-field">Lease reference<div>MTV-PF-0009</div></div><div class="wf-field">Agency<div>Imobiliária Exemplo</div></div><div class="wf-field">Monthly rent<div>1000</div></div><div class="wf-field">Default cover (× rent)<div>12 · R$12,000</div></div><div class="wf-field">Exit cover (× rent)<div>6 · R$6,000</div></div></div><div class="wf-prev"><div class="h">PREVIEW · Fits: the program should accept it</div><div class="k"><span>New cover</span><span>R$18,000</span></div><div class="k"><span>Coverage required after</span><span>R$40,500 (25%)</span></div><div class="k"><span>Headroom after</span><span class="up">R$3,500</span></div></div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>Click the tx link from F3 (opens Explorer). In the account list, click the new Guarantee account. Show the owner (the MUTAV program) and the data. Name, CPF and address appear nowhere.</dd>
-    <dt>VO</dt><dd class="vo">"On-chain, that's one account per lease, a PDA holding the cover and an opaque ID. Ana's name, CPF and address never leave MUTAV."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">Guarantee PDA · owner: MUTAV program · id = hash, not a name</span></dd>
-    <dt>On-chain proof</dt><dd><b>Primary proof shot:</b> a Solana Explorer page for the account on devnet.</dd>
-    <dt>Edit</dt><dd>The tab switch is a hard cut. Pre-open the Explorer tab so it's warm. Zoom on "owner" and the id.</dd>
-    <dt>Retake</dt><dd>Read-only: repeat freely. If the IDL isn't published on-chain, Explorer shows raw bytes. Keep it (the overlay reads "raw account data: no personal data"), or use the row's link on <span class="mono">/reserve#coverage</span>.</dd>
+    <dt>On screen</dt><dd>The register tab. Enter the opaque reference MTV-PF-0009, a fictional agency name, rent 1000, default 12×, exit 6×. The PREVIEW turns green: R$18,000 cover, R$3,500 of headroom left.</dd>
+    <dt>VO</dt><dd class="vo">"Ana is renting in Passo Fundo, a thousand reais a month. MUTAV guarantees twelve months of rent and six of property recovery: eighteen thousand in cover."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Rent R$1,000 · cover 12× + 6× = R$18,000</span></dd>
+    <dt>On-chain proof</dt><dd>The bound box reads free capital R$8,000 from VaultState.</dd>
+    <dt>Edit</dt><dd>Jump-cut the typing: field empty → field filled. Never show keystrokes in real time.</dd>
+    <dt>Retake</dt><dd>Read-only until you click: repeat freely.</dd>
    </dl>
   </article>
-
-  <!-- F5 -->
   <article class="frame" id="f5">
-   <div class="fhead"><span class="fno">F5</span><h3>The public reserve updates</h3><span class="tc">0:38 – 0:45 · 7 s</span><span class="route">/reserve#coverage</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve#coverage</span><em>DEVNET</em></div>
-    <div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span>Operator</span><span>Investor</span><span>Admin</span><span class="badge" style="border-color:var(--text-3);color:var(--text-2)">NO WALLET</span></div>
-    <div class="wf-body">
-     <div class="wf-metrics hl"><span class="tag">ZOOM</span>
-      <div class="wf-metric">Stable assets<b>R$10,000</b></div><div class="wf-metric">Coverage required<b>R$9,600</b></div><div class="wf-metric">Free capital<b>R$400</b></div><div class="wf-metric">Active guarantees<b>6</b></div>
-     </div>
-     <table class="wf-table">
-      <tr><th>Guarantee</th><th>Agency</th><th>Default left</th><th>Exit left</th><th>Status</th><th>Registered</th></tr>
-      <tr><td class="mono">a81c…</td><td class="mono dim">3f0d…</td><td class="mono">R$12,000</td><td class="mono">R$6,000</td><td class="up">active</td><td class="dim mono">09:31</td></tr>
-      <tr><td class="mono">…×4</td><td class="mono dim">…</td><td class="mono">R$12,000</td><td class="mono">R$6,000</td><td class="up">active</td><td class="dim mono">09:3x</td></tr>
-      <tr class="hl"><td class="mono" style="color:var(--accent)">5e1f… ↗</td><td class="mono dim">b27e…</td><td class="mono">R$4,500</td><td class="mono">R$1,500</td><td class="up">active</td><td class="mono">10:14</td></tr>
-     </table>
-    </div>
-   </div></div>
+   <div class="fhead"><span class="fno">F5</span><h3>Signed: the one Explorer shot</h3><span class="tc">0:34 – 0:42 · 8 s</span><span class="route">/operator → Solana Explorer</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>explorer.solana.com/address/7Gq…?cluster=devnet</span><em>DEVNET</em></div><div class="wf-body"><div class="wf-status hl"><span class="tag">STATUS CHIP</span><span class="sq"></span><span class="up">Confirmed</span><span style="color:var(--accent)">4kQm…x9Tz ↗</span></div><div class="wf-bound hl"><span class="tag">THE ONLY EXPLORER SHOT</span><div class="k"><span>Account</span><span>Guarantee PDA · 7Gq3…Lw2N</span></div><div class="k"><span>Owner</span><span>MUTAV program 8scC…Qqv9</span></div><div class="k"><span>id</span><span>0x5e1f…a9c3 (hash of the reference)</span></div><div class="k"><span>default / exit cover</span><span>12,000 / 6,000</span></div></div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>Hard cut to <span class="mono">/reserve</span> (no wallet). Show the metric cards, then scroll to Coverage, where the new row is at the bottom.</dd>
-    <dt>VO</dt><dd class="vo">"The public reserve updates at once: coverage required goes up, free capital goes down."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">Public page · no wallet · refreshed every 10 s</span></dd>
-    <dt>On-chain proof</dt><dd>The same numbers as F3, read independently by the public page.</dd>
-    <dt>Edit</dt><dd>Wait for the 10 s poll <i>before</i> rolling, or cut the wait. Highlight the new row with an amber box.</dd>
-    <dt>Retake</dt><dd>Read-only: repeat freely. Reload if the poll is slow.</dd>
+    <dt>On screen</dt><dd>Click register_guarantee and confirm in Phantom (cut). The status chip shows Confirmed and a short signature. Click it: Explorer opens on the new Guarantee PDA, showing the owner, the opaque id and the two cover legs.</dd>
+    <dt>VO</dt><dd class="vo">"The operator signs. On-chain it's one account per lease: cover and an opaque ID. No name, no CPF."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">register_guarantee · confirmed · 4kQm…x9Tz</span></dd>
+    <dt>On-chain proof</dt><dd>The single Explorer shot of the video: the Guarantee PDA on devnet.</dd>
+    <dt>Edit</dt><dd>Cut the Phantom wait to ≤1 s. This is the only Explorer shot; every other proof stays in the app.</dd>
+    <dt>Retake</dt><dd>Consumes R$4,500 of free capital and the reference. Reset: close_guarantee VOID on that lease (operator, instant), then register again as MTV-PF-0009b. The VOID lease stays on /reserve/coverage as "closed".</dd>
    </dl>
   </article>
-
-  <!-- F6 -->
   <article class="frame" id="f6">
-   <div class="fhead"><span class="fno">F6</span><h3>One more lease: the preview turns red</h3><span class="tc">0:45 – 1:00 · 15 s</span><span class="route">/operator · register_guarantee</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator#console</span><em>DEVNET</em></div>
-    <div class="wf-nav"><b>MUTAV</b><span>Reserve</span><span class="on">Operator</span><span class="badge">CONNECTED AS OPERATOR</span></div>
-    <div class="wf-body">
-     <div class="wf-fields">
-      <div class="wf-field">Lease reference<div>MTV-PF-0007</div></div>
-      <div class="wf-field">Agency<div>Imobiliária Exemplo</div></div>
-      <div class="wf-field">Monthly rent (BRS)<div>1500</div></div>
-      <div class="wf-field">Default cover (× rent)<div>3 · R$4,500</div></div>
-      <div class="wf-field">Exit cover (× rent)<div>1 · R$1,500</div></div>
-     </div>
-     <div class="wf-prev bad hl r"><span class="tag">ZOOM · RED</span><div class="h">PREVIEW · Would be refused: InsufficientFreeCapital</div>
-      <div class="k"><span>New cover</span><span>R$6,000</span></div>
-      <div class="k"><span>Free capital before</span><span>R$400</span></div>
-      <div class="k"><span>Coverage required after</span><span>R$10,200 (10% of cover)</span></div>
-      <div class="k"><span>Stable assets</span><span>R$10,000</span></div>
-      <div class="k"><span>Headroom after</span><span style="color:var(--error)">R$200 short</span></div>
-     </div>
-     <div><span class="wf-btn out">Send anyway: watch the program refuse it</span></div>
-    </div>
-   </div></div>
+   <div class="fhead"><span class="fno">F6</span><h3>The public reserve updates</h3><span class="tc">0:42 – 0:52 · 10 s</span><span class="route">/reserve/coverage</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve/coverage</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Investment</span><span class="">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,500 / HELD R$44,000</span><span class="badge">NO WALLET</span></div><div class="wf-body"><div class="wf-tabs"><span class="">Overview</span><span class="on">Coverage</span><span class="">Claims</span><span class="">Capital</span><span class="">Risks</span><span class="">Verify</span></div><div class="hl"><span class="tag">ZOOM</span><div class="wf-metrics"><div class="wf-metric">Coverage required<b>R$40,500</b></div><div class="wf-metric">Stable assets<b>R$44,000</b></div><div class="wf-metric">Free capital<b>R$3,500</b></div><div class="wf-metric">Active guarantees<b>9</b></div></div></div><table class="wf-table"><tr><th>Guarantee</th><th>Default left</th><th>Exit left</th><th>Status</th></tr><tr><td class="mono">…×8</td><td class="mono">R$12,000</td><td class="mono">R$6,000</td><td class="up">active</td></tr><tr class="hl"><td class="mono" style="color:var(--accent)">5e1f…</td><td class="mono">R$12,000</td><td class="mono">R$6,000</td><td class="up">active</td></tr></table></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>Back on <span class="mono">/operator</span>. The form already reads <span class="mono">MTV-PF-0007</span> with the same amounts, and the PREVIEW is red. Move the cursor slowly over "Coverage required after R$10,200" and "Stable assets R$10,000".</dd>
-    <dt>VO</dt><dd class="vo">"Now one more lease, the same size. The reserve must hold ten percent of all the cover it guarantees, and there isn't room. The preview replays the program's rule, and turns red."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">required = ceil(0.10 × cover) ≥ provisions · R$10,200 &gt; R$10,000</span></dd>
-    <dt>On-chain proof</dt><dd>The inputs come from VaultConfig and VaultState. The preview is the client's math mirror of the program's rule.</dd>
-    <dt>Edit</dt><dd>Climax 1: slow down. Zoom 170% onto the red box and hold 3 s. Ease out the background audio here.</dd>
-    <dt>Retake</dt><dd>Read-only preview: repeat freely. If it's green (state drifted), close stray leases or raise the rent until it's red.</dd>
+    <dt>On screen</dt><dd>/reserve/coverage with no wallet. Coverage required rises from R$36,000 to R$40,500, and the new row is at the bottom.</dd>
+    <dt>VO</dt><dd class="vo">"The public reserve updates at once. Coverage required rises to forty thousand five hundred."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Coverage required R$36,000 → R$40,500</span></dd>
+    <dt>On-chain proof</dt><dd>The same numbers as the operator saw, read independently by a public page.</dd>
+    <dt>Edit</dt><dd>Highlight the new row. The meter in the nav updates to 40,500 / 44,000.</dd>
+    <dt>Retake</dt><dd>Read-only: repeat freely.</dd>
    </dl>
   </article>
-
-  <!-- F7 -->
   <article class="frame" id="f7">
-   <div class="fhead"><span class="fno">F7</span><h3>Sent anyway: refused by the program</h3><span class="tc">1:00 – 1:15 · 15 s</span><span class="route">/operator · register_guarantee</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator#console</span><em>DEVNET</em></div>
-    <div class="wf-body">
-     <div style="position:relative"><span class="wf-btn out">Send anyway: watch the program refuse it</span><span class="mk" style="left:-.6em;top:-.8em">1</span></div>
-     <div class="wf-status bad hl r" style="margin-top:.8em"><span class="tag">ZOOM · THE ERROR</span><span class="sq"></span><span>Failed</span></div>
-     <div class="mono hl r" style="font-size:.95em;color:var(--error);padding:.3em 0">InsufficientFreeCapital — Transaction simulation failed: Error processing Instruction 0: custom program error…</div>
-     <div class="wf-bound" style="margin-top:.6em">Nothing was written: the reserve and the registry are unchanged (free capital still R$400, 6 active guarantees).</div>
-    </div>
-    <div class="wf-wallet" style="top:3.2em"><b>Phantom · Devnet</b>This transaction may fail<div class="x"><span>Cancel</span><span class="p">Confirm</span></div></div>
-    <div class="wf-cap">Refused by the MUTAV program before it lands · no state changed</div>
-   </div></div>
+   <div class="fhead"><span class="fno">F7</span><h3>The rule, and the next lease</h3><span class="tc">0:52 – 1:10 · 18 s</span><span class="route">/operator · register_guarantee</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="">Investment</span><span class="on">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,500 / HELD R$44,000</span><span class="badge">OPERATOR WALLET</span></div><div class="wf-body"><div class="wf-fields"><div class="wf-field">Lease reference<div>MTV-PF-0010</div></div><div class="wf-field">Agency<div>Imobiliária Exemplo</div></div><div class="wf-field">Monthly rent<div>1000</div></div><div class="wf-field">Default<div>12 · R$12,000</div></div><div class="wf-field">Exit<div>6 · R$6,000</div></div></div><div class="wf-prev bad hl r"><span class="tag">ZOOM · RED</span><div class="h">PREVIEW · Would be refused: InsufficientFreeCapital</div><div class="k"><span>Coverage required after</span><span>R$45,000 (25%)</span></div><div class="k"><span>Stable assets</span><span>R$44,000</span></div><div class="k"><span>Headroom after</span><span style="color:var(--error)">R$1,000 short</span></div></div><span class="wf-btn out">Send anyway: watch the program refuse it</span></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>1. Click <b>Send anyway</b>. 2. Phantom may warn that the transaction could fail: Confirm. 3. The status turns red and shows the program's error name, <span class="mono">InsufficientFreeCapital</span>.</dd>
-    <dt>VO</dt><dd class="vo">"We send it anyway. The program refuses it: InsufficientFreeCapital. That's the coverage gate. MUTAV can't sign a guarantee the reserve can't back."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">Coverage gate · refused before it lands</span></dd>
-    <dt>On-chain proof</dt><dd>The program's own error, from the simulation logs of the deployed devnet program. <b>No Explorer link</b>: a refused transaction never lands. Don't imply one (an optional skipPreflight tx can add one; see Retake).</dd>
-    <dt>Edit</dt><dd>Keep the Phantom warning for 1 s: it is honest texture. If Phantom won't sign a transaction it expects to fail, use the optional skipPreflight tx on Explorer instead. Zoom 200% on the error name. Freeze-frame for 1 s on "InsufficientFreeCapital".</dd>
-    <dt>Retake</dt><dd><b>Repeatable without limit:</b> the refused transaction never lands and changes nothing. Re-click "Send anyway" as often as needed. <i>Optional:</i> if you want an Explorer link for the refusal, send the same instruction once with <span class="mono">skipPreflight</span> from a script. That gives a failed signature whose logs show <span class="mono">InsufficientFreeCapital</span>.</dd>
+    <dt>On screen</dt><dd>Same form, the next reference (MTV-PF-0010), the same amounts. The PREVIEW is red: R$45,000 would be required against R$44,000 held, R$1,000 short.</dd>
+    <dt>VO</dt><dd class="vo">"The rule: the reserve must hold a quarter of all the cover it guarantees, in BRS, Nora's Brazilian real stablecoin. The next lease, the same size, would need forty-five thousand. The reserve holds forty-four."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Rule: hold 25% of all cover · next lease: R$1,000 short</span></dd>
+    <dt>On-chain proof</dt><dd>VaultConfig (c = 0.25) and VaultState, through the client's mirror of the program's rule.</dd>
+    <dt>Edit</dt><dd>Centrepiece, part 1. Slow down. Zoom onto the red box. A simple on-screen formula card is fine: required = 25% × cover.</dd>
+    <dt>Retake</dt><dd>Read-only preview: repeat freely.</dd>
    </dl>
   </article>
-
-  <!-- F8 -->
   <article class="frame" id="f8">
-   <div class="fhead"><span class="fno">F8</span><h3>Rent goes unpaid: claim filed</h3><span class="tc">1:15 – 1:27 · 12 s</span><span class="route">/operator · file_claim</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator#console</span><em>DEVNET</em></div>
-    <div class="wf-body">
-     <div class="wf-tabs"><span>register_guarantee</span><span>contribute_fees</span><span>sweep_income</span><span class="on">file_claim</span><span>pay_claim</span><span>settle_payout</span><span>close_guarantee</span></div>
-     <div class="wf-fields" style="grid-template-columns:2fr 1fr 1fr 1fr">
-      <div class="wf-field hl"><span class="tag">ANA'S LEASE</span>Guarantee<div>5e1f… · default left R$4,500 · exit left R$1,500</div></div>
-      <div class="wf-field">Leg<div>default (rent arrears)</div></div>
-      <div class="wf-field">Claim amount (BRS)<div>3000</div></div>
-      <div class="wf-field">Notice reference<div>NTC-PF-0001</div></div>
-     </div>
-     <div style="position:relative"><span class="wf-btn">file_claim</span><span class="mk" style="left:-.6em;top:-.8em">1</span></div>
-     <div class="hl"><span class="tag">ZOOM</span><table class="wf-table">
-      <tr><th>Moved</th><th>Before</th><th>After</th></tr>
-      <tr><td>Open provisions</td><td class="mono">R$0.00</td><td class="mono up">R$3,000.00 ▲</td></tr>
-      <tr><td>NAV per share (from accounts)</td><td class="mono">1.000000000</td><td class="mono down">0.700000000 ▼</td></tr>
-     </table></div>
-    </div>
-   </div></div>
+   <div class="fhead"><span class="fno">F8</span><h3>Refused. Nothing moves.</h3><span class="tc">1:10 – 1:27 · 17 s</span><span class="route">/operator · register_guarantee</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="">Investment</span><span class="on">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,500 / HELD R$44,000</span><span class="badge">OPERATOR WALLET</span></div><div class="wf-body"><span class="wf-btn out">Send anyway: watch the program refuse it</span><div class="wf-status bad hl r" style="margin-top:.8em"><span class="tag">HOLD 3 s</span><span class="sq"></span><span>Failed · InsufficientFreeCapital</span></div><div class="pill r" style="align-self:flex-start;font-size:1em">COVERAGE GATE · REFUSED</div><div class="wf-bound">Meter unchanged: required R$40,500 / held R$44,000 · 9 active guarantees</div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>Switch to the file_claim tab. Choose Ana's guarantee (<span class="mono">5e1f…</span>, default left R$4,500), leg default, amount 3000 (two months of rent), notice <span class="mono">NTC-PF-0001</span>. Click <b>file_claim</b>, confirm in Phantom, and the table shows provisions ▲.</dd>
-    <dt>VO</dt><dd class="vo">"Months later, Ana's rent goes unpaid. The agency sends the claim. MUTAV files it, and a provision is booked before any money moves."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">file_claim · provision booked · R$3,000</span></dd>
-    <dt>On-chain proof</dt><dd>A confirmed tx, and a new ClaimFiling PDA.</dd>
-    <dt>Edit</dt><dd>Jump cut over Phantom. Optional: a "3 months later" title wipe (0.5 s) before the tab switch.</dd>
-    <dt>Retake</dt><dd><b>Consumes a notice and cover.</b> One filing per notice, and Ana's default leg has R$1,500 left after a R$3,000 filing, so a full redo of F8–F10 needs a fresh claim on another guarantee (an R$18k one, notice <span class="mono">NTC-PF-0002</span>). Each redo uses R$3,000 of that leg, R$3,000 of the R$20,000 per-period cap (about 6 redos at most) and R$3,000 of reserve. It adds a public timeline row. If only the recording was bad, not the transaction, don't redo it: continue to F9 on the same claim.</dd>
+    <dt>On screen</dt><dd>Click Send anyway and confirm (Phantom may warn). The status turns red with the program's error name, and the "Coverage gate · refused" chip appears. The meter does not move. Hold 3 s.</dd>
+    <dt>VO</dt><dd class="vo">"We send it anyway. The program refuses it: InsufficientFreeCapital. Nothing changes. MUTAV can't sign a guarantee the reserve can't back."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Coverage gate · refused · InsufficientFreeCapital</span></dd>
+    <dt>On-chain proof</dt><dd>The program's own error from its simulation logs. No Explorer link: a refused transaction never lands (an optional skipPreflight send can create one).</dd>
+    <dt>Edit</dt><dd>Freeze-frame for 3 s on the error and the unchanged meter. Silence under the hold, no music.</dd>
+    <dt>Retake</dt><dd>Repeatable without limit: nothing lands, nothing changes.</dd>
    </dl>
   </article>
-
-  <!-- F9 -->
   <article class="frame" id="f9">
-   <div class="fhead"><span class="fno">F9</span><h3>Paid, within the admin's cap</h3><span class="tc">1:27 – 1:43 · 16 s</span><span class="route">/operator · pay_claim</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator#console</span><em>DEVNET</em></div>
-    <div class="wf-body">
-     <div class="wf-tabs"><span>file_claim</span><span class="on">pay_claim</span><span>settle_payout</span></div>
-     <div class="wf-bound hl"><span class="tag">BOUND BEFORE YOU SIGN</span>
-      <div class="k"><span>Max per call</span><span>R$10,000.00</span></div>
-      <div class="k"><span>Left in the last 31 days</span><span>R$20,000.00 of R$20,000.00</span></div>
-      <div class="k"><span>PREVIEW · 5e1f… R$3,000</span><span class="up">within the caps</span></div>
-      <div>Never gated by required coverage. The destination is fixed to the payments account.</div>
-     </div>
-     <div style="position:relative"><span class="wf-btn">pay_claim R$3,000</span><span class="mk" style="left:-.6em;top:-.8em">1</span></div>
-     <table class="wf-table">
-      <tr><th>Moved</th><th>Before</th><th>After</th></tr>
-      <tr><td>Stable assets</td><td class="mono">R$10,000.00</td><td class="mono down">R$7,000.00 ▼</td></tr>
-      <tr><td>Coverage required</td><td class="mono">R$9,600.00</td><td class="mono down">R$9,300.00 ▼</td></tr>
-      <tr><td>Claim payments (total)</td><td class="mono">R$0.00</td><td class="mono up">R$3,000.00 ▲</td></tr>
-     </table>
-     <div class="pill r hl r" style="align-self:flex-start"><span class="tag">EDIT A ONLY</span>Stable R$7,000 &lt; required R$9,300 · under-covered · paid anyway</div>
-    </div>
-   </div></div>
+   <div class="fhead"><span class="fno">F9</span><h3>Rent goes unpaid: claim filed</h3><span class="tc">1:27 – 1:39 · 12 s</span><span class="route">/operator · file_claim</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="">Investment</span><span class="on">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,500 / HELD R$44,000</span><span class="badge">OPERATOR WALLET</span></div><div class="wf-body"><div class="wf-tabs"><span class="">register_guarantee</span><span class="">contribute_fees</span><span class="">sweep_income</span><span class="on">file_claim</span><span class="">pay_claim</span><span class="">settle_payout</span><span class="">close_guarantee</span></div><div class="wf-fields" style="grid-template-columns:2fr 1fr 1fr 1fr"><div class="wf-field hl"><span class="tag">ANA'S LEASE</span>Guarantee<div>5e1f… · default left R$12,000</div></div><div class="wf-field">Leg<div>default (rent arrears)</div></div><div class="wf-field">Amount<div>1000</div></div><div class="wf-field">Notice<div>NTC-PF-0001</div></div></div><div class="hl"><span class="tag">HOW THE RESERVE MOVED</span><table class="wf-table"><tr><th>Moved</th><th>Before</th><th>After</th></tr><tr><td>Open provisions</td><td class="mono">R$0</td><td class="mono up">R$1,000 ▲</td></tr><tr><td>NAV per share</td><td class="mono">1.000000</td><td class="mono down">0.977273 ▼</td></tr></table></div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>Open the pay_claim tab. Hover the bound box (per-call cap R$10k). Click <b>pay_claim R$3,000</b>, confirm, and the table shows stable assets ▼.</dd>
-    <dt>VO</dt><dd class="vo">"MUTAV pays it from the reserve, only to its own payments account, and within a per-call cap the admin sets."</dd>
-    <dd class="opt"><b>RECORD TAKE A · CHOOSE THE LINE IN THE EDIT</b><br>Always record this footage, plus a 5 s clip right after the payment: on <span class="mono">/reserve#health</span>, click Refresh (permissionless; mode only changes on <span class="mono">refresh</span>). The chip and badge then show under-covered, R$9,300 required against R$7,000 held. <b>Edit A</b> uses that clip and adds: <i>"This payment takes the reserve below its target. It's paid anyway: the coverage gate never blocks a claim."</i> <b>Edit B</b> drops the clip and uses: <i>"The coverage gate never blocks a claim, even when the reserve dips below its target."</i> Both lines are true of the same footage.</dd>
-    <dd class="opt"><b>OPTIONAL TAKE B · STAYS COVERED ON SCREEN</b><br>Only if you want the payment itself never to dip below target. It needs a top-up before F8; see Appendix B.</dd>
-    <dt>Overlay</dt><dd><span class="overlay">pay_claim → MUTAV payments account · cap R$10k per call</span></dd>
-    <dt>On-chain proof</dt><dd>A confirmed tx. BRS moves from the reserve PDA to the whitelisted payments account (visible in the tx's token balances on Explorer).</dd>
-    <dt>Edit</dt><dd>Climax 2 begins. Zoom on the bound box, then on the moved table. Don't linger on Phantom.</dd>
-    <dt>Retake</dt><dd>One payment per filing; it can't be repeated. A redo means a fresh claim (see F8). Keep claims ≤ R$10k, or it is refused with <span class="mono">ClaimCallCapExceeded</span> (<span class="mono">approve_claim</span> isn't built yet).</dd>
+    <dt>On screen</dt><dd>file_claim tab: Ana's guarantee, default leg, R$1,000 (one month), notice NTC-PF-0001. Confirm. The moved table shows provisions ▲ and NAV per share ▼.</dd>
+    <dt>VO</dt><dd class="vo">"Months later, Ana misses a month's rent. MUTAV files the claim, and a provision is booked before any money moves."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Claim filed · R$1,000 provision booked</span></dd>
+    <dt>On-chain proof</dt><dd>A confirmed tx and a new ClaimFiling PDA.</dd>
+    <dt>Edit</dt><dd>Optional 0.5 s "months later" wipe. Cut the wallet wait.</dd>
+    <dt>Retake</dt><dd>Consumes the notice and R$1,000 of Ana's default leg (R$11,000 left). If only the capture was bad, continue to F10 on the same claim. A full redo files a fresh claim (NTC-PF-0002), uses another R$1,000 of the R$20,000 per-31-day cap and adds a timeline row.</dd>
    </dl>
   </article>
-
-  <!-- F10 -->
   <article class="frame" id="f10">
-   <div class="fhead"><span class="fno">F10</span><h3>PIX settlement recorded: the timeline</h3><span class="tc">1:43 – 1:57 · 14 s</span><span class="route">/operator · settle_payout → /reserve#claims</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve#claims</span><em>DEVNET</em></div>
-    <div class="wf-body">
-     <div class="wf-split">
-      <div class="wf-bound"><div class="k"><span>5e1f… default leg · R$3,000</span><span>paid 10:21</span></div><div class="wf-field" style="margin-top:.3em">PIX end-to-end id<div>E1234567820261012demo5e1f</div></div><div class="dim" style="font-size:.9em">only its SHA-256 goes on-chain</div><div style="position:relative;margin-top:.4em"><span class="wf-btn">settle_payout</span><span class="mk" style="left:-.6em;top:-.8em">1</span></div></div>
-      <div class="wf-bound"><b style="color:var(--text)">Claim speed</b><div class="wf-bar" style="margin-top:.5em"><span style="width:22%"></span></div><div class="dim" style="font-size:.85em;margin-top:.3em">filed → paid → settled</div></div>
-     </div>
-     <div class="hl"><span class="tag">ZOOM · TIMESTAMPS</span><span class="mk" style="right:-.6em;top:-.8em">2</span><table class="wf-table">
-      <tr><th>Guarantee</th><th>Leg</th><th>Amount</th><th>Filed</th><th>Paid</th><th>Filed→paid</th><th>Settled (PIX)</th><th>Paid→settled</th><th>PIX hash</th></tr>
-      <tr><td class="mono" style="color:var(--accent)">5e1f…</td><td>default</td><td class="mono">R$3,000</td><td class="mono">10:19</td><td class="mono">10:21</td><td class="mono up">2m</td><td class="mono">10:23</td><td class="mono up">2m</td><td class="mono dim">9f2c…</td></tr>
-     </table></div>
-    </div>
-    <div class="wf-cap">Devnet: the PIX transfer is simulated · the settlement record is on-chain</div>
-   </div></div>
+   <div class="fhead"><span class="fno">F10</span><h3>Paid, and still covered</h3><span class="tc">1:39 – 1:50 · 11 s</span><span class="route">/operator · pay_claim</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="">Investment</span><span class="on">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,250 / HELD R$43,000</span><span class="badge">OPERATOR WALLET</span></div><div class="wf-body"><div class="wf-tabs"><span class="">register_guarantee</span><span class="">contribute_fees</span><span class="">sweep_income</span><span class="">file_claim</span><span class="on">pay_claim</span><span class="">settle_payout</span><span class="">close_guarantee</span></div><div class="wf-bound hl"><span class="tag">ADMIN-SET CAP</span><div class="k"><span>Max per call</span><span>R$15,000</span></div><div class="k"><span>Left in the last 31 days</span><span>R$20,000 of R$20,000</span></div><div class="k"><span>Destination</span><span>MUTAV payments account (fixed)</span></div></div><span class="wf-btn">pay_claim R$1,000</span><div class="hl"><span class="tag">STILL COVERED</span><table class="wf-table"><tr><th>Moved</th><th>Before</th><th>After</th></tr><tr><td>Stable assets</td><td class="mono">R$44,000</td><td class="mono down">R$43,000 ▼</td></tr><tr><td>Coverage required</td><td class="mono">R$40,500</td><td class="mono down">R$40,250 ▼</td></tr><tr><td>Claim payments</td><td class="mono">R$0</td><td class="mono up">R$1,000 ▲</td></tr></table></div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>1. On the settle_payout tab, keep the prefilled PIX id and click <b>settle_payout</b>, then confirm. 2. Cut to <span class="mono">/reserve#claims</span>: the row shows Filed → Paid → Settled with timestamps and durations.</dd>
-    <dt>VO</dt><dd class="vo">"The PIX to the agency is recorded on-chain with a hash of its receipt. Filed, paid and settled in minutes, where seguro-fiança can take up to thirty days."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">Filed → paid → settled: minutes · seguro-fiança: up to 30 days</span> and the caption "Devnet: PIX simulated · record on-chain". Source for the 30 days: SUSEP Circular 621/2021, art. 43 (cited in the <a href="../litepaper.html">litepaper</a>).</dd>
-    <dt>On-chain proof</dt><dd>Three tx timestamps on the same ClaimFiling PDA. Each row links to Explorer.</dd>
-    <dt>Edit</dt><dd>Hold the timeline row 3 s with a zoom on the durations. <b>No bank or PIX app screens</b>: none are real on devnet.</dd>
-    <dt>Retake</dt><dd><span class="mono">settle_payout</span> runs once per paid claim. The <span class="mono">/reserve#claims</span> part is read-only: repeat freely.</dd>
+    <dt>On screen</dt><dd>pay_claim tab: the bound box shows the R$15,000 per-call cap. Click pay_claim R$1,000 and confirm. The reserve is still covered: R$43,000 held against R$40,250 required.</dd>
+    <dt>VO</dt><dd class="vo">"It pays from the reserve, only to MUTAV's payments account, within a cap the admin multisig sets. The reserve stays covered."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Paid R$1,000 · cap R$15,000/call · still covered</span></dd>
+    <dt>On-chain proof</dt><dd>A confirmed tx; BRS from the reserve PDA to the whitelisted payments account.</dd>
+    <dt>Edit</dt><dd>Zoom on the cap, then on "still covered". The meter reads 40,250 / 43,000.</dd>
+    <dt>Retake</dt><dd>One payment per filing; a redo needs a fresh claim (see F9).</dd>
    </dl>
   </article>
-
-  <!-- F11 -->
   <article class="frame" id="f11">
-   <div class="fhead"><span class="fno">F11</span><h3>Anyone can verify</h3><span class="tc">1:57 – 2:10 · 13 s</span><span class="route">/reserve#health → #accounts</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve</span><em>DEVNET</em></div>
-    <div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="badge" style="border-color:var(--text-3);color:var(--text-2)">NO WALLET</span></div>
-    <div class="wf-body">
-     <div class="mono dim" style="font-size:.75em"><span style="color:var(--success)">●</span> LIVE FROM DEVNET · SLOT 41,2xx,xxx</div>
-     <div class="wf-bar hl"><span class="tag">COVERAGE REQUIRED vs STABLE ASSETS</span><span style="width:62%"></span><em style="left:75%"></em></div>
-     <div class="wf-metrics">
-      <div class="wf-metric">Stable assets<b>R$12,960</b></div><div class="wf-metric">Coverage required<b>R$9,300</b></div><div class="wf-metric">Claims paid<b>R$3,000</b></div><div class="wf-metric">Active guarantees<b>6</b></div>
-     </div>
-     <div class="hl"><span class="tag">EVERY ACCOUNT ↗ EXPLORER</span><table class="wf-table">
-      <tr><td>Program</td><td class="mono" style="color:var(--accent)">8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9</td></tr>
-      <tr><td>Reserve token account</td><td class="mono" style="color:var(--accent)">Hk2p…</td></tr>
-      <tr><td>Admin (Squads vault)</td><td class="mono" style="color:var(--accent)">9TQx…</td></tr>
-     </table></div>
-    </div>
-   </div></div>
+   <div class="fhead"><span class="fno">F11</span><h3>Settlement recorded: the timeline</h3><span class="tc">1:50 – 2:02 · 12 s</span><span class="route">/operator · settle_payout → /reserve/claims</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve/claims</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Investment</span><span class="">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,250 / HELD R$43,000</span><span class="badge">NO WALLET</span></div><div class="wf-body"><div class="wf-tabs"><span class="">Overview</span><span class="">Coverage</span><span class="on">Claims</span><span class="">Capital</span><span class="">Risks</span><span class="">Verify</span></div><div class="pill r" style="align-self:flex-start">PIX TRANSFER SIMULATED ON DEVNET · SETTLEMENT RECORDED ON-CHAIN</div><div class="hl"><span class="tag">TIMESTAMPS</span><table class="wf-table"><tr><th>Guarantee</th><th>Leg</th><th>Amount</th><th>Filed</th><th>Paid</th><th>Settled</th><th>Filed→settled</th></tr><tr><td class="mono" style="color:var(--accent)">5e1f…</td><td>default</td><td class="mono">R$1,000</td><td class="mono">10:19</td><td class="mono">10:21</td><td class="mono">10:23</td><td class="mono up">4 min</td></tr></table></div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>Scroll <span class="mono">/reserve</span> from Health (chart and cards) down to "Every account". Hover one address and stop. Recorded after the off-camera fee and the coverage restore, so the reserve reads healthy: stable R$12,960 against required R$9,300.</dd>
-    <dt>VO</dt><dd class="vo">"None of this asks for trust. Every number here is read straight from the program's accounts, by anyone, with no wallet."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">No wallet · read from the program's accounts</span></dd>
-    <dt>On-chain proof</dt><dd>The account list with Explorer links for the program, its PDAs and the Squads vault.</dd>
-    <dt>Edit</dt><dd>One smooth scroll at a constant speed; avoid jitter. Optional quick cut (1 s) to Explorer on the reserve token account showing the BRS balance.</dd>
-    <dt>Retake</dt><dd>Read-only: repeat freely. <b>Record after the coverage restore</b> (run sheet), so this shot shows a healthy reserve and works for both edits.</dd>
+    <dt>On screen</dt><dd>settle_payout with the prefilled PIX end-to-end id (only its hash goes on-chain), then cut to /reserve/claims: filed → paid → settled, with timestamps.</dd>
+    <dt>VO</dt><dd class="vo">"The PIX to the agency is recorded on-chain. Filed, paid and settled in minutes; seguro-fiança rules allow up to thirty days."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Seguro-fiança: up to 30 days · SUSEP 621/2021 art. 43</span></dd>
+    <dt>On-chain proof</dt><dd>Three on-chain timestamps on one ClaimFiling PDA.</dd>
+    <dt>Edit</dt><dd>The "PIX transfer simulated on devnet · settlement recorded on-chain" line stays on screen. No bank or PIX app screens.</dd>
+    <dt>Retake</dt><dd>settle_payout runs once per paid claim; /reserve/claims is read-only.</dd>
    </dl>
   </article>
-
-  <!-- F12 -->
   <article class="frame" id="f12">
-   <div class="fhead"><span class="fno">F12</span><h3>The flywheel</h3><span class="tc">2:10 – 2:27 · 17 s</span><span class="route">/reserve#flows + overlay (edit)</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve#flows</span><em>DEVNET</em></div>
-    <div class="wf-body">
-     <div class="wf-metrics" style="grid-template-columns:repeat(3,1fr)">
-      <div class="wf-metric">Guarantee fees → reserve<b>R$960</b></div><div class="wf-metric">Fee take → treasury<b>R$240</b></div><div class="wf-metric">Issuer income → reserve<b>R$0 / sim.</b></div>
-     </div>
-     <div style="display:flex;align-items:center;justify-content:center;gap:.6em;font-family:var(--font-mono);font-size:.85em;margin-top:.6em;flex-wrap:wrap" class="hl"><span class="tag">OVERLAY · FLYWHEEL</span>
-      <span class="pill a">fees + issuer revenue</span>→<span class="pill a">reserve grows</span>→<span class="pill a">more free capital</span>→<span class="pill a">more contracts</span>→<span class="pill">↺</span>
-     </div>
-    </div>
-    <div class="wf-cap">Modeled ~21%/yr · conservative pilot case · a model, not a promise · pilot capital is MUTAV's own</div>
-   </div></div>
+   <div class="fhead"><span class="fno">F12</span><h3>Guarantee fees land in the reserve</h3><span class="tc">2:02 – 2:14 · 12 s</span><span class="route">/operator · contribute_fees</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="">Investment</span><span class="on">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,250 / HELD R$43,000</span><span class="badge">OPERATOR WALLET</span></div><div class="wf-body"><div class="wf-tabs"><span class="">register_guarantee</span><span class="on">contribute_fees</span><span class="">sweep_income</span><span class="">file_claim</span><span class="">pay_claim</span><span class="">settle_payout</span><span class="">close_guarantee</span></div><div class="wf-fields" style="grid-template-columns:1fr 1fr"><div class="wf-field">Invoice reference<div>INV-2026-10-BOOK</div></div><div class="wf-field">Guarantee fees received<div>2040</div></div></div><div class="wf-prev" style="border-color:var(--border)"><div class="h" style="color:var(--text)">Split</div><div class="k"><span>MUTAV take (20%) → treasury</span><span>R$408</span></div><div class="k"><span>Net → reserve</span><span>R$1,632</span></div></div><div class="pill a" style="align-self:flex-start">TWO MONTHS OF THE BOOK'S GUARANTEE FEES, CONTRIBUTED IN ONE STEP FOR THE DEMO</div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd><span class="mono">/reserve</span> Money flows with the off-camera fee booked. The flywheel loop is drawn as an overlay in the edit, in brand style.</dd>
-    <dt>VO</dt><dd class="vo">"Guarantee fees and Nora's issuer revenue on the BRS grow the reserve, and a bigger reserve backs more contracts. In our conservative pilot case, that's modeled at about twenty-one percent a year."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">Modeled return ~21%/yr · conservative pilot case: Nora issuer revenue + guarantee fees, net of expected claims and MUTAV's take. A model, not a promise.</span></dd>
-    <dt>On-chain proof</dt><dd>Fee flows booked on-chain (FeeReceipt PDA). The 21% is a model and is labelled as one.</dd>
-    <dt>Edit</dt><dd>The caption stays on screen the whole time the figure is spoken. Never write "APY". Lower music if any.</dd>
-    <dt>Retake</dt><dd>Read-only: repeat freely. Issuer income stays R$0 on devnet unless you simulate a statement (captioned).</dd>
+    <dt>On screen</dt><dd>contribute_fees: R$2,040, which is two months of 12% fees on the book's R$1,000 rents (17 lease-months; Ana's missed month excluded). The split shows R$408 to MUTAV's treasury and R$1,632 to the reserve.</dd>
+    <dt>VO</dt><dd class="vo">"Then guarantee fees from the book arrive. Twenty percent goes to MUTAV; the rest stays in the reserve."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">2 months of book fees, one step for the demo: R$2,040</span></dd>
+    <dt>On-chain proof</dt><dd>A confirmed tx and a FeeReceipt PDA.</dd>
+    <dt>Edit</dt><dd>The honesty caption is on screen for the whole shot. Optional: one sweep_income captioned "issuer revenue · simulated on devnet" (see the numbers table).</dd>
+    <dt>Retake</dt><dd>Each invoice reference is recorded once; a redo uses a new reference and adds the fees again. Prefer to re-capture the screen only.</dd>
    </dl>
   </article>
-
-  <!-- F13 -->
   <article class="frame" id="f13">
-   <div class="fhead"><span class="fno">F13</span><h3>Close</h3><span class="tc">2:27 – 2:45 · 18 s</span><span class="route">tagline card (edit)</span></div>
-   <div class="wfbox"><div class="wf">
-    <div class="wf-card"><div class="k">MUTAV</div><div class="h" style="font-size:3em">A guarantor on the <span class="amber">agency's side</span></div><div class="s">Brazil's onchain rent guarantee</div><div class="s mono" style="margin-top:1.2em;font-size:.95em;color:var(--text)">reserve.mutav.finance<br>github.com/mutav-finance/mutav-protocol-solana</div></div>
-   </div></div>
+   <div class="fhead"><span class="fno">F13</span><h3>The reserve and every share rise</h3><span class="tc">2:14 – 2:21 · 7 s</span><span class="route">/reserve (Overview)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Investment</span><span class="">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,250 / HELD R$44,632</span><span class="badge">NO WALLET</span></div><div class="wf-body"><div class="wf-tabs"><span class="on">Overview</span><span class="">Coverage</span><span class="">Claims</span><span class="">Capital</span><span class="">Risks</span><span class="">Verify</span></div><div class="hl"><span class="tag">ZOOM · NAV</span><div class="wf-metrics"><div class="wf-metric">Stable assets<b>R$44,632</b></div><div class="wf-metric">Coverage required<b>R$40,250</b></div><div class="wf-metric">Free capital<b>R$4,382</b></div><div class="wf-metric">NAV per share<b>1.014364</b></div></div></div><div class="mono dim" style="font-size:.8em">NAV per share at deposit 1.000000 · after the claim 0.977273 · now 1.014364</div></div></div></div>
    <dl class="fields">
-    <dt>On screen</dt><dd>The tagline card on the brand grid, with the app URL and repo URL. Hold to the end.</dd>
+    <dt>On screen</dt><dd>/reserve overview: stable assets R$44,632, NAV per share 1.014364 (it was 1.000000 at deposit and 0.977273 after the claim).</dd>
+    <dt>VO</dt><dd class="vo">"Stable assets and the value of every share rise."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">NAV per share 0.977 → 1.014</span></dd>
+    <dt>On-chain proof</dt><dd>Read from VaultState (send refresh first so the published NAV is current).</dd>
+    <dt>Edit</dt><dd>Zoom on the NAV figure. Use the stable-assets history chart if it shows the step.</dd>
+    <dt>Retake</dt><dd>Read-only: repeat freely.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f14">
+   <div class="fhead"><span class="fno">F14</span><h3>Capital payoff: more out than in</h3><span class="tc">2:21 – 2:35 · 14 s</span><span class="route">/investment</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/investment</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="on">Investment</span><span class="">Operator</span><span class="">Admin</span><span class="badge">CAPITAL WALLET B</span></div><div class="wf-body"><div class="wf-split"><div class="wf-bound"><b style="color:var(--text)">Redeem</b><div class="k"><span>You pay</span><span>4,000.000000 shares</span></div><div class="k"><span>You receive (NAV now)</span><span>R$4,057.45</span></div><span class="wf-btn" style="margin-top:.4em">Request redemption</span></div><div class="wf-bound hl"><span class="tag">IN → OUT, IN REAIS</span><div class="k"><span>Deposited</span><span>R$4,000.00</span></div><div class="k"><span>Claimed</span><span class="up">R$4,057.45</span></div><span class="wf-btn" style="margin-top:.4em">claim_assets</span></div></div><div class="mono dim" style="font-size:.75em">Filled only from free capital above required coverage, after claims · admin multisig fill (5-min time lock, cut)</div><div class="pill" style="align-self:flex-start">PILOT CAPITAL IS MUTAV'S OWN; NOT OPEN TO OUTSIDE INVESTORS</div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>/investment as capital wallet B: redeem 4,000 shares ("You receive R$4,057.45") → Request redemption → [cut: admin multisig fills the queue after its 5-min lock] → claim_assets → "R$4,000 in → R$4,057.45 out". The disclaimer line is visible.</dd>
+    <dt>VO</dt><dd class="vo">"The same reserve that protects the landlord pays the people who fund it, only from free capital above required coverage, after claims. Four thousand reais in, four thousand and fifty-seven out."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">R$4,000 in → R$4,057.45 out</span></dd>
+    <dt>On-chain proof</dt><dd>The claim_assets tx and the wallet's BRS balance change.</dd>
+    <dt>Edit</dt><dd>Show amounts in reais only. Never an annual rate, APY or projection. Cut the fill wait with a 0.5 s caption: "Admin multisig fills the queue · 5-min lock".</dd>
+    <dt>Retake</dt><dd>One redemption; if the capture is bad, re-capture the screen. A redo needs another deposit (another Squads round).</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f15">
+   <div class="fhead"><span class="fno">F15</span><h3>Close</h3><span class="tc">2:35 – 2:45 · 10 s</span><span class="route">card (made in the editor)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-card"><div class="k">MUTAV</div><div class="h" style="font-size:3em">A guarantor on the <span class="amber">agency's side</span></div><div class="s">Brazil's onchain rent guarantee</div><div class="s mono" style="margin-top:1.2em;font-size:.95em;color:var(--text)">reserve.mutav.finance<br>github.com/mutav-finance/mutav-protocol-solana</div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>The tagline, the repo and the live app URL on the brand grid. Hold to the end.</dd>
     <dt>VO</dt><dd class="vo">"MUTAV. A guarantor on the agency's side. Brazil's onchain rent guarantee. Open source, and live on devnet."</dd>
-    <dt>Overlay</dt><dd><span class="overlay">Built on Solana · devnet · open source (MIT)</span></dd>
-    <dt>On-chain proof</dt><dd>Program id in small mono under the links (optional).</dd>
-    <dt>Edit</dt><dd>VO ends about 2:35. Hold the card in silence to 2:45 so judges can read the links. Fade out.</dd>
-    <dt>Retake</dt><dd>Made in the editor. If recorded on localnet, change the last words to "and deploying to devnet".</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Open source (MIT) · live on Solana devnet</span></dd>
+    <dt>On-chain proof</dt><dd>Program id in small mono (optional).</dd>
+    <dt>Edit</dt><dd>The VO ends about 2:42; hold the card in silence to 2:45.</dd>
+    <dt>Retake</dt><dd>Made in the editor.</dd>
    </dl>
   </article>
  </div>
 </section>
 
-<!-- (d) SCRIPT -->
 <section id="script" class="script">
  <div class="wrap">
   <p class="kicker">Narration</p>
-  <h2>Full script · <span class="amber">303 words</span></h2>
-  <p class="muted mono" style="font-size:12px">Edit A: 303 words (with the under-coverage line). Edit B: 300 words. At ~140 wpm that's about 2:10 of speech in 2:45 of picture, leaving room for the two climaxes to breathe.</p>
-  <p><span class="tc">0:00 · F1</span>Ana wants to rent an apartment in Passo Fundo.</p>
-  <p><span class="tc">0:06 · F2</span>She has no personal guarantor and no spare months of rent for a deposit. Her agency offers MUTAV as her guarantor.</p>
-  <p><span class="tc">0:15 · F3</span>MUTAV's operator registers her lease on Solana: six thousand reais of cover. Forty-five hundred for unpaid rent, fifteen hundred to recover the property.</p>
-  <p><span class="tc">0:27 · F4</span>On-chain, that's one account per lease, a PDA holding the cover and an opaque ID. Ana's name, CPF and address never leave MUTAV.</p>
-  <p><span class="tc">0:38 · F5</span>The public reserve updates at once: coverage required goes up, free capital goes down.</p>
-  <p><span class="tc">0:45 · F6</span>Now one more lease, the same size. The reserve must hold ten percent of all the cover it guarantees, and there isn't room. The preview replays the program's rule, and turns red.</p>
-  <p><span class="tc">1:00 · F7</span>We send it anyway. The program refuses it: InsufficientFreeCapital. That's the coverage gate. MUTAV can't sign a guarantee the reserve can't back.</p>
-  <p><span class="tc">1:15 · F8</span>Months later, Ana's rent goes unpaid. The agency sends the claim. MUTAV files it, and a provision is booked before any money moves.</p>
-  <p><span class="tc">1:27 · F9</span>MUTAV pays it from the reserve, only to its own payments account, and within a per-call cap the admin sets.</p>
-  <p class="alt"><span class="tc">Edit A</span>This payment takes the reserve below its target. It's paid anyway: the coverage gate never blocks a claim.</p>
-  <p class="alt"><span class="tc">Edit B</span>The coverage gate never blocks a claim, even when the reserve dips below its target.</p>
-  <p><span class="tc">1:43 · F10</span>The PIX to the agency is recorded on-chain with a hash of its receipt. Filed, paid and settled in minutes, where seguro-fiança can take up to thirty days.</p>
-  <p><span class="tc">1:57 · F11</span>None of this asks for trust. Every number here is read straight from the program's accounts, by anyone, with no wallet.</p>
-  <p><span class="tc">2:10 · F12</span>Guarantee fees and Nora's issuer revenue on the BRS grow the reserve, and a bigger reserve backs more contracts. In our conservative pilot case, that's modeled at about twenty-one percent a year.</p>
-  <p><span class="tc">2:27 · F13</span>MUTAV. A guarantor on the agency's side. Brazil's onchain rent guarantee. Open source, and live on devnet.</p>
-  <div class="note"><b>Say it like this:</b> "CPF" as letters (C-P-F); "PIX" as "peeks"; "seguro-fiança" in Portuguese; "InsufficientFreeCapital" slowly, as three words. Confirm how MUTAV is pronounced before recording.</div>
+  <h2>Full script · <span class="amber">294 words</span></h2>
+  <p class="muted mono" style="font-size:12px">About 2:00–2:05 of speech at 140–150 wpm, inside 2:45 of picture. The F8 hold is silent.</p>
+  <p><span class="tc">0:00 · F1</span>This is MUTAV, a rent guarantor whose reserve lives on Solana. We built its program and this app during the hackathon.</p><p><span class="tc">0:10 · F2</span>Agencies use MUTAV's platform, built before the hackathon and not yet on-chain.</p><p><span class="tc">0:16 · F3</span>MUTAV's operator carries each lease to the program. Claims settle by PIX.</p><p><span class="tc">0:22 · F4</span>Ana is renting in Passo Fundo, a thousand reais a month. MUTAV guarantees twelve months of rent and six of property recovery: eighteen thousand in cover.</p><p><span class="tc">0:34 · F5</span>The operator signs. On-chain it's one account per lease: cover and an opaque ID. No name, no CPF.</p><p><span class="tc">0:42 · F6</span>The public reserve updates at once. Coverage required rises to forty thousand five hundred.</p><p><span class="tc">0:52 · F7</span>The rule: the reserve must hold a quarter of all the cover it guarantees, in BRS, Nora's Brazilian real stablecoin. The next lease, the same size, would need forty-five thousand. The reserve holds forty-four.</p><p><span class="tc">1:10 · F8</span>We send it anyway. The program refuses it: InsufficientFreeCapital. Nothing changes. MUTAV can't sign a guarantee the reserve can't back.</p><p><span class="tc">1:27 · F9</span>Months later, Ana misses a month's rent. MUTAV files the claim, and a provision is booked before any money moves.</p><p><span class="tc">1:39 · F10</span>It pays from the reserve, only to MUTAV's payments account, within a cap the admin multisig sets. The reserve stays covered.</p><p><span class="tc">1:50 · F11</span>The PIX to the agency is recorded on-chain. Filed, paid and settled in minutes; seguro-fiança rules allow up to thirty days.</p><p><span class="tc">2:02 · F12</span>Then guarantee fees from the book arrive. Twenty percent goes to MUTAV; the rest stays in the reserve.</p><p><span class="tc">2:14 · F13</span>Stable assets and the value of every share rise.</p><p><span class="tc">2:21 · F14</span>The same reserve that protects the landlord pays the people who fund it, only from free capital above required coverage, after claims. Four thousand reais in, four thousand and fifty-seven out.</p><p><span class="tc">2:35 · F15</span>MUTAV. A guarantor on the agency's side. Brazil's onchain rent guarantee. Open source, and live on devnet.</p>
+  <div class="note"><b>Say it like this:</b> "CPF" as letters; "PIX" as "peeks"; "seguro-fiança" in Portuguese; "InsufficientFreeCapital" slowly, as three words; reais amounts as written.</div>
  </div>
 </section>
 
-<!-- (e) PRODUCTION -->
+<section id="routes">
+ <div class="wrap">
+  <p class="kicker">Recording surface</p>
+  <h2>Route <span class="amber">map</span></h2>
+  <div class="tablewrap"><table class=""><tr><th>Route</th><th>Today (main)</th><th>After PR #45</th><th>Used in</th></tr><tr><td>/</td><td>Landing</td><td>Landing (restyled)</td><td>—</td></tr><tr><td>/reserve</td><td>Transparency, one long page</td><td>Overview + sub-routes</td><td>F1, F13</td></tr><tr><td>/reserve/coverage</td><td>—</td><td>Coverage tab</td><td>F6</td></tr><tr><td>/reserve/claims</td><td>— (section #claims)</td><td>Claims tab</td><td>F11</td></tr><tr><td>/reserve/capital</td><td>— (sections #flows, #queue)</td><td>Capital tab (flows + queue); /reserve/flows and /reserve/queue redirect here</td><td>optional</td></tr><tr><td>/reserve/risks</td><td>— (section #disclosures)</td><td>Risks tab; /reserve/disclosures redirects here</td><td>—</td></tr><tr><td>/reserve/verify</td><td>— (section #accounts)</td><td>Verify tab; /reserve/accounts redirects here</td><td>—</td></tr><tr><td>/investment</td><td>— (/investor)</td><td>Swap-style request card + queue entries; /investor and /dashboard redirect here</td><td>F14</td></tr><tr><td>/operator</td><td>Operator console (tabs per instruction)</td><td>Same, restyled</td><td>F4–F5, F7–F12</td></tr><tr><td>/admin</td><td>Squads proposals</td><td>Same, restyled</td><td>off-camera (fills)</td></tr><tr><td>/demo</td><td>Guided six steps</td><td>Same; a cleaned version is the optional alternative surface</td><td>alternative</td></tr><tr><td>/simulator</td><td>Reserve simulator</td><td>Same</td><td>not used</td></tr><tr><td>app.mutav.finance</td><td>Agency platform (mutav-app, pre-existing)</td><td>—</td><td>F2</td></tr></table></div>
+  <p class="muted" style="margin-top:10px">Plan on the real pages. A cleaned <span class="mono">/demo</span> is the optional alternative surface. The restyle shows USD on investor pages; the demo needs reais on /reserve and /investment and the disclaimer line restored (see app-requirements).</p>
+ </div>
+</section>
+
 <section id="production">
  <div class="wrap">
   <p class="kicker">Production guidance</p>
-  <h2>Before you <span class="amber">press record</span></h2>
-
-  <h3 style="margin:8px 0 12px">1 · Devnet starting state <span class="muted" style="font-weight:400;text-transform:none">(numbers checked at c = 0.10)</span></h3>
-  <div class="grid3" style="margin-bottom:16px">
-   <div class="card"><div class="stat">R$10,000<small>stable assets after the deposit</small></div></div>
-   <div class="card"><div class="stat">5 × R$18,000<small>guarantees (rent 2,000 × 6 default + 3 exit) → R$90,000 cover → R$9,000 required</small></div></div>
-   <div class="card"><div class="stat amber">R$1,000<small>free capital. One R$6,000 lease needs R$600 (fits, leaves R$400); a second needs R$600 more (refused, R$200 short)</small></div></div>
-  </div>
-  <div class="tablewrap"><table>
-   <tr><th>#</th><th>Step</th><th>Who signs</th><th>Where</th><th>Wait</th></tr>
-   <tr><td class="mono">1</td><td>Program deployed, <span class="mono">initialize</span> executed, <span class="mono">verify.ts</span> green (c = 0.10, caps per <span class="mono">devnet.example.json</span>)</td><td>Upgrade Squads 2-of-2 (admin signers)</td><td>scripts/devnet</td><td>1 h lock</td></tr>
-   <tr><td class="mono">2</td><td>Vercel env on <span class="mono">mutav-pilot-app</span> (team <span class="mono">mutav</span>): program id, <span class="mono">NEXT_PUBLIC_CLUSTER=devnet</span>, <span class="mono">SQUADS_MULTISIG</span>, <span class="mono">ALLOWLIST</span>. <span class="mono">/reserve</span> shows numbers</td><td>Julia</td><td>Vercel</td><td>build</td></tr>
-   <tr><td class="mono">3</td><td>Fund the capital wallet with ≥ R$15,000 BRS (R$10,000 now, R$5,000 for the coverage restore) and some SOL, from the operator wallet</td><td>Julia (Phantom)</td><td>Phantom</td><td>—</td></tr>
-   <tr><td class="mono">4</td><td><span class="mono">set_allowlist_root</span> with the capital wallet, if <span class="mono">initialize</span> didn't set it</td><td>Admin Squads: propose, admin signers (2-of-2) approve, execute</td><td>/admin → General → Allowlist</td><td>5 min lock</td></tr>
-   <tr><td class="mono">5</td><td><span class="mono">request_deposit 10000</span></td><td>Capital wallet</td><td>/investor</td><td>—</td></tr>
-   <tr><td class="mono">6</td><td><span class="mono">fulfil_deposits</span> (count 1) → then <span class="mono">claim_shares</span></td><td>Admin Squads 2-of-2 → capital wallet</td><td>/admin → Money → Capital deposits → Execute; /investor</td><td>5 min lock</td></tr>
-   <tr><td class="mono">7</td><td>Register 5 guarantees: rent 2000, default 6, exit 3, opaque refs <span class="mono">MTV-PF-0001…0005</span>, 2–3 fictional agency names</td><td>Operator wallet (Phantom)</td><td>/operator</td><td>—</td></tr>
-   <tr><td class="mono">8</td><td><b>Check:</b> stable R$10,000 · required R$9,000 · free R$1,000 · 5 active. Don't contribute fees or file claims before the take.</td><td>—</td><td>/reserve</td><td>—</td></tr>
-   <tr><td class="mono">9</td><td><i>Optional:</i> send a <span class="mono">register_guarantee</span> with <span class="mono">skipPreflight</span> that fails with <span class="mono">InsufficientFreeCapital</span> (e.g. R$40,000 cover), only if you want an Explorer link for the refusal. It changes no state</td><td>Operator (script)</td><td>terminal</td><td>—</td></tr>
-   <tr><td class="mono">10</td><td>Record F2–F10 (see the run sheet). Then, off-camera: <span class="mono">contribute_fees 1200</span> (invoice <span class="mono">INV-2026-0001</span>)</td><td>Operator</td><td>/operator</td><td>—</td></tr>
-   <tr><td class="mono">11</td><td><b>Coverage restore, before F11–F12 and before judges look:</b> capital wallet <span class="mono">request_deposit 5000</span> → Squads <span class="mono">fulfil_deposits</span> (count 1) → <span class="mono">claim_shares</span> → anyone clicks Refresh on <span class="mono">/reserve#health</span>. Result: stable R$12,960, required R$9,300, free R$3,660, mode Normal</td><td>Capital wallet + Admin Squads 2-of-2; any wallet for refresh</td><td>/investor, /admin, /reserve</td><td>5 min lock</td></tr>
-  </table></div>
-  <div class="note"><b>Why the restore works (checked in <span class="mono">programs/mutav</span>, branch <span class="mono">feat/interfaces</span>):</b> <span class="mono">fulfil_deposits</span> is allowed while under-covered. It is "the recapitalization path (ADR 0008)" (<span class="mono">capital/fulfil_deposits.rs:2-3</span>), and its only gates are pause and the fulfil halt (<span class="mono">:75-77</span>), plus the TVL cap (<span class="mono">:168-172</span>). <span class="mono">request_deposit</span> checks only pause (<span class="mono">capital/request_deposit.rs:76</span>). Mode changes only in <span class="mono">refresh</span> (<span class="mono">public/refresh.rs:105-110</span>); <span class="mono">pay_claim</span> has no mode check (<span class="mono">operator/pay_claim.rs:3,157</span>). So after the restore, someone must send <span class="mono">refresh</span> or the badge keeps the last mode. <b>Alternative without Squads:</b> <span class="mono">close_guarantee</span> RELEASED on two R$18k demo leases (not gated, not paused: <span class="mono">operator/close_guarantee.rs:1-2</span>), giving required R$5,700 against R$7,960, then refresh. It shrinks the book to 4 active leases, so the deposit is preferred.</div>
-  <div class="flag"><b>The app can't do these on devnet:</b> the stress-buffer term (in config, read by no rule in the PR #37 binary); an Explorer link for the refusal (it fails in pre-send simulation); claims above R$10k (they need <span class="mono">approve_claim</span>, Wave 2); a term or end date on the Guarantee account (the program stores cover legs and <span class="mono">registered_at</span> only, so the VO doesn't mention a term); real issuer income (Nora doesn't pay on devnet); a real PIX transfer (simulated, and only its record is on-chain).</div>
-
-  <h3 style="margin:28px 0 12px">2 · Recording setup</h3>
-  <div class="grid2">
-   <div class="card"><ul class="clean">
-    <li><b>Canvas:</b> 1920×1080, 30 fps. Record the browser window at exactly 1920×1080 (no full-screen menu bar), or crop to it.</li>
-    <li><b>Browser:</b> a fresh Chrome profile: only Phantom installed, bookmarks bar hidden (⌘⇧B), no other extensions, default theme. Zoom 125%; check that the <span class="mono">/operator</span> form fits without horizontal scroll.</li>
-    <li><b>Phantom:</b> network devnet, operator account selected, auto-lock off for the session, the testnet-mode banner understood.</li>
-    <li><b>Mac:</b> Focus/Do Not Disturb on, Slack and Mail closed, the Dock hidden, a clean desktop.</li>
-   </ul></div>
-   <div class="card"><ul class="clean">
-    <li><b>Tabs pre-opened in order:</b> /operator#console · /reserve#coverage · /reserve#claims · /reserve#health · the Explorer tab for guarantee #1 (warm).</li>
-    <li><b>Recorder:</b> Screen Studio, or OBS (Display Capture, 1080p, CRF ~18). Turn on a cursor highlight if the tool has it, and keep the cursor still between clicks.</li>
-    <li><b>One screen clip per beat:</b> F2–F5, F6–F7, F8–F10, F11–F12. Nothing has to be continuous: let confirmations run, and they are cut in the edit. Name files like <span class="mono">B3-F06-take2.mov</span>.</li>
-    <li><b>RPC check:</b> <span class="mono">/api/ledger</span> answers in under 2 s right before each clip.</li>
-   </ul></div>
-  </div>
-
-  <h3 style="margin:28px 0 12px">3 · Order of work: picture first, then voice</h3>
+  <h2>Stage, capture, <span class="amber">then voice</span></h2>
+  <h3 style="margin:8px 0 12px">1 · Devnet staging sequence</h3>
+  <div class="tablewrap"><table class=""><tr><th>#</th><th>Step</th><th>Who signs</th><th>Wait</th></tr><tr><td>1</td><td>Deploy, initialize, verify.ts green (ADR 0028 values: c = 0.25, R$1M TVL, R$120k per guarantee, R$15k / R$20k claim caps)</td><td>Upgrade Squads 2-of-2</td><td>1 h lock</td></tr><tr><td>2</td><td>App env for devnet; /reserve shows numbers in reais</td><td>App owner</td><td>—</td></tr><tr><td>3</td><td>Fund: capital wallet A R$40,000 BRS, capital wallet B R$4,000, operator R$2,040 (+R$356 if the optional sweep); SOL for each</td><td>BRS holder</td><td>—</td></tr><tr><td>4</td><td>set_allowlist_root with A and B (skip if set at initialize)</td><td>Admin Squads 2-of-2</td><td>5 min lock</td></tr><tr><td>5</td><td>request_deposit: A 40,000; B 4,000</td><td>Capital wallets A, B</td><td>—</td></tr><tr><td>6</td><td>fulfil_deposits (count 2), then claim_shares from A and B</td><td>Admin Squads 2-of-2; A, B</td><td>5 min lock</td></tr><tr><td>7</td><td>Register 8 leases: rent 1000, default 12×, exit 6×, refs MTV-PF-0001…0008, 2–3 fictional agency names</td><td>Operator</td><td>—</td></tr><tr><td>8</td><td>Check: stable R$44,000 · required R$36,000 · free R$8,000 · 8 active · NAV 1.000000</td><td>Anyone</td><td>—</td></tr><tr><td>9</td><td>Capture F1–F13 in order (see the run sheet); send refresh before F13</td><td>Operator; anyone for refresh</td><td>—</td></tr><tr><td>10</td><td>F14: B request_redeem 4,000 shares → fulfil_redeems (count 1) → B claim_assets</td><td>B; Admin Squads 2-of-2</td><td>5 min lock</td></tr><tr><td>11</td><td>Judge-ready check: mode Normal, covered (free R$324.55), timeline reads correctly. No restore needed</td><td>Anyone</td><td>—</td></tr></table></div>
+  <div class="note">No restore is needed: the reserve stays covered through the whole cut (free capital R$324.55 at the end, mode Normal). If a Take A-style under-coverage is ever recorded, restore with a deposit + Squads fill (allowed while under-covered: <span class="mono">capital/fulfil_deposits.rs</span> calls it the recapitalization path) and send refresh.</div>
+  <h3 style="margin:28px 0 12px">2 · Capture</h3>
+  <div class="card"><ul class="clean">
+   <li><b>Capture at 2×</b> (a Retina 3840×2160 capture of a 1920×1080 window) so zooms stay sharp. If capturing at 1080p, keep zooms at or below 1.3×.</li>
+   <li>Clean Chrome profile: only Phantom, bookmarks bar hidden, notifications and Focus on, Dock hidden. Phantom on devnet with the operator account; capital wallet B as a second account for F14.</li>
+   <li>One silent screen clip per beat. Let confirmations run; they are cut later. Jump-cut all typing.</li>
+   <li>Pre-open: /reserve, /reserve/coverage, /reserve/claims, /operator, /investment, and the Explorer tab warm for F5.</li>
+  </ul></div>
+  <h3 style="margin:28px 0 12px">3 · Voice, edit, export</h3>
   <div class="card"><ol class="steps">
-   <li><b>Capture the screen clips</b> beat by beat, silently. Retake any clip freely: see each frame's Retake note for what a redo consumes on-chain.</li>
-   <li><b>Rough cut</b> the picture to the frame timings: cut every wait and keep each beat near its slot.</li>
-   <li><b>Record the VO to the cut</b>, watching the rough cut. Use a quiet, soft room (a closet with clothes works). Keep the mic 10–15 cm away with a pop filter, peaks around −12 dBFS. Pace about 140 wpm. Do two or three takes per line and record 5 s of room tone. Leave a short pause after "InsufficientFreeCapital" and after "never blocks a claim".</li>
-   <li><b>Fine-tune:</b> slip clips and holds so each on-screen event lands on its words, then add zooms and captions.</li>
+   <li><b>Rough cut</b> the clips to the frame timings.</li>
+   <li><b>Record the VO to the cut</b>, separately: quiet soft room, mic 10–15 cm with a pop filter, peaks around −12 dBFS, 140–150 wpm, two or three takes per line, 5 s of room tone.</li>
+   <li><b>Fine-tune</b> so each on-screen event lands on its words. Burned-in captions under 60 characters with the specific numbers, plus an SRT upload. Music none or very low, out under the F8 hold.</li>
+   <li><b>Export</b> ≤ 2:45, H.264 1080p30, AAC 48 kHz, about −14 LUFS. Upload unlisted (YouTube preferred, or Loom) and check the field on the Colosseum submission form.</li>
   </ol></div>
-
-  <h3 style="margin:28px 0 12px">4 · Editing</h3>
-  <div class="card"><ul class="clean">
-   <li><b>Captions on:</b> burn in open captions, since judges often watch muted, and also upload an .srt.</li>
-   <li><b>Cut every wait:</b> Phantom pop-ups (keep at most 1 s), "Confirming…", and page loads.</li>
-   <li><b>Zoom-ins</b> at 150–200% with a 300 ms ease. Use amber outline highlights matching the brand (#E8A020) and keep everything else neutral.</li>
-   <li><b>Music:</b> none, or very low ambient (about −30 dB under the VO), dipped out at the two climaxes.</li>
-   <li><b>Lower thirds</b> in the brand style: mono, small, with an amber tick. Use hard cuts only, no transitions.</li>
-   <li>No terminal or code on screen (the optional skipPreflight tx is shown on Explorer, not in a terminal). No bank or PIX screens.</li>
-  </ul></div>
-
-  <h3 style="margin:28px 0 12px">5 · Export and upload</h3>
-  <div class="card"><ul class="clean">
-   <li>Length ≤ 3:00 (target 2:45). H.264, 1920×1080, 30 fps, about 12 Mbps, AAC 48 kHz, loudness about −14 LUFS.</li>
-   <li>Upload <b>unlisted</b> to YouTube (preferred, plays everywhere) or Loom. Open the link in an incognito window to confirm it plays without a login.</li>
-   <li><b>Check the current Colosseum submission form</b> for the exact technical-demo video field and any host rules. Public 2026 hosting rules weren't found, and the Colosseum workshop post only says the demo should cover the "how" (features built, tech stack, Solana design choices), not a second pitch.</li>
-   <li>Title: "MUTAV: technical demo (Colosseum Crypto World's Fair)". Put the repo and app links in the description.</li>
-  </ul></div>
  </div>
 </section>
 
-<!-- (f) RUN SHEET -->
 <section id="runsheet">
  <div class="wrap">
-  <p class="kicker">Day of · times in BRT</p>
-  <h2>Run sheet · <span class="amber">working back from 23:59</span></h2>
-  <div class="tablewrap"><table>
-   <tr><th>When</th><th>What</th><th>Who</th></tr>
-   <tr><td class="mono">Oct 11 · night</td><td>Deploy and <span class="mono">verify.ts</span>. If devnet is live, do setup steps 2–8 tonight. Time a VO read-through.</td><td>Julia</td></tr>
-   <tr><td class="mono">Oct 12 · by 10:00</td><td>Setup done: two Squads rounds (allowlist if needed; fulfil the R$10k deposit), 5 guarantees, state check 10,000 / 9,000 / 1,000 / 5. If devnet isn't ready by <b>12:00</b>, record on localnet.</td><td>Julia + Draau</td></tr>
-   <tr><td class="mono">10:00–12:00</td><td>Capture the screen clips: beats 1–4 (F2–F10), plus the 5 s Refresh clip for Edit A.</td><td>Julia</td></tr>
-   <tr><td class="mono">12:00–12:30</td><td>Off-camera: fee, then the <b>coverage restore</b> (deposit R$5k → Squads fulfil → claim_shares → refresh).</td><td>Julia + Draau</td></tr>
-   <tr><td class="mono">12:30–13:00</td><td>Capture beat 5 (F11–F12) on the restored, healthy reserve.</td><td>Julia</td></tr>
-   <tr><td class="mono">13:00–15:00</td><td>Rough cut, then record the VO to the cut.</td><td>Editor + narrator</td></tr>
-   <tr><td class="mono">15:00–18:00</td><td>Fine-tune, captions, cards. Choose Edit A or B.</td><td>Editor</td></tr>
-   <tr><td class="mono">18:00</td><td>Review muted and with sound; check it's ≤ 3:00 and the terminology.</td><td>Julia + Draau</td></tr>
-   <tr><td class="mono">19:00</td><td>Export, upload unlisted, test in incognito.</td><td>Julia</td></tr>
-   <tr><td class="mono">20:00</td><td><b>Judge-ready check</b> on <span class="mono">reserve.mutav.finance/reserve</span> in a private window: mode NORMAL, free capital &gt; 0, Ana's lease and the claim row read correctly (see "What judges will see").</td><td>Julia</td></tr>
-   <tr><td class="mono">20:30</td><td>Submit on Colosseum and the Superteam BR track.</td><td>Julia + Draau</td></tr>
-   <tr><td class="mono">23:00</td><td><b>Hard stop:</b> submitted. The rest of the time is buffer.</td><td>—</td></tr>
-  </table></div>
-  <p class="muted" style="margin-top:10px">The pitch video (2–3 min) is a separate deliverable on the same day; keep it off this critical path.</p>
+  <p class="kicker">Day of · BRT</p>
+  <h2>Run <span class="amber">sheet</span></h2>
+  <div class="tablewrap"><table class=""><tr><th>When</th><th>What</th></tr><tr><td>Before Oct 12</td><td>Deploy and verify. App requirements merged and deployed (see app-requirements). Staging steps 3–8. Time a VO read-through.</td></tr><tr><td>Oct 12 · by 10:00</td><td>Staging complete and checked. If devnet or the app is not ready by 12:00, record on a seeded localnet with the same numbers.</td></tr><tr><td>10:00–12:00</td><td>Capture F1–F13 as silent clips, one per beat (agency view F2 from app.mutav.finance).</td></tr><tr><td>12:00–12:30</td><td>F14: B requests the redemption; Squads fill (5-min lock); capture claim_assets.</td></tr><tr><td>12:30–14:30</td><td>Rough cut to the frame timings; record the VO to the cut.</td></tr><tr><td>14:30–17:30</td><td>Fine-tune, burned-in captions + SRT, cards (architecture strip, close).</td></tr><tr><td>17:30</td><td>Review muted and with sound: ≤ 2:45, terminology, honesty labels.</td></tr><tr><td>18:30</td><td>Export, upload unlisted, test the link in a private window.</td></tr><tr><td>19:30</td><td><b>Judge-ready check</b> of reserve.mutav.finance/reserve and /investment in a private window.</td></tr><tr><td>20:00</td><td>Submit (Colosseum + Superteam BR track).</td></tr><tr><td>23:00</td><td>Hard stop; the rest is buffer.</td></tr></table></div>
  </div>
 </section>
 
-<!-- (g) RISKS -->
 <section id="risks">
  <div class="wrap">
-  <p class="kicker">Risks and judge view</p>
-  <h2>What can go wrong, and what <span class="amber">judges will see</span></h2>
-  <div class="tablewrap"><table>
-   <tr><th>Risk</th><th>Frames</th><th>What to do</th></tr>
-   <tr><td>The devnet deploy slips</td><td>all</td><td>Record on a seeded localnet with the same numbers. Drop the Explorer cutaways. Change the last VO words to "deploying to devnet".</td></tr>
-   <tr><td>Phantom won't sign a transaction it expects to fail</td><td>F7</td><td>Send the optional skipPreflight tx and show it on Explorer, with an overlay saying it was sent separately.</td></tr>
-   <tr><td>State drifted from the planned numbers</td><td>F6</td><td>Close stray leases (VOID) or adjust the rent; recheck the preview before capturing.</td></tr>
-   <tr><td>Retakes leave traces</td><td>F3, F8–F10</td><td>VOID-closed leases show as "closed" rows, and each redone claim adds a timeline row. Keep redos few; consider closing the extras as VOID or RELEASED.</td></tr>
-   <tr><td>The reserve left under-covered</td><td>after F10</td><td>Run the coverage restore (setup step 11) before F11 and before the judge-ready check.</td></tr>
-   <tr><td>Over 3:00</td><td>edit</td><td>Trim F5 (−4 s), F11 (−4 s), and the F13 hold (−6 s).</td></tr>
-  </table></div>
-  <h3 style="margin:28px 0 12px">What judges will see on <span class="mono" style="text-transform:none">/reserve</span> afterwards</h3>
-  <div class="tablewrap"><table>
-   <tr><th>Artefact</th><th>How it reads</th><th>Check</th></tr>
-   <tr><td>Health</td><td>Stable R$12,960 · required R$9,300 · free R$3,660 · <b>MODE NORMAL</b></td><td>Refresh was sent after the restore; otherwise the badge can lag</td></tr>
-   <tr><td>Ana's guarantee (<span class="mono">5e1f…</span>)</td><td>Active · default left R$1,500 · exit left R$1,500 · 0 open claims. An opaque id and an agency hash, no names</td><td>Correct: R$3,000 of its R$4,500 default leg was paid</td></tr>
-   <tr><td>Claims timeline</td><td>One row: default leg R$3,000 · filed → paid → settled, minutes apart · a PIX hash</td><td>The page doesn't say the PIX was simulated. Say so in the submission text ("devnet: PIX settlement simulated; the record is real")</td></tr>
-   <tr><td>5 setup guarantees</td><td>Active, R$12,000 / R$6,000 left on each leg</td><td>—</td></tr>
-   <tr><td>Money flows</td><td>Two deposits (R$10k, R$5k), one guarantee fee (R$960 net, R$240 take), one claim payment (R$3k)</td><td>Reads as a small pilot cycle</td></tr>
-   <tr><td>The refused lease</td><td>Nothing: it never landed</td><td>—</td></tr>
-   <tr><td>Retake leftovers</td><td>"closed" rows and extra claim rows, if any</td><td>Note them in the submission, or keep retakes to zero on-chain</td></tr>
-  </table></div>
+  <p class="kicker">Risks</p>
+  <h2>What can go <span class="amber">wrong</span></h2>
+  <div class="tablewrap"><table class=""><tr><th>Risk</th><th>Where</th><th>What to do</th></tr><tr><td>Not enough devnet BRS</td><td>staging</td><td>The chosen numbers need ≈ R$46k BRS. If more sandbox BRS arrives, the pilot-product variant (Plan A) is better.</td></tr><tr><td>State drifted (stray lease or fee)</td><td>F7</td><td>Recompute: free capital before Ana must be in [R$4,500, R$9,000) so Ana fits and the next equal lease does not. Close strays with close_guarantee VOID.</td></tr><tr><td>Phantom will not sign a transaction it expects to fail</td><td>F8</td><td>Optional: send the same instruction once with skipPreflight from a script, and show its failed signature on Explorer (the logs name InsufficientFreeCapital).</td></tr><tr><td>NAV not published</td><td>F13</td><td>Send refresh (permissionless) before capturing; or show the page's "now" value.</td></tr><tr><td>Withdrawal not filled</td><td>F14</td><td>Check mode Normal, not paused, no fulfil halt, and free capital ≥ R$4,057.45 before proposing the fill.</td></tr><tr><td>Retake leftovers visible to judges</td><td>after</td><td>VOID leases show as "closed"; extra claims add rows. Keep on-chain redos few.</td></tr><tr><td>Over 2:45</td><td>edit</td><td>Trim F6 (−3 s) and F13 (−2 s); never trim the F8 hold.</td></tr></table></div>
+  <h3 style="margin:28px 0 12px">What judges will see afterwards</h3>
+  <div class="tablewrap"><table class=""><tr><th>Artefact</th><th>How it reads</th></tr><tr><td>/reserve</td><td>Covered, mode Normal: stable R$40,574.55, required R$40,250, NAV per share 1.014364</td></tr><tr><td>Ana's guarantee 5e1f…</td><td>Active · default left R$11,000 · exit left R$6,000 · opaque id, no names</td></tr><tr><td>/reserve/claims</td><td>One claim: R$1,000, filed → paid → settled minutes apart, with the "PIX simulated on devnet" line</td></tr><tr><td>/reserve/capital</td><td>Deposits R$40,000 + R$4,000; one fee receipt (R$1,632 net, R$408 take); one claim; one redemption R$4,057.45</td></tr><tr><td>The refused lease</td><td>Nothing: it never landed</td></tr></table></div>
  </div>
 </section>
 
-<!-- APPENDIX B -->
-<section id="appendix-b">
- <div class="wrap">
-  <p class="kicker">Appendix B · optional</p>
-  <h2>Take B: <span class="amber">stays covered</span> on screen</h2>
-  <p class="muted" style="max-width:860px">Only if you want the claim payment itself never to leave the reserve under its target. The same footage already supports Edit B; this changes the on-chain state, not the VO.</p>
-  <ol class="steps">
-   <li>After capturing F6–F7 and before F8: capital wallet <span class="mono">request_deposit 5000</span> on <span class="mono">/investor</span>.</li>
-   <li>Squads: propose <span class="mono">fulfil_deposits</span> (count 1) on <span class="mono">/admin</span> → admin signers (2-of-2) approve → wait 5 min → Execute. Then the capital wallet runs <span class="mono">claim_shares</span>.</li>
-   <li>Now stable is R$15,000 and required R$9,600. After the R$3,000 payment: R$12,000 against R$9,300, still covered.</li>
-   <li>The coverage restore (setup step 11) is then not needed. Still send <span class="mono">refresh</span> and run the judge-ready check.</li>
-  </ol>
- </div>
-</section>
-
-<!-- (h) OPEN DECISIONS -->
 <section id="questions" style="border-bottom:0">
  <div class="wrap">
   <p class="kicker">Production</p>
-  <h2>Open production <span class="amber">decisions</span></h2>
-  <ol class="steps">
-   <li><b>Edit A or B</b> is decided in the edit; both work from the same footage. Whether to also record the optional Take B on-chain (Appendix B).</li>
-   <li><b>Narrator and pronunciation:</b> who records the VO, how "MUTAV" is said, and whether to use a face cam.</li>
-   <li><b>Signers:</b> scheduling of the admin Squads rounds (allowlist if needed, the R$10k fulfil, the R$5k restore fulfil); admin signers (2-of-2) approve each one.</li>
-   <li><b>Issuer income:</b> leave it at R$0 on devnet, or simulate a Nora statement and sweep (captioned "simulated").</li>
-  </ol>
-  <p class="dim mono" style="font-size:12px;margin-top:28px">Production note: Ana is a fictional persona, and agency names and lease references in the demo are fictional. In the real system, personal data stays with MUTAV off-chain; the chain holds opaque IDs and hashes only.</p>
+  <h2>Open <span class="amber">production decisions</span></h2>
+  <ol class="steps"><li>Plan B (fits the devnet BRS in hand) or Plan A (pilot product; needs more sandbox BRS).</li><li>Recording surface: the real pages (default) or a cleaned /demo.</li><li>Whether to include the optional simulated issuer-revenue sweep in F12.</li><li>Narrator, pronunciation of "MUTAV", face cam or not.</li></ol>
+  <p class="dim mono" style="font-size:12px;margin-top:28px">Ana is a fictional persona; agency names and lease references are fictional. Personal data stays with MUTAV off-chain; the chain holds opaque ids and hashes only. Pilot capital is MUTAV's own; not open to outside investors.</p>
  </div>
 </section>
-
 </body>
 </html>
