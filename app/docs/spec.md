@@ -22,9 +22,10 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 
 - **No keys.** The app composes transactions; the connected wallet signs. No secret material in the repo, env or code. Admin actions are Squads proposals signed by members' wallets.
 - **Cluster by env:** `NEXT_PUBLIC_CLUSTER` = `localnet` (Surfpool / local validator seeded by the protocol's dry-run scripts) or `devnet`. Mainnet is refused.
-- **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts via the client's read helpers. Previews (for example the solvency gate) use the client's math mirror and are labelled as previews.
+- **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts via the client's read helpers. Previews (for example the coverage gate) use the client's math mirror and are labelled as previews.
 - **Language:** English for the hackathon. MUTAV's guarantee is a *fiança*: say "guarantee fee", "claim payment", "reserve". Never "premium", "insurance", "policy", "yield vault".
 - **Not open to public investment.** The pilot runs on MUTAV's own capital. Capital requests are gated by the on-chain allowlist (KYC off-chain); in the pilot the allowlisted capital provider is MUTAV's capital wallet. Investor-facing copy says so.
+- **Wallets send; the app relays only on localnet.** On devnet the wallet signs and sends (`solana:signAndSendTransaction`) and the app confirms through its read endpoint; `/api/tx/send` relays signed bytes on localnet only (MUTAV, the configured Squads multisig and Compute Budget instructions; 4 KB body cap).
 - **Roles are explicit.** Every page tags each action and each number with the role that signs or owns it: Reserve Admin, Operator, Investor (or Anyone for cranks), one colour and one shape per role (`lib/roles.ts`, `components/RoleTag.tsx`).
 
 ## Routes
@@ -33,8 +34,8 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 
 - The one-line story: MUTAV is an institutional rental guarantor in Brazil; every guarantee is backed by a reserve anyone can verify on Solana.
 - A live reserve strip (reserve, coverage required, free capital, NAV, active guarantees, mode) linking to `/reserve`.
-- How it works in three steps (agency registers a lease → reserve covers it, gated by solvency → claims are paid from the reserve, never blocked).
-- The protocol diagram (React Flow): reserve, escrows, treasury, payments account, operator, admin (Squads), Nora BRS, and the solvency gate between them.
+- How it works in three steps (agency registers a lease → reserve covers it, gated by required coverage → claims are paid from the reserve, never blocked).
+- The protocol diagram (React Flow): reserve, escrows, treasury, payments account, operator, admin (Squads), Nora BRS, and the coverage gate between them.
 - Calls to action: "See the reserve" (`/reserve`), "Run the demo" (`/demo`).
 - Design reference: the full wordmark over the hero; past the hero, a compact pinned bar with a solid CTA (see the "two-nav swap" pattern, compositor-only animations).
 
@@ -58,6 +59,7 @@ During the launch and the hackathon MUTAV's team operates the reserve by hand fr
 - **Limits now:** the claim-payment cap window (the last 31 days of `claim_day_buckets` vs `max_claim_per_period`, `max_claim_per_call`; ADR 0019), free capital for new guarantees.
 - **Console:** a form per operator instruction (shared with `/demo`), each with its on-chain bound shown before signing and the gate preview where it applies. `sweep_income` (ADR 0017) shows the income-inbox balance and previews the split; it sweeps exactly the amount on a Nora statement.
 - **Responsibilities:** each instruction, what is done by hand today and what will trigger it in the backend; undocumented triggers say "triggered by the MUTAV platform".
+- **Close reasons:** `close_guarantee` takes RELEASED (the lease ended) or VOID (registered in error; refused once anything was paid). Demo agency ids are opaque random ids the operator keeps, and `refs_hash` is salted with a salt it keeps (ADR 0019 decision 8).
 - **Recent activity:** the operator key's last MUTAV transactions, and the last operator `accept_role` (role = 1) in VaultConfig's recent history, when the RPC keeps history.
 - **Safety:** what bounds a compromised operator key (caps, fixed payments account, `revoke_operator`, admin-only config).
 
@@ -66,9 +68,9 @@ During the launch and the hackathon MUTAV's team operates the reserve by hand fr
 Read by anyone; actions gated on the allowlist.
 
 - **Allowlist status** of the connected wallet: its Merkle proof (client `buildAllowlist` over `ALLOWLIST`) checked with `verifyAllowlistProof` against `VaultConfig.investor_allowlist_root`. States: allowlisted, not listed (KYC is done off-chain), root unset, list mismatch.
-- **Position:** reserve shares, value at NAV now (math mirror, labelled preview), BRS in the wallet, waiting deposits and redemptions, `HolderState`.
+- **Position:** reserve shares, value at NAV now (math mirror, labelled preview), BRS in the wallet, waiting deposits and redemptions.
 - **Queue entries** of the wallet, with `cancel_deposit`, `claim_shares`, `cancel_redeem`, `claim_assets` where the request's state allows them (owner only, no proof).
-- **New requests:** `request_deposit`, `request_redeem`, the proof built by the server. Without an allowlisted wallet the view stays visible, read-only.
+- **New requests:** `request_deposit`, `request_redeem`, the proof built by the server, each with an optional price limit (`min_shares_out`, `min_assets_out`; 0 = none; a "preview − 1%" shortcut) and "Redeem all". A request that heads its queue and would not fill now says why (preview). Without an allowlisted wallet the view stays visible, read-only.
 
 ### `/demo` Guided demo (operator cockpit)
 
@@ -89,13 +91,22 @@ For Squads members. A sticky in-page nav (General controls · Money in & out · 
 
 - **General controls** (`#general`), the cross-cutting settings:
   - **Emergency** strip: paused, fulfil halted, operator active or revoked; `pause` and `revoke_operator` (pauser key or admin, signed directly, no time lock), `unpause` and `clear_fulfil_halt` (Reserve Admin, through Squads). `clear_fulfil_halt`'s default NAV bounds centre on the published NAV (`navPerShare` floored at 1, 0 with no shares), which it checks; fills centre on the conversion NAV.
-  - **Roles & multisig:** the Squads status, time lock and proposal list, with the create → approve → execute flow explained once; the roles; a role change is a `propose_role` proposal (an unexpired handover to another key is cancelled first with `cancel_pending`, in the same proposal), then the new key signs `accept_role` itself (ADR 0020).
+  - **Watch · last 24 hours:** the operator key's registrations, closes, filings, payments and fees from the accounts' timestamps, and red flags on the payments account (owner change against `PAYMENTS_OWNER`, operator-owned, delegate, close authority, frozen).
+  - **Roles & multisig:** the Squads status, time lock and every live proposal (scanned back 256 indices; Approved ones count even below the stale index) plus the last finished ones, with approve, reject (Active), cancel (Approved) and execute; a `set_config` proposal records the values it was built against in its memo, and the app refuses to execute it once one of them has moved (stale carry; app-side only, the Squads UI skips it); the create → approve → execute flow explained once; the roles; a role change is a `propose_role` proposal (an unexpired handover to another key is cancelled first with `cancel_pending`, in the same proposal), then the new key signs `accept_role` itself from the **Pending handovers** screen (ADR 0020); the admin can cancel a pending handover (`cancel_pending`).
   - **Coverage & reserve limits:** coverage ratio c, `max_tvl`, `max_cover_per_guarantee`; one `set_config` (no per-agency cap, ADR 0019). A change to c, `max_nav_move_bps` or `stress_buffer` is proposed as `refresh` → `set_config` → `refresh`, so the mode reflects the new values when it executes.
-  - **Allowlist & accounts:** allowlist root, treasury, payments, mints; `set_allowlist_root` (client Merkle builder), `set_payments_account`.
+  - **Allowlist & accounts:** allowlist root, treasury, payments, mints; `set_allowlist_root` (the root of the server's `ALLOWLIST`, the list the proofs come from; a browser-sent list must match it), `set_payments_account`.
 - **Money in & out** (`#money`): each flow with its settings. Operator and Investor steps are one-line context rows (role tag, live total, link to `/operator`, `/investor` or `/reserve`); charts stay on `/reserve`.
+  - Fill proposals carry `nav_bounds` from a tolerance field (default ±1% around the conversion NAV) and show why each queue head would not fill now (needed vs available, price limit, under-coverage, TVL, halt, pause; preview). Deposit fills stop before the first request whose owner is off the current allowlist.
   - In: **deposits** (`fulfil_deposits`; `min_request`, `max_request`), **guarantee fees** (`fee_take_bps`), **BRS issuer income** (Nora → inbox → `sweep_income`; inbox balance, swept total, last statements; `income_take_bps`, fail-closed cap 0 until spec §12 Q47).
   - Out: **redemptions** (`fulfil_redeems`, gated by free capital; whole fills), **claim payments** (`max_claim_per_call`, `max_claim_per_period` over 31 days; `pay_claim_admin` shown as planned).
 - **Allocation** (`#allocation`, alias `#reserve-assets`): "BRS today, more assets through adapters" (ADR 0018). Composition shows BRS plus the income inbox kept apart, "100% BRS (pilot)", with the settlement floor as a marker ("Min in BRS (settlement token): 100%"). **Expand with adapters** explains how a new asset is added (upgrade with the adapter instructions; whitelist an adapter with its cap, share limit and own price feed; lower the settlement floor; allocate and deallocate within the gates), lists TESOURO as the first candidate with its blocker (no Etherfuse BRS path), and shows the per-adapter table (`VaultConfig.adapters`: cap, share limit, price feed, allocated) and the planned instructions. Controls: "Min held in the settlement token" (composed as `caps.min_settlement_bps`; the program stores its complement `caps.max_allocated_bps`, read through the client's `minSettlementBps`), and the per-adapter price feed and share limit (`AdapterEntry.max_share_bps`, reserved before the freeze) shown as planned.
+
+## Hardening
+
+- Every route checks the RPC's genesis hash against the cluster (mainnet refused); errors cut URLs to their host.
+- Read routes: CDN `s-maxage=3, stale-while-revalidate=10`, and an in-process cache (3 s; 1 s for a `?fresh=` read after a transaction).
+- Every response: `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`. Pages: a nonce CSP in report-only mode (`proxy.ts`), enforced after the demo.
+- A Vercel WAF rate limit is staged in `docs/waf-rule.md`, applied only once confirmed.
 
 ## Seed scenario
 

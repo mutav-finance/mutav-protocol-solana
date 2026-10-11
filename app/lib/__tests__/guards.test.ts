@@ -6,23 +6,46 @@ import { MainnetRefusedError } from "../cluster";
 
 const ROOT = join(__dirname, "..", "..");
 
-function files(dir: string, out: string[] = []): string[] {
+function files(dir: string, ext: RegExp, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     if (name === "__tests__" || name === "node_modules") continue;
-    if (statSync(p).isDirectory()) files(p, out);
-    else if (/\.(tsx?|css)$/.test(name)) out.push(p);
+    if (statSync(p).isDirectory()) files(p, ext, out);
+    else if (ext.test(name)) out.push(p);
   }
   return out;
 }
 
-const SOURCES = ["app", "components", "lib"].flatMap((d) => files(join(ROOT, d)));
+const SOURCES = ["app", "components", "lib"].flatMap((d) => files(join(ROOT, d), /\.(tsx?|css)$/));
+/** A7: the static pages too (the simulator), and any other public HTML. */
+const STATIC = files(join(ROOT, "public"), /\.html?$/);
+
+/**
+ * (Re)insurance vocabulary, yield-product framing, "sinistro" (A7), the reserve
+ * called a "fund", and "solvency gate" in copy (it is the coverage gate; code
+ * identifiers such as `solvencyFromAccounts` are renamed in a later PR and do
+ * not match: the regex needs a space or hyphen). "funds" (money) is fine.
+ */
+const BANNED = /\b(premiums?|(re)?insur(ance|ed|ers?)|polic(y|ies)|policyholders?|yield vault|sinistros?|fund|solvency[ -]gat(e|ed|es|ing))\b/i;
+/** Standard HTTP header names (Referrer-Policy, Content-Security-Policy, …) are not UI copy. */
+const HEADER_NAMES = /\b[A-Z][A-Za-z]*(-[A-Z][A-Za-z]*)*-Policy(-Report-Only)?\b/g;
+const stripComments = (src: string) => src.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "");
 
 describe("app rules", () => {
   it("never uses insurance or yield-product language in the UI", () => {
-    const banned = /\b(premiums?|insurance|insured|insurer|policy|policies|policyholders?|yield vault)\b/i;
-    const hits = SOURCES.filter((f) => banned.test(readFileSync(f, "utf8").replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "")));
+    const hits = SOURCES.filter((f) => BANNED.test(stripComments(readFileSync(f, "utf8")).replace(HEADER_NAMES, "")));
     expect(hits).toEqual([]);
+  });
+
+  it("never uses it in the static pages either (A7)", () => {
+    expect(STATIC.length).toBeGreaterThan(0);
+    const hits = STATIC.filter((f) => BANNED.test(readFileSync(f, "utf8").replace(/<!--[\s\S]*?-->/g, "")));
+    expect(hits).toEqual([]);
+  });
+
+  it("catches the words it is meant to catch", () => {
+    for (const w of ["reinsurance", "Insurance", "insured", "insurers", "policy", "policies", "policyholder", "premium", "sinistro", "sinistros", "yield vault", "the fund", "SOLVENCY GATE", "solvency-gated"]) expect([w, BANNED.test(w)]).toEqual([w, true]);
+    for (const w of ["guarantee fee", "claim payment", "reserve", "Referrer-Policy", "moves no funds", "funded", "solvencyFromAccounts", "coverage gate"]) expect([w, BANNED.test(w.replace(HEADER_NAMES, ""))]).toEqual([w, false]);
   });
 
   it("never builds a signer from secret bytes in app code", () => {

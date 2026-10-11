@@ -1,8 +1,9 @@
 "use client";
 
 /**
- * One form per instruction. Inputs are labels (lease, agency, invoice, notice,
- * PIX end-to-end id) hashed to the 32-byte references the program stores;
+ * One form per instruction. Inputs are labels (lease, invoice, notice, PIX
+ * end-to-end id) hashed to the 32-byte references the program stores, and
+ * the agency, mapped to an opaque random id;
  * amounts are BRS. Previews are computed with the client's math mirror from
  * the last read and labelled PREVIEW.
  */
@@ -12,7 +13,8 @@ import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { previewRegisterGuarantee, REFUSAL_TEXT } from "@/lib/gate";
-import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, parseHundredths } from "@/lib/format";
+import { agencyIdFor, refsSaltFor } from "@/lib/client/operator-refs";
 import { REF } from "@/lib/refs";
 import { bytesToHex } from "@/lib/serde";
 import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE } from "@/lib/view";
@@ -112,11 +114,12 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
   const [exitMult, setExitMult] = useState("1");
 
   const rentBase = parseBrs(rent);
-  const dm = Number(defMult);
-  const em = Number(exitMult);
-  const multOk = Number.isInteger(dm * 100) && Number.isInteger(em * 100) && dm >= 0 && em >= 0 && dm <= 6 && em <= 6;
-  const defaultCover = rentBase && multOk ? (rentBase * BigInt(Math.round(dm * 100))) / 100n : 0n;
-  const exitCover = rentBase && multOk ? (rentBase * BigInt(Math.round(em * 100))) / 100n : 0n;
+  // Multiples parsed once to exact hundredths (A8): no float math.
+  const dm = parseHundredths(defMult);
+  const em = parseHundredths(exitMult);
+  const multOk = dm !== null && em !== null && dm <= 600n && em <= 600n;
+  const defaultCover = rentBase && multOk ? (rentBase * dm) / 100n : 0n;
+  const exitCover = rentBase && multOk ? (rentBase * em) / 100n : 0n;
   const preview = useMemo(
     () => (rentBase ? previewRegisterGuarantee(reserve.config, reserve.state, { defaultCover, exitCover }) : null),
     [reserve, rentBase, defaultCover, exitCover],
@@ -128,8 +131,9 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
     return {
       kind: "register_guarantee" as const,
       id: await REF.guaranteeId(lease.trim()),
-      agencyId: await REF.agencyId(agency.trim()),
-      refsHash: await REF.refsHash(lease.trim()),
+      // Opaque random id per agency and a refs-hash salt per lease, both kept by the operator.
+      agencyId: agencyIdFor(agency.trim()),
+      refsHash: await REF.refsHash(lease.trim(), refsSaltFor(lease.trim())),
       defaultCover,
       exitCover,
     };
@@ -139,7 +143,7 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
     <div>
       <Grid>
         <TextField id={`${p}reg-lease`} label="Lease reference" value={lease} onChange={setLease} hint="hashed to the guarantee id" />
-        <TextField id={`${p}reg-agency`} label="Agency" value={agency} onChange={setAgency} hint="hashed to the agency id" />
+        <TextField id={`${p}reg-agency`} label="Agency" value={agency} onChange={setAgency} hint="mapped to an opaque random id, kept off-chain" />
         <TextField id={`${p}reg-rent`} label="Monthly rent (BRS)" value={rent} onChange={setRent} numeric />
         <TextField id={`${p}reg-def`} label="Default cover (× rent)" value={defMult} onChange={setDefMult} numeric hint={fmtBrs(defaultCover, 0)} />
         <TextField id={`${p}reg-exit`} label="Exit cover (× rent)" value={exitMult} onChange={setExitMult} numeric hint={fmtBrs(exitCover, 0)} />
@@ -185,16 +189,40 @@ function GuaranteeSelect({ id, value, onChange, filter }: { id: string; value: s
   );
 }
 
+/** `close_guarantee` reasons (ADR 0020): the program stores the one given. */
+const CLOSE_REASONS = {
+  "1": { label: "RELEASED: the lease ended", note: "Releases the remaining cover. Refused while the guarantee has an open claim." },
+  "2": { label: "VOID: registered in error", note: "For a guarantee that never ran: refused if anything was paid or a claim is open." },
+} as const;
+
 export function CloseGuaranteeForm({ p = "" }: { p?: string }) {
+  const { ledger } = useLive();
   const [g, setG] = useState("");
+  const [reason, setReason] = useState<"1" | "2">("1");
+  const picked = ledger.guarantees.find((x) => x.address === g)?.data;
+  const paid = picked ? picked.defaultPaid + picked.exitPaid : 0n;
+  const voidRefused = reason === "2" && paid > 0n;
   return (
     <div>
       <Grid>
         <GuaranteeSelect id={`${p}close-g`} value={g} onChange={setG} filter={(x) => x.active && x.openClaims === 0} />
+        <Field id={`${p}close-reason`} label="Reason">
+          <Select value={reason} onValueChange={(v) => setReason(v as "1" | "2")}>
+            <SelectTrigger id={`${p}close-reason`} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(CLOSE_REASONS) as ("1" | "2")[]).map((k) => (
+                <SelectItem key={k} value={k}>{CLOSE_REASONS[k].label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
       </Grid>
-      <Note>Releases the guarantee&apos;s remaining cover. Refused while it has open claims.</Note>
+      <Note>{CLOSE_REASONS[reason].note}</Note>
+      {voidRefused && <Note tone="warn">This guarantee has paid {fmtBrs(paid)}: the program refuses VOID. Close it as RELEASED.</Note>}
       <RoleWarning need="operator" />
-      <Action label="close_guarantee" request={g ? { kind: "close_guarantee", guarantee: g } : null} variant="outline" />
+      <Action label="close_guarantee" request={g ? { kind: "close_guarantee", guarantee: g, reason: Number(reason) as 1 | 2 } : null} variant="outline" />
     </div>
   );
 }

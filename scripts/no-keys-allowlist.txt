@@ -18,6 +18,18 @@ scripts/test/check-no-keys.test.ts
 # The connected wallet signs (wallet-standard solana:signTransaction); the app holds no key.
 app/components/WalletProvider.tsx signTransaction
 app/lib/client/use-tx.ts signTransaction
+# On devnet the wallet signs AND sends (solana:signAndSendTransaction, A1); the app holds no key.
+app/components/WalletProvider.tsx SolanaSignAndSendTransaction(Feature)?|signAndSendTransaction
+app/lib/client/use-tx.ts signAndSendTransaction
+app/lib/client/transport.ts solana:sign(AndSend)?Transaction
+app/lib/server/relay.ts solana:signAndSendTransaction
+app/app/api/tx/send/route.ts solana:signAndSendTransaction
+app/lib/__tests__/relay.test.ts solana:sign(AndSend)?Transaction
+# A6: hashes the static simulator's inline scripts for the report-only CSP.
+app/next.config.ts import \{ readFileSync \} from "node:fs"|readFileSync\(join\(process\.cwd\(\), "public", "simulator\.html"\)
+# A5 tests: a fake API key inside an RPC URL, to prove errors redact it.
+app/lib/__tests__/cluster.test.ts SECRETKEY
+app/lib/__tests__/respond.test.ts SECRETKEY
 
 # The app's own guards name the forbidden APIs.
 app/eslint.config.mjs createKeyPair[A-Za-z]*|generateKeyPair[A-Za-z]*

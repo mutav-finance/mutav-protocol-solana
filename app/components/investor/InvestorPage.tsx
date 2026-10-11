@@ -10,7 +10,9 @@
  */
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { assetsFor } from "@mutav-finance/mutav-protocol-solana";
+import { assetsFor, sharesFor } from "@mutav-finance/mutav-protocol-solana";
+import { Button } from "@/components/ui/button";
+import { depositHead, limitWithSlippage, redeemHead, type HeadStatus } from "@/lib/queue";
 import { Page, ReadError, Section } from "@/components/Section";
 import { Explorer } from "@/components/Explorer";
 import { MetricCard } from "@/components/MetricCard";
@@ -21,7 +23,7 @@ import { useWallet } from "@/components/WalletProvider";
 import { Action, Grid, LiveProvider, Note, TextField, useLive } from "@/components/demo/shared";
 import { ALLOWLIST_TEXT, type AllowlistState } from "@/lib/allowlist";
 import { usePoll } from "@/lib/client/use-poll";
-import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, SHARE_DECIMALS } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, parseUnitsOrZero, SHARE_DECIMALS, toInput } from "@/lib/format";
 import type { InvestorView } from "@/lib/server/investor";
 import { investorRequests, type Ledger, type ReserveView } from "@/lib/view";
 
@@ -84,7 +86,14 @@ function Requests({ owner }: { owner: string | null }) {
   const rows = investorRequests(owner, reserve.state, ledger);
   if (!owner) return <Note>Connect a wallet to see its requests. The whole queue is public on <Link href="/reserve#queue" className="ext-link">/reserve</Link>.</Note>;
   if (rows.length === 0) return <Note>This wallet has no open request.</Note>;
+  // Why a request at the head of its queue would not fill now (preview).
+  const heads = [depositHead(reserve.config, reserve.state, reserve.solvency, ledger, null), redeemHead(reserve.config, reserve.state, reserve.solvency, ledger)]
+    .filter((h): h is HeadStatus => h !== null && h.owner === owner && h.stuck.length > 0);
   return (
+    <>
+    {heads.map((h) => (
+      <Note key={h.side} tone="warn">Your {h.side} seq {h.seq.toString()} heads the queue and would not fill now (PREVIEW): {h.stuck.join("; ")}.</Note>
+    ))}
     <div className="table-wrap">
       <table className="data-table" aria-label="Your queue entries">
         <thead>
@@ -121,6 +130,7 @@ function Requests({ owner }: { owner: string | null }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -133,16 +143,29 @@ function Gate({ allowed, children }: { allowed: boolean; children: ReactNode }) 
   );
 }
 
-function RequestForms({ allowed }: { allowed: boolean }) {
+/** Room left for the NAV to move between the request and its fill, in the "use preview" price limit. */
+const LIMIT_SLIPPAGE_BPS = 100;
+
+function RequestForms({ allowed, inv }: { allowed: boolean; inv: InvestorView | null }) {
   const { reserve } = useLive();
   const caps = reserve.config.caps;
+  const so = reserve.state.sharesOutstanding;
+  const net = reserve.solvency.netAssets;
   const [amount, setAmount] = useState("10000");
+  const [minShares, setMinShares] = useState("");
   const [sharesIn, setSharesIn] = useState("2000");
+  const [minBrs, setMinBrs] = useState("");
   const assets = parseBrs(amount);
   const shares = parseBrs(sharesIn, SHARE_DECIMALS);
+  const balance = inv?.shares.amount ?? null;
   const depOut = assets !== null && (assets < caps.minRequest || assets > caps.maxRequest);
-  const redValue = shares ? assetsFor(shares, reserve.state.sharesOutstanding, reserve.solvency.netAssets) : null;
+  const depPreview = assets ? sharesFor(assets, so, net) : null;
+  const redValue = shares ? assetsFor(shares, so, net) : null;
   const redOut = redValue !== null && (redValue < caps.minRequest || redValue > caps.maxRequest);
+  const overBalance = shares !== null && balance !== null && shares > balance;
+  // Blank = no limit (0 on-chain); otherwise the least the owner accepts.
+  const minSharesOut = minShares.trim() ? parseUnitsOrZero(minShares, SHARE_DECIMALS) : 0n;
+  const minAssetsOut = minBrs.trim() ? parseUnitsOrZero(minBrs) : 0n;
   return (
     <div className="grid-2">
       <article style={{ border: "1px solid var(--color-border)", padding: "16px 18px" }}>
@@ -151,9 +174,15 @@ function RequestForms({ allowed }: { allowed: boolean }) {
         <Gate allowed={allowed}>
           <Grid>
             <TextField id="inv-dep" label="Deposit (BRS)" value={amount} onChange={setAmount} numeric hint={`allowed ${fmtBrs(caps.minRequest, 0)} – ${fmtBrs(caps.maxRequest, 0)} per request`} />
+            <TextField id="inv-dep-min" label="Price limit: min shares (blank = none)" value={minShares} onChange={setMinShares} numeric hint={depPreview !== null ? `PREVIEW ${fmtShares(depPreview)} shares at NAV now` : "reserve shares (6 decimals)"} />
           </Grid>
+          {depPreview !== null && depPreview > 0n && (
+            <Button size="sm" variant="outline" onClick={() => setMinShares(toInput(limitWithSlippage(depPreview, LIMIT_SLIPPAGE_BPS), SHARE_DECIMALS))}>Limit at preview − 1%</Button>
+          )}
           {depOut && <Note tone="warn">Outside the per-request limits: the program will refuse it.</Note>}
-          <Action label="request_deposit" disabled={!allowed} request={assets ? { kind: "request_deposit", assets } : null} />
+          {minSharesOut === null && <Note tone="warn">The price limit is not a share amount.</Note>}
+          <Note>A fill that would mint fewer shares than the limit stops at your request, which stays pending: you (or the admin) can cancel it.</Note>
+          <Action label="request_deposit" disabled={!allowed} request={assets && minSharesOut !== null ? { kind: "request_deposit", assets, minSharesOut } : null} />
         </Gate>
       </article>
       <article style={{ border: "1px solid var(--color-border)", padding: "16px 18px" }}>
@@ -162,9 +191,21 @@ function RequestForms({ allowed }: { allowed: boolean }) {
         <Gate allowed={allowed}>
           <Grid>
             <TextField id="inv-red" label="Shares to redeem" value={sharesIn} onChange={setSharesIn} numeric hint={redValue !== null ? `PREVIEW ≈ ${fmtBrs(redValue)} at NAV now` : "reserve shares (6 decimals)"} />
+            <TextField id="inv-red-min" label="Price limit: min BRS (blank = none)" value={minBrs} onChange={setMinBrs} numeric hint="the least BRS this request accepts" />
           </Grid>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button size="sm" variant="outline" disabled={!balance} onClick={() => balance && setSharesIn(toInput(balance, SHARE_DECIMALS))}>
+              Redeem all{balance ? ` (${fmtShares(balance)})` : ""}
+            </Button>
+            {redValue !== null && redValue > 0n && (
+              <Button size="sm" variant="outline" onClick={() => setMinBrs(toInput(limitWithSlippage(redValue, LIMIT_SLIPPAGE_BPS)))}>Limit at preview − 1%</Button>
+            )}
+          </div>
+          {overBalance && <Note tone="warn">More than this wallet holds ({fmtShares(balance!)}): the program will refuse it.</Note>}
           {redOut && <Note tone="warn">Worth less than {fmtBrs(caps.minRequest, 0)} or more than {fmtBrs(caps.maxRequest, 0)} at the current NAV: the program will refuse it.</Note>}
-          <Action label="request_redeem" disabled={!allowed} request={shares ? { kind: "request_redeem", shares } : null} />
+          {minAssetsOut === null && <Note tone="warn">The price limit is not a BRS amount.</Note>}
+          <Note>A fill that would pay less than the limit stops at your request, which stays pending: you (or the admin) can cancel it.</Note>
+          <Action label="request_redeem" disabled={!allowed} request={shares && minAssetsOut !== null ? { kind: "request_redeem", shares, minAssetsOut } : null} />
         </Gate>
       </article>
     </div>
@@ -212,7 +253,7 @@ export function InvestorPage() {
             <Note>Cancelling and claiming need only the request&apos;s owner, not the allowlist, and are never paused.</Note>
           </Section>
           <Section id="request" title="New request" kicker={allowed ? "Allowlisted" : "Read-only"} roles={<RoleLine items={[{ role: "investor", prefix: "signed by" }]}>with a Merkle proof of the wallet against the on-chain root.</RoleLine>}>
-            <RequestForms allowed={allowed} />
+            <RequestForms allowed={allowed} inv={invData} />
           </Section>
         </LiveProvider>
       )}

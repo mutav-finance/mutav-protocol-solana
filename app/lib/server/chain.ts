@@ -35,7 +35,8 @@ import {
   getRedeemsFulfilledEventDecoder,
 } from "@mutav-finance/mutav-protocol-solana";
 import { fetchEncodedAccount, getAddressDecoder } from "@solana/kit";
-import type { CapitalEvent, Ledger, ReserveView, Row, TokenFacts } from "../view";
+import type { CapitalEvent, Ledger, PaymentsFacts, ReserveView, Row, TokenFacts } from "../view";
+import { assertGenesis } from "../cluster";
 import { serverEnv, type ServerEnv } from "./env";
 
 export class NotConfiguredError extends Error {
@@ -46,6 +47,26 @@ let cached: { url: string; rpc: ReturnType<typeof createSolanaRpc> } | null = nu
 export function rpcFor(env: ServerEnv) {
   if (!cached || cached.url !== env.rpcUrl) cached = { url: env.rpcUrl, rpc: createSolanaRpc(env.rpcUrl) };
   return cached.rpc;
+}
+
+/** One genesis check per RPC URL per server instance (A4); a failed check is retried on the next request. */
+const genesisChecked = new Map<string, Promise<void>>();
+
+export function assertClusterGenesis(env: ServerEnv, read = async () => String(await rpcFor(env).getGenesisHash().send())): Promise<void> {
+  let p = genesisChecked.get(env.rpcUrl);
+  if (!p) {
+    p = read().then((hash) => assertGenesis(hash, env.cluster, env.rpcUrl));
+    p.catch(() => genesisChecked.delete(env.rpcUrl));
+    genesisChecked.set(env.rpcUrl, p);
+  }
+  return p;
+}
+
+/** The server env, after the RPC's genesis hash matched the cluster. Every route starts here. */
+export async function guardedEnv(): Promise<ServerEnv> {
+  const env = serverEnv();
+  await assertClusterGenesis(env);
+  return env;
 }
 
 /** Reads see a transaction as soon as it confirms (the RPC default is finalized, ~13 s behind). */
@@ -77,12 +98,13 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
   if (addresses.config !== env.configAddress) {
     throw new Error(`CONFIG_ADDRESS ${env.configAddress} is not the config PDA of its reserve mint under ${env.programId}`);
   }
-  const [state, clock, token, inbox] = await Promise.all([
+  const [state, clock, token, inbox, payments] = await Promise.all([
     fetchVaultState(rpc, addresses.state, READ),
     clusterNow(env),
     readTokenFacts(env, config.data.reserveMint, addresses.reserve),
     // ADR 0017: issuer income paid and not swept yet (never in NAV).
     fetchIncomeInbox(rpc, { vaultAuthority: addresses.vaultAuthority, config: config.data }),
+    readPaymentsFacts(env, config.data.paymentsAccount),
   ]);
   return {
     cluster: env.cluster,
@@ -96,6 +118,30 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
     slot: clock.slot,
     token,
     incomeInbox: { address: inbox.address, exists: inbox.exists, amount: inbox.amount },
+    payments,
+  };
+}
+
+/**
+ * The payments token account's SPL facts (account layout: mint [0..32),
+ * owner [32..64), delegate option [72..76) + key [76..108), state [108],
+ * close-authority option [129..133) + key [133..165)).
+ */
+async function readPaymentsFacts(env: ServerEnv, account: Address): Promise<PaymentsFacts> {
+  const a = await fetchEncodedAccount(rpcFor(env), account, READ);
+  const expectedOwner = env.paymentsOwner;
+  if (!a.exists || (a.data as Uint8Array).length < 165) return { exists: false, owner: null, mint: null, delegate: null, closeAuthority: null, frozen: false, expectedOwner };
+  const d = a.data as Uint8Array;
+  const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
+  const ad = getAddressDecoder();
+  return {
+    exists: true,
+    mint: ad.decode(d.subarray(0, 32)),
+    owner: ad.decode(d.subarray(32, 64)),
+    delegate: dv.getUint32(72, true) === 1 ? ad.decode(d.subarray(76, 108)) : null,
+    frozen: d[108] === 2,
+    closeAuthority: dv.getUint32(129, true) === 1 ? ad.decode(d.subarray(133, 165)) : null,
+    expectedOwner,
   };
 }
 

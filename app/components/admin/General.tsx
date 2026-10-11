@@ -7,13 +7,14 @@
  * accounts. Per-flow settings live in Money in & out; asset settings in
  * Allocation.
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { address as toAddress } from "@solana/kit";
-import { buildAllowlist, MIN_COVERAGE_RATIO_BPS } from "@mutav-finance/mutav-protocol-solana";
+import { MIN_COVERAGE_RATIO_BPS } from "@mutav-finance/mutav-protocol-solana";
+import { usePoll } from "@/lib/client/use-poll";
+import type { InvestorView } from "@/lib/server/investor";
 import { Section } from "@/components/Section";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
-import { Label } from "@/components/ui/label";
 import { RoleLine, RoleTag } from "@/components/RoleTag";
 import { Action, Grid, Note, TextField, useLive } from "@/components/demo/shared";
 import { AdminAction, Cards, Facts, KV, Meaning, PauserAction, Sub, WhatThis, type Mode } from "@/components/admin/shared";
@@ -22,8 +23,11 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { UNSET_ADDRESS } from "@/lib/reserve-assets";
 import { SquadsPanel, type SquadsResp } from "@/components/admin/Squads";
 import { rolesError } from "@/lib/admin";
-import { fmtBps, fmtBrs } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
+import { useWallet } from "@/components/WalletProvider";
 import { ACCOUNT_ROLES } from "@/lib/roles";
+import { operatorDay } from "@/lib/operator";
+import { paymentsAlerts } from "@/lib/view";
 import { bytesToHex } from "@/lib/serde";
 
 const m = (x: ReactNode) => <Mono style={{ fontSize: 12 }}>{x}</Mono>;
@@ -77,6 +81,45 @@ function Emergency({ mode }: { mode: Mode }) {
         />
       </Cards>
     </div>
+  );
+}
+
+// ── Watch ───────────────────────────────────────────────────────────────────
+
+/**
+ * Early detection: what the operator key did in the last 24 hours, read from
+ * the accounts, and red flags on the payments account every claim payment
+ * lands in. The pauser key acts on either at once (pause, revoke_operator).
+ */
+function Watch() {
+  const { reserve, ledger } = useLive();
+  const day = operatorDay(ledger, reserve.now);
+  const alerts = paymentsAlerts(reserve.payments, reserve.config);
+  const p = reserve.payments;
+  return (
+    <Sub id="general-watch" title="Watch · last 24 hours">
+      <div className="grid-2">
+        <KV
+          rows={[
+            [<Meaning key="r" label="Guarantees registered">register_guarantee by the operator key</Meaning>, m(`${day.registered.count} · ${fmtBrs(day.registered.cover, 0)} cover`)],
+            [<Meaning key="c" label="Guarantees closed">close_guarantee</Meaning>, m(String(day.closed.count))],
+            [<Meaning key="f" label="Claims filed">file_claim (provisions)</Meaning>, m(`${day.filed.count} · ${fmtBrs(day.filed.amount, 0)}`)],
+            [<Meaning key="p" label="Claims paid">pay_claim, bounded by the claim caps</Meaning>, m(`${day.paid.count} · ${fmtBrs(day.paid.amount, 0)} of ${fmtBrs(reserve.config.caps.maxClaimPerPeriod, 0)} per 31 days`)],
+            [<Meaning key="g" label="Guarantee fees booked">contribute_fees</Meaning>, m(`${day.fees.count} · ${fmtBrs(day.fees.amount, 0)}`)],
+          ]}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <StatusBadge bordered color={alerts.length ? "var(--color-error)" : "var(--color-success)"} label={alerts.length ? "PAYMENTS ACCOUNT · CHECK" : "PAYMENTS ACCOUNT · OK"} />
+          {alerts.map((a) => <Note key={a} tone="error">The payments account: {a}.</Note>)}
+          {p?.exists && (
+            <Mono style={{ fontSize: 11, color: "var(--color-text-3)", wordBreak: "break-all" }}>
+              owner {p.owner}{p.expectedOwner ? " (checked against PAYMENTS_OWNER)" : " · set PAYMENTS_OWNER on the server to alert when it changes"}
+            </Mono>
+          )}
+          <Note>Read from the accounts&apos; own timestamps on every refresh. A burst of registrations or payments, or a red flag here, is the cue to pause or revoke the operator above.</Note>
+        </div>
+      </div>
+    </Sub>
   );
 }
 
@@ -173,6 +216,55 @@ function RolesControl({ mode }: { mode: Mode }) {
   );
 }
 
+/**
+ * Two-step role handover (ADR 0020): the admin proposes a key; that key
+ * signs accept_role itself, from its own wallet, within 72 hours. The admin
+ * can cancel a pending handover through a proposal.
+ */
+function Handovers({ mode }: { mode: Mode }) {
+  const { reserve } = useLive();
+  const { address } = useWallet();
+  const c = reserve.config;
+  const rows = [
+    { role: 1 as const, name: "operator", key: c.pendingOperator, expiresAt: c.pendingOperatorExpiresAt },
+    { role: 2 as const, name: "pauser", key: c.pendingPauser, expiresAt: c.pendingPauserExpiresAt },
+    { role: 3 as const, name: "admin", key: c.pendingAdmin, expiresAt: c.pendingAdminExpiresAt },
+  ].filter((r) => r.key !== UNSET_ADDRESS);
+  return (
+    <div id="general-handovers" style={{ display: "flex", flexDirection: "column", gap: 10, scrollMarginTop: 112 }}>
+      <h3 style={{ fontSize: 15, margin: 0 }}>Pending handovers</h3>
+      {rows.length === 0 ? (
+        <Note>No role handover is pending. The admin proposes one with the operator and pauser keys card; the proposed key then accepts it here, signing from its own wallet.</Note>
+      ) : (
+        <Cards>
+          {rows.map((r) => {
+            const expired = reserve.now > r.expiresAt;
+            const mine = address === r.key;
+            return (
+              <article key={r.role} style={{ border: "1px solid var(--color-border)", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 6 }}>
+                <h3 style={{ fontSize: 15, margin: 0 }}>New {r.name} key</h3>
+                <Facts
+                  now={<Explorer value={r.key} />}
+                  bound={m(expired ? `expired ${fmtTime(r.expiresAt)}` : `accept by ${fmtTime(r.expiresAt)}`)}
+                  does={r.role === 3 ? "The admin handover is accepted by the new admin itself (a Squads vault): outside this app." : `The proposed key signs accept_role(${r.role}) from its own wallet. ${r.role === 1 ? "The program checks the new operator owns neither money account." : ""}`}
+                />
+                {r.role !== 3 && (
+                  <>
+                    {!mine && <Note tone="dim">Connect the proposed key&apos;s wallet to accept.</Note>}
+                    {expired && <Note tone="warn">Expired: the admin cancels it and proposes again.</Note>}
+                    <Action label={`accept_role (${r.name})`} request={mine && !expired ? { kind: "accept_role", role: r.role } : null} />
+                  </>
+                )}
+                <AdminAction title={`Cancel the ${r.name} handover`} label="cancel_pending" mode={mode} request={{ kind: "cancel_pending", role: r.role }} />
+              </article>
+            );
+          })}
+        </Cards>
+      )}
+    </div>
+  );
+}
+
 function PaymentsControl({ mode }: { mode: Mode }) {
   const { reserve } = useLive();
   const [acct, setAcct] = useState("");
@@ -196,35 +288,34 @@ function PaymentsControl({ mode }: { mode: Mode }) {
 
 function AllowlistControl({ mode }: { mode: Mode }) {
   const { reserve } = useLive();
-  const [owners, setOwners] = useState<string>(reserve.config.mutavCapitalWallet);
-  const [rootPreview, setRootPreview] = useState<string | null>(null);
-  const ownerList = useMemo(() => owners.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean), [owners]);
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const t = await buildAllowlist(ownerList.map((o) => toAddress(o)));
-        if (alive) setRootPreview(bytesToHex(t.root));
-      } catch (e) {
-        if (alive) setRootPreview(`invalid: ${(e as Error).message}`);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [ownerList]);
+  // A9: the root is composed on the server from its public ALLOWLIST, the
+  // list the investor proofs come from; the browser never sends the owners.
+  const inv = usePoll<InvestorView>("/api/investor", 30_000);
+  const onChain = bytesToHex(Uint8Array.from(reserve.config.investorAllowlistRoot));
+  const list = inv.data?.allowlist ?? null;
+  const inSync = list?.listRoot !== null && list?.listRoot === onChain;
   return (
-    <AdminAction title="Investor allowlist" label="set_allowlist_root" mode={mode} request={ownerList.length ? { kind: "set_allowlist_root", owners: ownerList } : null}>
+    <AdminAction title="Investor allowlist" label="set_allowlist_root" mode={mode} request={list?.listRoot && !inSync ? { kind: "set_allowlist_root" } : null}>
       <Facts
-        now={m(`${bytesToHex(Uint8Array.from(reserve.config.investorAllowlistRoot)).slice(0, 24)}…`)}
-        bound={m("any 32-byte root")}
-        does="Built with the client's Merkle builder. Proofs for request_deposit and request_redeem come from the same list (ALLOWLIST on the server), checked on /investor."
+        now={m(`${onChain.slice(0, 24)}…`)}
+        bound={m("the root of the server's ALLOWLIST")}
+        does="Proposes the Merkle root of the server's public ALLOWLIST (the same list request proofs are built from). To add or remove a wallet, change ALLOWLIST and redeploy, then propose its root here. KYC is off-chain."
       />
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, margin: "12px 0" }}>
-        <Label htmlFor="adm-owners" className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)" }}>Allowlisted wallets (one per line)</Label>
-        <textarea id="adm-owners" value={owners} onChange={(e) => setOwners(e.target.value)} rows={3} className="font-mono" style={{ background: "transparent", border: "1px solid var(--color-border-input)", color: "var(--color-text)", fontSize: 12, padding: 8 }} />
-        <Mono style={{ fontSize: 11, color: "var(--color-text-3)", wordBreak: "break-all" }}>new root {rootPreview ? `${rootPreview.slice(0, 24)}…` : "—"}</Mono>
-      </div>
+      {inv.error && !inv.data ? (
+        <Note tone="warn">Cannot read the server&apos;s ALLOWLIST: {inv.error.message}</Note>
+      ) : !list ? (
+        <Note>Reading the server&apos;s ALLOWLIST…</Note>
+      ) : (
+        <>
+          <Mono style={{ fontSize: 11, color: "var(--color-text-3)", wordBreak: "break-all" }}>
+            ALLOWLIST ({list.owners.length} wallet{list.owners.length === 1 ? "" : "s"}): {list.owners.join(", ") || "empty"}
+          </Mono>
+          <Mono style={{ fontSize: 11, color: "var(--color-text-3)", wordBreak: "break-all" }}>its root {list.listRoot ? `${list.listRoot.slice(0, 24)}…` : "—"}</Mono>
+          <Note tone={inSync ? "ok" : "warn"}>
+            {list.listRoot === null ? "ALLOWLIST is empty on the server: nothing to propose." : inSync ? "The on-chain root matches ALLOWLIST: nothing to propose." : "The on-chain root differs from ALLOWLIST: propose its root."}
+          </Note>
+        </>
+      )}
     </AdminAction>
   );
 }
@@ -236,15 +327,17 @@ export function General({ mode, sq, sqError, onSquadsDone }: { mode: Mode; sq: S
     <Section id="general" kicker="Governance" title="General controls" roles={<RoleLine items={[{ role: "admin", prefix: "written only by the" }]}>The pauser key can also pause and revoke the operator.</RoleLine>}>
       <WhatThis>The settings that cut across every flow: the stop switches, who holds each role, how much cover the reserve backs, and who may hold shares. Per-flow settings sit with their flow; asset settings sit under Allocation.</WhatThis>
       <Emergency mode={mode} />
+      <Watch />
       <Sub id="general-roles" title="Roles & multisig">
         <Note>
-          Every admin change on this page is a Squads vault-transaction proposal: one member creates and approves it, the others approve from their own wallets, and anyone executes it once the threshold is met and the time lock has passed. This page holds no key.
+          Every admin change on this page is a Squads vault-transaction proposal: one member creates and approves it, the others approve from their own wallets, and anyone executes it once the threshold is met and the time lock has passed. Members reject a proposal while it is Active, or vote to cancel it once Approved; a live set_config blocks the next one until it runs or is rejected or cancelled. This app refuses to execute a set_config whose fields moved on-chain since it was proposed; the check is the app&apos;s own, so executing from the Squads UI skips it: read the diff before approving. This page holds no key.
         </Note>
         <SquadsPanel sq={sq} error={sqError} onDone={onSquadsDone} />
         <div className="grid-2">
           <RolesTable />
           <RolesControl mode={mode} />
         </div>
+        <Handovers mode={mode} />
       </Sub>
       <Sub id="general-coverage" title="Coverage & reserve limits">
         <div className="grid-2">
