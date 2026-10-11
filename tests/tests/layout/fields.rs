@@ -50,6 +50,11 @@ macro_rules! vault_config_fields {
             "pending_pauser" => pending_pauser,
             "pending_pauser_expires_at" => pending_pauser_expires_at,
             "guardians" => guardians,
+            "disabled_ops" => disabled_ops,
+            "kyc_attester" => kyc_attester,
+            "attestation_program" => attestation_program,
+            "required_attestation_type" => required_attestation_type,
+            "attester_epoch" => attester_epoch,
             "_reserved" => _reserved,
         )
     };
@@ -85,6 +90,10 @@ macro_rules! vault_state_fields {
             "inflow_nav" => inflow_nav,
             "claim_day_buckets" => claim_day_buckets,
             "claim_day_anchor" => claim_day_anchor,
+            "deposited_assets_total" => deposited_assets_total,
+            "minted_shares_total" => minted_shares_total,
+            "redeemed_shares_total" => redeemed_shares_total,
+            "redeemed_assets_total" => redeemed_assets_total,
             "_reserved" => _reserved,
         )
     };
@@ -108,6 +117,7 @@ macro_rules! guarantee_fields {
             "status" => status,
             "registered_at" => registered_at,
             "closed_at" => closed_at,
+            "close_reason" => close_reason,
             "_reserved" => _reserved,
         )
     };
@@ -165,6 +175,7 @@ macro_rules! deposit_request_fields {
             "requested_at" => requested_at,
             "fulfilled_at" => fulfilled_at,
             "status" => status,
+            "min_shares_out" => min_shares_out,
             "_reserved" => _reserved,
         )
     };
@@ -184,6 +195,7 @@ macro_rules! redeem_request_fields {
             "filled_at" => filled_at,
             "status" => status,
             "shares_filled" => shares_filled,
+            "min_assets_out" => min_assets_out,
             "_reserved" => _reserved,
         )
     };

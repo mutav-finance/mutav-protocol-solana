@@ -21,8 +21,12 @@ use super::{send_ixs, BRS_DECIMALS, TOKEN_2022_PROGRAM};
 pub enum Ext {
     PermanentDelegate,
     TransferHook,
-    /// `TransferFeeConfig` with this fee in basis points.
+    /// `TransferFeeConfig` with this fee in basis points and a config
+    /// authority (which could change the fee later).
     TransferFee(u16),
+    /// `TransferFeeConfig` with this fee and no config authority: the fee
+    /// can never change.
+    FixedTransferFee(u16),
     NonTransferable,
     /// `DefaultAccountState` with this state.
     DefaultState(AccountState),
@@ -39,7 +43,7 @@ impl Ext {
         match self {
             Ext::PermanentDelegate => ExtensionType::PermanentDelegate,
             Ext::TransferHook => ExtensionType::TransferHook,
-            Ext::TransferFee(_) => ExtensionType::TransferFeeConfig,
+            Ext::TransferFee(_) | Ext::FixedTransferFee(_) => ExtensionType::TransferFeeConfig,
             Ext::NonTransferable => ExtensionType::NonTransferable,
             Ext::DefaultState(_) => ExtensionType::DefaultAccountState,
             Ext::ScaledUiAmount => ExtensionType::ScaledUiAmount,
@@ -89,6 +93,10 @@ pub fn create_token2022_mint(
                 u64::MAX,
             )
             .unwrap(),
+            Ext::FixedTransferFee(bps) => {
+                initialize_transfer_fee_config(p, m, None, Some(&payer.pubkey()), bps, u64::MAX)
+                    .unwrap()
+            }
             Ext::NonTransferable => {
                 t22::instruction::initialize_non_transferable_mint(p, m).unwrap()
             }

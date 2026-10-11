@@ -29,7 +29,7 @@ use mutav::{
     math::{assets_for, conversion_nav, mul_div, shares_for, Rounding},
     solvency::{nav_per_share, Solvency, SolvencyInputs},
     state::CapsInput,
-    InitializeArgs, RegisterGuaranteeArgs,
+    ConfigParam, Eligibility, InitializeArgs, NavBounds, RegisterGuaranteeArgs,
 };
 use serde_json::{json, Value};
 
@@ -284,6 +284,7 @@ fn pda_vectors(rng: &mut Rng) -> Value {
             "pendingDeposits": pda(&[PENDING_DEPOSITS_SEED, c]).to_string(),
             "pendingRedemptions": pda(&[PENDING_REDEMPTIONS_SEED, c]).to_string(),
             "claims": pda(&[CLAIMS_SEED, c]).to_string(),
+            "unsolicited": pda(&[UNSOLICITED_SEED, c]).to_string(),
             "eventAuthority": pda(&[b"__event_authority"]).to_string(),
             "guarantee": guarantee.to_string(),
             "feeReceipt": pda(&[FEE_SEED, c, &invoice]).to_string(),
@@ -342,6 +343,9 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         min_request: 1_000_000_000,
         max_request: 30_000_000_000,
         max_nav_move_bps: 10_000,
+        stress_buffer: 19_000_000_000,
+        max_queue_wait_secs: 0,
+        max_reinstate_age: 30 * 86_400,
     };
     let init = InitializeArgs {
         admin: rng.pubkey(),
@@ -360,7 +364,28 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         "minRequest": s(caps.min_request),
         "maxRequest": s(caps.max_request),
         "maxNavMoveBps": caps.max_nav_move_bps,
+        "stressBuffer": s(caps.stress_buffer),
+        "maxQueueWaitSecs": s(caps.max_queue_wait_secs as u64),
+        "maxReinstateAge": s(caps.max_reinstate_age as u64),
     });
+    let nav_bounds = NavBounds {
+        min: 990_000_000,
+        max: 1_010_000_000,
+    };
+    let nav_json = json!({ "min": s(nav_bounds.min), "max": s(nav_bounds.max) });
+    let params = vec![
+        ConfigParam::CoverageRatioBps(1_000),
+        ConfigParam::MaxTvl(300_000_000_000),
+        ConfigParam::MutavCapitalWallet(operator),
+        ConfigParam::MaxReinstateAge(-1),
+    ];
+    let params_json = json!([
+        { "__kind": "CoverageRatioBps", "fields": [1_000] },
+        { "__kind": "MaxTvl", "fields": [s(300_000_000_000)] },
+        { "__kind": "MutavCapitalWallet", "fields": [operator.to_string()] },
+        { "__kind": "MaxReinstateAge", "fields": ["-1"] },
+    ]);
+    let guardians = [rng.pubkey(), Pubkey::default(), rng.pubkey()];
     let hexes = |v: &[[u8; 32]]| v.iter().map(|p| hex(p)).collect::<Vec<_>>();
     Value::Array(vec![
         ix(
@@ -377,9 +402,65 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
             mutav::instruction::Initialize { args: init }.data(),
         ),
         ix(
-            "setRoles",
-            json!({ "operator": operator.to_string(), "pauser": pauser.to_string() }),
-            mutav::instruction::SetRoles { operator, pauser }.data(),
+            "setConfig",
+            json!({ "params": params_json }),
+            mutav::instruction::SetConfig { params }.data(),
+        ),
+        ix(
+            "proposeRole",
+            json!({ "role": ROLE_PAUSER, "key": pauser.to_string() }),
+            mutav::instruction::ProposeRole {
+                role: ROLE_PAUSER,
+                key: pauser,
+            }
+            .data(),
+        ),
+        ix(
+            "acceptRole",
+            json!({ "role": ROLE_OPERATOR }),
+            mutav::instruction::AcceptRole {
+                role: ROLE_OPERATOR,
+            }
+            .data(),
+        ),
+        ix(
+            "proposeAdmin",
+            json!({ "key": operator.to_string() }),
+            mutav::instruction::ProposeAdmin { key: operator }.data(),
+        ),
+        ix(
+            "acceptAdmin",
+            json!({}),
+            mutav::instruction::AcceptAdmin {}.data(),
+        ),
+        ix(
+            "cancelPending",
+            json!({ "role": ROLE_ADMIN }),
+            mutav::instruction::CancelPending { role: ROLE_ADMIN }.data(),
+        ),
+        ix(
+            "setGuardians",
+            json!({ "guardians": guardians.iter().map(|g| g.to_string()).collect::<Vec<_>>() }),
+            mutav::instruction::SetGuardians { guardians }.data(),
+        ),
+        ix(
+            "revokePauser",
+            json!({}),
+            mutav::instruction::RevokePauser {}.data(),
+        ),
+        ix(
+            "setTreasuryAccount",
+            json!({}),
+            mutav::instruction::SetTreasuryAccount {}.data(),
+        ),
+        ix(
+            "closeGuarantee",
+            json!({ "id": hex(&reg.id), "reason": CLOSE_VOID }),
+            mutav::instruction::CloseGuarantee {
+                id: reg.id,
+                reason: CLOSE_VOID,
+            }
+            .data(),
         ),
         ix(
             "setAllowlistRoot",
@@ -418,11 +499,10 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         ),
         ix(
             "payClaim",
-            json!({ "leg": LEG_EXIT, "amount": s(MAX), "noticeRefHash": hex(&notice) }),
+            json!({ "noticeRefHash": hex(&notice), "expectedAmount": s(MAX) }),
             mutav::instruction::PayClaim {
-                leg: LEG_EXIT,
-                amount: MAX,
                 notice_ref_hash: notice,
+                expected_amount: MAX,
             }
             .data(),
         ),
@@ -437,47 +517,68 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         ),
         ix(
             "requestDeposit",
-            json!({ "assets": s(5_000_000_000), "proof": hexes(&proof) }),
+            json!({
+                "assets": s(5_000_000_000),
+                "minSharesOut": s(4_950_000_000),
+                "eligibility": { "__kind": "Merkle", "proof": hexes(&proof) },
+            }),
             mutav::instruction::RequestDeposit {
                 assets: 5_000_000_000,
-                proof: proof.clone(),
+                min_shares_out: 4_950_000_000,
+                eligibility: Eligibility::Merkle {
+                    proof: proof.clone(),
+                },
             }
             .data(),
         ),
         ix(
             "requestRedeem",
-            json!({ "shares": s(1), "proof": Vec::<String>::new() }),
+            json!({
+                "shares": s(1),
+                "minAssetsOut": s(0),
+                "eligibility": { "__kind": "Merkle", "proof": Vec::<String>::new() },
+            }),
             mutav::instruction::RequestRedeem {
                 shares: 1,
-                proof: vec![],
+                min_assets_out: 0,
+                eligibility: Eligibility::Merkle { proof: vec![] },
             }
             .data(),
         ),
         ix(
             "fulfilDeposits",
-            json!({ "count": 8 }),
-            mutav::instruction::FulfilDeposits { count: 8 }.data(),
-        ),
-        ix(
-            "fulfilRedeems",
-            json!({ "count": 3, "maxAssets": s(MAX) }),
-            mutav::instruction::FulfilRedeems {
-                count: 3,
-                max_assets: MAX,
+            json!({ "count": 8, "navBounds": nav_json.clone() }),
+            mutav::instruction::FulfilDeposits {
+                count: 8,
+                nav_bounds,
             }
             .data(),
         ),
         ix(
-            "advanceQueueHeads",
-            json!({ "max": 255 }),
-            mutav::instruction::AdvanceQueueHeads { max: 255 }.data(),
+            "fulfilRedeems",
+            json!({ "count": 3, "maxAssets": s(MAX), "navBounds": nav_json.clone() }),
+            mutav::instruction::FulfilRedeems {
+                count: 3,
+                max_assets: MAX,
+                nav_bounds,
+            }
+            .data(),
+        ),
+        ix(
+            "advanceQueueHead",
+            json!({ "queue": QUEUE_REDEEM, "max": 255 }),
+            mutav::instruction::AdvanceQueueHead {
+                queue: QUEUE_REDEEM,
+                max: 255,
+            }
+            .data(),
         ),
         ix("refresh", json!({}), mutav::instruction::Refresh {}.data()),
         ix("pause", json!({}), mutav::instruction::Pause {}.data()),
         ix(
             "clearFulfilHalt",
-            json!({}),
-            mutav::instruction::ClearFulfilHalt {}.data(),
+            json!({ "navBounds": nav_json }),
+            mutav::instruction::ClearFulfilHalt { nav_bounds }.data(),
         ),
         ix(
             "sweepIncome",

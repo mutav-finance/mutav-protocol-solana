@@ -6,8 +6,8 @@ use mutav::{constants::PROGRAM_LAYOUT_VERSION, state::VaultConfig};
 use mutav_tests::helpers::*;
 
 /// Top-level `_reserved` length of `VaultConfig` and `VaultState`.
-const CONFIG_PAD: usize = 512;
-const STATE_PAD: usize = 256;
+const CONFIG_PAD: usize = 411;
+const STATE_PAD: usize = 224;
 
 /// Every `_reserved` region of `VaultConfig`, top-level and nested.
 fn config_padding(c: &VaultConfig) -> Vec<Vec<u8>> {
@@ -103,7 +103,7 @@ fn request_padding_is_zero_at_init_and_preserved() {
     let dep = deposit_pda(&config, d);
     // Zero at init.
     let raw = f.raw(&dep);
-    assert_eq!(&raw[raw.len() - 64..], &[0; 64]);
+    assert_eq!(&raw[raw.len() - 56..], &[0; 56]);
 
     // Preserved by fulfil (in-place update).
     let tail = |f: &mut Fixture, addr: &anchor_lang::prelude::Pubkey, seed: u64, pad: usize| {
@@ -112,22 +112,23 @@ fn request_padding_is_zero_at_init_and_preserved() {
         raw[n - pad..].copy_from_slice(&noise(seed, pad));
         f.write_raw(addr, &raw);
     };
-    tail(&mut f, &dep, 1, 64);
+    tail(&mut f, &dep, 1, 56);
     f.fulfil_deposits(1, &[d]).unwrap();
     let raw = f.raw(&dep);
-    assert_eq!(&raw[raw.len() - 64..], noise(1, 64).as_slice());
+    assert_eq!(&raw[raw.len() - 56..], noise(1, 56).as_slice());
     f.claim_shares(&a, d).unwrap();
 
     let (r, seq) = f.request_redeem(&a, &list, 2_000 * BRL);
     r.unwrap();
     let red = redeem_pda(&config, seq);
-    // `RedeemRequest` keeps 56 bytes of padding after `shares_filled` (ADR 0019).
+    // `RedeemRequest` keeps 48 bytes of padding after `shares_filled` and
+    // `min_assets_out` (ADR 0019).
     let raw = f.raw(&red);
-    assert_eq!(&raw[raw.len() - 56..], &[0; 56]);
-    tail(&mut f, &red, 3, 56);
+    assert_eq!(&raw[raw.len() - 48..], &[0; 48]);
+    tail(&mut f, &red, 3, 48);
     f.fulfil_redeems(1, u64::MAX, &[seq]).unwrap();
     let raw = f.raw(&red);
-    assert_eq!(&raw[raw.len() - 56..], noise(3, 56).as_slice());
+    assert_eq!(&raw[raw.len() - 48..], noise(3, 48).as_slice());
 }
 
 #[test]
