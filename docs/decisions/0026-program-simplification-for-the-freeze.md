@@ -47,11 +47,13 @@ The plan was reviewed against Solana and Anchor guidance: Borsh enum evolution, 
 
 - **One generic return:** `return_unsolicited` with a `Source` enum (`Unsolicited`, `PendingRedemptionsSurplus`, `Foreign`, `Lamports`; ADR 0024) replaces separate foreign-token, share-return and SOL-return instructions.
 - **`advance_queue_head(queue: u8, max)`** advances one queue per call past closed requests, in place of a two-queue instruction.
-- **`cancel_deposit`** is signed by the owner or the admin (ADR 0023), in place of a separate `refund_deposit`.
+- **`cancel_deposit` and `cancel_redeem`** are signed by the owner or the admin (ADR 0023), in place of a separate `refund_deposit`.
+- **Leg ids start at 1:** `LEG_DEFAULT = 1`, `LEG_EXIT = 2`, like the role ids, so a zeroed field never names a leg; `0` fails with `InvalidParameter`.
+- **Config seeds:** every instruction checks `config` against its seeds, not only its type.
 - **`amend_claim` and `refile_claim`** (ADR 0021) replace a separate `withdraw_claim`.
 - **`propose_role` / `accept_role`** (ADR 0020) replace `set_roles`. Guardians are appointed by the admin in one step (ADR 0020), not through a handover.
 - **Bounds in `validate_params`** include an upper cap on `c` of 10,000 bps (ADR 0022).
-- No new `init_if_needed` on program state. Idempotent creation is kept only for associated token accounts.
+- No `init_if_needed` on program state (the Anchor feature is not enabled). Idempotent creation is kept only for associated token accounts, through the associated token program.
 
 ## Alternatives considered
 

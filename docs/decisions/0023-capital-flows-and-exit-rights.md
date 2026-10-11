@@ -30,12 +30,12 @@ Capital enters and leaves the reserve through two FIFO queues: deposits are requ
 - **A 0-value head fills as 0 assets.** If the head redemption is worth 0 at fill time, `fulfil_redeems` burns its shares and closes the request with a 0-asset fill.
 - `request_redeem` stays pause-gated (ADR 0020). `cancel_redeem` and `claim_assets` stay open.
 
-### 3. Cancelling deposits
+### 3. Cancelling requests
 
-- `cancel_deposit` may be signed by the **owner or the admin**.
+- `cancel_deposit` and `cancel_redeem` may be signed by the **owner or the admin**. For redemptions this removes a head that cannot fill (for example a `min_assets_out` no fill can meet), so the queue behind it moves; the shares and the rent go back to the owner's share associated token account, created idempotently with the signer as payer.
 - The BRS and the request's rent go to the owner's associated token account for `reserve_mint`, created idempotently with the signer as payer. The owner account is not a signer when the admin cancels; it is bound to the address stored in the request.
 - The instruction checks the config and mint seeds, is not pause-gated and emits an event that names who signed (`by`).
-- This removes a de-listed or unreachable investor's deposit from the head of the queue. If the owner's token account is frozen by the issuer, the cancel cannot complete; the runbook covers that case.
+- This removes a de-listed or unreachable investor's request from the head of its queue. If the owner's token account is frozen by the issuer, the cancel cannot complete; the runbook covers that case.
 
 ### 4. Whole fills in the pilot
 
@@ -50,9 +50,10 @@ Capital enters and leaves the reserve through two FIFO queues: deposits are requ
 ### 6. Price limits and eligibility (added before the freeze)
 
 - `request_deposit(assets, min_shares_out, eligibility)` and `request_redeem(shares, min_assets_out, eligibility)`. The limit is the fewest shares, or the least BRS, the owner accepts; `0` means no limit. It is stored in the request.
-- At a fill, a request whose limit is not met **stops the batch at that request**: it is neither filled nor skipped. A batch that fills nothing fails with `PriceLimitNotMet`; after earlier fills it succeeds up to that request. The owner (or, for a deposit, the admin through `cancel_deposit`) cancels it, or it fills once the price recovers. A limit is never a maximum.
+- At a fill, a request whose limit is not met **stops the batch at that request**: it is neither filled nor skipped. A batch that fills nothing fails with `PriceLimitNotMet`; after earlier fills it succeeds up to that request. The owner or the admin (`cancel_deposit`, `cancel_redeem`) cancels it, or it fills once the price recovers. A limit is never a maximum. `DepositRequested` and `RedeemRequested` carry the limit (`min_shares_out`, `min_assets_out`).
+- A deposit fill that would mint 0 shares stops the batch at that request the same way, with `RequestTooSmall` when nothing fills; the BRS stays in escrow (the redemption side already stops at a head worth 0 BRS). Both fills take `0 < count ≤ MAX_FULFIL_BATCH`.
 - `eligibility` is an append-only enum. Variant 0, `Merkle { proof }`, is today's allowlist proof. An attestation variant (the attester block carved in `VaultConfig`, ADR 0019) is appended when it is built. Until the exit-open rule of decision 2 lands, holders also pass a Merkle proof; afterwards a holder redeems with an empty one.
-- `clear_fulfil_halt(nav_bounds)` takes the same bounds as the fills: the new baseline must lie within the range the admin reviewed.
+- `clear_fulfil_halt(nav_bounds)` takes the same bounds type as the fills: the new baseline must lie within the range the admin reviewed. Fills check the conversion NAV against their bounds; `clear_fulfil_halt` checks the published NAV (`nav_per_share` floored at 1, 0 with no shares), so `/admin` composes each around the NAV it checks.
 - The first `adapter_count` remaining accounts of `refresh` and both fills are the `AdapterState` PDAs, in bitmap order, then the request PDAs. With `adapter_count == 0` nothing changes; a binary that values no adapter refuses a reserve with adapters (`FeatureNotSupported`).
 
 ## Alternatives considered
