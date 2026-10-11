@@ -57,10 +57,18 @@ fn book() -> Book {
     }
 }
 
+/// Sets `c`: through `set_config` up to 1.0; above it (refused by
+/// `set_config` since ADR 0022) by injection, as an older binary could
+/// have stored it.
 fn set_coverage_ratio(f: &mut Fixture, bps: u16) {
-    let mut args = set_config_args(&f.config());
-    args.coverage_ratio_bps = bps;
-    f.set_config(args).unwrap();
+    if bps <= mutav::constants::MAX_COVERAGE_RATIO_BPS {
+        f.set_config(vec![mutav::ConfigParam::CoverageRatioBps(bps)])
+            .unwrap();
+    } else {
+        let mut c = f.config();
+        c.coverage_ratio_bps = bps;
+        f.write_config(&c);
+    }
 }
 
 #[test]
@@ -290,8 +298,7 @@ fn a_nav_move_beyond_the_bound_halts_fulfilment() {
     // Only the admin's `clear_fulfil_halt` clears it (ADR 0015): later
     // refreshes and `set_config` leave it set.
     f.refresh().unwrap();
-    let args = set_config_args(&f.config());
-    f.set_config(args).unwrap();
+    f.set_config(all_params(&f.config())).unwrap();
     assert!(f.state().fulfil_halted);
     assert_mutav_err(f.fulfil_deposits(1, &[d]), MutavError::FulfilHalted);
     // Claims are never halted.

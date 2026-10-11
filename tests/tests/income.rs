@@ -376,13 +376,6 @@ fn only_the_reserve_receives_income() {
         anchor_lang::error::ErrorCode::ConstraintSeeds,
     );
 
-    for other in [f.payments, f.token_account(&Pubkey::new_unique())] {
-        let mut a = f.income_accounts();
-        a.treasury = other;
-        let ix = f.sweep_income_ix(a, unique_hash(), PERIOD, 1);
-        assert_mutav_err(f.send(ix, &o), MutavError::InvalidTreasuryAccount);
-    }
-
     let mut a = f.income_accounts();
     a.vault_authority = Pubkey::new_unique();
     let ix = f.sweep_income_ix(a, unique_hash(), PERIOD, 1);
@@ -419,14 +412,10 @@ fn a_revoked_or_rotated_operator_cannot_sweep() {
     let old = op(&f);
 
     // Rotated by the admin: the old key is refused, the new one works.
-    let admin = f.admin.insecure_clone();
     let new_op = Keypair::new();
-    let pauser = f.config().pauser;
-    f.send(
-        f.set_roles_ix(&admin.pubkey(), new_op.pubkey(), pauser),
-        &admin,
-    )
-    .unwrap();
+    f.svm.airdrop(&new_op.pubkey(), 1_000_000_000).unwrap();
+    f.handover(mutav::constants::ROLE_OPERATOR, &new_op)
+        .unwrap();
     let ix = f.sweep_income_ix(f.income_accounts(), unique_hash(), PERIOD, 500 * BRL);
     assert_mutav_err(f.send(ix, &old), MutavError::Unauthorized);
     let mut a = f.income_accounts();
@@ -598,7 +587,17 @@ fn no_drift_between_the_reserve_and_brs_balance() {
         x ^= x << 13;
         x ^= x >> 7;
         x ^= x << 17;
-        let mut ixs = f.pilot_instructions();
+        // Role changes are left out: they would retire the fixture's keys.
+        let mut ixs: Vec<_> = f
+            .pilot_instructions()
+            .into_iter()
+            .filter(|(n, _, _)| {
+                !matches!(
+                    *n,
+                    "accept_role" | "accept_admin" | "revoke_operator" | "revoke_pauser"
+                )
+            })
+            .collect();
         let (name, ix, signer) = ixs.swap_remove((x % ixs.len() as u64) as usize);
         let _ = f.send(ix, &signer);
         let s = f.state();

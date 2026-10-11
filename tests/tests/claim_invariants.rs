@@ -141,29 +141,25 @@ fn run(seed: u64, steps: usize) {
                     book.open.push((c, amount));
                 }
             }
-            // Pay an open filing: partial, exact provision, over the
-            // provision within the ADR 0014 bound, or one above the bound.
+            // Pay an open filing: exactly its provision (ADR 0021), or a
+            // stated amount that differs from it, which is refused.
             _ if !book.open.is_empty() => {
                 let i = rng.below(book.open.len() as u64) as usize;
                 let (c, p) = book.open[i];
-                let (cover, paid, prov) = leg(&f.guarantee(&c.id), c.leg);
-                let unprov = cover - paid - prov;
-                let bound = p + unprov;
                 // A fresh period per payment keeps the period cap out of play.
                 now += period;
                 set_time(&mut f.svm, now);
                 let (amount, ok) = match rng.below(4) {
-                    0 => (1 + rng.below(p), true),
-                    1 => (p, true),
-                    2 => (p + rng.below(unprov + 1), true),
-                    _ => (bound + 1, false),
+                    0 => (p - 1 - rng.below(p), false),
+                    3 => (p + 1 + rng.below(p), false),
+                    _ => (p, true),
                 };
                 let res = f.pay_claim(c.amount(amount));
                 if ok {
-                    res.unwrap_or_else(|e| panic!("{ctx} pay {amount}/{bound}: {:?}", e.err));
+                    res.unwrap_or_else(|e| panic!("{ctx} pay {amount}: {:?}", e.err));
                     book.open.swap_remove(i);
                 } else {
-                    assert_mutav_err(res, MutavError::ExceedsRemainingCover);
+                    assert_mutav_err(res, MutavError::ExpectedAmountMismatch);
                 }
             }
             _ => {}

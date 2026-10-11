@@ -261,6 +261,7 @@ impl Fixture {
                 config,
                 state: self.pdas.state,
                 guarantee: guarantee_pda(&config, &args.id),
+                reserve: self.pdas.reserve,
                 payer: self.payer.pubkey(),
                 system_program: anchor_lang::solana_program::system_program::ID,
                 event_authority: self.pdas.event_authority,
@@ -270,11 +271,21 @@ impl Fixture {
         )
     }
 
+    /// `close_guarantee(id, CLOSE_RELEASED)`.
     pub fn close_guarantee_ix(&self, signer: &Pubkey, id: [u8; 32]) -> Instruction {
+        self.close_guarantee_reason_ix(signer, id, CLOSE_RELEASED)
+    }
+
+    pub fn close_guarantee_reason_ix(
+        &self,
+        signer: &Pubkey,
+        id: [u8; 32],
+        reason: u8,
+    ) -> Instruction {
         let config = self.pdas.config;
         Instruction::new_with_bytes(
             mutav::ID,
-            &mutav::instruction::CloseGuarantee { id }.data(),
+            &mutav::instruction::CloseGuarantee { id, reason }.data(),
             mutav::accounts::CloseGuarantee {
                 operator: *signer,
                 config,
@@ -294,10 +305,15 @@ impl Fixture {
         self.send(ix, &op)
     }
 
-    /// `close_guarantee` signed by the operator.
+    /// `close_guarantee(id, CLOSE_RELEASED)` signed by the operator.
     pub fn close_guarantee(&mut self, id: [u8; 32]) -> TransactionResult {
+        self.close_guarantee_reason(id, CLOSE_RELEASED)
+    }
+
+    /// `close_guarantee(id, reason)` signed by the operator.
+    pub fn close_guarantee_reason(&mut self, id: [u8; 32], reason: u8) -> TransactionResult {
         let op = self.operator.insecure_clone();
-        let ix = self.close_guarantee_ix(&op.pubkey(), id);
+        let ix = self.close_guarantee_reason_ix(&op.pubkey(), id, reason);
         self.send(ix, &op)
     }
 
@@ -357,16 +373,16 @@ impl Fixture {
         )
     }
 
-    /// `pay_claim` to `payments` (normally `config.payments_account`).
+    /// `pay_claim` of `c.notice` with `expected_amount = c.amount`, to
+    /// `payments` (normally `config.payments_account`).
     pub fn pay_claim_ix(&self, signer: &Pubkey, c: Claim, payments: &Pubkey) -> Instruction {
         let config = self.pdas.config;
         let guarantee = guarantee_pda(&config, &c.id);
         Instruction::new_with_bytes(
             mutav::ID,
             &mutav::instruction::PayClaim {
-                leg: c.leg,
-                amount: c.amount,
                 notice_ref_hash: c.notice,
+                expected_amount: c.amount,
             }
             .data(),
             mutav::accounts::PayClaim {

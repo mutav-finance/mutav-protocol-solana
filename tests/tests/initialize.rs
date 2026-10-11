@@ -56,7 +56,7 @@ fn initialize_creates_the_reserve() {
     // Pilot defaults: no features, zero padding.
     assert_eq!(c.feature_flags, 0);
     assert_eq!(c.caps._reserved, [0; 32]);
-    assert_eq!(c._reserved, [0; 512]);
+    assert_eq!(c._reserved, [0; 411]);
 
     // VaultState: empty.
     let acc = f.svm.get_account(&p.state).unwrap();
@@ -70,7 +70,7 @@ fn initialize_creates_the_reserve() {
     assert_eq!(s.next_redeem_seq, 0);
     assert!(!s.fulfil_halted);
     assert_eq!((s.income_total, s.inflow_nav), (0, 0));
-    assert_eq!(s._reserved, [0; 256]);
+    assert_eq!(s._reserved, [0; 224]);
 
     // Share mint: 6 dp, mint and freeze authority = vault authority, no supply.
     let m = mint_at(&f, &p.share_mint);

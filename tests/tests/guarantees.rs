@@ -320,7 +320,7 @@ fn close_works_while_paused_and_in_under_coverage() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn revoke_operator_blocks_operator_instructions_until_set_roles() {
+fn revoke_operator_blocks_operator_instructions_until_a_new_operator_accepts() {
     let mut f = Fixture::new();
     let ag = agency();
     let live = f.funded_guarantee(ag, 1_000 * BRL);
@@ -337,12 +337,8 @@ fn revoke_operator_blocks_operator_instructions_until_set_roles() {
 
     // The admin appoints a new operator; the old key stays refused.
     let new_op = Keypair::new();
-    let admin = f.admin.insecure_clone();
-    f.send(
-        f.set_roles_ix(&admin.pubkey(), new_op.pubkey(), pauser.pubkey()),
-        &admin,
-    )
-    .unwrap();
+    f.svm.airdrop(&new_op.pubkey(), 1_000_000_000).unwrap();
+    f.handover(ROLE_OPERATOR, &new_op).unwrap();
     assert_mutav_err(f.send(close, &old), MutavError::Unauthorized);
     let reg = f.register_guarantee_ix(&new_op.pubkey(), guarantee_args(ag, BRL, 0));
     f.send(reg, &new_op).expect("new operator registers");
@@ -409,15 +405,15 @@ fn guarantee_padding_is_zero_at_init_and_preserved() {
     let ag = agency();
     let args = guarantee_args(ag, 1_000 * BRL, 0);
     f.register(args.clone()).unwrap();
-    assert_eq!(f.guarantee(&args.id)._reserved, [0; 204]);
+    assert_eq!(f.guarantee(&args.id)._reserved, [0; 203]);
 
     let mut g = f.guarantee(&args.id);
-    g._reserved = [0xa5; 204];
+    g._reserved = [0xa5; 203];
     f.write_guarantee(&g);
 
     // A close updates the account in place.
     f.close_guarantee(args.id).unwrap();
-    assert_eq!(f.guarantee(&args.id)._reserved, [0xa5; 204]);
+    assert_eq!(f.guarantee(&args.id)._reserved, [0xa5; 203]);
 }
 
 // ---------------------------------------------------------------------------

@@ -78,7 +78,12 @@ pub struct VaultConfigV1 {
     pub pending_pauser: Pubkey,
     pub pending_pauser_expires_at: i64,
     pub guardians: [Pubkey; 3],
-    pub _reserved: [u8; 512],
+    pub disabled_ops: u8,
+    pub kyc_attester: Pubkey,
+    pub attestation_program: Pubkey,
+    pub required_attestation_type: [u8; 32],
+    pub attester_epoch: u32,
+    pub _reserved: [u8; 411],
 }
 
 pub const VAULT_CONFIG_V1: OffsetTable = &[
@@ -110,7 +115,12 @@ pub const VAULT_CONFIG_V1: OffsetTable = &[
     ("pending_pauser", 525, 32),
     ("pending_pauser_expires_at", 557, 8),
     ("guardians", 565, 96),
-    ("_reserved", 661, 512),
+    ("disabled_ops", 661, 1),
+    ("kyc_attester", 662, 32),
+    ("attestation_program", 694, 32),
+    ("required_attestation_type", 726, 32),
+    ("attester_epoch", 758, 4),
+    ("_reserved", 762, 411),
 ];
 
 /// Serialized size of `VaultConfigV1` (the account adds 8).
@@ -145,7 +155,11 @@ pub struct VaultStateV1 {
     pub inflow_nav: u64,
     pub claim_day_buckets: [u64; 31],
     pub claim_day_anchor: i64,
-    pub _reserved: [u8; 256],
+    pub deposited_assets_total: u64,
+    pub minted_shares_total: u64,
+    pub redeemed_shares_total: u64,
+    pub redeemed_assets_total: u64,
+    pub _reserved: [u8; 224],
 }
 
 pub const VAULT_STATE_V1: OffsetTable = &[
@@ -176,7 +190,11 @@ pub const VAULT_STATE_V1: OffsetTable = &[
     ("inflow_nav", 160, 8),
     ("claim_day_buckets", 168, 248),
     ("claim_day_anchor", 416, 8),
-    ("_reserved", 424, 256),
+    ("deposited_assets_total", 424, 8),
+    ("minted_shares_total", 432, 8),
+    ("redeemed_shares_total", 440, 8),
+    ("redeemed_assets_total", 448, 8),
+    ("_reserved", 456, 224),
 ];
 
 /// Serialized size of `VaultStateV1` (the account adds 8).
@@ -199,7 +217,8 @@ pub struct GuaranteeV1 {
     pub status: u8,
     pub registered_at: i64,
     pub closed_at: i64,
-    pub _reserved: [u8; 204],
+    pub close_reason: u8,
+    pub _reserved: [u8; 203],
 }
 
 pub const GUARANTEE_V1: OffsetTable = &[
@@ -218,7 +237,8 @@ pub const GUARANTEE_V1: OffsetTable = &[
     ("status", 148, 1),
     ("registered_at", 149, 8),
     ("closed_at", 157, 8),
-    ("_reserved", 165, 204),
+    ("close_reason", 165, 1),
+    ("_reserved", 166, 203),
 ];
 
 /// Serialized size of `GuaranteeV1` (the account adds 8).
@@ -306,7 +326,8 @@ pub struct DepositRequestV1 {
     pub requested_at: i64,
     pub fulfilled_at: i64,
     pub status: u8,
-    pub _reserved: [u8; 64],
+    pub min_shares_out: u64,
+    pub _reserved: [u8; 56],
 }
 
 pub const DEPOSIT_REQUEST_V1: OffsetTable = &[
@@ -320,7 +341,8 @@ pub const DEPOSIT_REQUEST_V1: OffsetTable = &[
     ("requested_at", 66, 8),
     ("fulfilled_at", 74, 8),
     ("status", 82, 1),
-    ("_reserved", 83, 64),
+    ("min_shares_out", 83, 8),
+    ("_reserved", 91, 56),
 ];
 
 /// Serialized size of `DepositRequestV1` (the account adds 8).
@@ -339,7 +361,8 @@ pub struct RedeemRequestV1 {
     pub filled_at: i64,
     pub status: u8,
     pub shares_filled: u64,
-    pub _reserved: [u8; 56],
+    pub min_assets_out: u64,
+    pub _reserved: [u8; 48],
 }
 
 pub const REDEEM_REQUEST_V1: OffsetTable = &[
@@ -354,7 +377,8 @@ pub const REDEEM_REQUEST_V1: OffsetTable = &[
     ("filled_at", 74, 8),
     ("status", 82, 1),
     ("shares_filled", 83, 8),
-    ("_reserved", 91, 56),
+    ("min_assets_out", 91, 8),
+    ("_reserved", 99, 48),
 ];
 
 /// Serialized size of `RedeemRequestV1` (the account adds 8).
