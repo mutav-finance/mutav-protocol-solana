@@ -23,7 +23,9 @@
  * to the vault (`--skip-new-upgrade-authority-signer-check`: a vault PDA
  * cannot co-sign). If the handover fails, the deployer still holds the
  * authority: the script prints the exact retry command and exits non-zero.
- * Finally it re-reads ProgramData and confirms the authority. The keypair
+ * Finally it re-reads ProgramData at `confirmed` (polling up to ~20 s) and
+ * confirms the authority; a read-back that disagrees says to check
+ * `solana program show` first, since the handover itself succeeded. The keypair
  * *paths* go to the CLI; this script never opens them.
  *
  * For the real devnet deploy, build with `solana-verify build` first (see
@@ -39,20 +41,29 @@ import { programDataUpgradeAuthority } from './lib/checks';
 import { programDataAddress } from './lib/compose';
 import { loadConfig, type DeployConfig } from './lib/config';
 import { run } from './lib/local';
-import { accountInfo, rpcFor } from './lib/rpc';
+import { accountInfo, rpcFor, type ReadOptions } from './lib/rpc';
 import { checkSquadsAccount, squadsVaultAddress } from './lib/squads';
 
 export type DeployDeps = {
   run: (cmd: string[], opts?: { quiet?: boolean }) => string;
   genesis: GenesisSource;
-  account: (url: string, a: Address) => Promise<{ owner: Address; data: Uint8Array } | null>;
+  account: (url: string, a: Address, o?: ReadOptions) => Promise<{ owner: Address; data: Uint8Array } | null>;
+  sleep: (ms: number) => Promise<void>;
 };
 
 const defaultDeps: DeployDeps = {
   run,
   genesis: rpcGenesis,
-  account: (url, a) => accountInfo(rpcFor(url), a),
+  account: (url, a, o) => accountInfo(rpcFor(url), a, o),
+  sleep: (ms) => Bun.sleep(ms),
 };
+
+/**
+ * The CLI confirms the handover at `confirmed`; the read-back uses the same
+ * commitment and polls, since an RPC node can lag a slot or two behind.
+ */
+export const READBACK_ATTEMPTS = 10;
+export const READBACK_INTERVAL_MS = 2_000;
 
 export type DeployOptions = {
   url: string | undefined;
@@ -137,10 +148,24 @@ export async function deploy(o: DeployOptions, deps: DeployDeps = defaultDeps): 
     throw recovery(`set-upgrade-authority failed: ${(e as Error).message}`);
   }
 
-  const pd = await deps.account(url, await programDataAddress(programId));
-  if (!pd) throw recovery('ProgramData not found after the handover');
-  const ua = programDataUpgradeAuthority(pd.data);
-  if (ua !== authority) throw recovery(`upgrade authority is ${ua ?? 'none'} after the handover, expected ${authority}`);
+  const pdAddr = await programDataAddress(programId);
+  let ua: Address | null | undefined;
+  for (let i = 0; i < READBACK_ATTEMPTS; i++) {
+    if (i > 0) await deps.sleep(READBACK_INTERVAL_MS);
+    const pd = await deps.account(url, pdAddr, { commitment: 'confirmed' });
+    ua = pd ? programDataUpgradeAuthority(pd.data) : undefined;
+    if (ua === authority) break;
+  }
+  if (ua !== authority) {
+    // The handover command succeeded; only the read-back disagrees, so it
+    // may be stale. Never tell the operator the deployer still holds it.
+    const seen = ua === undefined ? 'ProgramData was not found' : `the upgrade authority read back as ${ua ?? 'none'}`;
+    const msg =
+      `set-upgrade-authority succeeded, but after ${READBACK_ATTEMPTS} reads at confirmed ${seen}, expected ${authority}.\n` +
+      `Check \`solana program show ${programId} --url "$RPC_URL"\` first; if the authority is already the vault ${authority}, nothing to do.\n`;
+    console.error(msg);
+    throw new Error(msg);
+  }
   console.log(`deployed ${programId}; upgrade authority ${ua}`);
   return { programId };
 }
