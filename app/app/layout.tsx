@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import "./globals.css";
+import { DemoBanner } from "@/components/DemoBanner";
 import { WalletProvider } from "@/components/WalletProvider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { parseCluster } from "@/lib/cluster";
@@ -23,6 +24,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <a href="#main-content" className="skip-link font-body">
           Skip to content
         </a>
+        <DemoBanner cluster={CLUSTER} />
         <WalletProvider>
           <TooltipProvider>{children}</TooltipProvider>
         </WalletProvider>

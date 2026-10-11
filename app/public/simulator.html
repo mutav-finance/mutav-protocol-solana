@@ -348,9 +348,12 @@ h3:first-child{margin-top:0}
   .f{grid-template-columns:minmax(0,1fr) 148px}
 }
 @media print{ .bar .tbtn,.tabs,.footbar,.htip{display:none} .panel{position:static;max-height:none} .pane[hidden]{display:block} body{background:#fff;padding:0} .grp > .body{display:grid} }
+.demo-banner{background:var(--bg);border-bottom:1px solid var(--accent);color:var(--ink);font-family:var(--sans);font-size:12px;line-height:1.5;padding:8px 16px;text-align:center}
+.demo-banner b{font-family:var(--mono);font-weight:400;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-right:8px}
 </style>
 </head>
 <body>
+<div class="demo-banner" role="note" aria-label="Pilot demo"><b>Pilot demo</b>Not open to public investment. Capital participation will open only through a regulated vehicle, to eligible investors.</div>
 
 <div class="bar"><div class="in">
   <div class="ttl"><span class="brand" translate="no">MUTAV</span><h1>Reserve simulator</h1></div>
