@@ -10,7 +10,7 @@
  * ledger → how the figures are counted. Earnings and capital never mix: a
  * deposit is not income.
  */
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { ImageSlot, type ImageSlotName } from "@/components/ImageSlot";
@@ -97,6 +97,52 @@ const BlockHead = ({ children, action }: { children: ReactNode; action?: ReactNo
   </div>
 );
 
+// ── Totals strip (also used by Coverage and Queue) ──────────────────────────
+
+/** How a term joins the one before it. "or" reads as "the larger of". */
+export type TotalsOp = "+" | "−" | "=" | "or";
+export type TotalsTerm = { op?: TotalsOp; label: string; value: string; result?: boolean; color?: string };
+
+const OP_WORD: Record<TotalsOp, string> = { "+": "plus", "−": "minus", "=": "equals", or: "or" };
+
+/**
+ * A reconciling footer: each group is one sum laid out left to right with its
+ * operators visible, so a reader can redo the arithmetic. Groups sit on one
+ * row on wide screens and stack on narrow ones.
+ */
+export function TotalsStrip({ title, groups, note }: { title: string; groups: TotalsTerm[][]; note?: ReactNode }) {
+  return (
+    <div role="group" aria-label={title} className="bg-(--color-surface) flex flex-col border">
+      <div className="border-b px-6 py-3">
+        <Label>{title}</Label>
+      </div>
+      <div className="flex flex-col lg:flex-row lg:flex-wrap">
+        {groups.map((g, gi) => (
+          <div key={gi} className={`flex flex-wrap items-end gap-x-4 gap-y-3 px-6 py-4 ${gi > 0 ? "border-t lg:border-t-0 lg:border-l" : ""}`}>
+            {g.map((t) => (
+              <Fragment key={t.label}>
+                {t.op && (
+                  <span className={`text-(--color-text-3) pb-0.5 leading-none ${t.op === "or" ? "font-body text-sm" : "font-mono text-lg"}`}>
+                    <span aria-hidden="true">{t.op}</span>
+                    <span className="sr-only">{OP_WORD[t.op]}</span>
+                  </span>
+                )}
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="font-body text-(--color-text-2) text-xs">{t.label}</span>
+                  <Mono style={{ fontSize: 16, fontWeight: t.result ? 700 : 500, lineHeight: 1.2, whiteSpace: "nowrap", color: t.color ?? (t.result ? "var(--color-text)" : "var(--color-text-2)") }}>
+                    {t.value}
+                  </Mono>
+                </div>
+              </Fragment>
+            ))}
+          </div>
+        ))}
+      </div>
+      {note && <p className="font-body text-(--color-text-3) m-0 border-t px-6 py-3 text-xs leading-relaxed">{note}</p>}
+    </div>
+  );
+}
+
 type Bar = { label: string; sub: string; amount: bigint; dir: "in" | "out" };
 
 /** One side of the money (earnings or capital): its net in the head, then diverging bars on the group's own axis. */
@@ -108,7 +154,7 @@ function FlowGroup({ title, note, net, bars }: { title: string; note: string; ne
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="flex flex-col gap-1">
           <Label>{title}</Label>
-          <span className="font-mono text-(--color-text-3) text-2xs">{note}</span>
+          <span className="font-body text-(--color-text-2) text-sm">{note}</span>
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className="font-mono text-(--color-text-3) text-2xs uppercase">net</span>
@@ -223,10 +269,24 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
           In and out · since launch
         </BlockHead>
         <div className="grid grid-cols-1 gap-px border lg:grid-cols-2" style={{ background: "var(--color-border)" }}>
-          <FlowGroup title="Earnings" note="what the reserve earned and paid" net={earned} bars={earnings} />
-          <FlowGroup title="Capital" note="not earnings · last 100 fills per escrow" net={capital} bars={capitalBars} />
+          <FlowGroup title="Earnings" note="What the reserve earned from its guarantees, after the claim payments it made." net={earned} bars={earnings} />
+          <FlowGroup title="Capital" note="Investor money filled in and out of the reserve. Not earnings." net={capital} bars={capitalBars} />
         </div>
         <span className="font-body text-(--color-text-3) text-2xs">Each side has its own scale.</span>
+        <TotalsStrip
+          title="Money in and out · since launch"
+          groups={[
+            [
+              { label: "Guarantee fees, net", value: fmtBrs(totals.feesNetToReserve) },
+              { op: "+", label: "Issuer income, net", value: fmtBrs(totals.incomeNetToReserve) },
+              { op: "+", label: "Deposits filled", value: fmtBrs(totals.depositsIn) },
+              { op: "−", label: "Claim payments", value: fmtBrs(totals.claimsPaid) },
+              { op: "−", label: "Redemptions filled", value: fmtBrs(totals.redemptionsOut) },
+              { op: "=", label: "Net change", value: signed(earned + capital, fmtBrs), result: true },
+            ],
+          ]}
+          note="Fees, income and claim payments are lifetime totals from the reserve's state account. Deposits and redemptions sum the fills in the last 100 transactions of each escrow."
+        />
       </div>
 
       {/* [E] The dated ledger; the period filter applies here only. */}
