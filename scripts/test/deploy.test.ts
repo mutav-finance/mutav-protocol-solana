@@ -7,6 +7,7 @@ import { MUTAV_PROGRAM_ADDRESS } from '../../clients/js/src';
 import { deploy, READBACK_ATTEMPTS, READBACK_INTERVAL_MS, type DeployDeps } from '../devnet/deploy';
 import { DEVNET_GENESIS } from '../devnet/lib/cluster';
 import { programDataAddress } from '../devnet/lib/compose';
+import { executableHash } from '../devnet/lib/hash';
 import { parseConfig, type DeployConfig } from '../devnet/lib/config';
 import { squadsVaultAddress, SQUADS_V4_PROGRAM } from '../devnet/lib/squads';
 import { filled, multisigBytes, programData, testAddress } from './fixtures';
@@ -21,6 +22,9 @@ const payerFile = (mode: number) => {
   return p;
 };
 const BPF = 'BPFLoaderUpgradeab1e11111111111111111111111' as Address;
+/** The verified build's bytes and their `solana-verify get-executable-hash`. */
+const SO = new Uint8Array([0x7f, 0x45, 0x4c, 0x46, 1, 2, 3]);
+const SO_HASH = executableHash(SO);
 /** Stands for the deployer's key in a stale ProgramData read. */
 const DEPLOYER = testAddress(92);
 
@@ -61,6 +65,10 @@ async function setup(
     sleep: async (ms) => {
       sleeps.push(ms);
     },
+    readFile: (p) => {
+      if (p !== '/outside/mutav.so') throw new Error(`unexpected read of ${p}`);
+      return SO;
+    },
     run: (cmd) => {
       calls.push(cmd);
       if (cmd[0] === 'solana-keygen') return `${MUTAV_PROGRAM_ADDRESS}\n`;
@@ -78,6 +86,7 @@ async function setup(
     programKeypair: '/outside/mutav-keypair.json',
     so: '/outside/mutav.so',
     upgradeAuthority: cfg.upgradeAuthority as string,
+    expectedHash: SO_HASH as string | undefined,
     cfg,
   };
   return { cfg, deps, calls, opts, pdReads, sleeps };
@@ -133,6 +142,24 @@ describe('deploy.ts preflight (refuses before any CLI run)', () => {
     cfg.cluster = 'localnet';
     await expect(deploy(opts, deps)).rejects.toThrow('localnet');
     expect(calls).toEqual([]);
+  });
+
+  test('a .so that is not the verified build', async () => {
+    const { deps, calls, opts } = await setup();
+    await expect(deploy({ ...opts, expectedHash: 'ab'.repeat(32) }, deps)).rejects.toThrow(`executable hash is ${SO_HASH}`);
+    expect(calls).toEqual([]);
+  });
+
+  test('no --expected-hash', async () => {
+    const { deps, calls, opts } = await setup();
+    await expect(deploy({ ...opts, expectedHash: undefined }, deps)).rejects.toThrow('--expected-hash is required');
+    await expect(deploy({ ...opts, expectedHash: 'not-a-hash' }, deps)).rejects.toThrow('--expected-hash must be');
+    expect(calls).toEqual([]);
+  });
+
+  test('the expected hash is compared case-insensitively', async () => {
+    const { deps, opts } = await setup();
+    expect(await deploy({ ...opts, expectedHash: SO_HASH.toUpperCase() }, deps)).toEqual({ programId: MUTAV_PROGRAM_ADDRESS });
   });
 
   test('a stand-in authority is refused off localnet', async () => {

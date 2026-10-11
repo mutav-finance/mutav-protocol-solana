@@ -4,6 +4,17 @@
  */
 import { getAddressDecoder, type Address } from '@solana/kit';
 import type { VaultConfig, VaultState } from '../../../clients/js/src';
+import { programDataHash } from './hash';
+
+/**
+ * The deployed bytecode is the verified build: the ProgramData program
+ * bytes (header stripped, trailing zeros trimmed, as `solana-verify
+ * get-program-hash` computes them) hash to `expected`.
+ */
+export function checkProgramHash(programData: Uint8Array, expected: string): string[] {
+  const got = programDataHash(programData);
+  return got === expected ? [] : [`program hash is ${got}, expected ${expected} (solana-verify get-program-hash)`];
+}
 
 /**
  * Upgrade authority from a BPF Loader Upgradeable `ProgramData` account:
