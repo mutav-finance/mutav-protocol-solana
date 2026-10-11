@@ -1,7 +1,7 @@
 import { address } from "@solana/kit";
 import { guardedEnv, readReserve } from "@/lib/server/chain";
 import { ComposeError } from "@/lib/server/compose";
-import { errorResponse } from "@/lib/server/respond";
+import { errorResponse, readResponse } from "@/lib/server/respond";
 import { boundedBody } from "@/lib/server/relay";
 import { composeProposalAction, readMultisig, vaultAddress, type ProposalAction } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
@@ -12,11 +12,11 @@ export async function GET() {
     const env = await guardedEnv();
     const reserve = await readReserve(env);
     if (!env.squadsMultisig) {
-      return jsonResponse({ configured: false, admin: reserve.config.admin, cluster: env.cluster });
+      return readResponse({ configured: false, admin: reserve.config.admin, cluster: env.cluster });
     }
     const vault = vaultAddress(env.squadsMultisig);
     const ms = await readMultisig(env, reserve.now, reserve.config);
-    return jsonResponse({ configured: true, adminIsVault: reserve.config.admin === vault, multisig: ms, now: reserve.now });
+    return readResponse({ configured: true, adminIsVault: reserve.config.admin === vault, multisig: ms, now: reserve.now });
   } catch (e) {
     return errorResponse(e);
   }
