@@ -80,6 +80,8 @@ export type Expected = {
   operator?: Address;
   pauser?: Address;
   allowlistRoot?: Uint8Array;
+  /** The guardians the config names (none when empty); the on-chain set must match. */
+  guardians?: Address[];
 };
 
 /** Returns the failed checks; empty means all pass. */
@@ -108,6 +110,14 @@ export function postDeployChecks(
     ['admin', config.pendingAdmin],
   ] as const) {
     if (key !== DEFAULT_ADDRESS) out.push(`pending ${role} handover to ${key}: accept or cancel_pending it first`);
+  }
+  if (e.guardians) {
+    const set = (xs: readonly Address[]) => xs.filter((x) => x !== DEFAULT_ADDRESS).sort();
+    const got = set(config.guardians);
+    const want = set(e.guardians);
+    if (JSON.stringify(got) !== JSON.stringify(want)) {
+      out.push(`guardians are [${got.join(', ')}], expected [${want.join(', ')}]`);
+    }
   }
   if (config.paused) out.push('reserve is paused');
   return out;

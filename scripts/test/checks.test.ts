@@ -34,6 +34,15 @@ describe('postDeployChecks', () => {
     ).join('\n');
     for (const s of ['upgrade authority', 'feature_flags', 'allowlist root', 'paused']) expect(f).toContain(s);
   });
+  test('guardians must equal the config set (slot order ignored; none when empty)', () => {
+    const D = address('11111111111111111111111111111111');
+    const e = { upgradeAuthority: VAULT, admin: VAULT };
+    const c = (guardians: Address[]) => ({ ...config(), guardians });
+    expect(postDeployChecks(programData(VAULT), c([D, OTHER, D]), blankState(), { ...e, guardians: [OTHER] })).toEqual([]);
+    expect(postDeployChecks(programData(VAULT), c([D, D, D]), blankState(), { ...e, guardians: [] })).toEqual([]);
+    expect(postDeployChecks(programData(VAULT), c([OTHER, D, D]), blankState(), { ...e, guardians: [] })[0]).toContain('guardians are');
+    expect(postDeployChecks(programData(VAULT), c([D, D, D]), blankState(), { ...e, guardians: [OTHER] })[0]).toContain(`expected [${OTHER}]`);
+  });
   test('any pending handover fails, live or expired', () => {
     for (const [field, label] of [
       ['pendingOperator', 'pending operator'],

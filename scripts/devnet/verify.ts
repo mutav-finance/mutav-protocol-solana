@@ -7,7 +7,8 @@
  * - upgrade authority == the config's `upgradeAuthority`;
  * - `feature_flags == 0`;
  * - admin, operator, pauser and the allowlist root as configured, with no
- *   pending operator, pauser or admin handover;
+ *   pending operator, pauser or admin handover; the guardians are exactly
+ *   the config's `guardians` (none when absent);
  * - every other `VaultConfig` field equals the config file (c, fee take,
  *   every cap including the NAV-move guard, decimals 6, mint, token program, money accounts, capital wallet);
  * - on devnet, the locked devnet values (lib/compare.ts `DEVNET_LOCKED`);
@@ -60,6 +61,7 @@ export async function main(args: Args) {
     operator: cfg.operator,
     pauser: cfg.pauser,
     allowlistRoot: (await buildAllowlist(cfg.allowlist)).root,
+    guardians: cfg.guardians ?? [],
   });
   failures.push(...checkProgramHash(pd, expectedHash));
   failures.push(...checkReserveMint(await accountInfo(rpc, cfg.reserveMint), cfg));

@@ -2,12 +2,13 @@ import { describe, expect, test } from 'bun:test';
 import { address, createNoopSigner, type Address, type Instruction } from '@solana/kit';
 import {
   getCancelPendingInstructionDataDecoder,
+  getSetGuardiansInstructionDataDecoder,
   REFRESH_DISCRIMINATOR,
   SET_CONFIG_DISCRIMINATOR,
   getProposeRoleInstructionDataDecoder,
   type VaultConfig,
 } from '../../clients/js/src';
-import { composeAcceptRole, composeProposeRoles, composeRoleChanges, composeSetCaps, ROLE_ADMIN, ROLE_OPERATOR, ROLE_PAUSER } from '../devnet/lib/compose';
+import { composeAcceptRole, composeProposeRoles, composeRoleChanges, composeSetCaps, composeSetGuardians, ROLE_ADMIN, ROLE_OPERATOR, ROLE_PAUSER } from '../devnet/lib/compose';
 import { parseConfig } from '../devnet/lib/config';
 import { rolesTitle } from '../devnet/roles';
 import { filled, testAddress } from './fixtures';
@@ -118,6 +119,35 @@ describe('composeProposeRoles: stray pending handovers', () => {
 
   test('a chain admin other than the config is refused', async () => {
     await expect(composeProposeRoles(cfg, matching({ admin: testAddress(214) }), admin, NOW)).rejects.toThrow('propose_admin');
+  });
+});
+
+describe('guardians', () => {
+  const onChain = (guardians: Address[]) => chain({ guardians } as Partial<VaultConfig>);
+  test('the same set on-chain (any slot order): nothing to propose', async () => {
+    const g = [testAddress(220), testAddress(221)];
+    expect(await composeSetGuardians({ ...cfg, guardians: g }, onChain([DEFAULT, g[1]!, g[0]!]), admin)).toEqual([]);
+    expect(await composeSetGuardians(cfg, onChain([DEFAULT, DEFAULT, DEFAULT]), admin)).toEqual([]);
+  });
+  test('a different set: set_guardians with all three slots, padded with the default key', async () => {
+    const ixs = await composeSetGuardians({ ...cfg, guardians: [testAddress(220)] }, onChain([testAddress(222), DEFAULT, DEFAULT]), admin);
+    expect(ixs).toHaveLength(1);
+    expect(getSetGuardiansInstructionDataDecoder().decode(ixs[0]!.data!).guardians).toEqual([testAddress(220), DEFAULT, DEFAULT]);
+  });
+  test('no guardians in the config clears guardians set on-chain', async () => {
+    const ixs = await composeSetGuardians(cfg, onChain([testAddress(222), DEFAULT, DEFAULT]), admin);
+    expect(getSetGuardiansInstructionDataDecoder().decode(ixs[0]!.data!).guardians).toEqual([DEFAULT, DEFAULT, DEFAULT]);
+  });
+  test('the config refuses more than 3, duplicates, the default key and role keys', () => {
+    const g = (guardians: unknown) => () => parseConfig({ ...filled(), guardians });
+    expect(g([testAddress(1), testAddress(2), testAddress(3), testAddress(4)])).toThrow('at most 3');
+    expect(g([testAddress(1), testAddress(1)])).toThrow('distinct');
+    expect(g([DEFAULT])).toThrow('default key');
+    expect(g([cfg.operator])).toThrow('admin, operator or pauser');
+    expect(parseConfig({ ...filled(), guardians: [testAddress(230)] }).guardians).toEqual([testAddress(230)]);
+  });
+  test('the title names set_guardians', () => {
+    expect(rolesTitle(cfg, [], true)).toContain('set_guardians');
   });
 });
 

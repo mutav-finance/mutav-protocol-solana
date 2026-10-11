@@ -24,6 +24,7 @@ import {
   getRefreshInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
+  getSetGuardiansInstruction,
   type VaultConfig,
 } from '../../../clients/js/src';
 
@@ -189,6 +190,26 @@ export async function composeProposeRoles(
   o: { cancelAdmin?: boolean } = {},
 ): Promise<Instruction[]> {
   return (await composeRoleChanges(cfg, current, admin, nowSecs, o)).instructions;
+}
+
+/** The three guardian slots the config asks for, padded with the default key. */
+export function guardianSlots(cfg: Pick<DeployConfig, 'guardians'>): Address[] {
+  const g = cfg.guardians ?? [];
+  return [0, 1, 2].map((i) => g[i] ?? DEFAULT_ADDRESS);
+}
+
+/** Guardian sets as sorted lists without default slots, for comparison. */
+export const guardianSet = (xs: readonly Address[]) => xs.filter((x) => x !== DEFAULT_ADDRESS).sort();
+
+/**
+ * `set_guardians` with the config's guardians (all three slots in one step),
+ * or nothing when the chain already holds the same set. Admin.
+ */
+export async function composeSetGuardians(cfg: DeployConfig, current: VaultConfig, admin: TransactionSigner): Promise<Instruction[]> {
+  const want = guardianSlots(cfg);
+  if (JSON.stringify(guardianSet(want)) === JSON.stringify(guardianSet(current.guardians))) return [];
+  const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
+  return [getSetGuardiansInstruction({ admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId, guardians: want }, opts(cfg))];
 }
 
 /** `accept_role(role)`, signed by the proposed key. */

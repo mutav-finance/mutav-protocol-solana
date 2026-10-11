@@ -67,9 +67,15 @@ export type DeployConfig = {
   };
   /** Owners allowlisted for `request_deposit` / `request_redeem`. */
   allowlist: Address[];
+  /**
+   * Optional pause-only guardian keys (`set_guardians`, up to 3). Absent or
+   * empty means no guardian: verify.ts fails on any guardian set on-chain.
+   */
+  guardians?: Address[];
 };
 
 const FILL = /^<FILL/;
+const DEFAULT_KEY = address('11111111111111111111111111111111');
 
 function walkPlaceholders(v: unknown, path: string, out: string[]) {
   if (typeof v === 'string' && FILL.test(v)) out.push(`${path}: ${v}`);
@@ -155,6 +161,9 @@ export function parseConfig(raw: any): DeployConfig {
       maxReinstateAge: optBig(raw.caps?.maxReinstateAge, 'caps.maxReinstateAge'),
     },
     allowlist: (raw.allowlist ?? []).map((a: unknown, i: number) => addr(a, `allowlist[${i}]`)),
+    ...(raw.guardians === undefined || raw.guardians === null
+      ? {}
+      : { guardians: (Array.isArray(raw.guardians) ? raw.guardians : [raw.guardians]).map((a: unknown, i: number) => addr(a, `guardians[${i}]`)) }),
   };
 
   // Program bounds (validate_params, validate_roles).
@@ -167,6 +176,13 @@ export function parseConfig(raw: any): DeployConfig {
   if (new Set(roles).size !== 3) throw new Error('admin, operator and pauser must be distinct');
   if (c.treasuryAccount === c.paymentsAccount) throw new Error('treasuryAccount and paymentsAccount must differ');
   if (c.allowlist.length === 0) throw new Error('allowlist is empty (a zero root allowlists nobody)');
+  // set_guardians bounds: three slots, distinct, none an admin/operator/pauser key.
+  if (c.guardians) {
+    if (c.guardians.length > 3) throw new Error('guardians holds at most 3 keys');
+    if (new Set(c.guardians).size !== c.guardians.length) throw new Error('guardians must be distinct');
+    if (c.guardians.includes(DEFAULT_KEY)) throw new Error('guardians must not hold the default key (leave the slot out instead)');
+    if (c.guardians.some((g) => roles.includes(g))) throw new Error('a guardian must not be the admin, operator or pauser key');
+  }
 
   // Governance (two multisigs, devnet time-lock floors). The localnet dry run
   // stands one throwaway key in for both.
