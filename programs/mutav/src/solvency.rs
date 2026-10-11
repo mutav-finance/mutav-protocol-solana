@@ -107,6 +107,16 @@ pub fn nav_per_share(net_assets: u64, shares_outstanding: u64) -> Result<u64> {
     mul_div(net_assets, NAV_SCALE, shares_outstanding, Rounding::Down)
 }
 
+/// An underwater reserve (ADR 0022, ADR 0029): shares are outstanding and
+/// NAV per share is below the smallest published unit, `net_assets ×
+/// NAV_SCALE < shares_outstanding` (`nav_per_share` would floor to 0). The
+/// references refuse to price at a zero NAV (the SF vault's `nav > 0`,
+/// OnRe's `price > 0`); net assets of exactly 0 are the extreme case.
+pub fn is_underwater(net_assets: u64, shares_outstanding: u64) -> bool {
+    shares_outstanding > 0
+        && (net_assets as u128) * (NAV_SCALE as u128) < shares_outstanding as u128
+}
+
 /// Everything §4 derives from one snapshot of state and config.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SolvencyInputs {
@@ -252,6 +262,16 @@ mod tests {
         assert_eq!(coverage_required(100_000, 1_000, 4_000, 0).unwrap(), 10_000);
         // Empty book: nothing to cover, whatever the buffer.
         assert_eq!(coverage_required(0, 1_000, 0, 19_000).unwrap(), 0);
+    }
+
+    #[test]
+    fn underwater_is_a_nav_below_the_smallest_unit() {
+        assert!(!is_underwater(0, 0), "an empty reserve");
+        assert!(is_underwater(0, 1));
+        // 1 BRS unit behind 10⁹ shares is NAV 10⁻⁹: the smallest unit.
+        assert!(!is_underwater(1, 1_000_000_000));
+        assert!(is_underwater(1, 1_000_000_001));
+        assert!(!is_underwater(u64::MAX, u64::MAX));
     }
 
     #[test]

@@ -9,7 +9,7 @@ use anchor_spl::token::spl_token::instruction::transfer;
 use mutav::{
     constants::*,
     errors::MutavError,
-    events::{FulfilHaltRaised, RedeemFilled},
+    events::FulfilHaltRaised,
     math::assets_for,
     pricing::published_nav,
     solvency::{Solvency, SolvencyInputs},
@@ -341,28 +341,59 @@ fn a_delisted_holder_can_still_exit() {
 }
 
 #[test]
-fn a_full_exit_from_the_canonical_account_skips_min_request() {
+fn an_exit_of_the_balance_may_be_below_min_request() {
     let (mut f, list, inv) = holders(2, 10_000 * BRL);
     let (a, b) = (&inv[0], &inv[1]);
     // `a` keeps 500 BRL of shares, below the 1,000 minimum.
     send_shares(&mut f, a, &b.shares, 9_500 * BRL);
     let left = share_balance(&f, &a.shares);
     assert_eq!(left, 500 * BRL);
-    // A partial exit below the minimum is refused.
+    // Below the floor (1,000 / 10 = 100) even as an exit: refused.
     assert_mutav_err(
-        f.request_redeem(a, &list, left / 2).0,
+        f.request_redeem(a, &list, 99 * BRL).0,
         MutavError::RequestTooSmall,
     );
-    // The whole balance of the canonical account is a full exit.
+    // The whole balance of the canonical account.
     let (r, seq) = f.request_redeem(a, &list, left);
-    r.expect("full exit below min_request");
-    assert_eq!(f.redeem_request(seq).unwrap().shares, left);
+    r.expect("exit below min_request");
     f.fulfil_redeems(1, u64::MAX, &[seq]).unwrap();
     assert_eq!(f.redeem_request(seq).unwrap().assets_out, 500 * BRL);
 }
 
 #[test]
-fn a_full_exit_from_another_share_account_keeps_min_request() {
+fn a_partial_request_below_the_minimum_must_leave_less_than_the_minimum() {
+    let (mut f, list, inv) = holders(2, 10_000 * BRL);
+    let (a, b) = (&inv[0], &inv[1]);
+    // 1,500 left: a 400 request would leave 1,100, a normal-size balance.
+    send_shares(&mut f, a, &b.shares, 8_500 * BRL);
+    assert_mutav_err(
+        f.request_redeem(a, &list, 400 * BRL).0,
+        MutavError::RequestTooSmall,
+    );
+    // 600 leaves 900, below the minimum: an exit in two steps (ADR 0010's
+    // remainder rule), then the 900 as the rest of the balance.
+    f.request_redeem(a, &list, 600 * BRL)
+        .0
+        .expect("leaves < min");
+    f.request_redeem(a, &list, 900 * BRL).0.expect("the rest");
+}
+
+#[test]
+fn a_share_sent_into_the_account_does_not_block_an_exit() {
+    // Griefing: someone sends 1 share unit into a holder's account below the
+    // minimum, so the balance is no longer what the holder asked for.
+    let (mut f, list, inv) = holders(2, 10_000 * BRL);
+    let (a, b) = (&inv[0], &inv[1]);
+    send_shares(&mut f, a, &b.shares, 9_500 * BRL);
+    send_shares(&mut f, b, &a.shares, 1);
+    assert_eq!(share_balance(&f, &a.shares), 500 * BRL + 1);
+    f.request_redeem(a, &list, 500 * BRL)
+        .0
+        .expect("the 1-unit remainder is below the minimum");
+}
+
+#[test]
+fn a_sub_minimum_exit_from_another_share_account_is_refused() {
     let (mut f, list, inv) = holders(1, 10_000 * BRL);
     let a = &inv[0];
     // A second, non-associated share account of the same owner.
@@ -374,61 +405,74 @@ fn a_full_exit_from_another_share_account_keeps_min_request() {
     assert_mutav_err(f.send_as(ix, &a.key), MutavError::RequestTooSmall);
 }
 
-/// A holder with a dust balance worth 1 base unit, requested as a full exit,
-/// then NAV falls below 1.0 so the head is worth 0 at fill time. The guard
-/// is opened wide (the devnet value) so the fall itself does not halt.
-fn zero_value_head(min_assets_out: u64) -> (Fixture, Investor, u64) {
-    let (mut f, _list, inv) = holders(2, 30_000 * BRL);
-    f.set_config(vec![MaxNavMoveBps(10_000)]).unwrap();
+#[test]
+fn many_one_unit_exits_cannot_fill_the_queue() {
+    // Dust splitting: 1 share unit in another wallet's canonical account is
+    // worth 1 base unit, below the floor.
+    let (mut f, list, inv) = holders(2, 10_000 * BRL);
     let (a, b) = (&inv[0], &inv[1]);
-    send_shares(&mut f, a, &b.shares, 30_000 * BRL - 1);
-    let ix = f.request_redeem_limit_ix(&a.pubkey(), &a.shares, 1, min_assets_out, vec![]);
-    let seq = f.state().next_redeem_seq;
-    f.send_as(ix, &a.key).expect("dust full exit");
+    send_shares(&mut f, b, &a.shares, 10_000 * BRL - 1);
+    assert_mutav_err(f.request_redeem(b, &list, 1).0, MutavError::RequestTooSmall);
+}
+
+#[test]
+fn a_head_worth_zero_is_not_filled_and_the_admin_cancels_it() {
+    // A 1-unit request (allowed here: min_request is 1 base unit), then NAV
+    // falls below 1.0 so the head is worth 0 at fill time. No reference pays
+    // nothing: the batch stops, and the admin's cancel moves the queue.
+    let (mut f, list, inv) = holders(2, 30_000 * BRL);
+    f.set_config(vec![MaxNavMoveBps(10_000), MinRequest(1)])
+        .unwrap();
+    let (a, b) = (&inv[0], &inv[1]);
+    let (r, seq) = f.request_redeem(a, &list, 1);
+    r.expect("1 unit at NAV 1.0");
+    let (r, next) = f.request_redeem(b, &list, 1_000 * BRL);
+    r.unwrap();
     let g = guarantee_args(unique_hash(), 30_000 * BRL, 0);
     f.register(g.clone()).unwrap();
     f.file_claim(Claim::on(&g, 10_000 * BRL)).unwrap();
     let (so, na) = (f.state().shares_outstanding, solvency(&f).net_assets);
     assert_eq!(assets_for(1, so, na).unwrap(), 0, "worth 0 at fill time");
-    let a = Investor {
-        key: a.key.insecure_clone(),
-        brs: a.brs,
-        shares: a.shares,
-    };
-    (f, a, seq)
-}
-
-#[test]
-fn a_head_worth_zero_fills_as_zero_assets_and_the_queue_moves() {
-    let (mut f, a, seq) = zero_value_head(0);
-    let before = f.state();
-    let meta = f.fulfil_redeems(1, u64::MAX, &[seq]).expect("0-asset fill");
-    let r = f.redeem_request(seq).unwrap();
-    assert_eq!(
-        (r.status, r.shares_filled, r.assets_out),
-        (REDEEM_FILLED, 1, 0)
-    );
-    let s = f.state();
-    assert_eq!(s.redeem_head, seq + 1);
-    assert_eq!(s.shares_outstanding, before.shares_outstanding - 1);
-    assert_eq!(s.brs_balance, before.brs_balance);
-    let filled = events::<RedeemFilled>(&meta);
-    assert_eq!((filled[0].shares, filled[0].assets), (1, 0));
-    // The owner closes it; nothing moves.
-    let brs = f.balance(&a.brs);
-    f.claim_assets(&a, seq).expect("claim 0 assets");
-    assert_eq!(f.balance(&a.brs), brs);
-    assert!(f.redeem_request(seq).is_none());
-}
-
-#[test]
-fn a_price_limit_still_protects_a_head_worth_zero() {
-    let (mut f, _, seq) = zero_value_head(1);
+    assert!(!mutav::solvency::is_underwater(na, so));
     assert_mutav_err(
-        f.fulfil_redeems(1, u64::MAX, &[seq]),
-        MutavError::PriceLimitNotMet,
+        f.fulfil_redeems(2, u64::MAX, &[seq, next]),
+        MutavError::RequestTooSmall,
     );
     assert_eq!(f.redeem_request(seq).unwrap().status, REDEEM_PENDING);
+    f.admin_cancel_redeem(a, seq)
+        .expect("admin cancels the head");
+    f.fulfil_redeems(1, u64::MAX, &[seq, next])
+        .expect("the queue moves");
+    assert_eq!(f.redeem_request(next).unwrap().status, REDEEM_FILLED);
+}
+
+#[test]
+fn a_near_underwater_reserve_burns_no_shares() {
+    // BRS = provisions + 1: NAV is far below the smallest unit, so heads
+    // would be paid 0. Both fills refuse (ADR 0029).
+    let (mut f, list, inv) = holders(2, 10_000 * BRL);
+    let (r, rseq) = f.request_redeem(&inv[0], &list, 5_000 * BRL);
+    r.unwrap();
+    let mut s = f.state();
+    s.provisions = s.brs_balance - 1;
+    s.remaining_cover_total = s.brs_balance;
+    f.write_state(&s);
+    let sol = solvency(&f);
+    assert_eq!(sol.net_assets, 1);
+    assert!(!sol.under_covered());
+    assert_mutav_err(
+        f.fulfil_redeems(1, u64::MAX, &[rseq]),
+        MutavError::ReserveUnderwater,
+    );
+    assert_eq!(f.redeem_request(rseq).unwrap().status, REDEEM_PENDING);
+    // Recovery in this binary: a guarantee fee lifts NAV (ADR 0029).
+    f.contribute(2_000 * BRL)
+        .0
+        .expect("fees are accepted underwater");
+    assert!(!mutav::solvency::is_underwater(
+        solvency(&f).net_assets,
+        f.state().shares_outstanding
+    ));
 }
 
 #[test]

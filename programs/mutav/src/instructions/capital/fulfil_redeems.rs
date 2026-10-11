@@ -3,8 +3,8 @@
 //! `redeem_head`, out of `free_capital` and `liquid_budget` only, whole fills
 //! each at its own NAV. Refused while the reserve is underwater
 //! (`ReserveUnderwater`, ADR 0022) and across a NAV move the guard would halt
-//! (inline guard, ADR 0023). A head worth 0 BRS fills as a 0-asset fill
-//! (NEW-B); the last shares out clear the guard's baseline.
+//! (inline guard, ADR 0023). A head worth 0 BRS is never filled (ADR 0029);
+//! the last shares out clear the guard's baseline.
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -168,10 +168,14 @@ pub fn handle_fulfil_redeems(
         let sol = snapshot(brs_balance)?;
         let admin_left = max_assets - paid; // paid ≤ max_assets by construction
         let budget = admin_left.min(sol.free_capital).min(sol.liquid_budget);
-        // A head worth 0 BRS at this NAV (a dust full exit, NEW-B) fills as a
-        // 0-asset fill below: its shares are burned and the queue moves on
-        // (ADR 0023). A 0-asset fill always fits the budget.
         let value = assets_for(r.shares, shares_outstanding, sol.net_assets)?;
+        if value == 0 {
+            // Worth nothing at this NAV: no fill, as every reference refuses
+            // a zero output (ADR 0029). The batch stops with the head
+            // untouched; the owner or the admin cancels it (ADR 0023).
+            blocked = Some(MutavError::RequestTooSmall);
+            break;
+        }
         if value > budget {
             // Whole fills only (ADR 0019): a head that does not fit stops the
             // batch and is left untouched.
@@ -184,8 +188,7 @@ pub fn handle_fulfil_redeems(
         }
 
         // The owner's price limit: the batch stops at this request, which
-        // stays pending (no fill, no skip). It applies to a 0-asset fill too:
-        // an owner who set a limit never has shares burned for less.
+        // stays pending (no fill, no skip).
         if value < r.min_assets_out {
             blocked = Some(MutavError::PriceLimitNotMet);
             break;
@@ -245,22 +248,20 @@ pub fn handle_fulfil_redeems(
         ),
         burned,
     )?;
-    if paid > 0 {
-        transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.key(),
-                TransferChecked {
-                    from: ctx.accounts.reserve.to_account_info(),
-                    mint: ctx.accounts.reserve_mint.to_account_info(),
-                    to: ctx.accounts.claims.to_account_info(),
-                    authority: ctx.accounts.vault_authority.to_account_info(),
-                },
-                &[authority_seeds],
-            ),
-            paid,
-            ctx.accounts.reserve_mint.decimals,
-        )?;
-    }
+    transfer_checked(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.key(),
+            TransferChecked {
+                from: ctx.accounts.reserve.to_account_info(),
+                mint: ctx.accounts.reserve_mint.to_account_info(),
+                to: ctx.accounts.claims.to_account_info(),
+                authority: ctx.accounts.vault_authority.to_account_info(),
+            },
+            &[authority_seeds],
+        ),
+        paid,
+        ctx.accounts.reserve_mint.decimals,
+    )?;
 
     let idle_free_capital = snapshot(brs_balance)?.free_capital;
     let state = &mut ctx.accounts.state;

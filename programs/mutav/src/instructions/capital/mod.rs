@@ -91,13 +91,14 @@ pub(crate) fn require_nav_within_guard(
     Ok(())
 }
 
-/// An underwater reserve (ADR 0022): net assets are 0 while shares are
-/// outstanding. A deposit would buy the holders' losses and a redemption
-/// would burn shares for nothing, so both fills refuse with
-/// `ReserveUnderwater` until a MUTAV backstop restores NAV.
+/// An underwater reserve ([`crate::solvency::is_underwater`]; ADR 0022,
+/// ADR 0029): NAV per share below the smallest published unit while shares
+/// are outstanding. A deposit would buy the holders' losses at a near-zero
+/// price and a redemption would pay nothing, so both fills refuse with
+/// `ReserveUnderwater` until NAV is restored (spec §6: interim recovery).
 pub(crate) fn require_not_underwater(shares_outstanding: u64, net_assets: u64) -> Result<()> {
     require!(
-        shares_outstanding == 0 || net_assets > 0,
+        !crate::solvency::is_underwater(net_assets, shares_outstanding),
         MutavError::ReserveUnderwater
     );
     Ok(())

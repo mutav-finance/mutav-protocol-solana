@@ -5,10 +5,10 @@
 //! **Exit is open to holders** (ADR 0023, AV-6): a wallet that holds shares
 //! is not checked against the allowlist, so a de-listed holder can always
 //! leave; `eligibility` is read only from a wallet with no shares (which then
-//! has nothing to redeem). **A full exit skips `min_request`** (Q-1, NEW-B):
-//! redeeming the whole balance of the owner's canonical share associated
-//! token account may be worth less than the minimum, but never 0 BRS at
-//! request time. Partial exits keep both size limits; a full exit keeps
+//! has nothing to redeem). **An exit of the balance may be below
+//! `min_request`** (Q-1, NEW-B; ADR 0029): from the owner's canonical share
+//! associated token account, leaving less than `min_request` behind, and
+//! worth at least the sub-minimum floor. Never 0 BRS; never above
 //! `max_request`.
 
 use anchor_lang::prelude::*;
@@ -21,9 +21,9 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::RedeemRequested,
-    instructions::capital::{owner_ata, require_eligible, require_request_size, Eligibility},
+    instructions::capital::{owner_ata, require_eligible, Eligibility},
     instructions::operator::solvency_snapshot,
-    math::assets_for,
+    math::{assets_for, redeem_size_error},
     state::{RedeemRequest, VaultConfig, VaultState},
 };
 
@@ -100,23 +100,28 @@ pub fn handle_request_redeem(
         ctx.accounts.state.shares_outstanding,
         sol.net_assets,
     )?;
-    // A full exit from the canonical share account skips `min_request`
-    // (ADR 0023): only that account, so a balance cannot be split across
-    // token accounts into many sub-minimum requests (NEW-B).
+    // Below `min_request`, only an exit of the balance of the canonical
+    // share account, above a floor (ADR 0029, `math::redeem_size_error`): a
+    // balance cannot be split across token accounts into sub-minimum
+    // requests, and a share sent into the account does not block the exit.
     let canonical = owner_ata(
         &owner,
         &config.share_mint,
         &ctx.accounts.share_token_program.key(),
     );
-    let full_exit = owner_shares.key() == canonical && shares == owner_shares.amount;
-    if full_exit {
-        require!(value > 0, MutavError::RequestTooSmall);
-        require!(
-            value <= config.caps.max_request,
-            MutavError::RequestTooLarge
-        );
-    } else {
-        require_request_size(config, value)?;
+    let remainder = assets_for(
+        owner_shares.amount.saturating_sub(shares),
+        ctx.accounts.state.shares_outstanding,
+        sol.net_assets,
+    )?;
+    if let Some(e) = redeem_size_error(
+        value,
+        remainder,
+        owner_shares.key() == canonical,
+        config.caps.min_request,
+        config.caps.max_request,
+    ) {
+        return Err(e.into());
     }
 
     // Escrow with the owner as authority, never a delegate.
