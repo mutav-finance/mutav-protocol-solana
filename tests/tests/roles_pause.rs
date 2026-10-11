@@ -724,3 +724,65 @@ fn revoke_pauser_removes_the_pauser_at_once() {
         MutavError::NoPendingHandover,
     );
 }
+
+#[test]
+fn accept_admin_clears_the_old_admins_pending_handovers() {
+    // Proposals by the old admin do not survive the admin handover.
+    let mut f = Fixture::new();
+    let (op, pa, new) = (funded(&mut f), funded(&mut f), funded(&mut f));
+    propose(&mut f, ROLE_OPERATOR, op.pubkey()).unwrap();
+    propose(&mut f, ROLE_PAUSER, pa.pubkey()).unwrap();
+    let admin = f.admin.insecure_clone();
+    let ix = f.propose_admin_ix(&admin.pubkey(), new.pubkey());
+    f.send(ix, &admin).unwrap();
+    let meta = f
+        .send(f.accept_admin_ix(&new.pubkey()), &new)
+        .expect("accept_admin");
+    let c = f.config();
+    assert_eq!(c.admin, new.pubkey());
+    assert_eq!(
+        (
+            c.pending_operator,
+            c.pending_operator_expires_at,
+            c.pending_pauser,
+            c.pending_pauser_expires_at
+        ),
+        (Pubkey::default(), 0, Pubkey::default(), 0)
+    );
+    let ids = fields(&meta);
+    assert!(ids.contains(&field::PENDING_OPERATOR) && ids.contains(&field::PENDING_PAUSER));
+    assert_mutav_err(
+        accept(&mut f, ROLE_OPERATOR, &op),
+        MutavError::NoPendingHandover,
+    );
+    assert_mutav_err(
+        accept(&mut f, ROLE_PAUSER, &pa),
+        MutavError::NoPendingHandover,
+    );
+}
+
+#[test]
+fn a_pauser_handover_does_not_need_the_money_accounts() {
+    let mut f = Fixture::new();
+    // Freeze both money accounts: the pauser still takes its role, passing
+    // neither account.
+    let (treasury, payments) = (f.config().treasury_account, f.config().payments_account);
+    f.set_frozen(&treasury, true);
+    f.set_frozen(&payments, true);
+    let pa = funded(&mut f);
+    propose(&mut f, ROLE_PAUSER, pa.pubkey()).unwrap();
+    let ix = f.accept_role_accounts_ix(&pa.pubkey(), ROLE_PAUSER, None, None);
+    f.send(ix, &pa)
+        .expect("pauser accepts without the money accounts");
+    assert_eq!(f.config().pauser, pa.pubkey());
+
+    // The operator still needs both, for the ownership check (ADR 0020).
+    let op = funded(&mut f);
+    propose(&mut f, ROLE_OPERATOR, op.pubkey()).unwrap();
+    let ix = f.accept_role_accounts_ix(&op.pubkey(), ROLE_OPERATOR, None, None);
+    assert_mutav_err(f.send(ix, &op), MutavError::InvalidParameter);
+    let ix = f.accept_role_accounts_ix(&op.pubkey(), ROLE_OPERATOR, Some(treasury), None);
+    assert_mutav_err(f.send(ix, &op), MutavError::InvalidParameter);
+    accept(&mut f, ROLE_OPERATOR, &op).expect("operator accepts with both accounts");
+    assert_eq!(f.config().operator, op.pubkey());
+}

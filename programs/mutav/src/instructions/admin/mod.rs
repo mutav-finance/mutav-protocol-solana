@@ -114,15 +114,32 @@ pub(crate) fn validate_config(c: &VaultConfig) -> Result<()> {
     Ok(())
 }
 
+/// Which money account is being installed, and so has to be a plain account
+/// (no delegate, no close authority, not frozen). The account already in
+/// place is not re-checked for plainness: an issuer freeze or a delegate set
+/// on it must not block replacing either account or changing the config.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Installing {
+    /// `initialize`: both accounts are new.
+    Both,
+    /// `set_treasury_account`.
+    Treasury,
+    /// `set_payments_account`.
+    Payments,
+    /// `set_config`: neither; only the owner rules are re-checked.
+    Neither,
+}
+
 /// The three MUTAV money flows stay apart (spec §2.1): the treasury and
 /// payments token accounts are different BRS accounts, the capital wallet owns
 /// neither of them, neither is one of the reserve's own token accounts (owned
 /// by the vault authority PDA), and the operator owns neither (ADR 0020):
 /// claim payments and the fee take never land in an account the operator
-/// controls. A revoked operator (the default key) is not compared. Neither
-/// account may have a delegate or a close authority (someone other than the
-/// owner could move or close it) or be frozen (a frozen payments account
-/// would stop `pay_claim` until it is replaced).
+/// controls. A revoked operator (the default key) is not compared. The
+/// account being installed (`installing`) may not have a delegate or a close
+/// authority (someone other than the owner could move or close it) or be
+/// frozen (a frozen payments account would stop `pay_claim` until it is
+/// replaced).
 pub(crate) fn validate_money_accounts(
     reserve_mint: &Pubkey,
     treasury: &InterfaceAccount<TokenAccount>,
@@ -130,12 +147,17 @@ pub(crate) fn validate_money_accounts(
     mutav_capital_wallet: &Pubkey,
     vault_authority: &Pubkey,
     operator: &Pubkey,
+    installing: Installing,
 ) -> Result<()> {
     require_keys_eq!(treasury.mint, *reserve_mint, MutavError::InvalidMint);
     require_keys_eq!(payments.mint, *reserve_mint, MutavError::InvalidMint);
     require_keys_neq!(treasury.key(), payments.key(), MutavError::InvalidParameter);
-    require_plain_account(treasury, MutavError::InvalidTreasuryAccount)?;
-    require_plain_account(payments, MutavError::InvalidPaymentsAccount)?;
+    if matches!(installing, Installing::Both | Installing::Treasury) {
+        require_plain_account(treasury, MutavError::InvalidTreasuryAccount)?;
+    }
+    if matches!(installing, Installing::Both | Installing::Payments) {
+        require_plain_account(payments, MutavError::InvalidPaymentsAccount)?;
+    }
     require!(
         *mutav_capital_wallet != treasury.owner && *mutav_capital_wallet != payments.owner,
         MutavError::InvalidParameter

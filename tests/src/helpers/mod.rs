@@ -562,15 +562,32 @@ impl Fixture {
         )
     }
 
+    /// `accept_role`; the money accounts are passed for the operator only.
     pub fn accept_role_ix(&self, new_key: &Pubkey, role: u8) -> Instruction {
         let c = self.config();
+        let money = role == mutav::constants::ROLE_OPERATOR;
+        self.accept_role_accounts_ix(
+            new_key,
+            role,
+            money.then_some(c.treasury_account),
+            money.then_some(c.payments_account),
+        )
+    }
+
+    pub fn accept_role_accounts_ix(
+        &self,
+        new_key: &Pubkey,
+        role: u8,
+        treasury_account: Option<Pubkey>,
+        payments_account: Option<Pubkey>,
+    ) -> Instruction {
         self.ix(
             mutav::instruction::AcceptRole { role }.data(),
             mutav::accounts::AcceptRole {
                 new_key: *new_key,
                 config: self.pdas.config,
-                treasury_account: c.treasury_account,
-                payments_account: c.payments_account,
+                treasury_account,
+                payments_account,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }

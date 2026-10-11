@@ -14,7 +14,7 @@ use mutav::{
         DepositFilled, DepositsFulfilled, FeesContributed, FulfilHaltRaised, GuaranteeClosed,
         GuaranteeRegistered, IncomeSwept, RedeemsFulfilled, StateRefreshed,
     },
-    NavBounds,
+    ConfigParam, NavBounds,
 };
 use mutav_tests::helpers::*;
 use solana_keypair::Keypair;
@@ -165,6 +165,40 @@ fn a_money_account_may_not_have_a_delegate_a_close_authority_or_be_frozen() {
         let ix = f.set_payments_account_ix(&admin.pubkey(), &acct, &treasury);
         assert_mutav_err(f.send(ix, &admin), MutavError::InvalidPaymentsAccount);
     }
+}
+
+#[test]
+fn only_the_installed_money_account_must_be_plain() {
+    // An issuer freeze on the accounts in place must not block replacing
+    // them or changing the config: plainness is checked only on the account
+    // being installed.
+    let mut f = Fixture::new();
+    let admin = f.admin.insecure_clone();
+    let (treasury, payments) = (f.config().treasury_account, f.config().payments_account);
+    f.set_frozen(&treasury, true);
+    f.set_frozen(&payments, true);
+
+    f.set_config(vec![ConfigParam::MaxTvl(f.config().caps.max_tvl - 1)])
+        .expect("set_config with both money accounts frozen");
+
+    let new_payments = f.token_account(&Pubkey::new_unique());
+    let ix = f.set_payments_account_ix(&admin.pubkey(), &new_payments, &treasury);
+    f.send(ix, &admin)
+        .expect("set_payments_account(fresh) with a frozen treasury");
+    assert_eq!(f.config().payments_account, new_payments);
+
+    let new_treasury = f.token_account(&Pubkey::new_unique());
+    let ix = f.set_treasury_account_ix(&admin.pubkey(), &new_treasury);
+    f.send(ix, &admin).expect("set_treasury_account(fresh)");
+    assert_eq!(f.config().treasury_account, new_treasury);
+
+    f.set_config(vec![ConfigParam::MaxTvl(f.config().caps.max_tvl - 1)])
+        .expect("set_config after the replacement");
+
+    // The owner rules still apply to the account in place: a new payments
+    // account may not be the current treasury.
+    let ix = f.set_payments_account_ix(&admin.pubkey(), &new_treasury, &new_treasury);
+    assert_mutav_err(f.send(ix, &admin), MutavError::InvalidParameter);
 }
 
 // ===========================================================================
@@ -494,7 +528,7 @@ fn claim_and_cancel_create_the_owners_token_accounts() {
     let rseq = f.state().next_redeem_seq;
     let ix = f.request_redeem_ix(&k.pubkey(), &shares, 1_000 * BRL, list.proof(&k.pubkey()));
     f.send_as(ix, &k).unwrap();
-    let ix = f.cancel_redeem_ix(&k.pubkey(), rseq, &wrong);
+    let ix = f.cancel_redeem_ix(&k.pubkey(), &k.pubkey(), rseq, &wrong);
     assert_mutav_err(f.send_as(ix, &k), MutavError::Unauthorized);
     let ix = f.request_redeem_ix(&k.pubkey(), &shares, 1_000 * BRL, list.proof(&k.pubkey()));
     let rseq2 = f.state().next_redeem_seq;
@@ -515,7 +549,7 @@ fn claim_and_cancel_create_the_owners_token_accounts() {
         .expect("claim_assets recreates the BRS ATA");
     assert_eq!(f.balance(&brs), 1_000 * BRL);
     // cancel_redeem into the existing share ATA (idempotent create).
-    let ix = f.cancel_redeem_ix(&k.pubkey(), rseq2, &shares);
+    let ix = f.cancel_redeem_ix(&k.pubkey(), &k.pubkey(), rseq2, &shares);
     f.send_as(ix, &k).expect("cancel_redeem");
     assert_eq!(f.balance(&shares), 1_000 * BRL);
 }

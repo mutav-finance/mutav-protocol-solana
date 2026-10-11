@@ -67,6 +67,10 @@ pub fn handle_fulfil_deposits(
     let config = &ctx.accounts.config;
     let state = &ctx.accounts.state;
     nav_bounds.validate()?;
+    require!(
+        count > 0 && count <= MAX_FULFIL_BATCH,
+        MutavError::InvalidParameter
+    );
 
     // Rules, in the spec's order. Under-coverage is allowed (ADR 0008).
     require!(!config.paused, MutavError::Paused);
@@ -84,7 +88,7 @@ pub fn handle_fulfil_deposits(
 
     let requests = split_adapter_accounts(config, ctx.remaining_accounts)?;
     let mut filled: Vec<DepositFilled> = Vec::with_capacity(count as usize);
-    let mut limit_hit = false;
+    let mut blocked: Option<MutavError> = None;
     for info in requests.iter() {
         if seq >= next_seq || fills >= count {
             break;
@@ -98,10 +102,16 @@ pub fn handle_fulfil_deposits(
                 let nav = conversion_nav(shares_outstanding, net_assets)?;
                 nav_bounds.check(nav)?;
                 let shares = shares_for(r.assets, shares_outstanding, net_assets)?;
+                if shares == 0 {
+                    // Would mint nothing at this NAV: no fill, the BRS stays
+                    // pending. The batch stops at this request.
+                    blocked = Some(MutavError::RequestTooSmall);
+                    break;
+                }
                 // The owner's price limit: the batch stops at this request,
                 // which stays pending (no fill, no skip).
                 if shares < r.min_shares_out {
-                    limit_hit = true;
+                    blocked = Some(MutavError::PriceLimitNotMet);
                     break;
                 }
                 r.shares_out = shares;
@@ -146,9 +156,14 @@ pub fn handle_fulfil_deposits(
         seq += 1;
     }
 
-    // A batch that stops at a price limit before any fill fails, so the
-    // admin sees why; after some fills it succeeds up to that request.
-    require!(!(limit_hit && fills == 0), MutavError::PriceLimitNotMet);
+    // A batch that stops at a request (price limit, or zero shares) before
+    // any fill fails, so the admin sees why; after some fills it succeeds up
+    // to that request.
+    if fills == 0 {
+        if let Some(e) = blocked {
+            return Err(e.into());
+        }
+    }
 
     // TVL cap on the whole batch.
     let tvl_after = (before.stable_assets as u128) + (total_assets as u128);

@@ -258,7 +258,8 @@ pub mod mutav {
         )
     }
 
-    /// Return a redeem request's unfilled shares. Never paused. Owner.
+    /// Return a redeem request's unfilled shares to its owner and close it.
+    /// Never paused. Owner or admin (ADR 0023).
     pub fn cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
         instructions::capital::cancel_redeem::handle_cancel_redeem(ctx)
     }

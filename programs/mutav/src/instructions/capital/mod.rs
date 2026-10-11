@@ -40,6 +40,11 @@ use crate::{
 /// a NAV outside `[min, max]` refuses with `NavOutOfBounds`, so a proposal
 /// that waits on the time lock never executes at a NAV the admin did not
 /// agree to.
+///
+/// Fills (`fulfil_deposits`, `fulfil_redeems`) check the conversion NAV, the
+/// price each fill converts at (`V = 1` on an empty reserve).
+/// `clear_fulfil_halt` checks the published NAV (`nav_per_share`, floored at
+/// 1, and 0 with no shares outstanding).
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NavBounds {
     pub min: u64,

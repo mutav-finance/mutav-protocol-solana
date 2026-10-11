@@ -223,11 +223,13 @@ pub struct AcceptRole<'info> {
     pub config: Box<Account<'info, VaultConfig>>,
 
     /// The money accounts, to check a new operator owns neither (ADR 0020).
+    /// Required for `ROLE_OPERATOR`; omitted for `ROLE_PAUSER`, so a pauser
+    /// handover never depends on the money accounts' state.
     #[account(address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
-    pub treasury_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub treasury_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
 
     #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
-    pub payments_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub payments_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
 }
 
 /// The pending operator or pauser takes its role.
@@ -241,11 +243,13 @@ pub fn handle_accept_role(ctx: Context<AcceptRole>, role: u8) -> Result<()> {
     let mut ch = ConfigChanges::default();
     let key = take_pending(config, role, &signer, &mut ch)?;
     let old = if role == ROLE_OPERATOR {
-        require_not_operator_owned(
-            &ctx.accounts.treasury_account,
-            &ctx.accounts.payments_account,
-            &key,
-        )?;
+        let (Some(treasury), Some(payments)) = (
+            ctx.accounts.treasury_account.as_ref(),
+            ctx.accounts.payments_account.as_ref(),
+        ) else {
+            return err!(MutavError::InvalidParameter);
+        };
+        require_not_operator_owned(treasury, payments, &key)?;
         let old = config.operator;
         ch.set(field::OPERATOR, &mut config.operator, key);
         old
@@ -286,7 +290,8 @@ pub struct AcceptAdmin<'info> {
     pub config: Box<Account<'info, VaultConfig>>,
 }
 
-/// The pending admin takes the admin role.
+/// The pending admin takes the admin role. Clears the pending operator
+/// and pauser handovers the old admin proposed.
 pub fn handle_accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
     let signer = ctx.accounts.new_admin.key();
     let config = &mut ctx.accounts.config;
@@ -294,6 +299,19 @@ pub fn handle_accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
     let key = take_pending(config, ROLE_ADMIN, &signer, &mut ch)?;
     let old = config.admin;
     ch.set(field::ADMIN, &mut config.admin, key);
+    // Handovers proposed by the old admin do not survive it (ADR 0020).
+    ch.set(
+        field::PENDING_OPERATOR,
+        &mut config.pending_operator,
+        Pubkey::default(),
+    );
+    config.pending_operator_expires_at = 0;
+    ch.set(
+        field::PENDING_PAUSER,
+        &mut config.pending_pauser,
+        Pubkey::default(),
+    );
+    config.pending_pauser_expires_at = 0;
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;

@@ -9,7 +9,7 @@ use crate::{
     constants::field,
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges, TreasuryAccountUpdated},
-    instructions::admin::{validate_money_accounts, vault_authority_key},
+    instructions::admin::{validate_money_accounts, vault_authority_key, Installing},
     state::VaultConfig,
 };
 
@@ -49,6 +49,7 @@ pub fn handle_set_treasury_account(ctx: Context<SetTreasuryAccount>) -> Result<(
         &ctx.accounts.config.mutav_capital_wallet,
         &vault_authority,
         &ctx.accounts.config.operator,
+        Installing::Treasury,
     )?;
 
     let new = ctx.accounts.treasury_account.key();

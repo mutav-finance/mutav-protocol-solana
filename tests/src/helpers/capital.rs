@@ -351,11 +351,20 @@ impl Fixture {
         )
     }
 
-    pub fn cancel_redeem_ix(&self, owner: &Pubkey, seq: u64, owner_shares: &Pubkey) -> Instruction {
+    /// `cancel_redeem` signed by `signer` (the owner or the admin), returning
+    /// the shares into `owner_shares` (normally the owner's share ATA).
+    pub fn cancel_redeem_ix(
+        &self,
+        signer: &Pubkey,
+        owner: &Pubkey,
+        seq: u64,
+        owner_shares: &Pubkey,
+    ) -> Instruction {
         let config = self.pdas.config;
         self.capital_ix(
             mutav::instruction::CancelRedeem {}.data(),
             mutav::accounts::CancelRedeem {
+                signer: *signer,
                 owner: *owner,
                 config,
                 state: self.pdas.state,
@@ -575,8 +584,15 @@ impl Fixture {
     }
 
     pub fn cancel_redeem(&mut self, inv: &Investor, seq: u64) -> TransactionResult {
-        let ix = self.cancel_redeem_ix(&inv.pubkey(), seq, &inv.shares);
+        let ix = self.cancel_redeem_ix(&inv.pubkey(), &inv.pubkey(), seq, &inv.shares);
         self.send_as(ix, &inv.key)
+    }
+
+    /// `cancel_redeem` of `inv`'s request, signed by the admin.
+    pub fn admin_cancel_redeem(&mut self, inv: &Investor, seq: u64) -> TransactionResult {
+        let admin = self.admin.insecure_clone();
+        let ix = self.cancel_redeem_ix(&admin.pubkey(), &inv.pubkey(), seq, &inv.shares);
+        self.send(ix, &admin)
     }
 
     pub fn claim_assets(&mut self, inv: &Investor, seq: u64) -> TransactionResult {
@@ -772,7 +788,7 @@ impl Fixture {
             ("request_redeem", redeem2, k()),
             (
                 "cancel_redeem",
-                self.cancel_redeem_ix(&owner, r1, &inv.shares),
+                self.cancel_redeem_ix(&owner, &owner, r1, &inv.shares),
                 k(),
             ),
             (

@@ -25,7 +25,9 @@ use crate::{
     constants::{field, CONFIG_SEED, MAX_CONFIG_PARAMS, STATE_SEED},
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges},
-    instructions::admin::{validate_config, validate_money_accounts, vault_authority_key},
+    instructions::admin::{
+        validate_config, validate_money_accounts, vault_authority_key, Installing,
+    },
     solvency::coverage_required,
     state::{VaultConfig, VaultState},
 };
@@ -180,6 +182,7 @@ pub fn handle_set_config(ctx: Context<SetConfig>, params: Vec<ConfigParam>) -> R
         &config.mutav_capital_wallet,
         &vault_authority,
         &config.operator,
+        Installing::Neither,
     )?;
     // `VaultState.fulfil_halted` is cleared by `clear_fulfil_halt`, not here
     // (ADR 0015).

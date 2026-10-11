@@ -8,7 +8,7 @@ use crate::{
     constants::field,
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges, PaymentsAccountUpdated},
-    instructions::admin::{validate_money_accounts, vault_authority_key},
+    instructions::admin::{validate_money_accounts, vault_authority_key, Installing},
     state::VaultConfig,
 };
 
@@ -48,6 +48,7 @@ pub fn handle_set_payments_account(ctx: Context<SetPaymentsAccount>) -> Result<(
         &ctx.accounts.config.mutav_capital_wallet,
         &vault_authority,
         &ctx.accounts.config.operator,
+        Installing::Payments,
     )?;
 
     let new = ctx.accounts.payments_account.key();

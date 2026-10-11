@@ -19,6 +19,8 @@ pub struct CloseGuarantee<'info> {
     pub operator: Signer<'info>,
 
     #[account(
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
         constraint = config.is_supported() @ MutavError::UnsupportedVersion,
         constraint = config.is_operator(&operator.key()) @ MutavError::Unauthorized,
     )]

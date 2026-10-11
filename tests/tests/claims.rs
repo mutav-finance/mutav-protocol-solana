@@ -141,8 +141,14 @@ fn file_claim_is_bounded_by_the_unprovisioned_cover_on_the_leg() {
 fn file_claim_rejects_bad_parameters() {
     let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
     assert_mutav_err(f.file_claim(Claim::on(&g, 0)), MutavError::InvalidParameter);
+    // Leg ids start at 1 (LEG_DEFAULT = 1, LEG_EXIT = 2): 0 names no leg.
+    assert_eq!((LEG_DEFAULT, LEG_EXIT), (1, 2));
     assert_mutav_err(
-        f.file_claim(Claim::on(&g, BRL).leg(2)),
+        f.file_claim(Claim::on(&g, BRL).leg(0)),
+        MutavError::InvalidParameter,
+    );
+    assert_mutav_err(
+        f.file_claim(Claim::on(&g, BRL).leg(3)),
         MutavError::InvalidParameter,
     );
     assert_mutav_err(

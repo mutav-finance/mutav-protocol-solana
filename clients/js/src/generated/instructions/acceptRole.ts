@@ -135,9 +135,13 @@ export type AcceptRoleInput<
   /** The proposed key. */
   newKey: TAccountNewKey;
   config: TAccountConfig;
-  /** The money accounts, to check a new operator owns neither (ADR 0020). */
-  treasuryAccount: TAccountTreasuryAccount;
-  paymentsAccount: TAccountPaymentsAccount;
+  /**
+   * The money accounts, to check a new operator owns neither (ADR 0020).
+   * Required for `ROLE_OPERATOR`; omitted for `ROLE_PAUSER`, so a pauser
+   * handover never depends on the money accounts' state.
+   */
+  treasuryAccount?: TAccountTreasuryAccount;
+  paymentsAccount?: TAccountPaymentsAccount;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   role: AcceptRoleInstructionDataArgs["role"];
@@ -278,9 +282,13 @@ export type ParsedAcceptRoleInstruction<
     /** The proposed key. */
     newKey: TAccountMetas[0];
     config: TAccountMetas[1];
-    /** The money accounts, to check a new operator owns neither (ADR 0020). */
-    treasuryAccount: TAccountMetas[2];
-    paymentsAccount: TAccountMetas[3];
+    /**
+     * The money accounts, to check a new operator owns neither (ADR 0020).
+     * Required for `ROLE_OPERATOR`; omitted for `ROLE_PAUSER`, so a pauser
+     * handover never depends on the money accounts' state.
+     */
+    treasuryAccount?: TAccountMetas[2] | undefined;
+    paymentsAccount?: TAccountMetas[3] | undefined;
     eventAuthority: TAccountMetas[4];
     program: TAccountMetas[5];
   };
@@ -310,13 +318,19 @@ export function parseAcceptRoleInstruction<
     accountIndex += 1;
     return accountMeta;
   };
+  const getNextOptionalAccount = () => {
+    const accountMeta = getNextAccount();
+    return accountMeta.address === MUTAV_PROGRAM_ADDRESS
+      ? undefined
+      : accountMeta;
+  };
   return {
     programAddress: instruction.programAddress,
     accounts: {
       newKey: getNextAccount(),
       config: getNextAccount(),
-      treasuryAccount: getNextAccount(),
-      paymentsAccount: getNextAccount(),
+      treasuryAccount: getNextOptionalAccount(),
+      paymentsAccount: getNextOptionalAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

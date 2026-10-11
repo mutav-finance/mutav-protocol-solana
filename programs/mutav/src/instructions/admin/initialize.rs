@@ -30,7 +30,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::{ConfigChanges, VaultInitialized},
-    instructions::admin::{validate_config, validate_money_accounts, validate_roles},
+    instructions::admin::{validate_config, validate_money_accounts, validate_roles, Installing},
     state::{CapsInput, VaultConfig, VaultState},
     token_guard,
 };
@@ -191,6 +191,7 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
         &args.mutav_capital_wallet,
         &ctx.accounts.vault_authority.key(),
         &args.operator,
+        Installing::Both,
     )?;
     create_income_inbox(&ctx)?;
     // No seed deposit (spec §12 Q20, decided 2026-10-06): the reserve starts

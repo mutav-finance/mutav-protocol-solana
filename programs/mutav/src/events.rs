@@ -344,6 +344,8 @@ pub struct DepositRequested {
     pub owner: Pubkey,
     pub seq: u64,
     pub assets: u64,
+    /// The owner's price limit: the fewest shares a fill may mint.
+    pub min_shares_out: u64,
 }
 
 /// `by` is the signer: the owner, or the admin (ADR 0023).
@@ -401,6 +403,8 @@ pub struct RedeemRequested {
     pub owner: Pubkey,
     pub seq: u64,
     pub shares: u64,
+    /// The owner's price limit: the least BRS a fill may pay out.
+    pub min_assets_out: u64,
 }
 
 /// One per fill.
@@ -438,6 +442,8 @@ pub struct RedeemCancelled {
     pub owner: Pubkey,
     pub seq: u64,
     pub shares_returned: u64,
+    /// The signer: the owner, or the admin removing the request (ADR 0023).
+    pub by: Pubkey,
 }
 
 #[event]

@@ -187,9 +187,10 @@ pub const HALT_SOURCE_FULFIL_REDEEMS: u8 = 3;
 pub const QUEUE_DEPOSIT: u8 = 1;
 pub const QUEUE_REDEEM: u8 = 2;
 
-/// `ClaimFiling.leg` (spec §3.6).
-pub const LEG_DEFAULT: u8 = 0;
-pub const LEG_EXIT: u8 = 1;
+/// `ClaimFiling.leg` (spec §3.6). Ids start at 1 so a zeroed field never
+/// names a leg; 0 and any other value are `InvalidParameter`.
+pub const LEG_DEFAULT: u8 = 1;
+pub const LEG_EXIT: u8 = 2;
 
 /// `ClaimFiling.status` (spec §3.6).
 pub const CLAIM_FILED: u8 = 0;

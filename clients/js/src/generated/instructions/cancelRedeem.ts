@@ -59,6 +59,7 @@ export function getCancelRedeemDiscriminatorBytes(): ReadonlyUint8Array {
 
 export type CancelRedeemInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
+  TAccountSigner extends string | AccountMeta<string> = string,
   TAccountOwner extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
@@ -80,9 +81,12 @@ export type CancelRedeemInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
+      TAccountSigner extends string
+        ? WritableSignerAccount<TAccountSigner> &
+            AccountSignerMeta<TAccountSigner>
+        : TAccountSigner,
       TAccountOwner extends string
-        ? WritableSignerAccount<TAccountOwner> &
-            AccountSignerMeta<TAccountOwner>
+        ? WritableAccount<TAccountOwner>
         : TAccountOwner,
       TAccountConfig extends string
         ? ReadonlyAccount<TAccountConfig>
@@ -152,7 +156,8 @@ export function getCancelRedeemInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CancelRedeemAsyncInput<
-  TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+  TAccountSigner extends InstructionSignerInput = InstructionSignerInput,
+  TAccountOwner extends InstructionAccountInput = InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountRedeemRequest extends InstructionAccountInput =
@@ -173,14 +178,22 @@ export type CancelRedeemAsyncInput<
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** The request's owner; receives the shares back (and the rent, on close). */
+  /**
+   * The request's owner or the admin. Pays the rent of the owner's share
+   * token account if it has to be created.
+   */
+  signer: TAccountSigner;
+  /**
+   * The request's owner; receives the shares back and the request's rent.
+   * only.
+   */
   owner: TAccountOwner;
   config: TAccountConfig;
   state?: TAccountState;
   redeemRequest: TAccountRedeemRequest;
   /**
    * The owner's associated token account for the share mint; created
-   * idempotently in the handler, the owner paying its rent (ADR 0023).
+   * idempotently in the handler, the signer paying its rent (ADR 0023).
    */
   ownerShares: TAccountOwnerShares;
   pendingRedemptions?: TAccountPendingRedemptions;
@@ -194,7 +207,8 @@ export type CancelRedeemAsyncInput<
 };
 
 export async function getCancelRedeemInstructionAsync<
-  TAccountOwner extends InstructionSignerInput,
+  TAccountSigner extends InstructionSignerInput,
+  TAccountOwner extends InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountRedeemRequest extends InstructionAccountInput,
@@ -210,6 +224,7 @@ export async function getCancelRedeemInstructionAsync<
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
   input: CancelRedeemAsyncInput<
+    TAccountSigner,
     TAccountOwner,
     TAccountConfig,
     TAccountState,
@@ -228,6 +243,10 @@ export async function getCancelRedeemInstructionAsync<
 ): Promise<
   CancelRedeemInstruction<
     TProgramAddress,
+    ResolvedInstructionAccountMeta<
+      TAccountSigner,
+      InstructionAccountInputAddress<TAccountSigner>
+    >,
     ResolvedInstructionAccountMeta<
       TAccountOwner,
       InstructionAccountInputAddress<TAccountOwner>
@@ -290,7 +309,8 @@ export async function getCancelRedeemInstructionAsync<
 
   // Original accounts.
   const originalAccounts = {
-    owner: { value: input.owner ?? null, isSigner: true, isWritable: true },
+    signer: { value: input.signer ?? null, isSigner: true, isWritable: true },
+    owner: { value: input.owner ?? null, isSigner: false, isWritable: true },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
     redeemRequest: {
@@ -398,6 +418,7 @@ export async function getCancelRedeemInstructionAsync<
 
   return Object.freeze({
     accounts: [
+      getAccountMeta("signer", accounts.signer),
       getAccountMeta("owner", accounts.owner),
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
@@ -416,6 +437,10 @@ export async function getCancelRedeemInstructionAsync<
     programAddress,
   } as CancelRedeemInstruction<
     TProgramAddress,
+    ResolvedInstructionAccountMeta<
+      TAccountSigner,
+      InstructionAccountInputAddress<TAccountSigner>
+    >,
     ResolvedInstructionAccountMeta<
       TAccountOwner,
       InstructionAccountInputAddress<TAccountOwner>
@@ -472,7 +497,8 @@ export async function getCancelRedeemInstructionAsync<
 }
 
 export type CancelRedeemInput<
-  TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+  TAccountSigner extends InstructionSignerInput = InstructionSignerInput,
+  TAccountOwner extends InstructionAccountInput = InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountRedeemRequest extends InstructionAccountInput =
@@ -493,14 +519,22 @@ export type CancelRedeemInput<
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** The request's owner; receives the shares back (and the rent, on close). */
+  /**
+   * The request's owner or the admin. Pays the rent of the owner's share
+   * token account if it has to be created.
+   */
+  signer: TAccountSigner;
+  /**
+   * The request's owner; receives the shares back and the request's rent.
+   * only.
+   */
   owner: TAccountOwner;
   config: TAccountConfig;
   state: TAccountState;
   redeemRequest: TAccountRedeemRequest;
   /**
    * The owner's associated token account for the share mint; created
-   * idempotently in the handler, the owner paying its rent (ADR 0023).
+   * idempotently in the handler, the signer paying its rent (ADR 0023).
    */
   ownerShares: TAccountOwnerShares;
   pendingRedemptions: TAccountPendingRedemptions;
@@ -514,7 +548,8 @@ export type CancelRedeemInput<
 };
 
 export function getCancelRedeemInstruction<
-  TAccountOwner extends InstructionSignerInput,
+  TAccountSigner extends InstructionSignerInput,
+  TAccountOwner extends InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountRedeemRequest extends InstructionAccountInput,
@@ -530,6 +565,7 @@ export function getCancelRedeemInstruction<
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
   input: CancelRedeemInput<
+    TAccountSigner,
     TAccountOwner,
     TAccountConfig,
     TAccountState,
@@ -547,6 +583,10 @@ export function getCancelRedeemInstruction<
   config?: { programAddress?: TProgramAddress },
 ): CancelRedeemInstruction<
   TProgramAddress,
+  ResolvedInstructionAccountMeta<
+    TAccountSigner,
+    InstructionAccountInputAddress<TAccountSigner>
+  >,
   ResolvedInstructionAccountMeta<
     TAccountOwner,
     InstructionAccountInputAddress<TAccountOwner>
@@ -608,7 +648,8 @@ export function getCancelRedeemInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    owner: { value: input.owner ?? null, isSigner: true, isWritable: true },
+    signer: { value: input.signer ?? null, isSigner: true, isWritable: true },
+    owner: { value: input.owner ?? null, isSigner: false, isWritable: true },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
     redeemRequest: {
@@ -683,6 +724,7 @@ export function getCancelRedeemInstruction<
 
   return Object.freeze({
     accounts: [
+      getAccountMeta("signer", accounts.signer),
       getAccountMeta("owner", accounts.owner),
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
@@ -701,6 +743,10 @@ export function getCancelRedeemInstruction<
     programAddress,
   } as CancelRedeemInstruction<
     TProgramAddress,
+    ResolvedInstructionAccountMeta<
+      TAccountSigner,
+      InstructionAccountInputAddress<TAccountSigner>
+    >,
     ResolvedInstructionAccountMeta<
       TAccountOwner,
       InstructionAccountInputAddress<TAccountOwner>
@@ -762,24 +808,32 @@ export type ParsedCancelRedeemInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** The request's owner; receives the shares back (and the rent, on close). */
-    owner: TAccountMetas[0];
-    config: TAccountMetas[1];
-    state: TAccountMetas[2];
-    redeemRequest: TAccountMetas[3];
+    /**
+     * The request's owner or the admin. Pays the rent of the owner's share
+     * token account if it has to be created.
+     */
+    signer: TAccountMetas[0];
+    /**
+     * The request's owner; receives the shares back and the request's rent.
+     * only.
+     */
+    owner: TAccountMetas[1];
+    config: TAccountMetas[2];
+    state: TAccountMetas[3];
+    redeemRequest: TAccountMetas[4];
     /**
      * The owner's associated token account for the share mint; created
-     * idempotently in the handler, the owner paying its rent (ADR 0023).
+     * idempotently in the handler, the signer paying its rent (ADR 0023).
      */
-    ownerShares: TAccountMetas[4];
-    pendingRedemptions: TAccountMetas[5];
-    vaultAuthority: TAccountMetas[6];
-    shareMint: TAccountMetas[7];
-    shareTokenProgram: TAccountMetas[8];
-    associatedTokenProgram: TAccountMetas[9];
-    systemProgram: TAccountMetas[10];
-    eventAuthority: TAccountMetas[11];
-    program: TAccountMetas[12];
+    ownerShares: TAccountMetas[5];
+    pendingRedemptions: TAccountMetas[6];
+    vaultAuthority: TAccountMetas[7];
+    shareMint: TAccountMetas[8];
+    shareTokenProgram: TAccountMetas[9];
+    associatedTokenProgram: TAccountMetas[10];
+    systemProgram: TAccountMetas[11];
+    eventAuthority: TAccountMetas[12];
+    program: TAccountMetas[13];
   };
   data: CancelRedeemInstructionData;
 };
@@ -792,12 +846,12 @@ export function parseCancelRedeemInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCancelRedeemInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 13) {
+  if (instruction.accounts.length < 14) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 13,
+        expectedAccountMetas: 14,
       },
     );
   }
@@ -810,6 +864,7 @@ export function parseCancelRedeemInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
+      signer: getNextAccount(),
       owner: getNextAccount(),
       config: getNextAccount(),
       state: getNextAccount(),

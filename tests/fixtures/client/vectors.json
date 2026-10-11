@@ -2093,10 +2093,10 @@
     {
       "args": {
         "amount": "3500000000",
-        "leg": 0,
+        "leg": 1,
         "noticeRefHash": "a95b0c47f0524784efb870fe7070d9965b309f63a57cdb79270e0171c1d55dae"
       },
-      "data": "bbfe280d92dfe6610000c39dd000000000a95b0c47f0524784efb870fe7070d9965b309f63a57cdb79270e0171c1d55dae",
+      "data": "bbfe280d92dfe6610100c39dd000000000a95b0c47f0524784efb870fe7070d9965b309f63a57cdb79270e0171c1d55dae",
       "name": "fileClaim"
     },
     {

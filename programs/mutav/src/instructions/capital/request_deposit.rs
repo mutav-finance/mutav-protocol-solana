@@ -21,7 +21,11 @@ pub struct RequestDeposit<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
-    #[account(constraint = config.is_supported() @ MutavError::UnsupportedVersion)]
+    #[account(
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
+        constraint = config.is_supported() @ MutavError::UnsupportedVersion,
+    )]
     pub config: Box<Account<'info, VaultConfig>>,
 
     #[account(
@@ -113,6 +117,7 @@ pub fn handle_request_deposit(
         owner,
         seq,
         assets,
+        min_shares_out,
     });
     Ok(())
 }
