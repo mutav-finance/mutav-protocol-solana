@@ -40,6 +40,8 @@
     "maxNavMoveBps": 10000,
     "stressBuffer": 19000000000
   },
+  "_guardians": "Optional pause-only guardian keys (set_guardians, at most 3, distinct, none an admin/operator/pauser key). Empty means none; verify.ts fails if the chain's guardians differ. roles.ts proposes set_guardians when they do.",
+  "guardians": [],
   "allowlist": [
     "<FILL: MUTAV capital wallet, plus any devnet investor wallets>"
   ]

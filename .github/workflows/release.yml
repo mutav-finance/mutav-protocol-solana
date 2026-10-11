@@ -207,7 +207,7 @@ jobs:
           bun scripts/release/upgrade-proposal.ts --url "$RELEASE_RPC" --confirm-cluster "${{ inputs.cluster }}" \
             --program "$PROGRAM_ID" --buffer "${{ steps.buffer.outputs.buffer }}" \
             --multisig "$MULTISIG" --vault-index "$VAULT_INDEX" \
-            --so release/mutav.so --out upgrade-proposal.json
+            --expected-hash "${{ needs.build.outputs.hash }}" --out upgrade-proposal.json
 
       # 5. Verify-PDA write, exported for the same vault transaction.
       - name: Verify-PDA transaction
