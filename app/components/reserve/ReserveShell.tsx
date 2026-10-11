@@ -113,9 +113,6 @@ export function ReserveShell({ children }: { children: ReactNode }) {
                 className={`font-body inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm whitespace-nowrap no-underline ${active ? "text-(--color-text) border-(--color-text) font-medium" : "text-(--color-text-2) hover:text-(--color-text) border-transparent"}`}
               >
                 {label}
-                <svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke={active ? "var(--color-accent)" : "var(--color-text-3)"} strokeWidth="1.5">
-                  <path d="M2 3.5L5 6.5L8 3.5" />
-                </svg>
               </Link>
             );
           })}

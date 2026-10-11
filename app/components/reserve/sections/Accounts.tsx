@@ -7,7 +7,6 @@
  * from /api/ledger; nothing is hardcoded.
  */
 import { RoleTag } from "@/components/RoleTag";
-import { ImageSlot, type ImageSlotName } from "@/components/ImageSlot";
 import { type ReserveView } from "@/lib/view";
 import { ACCOUNT_ROLES, type AccountRole } from "@/lib/roles";
 import { Section } from "@/components/Section";
@@ -33,8 +32,6 @@ const PLAIN_NOTE: Record<string, string> = {
   "upgrade authority: the Reserve Admin": "Upgradable by the Reserve Admin",
   "issued by Nora": "Issued by Nora",
 };
-
-const DIVIDER_SLOT: ImageSlotName = "accounts-verify";
 
 /** Who owns the account: its role tag, or "Program-owned". */
 function Owner({ a }: { a: AccountRole }) {
@@ -145,13 +142,11 @@ export function Accounts({ r }: { r: ReserveView }) {
 
       {/* [E] Detail: the program, then every account it uses, grouped by job. */}
       <div className="flex flex-col gap-3">
-        <ImageSlot slot={DIVIDER_SLOT} aspect="8:1" opacity={0.12} className="h-14">
-          <div className="flex h-full items-center px-6">
-            <h3 id="accounts-all" className="font-body text-(--color-text) m-0 text-sm font-medium">
-              Every account
-            </h3>
-          </div>
-        </ImageSlot>
+        <div className="bg-(--color-surface) border-l-(--color-text-3) border border-l-2 px-6 py-3">
+          <h3 id="accounts-all" className="font-body text-(--color-text) m-0 text-sm font-medium">
+            Every account
+          </h3>
+        </div>
 
         <div className="flex flex-col border" aria-labelledby="accounts-all" role="group">
           <ul className="bg-(--color-surface) m-0 list-none border-b p-0">
