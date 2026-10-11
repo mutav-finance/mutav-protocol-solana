@@ -6,7 +6,7 @@
  * wallet; later mutav-app's backend sends the same instructions with a
  * KMS-held key. Anyone can read the page; actions are enabled only when the
  * connected wallet is VaultConfig.operator. The wallet signs; nothing here
- * holds a key (compose → wallet → /api/tx/send, as everywhere in the app).
+ * holds a key (compose → the wallet signs and sends, as everywhere in the app).
  */
 import Link from "next/link";
 import type { ReactNode } from "react";

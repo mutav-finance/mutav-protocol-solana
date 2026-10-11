@@ -223,7 +223,8 @@ describe("compose", () => {
     const tx = unsignedTransaction(WALLET, ixs, lifetime);
     expect(invokedPrograms(tx)).toEqual([MUTAV_PROGRAM_ADDRESS]);
     expect(isFullySigned(tx)).toBe(false);
-    expect(() => assertRelayable(tx, [MUTAV_PROGRAM_ADDRESS])).toThrow(/not fully signed/);
-    expect(() => assertRelayable(tx, [])).toThrow(RelayRefusedError);
+    const policy = { mutav: MUTAV_PROGRAM_ADDRESS, squadsProgram: "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf", squadsMultisig: null };
+    expect(() => assertRelayable(tx, policy)).toThrow(/not fully signed/);
+    expect(() => assertRelayable(tx, { ...policy, mutav: WALLET })).toThrow(RelayRefusedError);
   });
 });
