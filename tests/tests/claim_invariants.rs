@@ -124,7 +124,7 @@ fn run(seed: u64, steps: usize) {
             // File: any amount in the leg's unprovisioned cover.
             3..=5 if !book.active.is_empty() => {
                 let (id, ag) = book.active[rng.below(book.active.len() as u64) as usize];
-                let l = rng.below(2) as u8;
+                let l = LEG_DEFAULT + rng.below(2) as u8;
                 let (cover, paid, prov) = leg(&f.guarantee(&id), l);
                 let unprov = cover - paid - prov;
                 if unprov > 0 {
