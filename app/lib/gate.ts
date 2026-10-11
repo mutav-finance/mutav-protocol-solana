@@ -10,7 +10,7 @@
  */
 import {
   coverageRequired,
-  solvencyFromAccounts,
+  coverageFromAccounts,
   MODE_NORMAL,
   type VaultConfig,
   type VaultState,
@@ -48,7 +48,7 @@ type ConfigView = Pick<VaultConfig, "paused" | "coverageRatioBps" | "caps">;
 type StateView = Pick<VaultState, "mode" | "brsBalance" | "remainingCoverTotal" | "provisions">;
 
 export function previewRegisterGuarantee(config: ConfigView, state: StateView, g: GateInput): GatePreview {
-  const before = solvencyFromAccounts(config, state);
+  const before = coverageFromAccounts(config, state);
   const newCover = g.defaultCover + g.exitCover;
   const coverageRequiredAfter = coverageRequired(state.remainingCoverTotal + newCover, config.coverageRatioBps, state.provisions);
   const needed = coverageRequiredAfter;

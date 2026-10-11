@@ -19,7 +19,7 @@ function view({ brs, inbox = 0n }: { brs: bigint; inbox?: bigint }) {
   return {
     config: config() as never,
     state: state({ brsBalance: brs }),
-    solvency: { stableAssets: brs } as never,
+    coverage: { stableAssets: brs } as never,
     incomeInbox: { address: ADAPTER, exists: true, amount: inbox },
   };
 }

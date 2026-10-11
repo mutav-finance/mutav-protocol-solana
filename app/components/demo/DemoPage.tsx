@@ -57,11 +57,11 @@ function Ticker({ r }: { r: ReserveView }) {
   const s = r.state;
   return (
     <div className="grid-metrics" data-testid="demo-ticker">
-      <MetricCard dense label="Stable assets" value={fmtBrs(r.solvency.stableAssets)} />
-      <MetricCard dense label="Coverage required" value={fmtBrs(r.solvency.coverageRequired)} />
-      <MetricCard dense label="Free capital" value={fmtBrs(r.solvency.freeCapital)} />
+      <MetricCard dense label="Stable assets" value={fmtBrs(r.coverage.stableAssets)} />
+      <MetricCard dense label="Coverage required" value={fmtBrs(r.coverage.coverageRequired)} />
+      <MetricCard dense label="Free capital" value={fmtBrs(r.coverage.freeCapital)} />
       <MetricCard dense label="Provisions" value={fmtBrs(s.provisions)} />
-      <MetricCard dense label="NAV (from accounts)" value={fmtNav(navPerShare(r.solvency.netAssets, s.sharesOutstanding))} />
+      <MetricCard dense label="NAV (from accounts)" value={fmtNav(navPerShare(r.coverage.netAssets, s.sharesOutstanding))} />
       <MetricCard dense label="Mode" value={MODE_LABEL(s.mode)} />
     </div>
   );

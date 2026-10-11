@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
-import { computeSolvency, coverageRequired } from "@mutav-finance/mutav-protocol-solana";
+import { computeCoverage, coverageRequired } from "@mutav-finance/mutav-protocol-solana";
 
 type Row = { refusal: string | null; newLeases: number; remaining: number; required: number; balance: number; active: number; opening: number; gain: number; brsIncome: number };
 type Result = {
@@ -110,10 +110,10 @@ describe("simulator ↔ client coverage maths", () => {
     expect(sim.mutavCoverageRequired(100, 1_000, 11)).toBe(11);
   });
 
-  it("free capital matches the client's computeSolvency (no provisions, no TESOURO, no earmark)", () => {
+  it("free capital matches the client's computeCoverage (no provisions, no TESOURO, no earmark)", () => {
     for (let i = 0; i < 1_000; i++) {
       const remaining = amount(), c = bps(), stable = amount(), stress = stressOf();
-      const sol = computeSolvency({
+      const sol = computeCoverage({
         brsBalance: BigInt(stable), remainingCoverTotal: BigInt(remaining), coverageRatioBps: c, provisions: 0n,
         stressBuffer: BigInt(stress),
       });

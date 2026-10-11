@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeSolvency, coverageRequired } from "@mutav-finance/mutav-protocol-solana";
+import { computeCoverage, coverageRequired } from "@mutav-finance/mutav-protocol-solana";
 import { previewRegisterGuarantee } from "../gate";
 import { BRL, config, state } from "./fixtures";
 
@@ -24,7 +24,7 @@ describe("register_guarantee gate preview", () => {
   });
 
   it("agrees with the math mirror's free capital (c = 100%)", () => {
-    const sol = computeSolvency({
+    const sol = computeCoverage({
       brsBalance: funded.brsBalance, remainingCoverTotal: funded.remainingCoverTotal, coverageRatioBps: 10_000, provisions: 0n,
     });
     expect(previewRegisterGuarantee(config(), funded, g(sol.freeCapital)).fits).toBe(true);
@@ -64,7 +64,7 @@ describe("register_guarantee gate preview", () => {
     expect(previewRegisterGuarantee(c, over, g(1_000n * BRL)).refusal).toBe("UnderCovered");
   });
 
-  it("checks caps before solvency, in program order", () => {
+  it("checks caps before coverage, in program order", () => {
     expect(previewRegisterGuarantee(config(), funded, g(30_000n * BRL + 1n)).refusal).toBe("GuaranteeCapExceeded");
     expect(previewRegisterGuarantee(config(), funded, g(0n)).refusal).toBe("InvalidParameter");
   });

@@ -22,9 +22,10 @@ const STATIC = files(join(ROOT, "public"), /\.html?$/);
 
 /**
  * (Re)insurance vocabulary, yield-product framing, "sinistro" (A7), the reserve
- * called a "fund", and "solvency gate" in copy (it is the coverage gate; code
- * identifiers such as `solvencyFromAccounts` are renamed in a later PR and do
- * not match: the regex needs a space or hyphen). "funds" (money) is fine.
+ * called a "fund", and "solvency gate" in copy (it is the coverage gate, and
+ * the code identifiers are now `coverage*` too; the regex needs a space or
+ * hyphen, so an old name such as `solvencyFromAccounts` does not match).
+ * "funds" (money) is fine.
  */
 const BANNED = /\b(premiums?|(re)?insur(ance|ed|ers?)|polic(y|ies)|policyholders?|yield vault|sinistros?|fund|solvency[ -]gat(e|ed|es|ing))\b/i;
 /** Standard HTTP header names (Referrer-Policy, Content-Security-Policy, …) are not UI copy. */

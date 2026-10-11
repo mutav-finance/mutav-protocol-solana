@@ -394,7 +394,7 @@ export function BlockedPreview() {
     .map((r) => ({ seq: r.data.seq, shares: r.data.shares }));
   const red = previewRedeemFulfil(reserve.config, reserve.state, heads.length ? heads : [{ seq: 0n, shares: 1_000_000n }]);
   return (
-    <PreviewBox ok={reg.fits && red.stoppedBy === null} title={reserve.state.mode === 0 && !reserve.solvency.underCovered ? "Reserve covered: gated actions open" : "Under-covered: gated actions blocked"}>
+    <PreviewBox ok={reg.fits && red.stoppedBy === null} title={reserve.state.mode === 0 && !reserve.coverage.underCovered ? "Reserve covered: gated actions open" : "Under-covered: gated actions blocked"}>
       {kv("New guarantee (R$4,000 cover)", reg.fits ? "would be accepted" : `refused: ${reg.refusal}`, reg.fits ? "var(--color-success)" : "var(--color-error)")}
       {kv(heads.length ? "Redemption fill (queue head)" : "Redemption fill (hypothetical 1 share)", red.stoppedBy ? `refused: ${red.stoppedBy}` : "would be filled", red.stoppedBy ? "var(--color-error)" : "var(--color-success)")}
       {kv("Claim payment", "never gated by required coverage", "var(--color-success)")}

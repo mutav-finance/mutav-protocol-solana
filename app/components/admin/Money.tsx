@@ -51,7 +51,7 @@ function useNavBounds(id: string) {
   const [tol, setTol] = useState("100");
   const bps = Number(tol);
   const ok = Number.isInteger(bps) && bps >= 0 && bps <= 10_000;
-  const nav = conversionNav(reserve.state.sharesOutstanding, reserve.solvency.netAssets);
+  const nav = conversionNav(reserve.state.sharesOutstanding, reserve.coverage.netAssets);
   const bounds = ok ? navBoundsAround(nav, bps) : null;
   const field = (
     <TextField
@@ -85,7 +85,7 @@ function Deposits({ mode }: { mode: Mode }) {
   const c = reserve.config;
   const [count, setCount] = useState("8");
   const nb = useNavBounds("adm-dep-nav");
-  const head = depositHead(c, reserve.state, reserve.solvency, ledger, null);
+  const head = depositHead(c, reserve.state, reserve.coverage, ledger, null);
   return (
     <Sub id="money-deposits" title="Capital deposits" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
@@ -189,7 +189,7 @@ function Redemptions({ mode }: { mode: Mode }) {
   const [maxAssets, setMaxAssets] = useState("");
   const nb = useNavBounds("adm-red-nav");
   const max = parseBrs(maxAssets);
-  const head = redeemHead(reserve.config, reserve.state, reserve.solvency, ledger, max);
+  const head = redeemHead(reserve.config, reserve.state, reserve.coverage, ledger, max);
   return (
     <Sub id="money-redemptions" title="Redemptions" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
@@ -200,7 +200,7 @@ function Redemptions({ mode }: { mode: Mode }) {
       <Cards>
         <AdminAction title="Fulfil redemptions" label="fulfil_redeems" mode={mode} request={nb.bounds ? { kind: "fulfil_redeems", count: Math.min(8, Math.max(1, Number(count) || 1)), maxAssets: max ?? (1n << 64n) - 1n, navBounds: nb.bounds } : null}>
           <Facts
-            now={m(`${q.redeems.length} waiting · free capital ${fmtBrs(reserve.solvency.freeCapital, 0)}`)}
+            now={m(`${q.redeems.length} waiting · free capital ${fmtBrs(reserve.coverage.freeCapital, 0)}`)}
             bound={m("each fill ≤ free capital · whole requests only · up to 8 per call")}
             does="Pays redemptions in FIFO order at NAV, from free capital only (the coverage gate). Frozen in under-coverage and while paused or halted; a head that does not fit stops the batch."
           />

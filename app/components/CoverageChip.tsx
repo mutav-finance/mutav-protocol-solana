@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * SolvencyChip — the core invariant `stable_assets ≥ coverage_required`, with
+ * CoverageChip — the core invariant `stable_assets ≥ coverage_required`, with
  * both values and the ratio. Ported from mutav-pulse (status square + mono).
  */
 import { Mono } from "@/components/Mono";
 import { StatusBadge } from "@/components/StatusBadge";
 import { fmtBrs, fmtRatio } from "@/lib/format";
 
-export function SolvencyChip({ stableAssets, coverageRequired }: { stableAssets: bigint; coverageRequired: bigint }) {
+export function CoverageChip({ stableAssets, coverageRequired }: { stableAssets: bigint; coverageRequired: bigint }) {
   const covered = stableAssets >= coverageRequired;
   const color = covered ? "var(--color-success)" : "var(--color-error)";
   const label = covered ? "COVERED" : "UNDER-COVERED";

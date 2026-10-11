@@ -12,7 +12,7 @@ Live: [reserve.mutav.finance](https://reserve.mutav.finance).
 | `/reserve` | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Explorer, and the permissionless `refresh`; snapshot charts of each |
 | `/investor` | The capital provider's view: allowlist status (on-chain root + `ALLOWLIST`), position, own queue entries, and `request_deposit` / `cancel_deposit` / `claim_shares` / `request_redeem` / `cancel_redeem` / `claim_assets`. Read-only unless the wallet's Merkle proof verifies |
 | `/operator` | Operator console: today MUTAV's team signs by hand with the operator wallet (later mutav-app's backend, KMS key). Live limits (claim caps window, payouts vs SLA, free capital), every operator instruction with its bound shown before signing, duties (today → later), recent operator transactions, safety. Actions enabled only for `VaultConfig.operator` |
-| `/demo` | Guided operator demo (six steps, with the solvency-gate preview); free-form operator actions are on `/operator` |
+| `/demo` | Guided operator demo (six steps, with the coverage-gate preview); free-form operator actions are on `/operator` |
 | `/admin` | `VaultConfig`, Squads v4 proposal builders (create / approve / execute, with the time lock), direct signing on localnet only |
 | `/simulator` | The reserve simulator, a standalone page (`public/simulator.html`): reserve sizing, coverage, yield against Selic |
 

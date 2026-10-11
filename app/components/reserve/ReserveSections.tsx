@@ -10,7 +10,7 @@ import { MetricCard } from "@/components/MetricCard";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { StatusBadge } from "@/components/StatusBadge";
-import { SolvencyChip } from "@/components/SolvencyChip";
+import { CoverageChip } from "@/components/CoverageChip";
 import { fmtBps, fmtBrs, fmtDuration, fmtNav, fmtShares, fmtTime } from "@/lib/format";
 import {
   activeRemainingCover,
@@ -24,7 +24,7 @@ import {
   type ReserveView,
 } from "@/lib/view";
 import { navPerShare } from "@mutav-finance/mutav-protocol-solana";
-import { AgencyCoverChart, ClaimSpeedChart, CoverChart, FlowChart, NavBasisChart, SolvencyChart } from "@/components/charts/Charts";
+import { AgencyCoverChart, ClaimSpeedChart, CoverChart, FlowChart, NavBasisChart, CoverageChart } from "@/components/charts/Charts";
 import { RoleTag } from "@/components/RoleTag";
 import { ACCOUNT_ROLES, FLOW_ROLES, type AccountRole } from "@/lib/roles";
 
@@ -63,14 +63,14 @@ const Num = ({ children, color }: { children: ReactNode; color?: string }) => (
 
 export function Health({ r }: { r: ReserveView }) {
   const s = r.state;
-  const sol = r.solvency;
+  const sol = r.coverage;
   const navNow = navPerShare(sol.netAssets, s.sharesOutstanding);
   const underCovered = s.mode !== 0;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <SolvencyChip stableAssets={sol.stableAssets} coverageRequired={sol.coverageRequired} />
+      <CoverageChip stableAssets={sol.stableAssets} coverageRequired={sol.coverageRequired} />
       <div className="grid-2">
-        <SolvencyChart s={sol} ratioBps={r.config.coverageRatioBps} />
+        <CoverageChart s={sol} ratioBps={r.config.coverageRatioBps} />
         <NavBasisChart s={sol} navNow={fmtNav(navNow)} />
       </div>
       <div className="grid-metrics">
