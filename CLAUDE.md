@@ -30,7 +30,7 @@ Rules for AI agents and humans working in this repo. `mutav-finance/mutav-protoc
 
 - [`docs/spec.md`](docs/spec.md) is the source of truth for accounts, instructions, invariants, caps and events. Implement against it; don't infer rules from other repos.
 - Where the spec says **TBD**, don't pick a value or behaviour in code. Ask, or leave a typed `TODO(spec: <open question>)` and fail closed.
-- The solvency gate never blocks a claim payment. Any change touching `pay_claim` must keep the property test that asserts this.
+- The coverage gate never blocks a claim payment. Any change touching `pay_claim` must keep the property test that asserts this.
 
 ## Testing
 

@@ -307,7 +307,7 @@ MUTAV chose the second, and the program now expresses it ([ADR 0016](decisions/0
 
 **Price safety.** TESOURO is valued at `min(BondPrice, accrual ceiling)`; stale prices fail gated instructions closed, a deviation bound rejects jumps, and `fulfil_halted` stops fills after an outsized NAV move. `pay_claim` never reads the price.
 
-**Invariants.** The test plan asserts, after every instruction, that `stable_assets` uses only tracked balances and the bounded price (1); paid ≤ cover on each leg (2); a provision lowers NAV, never `stable_assets` (6); a claim payment moves surplus by `(c − 1)` times the amount, so it is unchanged at `c` = 1 (7); and no fill lowers NAV per share (12). A property test fuzzes `stable_assets` below `coverage_required` and `c` from 0.10 to 2.0, and asserts that `pay_claim` is never refused for solvency.
+**Invariants.** The test plan asserts, after every instruction, that `stable_assets` uses only tracked balances and the bounded price (1); paid ≤ cover on each leg (2); a provision lowers NAV, never `stable_assets` (6); a claim payment moves surplus by `(c − 1)` times the amount, so it is unchanged at `c` = 1 (7); and no fill lowers NAV per share (12). A property test fuzzes `stable_assets` below `coverage_required` and `c` from 0.10 to 2.0, and asserts that `pay_claim` is never refused by the coverage gate.
 
 ```figure id="fig-4-coverage-bar" title="Figure 4. Balance sheet and coverage"
 Two vertical stacked bars side by side on a common baseline.

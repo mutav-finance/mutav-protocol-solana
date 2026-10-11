@@ -22,7 +22,7 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 
 **Where to look in the code:**
 
-- [`programs/mutav/src/solvency.rs`](programs/mutav/src/solvency.rs): the solvency gate, which refuses any capital movement that would leave the guarantees under-covered. It never blocks a claim payment.
+- [`programs/mutav/src/coverage.rs`](programs/mutav/src/coverage.rs): the coverage gate, which refuses any capital movement that would leave the guarantees under-covered. It never blocks a claim payment.
 - [`programs/mutav/src/instructions/`](programs/mutav/src/instructions/): instructions by area: `admin/` (config, roles, pause), `operator/` (guarantees, guarantee fees, claims), `capital/` (the deposit and redemption queue), `public/` (permissionless `refresh`).
 - [`tests/`](tests/): LiteSVM integration tests. [`clients/js/`](clients/js/): the Codama client the app reads through.
 - [`app/`](app/): the pilot web app. It holds no keys; wallets sign.
