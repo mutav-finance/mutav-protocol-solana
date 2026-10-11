@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { address } from "@solana/kit";
-import { findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getSetConfigInstructionDataDecoder, identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
+import { address, type Address } from "@solana/kit";
+import { conversionNav, findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getClearFulfilHaltInstructionDataDecoder, getFulfilDepositsInstructionDataDecoder, getSetConfigInstructionDataDecoder, navBoundsAround, publishedNav, solvencyFromAccounts, identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
 import { fromHex } from "../serde";
-import { composeInstructions, describeInstructions, queueSeqs, refuseOverlappingSetConfig, unsignedTransaction } from "../server/compose";
+import { composeInstructions, DEFAULT_NAV_TOLERANCE_BPS, describeInstructions, queueSeqs, refuseOverlappingSetConfig, unsignedTransaction } from "../server/compose";
 import { assertRelayable, invokedPrograms, isFullySigned, RelayRefusedError } from "../server/relay";
 import type { ReserveView } from "../view";
 import { config, state } from "./fixtures";
@@ -63,19 +63,61 @@ describe("compose", () => {
     expect(d.accounts.filter((a) => a.signer).map((a) => a.address)).toEqual([WALLET]);
   });
 
-  it("set_config is sparse: one param per changed field, refresh first when c changes", async () => {
+  it("set_config is sparse: one param per changed field, a refresh before and after when c changes", async () => {
     const r = await reserve();
     const ixs = await composeInstructions({ kind: "set_config", coverageRatioBps: 5_000 }, WALLET, { reserve: r });
-    expect(ixs.length).toBe(2);
-    expect(identifyMutavInstruction(ixs[0]!.data!)).toBe(MutavInstruction.Refresh);
+    expect(ixs.map((ix) => identifyMutavInstruction(ix.data!))).toEqual([MutavInstruction.Refresh, MutavInstruction.SetConfig, MutavInstruction.Refresh]);
     const d = getSetConfigInstructionDataDecoder().decode(ixs[1]!.data!);
     expect(d.params).toEqual([{ __kind: "CoverageRatioBps", fields: [5_000] }]);
+    // A change that needs no refresh is set_config alone.
+    const only = await composeInstructions({ kind: "set_config", feeTakeBps: 1_500 }, WALLET, { reserve: r });
+    expect(only.map((ix) => identifyMutavInstruction(ix.data!))).toEqual([MutavInstruction.SetConfig]);
+  });
+
+  it("set_roles handles a pending handover: refuses the same key, cancels another one first", async () => {
+    const r = await reserve();
+    const op = address("HnDdop5PFqvVKZNujsuakwm2K5GskAUk1GxzbDSdGuMo");
+    const other = address("BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4");
+    const pa = address("SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf");
+    const req = { kind: "set_roles", operator: op, pauser: pa } as const;
+    const pendingFor = (key: Address, expiresAt: bigint): ReserveView => ({
+      ...r,
+      now: 100n,
+      config: { ...r.config, admin: WALLET, pauser: pa, pendingOperator: key, pendingOperatorExpiresAt: expiresAt, pendingPauser: address("11111111111111111111111111111111"), pendingPauserExpiresAt: 0n },
+    });
+    await expect(composeInstructions(req, WALLET, { reserve: pendingFor(op, 200n) })).rejects.toThrow(/awaiting accept_role/);
+    const kinds = async (v: ReserveView) => (await composeInstructions(req, WALLET, { reserve: v })).map((ix) => identifyMutavInstruction(ix.data!));
+    expect(await kinds(pendingFor(other, 200n))).toEqual([MutavInstruction.CancelPending, MutavInstruction.ProposeRole]);
+    // Expired: simply replaced.
+    expect(await kinds(pendingFor(other, 99n))).toEqual([MutavInstruction.ProposeRole]);
+    expect(await kinds(pendingFor(op, 99n))).toEqual([MutavInstruction.ProposeRole]);
+  });
+
+  it("clear_fulfil_halt defaults to bounds around the published NAV, fills around the conversion NAV", async () => {
+    const base = await reserve();
+    const halt = async (v: ReserveView) => getClearFulfilHaltInstructionDataDecoder().decode((await composeInstructions({ kind: "clear_fulfil_halt" }, WALLET, { reserve: v }))[0]!.data!).navBounds;
+    // No shares: the published NAV is 0, so the default bounds are [0, 0].
+    expect(await halt(base)).toEqual({ min: 0n, max: 0n });
+    const v: ReserveView = { ...base, state: { ...base.state, brsBalance: 2_000n * 1_000_000n, sharesOutstanding: 1_000n * 1_000_000n } };
+    const sol = solvencyFromAccounts(v.config, v.state);
+    expect(await halt(v)).toEqual(navBoundsAround(publishedNav(sol.netAssets, v.state.sharesOutstanding), DEFAULT_NAV_TOLERANCE_BPS));
+    const fill = (await composeInstructions({ kind: "fulfil_deposits", count: 1 }, WALLET, { reserve: v }))[0]!;
+    expect(getFulfilDepositsInstructionDataDecoder().decode(fill.data!).navBounds).toEqual(navBoundsAround(conversionNav(v.state.sharesOutstanding, sol.netAssets), DEFAULT_NAV_TOLERANCE_BPS));
+  });
+
+  it("cancel_redeem is signed by the investor and returns the shares to it", async () => {
+    const r = await reserve();
+    const [ix] = await composeInstructions({ kind: "cancel_redeem", seq: 0n }, WALLET, { reserve: r });
+    const d = describeInstructions([ix!])[0]!;
+    expect(d.accounts.filter((a) => a.signer).map((a) => a.address)).toEqual([WALLET]);
+    expect(d.accounts[1]!.address).toBe(WALLET);
   });
 
   it("set_config writes the NAV-move bound, after a refresh", async () => {
     const r = await reserve();
     const ixs = await composeInstructions({ kind: "set_config", maxNavMoveBps: 500 }, WALLET, { reserve: r });
-    const ix = ixs[ixs.length - 1]!;
+    expect(ixs.map((x) => identifyMutavInstruction(x.data!))).toEqual([MutavInstruction.Refresh, MutavInstruction.SetConfig, MutavInstruction.Refresh]);
+    const ix = ixs[1]!;
     const d = getSetConfigInstructionDataDecoder().decode(ix.data!);
     expect(d.params).toEqual([{ __kind: "MaxNavMoveBps", fields: [500] }]);
     // set_config takes the state account, for the cached coverage_required (#29).

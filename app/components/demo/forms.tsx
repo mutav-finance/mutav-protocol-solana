@@ -273,7 +273,7 @@ export function IncomeForm({ p = "" }: { p?: string }) {
 export function FileClaimForm({ p = "" }: { p?: string }) {
   const { ledger } = useLive();
   const [g, setG] = useState("");
-  const [leg, setLeg] = useState<"0" | "1">("0");
+  const [leg, setLeg] = useState<"1" | "2">("1");
   const [amount, setAmount] = useState("1500");
   const [notice, setNotice] = useState(`notice-demo-${ledger.filings.length + 1}`);
   const value = parseBrs(amount);
@@ -282,13 +282,13 @@ export function FileClaimForm({ p = "" }: { p?: string }) {
       <Grid>
         <GuaranteeSelect id={`${p}fc-g`} value={g} onChange={setG} />
         <Field id={`${p}fc-leg`} label="Leg">
-          <Select value={leg} onValueChange={(v) => setLeg(v as "0" | "1")}>
+          <Select value={leg} onValueChange={(v) => setLeg(v as "1" | "2")}>
             <SelectTrigger id={`${p}fc-leg`} className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="0">default (rent arrears)</SelectItem>
-              <SelectItem value="1">exit (property recovery)</SelectItem>
+              <SelectItem value="1">default (rent arrears)</SelectItem>
+              <SelectItem value="2">exit (property recovery)</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -299,7 +299,7 @@ export function FileClaimForm({ p = "" }: { p?: string }) {
       <RoleWarning need="operator" />
       <Action
         label="file_claim"
-        request={async () => (g && value && notice.trim() ? { kind: "file_claim", guarantee: g, leg: Number(leg) as 0 | 1, amount: value, noticeRefHash: await REF.notice(notice.trim()) } : null)}
+        request={async () => (g && value && notice.trim() ? { kind: "file_claim", guarantee: g, leg: Number(leg) as 1 | 2, amount: value, noticeRefHash: await REF.notice(notice.trim()) } : null)}
         onDone={() => setNotice(`notice-demo-${ledger.filings.length + 2}`)}
       />
     </div>
@@ -319,7 +319,7 @@ export function PayClaimList() {
           <Mono style={{ fontSize: 12, minWidth: 280 }}>
             {c.guaranteeId.slice(0, 8)}… · {c.leg} leg · {fmtBrs(c.provision)} · filed {fmtTime(c.filedAt)}
           </Mono>
-          <Action label={`pay_claim ${fmtBrs(c.provision, 0)}`} request={{ kind: "pay_claim", guarantee: c.guarantee, leg: c.leg === "exit" ? 1 : 0, amount: c.provision, noticeRefHash: c.noticeRefHash }} />
+          <Action label={`pay_claim ${fmtBrs(c.provision, 0)}`} request={{ kind: "pay_claim", guarantee: c.guarantee, leg: c.leg === "exit" ? 2 : 1, amount: c.provision, noticeRefHash: c.noticeRefHash }} />
         </div>
       ))}
     </div>

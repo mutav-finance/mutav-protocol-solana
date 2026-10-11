@@ -136,7 +136,7 @@ export function DemoPage() {
                   <BlockedPreview />
                   <Note>
                     {CLUSTER === "localnet" ? (
-                      <>Seeded scenario: run <code className="font-mono">bun scripts/localnet.ts scenario under-covered</code> (raises the coverage ratio to 150% through <code className="font-mono">set_config</code>), or raise it from <Link href="/admin#actions" className="ext-link">/admin</Link>. Restore with <code className="font-mono">scenario normal</code>.</>
+                      <>Seeded scenario: run <code className="font-mono">bun scripts/localnet.ts scenario under-covered</code> (raises the coverage ratio to 100%, the program maximum, through <code className="font-mono">set_config</code>: the seeded cover then exceeds the stable assets), or raise it from <Link href="/admin#actions" className="ext-link">/admin</Link>. Restore with <code className="font-mono">scenario normal</code>.</>
                     ) : (
                       <>On devnet the coverage ratio is raised through a Squads <code className="font-mono">set_config</code> proposal from <Link href="/admin#actions" className="ext-link">/admin</Link>.</>
                     )}

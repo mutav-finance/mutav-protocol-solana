@@ -88,7 +88,8 @@ export type ReserveView = {
   incomeInbox: { address: string; exists: boolean; amount: bigint };
 };
 
-export const LEG = { default: 0, exit: 1 } as const;
+/** `ClaimFiling.leg` ids (LEG_DEFAULT = 1, LEG_EXIT = 2; 0 names no leg). */
+export const LEG = { default: 1, exit: 2 } as const;
 export const legName = (leg: number) => (leg === LEG.exit ? "exit" : "default");
 
 export const GUARANTEE_ACTIVE = 0;

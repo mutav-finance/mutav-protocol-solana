@@ -67,8 +67,8 @@ type ProposalLike = { index: bigint; status: string; instructions: string[] };
 
 /**
  * The first live proposal (Draft, Active or Approved, not yet executed) that
- * already writes `set_config`, or null. A second one would carry the same
- * on-chain values over and undo the first when both execute.
+ * already writes `set_config`, or null. A second one is diffed against the
+ * values before the first runs, so it could undo a field the first changes.
  */
 export function pendingSetConfig(proposals: readonly ProposalLike[]): bigint | null {
   const live = new Set(["Draft", "Active", "Approved", "Executing"]);
@@ -77,4 +77,4 @@ export function pendingSetConfig(proposals: readonly ProposalLike[]): bigint | n
 }
 
 export const pendingSetConfigText = (index: bigint) =>
-  `execute or cancel proposal #${index} first: it also writes set_config, and set_config writes every field, so a second proposal built now would undo it`;
+  `execute or cancel proposal #${index} first: it also writes set_config, and a second proposal built now is diffed against the values before #${index} runs, so it could undo a field #${index} changes`;

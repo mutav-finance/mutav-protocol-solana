@@ -39,8 +39,8 @@ function signerCheck(ix: string): "admin" | "operator" | "pauser-or-admin" | "ow
   if (/is_operator\(/.test(src)) return "operator";
   if (/upgrade_authority/.test(src)) return "upgrade-authority";
   if (/pub new_key: Signer|pub new_admin: Signer/.test(src)) return "proposed";
-  // `cancel_deposit`: the request's owner, or the admin (ADR 0023).
-  if (/pub owner: Signer|signer\.key\(\) == deposit_request\.owner/.test(src)) return "owner";
+  // `cancel_deposit` / `cancel_redeem`: the request's owner, or the admin (ADR 0023).
+  if (/pub owner: Signer|signer\.key\(\) == (deposit|redeem)_request\.owner/.test(src)) return "owner";
   if (/config\.admin == admin\.key\(\)|admin\.key\(\) == config\.admin/.test(src)) return "admin";
   return "none";
 }

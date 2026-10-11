@@ -27,7 +27,9 @@ import {
   configParamsDiff,
   configParamsNeedRefresh,
   conversionNav,
+  getCancelPendingInstruction,
   getProposeRoleInstruction,
+  publishedNav,
   navBoundsAround,
   solvencyFromAccounts,
   type NavBounds,
@@ -167,14 +169,17 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       o,
     );
   // The NAV the admin sees now, ± a tolerance (ADR 0023): a proposal that
-  // executes after a larger move is refused with `NavOutOfBounds`.
-  const navBounds = (draft?: { min: bigint; max: bigint }): NavBounds => {
+  // executes after a larger move is refused with `NavOutOfBounds`. Fills
+  // check the conversion NAV; `clear_fulfil_halt` checks the published NAV
+  // (`published`), so its default bounds centre on that one.
+  const navBounds = (draft?: { min: bigint; max: bigint }, published = false): NavBounds => {
     if (draft) {
       if (draft.min > draft.max) throw new ComposeError("NAV bounds: min must be ≤ max");
       return draft;
     }
     const sol = solvencyFromAccounts(r.config, r.state);
-    return navBoundsAround(conversionNav(r.state.sharesOutstanding, sol.netAssets), DEFAULT_NAV_TOLERANCE_BPS);
+    const nav = published ? publishedNav(sol.netAssets, r.state.sharesOutstanding) : conversionNav(r.state.sharesOutstanding, sol.netAssets);
+    return navBoundsAround(nav, DEFAULT_NAV_TOLERANCE_BPS);
   };
 
   switch (req.kind) {
@@ -383,7 +388,9 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
         getCancelRedeemInstruction(
           {
             ...common,
-            owner: signer,
+            // The investor cancels its own request (the program also lets the admin).
+            signer,
+            owner: signerAddress,
             state: a.state,
             redeemRequest: (await findRedeemRequestPda({ config, seq: req.seq }, o))[0],
             ownerShares: await associatedTokenAddress(signerAddress, a.shareMint),
@@ -474,13 +481,20 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       const bad = rolesError(req, r.config.admin);
       if (bad) throw new ComposeError(bad);
       // Two-step handover (ADR 0020): propose each changed key; the new key
-      // signs `accept_role` itself.
+      // signs `accept_role` itself. A key already pending is refused; another
+      // unexpired pending key is cancelled first, in the same proposal
+      // (`propose_role` refuses while one waits).
       const out: Instruction[] = [];
-      for (const [role, key, now] of [
-        [ROLE_OPERATOR, req.operator, r.config.operator],
-        [ROLE_PAUSER, req.pauser, r.config.pauser],
+      const c = r.config;
+      for (const [role, name, key, now, pending, expiresAt] of [
+        [ROLE_OPERATOR, "operator", req.operator, c.operator, c.pendingOperator, c.pendingOperatorExpiresAt],
+        [ROLE_PAUSER, "pauser", req.pauser, c.pauser, c.pendingPauser, c.pendingPauserExpiresAt],
       ] as const) {
-        if (key !== now) out.push(getProposeRoleInstruction({ ...common, admin: signer, role, key: address(key) }, o));
+        if (key === now) continue;
+        const live = pending !== SYSTEM_PROGRAM /* the default key */ && r.now <= expiresAt;
+        if (live && pending === key) throw new ComposeError(`the ${name} key ${key} is already proposed, awaiting accept_role`);
+        if (live) out.push(getCancelPendingInstruction({ ...common, admin: signer, role }, o));
+        out.push(getProposeRoleInstruction({ ...common, admin: signer, role, key: address(key) }, o));
       }
       if (out.length === 0) throw new ComposeError("operator and pauser already hold these keys");
       return out;
@@ -493,7 +507,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "unpause":
       return [getUnpauseInstruction({ ...common, admin: signer }, o)];
     case "clear_fulfil_halt":
-      return [getClearFulfilHaltInstruction({ ...common, admin: signer, state: a.state, reserve: a.reserve, navBounds: navBounds(req.navBounds) }, o)];
+      return [getClearFulfilHaltInstruction({ ...common, admin: signer, state: a.state, reserve: a.reserve, navBounds: navBounds(req.navBounds, true) }, o)];
     case "set_config": {
       // Write only what changed; carry every other field over as it is on-chain.
       const c = r.config;
@@ -513,8 +527,10 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
         { ...common, admin: signer, state: a.state, treasuryAccount: c.treasuryAccount, paymentsAccount: c.paymentsAccount, params },
         o,
       );
-      // c, the NAV-move bound and the stress buffer need a refresh in the same slot.
-      return configParamsNeedRefresh(params) ? [refreshIx(), setConfig] : [setConfig];
+      // c, the NAV-move bound and the stress buffer need a refresh in the same
+      // slot before set_config, and one after it so the mode reflects the new
+      // values at once.
+      return configParamsNeedRefresh(params) ? [refreshIx(), setConfig, refreshIx()] : [setConfig];
     }
     case "set_allowlist_root": {
       const tree = await buildAllowlist(req.owners.map((x) => address(x)));
@@ -586,8 +602,9 @@ export function describeInstructions(ixs: Instruction[], config?: VaultConfig) {
 }
 
 /**
- * Refuses a second set_config while one is live in the multisig: set_config
- * writes every field, so the later one would undo the earlier when both run.
+ * Refuses a second set_config while one is live in the multisig: both were
+ * composed against the same on-chain values, so the later one could undo a
+ * field the earlier one changes when both run.
  */
 export function refuseOverlappingSetConfig(proposals: Parameters<typeof pendingSetConfig>[0]) {
   const pending = pendingSetConfig(proposals);

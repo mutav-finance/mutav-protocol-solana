@@ -17,9 +17,9 @@ export type OperatorTx =
   | { kind: "contribute_fees"; invoiceRefHash: string; amount: bigint }
   /** ADR 0017: sweep one issuer income statement from the income inbox into the reserve. `period` is YYYYMM. */
   | { kind: "sweep_income"; incomeRefHash: string; period: number; amount: bigint }
-  | { kind: "file_claim"; guarantee: string; leg: 0 | 1; amount: bigint; noticeRefHash: string }
+  | { kind: "file_claim"; guarantee: string; leg: 1 | 2; amount: bigint; noticeRefHash: string }
   /** Pays exactly the filing's provision: `amount` is sent as `expected_amount` (ADR 0021); `leg` is read from the filing. */
-  | { kind: "pay_claim"; guarantee: string; leg: 0 | 1; amount: bigint; noticeRefHash: string }
+  | { kind: "pay_claim"; guarantee: string; leg: 1 | 2; amount: bigint; noticeRefHash: string }
   | { kind: "settle_payout"; guarantee: string; noticeRefHash: string; pixE2eHash: string };
 
 /** The allowlisted capital provider's instructions (spec §5.5); `seq` names the owner's request. */
