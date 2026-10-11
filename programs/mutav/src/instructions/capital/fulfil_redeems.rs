@@ -1,4 +1,5 @@
-//! `fulfil_redeems(count, max_assets)` (spec §5.5). Admin. Strict FIFO from
+//! `fulfil_redeems(count, max_assets, nav_bounds)` (spec §5.5; ADR 0023).
+//! Admin. Strict FIFO from
 //! `redeem_head`, out of `free_capital` and `liquid_budget` only, whole fills
 //! each at its own NAV.
 
@@ -14,7 +15,9 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::{RedeemFilled, RedeemsFulfilled},
-    instructions::capital::{load_slot, redeem_request_address, store, Slot},
+    instructions::capital::{
+        load_slot, redeem_request_address, split_adapter_accounts, store, NavBounds, Slot,
+    },
     math::{assets_for, conversion_nav},
     solvency::{Solvency, SolvencyInputs},
     state::{RedeemRequest, VaultConfig, VaultState},
@@ -28,6 +31,8 @@ pub struct FulfilRedeems<'info> {
     pub admin: Signer<'info>,
 
     #[account(
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
         constraint = config.is_supported() @ MutavError::UnsupportedVersion,
         constraint = admin.key() == config.admin @ MutavError::Unauthorized,
     )]
@@ -94,9 +99,11 @@ pub fn handle_fulfil_redeems(
     ctx: Context<FulfilRedeems>,
     count: u8,
     max_assets: u64,
+    nav_bounds: NavBounds,
 ) -> Result<()> {
     let config = &ctx.accounts.config;
     let state = &ctx.accounts.state;
+    nav_bounds.validate()?;
 
     // Rules, in the spec's order.
     require!(!config.paused, MutavError::Paused);
@@ -130,7 +137,8 @@ pub fn handle_fulfil_redeems(
     let mut fills: Vec<Fill> = Vec::with_capacity(count as usize);
     let mut blocked: Option<MutavError> = None;
 
-    for info in ctx.remaining_accounts.iter() {
+    let requests = split_adapter_accounts(config, ctx.remaining_accounts)?;
+    for info in requests.iter() {
         if seq >= next_seq || fills.len() >= count as usize {
             break;
         }
@@ -173,8 +181,16 @@ pub fn handle_fulfil_redeems(
             break;
         }
 
-        // Whole fill at the NAV of this fill.
+        // The owner's price limit: the batch stops at this request, which
+        // stays pending (no fill, no skip).
+        if value < r.min_assets_out {
+            blocked = Some(MutavError::PriceLimitNotMet);
+            break;
+        }
+
+        // Whole fill at the NAV of this fill, inside the admin's bounds.
         let nav = conversion_nav(shares_outstanding, sol.net_assets)?;
+        nav_bounds.check(nav)?;
         let shares = r.shares;
         r.shares_filled = shares;
         r.assets_out = value;
@@ -254,6 +270,16 @@ pub fn handle_fulfil_redeems(
         .checked_sub(burned)
         .ok_or(MutavError::MathOverflow)?;
     state.redeem_head = seq;
+    state.redeemed_shares_total = state
+        .redeemed_shares_total
+        .checked_add(burned)
+        .ok_or(MutavError::MathOverflow)?;
+    state.redeemed_assets_total = state
+        .redeemed_assets_total
+        .checked_add(paid)
+        .ok_or(MutavError::MathOverflow)?;
+    let (redeemed_shares_total, redeemed_assets_total) =
+        (state.redeemed_shares_total, state.redeemed_assets_total);
 
     for x in &fills {
         emit_cpi!(RedeemFilled {
@@ -276,6 +302,8 @@ pub fn handle_fulfil_redeems(
         assets: paid,
         nav: last.nav,
         idle_free_capital,
+        redeemed_shares_total,
+        redeemed_assets_total,
     });
     Ok(())
 }

@@ -2,6 +2,7 @@
 
 use anchor_lang::{prelude::*, AccountsClose};
 use anchor_spl::{
+    associated_token::AssociatedToken,
     token::Token,
     token_interface::{transfer_checked, Mint, TokenAccount, TransferChecked},
 };
@@ -10,6 +11,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::RedeemCancelled,
+    instructions::capital::{create_owner_ata, owner_ata},
     state::{RedeemRequest, VaultConfig, VaultState},
 };
 
@@ -40,13 +42,15 @@ pub struct CancelRedeem<'info> {
     )]
     pub redeem_request: Box<Account<'info, RedeemRequest>>,
 
-    /// The owner's share account.
+    /// The owner's associated token account for the share mint; created
+    /// idempotently in the handler, the owner paying its rent (ADR 0023).
+    /// CHECK: address-bound to the owner's associated token account.
     #[account(
         mut,
-        constraint = owner_shares.owner == owner.key() @ MutavError::Unauthorized,
-        constraint = owner_shares.mint == config.share_mint @ MutavError::InvalidMint,
+        address = owner_ata(&owner.key(), &config.share_mint, &anchor_spl::token::ID)
+            @ MutavError::Unauthorized,
     )]
-    pub owner_shares: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub owner_shares: UncheckedAccount<'info>,
 
     #[account(mut, seeds = [PENDING_REDEMPTIONS_SEED, config.key().as_ref()], bump)]
     pub pending_redemptions: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -59,6 +63,8 @@ pub struct CancelRedeem<'info> {
     pub share_mint: Box<InterfaceAccount<'info, Mint>>,
 
     pub share_token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }
 
 pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
@@ -67,6 +73,16 @@ pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
     let r = &ctx.accounts.redeem_request;
     require!(r.status == REDEEM_PENDING, MutavError::InvalidRequestStatus);
     let (seq, returned, owner) = (r.seq, r.shares, r.owner);
+    let a = &ctx.accounts;
+    create_owner_ata(
+        a.owner.to_account_info(),
+        a.owner_shares.to_account_info(),
+        a.owner.to_account_info(),
+        a.share_mint.to_account_info(),
+        a.system_program.to_account_info(),
+        a.share_token_program.to_account_info(),
+        a.associated_token_program.key(),
+    )?;
 
     let config_key = ctx.accounts.config.key();
     let authority_seeds: &[&[u8]] = &[

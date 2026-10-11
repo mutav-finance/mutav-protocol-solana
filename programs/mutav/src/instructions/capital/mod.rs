@@ -26,6 +26,7 @@ pub use request_deposit::*;
 pub use request_redeem::*;
 
 use anchor_lang::{prelude::*, Discriminator};
+use anchor_spl::associated_token::{self, get_associated_token_address_with_program_id};
 
 use crate::{
     allowlist,
@@ -34,17 +35,72 @@ use crate::{
     state::VaultConfig,
 };
 
-/// `owner` is on the investor allowlist (spec §5.5).
-pub(crate) fn require_allowlisted(
+/// The NAV per share range (`NAV_SCALE`) a fill may run at (ADR 0023).
+/// `/admin` composes it at proposal time around the NAV it shows; a fill at
+/// a NAV outside `[min, max]` refuses with `NavOutOfBounds`, so a proposal
+/// that waits on the time lock never executes at a NAV the admin did not
+/// agree to.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NavBounds {
+    pub min: u64,
+    pub max: u64,
+}
+
+impl NavBounds {
+    /// `min ≤ max`, else `InvalidParameter`.
+    pub fn validate(&self) -> Result<()> {
+        require!(self.min <= self.max, MutavError::InvalidParameter);
+        Ok(())
+    }
+
+    /// `nav` is inside the bounds, else `NavOutOfBounds`.
+    pub fn check(&self, nav: u64) -> Result<()> {
+        require!(
+            self.min <= nav && nav <= self.max,
+            MutavError::NavOutOfBounds
+        );
+        Ok(())
+    }
+}
+
+/// How an investor shows it may enter the reserve (spec §5.5).
+///
+/// **Append-only.** Borsh encodes the variant index, so a variant is never
+/// removed or reordered; an attestation variant (`kyc_attester`, carved in
+/// `VaultConfig`) is added at the end when it is built.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
+pub enum Eligibility {
+    /// A proof that the owner is a leaf of `investor_allowlist_root`.
+    Merkle { proof: Vec<[u8; 32]> },
+}
+
+/// `owner` is eligible (spec §5.5): on the investor allowlist.
+pub(crate) fn require_eligible(
     config: &VaultConfig,
     owner: &Pubkey,
-    proof: &[[u8; 32]],
+    eligibility: &Eligibility,
 ) -> Result<()> {
-    require!(
-        allowlist::verify(&config.investor_allowlist_root, owner, proof),
-        MutavError::NotAllowlisted
-    );
+    match eligibility {
+        Eligibility::Merkle { proof } => require!(
+            allowlist::verify(&config.investor_allowlist_root, owner, proof),
+            MutavError::NotAllowlisted
+        ),
+    }
     Ok(())
+}
+
+/// The remaining accounts of a gate (`refresh`, `fulfil_deposits`,
+/// `fulfil_redeems`): the first `config.adapter_count` are the `AdapterState`
+/// PDAs in bitmap order (ADR 0018, ADR 0027), the rest follow (request PDAs).
+/// This binary values no adapter, so a reserve with adapters fails closed
+/// (`FeatureNotSupported`); with `adapter_count == 0` every remaining
+/// account is passed through unchanged.
+pub(crate) fn split_adapter_accounts<'a, 'info>(
+    config: &VaultConfig,
+    remaining: &'a [AccountInfo<'info>],
+) -> Result<&'a [AccountInfo<'info>]> {
+    require!(config.adapter_count == 0, MutavError::FeatureNotSupported);
+    Ok(remaining)
 }
 
 /// `caps.min_request ≤ assets ≤ caps.max_request` (spec §5.5, §8).
@@ -58,6 +114,39 @@ pub(crate) fn require_request_size(config: &VaultConfig, assets: u64) -> Result<
         MutavError::RequestTooLarge
     );
     Ok(())
+}
+
+/// The owner's associated token account for `mint` under `token_program`:
+/// the only destination of a refund, a share mint or a redemption payout
+/// (ADR 0023).
+pub fn owner_ata(owner: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> Pubkey {
+    get_associated_token_address_with_program_id(owner, mint, token_program)
+}
+
+/// Creates `ata` (the owner's associated token account for `mint`) if it
+/// does not exist, with `payer` paying the rent (ADR 0023). Idempotent: an
+/// existing account is left as is. The address is checked by the caller's
+/// account constraint and again by the associated token program.
+pub(crate) fn create_owner_ata<'info>(
+    payer: AccountInfo<'info>,
+    ata: AccountInfo<'info>,
+    owner: AccountInfo<'info>,
+    mint: AccountInfo<'info>,
+    system_program: AccountInfo<'info>,
+    token_program: AccountInfo<'info>,
+    associated_token_program: Pubkey,
+) -> Result<()> {
+    associated_token::create_idempotent(CpiContext::new(
+        associated_token_program,
+        associated_token::Create {
+            payer,
+            associated_token: ata,
+            authority: owner,
+            mint,
+            system_program,
+            token_program,
+        },
+    ))
 }
 
 /// `DepositRequest` PDA of `seq`.

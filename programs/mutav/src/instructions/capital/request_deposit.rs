@@ -1,4 +1,5 @@
-//! `request_deposit(assets, proof)` (spec §5.5).
+//! `request_deposit(assets, min_shares_out, eligibility)` (spec §5.5;
+//! ADR 0023). `min_shares_out` is the owner's price limit (`0` = none).
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
@@ -9,7 +10,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::DepositRequested,
-    instructions::capital::{require_allowlisted, require_request_size},
+    instructions::capital::{require_eligible, require_request_size, Eligibility},
     state::{DepositRequest, VaultConfig, VaultState},
 };
 
@@ -63,12 +64,13 @@ pub struct RequestDeposit<'info> {
 pub fn handle_request_deposit(
     ctx: Context<RequestDeposit>,
     assets: u64,
-    proof: Vec<[u8; 32]>,
+    min_shares_out: u64,
+    eligibility: Eligibility,
 ) -> Result<()> {
     let config = &ctx.accounts.config;
     let owner = ctx.accounts.owner.key();
     require!(!config.paused, MutavError::Paused);
-    require_allowlisted(config, &owner, &proof)?;
+    require_eligible(config, &owner, &eligibility)?;
     require_request_size(config, assets)?;
     // The source's owner is the signer (account constraint).
 
@@ -102,6 +104,7 @@ pub fn handle_request_deposit(
     r.seq = seq;
     r.assets = assets;
     r.requested_at = now;
+    r.min_shares_out = min_shares_out;
     r.status = DEPOSIT_PENDING;
 
     emit_cpi!(DepositRequested {
