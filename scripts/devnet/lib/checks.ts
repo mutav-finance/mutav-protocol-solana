@@ -18,12 +18,29 @@ export function programDataUpgradeAuthority(data: Uint8Array): Address | null {
   return getAddressDecoder().decode(data.subarray(13, 45));
 }
 
+const TOKEN_2022_PROGRAM = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+/** Base Mint and Account sizes; Token-2022 puts its account type byte right after an Account's 165. */
+const MINT_LEN = 82;
+const ACCOUNT_LEN = 165;
+const ACCOUNT_TYPE_MINT = 1;
+
+/**
+ * Mint-sized: a classic SPL mint is exactly 82 bytes; a Token-2022 mint is
+ * 82 bytes, or longer than 165 with account type byte 1 (Mint). A 165-byte
+ * token account (or a Token-2022 account with extensions) is refused.
+ */
+function isMintSized(owner: Address, data: Uint8Array): boolean {
+  if (data.length === MINT_LEN) return true;
+  if (owner !== TOKEN_2022_PROGRAM) return false;
+  return data.length > ACCOUNT_LEN && data[ACCOUNT_LEN] === ACCOUNT_TYPE_MINT;
+}
+
 /** Every cap is sized for BRS base units (6 dp); a 9-dp mint would shrink them 1000x. */
 export const RESERVE_DECIMALS = 6;
 
 /**
  * The reserve mint as read from the chain: owned by the configured token
- * program, an initialised mint, with 6 decimals. Returns the failures.
+ * program, mint-sized, initialised, with 6 decimals. Returns the failures.
  */
 export function checkReserveMint(
   account: { owner: Address; data: Uint8Array } | null,
@@ -35,7 +52,9 @@ export function checkReserveMint(
     out.push(`reserve mint ${cfg.reserveMint} is owned by ${account.owner}, not reserveTokenProgram ${cfg.reserveTokenProgram}`);
   }
   // SPL Token / Token-2022 base Mint layout: decimals at 44, is_initialized at 45.
-  if (account.data.length < 82) return [...out, `reserve mint ${cfg.reserveMint} is not a mint (${account.data.length} bytes)`];
+  if (!isMintSized(account.owner, account.data)) {
+    return [...out, `reserve mint ${cfg.reserveMint} is not a mint (${account.data.length} bytes)`];
+  }
   if (account.data[45] !== 1) out.push(`reserve mint ${cfg.reserveMint} is not initialised`);
   const decimals = account.data[44]!;
   if (decimals !== RESERVE_DECIMALS) out.push(`reserve mint ${cfg.reserveMint} has decimals ${decimals}, expected ${RESERVE_DECIMALS}`);
