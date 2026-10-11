@@ -154,25 +154,28 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
         Rebuilt from the ledger: today&apos;s stable assets, walked back through every dated guarantee fee, issuer income, claim payment and queue fill.
       </figcaption>
 
-      <table className="sr-only">
-        <caption>Stable assets after each movement</caption>
-        <thead>
-          <tr>
-            <th scope="col">Date (UTC)</th>
-            <th scope="col">Movement</th>
-            <th scope="col">Stable assets</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pts.map((p, i) => (
-            <tr key={i}>
-              <td>{fmtTime(p.at)}</td>
-              <td>{p.step ? `${KIND_LABEL[p.step.kind]} ${p.step.delta >= 0n ? "+" : "−"}${fmtBrs(p.step.delta < 0n ? -p.step.delta : p.step.delta)}` : "Period start"}</td>
-              <td>{fmtBrs(p.value)}</td>
+      {/* sr-only on a <div>: a table sizes to its content and would widen the page. */}
+      <div className="sr-only">
+        <table>
+          <caption>Stable assets after each movement</caption>
+          <thead>
+            <tr>
+              <th scope="col">Date (UTC)</th>
+              <th scope="col">Movement</th>
+              <th scope="col">Stable assets</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {pts.map((p, i) => (
+              <tr key={i}>
+                <td>{fmtTime(p.at)}</td>
+                <td>{p.step ? `${KIND_LABEL[p.step.kind]} ${p.step.delta >= 0n ? "+" : "−"}${fmtBrs(p.step.delta < 0n ? -p.step.delta : p.step.delta)}` : "Period start"}</td>
+                <td>{fmtBrs(p.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }
