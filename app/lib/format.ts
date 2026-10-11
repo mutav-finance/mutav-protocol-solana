@@ -84,6 +84,17 @@ export function parseBrs(input: string, decimals = BRS_DECIMALS): bigint | null 
   return v > 0n ? v : null;
 }
 
+/**
+ * A cover multiple ("3", "1.15") as hundredths, exactly, with no float (A8:
+ * `Number("1.15") * 100` is 114.999…). Null for invalid or over-precise input.
+ */
+export function parseHundredths(input: string): bigint | null {
+  const t = input.trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  const [w = "0", f = ""] = t.split(".");
+  return BigInt(w) * 100n + BigInt(f.padEnd(2, "0"));
+}
+
 /** Base units as an exact input string (`"1234.5"`): no grouping, trailing zeros trimmed; parseBrs reads it back. */
 export function toInput(base: bigint, decimals = BRS_DECIMALS): string {
   const scale = 10n ** BigInt(decimals);
