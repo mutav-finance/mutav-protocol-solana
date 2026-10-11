@@ -46,7 +46,7 @@ export function Page({ children, title, lede, banner, intro }: { children: React
         <header className="flex flex-col items-center gap-5 pb-4 text-center">
           <div className="relative flex h-[200px] w-full max-w-[960px] items-end justify-center overflow-hidden border pb-8 md:h-[280px] md:pb-12">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={banner} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 55%", opacity: 0.16 }} />
+            <img src={banner} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover grayscale" style={{ objectPosition: "50% 55%", opacity: 0.16 }} />
             <h1 className="font-display text-(--color-text) relative m-0 px-6 font-bold uppercase" style={{ fontSize: "clamp(24px, 4.2vw, 48px)", letterSpacing: "0.04em", lineHeight: 1.1 }}>
               {title}
             </h1>

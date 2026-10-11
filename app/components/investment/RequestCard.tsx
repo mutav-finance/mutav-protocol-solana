@@ -136,7 +136,7 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
         <p className="font-mono text-(--color-text-3) m-0 text-2xs">
           Limits {money.fmt(caps.minRequest, 0)} – {money.fmt(caps.maxRequest, 0)} per request{deposit ? "" : ", valued at NAV now"}
         </p>
-        <div className="[&>div>button]:h-11 [&>div>button]:w-full">
+        <div className="[&>div>button]:h-11 [&>div>button]:w-full [&>div>button:disabled]:bg-(--color-surface-3) [&>div>button:disabled]:text-(--color-text-3) [&>div>button:disabled]:opacity-100">
           {deposit ? (
             <Action label="Request deposit" disabled={!canRequest} request={amount ? { kind: "request_deposit", assets: amount } : null} />
           ) : (

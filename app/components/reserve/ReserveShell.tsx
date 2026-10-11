@@ -112,7 +112,7 @@ export function ReserveShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <div className="bg-(--color-canvas) sticky top-14 z-[90] border-b" style={PAD}>
-        <nav aria-label="Transparency views" className="scroll-dark -mb-px flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        <nav aria-label="Transparency views" className="scroll-dark scroll-fade-x -mb-px flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {TABS.map(([href, label]) => {
             const active = isActive(href);
             return (
@@ -120,7 +120,7 @@ export function ReserveShell({ children }: { children: ReactNode }) {
                 key={href}
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`font-body inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm whitespace-nowrap no-underline ${active ? "text-(--color-text) border-(--color-text) font-medium" : "text-(--color-text-2) hover:text-(--color-text) border-transparent"}`}
+                className={`font-body inline-flex shrink-0 items-center gap-2 border-b px-4 py-3 text-sm whitespace-nowrap no-underline ${active ? "text-(--color-text) border-(--color-accent) font-medium" : "text-(--color-text-2) hover:text-(--color-text) border-transparent"}`}
               >
                 {label}
               </Link>

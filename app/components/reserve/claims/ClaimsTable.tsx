@@ -25,11 +25,12 @@ const TIPS = {
 
 type Status = { label: string; color: string; title?: string; rank: number };
 
-/** SLA status of one claim: late (recorded on-chain), past SLA (not yet recorded) or on time. */
+/** SLA status of one claim: late (recorded on-chain), past SLA (not yet recorded), awaiting payment, or on time. */
 export function slaStatus(c: ClaimRow): Status {
   if (c.lateOnChain) return { label: "late", color: "var(--color-error)", rank: 0 };
   if (c.overdue) return { label: "past SLA", color: "var(--color-copper)", title: "Marked late on-chain at the next refresh.", rank: 1 };
-  return { label: "on time", color: "var(--color-text-3)", rank: 2 };
+  if (c.stage === "filed") return { label: "awaiting payment", color: "var(--color-text-3)", title: "Filed, not paid yet. The settlement deadline starts at payment.", rank: 2 };
+  return { label: "on time", color: "var(--color-text-3)", rank: 3 };
 }
 
 /** 6px square badge with a mono label (brand status mark, no fill behind the text). */

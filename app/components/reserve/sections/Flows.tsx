@@ -53,11 +53,11 @@ export function PeriodPicker({ value, onChange, label }: { value: Period; onChan
             onClick={() => onChange(p)}
             className="font-mono h-8 px-3 text-2xs hover:!bg-transparent"
             style={{
-              border: `1px solid ${on ? "var(--color-accent)" : "var(--color-border)"}`,
+              border: `1px solid ${on ? "var(--color-text)" : "var(--color-border)"}`,
               marginLeft: i === 0 ? 0 : -1,
               position: "relative",
               zIndex: on ? 1 : 0,
-              color: on ? "var(--color-accent)" : "var(--color-text-2)",
+              color: on ? "var(--color-text)" : "var(--color-text-2)",
             }}
           >
             {p}
@@ -165,7 +165,7 @@ function FlowGroup({ title, note, net, bars }: { title: string; note: string; ne
             <Row
               key={b.label}
               labelWidth={170}
-              label={<RowLabel sub={<span className="font-mono text-(--color-text-3) truncate text-2xs">{b.sub}</span>}>{b.label}</RowLabel>}
+              label={<RowLabel sub={<span className="font-body text-(--color-text-3) text-2xs">{b.sub}</span>}>{b.label}</RowLabel>}
               value={`${sign}${fmtBrs(b.amount, 0)}`}
               summary={`${b.label}: ${sign}${fmtBrs(b.amount)} ${b.dir === "in" ? "into" : "out of"} the reserve. ${b.sub}.`}
             >
@@ -198,7 +198,7 @@ function LedgerRow({ f }: { f: FlowRow }) {
         </span>
       </td>
       <td><Mono dim>{f.at !== null ? fmtTime(f.at) : "—"}</Mono></td>
-      <Num color={f.reserveDelta >= 0n ? "var(--color-success)" : "var(--color-text)"}>{signed(f.reserveDelta, fmtBrs)}</Num>
+      <Num>{signed(f.reserveDelta, fmtBrs)}</Num>
       <Num>{f.treasury > 0n ? fmtBrs(f.treasury) : "—"}</Num>
       <td><Explorer value={f.account} kind={f.isTx ? "tx" : "address"} /></td>
     </tr>
@@ -264,7 +264,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
       </div>
 
       {/* [E] The dated ledger; the period filter applies here only. */}
-      <div className="flex flex-col gap-4">
+      <div id="ledger" className="flex scroll-mt-32 flex-col gap-4">
         <BlockHead action={<PeriodPicker value={period} onChange={pick} label="Ledger period" />}>
           Ledger{all.length > 0 && <Mono dim> · {rows.length}</Mono>}
         </BlockHead>

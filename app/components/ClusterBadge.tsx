@@ -9,7 +9,7 @@ export function ClusterBadge() {
     <span
       className="font-mono"
       title={MOCK ? "Mock chain: fictional data for UI work; transactions are disabled" : "Solana cluster this app reads and writes"}
-      style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--color-copper)", border: "1px solid var(--color-copper-dim)", padding: "2px 6px", textTransform: "uppercase" }}
+      style={{ fontSize: 10, letterSpacing: "0.08em", color: "var(--color-text-3)", border: "1px solid var(--color-border)", padding: "2px 6px", textTransform: "uppercase" }}
     >
       {MOCK ? `${CLUSTER} · mock data` : CLUSTER}
     </span>

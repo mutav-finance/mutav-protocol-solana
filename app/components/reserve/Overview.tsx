@@ -106,7 +106,7 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
 
   const kpis: { label: string; value: string; def: string; href?: string }[] = [
     { label: "Coverage ratio", value: ratio, def: "Stable assets held against the cover the reserve must hold." },
-    { label: "NAV per share", value: fmtNav(s.navPerShare), def: "What each share is worth, after open claims are set aside.", href: "/reserve/capital" },
+    { label: "NAV per share", value: fmtNav(s.navPerShare), def: "What each share is worth, after open claims are set aside." },
     {
       label: "Remaining cover",
       value: fmtBrs(s.remainingCoverTotal),
@@ -183,9 +183,9 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
 // ── 2 · Where the capital sits ──────────────────────────────────────────────
 
 const PROVISION = "var(--color-copper)";
-const REST = "var(--color-chart-1)";
-const EARMARK = "var(--color-chart-2)";
-const FREE = "var(--color-success)";
+const REST = "var(--color-chart-2)";
+const EARMARK = "var(--color-text-3)";
+const FREE = "var(--color-chart-1)";
 const SHORT = "var(--color-error)";
 
 /** A ring of segments over `axis`; each segment keeps a 1-unit gap so neighbours read apart. */
@@ -344,7 +344,7 @@ function RecentActivity({ r, rows }: { r: ReserveView; rows: FlowRow[] }) {
             {plural(recent, "movement")} in the last {ACTIVITY_DAYS.toString()} days
           </Mono>
         </span>
-        <Link href="/reserve/capital" className="ext-link font-body text-xs">
+        <Link href="/reserve/capital#ledger" className="ext-link font-body text-xs">
           Full ledger →
         </Link>
       </div>
@@ -367,14 +367,14 @@ function ActivityRow({ x, now, rpc, last }: { x: FlowRow; now: bigint; rpc: stri
   return (
     <li className="grid list-none grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3.5 py-3" style={{ borderBottom: last ? "none" : "1px solid var(--color-border)" }}>
       <span aria-hidden="true" className="bg-(--color-surface-2) inline-flex size-9 items-center justify-center border">
-        <Mono style={{ fontSize: 14, color: into ? "var(--color-success)" : "var(--color-text-2)" }}>{into ? "↓" : "↑"}</Mono>
+        <Mono style={{ fontSize: 14, color: "var(--color-text-2)" }}>{into ? "↓" : "↑"}</Mono>
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="font-body text-(--color-text) text-[13px]">{FLOW_LABEL[x.kind]}</span>
         <Mono style={{ ...NUM, fontSize: 11, color: "var(--color-text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.detail}</Mono>
       </span>
       <span className="flex flex-col items-end gap-0.5">
-        <Mono style={{ ...NUM, fontSize: 13, color: into ? "var(--color-success)" : "var(--color-text)" }}>
+        <Mono style={{ ...NUM, fontSize: 13, color: "var(--color-text)" }}>
           {into ? "+" : "−"}
           {fmtBrs(abs(x.reserveDelta))}
         </Mono>
