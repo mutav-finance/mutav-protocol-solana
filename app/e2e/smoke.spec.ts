@@ -36,12 +36,12 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await page.goto("/reserve");
     await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
     await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();
-    await expect(page.getByText("2 active · Σ remaining cover R$ 19,500.00 = remaining_cover_total")).toBeVisible();
-    await expect(page.getByRole("table", { name: "Remaining cover by guarantee" }).locator("tbody tr")).toHaveCount(2);
-    await expect(page.getByRole("table", { name: "Per-agency exposure" }).locator("tbody tr")).toHaveCount(2);
+    await expect(page.getByText("3 active · Σ remaining cover R$ 35,500.00 = remaining_cover_total")).toBeVisible();
+    await expect(page.getByRole("table", { name: "Remaining cover by guarantee" }).locator("tbody tr")).toHaveCount(3);
+    await expect(page.getByRole("table", { name: "Per-agency exposure" }).locator("tbody tr")).toHaveCount(3);
     const claims = page.getByRole("table", { name: "Claims timeline" });
     await expect(claims.locator("tbody tr")).toHaveCount(1);
-    await expect(claims).toContainText("on time");
+    await expect(claims).toContainText("default");
     const flows = page.getByRole("table", { name: "Money flows" });
     await expect(flows).toContainText("Guarantee fee");
     await expect(flows).toContainText("Claim payment");
@@ -123,7 +123,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   test("/simulator — static reserve simulator in protocol terms, one full view", async ({ page }) => {
     await page.goto("/simulator");
     await expect(page.getByRole("heading", { name: "Reserve simulator", level: 1 })).toBeVisible();
-    await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0,1");
+    await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0,25");
     await expect(page.locator("#glance")).toContainText("Coverage & safety");
     await expect(page.locator("#chart")).toContainText("Stable assets vs coverage required");
     await expect(page.locator("#kstrip")).toContainText("What the reserve earns");
