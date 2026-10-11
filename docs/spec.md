@@ -4,7 +4,7 @@
 
 **Pilot assets.** The pilot reserve holds BRS only; more assets can be added through adapters (TESOURO is the first candidate, pending an Etherfuse BRS path; ADR 0018). The pricing (§7) and allocation instructions (§5.7) below define that first adapter. The devnet binary has no adapter instructions, no price fields and no settlement floor (ADR 0019): nothing can leave BRS, `stable_assets = brs_balance`, and no price is read. **Allocation limits (design, ADR 0018, built with the first adapter upgrade):** a floor on the settlement token, `min_settlement_bps` (the minimum share of stable assets held in `reserve_mint`), plus each adapter's own `cap`, `max_share_bps` and price feed in its `AdapterState` PDA (§3.9; seed reserved). `VaultConfig` records which adapters exist through `adapter_count` and `adapter_bitmap`, both `0` in the pilot.
 
-**Target design and devnet binary.** This spec describes the target design. Parts of it are built later: the ADR 0012 lifecycle and its fields, claim notices, `approve_claim` and the other Wave 2 instructions (ADRs 0020, 0021, 0024), adapters and pricing, partial fills (ADR 0010) and phase 2 (§13). Their fields are **carves**: they are not in the devnet layout, and the padding sized before the freeze holds every one of them (§14.2, ADR 0019). Where a section describes something the devnet binary does not have, it says so.
+**Target design and devnet binary.** This spec describes the target design. Parts of it are built later: the ADR 0012 lifecycle and its fields, claim notices, the Wave 2 instructions other than `approve_claim` (ADRs 0020, 0021, 0024), adapters and pricing, partial fills (ADR 0010) and phase 2 (§13). Their fields are **carves**: they are not in the devnet layout, and the padding sized before the freeze holds every one of them (§14.2, ADR 0019). Where a section describes something the devnet binary does not have, it says so.
 
 Where a value or behaviour is not yet decided, this spec says **TBD** and lists it under [§12 Open questions](#12-open-questions). Items marked *(derived)* are not named in the project document but follow from a rule it states; they are the minimum the program needs to enforce that rule.
 
@@ -314,7 +314,7 @@ Seeds: `["claim", guarantee, notice_ref_hash]`. One per claim notice, from filin
 | `payments_account` | `Pubkey` | Destination at payment time. Default until paid |
 | `pix_e2e_hash` | `[u8; 32]` | Keyed hash of the PIX end-to-end ID (key held by the operator, domain-separated; §3.5). Zero until settled |
 | `settled_at` | `i64` | `0` until settled |
-| `approved_amount` | `u64` | *Carve (ADR 0019), `0`.* The exact amount the reserve admin approved for a claim above `max_claim_per_call` (`approve_claim`, Wave 2). `0` = not approved. Read by no instruction of the devnet binary |
+| `approved_amount` | `u64` | *Carved by ADR 0019.* The exact amount the reserve admin approved for a claim above `max_claim_per_call`. `0` = not approved. Written by `approve_claim` (always the filing's provision); read by `pay_claim` above the per-call cap (ADR 0021) |
 | `_reserved` | `[u8; 192]` | Zeroed. Holds the ADR 0012 claim fields (49 bytes) and the settlement fields the filing does not already carry (65 bytes) below without a migration, with about 78 bytes to spare (§14.2) |
 
 Size: **380 bytes** including the discriminator, pinned in `constants.rs`.
@@ -791,7 +791,7 @@ Proposed in [ADR 0017](decisions/0017-brs-income-intake.md), pending founder con
   1. The `ClaimFiling` exists and is `FILED` (`ClaimNotFiled`).
   2. `expected_amount == filing.provision` (`ExpectedAmountMismatch`); the payment `amount` is the provision, which is `> 0` (`InvalidParameter`). A payment never releases more provision than it pays. To settle for less, the operator amends the filing first (`amend_claim`, a later upgrade).
   3. `amount ≤ filing.provision + (leg_cover − leg_paid − leg_provision)` ([ADR 0014](decisions/0014-pay-claim-bound-with-concurrent-filings.md)), which an exact payment always meets; checked subtraction, so a broken invariant 2 surfaces as `MathOverflow`.
-  4. **Per-call cap:** if `amount > caps.max_claim_per_call`, the filing's `approved_amount == amount`, set by the admin's `approve_claim` (`ClaimCallCapExceeded`). `approve_claim` is a later upgrade: until it ships, such a claim is paid **bank-first** by MUTAV and stays filed, and the reserve reimburses `payments_account` once the approval exists (ADR 0021).
+  4. **Per-call cap:** if `amount > caps.max_claim_per_call`, the filing's `approved_amount == amount`, set by the admin's `approve_claim` (`ClaimCallCapExceeded`). While the approval waits for the admin time lock, MUTAV may pay such a claim **bank-first**; it stays filed, and the reserve reimburses `payments_account` once the approval exists (ADR 0021).
   5. **Claim window** (ADR 0019): roll the 31-day ring to today (`day = now / 86_400`; a clock step back keeps the anchor's day, and the payment is booked on that effective day), clearing the buckets of days that left the window; then `Σ claim_day_buckets + amount ≤ caps.max_claim_per_period`: the payments of the last 31 UTC days, this one included (`ClaimPeriodCapExceeded`). Approved payments count too.
   6. Destination equals `config.payments_account`.
   7. `brs_balance ≥ amount` (liquid BRS; `InsufficientLiquidBalance`), and `reserve` is not frozen (`ReserveFrozen`).
@@ -803,12 +803,20 @@ Proposed in [ADR 0017](decisions/0017-brs-income-intake.md), pending founder con
 
 #### `approve_claim(notice_ref_hash, amount)`
 
-*Built later (Wave 2, ADR 0021); not in the devnet binary.* Replaces the earlier `pay_claim_admin` design.
+[ADR 0021](decisions/0021-claims-approval-amendment-exact-payment.md) decisions 2 and 8. Replaces the earlier `pay_claim_admin` design. Shipped as the first Wave 2 upgrade: a new instruction, with no change to any account layout or to an existing instruction.
 
-- **Signer:** admin (the Squads vault, through the admin time lock). Never paused, never coverage-gated.
-- **Rules:** the filing is `FILED`. Records `approved_amount = amount` on it. The admin approves the amount that leaves the reserve, not the merits of the claim.
-- **Effect on payment:** above `max_claim_per_call`, `pay_claim` pays only when `approved_amount` equals the provision. Approved payments count toward the sliding period cap; for an unusually large claim `/admin` bundles a `set_config` raise of `max_claim_per_period` with the approval. Any amendment of the filing resets the approval.
+- **Signer:** admin (the Squads vault, through the admin time lock). The operator, the pauser and the guardians cannot approve. Never paused, never coverage-gated, no mode check; it works with the operator revoked.
+- **Accounts:** `config`, `guarantee`, `claim_filing` (writable). No token account: it moves no funds.
+- **Rules:**
+  1. The `ClaimFiling` exists (an Anchor account error otherwise), its version, leg and status are known (`UnsupportedVersion`; `WITHDRAWN` is refused this way until `amend_claim` and `refile_claim` ship, ADR 0019), and it is `FILED` (`ClaimNotFiled`). A paid or settled filing takes no approval.
+  2. `amount > 0` (`InvalidParameter`): `0` means "not approved" and is never written as an approval.
+  3. `amount == filing.provision` (`ExpectedAmountMismatch`). The admin approves the exact amount that leaves the reserve, not the merits of the claim. A proposal composed before an amendment no longer matches and is refused when it executes.
+  4. **No cap is read.** An approval below or at `max_claim_per_call` is recorded and changes nothing at payment. The sliding period cap is applied by `pay_claim`, and approved payments count toward it.
+- **Effects:** `approved_amount = amount` on the filing. Re-approving the same amount is allowed and idempotent. Nothing else changes: no state, config, guarantee or token balance.
+- **Effect on payment:** above `max_claim_per_call`, `pay_claim` pays only when `approved_amount` equals the provision. For an unusually large claim, `/admin` bundles a `set_config` raise of `max_claim_per_period` with the approval in one proposal, and a later `set_config` lowers it back. Any amendment of the filing resets the approval (`amend_claim`, `refile_claim`: later upgrades).
 - **Latency:** the time lock counts from approval; bank-first payment covers the delay (§2.2).
+- **Errors:** `Unauthorized`, `UnsupportedVersion`, `ClaimNotFiled`, `InvalidParameter`, `ExpectedAmountMismatch`. No new error codes.
+- **Event:** `ClaimApproved { guarantee_id, leg, notice_ref_hash, amount, previous_amount, max_claim_per_call }` (`previous_amount`: the approval it replaces, `0` = none; `max_claim_per_call`: the cap at approval time).
 
 #### `settle_payout(notice_ref_hash, pix_e2e_hash, quitacao_hash)`
 
@@ -1050,6 +1058,7 @@ Emitted with `emit_cpi!` for every token movement and every state change the mut
 | `ClaimFiled` | `guarantee_id, leg, amount, notice_ref_hash, provisions_after, coverage_required_after` |
 | `ClaimPaid` | `guarantee_id, leg, amount, notice_ref_hash, payments_account, provisions_after, coverage_required_after, window_paid, brs_balance_after, claims_paid_total` (`window_paid`: the 31-day sum after the payment) |
 | `PayoutSettled` | `guarantee_id, notice_ref_hash, pix_e2e_hash` |
+| `ClaimApproved` | `guarantee_id, leg, notice_ref_hash, amount, previous_amount, max_claim_per_call` (`approve_claim`, ADR 0021; appended after the devnet release) |
 | `DepositRequested` / `DepositCancelled` / `SharesClaimed` | `owner, seq, assets, min_shares_out` / `owner, seq, assets, by` (the owner) / `owner, seq, shares` |
 | `DepositFilled` (one per fill) | `owner, seq, assets, shares, nav, shares_outstanding_after, net_assets_after` |
 | `DepositsFulfilled` | `from_seq, to_seq, assets, shares, nav, deposited_assets_total, minted_shares_total` |
