@@ -315,7 +315,8 @@ Seeds: `["claim", guarantee, notice_ref_hash]`. One per claim notice, from filin
 | `pix_e2e_hash` | `[u8; 32]` | Keyed hash of the PIX end-to-end ID (key held by the operator, domain-separated; §3.5). Zero until settled |
 | `settled_at` | `i64` | `0` until settled |
 | `approved_amount` | `u64` | *Carved by ADR 0019.* The exact amount the reserve admin approved for a claim above `max_claim_per_call`. `0` = not approved. Written by `approve_claim` (always the filing's provision); read by `pay_claim` above the per-call cap (ADR 0021) |
-| `_reserved` | `[u8; 192]` | Zeroed. Holds the ADR 0012 claim fields (49 bytes) and the settlement fields the filing does not already carry (65 bytes) below without a migration, with about 78 bytes to spare (§14.2) |
+| `revision` | `u16` | *Carved from `_reserved` (ADR 0021 decision 8); the v1 offset of `_reserved`, size unchanged.* The filing's version: `0` as `file_claim` creates it (a real revision, not "unset"; v1 filings read `0`). `amend_claim` and `refile_claim` (later upgrades) increment it and reset `approved_amount`. `approve_claim` must name it (`expected_revision`) |
+| `_reserved` | `[u8; 190]` | Zeroed. Holds the ADR 0012 claim fields (49 bytes) and the settlement fields the filing does not already carry (65 bytes) below without a migration, with about 76 bytes to spare (§14.2) |
 
 Size: **380 bytes** including the discriminator, pinned in `constants.rs`.
 
@@ -801,22 +802,23 @@ Proposed in [ADR 0017](decisions/0017-brs-income-intake.md), pending founder con
 - **Errors:** `Unauthorized`, `UnsupportedVersion`, `ClaimNotFiled`, `ExpectedAmountMismatch`, `InvalidParameter`, `ExceedsRemainingCover`, `ClaimCallCapExceeded`, `ClaimPeriodCapExceeded`, `InvalidPaymentsAccount`, `InsufficientLiquidBalance`, `ReserveFrozen`, `InvalidMint`, `InvalidTokenProgram`, `MathOverflow`.
 - **Event:** `ClaimPaid { guarantee_id, leg, amount, notice_ref_hash, payments_account, provisions_after, coverage_required_after, window_paid, brs_balance_after, claims_paid_total }` (`window_paid` is the 31-day sum after this payment); with ADR 0012, `GuaranteeExhausted { id, valor_afiancado }` on exhaustion.
 
-#### `approve_claim(notice_ref_hash, amount)`
+#### `approve_claim(notice_ref_hash, amount, expected_revision)`
 
-[ADR 0021](decisions/0021-claims-approval-amendment-exact-payment.md) decisions 2 and 8. Replaces the earlier `pay_claim_admin` design. Shipped as the first Wave 2 upgrade: a new instruction, with no change to any account layout or to an existing instruction.
+[ADR 0021](decisions/0021-claims-approval-amendment-exact-payment.md) decisions 2 and 8. Replaces the earlier `pay_claim_admin` design. Shipped as the first Wave 2 upgrade: a new instruction plus the `ClaimFiling.revision` carve from padding (no size or offset change), with no change to an existing instruction's arguments or accounts.
 
 - **Signer:** admin (the Squads vault, through the admin time lock). The operator, the pauser and the guardians cannot approve. Never paused, never coverage-gated, no mode check; it works with the operator revoked.
 - **Accounts:** `config`, `guarantee`, `claim_filing` (writable). No token account: it moves no funds.
 - **Rules:**
   1. The `ClaimFiling` exists (an Anchor account error otherwise), its version, leg and status are known (`UnsupportedVersion`; `WITHDRAWN` is refused this way until `amend_claim` and `refile_claim` ship, ADR 0019), and it is `FILED` (`ClaimNotFiled`). A paid or settled filing takes no approval.
   2. `amount > 0` (`InvalidParameter`): `0` means "not approved" and is never written as an approval.
-  3. `amount == filing.provision` (`ExpectedAmountMismatch`). The admin approves the exact amount that leaves the reserve, not the merits of the claim. A proposal composed before an amendment no longer matches and is refused when it executes.
-  4. **No cap is read.** An approval below or at `max_claim_per_call` is recorded and changes nothing at payment. The sliding period cap is applied by `pay_claim`, and approved payments count toward it.
+  3. `amount == filing.provision` (`ExpectedAmountMismatch`). The admin approves the exact amount that leaves the reserve, not the merits of the claim.
+  4. `expected_revision == filing.revision` (`ClaimRevisionMismatch`). A proposal composed against an earlier version of the filing is refused when it executes, even when an amendment X → Y → X has restored the same amount.
+  5. **No cap is read.** An approval below or at `max_claim_per_call` is recorded and changes nothing at payment. The sliding period cap is applied by `pay_claim`, and approved payments count toward it.
 - **Effects:** `approved_amount = amount` on the filing. Re-approving the same amount is allowed and idempotent. Nothing else changes: no state, config, guarantee or token balance.
 - **Effect on payment:** above `max_claim_per_call`, `pay_claim` pays only when `approved_amount` equals the provision. For an unusually large claim, `/admin` bundles a `set_config` raise of `max_claim_per_period` with the approval in one proposal, and a later `set_config` lowers it back. Any amendment of the filing resets the approval (`amend_claim`, `refile_claim`: later upgrades).
 - **Latency:** the time lock counts from approval; bank-first payment covers the delay (§2.2).
-- **Errors:** `Unauthorized`, `UnsupportedVersion`, `ClaimNotFiled`, `InvalidParameter`, `ExpectedAmountMismatch`. No new error codes.
-- **Event:** `ClaimApproved { guarantee_id, leg, notice_ref_hash, amount, previous_amount, max_claim_per_call }` (`previous_amount`: the approval it replaces, `0` = none; `max_claim_per_call`: the cap at approval time).
+- **Errors:** `Unauthorized`, `UnsupportedVersion`, `ClaimNotFiled`, `InvalidParameter`, `ExpectedAmountMismatch`, `ClaimRevisionMismatch` (appended), and Anchor's seeds error for a filing or guarantee that is not this reserve's.
+- **Event:** `ClaimApproved { guarantee_id, leg, notice_ref_hash, amount, revision, previous_amount, max_claim_per_call }` (`previous_amount`: the approval it replaces, `0` = none; `max_claim_per_call`: the cap at approval time).
 
 #### `settle_payout(notice_ref_hash, pix_e2e_hash, quitacao_hash)`
 
@@ -1058,7 +1060,7 @@ Emitted with `emit_cpi!` for every token movement and every state change the mut
 | `ClaimFiled` | `guarantee_id, leg, amount, notice_ref_hash, provisions_after, coverage_required_after` |
 | `ClaimPaid` | `guarantee_id, leg, amount, notice_ref_hash, payments_account, provisions_after, coverage_required_after, window_paid, brs_balance_after, claims_paid_total` (`window_paid`: the 31-day sum after the payment) |
 | `PayoutSettled` | `guarantee_id, notice_ref_hash, pix_e2e_hash` |
-| `ClaimApproved` | `guarantee_id, leg, notice_ref_hash, amount, previous_amount, max_claim_per_call` (`approve_claim`, ADR 0021; appended after the devnet release) |
+| `ClaimApproved` | `guarantee_id, leg, notice_ref_hash, amount, revision, previous_amount, max_claim_per_call` (`approve_claim`, ADR 0021; appended after the devnet release) |
 | `DepositRequested` / `DepositCancelled` / `SharesClaimed` | `owner, seq, assets, min_shares_out` / `owner, seq, assets, by` (the owner) / `owner, seq, shares` |
 | `DepositFilled` (one per fill) | `owner, seq, assets, shares, nav, shares_outstanding_after, net_assets_after` |
 | `DepositsFulfilled` | `from_seq, to_seq, assets, shares, nav, deposited_assets_total, minted_shares_total` |
@@ -1085,7 +1087,7 @@ Emitted with `emit_cpi!` for every token movement and every state change the mut
 
 The devnet binary's errors, in enum order (`errors.rs`):
 
-`Unauthorized`, `RolesNotDistinct`, `Paused`, `InvalidParameter`, `InvalidMint`, `UnsupportedMintExtension`, `ReserveFrozen`, `UnderCovered`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `FulfilHalted`, `TvlCapExceeded`, `GuaranteeCapExceeded`, `GuaranteeNotActive`, `OpenClaims`, `ExceedsRemainingCover`, `ClaimNotFiled`, `ClaimCallCapExceeded`, `ClaimPeriodCapExceeded`, `InvalidPaymentsAccount`, `PayoutAlreadySettled`, `NotAllowlisted`, `RequestTooSmall`, `RequestTooLarge`, `InvalidRequestStatus`, `QueueOrderViolation`, `PostCpiCheckFailed`, `MathOverflow`, `FeatureNotSupported`, `InvalidTreasuryAccount`, `UnsupportedVersion`, `InvalidIncomeSource`, `IncomeExceedsInbox`, `InvalidTokenProgram`, `ClaimNotPaid`, `DuplicateParam`, `ExpectedAmountMismatch`, `NavOutOfBounds`, `NoPendingHandover`, `HandoverExpired`, `GuaranteeHasPayments`, `HandoverPending`, `RefreshRequired`, `PriceLimitNotMet`, `ReserveUnderwater` (ADR 0022), `NoSharesOutstanding` (ADR 0023), appended after the v1 list.
+`Unauthorized`, `RolesNotDistinct`, `Paused`, `InvalidParameter`, `InvalidMint`, `UnsupportedMintExtension`, `ReserveFrozen`, `UnderCovered`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `FulfilHalted`, `TvlCapExceeded`, `GuaranteeCapExceeded`, `GuaranteeNotActive`, `OpenClaims`, `ExceedsRemainingCover`, `ClaimNotFiled`, `ClaimCallCapExceeded`, `ClaimPeriodCapExceeded`, `InvalidPaymentsAccount`, `PayoutAlreadySettled`, `NotAllowlisted`, `RequestTooSmall`, `RequestTooLarge`, `InvalidRequestStatus`, `QueueOrderViolation`, `PostCpiCheckFailed`, `MathOverflow`, `FeatureNotSupported`, `InvalidTreasuryAccount`, `UnsupportedVersion`, `InvalidIncomeSource`, `IncomeExceedsInbox`, `InvalidTokenProgram`, `ClaimNotPaid`, `DuplicateParam`, `ExpectedAmountMismatch`, `NavOutOfBounds`, `NoPendingHandover`, `HandoverExpired`, `GuaranteeHasPayments`, `HandoverPending`, `RefreshRequired`, `PriceLimitNotMet`, `ReserveUnderwater` (ADR 0022), `NoSharesOutstanding` (ADR 0023), appended after the v1 list; then `ClaimRevisionMismatch` (`approve_claim`, ADR 0021 decision 8).
 
 `ClaimCallCapExceeded` now means a payment above `max_claim_per_call` without a matching approval (ADR 0021); `LegMismatch` was removed with the `leg` argument of `pay_claim`.
 
