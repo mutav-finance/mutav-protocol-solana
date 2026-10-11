@@ -53,6 +53,8 @@ The model is CDI-linked and tiered on the whole balance: inputs are CDI and up t
 
 60 leases × R$2,200 × 12 × 2.01% (rent arrears, Superlógica IIL RS apartments) ≈ **R$32k a year**, about R$2.7k a month. With evictions and other exit debts in scope B the simulator expects R$812 per lease-year, about R$48.7k a year for 60 leases (≈ R$4.1k a month). Both are well inside the R$20k per 31-day operator cap, and the simulator shows no month above it in either pilot.
 
+**Amended 2026-10-11 (founders): base delinquency 2.5%.** The working figure for the starting region is a round 2.5% of annual rent, set above the measured 2.01% for RS apartments (South region 2.67%). At 2.5%: 60 × R$2,200 × 12 × 2.5% ≈ **R$39.6k a year** (≈ R$3.3k a month) of rent arrears; with evictions (0.25% a year at 6× rent) and other exit debts in scope B, R$942 per lease-year, about R$56.5k a year for 60 leases (≈ R$4.7k a month). Still well inside the R$20k per 31-day cap. The simulator default follows.
+
 ## Consequences
 
 - `devnet.example.json` and `DEVNET_LOCKED` carry the values in 1; `verify.ts` fails a devnet deploy that holds the old ones. `stress_buffer` (R$19k) is now locked too.
