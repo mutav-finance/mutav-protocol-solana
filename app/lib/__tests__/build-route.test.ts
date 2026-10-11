@@ -5,10 +5,10 @@ import { depositQueueSeqs } from "@/lib/server/chain";
 const WALLET = "4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T";
 const MULTISIG = "SysvarRent111111111111111111111111111111111";
 
-const { h, readReserve, readLedger, readDepositQueue } = vi.hoisted(() => {
+const { h, reserve, readReserve, readLedger, readDepositQueue } = vi.hoisted(() => {
   const h: { env: Record<string, unknown> } = { env: {} };
   const reserve = { config: { admin: "4Nd1mBQtrMJVYVfKf2PJy9NZUZdTAsp7D4xWLs4gDB4T" }, state: {}, now: 0n };
-  return { h, readReserve: vi.fn(async () => reserve), readLedger: vi.fn(async () => ({})), readDepositQueue: vi.fn(async () => []) };
+  return { h, reserve, readReserve: vi.fn(async () => reserve), readLedger: vi.fn(async () => ({})), readDepositQueue: vi.fn(async () => []) };
 });
 vi.mock("@/lib/server/chain", async (orig) => ({
   ...(await orig<object>()),
@@ -24,7 +24,15 @@ vi.mock("@/lib/server/compose", async (orig) => ({
   unsignedTransaction: () => "tx",
 }));
 
+vi.mock("@/lib/server/squads", async (orig) => ({
+  ...(await orig<object>()),
+  assertMember: vi.fn(async () => {
+    throw new (await import("@/lib/server/squads")).ProposalRefusedError("not a member");
+  }),
+}));
+
 const { POST } = await import("@/app/api/tx/build/route");
+const { vaultAddress } = await import("@/lib/server/squads");
 const post = (request: object, via?: "squads" | "direct") =>
   POST(new Request("http://x/api/tx/build", { method: "POST", body: encode({ request, signer: WALLET, ...(via ? { via } : {}) }) }));
 
@@ -58,6 +66,15 @@ describe("/api/tx/build RPC budget (A2)", () => {
     expect(readReserve).toHaveBeenCalledTimes(1);
     expect(readDepositQueue).not.toHaveBeenCalled();
   });
+  it("refuses a Squads fill from a non-member before reading the queue", async () => {
+    h.env.squadsMultisig = MULTISIG;
+    const admin = reserve.config.admin;
+    reserve.config.admin = vaultAddress(MULTISIG);
+    const res = await post({ kind: "fulfil_deposits", count: 1 });
+    reserve.config.admin = admin;
+    expect(res.status).toBe(400);
+    expect(readDepositQueue).not.toHaveBeenCalled();
+  });
   it("reads only the deposit queue for an accepted fill", async () => {
     h.env.cluster = "localnet";
     const res = await post({ kind: "fulfil_deposits", count: 1 }, "direct");
@@ -74,5 +91,9 @@ describe("deposit queue range", () => {
     const many = depositQueueSeqs({ depositHead: 10n, nextDepositSeq: 10_000n });
     expect(many.length).toBe(256);
     expect(many[0]).toBe(10n);
+  });
+  it("is bounded by the fill's count", () => {
+    expect(depositQueueSeqs({ depositHead: 10n, nextDepositSeq: 10_000n }, 3)).toEqual([10n, 11n, 12n]);
+    expect(depositQueueSeqs({ depositHead: 10n, nextDepositSeq: 10_000n }, 1_000).length).toBe(256);
   });
 });

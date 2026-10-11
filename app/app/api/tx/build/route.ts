@@ -3,7 +3,7 @@ import { guardedEnv, readDepositQueue, readReserve, rpcFor } from "@/lib/server/
 import { ComposeError, composeInstructions, describeInstructions, isAdminKind, refuseOverlappingSetConfig, unsignedTransaction } from "@/lib/server/compose";
 import { errorResponse } from "@/lib/server/respond";
 import { boundedBody } from "@/lib/server/relay";
-import { composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
+import { assertMember, composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 import type { TxRequest } from "@/lib/tx-kinds";
 import { baselineMemo, setConfigFields } from "@/lib/config-diff";
@@ -39,7 +39,9 @@ export async function POST(req: Request) {
     if (vault && reserve.config.admin !== vault) throw new ComposeError(`VaultConfig.admin ${reserve.config.admin} is not the Squads vault ${vault}`);
     // Only a deposit fill needs chain data beyond the reserve: the pending
     // queue from the head (no program-account scans, no capital events).
-    const ledger = body.request.kind === "fulfil_deposits" ? { deposits: await readDepositQueue(env, reserve) } : undefined;
+    // A proposal is built only for a multisig member (one account read, before the queue or proposal scans).
+    if (vault) await assertMember(env, signer);
+    const ledger = body.request.kind === "fulfil_deposits" ? { deposits: await readDepositQueue(env, reserve, body.request.count) } : undefined;
     const ctx = { reserve, ledger, allowlist: env.allowlist, env };
 
     if (vault) {
