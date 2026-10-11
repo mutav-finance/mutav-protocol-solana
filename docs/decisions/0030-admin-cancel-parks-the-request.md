@@ -31,10 +31,12 @@ A holder who requests with `min_assets_out = u64::MAX` (or `min_shares_out = u64
 ## Consequences
 
 - **Positive.** No owner action can stop the admin from moving a queue; parked funds are never lost, never filled and never claimable by anyone but the owner. The Token-2022 `MemoTransfer` and frozen-account cases are covered by the same rule.
-- **Negative.** A de-listed investor's BRS is no longer pushed back to it by the admin: the investor collects it with its own `cancel_deposit`. `/investor` shows a parked request as "cancelled — collect" with the cancel action.
+- **Negative.** A de-listed investor's BRS is no longer pushed back to it by the admin: the investor collects it with its own `cancel_deposit`. `/investor` shows a parked request as "parked" with the owner's cancel action.
 - **Program.** Status values `DEPOSIT_CANCELLED = 2` and `REDEEM_CANCELLED = 2` (accepted by the request version guards); events `DepositParked` and `RedeemParked` appended. `cancel_deposit` closes its request in the handler instead of through the `close` constraint. Account lists, arguments and layouts unchanged; `idl-compat` stays green.
-- **Client.** Status constants and helpers (`DEPOSIT_*`, `REDEEM_*`, `isParked*`) in `clients/js`; queue-position reads already treat any non-pending status as dead.
-- **Runbook.** When the admin parks a request, tell the owner how to collect it.
+- **No expiry, no sweep (accepted).** A parked request never expires and nothing sweeps it. If the owner never returns, its BRS stays in `pending_deposits` (counted in `pending_deposits_total`) or its shares stay in `pending_redemptions` (counted in `pending_redeem_shares` and `shares_outstanding`) indefinitely. Parked deposits are outside `stable_assets` and NAV; parked shares keep their pro-rata claim on net assets, exactly as if the owner still held them. A sweep would move an owner's funds without its signature, which this ADR exists to avoid.
+- **Griefing churn.** An owner can loop: request with an unfillable limit, the admin parks it, the owner cancels and collects, and so on. Each round costs the owner only refundable capital and the request's rent (returned on collect), and costs the admin one timelocked transaction. The queue never stalls, so this is a nuisance, not a wedge. The runbook monitors repeat parks per owner (`DepositParked` / `RedeemParked` events) and, for a repeat offender, removes the wallet from the allowlist (its exit stays open).
+- **Client.** Status constants and helpers (`DEPOSIT_*`, `REDEEM_*`, `isQueued`, `isParked`) in `clients/js`; queue-position reads already treat any non-pending status as dead. The new events shift the numeric values of the generated `MutavEvent` enum (see the client README).
+- **Runbook.** When the admin parks a request, tell the owner how to collect it; watch for repeat parks by the same owner.
 
 ## References
 
