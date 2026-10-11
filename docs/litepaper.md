@@ -103,7 +103,7 @@ Revenue is the *taxa da fiança*, billed monthly to partner agencies. Claim paym
 | Pilot book | ~170 leases across up to 5 partner agencies (~34 each), ~6 months; gross fees ≈R$37,400 a month at full book |
 | Expected claims against fees | ≈20% for rent arrears alone (RS base delinquency); ≈21–37% once exit debts are included, by scope (§12) |
 | MUTAV revenue | Take `t` on each fee (open; program maximum 30%) |
-| Reserve | Working target R$300k; sizing rule open (§8) |
+| Reserve | Working target R$300k (02 business plan); the pilot starts at R$100k plus R$100k a month to a R$1M cap (ADR 0028); sizing rule open (§8) |
 
 ```figure id="fig-1b-agency-month" title="Figure 1b. One agency, one month"
 Left-to-right flow (Sankey or stacked flow), labelled "working parameters, illustrative".
@@ -385,7 +385,7 @@ Caption line: "Each part priced at the NAV of its own fill; rounding favours the
 
 The treasury, payments account and capital wallet must be distinct, and there is no `withdraw_surplus`. **Every BRS in the reserve traces to a `FeeReceipt` or a `DepositRequest`,** and each `FeeReceipt` corresponds to one paid monthly agency bill, so a gap between bills paid and receipts recorded is visible. Because MUTAV also controls the operator key and the admin multisig, the notice gate is the program-level control against MUTAV exiting ahead of a loss it knows about.
 
-**Who provides capital (open).** MUTAV's working plan funds the reserve from its own balance sheet, capitalised by an equity round, with a working target of R$300k. The program also supports allowlisted, KYC'd third-party providers holding reserve shares. Counsel's review warns that outside capital pooled in a reserve that absorbs losses can make a *fiança* look like insurance or an unauthorised mutual scheme, so third-party providers stay disabled until counsel's written opinion, and the pilot may run on MUTAV capital only. The committed amount will be published before the mainnet pilot. Reserve shares absorb claim payments and receive net guarantee fees and swept issuer income, so their value can fall or rise; MUTAV sets no return target and makes no return projection.
+**Who provides capital (open).** MUTAV's working plan funds the reserve from its own balance sheet, capitalised by an equity round, with a working target of R$300k in the 02 business plan (the pilot plan, ADR 0028, starts with R$100k and adds R$100k a month). The program also supports allowlisted, KYC'd third-party providers holding reserve shares. Counsel's review warns that outside capital pooled in a reserve that absorbs losses can make a *fiança* look like insurance or an unauthorised mutual scheme, so third-party providers stay disabled until counsel's written opinion, and the pilot may run on MUTAV capital only. The committed amount will be published before the mainnet pilot. Reserve shares absorb claim payments and receive net guarantee fees and swept issuer income, so their value can fall or rise; MUTAV sets no return target and makes no return projection.
 
 ---
 
@@ -469,7 +469,7 @@ Legend: solid bar = done, outlined bar = planned, hatched = stretch. As of v0.3,
 | Track | What it proves | Size | Capital |
 |---|---|---|---|
 | On-chain mainnet pilot | The mechanism | Program cap R$1M (`max_tvl`, the devnet value, ADR 0028); at `c` = 0.25, about 101 working-product guarantees (R$4M of cover); the plan is 60 (10 a month) | MUTAV capital: R$100k, plus R$100k a month |
-| Operating plan | The business | ~170 guarantees across up to 5 partner agencies, ~6 months | Working reserve target R$300k from MUTAV's equity round and angel capital, not yet raised |
+| Operating plan | The business | ~170 guarantees across up to 5 partner agencies, ~6 months | Working reserve target R$300k (02 business plan) from MUTAV's equity round and angel capital, not yet raised |
 
 Caps rise from the first track toward the second only through the time-locked multisig, after an external audit, and while the KPIs below hold. At `c` = 1 the operating plan would not fit; a `c` below 1 (ADR 0016; 0.25 for the pilot, ADR 0028) is the decision that joins the two (§8).
 
@@ -477,9 +477,9 @@ Caps rise from the first track toward the second only through the time-locked mu
 
 The pilot caps (Appendix B, also the devnet values, decided by the founders in ADR 0028) are a R$1M reserve (`max_tvl`), `c` = 0.25, R$120k of cover per guarantee, a R$19k stress buffer, operator payments of R$15k per call (a 6×-rent eviction fits) and R$20k per 31 days (about 2% of `max_tvl`, the most a compromised operator key could pay out in a window), no TESOURO (BRS only, ADR 0018), and a 10-day `pay_claim` → `settle_payout` alarm; the take rate is open (program maximum 30%). Only the time-locked multisig can change them.
 
-**Capacity, honestly.** The working product (12× + 6× rent, under legal review) is a *valor afiançado* of R$39,600 per lease. At `c` = 0.25 each needs R$9,900 of reserve: the R$100k starting capital backs **10** such guarantees, and the R$1M cap about **101** (R$4M of cover); at `c` = 1 R$100k would back **2**. The 60-lease pilot needs R$594k by month 6, which the R$100k-a-month plan covers. The 170-lease book carries ≈R$6.7M of cover, ≈R$1.68M of reserve at `c` = 0.25, so `max_tvl` must rise before the book passes ~101 leases (§8). The per-guarantee cap (R$120k) fits the working product.
+**Capacity, honestly.** The working product (12× + 6× rent, under legal review) is a *valor afiançado* of R$39,600 per lease. At `c` = 0.25 each needs R$9,900 of reserve: the R$100k starting capital backs **10** such guarantees, and the R$1M cap about **101** (R$4M of cover); at `c` = 1 R$100k would back **2**. The 60-lease pilot opens month 1 at R$200k (the R$100k start plus the first R$100k raise) and needs R$594k by month 6, which the R$100k-a-month plan covers. The 170-lease book carries ≈R$6.7M of cover, ≈R$1.68M of reserve at `c` = 0.25, so `max_tvl` must rise before the book passes ~101 leases (§8). The per-guarantee cap (R$120k) fits the working product.
 
-**Unit economics.** MUTAV prices by tenant score in three bands of 9%, 12% and 15% of monthly rent, and refuses scores below 400. Our models use 10% (R$220 a month on the working R$2,200 rent), below the middle band and so conservative. That sits at or above the market band (CredPago/Loft publicly lists 8–10%).
+**Unit economics.** MUTAV prices by tenant score in three bands of 9%, 12% and 15% of monthly rent, and refuses scores below 400. The 02 business plan models 10% (R$220 a month on the working R$2,200 rent), below the middle band and so conservative, and the table below uses it; the pilot plan uses the middle band, 12% (ADR 0028). That sits at or above the market band (CredPago/Loft publicly lists 8–10%).
 
 | Reserve | Working-product guarantees at `c` = 1 (R$39,600 each) | Gross guarantee fees per month at R$220 | MUTAV revenue |
 |---|---|---|---|

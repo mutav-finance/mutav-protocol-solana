@@ -27,7 +27,7 @@ MUTAV's fee take stays 2,000 bps. The 12% guarantee fee below is what agencies p
 
 ### 2. Business plan (the simulator's "Pilot · recommended")
 
-- Starting capital R$100k, plus R$100k a month from month 1 (R$700k by month 6).
+- Starting capital R$100k, plus R$100k a month from month 1, so month 1 opens at R$200k (the start plus the first raise) and R$700k is in by month 6.
 - 10 new leases a month to a growth target of 60.
 - Guarantee fee 12% of rent per month; rent R$2,200; cover 12× + 6× rent (R$39,600 per lease).
 - Issuer income from Nora as a planning assumption (see 4); redemptions only above a 25% buffer over coverage required ("buffer").
@@ -37,7 +37,7 @@ Recomputed with the simulator's own model: every planned lease is admitted in bo
 
 ### 3. Why
 
-- **Higher, safer coverage.** `c` = 0.25 holds a quarter of every lease's remaining cover, two and a half times the program floor. The first real book is small and its loss data is not ours yet, so the pilot keeps a margin well above the worst-case floor.
+- **Higher, safer coverage.** `c` = 0.25 holds a quarter of every lease's remaining cover, two and a half times the program floor. The first real book is small and its loss data is not ours yet, so the pilot keeps a margin well above the worst-case floor. This reverses the alternative ADR 0022 rejected ("raise `c`; `c` stays at the 0.10 floor"): ADR 0022 rejected raising `c` as a way to make room for the next claims, because it slows growth; here the founders choose the higher `c` for the pilot's safety, and the stress buffer stays as ADR 0022 defined it.
 - **A capital plan instead of a single deposit.** Capital arrives with the book: R$100k a month backs about 10 new leases a month at `c` = 0.25. `max_tvl` (R$1M) is the ceiling of that plan, not a target, and it stops a raise from taking the reserve past what the founders want at risk.
 - **Claim caps bound the operator.** The operator pays claims without the multisig up to R$15k per call and R$20k per 31 days. A 6×-rent eviction (R$13,200) fits the per-call cap, so the most common large claim is paid without waiting for the multisig. Claims above R$15k need an `approve_claim` approval of the exact amount (ADR 0021). The bounded loss from a compromised operator key stays R$20k per 31 days, about 2% of `max_tvl`.
 - **Per-guarantee cap with room.** R$120k fits the working product (R$39,600) and leaves room for higher rents or covers without a cap change.
@@ -47,7 +47,7 @@ Recomputed with the simulator's own model: every planned lease is admitted in bo
 
 The simulator input "BRS yield" is renamed **"Issuer income (Nora), % of TVL a year"**. BRS itself pays no yield: Nora pays the reserve issuer partnership revenue in BRS, as an annual rate on the reserve's TVL. It reaches the reserve's income inbox and `sweep_income` books it on-chain (ADR 0017), all of it to NAV since the income take is 0.
 
-The model is CDI-linked and tiered on the whole balance: inputs are CDI and up to four tiers (a balance threshold and a % of CDI). Each month the reserve's TVL selects the tier whose threshold it is strictly above, and income = TVL × (tier % × CDI) / 12. The public default is one tier at 70% of CDI (CDI = Selic − 0.10 pp, ≈ 9.5% a year), a planning assumption until the agreement with the issuer is signed. Whether tiers apply to the whole balance or marginally, and any holding-period rules, are to be confirmed with the issuer. Links from earlier versions that carry a flat `brsYieldPct` still work: a flat rate overrides the tiers.
+The model is CDI-linked and tiered on the whole balance: inputs are CDI and up to four tiers (a balance threshold and a % of CDI). Each month the reserve's TVL selects the tier whose threshold it is strictly above, and income = TVL × (tier % × CDI) / 12. The public default is one tier at 70% of CDI (CDI = Selic − 0.10 pp, ≈ 9.6% a year: 0.70 × 13.65%), a planning assumption until the agreement with the issuer is signed. Whether tiers apply to the whole balance or marginally, and any holding-period rules, are to be confirmed with the issuer. Links from earlier versions that carry a flat `brsYieldPct` still work: a flat rate overrides the tiers.
 
 ### 5. Expected claims, a sanity check
 

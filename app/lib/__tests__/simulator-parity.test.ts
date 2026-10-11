@@ -38,6 +38,7 @@ type Sim = {
   mutavGateAdmits: (stable: number, remaining: number, newCover: number, bps: number, provisions: number) => boolean;
   mutavGateCount: (stable: number, remaining: number, cover: number, bps: number, provisions: number, max: number) => number;
   mutavCoverageBps: (c: number) => number;
+  mutavLeasesBacked: (stableBrl: number, coverBrl: number, bps: number) => number;
   mutavIssuerRate: (p: Params, tvl: number) => { rate: number; tier: number; flat: boolean; pctOfCdi: number };
   mutavCompute: (p: Params) => Result;
   MUTAV_DEFAULTS: Params;
@@ -163,6 +164,20 @@ describe("simulator defaults = the devnet config", () => {
     expect(Math.round((100 - (d.maxTesouroSharePct as number)) * 100)).toBe(10_000);
     expect(sim.MUTAV_PROTOCOL.MAX_FEE_TAKE_BPS).toBe(devnet.feeTakeBpsMax);
     expect((d.takePct as number) * 100).toBeLessThanOrEqual(devnet.feeTakeBpsMax);
+  });
+});
+
+describe("simulator Default (02 inputs on the devnet config)", () => {
+  it("backs 30 leases on R$300k at c = 0.25 and stalls at 33 on insufficient free capital", () => {
+    const r = sim.mutavCompute({ ...sim.MUTAV_DEFAULTS });
+    expect(r.capacityAtStart).toBe(30);
+    expect(r.finalActive).toBe(33);
+    expect(r.firstRefusal).toBe("free-capital");
+  });
+
+  it("max_tvl (R$1M) backs about 101 working-product leases at c = 0.25", () => {
+    const d = sim.MUTAV_DEFAULTS;
+    expect(sim.mutavLeasesBacked(d.maxTvl as number, 39_600, sim.mutavCoverageBps(d.coverageRatio as number))).toBe(101);
   });
 });
 
@@ -312,24 +327,24 @@ describe("simulator input parser (pt-BR)", () => {
 });
 
 describe("simulator issuer income (CDI-linked tiers on the whole balance)", () => {
-  const base: Params = { ...sim.MUTAV_DEFAULTS, issuerCdiPct: 10, tier1Min: 0, tier1Pct: 50, tier2Min: 200_000, tier2Pct: 80, tier3Min: 500_000, tier3Pct: 90, tier4Min: 0, tier4Pct: 0 };
+  const base: Params = { ...sim.MUTAV_DEFAULTS, issuerCdiPct: 10, tier1Min: 0, tier1Pct: 50, tier2Min: 1_000_000, tier2Pct: 80, tier3Min: 2_000_000, tier3Pct: 90, tier4Min: 0, tier4Pct: 0 };
   const rate = (tvl: number, o: Params = {}) => sim.mutavIssuerRate({ ...base, ...o }, tvl);
 
   it("picks the highest tier whose threshold the TVL is strictly above", () => {
     expect(rate(0)).toMatchObject({ rate: 0, tier: 0 });
     expect(rate(1).tier).toBe(1);
-    expect(rate(200_000).tier).toBe(1); // strictly above
-    expect(rate(200_000.01).tier).toBe(2);
-    expect(rate(600_000).tier).toBe(3);
-    expect(rate(600_000).rate).toBeCloseTo(0.09, 12); // 90% × 10%
+    expect(rate(1_000_000).tier).toBe(1); // strictly above
+    expect(rate(1_000_000.01).tier).toBe(2);
+    expect(rate(3_000_000).tier).toBe(3);
+    expect(rate(3_000_000).rate).toBeCloseTo(0.09, 12); // 90% × 10%
   });
 
   it("applies the tier rate to the whole balance each month", () => {
-    const r = sim.mutavCompute({ ...base, months: 1, perMonth: 0, startCapital: 300_000, monthlyRaise: 0 });
-    expect(r.rows[0].brsIncome).toBeCloseTo((300_000 * 0.08) / 12, 6);
+    const r = sim.mutavCompute({ ...base, months: 1, perMonth: 0, startCapital: 1_500_000, maxTvl: 2_000_000, monthlyRaise: 0 });
+    expect(r.rows[0].brsIncome).toBeCloseTo((1_500_000 * 0.08) / 12, 6);
   });
 
   it("an older link's flat brsYieldPct overrides the tiers", () => {
-    expect(rate(600_000, { brsYieldPct: 9.5 })).toMatchObject({ rate: 0.095, flat: true });
+    expect(rate(3_000_000, { brsYieldPct: 9.5 })).toMatchObject({ rate: 0.095, flat: true });
   });
 });

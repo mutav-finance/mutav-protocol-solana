@@ -1133,7 +1133,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 
 1. **Nora PDA whitelist and CPI burn.** Can a program-owned (PDA) token account be a whitelisted BRS mint destination, and is `burn` callable via CPI? This decides whether fees can be minted straight into `reserve` and whether claim payments can burn in-program, or whether both keep going through MUTAV's operator and payments wallets as specified here.
 2. **TESOURO price account layout.** The layout of Etherfuse's `BondPrice` account, how the price is published and how often, and whether TESOURO is fixed-rate (LTN) or Selic-linked. This sets the adapter's price fields (`AdapterState`, §3.9) and the accrual-curve `y_max`. Until confirmed, the adapter ships as interface + mock only.
-3. **Cap values.** Final values for every cap in §8, including `min_request` / `max_request`.
+3. **Cap values.** The pilot values are decided (ADR 0028; §8). Open: how the caps scale for mainnet beyond the pilot (when `max_tvl`, `max_cover_per_guarantee` and the claim caps rise, and on what evidence).
 4. **Take rate.** The value of `fee_take_bps` (program maximum 30%).
 5. **Recoveries.** Whether recoveries flow back to the reserve (would add a `record_recovery` instruction, PC-3).
 6. **BRS↔TESOURO path.** No direct path exists on Solana today (Etherfuse mints and redeems against USDC). `allocate`/`deallocate` against a real venue may need an async conversion state (PC-18). Until a path exists the pilot reserve is BRS only (ADR 0018).
