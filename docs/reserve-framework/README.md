@@ -116,7 +116,7 @@ All reserve token accounts are ordinary SPL Token accounts owned by the vault au
 - [Specification §1 Principles](../spec.md#1-principles), [§2.1 Money flows](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017), [§3.3 Vault authority and token accounts](../spec.md#33-vault-authority-and-token-accounts)
 - [Litepaper](../litepaper.md)
 - Program seeds: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs)
-- Coverage math: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs)
+- Coverage math: [`programs/mutav/src/coverage.rs`](../../programs/mutav/src/coverage.rs)
 
 ## Decisions
 

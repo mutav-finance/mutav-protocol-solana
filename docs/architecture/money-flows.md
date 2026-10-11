@@ -203,7 +203,7 @@ Every fee, income and booking inflow is also counted in `inflow_nav`, so the NAV
 - [Protocol specification, §2.1 Three separate MUTAV money flows](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017), [§4 Invariants and formulas](../spec.md#4-invariants-and-formulas), [§5.4 Claims and payouts](../spec.md#54-claims-and-payouts-operator), [§5.5 Investor capital](../spec.md#55-investor-capital-async)
 - [Litepaper, §7 Guarantee lifecycle](../litepaper.md#7-guarantee-lifecycle) and [§9 Capital flows](../litepaper.md#9-capital-flows)
 - Instructions: [`contribute_fees.rs`](../../programs/mutav/src/instructions/operator/contribute_fees.rs), [`sweep_income.rs`](../../programs/mutav/src/instructions/operator/sweep_income.rs), [`pay_claim.rs`](../../programs/mutav/src/instructions/operator/pay_claim.rs), [`fulfil_deposits.rs`](../../programs/mutav/src/instructions/capital/fulfil_deposits.rs), [`fulfil_redeems.rs`](../../programs/mutav/src/instructions/capital/fulfil_redeems.rs)
-- Coverage math: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs)
+- Coverage math: [`programs/mutav/src/coverage.rs`](../../programs/mutav/src/coverage.rs)
 
 ## Decisions
 

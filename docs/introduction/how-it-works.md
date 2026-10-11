@@ -199,7 +199,7 @@ Every value below is set by the reserve admin and changes only through the time-
 
 - [Specification §2 Roles and keys](../spec.md#2-roles-and-keys), [§2.1 Money flows](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017), [§4 Invariants and formulas](../spec.md#4-invariants-and-formulas), [§5 Instructions](../spec.md#5-instructions), [§6 Under-coverage mode](../spec.md#6-under-coverage-mode), [§8 Caps](../spec.md#8-caps)
 - [Litepaper §7 Guarantee lifecycle](../litepaper.md#7-guarantee-lifecycle), [§9 Capital flows](../litepaper.md#9-capital-flows)
-- Program code: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), [`programs/mutav/src/instructions/operator/`](../../programs/mutav/src/instructions/operator/), [`programs/mutav/src/instructions/capital/`](../../programs/mutav/src/instructions/capital/), [`programs/mutav/src/instructions/public/`](../../programs/mutav/src/instructions/public/)
+- Program code: [`programs/mutav/src/coverage.rs`](../../programs/mutav/src/coverage.rs), [`programs/mutav/src/instructions/operator/`](../../programs/mutav/src/instructions/operator/), [`programs/mutav/src/instructions/capital/`](../../programs/mutav/src/instructions/capital/), [`programs/mutav/src/instructions/public/`](../../programs/mutav/src/instructions/public/)
 - Squads v4: <https://github.com/Squads-Protocol/v4>
 - Pix (Banco Central do Brasil): <https://www.bcb.gov.br/estabilidadefinanceira/pix>
 

@@ -29,7 +29,7 @@ This page lists the documents, code and external references the MUTAV documentat
 | Program entry point and instruction list | [`programs/mutav/src/lib.rs`](../../programs/mutav/src/lib.rs) |
 | Accounts | [`programs/mutav/src/state/`](../../programs/mutav/src/state/) |
 | Instructions by role | [`programs/mutav/src/instructions/`](../../programs/mutav/src/instructions/) (`admin/`, `operator/`, `capital/`, `public/`, `reserve/`) |
-| Coverage maths (required coverage, the coverage gate, underwater check) | [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), [`math.rs`](../../programs/mutav/src/math.rs) |
+| Coverage maths (required coverage, the coverage gate, underwater check) | [`programs/mutav/src/coverage.rs`](../../programs/mutav/src/coverage.rs), [`math.rs`](../../programs/mutav/src/math.rs) |
 | Pricing | [`programs/mutav/src/pricing.rs`](../../programs/mutav/src/pricing.rs) |
 | Mint and token-account guards | [`programs/mutav/src/token_guard.rs`](../../programs/mutav/src/token_guard.rs) |
 | Allowlist proofs | [`programs/mutav/src/allowlist.rs`](../../programs/mutav/src/allowlist.rs) |

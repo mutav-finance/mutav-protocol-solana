@@ -141,7 +141,7 @@ Inflows that raise NAV without minting shares are guarantee fees (`contribute_fe
 ## Sources
 
 - [Specification §4 Invariants and formulas](../spec.md#4-invariants-and-formulas), [§6 Under-coverage mode](../spec.md#6-under-coverage-mode), [§7 Price safety](../spec.md#7-price-safety)
-- Coverage math: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), constants in [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs)
+- Coverage math: [`programs/mutav/src/coverage.rs`](../../programs/mutav/src/coverage.rs), constants in [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs)
 - [Litepaper, reserve sizing and under-coverage](../litepaper.md)
 
 ## Decisions

@@ -97,7 +97,7 @@ The fiança lifecycle of ADR 0012 adds lifecycle invariants (spec invariants 18 
 - [Specification §1 Principles](../spec.md#1-principles), [§2.1 Money flows](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017)
 - [Specification §14.2 Padding and version](../spec.md#142-padding-and-version)
 - Technical reference §6 and §8, devnet release design (branch `docs/protocol-reference`, PR #32)
-- Code: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`programs/mutav/src/pricing.rs`](../../programs/mutav/src/pricing.rs)
+- Code: [`programs/mutav/src/coverage.rs`](../../programs/mutav/src/coverage.rs), [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`programs/mutav/src/pricing.rs`](../../programs/mutav/src/pricing.rs)
 - Tests: [`tests/tests/`](../../tests/tests/)
 
 ## Decisions

@@ -118,7 +118,7 @@ No. `@mutav-finance/mutav-protocol-solana` composes unsigned instructions and re
 
 ### How do I read the reserve's health?
 
-`fetchReserve(rpc, reserveMint)` returns the config, the state and a coverage snapshot (its `solvency` field) computed with the same math as the program. Anyone can also send `refresh` to recompute and publish it on-chain.
+`fetchReserve(rpc, reserveMint)` returns the config, the state and a coverage snapshot (its `coverage` field) computed with the same math as the program. Anyone can also send `refresh` to recompute and publish it on-chain.
 
 ### Will instructions change shape after the deploy?
 

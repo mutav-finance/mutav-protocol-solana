@@ -455,7 +455,7 @@ The spec should name `instant_exit` now even though the instruction does not exi
 | `programs/mutav/src/state/config.rs` | Add `version: u8` as the first field. Add `feature_flags: u64` and `mutav_capital_wallet: Pubkey`. Grow `_reserved` to 512. Add a size `const` assert. Use `Box<Account<…>>` in contexts |
 | `state/state.rs` (new) | Add `buffer_earmark: u64` and `_reserved: [u8; 256]` |
 | `state/request.rs` (new) | The partial-fill fields and `_reserved: [u8; 64]` from §3.4 |
-| `solvency.rs` / `math.rs` | Earmark-aware `free_capital`; clamp in `pay_claim` (I-E2) |
+| `coverage.rs` / `math.rs` | Earmark-aware `free_capital`; clamp in `pay_claim` (I-E2) |
 | `constants.rs` | `features::INSTANT_EXIT = 1 << 0`; `SUPPORTED_FEATURES = 0`; reserved seed prefixes `"exit_buffer"`, `"exit_limit"`, `"instant_exit"` |
 | `errors.rs` | `FeatureNotSupported`, `FeatureDisabled` (append-only from now on) |
 | `docs/spec.md` | §3: rules R1 to R8, the new fields and the reserved phase-2 layouts. §4: earmark-aware `free_capital` and I-E1 to I-E4. §5.1: `set_config` feature-flag rule and pause list naming `instant_exit`. §5.5: partial fills. §12: Q15 single vs split multisig; `min_partial_fill` value; `unprovisioned_claims` definition |

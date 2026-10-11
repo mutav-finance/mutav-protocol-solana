@@ -28,7 +28,7 @@ bun add @mutav-finance/mutav-protocol-solana @solana/kit
 | `generated/` | Codama output from the Anchor IDL: one builder per instruction (`get<Name>Instruction` and `get<Name>InstructionAsync`), account decoders and fetchers, events, errors, `MUTAV_PROGRAM_ADDRESS` and the PDAs the IDL can describe. Do not edit. |
 | `pdas` | `findReserveAddresses(reserveMint)`, `findDepositRequestPda`, `findRedeemRequestPda` (seeded by queue `seq`), `findOwnerTokenAddress` (the owner's associated token account, the only destination of cancels and claims), `findIncomeInboxAddress` (the token program is required). |
 | `reads` | `fetchReserve`, guarantee, claim-filing and income-receipt scans, queue positions, the income inbox balance. |
-| `math` | Exact `bigint` mirror of the program's math and coverage code (`math.rs`, `solvency.rs`, the redeem size rule). |
+| `math` | Exact `bigint` mirror of the program's math and coverage code (`math.rs`, `coverage.rs`, the redeem size rule). |
 | `preview` | Previews of `fulfil_deposits` and `fulfil_redeems`, applying the program's checks in program order. |
 | `allowlist` | Domain-separated Merkle leaves and nodes, `buildAllowlist`, `verifyAllowlistProof`. |
 | `config` | Helpers for sparse `set_config` proposals (`configParamsDiff`, `configParamsNeedRefresh`, `MAX_CONFIG_PARAMS`), `nav_bounds` (`navBoundsAround`, `ANY_NAV`) and `capsInputFromConfig` for `initialize`. |
@@ -65,7 +65,7 @@ The record PDAs (`Guarantee`, `ClaimFiling`, `IncomeReceipt` under its `"income"
 
 | Function | Returns |
 |---|---|
-| `fetchReserve(rpc, reserveMint)` | `{ addresses, config, state, solvency }`. Config and state are read in one `getMultipleAccounts` call, so they come from the same slot. `solvency` is the program's spec §4 snapshot (stable assets, required coverage, surplus, free capital, liquid budget, net assets, mode) computed client-side. |
+| `fetchReserve(rpc, reserveMint)` | `{ addresses, config, state, coverage }`. Config and state are read in one `getMultipleAccounts` call, so they come from the same slot. `coverage` is the program's spec §4 snapshot (stable assets, required coverage, surplus, free capital, liquid budget, net assets, mode) computed client-side. |
 | `fetchGuaranteesForReserve(rpc, config)` | Every `Guarantee` of the reserve. Each account is kept only if it is the PDA of `(config, id)`. |
 | `fetchClaimFilingsForGuarantee(rpc, guarantee)` | Every `ClaimFiling` of a guarantee, with its status (`FILED`, `PAID`, `SETTLED`; `WITHDRAWN` is reserved for a later upgrade), payment and settlement fields. `approved_amount` stays 0 until `approve_claim` ships. |
 | `getDepositQueuePosition(rpc, config, seq)`, `getRedeemQueuePosition(rpc, config, seq)` | A request's place in its FIFO queue. |
@@ -80,7 +80,7 @@ import { fetchReserve, previewDepositFulfil } from '@mutav-finance/mutav-protoco
 
 const rpc = createSolanaRpc('https://api.devnet.solana.com');
 const r = await fetchReserve(rpc, address('BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4'));
-console.log(r.solvency.freeCapital, r.state.data.navPerShare);
+console.log(r.coverage.freeCapital, r.state.data.navPerShare);
 const { fills, stoppedBy } = previewDepositFulfil(r.config.data, r.state.data, [1_000_000_000n]);
 ```
 
@@ -97,7 +97,7 @@ Same formulas, same rounding, same failure points as the program. Functions thro
 | `navPerShare`, `publishedNav` | Published NAV, floored at 1 when shares exist. |
 | `isUnderwater(netAssets, sharesOutstanding)` | NAV per share below the smallest published unit with shares outstanding: both fills refuse with `ReserveUnderwater`. |
 | `redeemSizeError(value, remainder, canonical, minRequest, maxRequest)` | The `request_redeem` size rule, with `SUB_MINIMUM_EXIT_FLOOR_DIVISOR`: `null`, `'RequestTooSmall'` or `'RequestTooLarge'`. |
-| `computeSolvency` | Every spec §4 quantity from one snapshot, including stable assets, free capital, mode and deficit. |
+| `computeCoverage` | Every spec §4 quantity from one snapshot, including stable assets, free capital, mode and deficit. |
 | `takeSplit(amount, takeBps)` | Guarantee-fee take split. |
 | `isValidIncomePeriod` | Income intake checks. |
 
@@ -111,7 +111,7 @@ Previews answer "would this go through, and at what price?" before anyone signs.
 |---|---|
 | `previewDepositFulfil(config, state, requests)` | Returns `{ fills, stoppedBy }`. `requests` are BRS amounts or `{ assets, minSharesOut }`, head first. Checks the underwater refusal, zero-share fills and the owner's price limit, then prices each fill after the earlier ones. `stoppedBy` is `'ReserveUnderwater'`, `'RequestTooSmall'`, `'PriceLimitNotMet'` or `null`. Pause, halt, the NAV guard and the reserve-size cap are not replayed. |
 | `previewRedeemFulfil(config, state, requests, { count, maxAssets })` | Returns `{ fills, stoppedBy }`. Pause (when `config.paused` is passed), mode, halt, required coverage, the underwater refusal, then per head: a head worth 0 BRS stops the batch (`'RequestTooSmall'`), the budget (`min(max_assets − paid, free_capital, liquid_budget)`, whole fills only, naming the binding term) and the price limit. The NAV guard is not replayed. |
-| `solvencyFromAccounts(config, state)` | The spec §4 snapshot from decoded accounts. |
+| `coverageFromAccounts(config, state)` | The spec §4 snapshot from decoded accounts. |
 
 ## Composing instructions
 

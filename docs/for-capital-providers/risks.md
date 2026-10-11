@@ -158,7 +158,7 @@ The items still to decide are tracked in [Open questions](../meta/open-questions
 - [Spec §8, caps](../spec.md#8-caps)
 - [Spec §12, open questions](../spec.md#12-open-questions)
 - [Litepaper §13, risks, limits and disclosures](../litepaper.md#13-risks-limits-and-disclosures)
-- Program: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), [`programs/mutav/src/token_guard.rs`](../../programs/mutav/src/token_guard.rs), [`programs/mutav/src/instructions/operator/pay_claim.rs`](../../programs/mutav/src/instructions/operator/pay_claim.rs), [`programs/mutav/src/instructions/public/refresh.rs`](../../programs/mutav/src/instructions/public/refresh.rs)
+- Program: [`programs/mutav/src/coverage.rs`](../../programs/mutav/src/coverage.rs), [`programs/mutav/src/token_guard.rs`](../../programs/mutav/src/token_guard.rs), [`programs/mutav/src/instructions/operator/pay_claim.rs`](../../programs/mutav/src/instructions/operator/pay_claim.rs), [`programs/mutav/src/instructions/public/refresh.rs`](../../programs/mutav/src/instructions/public/refresh.rs)
 - [Squads v4](https://github.com/Squads-Protocol/v4)
 - [BRS token, Nora](https://www.nora.finance/docs/integrate/core-concepts/brs-token)
 

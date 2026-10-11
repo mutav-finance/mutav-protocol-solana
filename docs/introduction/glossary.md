@@ -120,7 +120,7 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 
 - [Specification §2 Roles and keys](../spec.md#2-roles-and-keys), [§2.2 MUTAV as fiador](../spec.md#22-mutav-as-fiador-off-chain-duties-adr-0012), [§3 Accounts](../spec.md#3-accounts), [§4 Invariants and formulas](../spec.md#4-invariants-and-formulas), [§8 Caps](../spec.md#8-caps), [§12 Open questions](../spec.md#12-open-questions)
 - [Litepaper, Appendix A Glossary](../litepaper.md#a-glossary)
-- Program code: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs), [`programs/mutav/src/state/`](../../programs/mutav/src/state/), [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs)
+- Program code: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs), [`programs/mutav/src/state/`](../../programs/mutav/src/state/), [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`programs/mutav/src/coverage.rs`](../../programs/mutav/src/coverage.rs)
 - Lei 8.245/91: <https://www.planalto.gov.br/ccivil_03/leis/l8245.htm>
 - Código Civil: <https://www.planalto.gov.br/ccivil_03/leis/2002/l10406compilada.htm>
 - Solana documentation (accounts, PDAs, CPI): <https://solana.com/docs/core>

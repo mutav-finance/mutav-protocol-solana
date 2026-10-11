@@ -249,7 +249,7 @@ Asserted in tests after every instruction.
 ## Sources
 
 - [Specification §4 Invariants and formulas](../spec.md#4-invariants-and-formulas), [§6 Under-coverage mode](../spec.md#6-under-coverage-mode), [§7 Price safety](../spec.md#7-price-safety), [§8 Caps](../spec.md#8-caps)
-- Program: [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`solvency.rs`](../../programs/mutav/src/solvency.rs), [`pricing.rs`](../../programs/mutav/src/pricing.rs), [`constants.rs`](../../programs/mutav/src/constants.rs)
+- Program: [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`coverage.rs`](../../programs/mutav/src/coverage.rs), [`pricing.rs`](../../programs/mutav/src/pricing.rs), [`constants.rs`](../../programs/mutav/src/constants.rs)
 - Client mirror: [`clients/js/src/math.ts`](../../clients/js/src/math.ts)
 - Shared test vectors: [`tests/fixtures/client/vectors.json`](../../tests/fixtures/client/vectors.json)
 

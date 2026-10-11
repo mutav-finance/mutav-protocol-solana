@@ -29,7 +29,7 @@ What lives where in this repo, and why it lives there. The split follows two rul
 | [`instructions/public/`](../../programs/mutav/src/instructions/public/) | Permissionless cranks: `refresh`, `advance_queue_head` |
 | [`instructions/reserve/`](../../programs/mutav/src/instructions/reserve/) | Reserved for the adapter instructions of the first adapter upgrade (`allocate`, `deallocate` and the emergency actions, [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)). Empty in the devnet release |
 | [`state/`](../../programs/mutav/src/state/) | Account structs, one file per account family, each with a compile-time size assertion |
-| [`solvency.rs`](../../programs/mutav/src/solvency.rs) | Pure functions for coverage required (with the saturating stress term), surplus, liquid budget, net assets, NAV per share and the underwater check |
+| [`coverage.rs`](../../programs/mutav/src/coverage.rs) | Pure functions for coverage required (with the saturating stress term), surplus, liquid budget, net assets, NAV per share and the underwater check |
 | [`math.rs`](../../programs/mutav/src/math.rs) | Fixed-point math in `u128`, checked, rounded in the reserve's favour |
 | [`pricing.rs`](../../programs/mutav/src/pricing.rs) | Price safety. BRS is valued at par. A priced asset fails closed until its per-adapter pricing is built |
 | [`allowlist.rs`](../../programs/mutav/src/allowlist.rs) | Domain-separated Merkle proofs for allowlisted entry |
@@ -57,7 +57,7 @@ See [Roles and trust](roles-and-trust.md) for the full matrix and the pause scop
 ### Why the program is shaped this way
 
 - **One program, one reserve per mint.** `VaultConfig` is seeded by the reserve mint, so each currency gets its own reserve, coverage and NAV.
-- **Pure math, separate from accounts.** `solvency.rs` and `math.rs` take plain numbers. The client mirrors them exactly in bigint, and shared test vectors keep the two in step.
+- **Pure math, separate from accounts.** `coverage.rs` and `math.rs` take plain numbers. The client mirrors them exactly in bigint, and shared test vectors keep the two in step.
 - **Handlers grouped by signer.** A reviewer reads one folder to see everything one role can do.
 - **No adapters in the devnet release.** The reserve holds BRS only, and `adapter_count` and the adapter bitmap are 0. Adapters arrive by program upgrade, each described by its own `AdapterState` account. The adapter moves tokens; MUTAV values the position itself from a bounded price and checks every balance after the CPI ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md), proposed).
 

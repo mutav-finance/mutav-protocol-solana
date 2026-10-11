@@ -139,7 +139,7 @@ The guard works together with `nav_bounds`: the admin's fill proposal fixes a NA
 - [Spec §7, price safety and the NAV-move guard](../spec.md#7-price-safety)
 - [Spec §2.1, money flows and issuer income](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017)
 - [Litepaper §8, reserve, required coverage and NAV](../litepaper.md#8-reserve-required-coverage-and-nav) and [§10, reserve assets](../litepaper.md#10-reserve-assets-and-brl-on-solana)
-- Program: [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`programs/mutav/src/pricing.rs`](../../programs/mutav/src/pricing.rs), [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), [`programs/mutav/src/instructions/operator/sweep_income.rs`](../../programs/mutav/src/instructions/operator/sweep_income.rs), [`programs/mutav/src/instructions/public/refresh.rs`](../../programs/mutav/src/instructions/public/refresh.rs)
+- Program: [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`programs/mutav/src/pricing.rs`](../../programs/mutav/src/pricing.rs), [`programs/mutav/src/coverage.rs`](../../programs/mutav/src/coverage.rs), [`programs/mutav/src/instructions/operator/sweep_income.rs`](../../programs/mutav/src/instructions/operator/sweep_income.rs), [`programs/mutav/src/instructions/public/refresh.rs`](../../programs/mutav/src/instructions/public/refresh.rs)
 - Client: [`clients/js`](../../clients/js)
 
 ## Decisions
