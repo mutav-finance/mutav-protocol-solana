@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /** The spec's language rule, checked on what actually renders. */
-const BANNED = /\b(premiums?|(re)?insur(ance|ed|ers?)|polic(y|ies)|policyholders?|yield vault|sinistros?)\b/i;
+const BANNED = /\b(premiums?|(re)?insur(ance|ed|ers?)|polic(y|ies)|policyholders?|yield vault|sinistros?|fund|solvency[ -]gat(e|ed|es|ing))\b/i;
 
 async function noBannedWords(page: Page) {
   const text = await page.locator("body").innerText();

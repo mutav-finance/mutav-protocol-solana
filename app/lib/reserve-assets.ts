@@ -137,7 +137,7 @@ export const EXPANSION_STEPS: readonly ExpansionStep[] = [
   { actor: "admin", ix: null, live: false, action: "Upgrade the program with the adapter instructions and deploy the asset's adapter program, after its own security review." },
   { actor: "admin", ix: "whitelist_adapter", live: false, action: "Whitelist the adapter with its limits: its cap (the most BRS-equivalent value it may hold), its share limit of stable assets, and its own price feed with staleness and deviation bounds." },
   { actor: "admin", ix: "set_config", live: true, action: "Lower the minimum held in the settlement token (BRS) below 100%: the share above the floor is what all adapters together may use." },
-  { actor: "admin", ix: "allocate", live: false, action: "Allocate BRS into the asset above the settlement floor, within the adapter's cap and share limit, the solvency gate and the liquidity check; deallocate brings it back." },
+  { actor: "admin", ix: "allocate", live: false, action: "Allocate BRS into the asset above the settlement floor, within the adapter's cap and share limit, the coverage gate and the liquidity check; deallocate brings it back." },
   { actor: "anyone", ix: "refresh", live: true, action: "Re-value the reserve at the bounded price on every refresh: stable assets, NAV and the mode follow." },
 ];
 
@@ -194,7 +194,7 @@ export const PLANNED_RESERVE_INSTRUCTIONS: readonly PlannedInstruction[] = [
     gatedBy: [
       "settlement floor: BRS after ≥ min_settlement_bps × stable assets",
       "adapter limits: allocated + amount ≤ its cap; its value ≤ its share limit",
-      "solvency gate: mode Normal, stable assets after ≥ coverage required",
+      "coverage gate: mode Normal, stable assets after ≥ coverage required",
       "liquidity: BRS left ≥ open provisions (+ earmark)",
       "fresh price from the adapter's feed; not paused",
     ],
@@ -206,7 +206,7 @@ export const PLANNED_RESERVE_INSTRUCTIONS: readonly PlannedInstruction[] = [
     role: "admin",
     what: "Brings an adapter's asset back into BRS in the reserve: the de-risking move.",
     gatedBy: [
-      "solvency gate: any value lost must fit in free capital",
+      "coverage gate: any value lost must fit in free capital",
       "under-coverage: allowed only if it does not worsen coverage",
       "fresh price from the adapter's feed; not paused",
     ],

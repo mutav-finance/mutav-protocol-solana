@@ -27,13 +27,13 @@ export const DUTIES: Duty[] = [
     ix: "register_guarantee",
     today: "Register the lease an agency signed up in the platform, with its default and exit cover.",
     later: "Triggered by the MUTAV platform when a lease is registered.",
-    bound: "Not paused, mode Normal; cover ≤ max per guarantee; the new cover must fit in free capital (solvency gate).",
+    bound: "Not paused, mode Normal; cover ≤ max per guarantee; the new cover must fit in free capital (gated by required coverage).",
   },
   {
     ix: "close_guarantee",
     today: "Close a guarantee that has ended, releasing its remaining cover.",
     later: "Triggered by the MUTAV platform.",
-    bound: "Guarantee active and no open claims; reason RELEASED, or VOID only if nothing was ever paid. Not solvency-gated: it only releases liability.",
+    bound: "Guarantee active and no open claims; reason RELEASED, or VOID only if nothing was ever paid. Not gated by required coverage: it only releases liability.",
   },
   {
     ix: "contribute_fees",
@@ -57,7 +57,7 @@ export const DUTIES: Duty[] = [
     ix: "pay_claim",
     today: "Pay a filed claim from the reserve to the payments account.",
     later: "Triggered by the MUTAV platform after the filing.",
-    bound: "≤ max per call; ≤ what is left of the cap over the last 31 days; ≤ the filing's provision plus the leg's unprovisioned cover; liquid BRS only; destination fixed to the payments account. Never solvency-gated.",
+    bound: "≤ max per call; ≤ what is left of the cap over the last 31 days; ≤ the filing's provision plus the leg's unprovisioned cover; liquid BRS only; destination fixed to the payments account. Never gated by required coverage.",
   },
   {
     ix: "settle_payout",

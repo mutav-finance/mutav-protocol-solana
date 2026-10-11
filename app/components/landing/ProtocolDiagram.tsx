@@ -79,7 +79,7 @@ const n = (id: string, x: number, y: number, data: BoxData): Node<BoxData> => ({
 
 const NODES: Node<BoxData>[] = [
   n("operator", 0, 20, { title: "OPERATOR", sub: "MUTAV platform key\nregisters · fees · claims", w: 190, h: 74, role: "operator" }),
-  n("gate", 300, 26, { title: "SOLVENCY GATE", sub: "new cover must fit\nin free capital", w: 170, h: 62, gate: true }),
+  n("gate", 300, 26, { title: "COVERAGE GATE", sub: "new cover must fit\nin free capital", w: 170, h: 62, gate: true }),
   n("admin", 840, 20, { title: "RESERVE ADMIN", sub: "Squads M-of-N multisig\ntime-locked proposals", w: 200, h: 74, role: "admin" }),
   n("reserve", 380, 170, { title: "RESERVE", sub: "BRS held by the program\nNAV · coverage · free capital\nshares minted at NAV", w: 260, h: 130, accent: true }),
   n("escrows", 820, 186, { title: "ESCROWS", sub: "pending deposits\npending redemptions\nclaims (filled redemptions)", w: 220, h: 98 }),

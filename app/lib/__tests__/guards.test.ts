@@ -20,8 +20,13 @@ const SOURCES = ["app", "components", "lib"].flatMap((d) => files(join(ROOT, d),
 /** A7: the static pages too (the simulator), and any other public HTML. */
 const STATIC = files(join(ROOT, "public"), /\.html?$/);
 
-/** (Re)insurance vocabulary, yield-product framing and "sinistro" (A7). */
-const BANNED = /\b(premiums?|(re)?insur(ance|ed|ers?)|polic(y|ies)|policyholders?|yield vault|sinistros?)\b/i;
+/**
+ * (Re)insurance vocabulary, yield-product framing, "sinistro" (A7), the reserve
+ * called a "fund", and "solvency gate" in copy (it is the coverage gate; code
+ * identifiers such as `solvencyFromAccounts` are renamed in a later PR and do
+ * not match: the regex needs a space or hyphen). "funds" (money) is fine.
+ */
+const BANNED = /\b(premiums?|(re)?insur(ance|ed|ers?)|polic(y|ies)|policyholders?|yield vault|sinistros?|fund|solvency[ -]gat(e|ed|es|ing))\b/i;
 /** Standard HTTP header names (Referrer-Policy, Content-Security-Policy, …) are not UI copy. */
 const HEADER_NAMES = /\b[A-Z][A-Za-z]*(-[A-Z][A-Za-z]*)*-Policy(-Report-Only)?\b/g;
 const stripComments = (src: string) => src.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "");
@@ -39,8 +44,8 @@ describe("app rules", () => {
   });
 
   it("catches the words it is meant to catch", () => {
-    for (const w of ["reinsurance", "Insurance", "insured", "insurers", "policy", "policies", "policyholder", "premium", "sinistro", "sinistros", "yield vault"]) expect([w, BANNED.test(w)]).toEqual([w, true]);
-    for (const w of ["guarantee fee", "claim payment", "reserve", "Referrer-Policy"]) expect([w, BANNED.test(w.replace(HEADER_NAMES, ""))]).toEqual([w, false]);
+    for (const w of ["reinsurance", "Insurance", "insured", "insurers", "policy", "policies", "policyholder", "premium", "sinistro", "sinistros", "yield vault", "the fund", "SOLVENCY GATE", "solvency-gated"]) expect([w, BANNED.test(w)]).toEqual([w, true]);
+    for (const w of ["guarantee fee", "claim payment", "reserve", "Referrer-Policy", "moves no funds", "funded", "solvencyFromAccounts", "coverage gate"]) expect([w, BANNED.test(w.replace(HEADER_NAMES, ""))]).toEqual([w, false]);
   });
 
   it("never builds a signer from secret bytes in app code", () => {
