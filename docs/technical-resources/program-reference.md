@@ -187,7 +187,7 @@ These instructions replace a one-step `set_roles` ([ADR 0020](../decisions/0020-
 | Errors | `Unauthorized`, `InvalidParameter`, `Paused`, `UnderCovered`, `FulfilHalted`, `ReserveUnderwater`, `ReserveFrozen`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `NavOutOfBounds`, `RequestTooSmall`, `PriceLimitNotMet`, `QueueOrderViolation` |
 | Events | `RedeemFilled` per fill, `RedeemsFulfilled { from_seq, to_seq, shares, assets, nav, idle_free_capital, redeemed_shares_total, redeemed_assets_total }` per batch. |
 
-The admin may also sign `cancel_deposit` for a pending deposit, for example when a wallet leaves the allowlist with a deposit pending, and `cancel_redeem` for a head that cannot fill. See [`cancel_deposit`](#cancel_deposit-and-claim_shares) and [`cancel_redeem`](#cancel_redeem-and-claim_assets) under the capital provider.
+The admin may also sign `cancel_deposit` for a pending deposit, for example when a wallet leaves the allowlist with a deposit pending, and `cancel_redeem` for a head that cannot fill. The admin's cancel **parks** the request ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)): nothing moves, the queue moves past it, and only the owner collects the escrow. See [`cancel_deposit`](#cancel_deposit-and-claim_shares) and [`cancel_redeem`](#cancel_redeem-and-claim_assets) under the capital provider.
 
 ### Claims (later upgrade)
 
@@ -378,13 +378,17 @@ stateDiagram-v2
   state "Deposit request" as D {
     [*] --> PENDING_D: request_deposit
     PENDING_D --> FULFILLED: fulfil_deposits (admin)
-    PENDING_D --> closed_d: cancel_deposit (owner or admin)
+    PENDING_D --> closed_d: cancel_deposit (owner)
+    PENDING_D --> CANCELLED_D: cancel_deposit (admin parks)
+    CANCELLED_D --> closed_d: cancel_deposit (owner)
     FULFILLED --> closed_d: claim_shares (owner)
   }
   state "Redeem request" as R {
     [*] --> PENDING_R: request_redeem
     PENDING_R --> FILLED: fulfil_redeems (admin)
-    PENDING_R --> closed_r: cancel_redeem (owner or admin)
+    PENDING_R --> closed_r: cancel_redeem (owner)
+    PENDING_R --> CANCELLED_R: cancel_redeem (admin parks)
+    CANCELLED_R --> closed_r: cancel_redeem (owner)
     FILLED --> closed_r: claim_assets (owner)
   }
 ```
@@ -404,10 +408,10 @@ stateDiagram-v2
 | | |
 |---|---|
 | Signer | Cancel: the owner or the admin. Claim: the owner. |
-| Rules | Cancel: `PENDING`. Claim: `FULFILLED`. Both run under pause. When the admin cancels, the owner is not a signer; the owner account is bound to the address stored in the request. Config and mint seeds are checked. |
-| Effects | Cancel returns the BRS and the request's rent to the owner's associated token account for `reserve_mint`, created idempotently with the signer as payer, and closes the request. It removes a de-listed or unreachable investor's deposit from the queue head. Claim mints `shares_out` to the owner's share account and closes the request. If the owner's token account is frozen by the issuer, the cancel cannot complete; the runbook covers that case. |
+| Rules | Admin's cancel: `PENDING`. Owner's cancel: `PENDING` or `CANCELLED`. Claim: `FULFILLED`. All run under pause. When the admin cancels, the owner is not a signer; the owner account is bound to the address stored in the request. Config and mint seeds are checked. |
+| Effects | The admin's cancel parks the request (`status = CANCELLED`, [ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)): no transfer, no account creation, no close; the BRS stays in `pending_deposits`, owed to the owner, and the queue moves past it. It removes a de-listed or unreachable investor's deposit from the queue head, and the owner cannot make it fail. The owner's cancel returns the BRS and the request's rent to the owner's associated token account for `reserve_mint`, created idempotently with the owner as payer, and closes the request. Claim mints `shares_out` to the owner's share account and closes the request. If the owner's token account is frozen by the issuer, the cancel cannot complete; the runbook covers that case. |
 | Errors | `Unauthorized`, `InvalidRequestStatus` |
-| Events | `DepositCancelled { owner, seq, assets, by }`, `SharesClaimed { owner, seq, shares }` |
+| Events | `DepositParked { owner, seq, assets, by }` (admin), `DepositCancelled { owner, seq, assets, by }` (owner), `SharesClaimed { owner, seq, shares }` |
 
 #### `request_redeem(shares, min_assets_out, eligibility)`
 
@@ -425,10 +429,10 @@ stateDiagram-v2
 | | |
 |---|---|
 | Signer | Cancel: the owner or the admin. Claim: the owner. |
-| Rules | Cancel: `PENDING`. Claim: `FILLED`. Both run under pause. When the admin cancels, the owner account is bound to the address stored in the request. |
-| Effects | Cancel returns the escrowed shares to the owner's share associated token account, created idempotently with the signer as payer, and closes the request with its rent to the owner. The admin uses it to remove a head that cannot fill, for example one worth 0 BRS or with a `min_assets_out` no fill can meet. Claim pays `assets_out` from `claims` to the owner's BRS associated token account and closes the request. |
+| Rules | Admin's cancel: `PENDING`. Owner's cancel: `PENDING` or `CANCELLED`. Claim: `FILLED`. All run under pause. When the admin cancels, the owner account is bound to the address stored in the request. |
+| Effects | The admin's cancel parks the request (`status = CANCELLED`, [ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)) to remove a head that cannot fill, for example one worth 0 BRS or with a `min_assets_out` no fill can meet: nothing moves, the shares stay escrowed and owed to the owner. The owner's cancel returns the escrowed shares to the owner's share associated token account, created idempotently with the owner as payer, and closes the request with its rent to the owner. Claim pays `assets_out` from `claims` to the owner's BRS associated token account and closes the request. |
 | Errors | `Unauthorized`, `InvalidRequestStatus` |
-| Events | `RedeemCancelled { owner, seq, shares_returned, by }`, `AssetsClaimed { owner, seq, assets }` |
+| Events | `RedeemParked { owner, seq, shares, by }` (admin), `RedeemCancelled { owner, seq, shares_returned, by }` (owner), `AssetsClaimed { owner, seq, assets }` |
 
 ## Anyone
 
@@ -583,6 +587,7 @@ Dead errors (adapter, price and claim-notice errors that v1 never raises) and th
 - [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
 - [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
 - [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md) (`nav_bounds`, open exit, owner or admin cancel)
+- [ADR 0030: The admin's cancel parks the request](../decisions/0030-admin-cancel-parks-the-request.md)
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (sparse `set_config`, `advance_queue_head`, removed state)
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; guardian emergency actions decided)

@@ -14,7 +14,7 @@ Capital enters and leaves the reserve through two asynchronous, first-in first-o
 | Price | NAV at the fill | NAV at the fill |
 | Size of a fill | Whole request | Whole request in the pilot |
 | Collect | `claim_shares()` | `claim_assets()` |
-| Cancel before a fill | `cancel_deposit()`, owner or admin | `cancel_redeem()`, owner or admin |
+| Cancel before a fill | `cancel_deposit()`: the owner collects; the admin parks | `cancel_redeem()`: the owner collects; the admin parks |
 | Entry check | Allowlist proof (`Eligibility::Merkle { proof }`) | Checked only when the debited share account is empty, so holders skip it |
 
 Each request is its own PDA, seeded `["deposit", config, seq]` or `["redeem", config, seq]`. The `seq` comes from a counter in `VaultState` and is never reused. Two requests sent at the same moment can race for the same `seq`; the client retries with the next one.
@@ -82,7 +82,7 @@ The pilot fills whole requests only. If the head request is larger than the budg
 
 ### A head worth nothing
 
-A head worth 0 BRS at the fill is never filled: no fill pays nothing or burns shares for nothing. `fulfil_redeems` stops the batch with the head untouched (`RequestTooSmall` when nothing was filled). The owner or the admin cancels it with `cancel_redeem`, the shares go back to the owner, and the queue moves on. The sub-minimum floor below keeps such heads rare ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)).
+A head worth 0 BRS at the fill is never filled: no fill pays nothing or burns shares for nothing. `fulfil_redeems` stops the batch with the head untouched (`RequestTooSmall` when nothing was filled). The owner cancels it with `cancel_redeem` and the shares go back to it, or the admin parks it; either way the queue moves on. The sub-minimum floor below keeps such heads rare ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)).
 
 ## NAV bounds on every fill
 
@@ -90,13 +90,13 @@ Fills are signed by the admin multisig and run after its time lock. The NAV can 
 
 ## Cancel and claim rights
 
-These owner actions never depend on the admin, and a pause does not stop them. The admin can also cancel a pending request on the owner's behalf.
+These owner actions never depend on the admin, and a pause does not stop them. The admin can also remove a pending request from the queue: it **parks** it ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)), nothing moves, and the escrow stays yours to collect with the same cancel.
 
 | Action | When | Effect |
 |---|---|---|
-| `cancel_deposit` | Request still pending | BRS returned to the owner; request closed. Signed by the owner, or by the admin on the owner's behalf |
+| `cancel_deposit` | Request pending, or parked by the admin | BRS returned to the owner; request closed. The admin's cancel only parks a pending request |
 | `claim_shares` | Deposit filled | Shares minted to the owner; request closed |
-| `cancel_redeem` | Request still pending | Shares returned to the owner; request closed. Signed by the owner, or by the admin on the owner's behalf |
+| `cancel_redeem` | Request pending, or parked by the admin | Shares returned to the owner; request closed. The admin's cancel only parks a pending request |
 | `claim_assets` | Redemption filled | BRS paid from `claims` to the owner |
 
 - `cancel_deposit`, `cancel_redeem`, `claim_shares` and `claim_assets` create the owner's associated token account if it does not exist. The caller pays its rent.
@@ -110,10 +110,10 @@ Entry is gated; exit is open ([ADR 0023](../decisions/0023-capital-flows-and-exi
 | Situation | Rule |
 |---|---|
 | Holder removed from the allowlist | `request_redeem` checks eligibility only when the share token account it debits is empty, which a redemption could not use anyway. A holder can always ask to exit. |
-| Pending deposit from a removed or unreachable wallet | The admin signs `cancel_deposit` for that request. The BRS and the request's rent go to the owner's associated token account for BRS, created if needed with the admin as payer. The owner is bound to the address stored in the request, the event names who signed (`by`), and the deposit queue moves on. If the issuer has frozen the owner's token account, the cancel cannot complete and the runbook covers the case. |
+| Pending deposit from a removed or unreachable wallet | The admin signs `cancel_deposit` for that request, which parks it ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)): nothing moves, `DepositParked` names the admin (`by`), and the deposit queue moves on. The BRS stays in escrow, owed to the owner, who collects it with its own `cancel_deposit` into its BRS associated token account. Nothing the owner does to its own token account (frozen, reassigned, memo-required) can stop the park. |
 | Balance below `min_request` | Only an exit of the balance. The request must debit the owner's canonical share account (its associated token account), leave a remainder there worth less than `min_request`, and be worth at least `max(1, min_request / 10)` (R$100 at the R$1,000 minimum). A share sent into the account cannot block the exit, and a balance cannot be split across accounts into sub-minimum requests. Deposits keep the minimum. |
 | Balance below the floor (`min_request / 10`) | It waits. It stays transferable and is valued in NAV, and can be redeemed once it grows or is combined. |
-| Head worth 0 at the fill | Not filled. The owner or the admin cancels it, and the shares go back to the owner. |
+| Head worth 0 at the fill | Not filled. The owner cancels it and gets the shares back, or the admin parks it and the owner collects later. |
 | Reserve paused | New requests wait. Cancels and claims stay open, so escrowed money is never trapped. |
 | Reserve below its coverage target | Redemption fills stop until capital comes in or guarantees run off. Requests can still be made and cancelled. |
 | Reserve underwater | Deposit and redemption fills stop until MUTAV recapitalizes the reserve. Cancels stay open. |

@@ -80,7 +80,9 @@ The rule is exact: there is no weighting or estimate. Every 30-day span lies ins
 stateDiagram-v2
   [*] --> PENDING: request_deposit (owner, allowlisted)
   PENDING --> FULFILLED: fulfil_deposits (admin)
-  PENDING --> Closed: cancel_deposit (owner or admin)
+  PENDING --> Closed: cancel_deposit (owner)
+  PENDING --> CANCELLED: cancel_deposit (admin parks)
+  CANCELLED --> Closed: cancel_deposit (owner)
   FULFILLED --> Closed: claim_shares (owner)
   Closed --> [*]
 ```
@@ -90,7 +92,7 @@ stateDiagram-v2
 | Request | Owner | Not paused. `Eligibility::Merkle { proof }` against the allowlist root. `min_request ≤ assets ≤ max_request`. Optional `min_shares_out` | BRS escrowed in `pending_deposits` at the next `seq` |
 | Fill | Admin | Not paused. Strict FIFO from `deposit_head`. Not halted; the NAV-move guard runs inline. NAV inside `nav_bounds`. Reserve not frozen. Within `max_tvl`. Not underwater (`ReserveUnderwater`). Mints more than 0 shares. A request whose `min_shares_out` is not met stops the batch (`PriceLimitNotMet`). `count` from 1 to 8 | `FULFILLED`. Emits `DepositFilled` per fill, and an event when the head moves with no fill. BRS to `reserve`. `shares_out` owed at the fill's NAV. The batch that mints the first shares seeds the NAV-move guard's baseline |
 | Claim | Owner | `FULFILLED`. Runs under pause | Shares minted to the owner's associated token account, created idempotently. Request closed, rent to the owner |
-| Cancel | Owner or admin | `PENDING`. Runs under pause. Destination is the owner's own BRS associated token account, created idempotently with the signer as payer; the owner is bound to the address stored in the request | BRS and rent back to the owner. Request closed. The event names who signed (`by`). An admin cancel unblocks the queue when the owner is de-listed or unreachable |
+| Cancel | Owner or admin | `PENDING`. Runs under pause. **Admin: parks** the request (`CANCELLED`, [ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)): nothing moves, nothing is created, the request stays open. **Owner: collects** a `PENDING` or `CANCELLED` request into its own BRS associated token account, created idempotently with the owner as payer | Admin: the BRS stays in `pending_deposits`, owed to the owner, and the queue moves past it (`DepositParked`). Owner: BRS and rent back to the owner, request closed (`DepositCancelled`). The owner cannot make the admin's cancel fail, so a de-listed or unreachable owner never blocks the queue |
 
 ## Redemption request
 
@@ -98,7 +100,9 @@ stateDiagram-v2
 stateDiagram-v2
   [*] --> PENDING: request_redeem (owner)
   PENDING --> FILLED: fulfil_redeems (admin), whole fill
-  PENDING --> Closed: cancel_redeem (owner or admin)
+  PENDING --> Closed: cancel_redeem (owner)
+  PENDING --> CANCELLED: cancel_redeem (admin parks)
+  CANCELLED --> Closed: cancel_redeem (owner)
   FILLED --> Closed: claim_assets (owner)
   Closed --> [*]
 ```
@@ -107,9 +111,9 @@ stateDiagram-v2
 |---|---|---|---|
 | Request | Owner, never a delegate | Not paused. Shares above 0. The allowlist is checked only when the debited share account is empty, so holders skip it. Value at the current NAV: 0 or above `max_request` refused; from `min_request` normal. Below `min_request` only an exit of the balance: from the owner's canonical share associated token account, leaving a remainder worth less than `min_request`, and worth at least `max(1, min_request / 10)` (R$100 at the R$1,000 minimum). Optional `min_assets_out` | Shares escrowed in `pending_redemptions` at the next `seq` |
 | Fill | Admin | `fulfil_redeems(count, max_assets, nav_bounds)`. Not paused. Strict FIFO from `redeem_head`. Normal mode. Not underwater (`ReserveUnderwater`). Not halted; the guard runs inline. NAV inside `nav_bounds`. Each fill within `min(max_assets − paid, free_capital, liquid_budget)`. Whole fills only. Up to 8 per call. A call with no fill fails | `FILLED`. Escrowed shares burned, BRS moved to `claims`. The batch that burns the last shares clears the guard's baseline |
-| 0-value head | Admin | The head request is worth 0 BRS at the fill's NAV | Never filled. The batch stops with the head untouched (`RequestTooSmall` if nothing was filled). The owner or the admin cancels it |
+| 0-value head | Admin | The head request is worth 0 BRS at the fill's NAV | Never filled. The batch stops with the head untouched (`RequestTooSmall` if nothing was filled). The owner cancels it, or the admin parks it |
 | Claim | Owner | `FILLED`. Runs under pause | BRS from `claims` to the owner's associated token account, created idempotently. Request closed |
-| Cancel | Owner or admin | `PENDING`. Runs under pause | Escrowed shares returned to the owner. Request closed |
+| Cancel | Owner or admin | `PENDING`. Runs under pause. **Admin: parks** the request (`CANCELLED`, [ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)). **Owner: collects** a `PENDING` or `CANCELLED` request | Admin: nothing moves; the shares stay escrowed and owed to the owner, and the queue moves past it (`RedeemParked`). Owner: escrowed shares returned, request closed (`RedeemCancelled`) |
 
 The devnet release fills whole requests only, so a head larger than the budget waits until free capital grows. The consoles show what a stuck head needs against what is available. Partial fills at the queue head ([ADR 0010](../decisions/0010-partial-fills-at-queue-head.md)) come in the first upgrade after the hackathon, as carves held by the padding test, with any fee or rounding computed once per request.
 
