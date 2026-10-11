@@ -164,16 +164,20 @@ impl<'a> Money<'a> {
 }
 
 /// Reads a **current** money account (the one recorded in `VaultConfig`)
-/// leniently: `None` when it is closed (no data; it may still hold
-/// lamports), so a closed treasury or payments account never blocks
-/// `set_config`, `accept_role` or replacing either account. An account with
-/// data must be a token account of `token_program`, else `err`.
+/// leniently, so a closed treasury or payments account never blocks
+/// `set_config`, `accept_role` or replacing either account:
+///
+/// - owned by the system program with no data: closed, `None` (it may still
+///   hold lamports, which anyone can send to a closed address);
+/// - owned by `token_program`: decoded as a token account, else `err` (a mint
+///   or a malformed account is refused);
+/// - owned by any other program, with or without data: `err`.
 pub(crate) fn load_money_account(
     info: &AccountInfo,
     token_program: &Pubkey,
     err: MutavError,
 ) -> Result<Option<TokenAccount>> {
-    if info.data_is_empty() {
+    if *info.owner == anchor_lang::system_program::ID && info.data_is_empty() {
         return Ok(None);
     }
     require_keys_eq!(*info.owner, *token_program, err);
