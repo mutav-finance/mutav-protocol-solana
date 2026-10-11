@@ -97,10 +97,10 @@ Revenue is the *taxa da fiança*, billed monthly to partner agencies. Claim paym
 | Item | Working parameter |
 |---|---|
 | Average rent | R$2,200 a month |
-| *Taxa da fiança* | 9%, 12% or 15% of monthly rent by tenant score band (scores below 400 refused); modelled at 10% = **R$220 per lease per month** |
+| *Taxa da fiança* | 9%, 12% or 15% of monthly rent by tenant score band (scores below 400 refused); modelled at 10% = **R$220 per lease per month** in the 02 business plan; the pilot plan uses 12% (ADR 0028) |
 | Who pays whom | Tenant → agency, with the rent. Agency → MUTAV, one consolidated bill a month, boleto or PIX |
 | *Valor afiançado* per lease | Default sub-limit 12× rent (under legal review) + exit sub-limit 6× rent = **R$39,600** |
-| Pilot book | ~170 leases across up to 5 partner agencies (~34 each), ~6 months; gross fees ≈R$37,400 a month at full book |
+| Book | Pilot: 60 leases, 10 a month over ~6 months (ADR 0028). Operating plan: ~170 leases across up to 5 partner agencies (~34 each); gross fees ≈R$37,400 a month at full book (02 business plan) |
 | Expected claims against fees | ≈20% for rent arrears alone (RS base delinquency); ≈21–37% once exit debts are included, by scope (§12) |
 | MUTAV revenue | Take `t` on each fee (open; program maximum 30%) |
 | Reserve | Working target R$300k (02 business plan); the pilot starts at R$100k plus R$100k a month to a R$1M cap (ADR 0028); sizing rule open (§8) |
