@@ -131,16 +131,19 @@ bun scripts/devnet/dry-run.ts --program-keypair ~/.config/solana/mutav/mutav-key
 
 # 1. Fill a copy of scripts/devnet/devnet.example.json outside the repo (every <FILL: …>):
 #    both multisigs, their exact members, the vaults, roles and money accounts.
+#    Build with `solana-verify build` and record the executable hash of the verified build.
 CFG=~/mutav/devnet.json; RPC=https://api.devnet.solana.com
+HASH=$(solana-verify get-executable-hash target/deploy/mutav.so)
 
 # 2. Deploy, then hand the upgrade authority to the upgrade multisig's vault.
 #    Refuses before any CLI call unless --upgrade-authority equals the config's
 #    upgradeAuthority and the vault derived from upgradeSquads, and both
-#    multisigs pass the checks below. A failed handover prints the retry command.
+#    multisigs pass the checks below, and the .so's executable hash equals
+#    --expected-hash (the verified build). A failed handover prints the retry command.
 bun scripts/devnet/deploy.ts --config $CFG --url $RPC --confirm-cluster devnet \
   --payer ~/.config/solana/mutav/deployer.json \
   --program-keypair ~/.config/solana/mutav/mutav-keypair.json \
-  --upgrade-authority <UPGRADE_VAULT>
+  --upgrade-authority <UPGRADE_VAULT> --expected-hash $HASH
 
 # 3. Proposals. init.json is for the upgrade multisig (fund its vault with ~0.1 SOL
 #    first: it pays rent for initialize); the others are for the admin multisig.
@@ -148,18 +151,23 @@ bun scripts/devnet/deploy.ts --config $CFG --url $RPC --confirm-cluster devnet \
 bun scripts/devnet/init.ts      --config $CFG --url $RPC --confirm-cluster devnet --out init.json
 bun scripts/devnet/allowlist.ts --config $CFG --proofs allowlist-proofs.json --out allowlist.json
 #    … execute both, then if needed:
+#    roles.ts also cancels any pending handover the config does not ask for
+#    (a pending admin is kept only if the config names it as `nextAdmin`).
 bun scripts/devnet/roles.ts     --config $CFG --out roles.json
 bun scripts/devnet/caps.ts      --config $CFG --url $RPC --confirm-cluster devnet --out caps.json
 
 # 4. Post-deploy checks.
-bun scripts/devnet/verify.ts --config $CFG --url $RPC --confirm-cluster devnet
+bun scripts/devnet/verify.ts --config $CFG --url $RPC --confirm-cluster devnet --expected-hash $HASH
 ```
+
+Program upgrades go through `scripts/release/upgrade-proposal.ts` (run by `.github/workflows/release.yml`), which also takes `--expected-hash`: it refuses unless the buffer is owned by BPF Loader Upgradeable, its authority is the upgrade vault and its program bytes hash to the expected value (as `solana-verify get-buffer-hash`), and ProgramData's upgrade authority is the vault.
 
 `verify.ts` checks:
 
+- the deployed program is the verified build: the ProgramData program bytes hash to `--expected-hash` (as `solana-verify get-program-hash`);
 - the upgrade authority is the upgrade multisig's vault;
 - `feature_flags == 0`;
-- admin, operator, pauser and the allowlist root are as configured;
+- admin, operator, pauser and the allowlist root are as configured, with no pending operator, pauser or admin handover;
 - every other `VaultConfig` field equals the config file, field by field (c, fee take, every cap including `max_nav_move_bps`, 6 decimals, mint, token program, money accounts, capital wallet);
 - on devnet, the locked devnet values (`scripts/devnet/lib/compare.ts`); a `max_claim_per_period` raised for a large claim payment is reported until it is lowered again;
 - the treasury and payments accounts hold the reserve mint and are not owned by the operator;
