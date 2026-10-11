@@ -555,7 +555,7 @@ pub struct RedeemParked {
 
 /// The reserve admin approved `amount` for one filed claim (`approve_claim`,
 /// ADR 0021): above `max_claim_per_call`, `pay_claim` pays the filing only at
-/// this amount. `previous_amount` is the approval it replaces (`0` = none);
+/// this amount, at this `revision`. `previous_amount` is the approval it replaces (`0` = none);
 /// `max_claim_per_call` is the cap at approval time.
 #[event]
 pub struct ClaimApproved {
@@ -565,6 +565,8 @@ pub struct ClaimApproved {
     pub leg: u8,
     pub notice_ref_hash: [u8; 32],
     pub amount: u64,
+    /// `ClaimFiling.revision` the approval is bound to.
+    pub revision: u16,
     pub previous_amount: u64,
     pub max_claim_per_call: u64,
 }

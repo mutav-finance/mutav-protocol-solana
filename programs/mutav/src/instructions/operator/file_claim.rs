@@ -107,6 +107,9 @@ pub fn handle_file_claim(
     x.provision = amount;
     x.filed_at = now;
     x.status = CLAIM_FILED;
+    // The first version of the filing (ADR 0021 decision 8): `0` is a real
+    // revision, not "unset". Amendments and re-files increment it.
+    x.revision = 0;
 
     emit_cpi!(ClaimFiled {
         config: ctx.accounts.config.key(),

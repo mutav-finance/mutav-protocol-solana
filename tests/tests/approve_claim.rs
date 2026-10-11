@@ -6,6 +6,7 @@
 //! Test caps: R$10k per call, R$20k per 31-day window.
 
 use anchor_lang::prelude::Pubkey;
+use litesvm::types::TransactionResult;
 use mutav::{
     constants::*,
     errors::MutavError,
@@ -15,7 +16,6 @@ use mutav::{
 use mutav_tests::helpers::*;
 use proptest::prelude::*;
 use solana_keypair::Keypair;
-use litesvm::types::TransactionResult;
 use solana_signer::Signer;
 
 const OVER: u64 = 10_000 * BRL + 1;
@@ -67,7 +67,13 @@ fn approve_claim_records_the_exact_amount_and_unlocks_pay_claim() {
     let x = f.claim_filing(&c);
     assert_eq!(x.approved_amount, OVER);
     assert_eq!(
-        (x.status, x.provision, x.filed_at, x.paid_amount, x._reserved),
+        (
+            x.status,
+            x.provision,
+            x.filed_at,
+            x.paid_amount,
+            x._reserved
+        ),
         (
             expected.status,
             expected.provision,
@@ -97,6 +103,7 @@ fn approve_claim_records_the_exact_amount_and_unlocks_pay_claim() {
         (e.config, e.ts, e.guarantee_id, e.leg, e.notice_ref_hash),
         (f.pdas.config, 1_760_000_000, g.id, LEG_DEFAULT, c.notice)
     );
+    assert_eq!(e.revision, 0);
     assert_eq!(
         (e.amount, e.previous_amount, e.max_claim_per_call),
         (OVER, 0, 10_000 * BRL)
@@ -108,7 +115,10 @@ fn approve_claim_records_the_exact_amount_and_unlocks_pay_claim() {
     assert_eq!(f.balance(&payments), OVER);
     assert_eq!(events::<ClaimPaid>(&meta)[0].amount, OVER);
     let x = f.claim_filing(&c);
-    assert_eq!((x.status, x.paid_amount, x.approved_amount), (CLAIM_PAID, OVER, OVER));
+    assert_eq!(
+        (x.status, x.paid_amount, x.approved_amount),
+        (CLAIM_PAID, OVER, OVER)
+    );
 }
 
 #[test]
@@ -166,7 +176,8 @@ fn an_approval_survives_a_lower_per_call_cap() {
     // `max_claim_per_call` afterwards and the approved filing still pays.
     let (mut f, _, c) = filed(OVER);
     f.approve_claim(c).unwrap();
-    f.set_config(vec![ConfigParam::MaxClaimPerCall(BRL)]).unwrap();
+    f.set_config(vec![ConfigParam::MaxClaimPerCall(BRL)])
+        .unwrap();
     f.pay_claim(c).expect("approved exactly");
 }
 
@@ -237,6 +248,66 @@ fn approve_claim_must_name_the_exact_provision() {
 }
 
 #[test]
+fn approve_claim_is_bound_to_the_filing_revision() {
+    // A proposal names the revision it was composed against (ADR 0021
+    // decision 8). `amend_claim` is a later upgrade, so its effect (amount
+    // changed, revision bumped, approval reset) is injected here.
+    let (mut f, _, c) = filed(OVER);
+    let admin = f.admin.insecure_clone();
+    for rev in [1, u16::MAX] {
+        let ix = f.approve_claim_rev_ix(&admin.pubkey(), c, OVER, rev);
+        assert_mutav_err(f.send(ix, &admin), MutavError::ClaimRevisionMismatch);
+    }
+
+    // X → Y → X: the amount is X again, the revision is 2. The proposal
+    // composed at revision 0 for X is stale and refused.
+    let stale = f.approve_claim_rev_ix(&admin.pubkey(), c, OVER, 0);
+    let mut x = f.claim_filing(&c);
+    for (provision, revision) in [(OVER + 5, 1), (OVER, 2)] {
+        x.provision = provision;
+        x.revision = revision;
+        x.approved_amount = 0;
+    }
+    f.write_claim_filing(&c, &x);
+    assert_mutav_err(f.send(stale, &admin), MutavError::ClaimRevisionMismatch);
+    assert_eq!(f.claim_filing(&c).approved_amount, 0);
+    assert_mutav_err(f.pay_claim(c), MutavError::ClaimCallCapExceeded);
+
+    // A fresh proposal at revision 2 approves it.
+    let ix = f.approve_claim_rev_ix(&admin.pubkey(), c, OVER, 2);
+    let meta = f.send(ix, &admin).expect("current revision");
+    assert_eq!(events::<ClaimApproved>(&meta)[0].revision, 2);
+    f.pay_claim(c).expect("approved at revision 2");
+}
+
+#[test]
+fn approve_claim_refuses_a_filing_of_another_guarantee() {
+    // Seeds: the filing must be `["claim", guarantee, notice]` of the
+    // guarantee passed, and the guarantee `["guarantee", config, id]` of this
+    // reserve's config.
+    let (mut f, _, c) = filed(OVER);
+    let g2 = guarantee_args(unique_hash(), 1_000 * BRL, 0);
+    f.fund_reserve(1_000 * BRL);
+    f.register(g2.clone()).unwrap();
+    let admin = f.admin.insecure_clone();
+    let mut ix = f.approve_claim_ix(&admin.pubkey(), c, OVER);
+    // accounts: admin, config, guarantee, claim_filing, ...
+    ix.accounts[2].pubkey = guarantee_pda(&f.pdas.config, &g2.id);
+    assert_anchor_err(
+        f.send(ix, &admin),
+        anchor_lang::error::ErrorCode::ConstraintSeeds,
+    );
+    // A guarantee address that is not this config's guarantee PDA (another
+    // reserve's): the seeds check fails before the filing is read.
+    let other_config = Pubkey::new_unique();
+    let foreign = guarantee_pda(&other_config, &c.id);
+    let mut ix = f.approve_claim_ix(&admin.pubkey(), c, OVER);
+    ix.accounts[2].pubkey = foreign;
+    assert!(f.send(ix, &admin).is_err(), "foreign guarantee accepted");
+    assert_eq!(f.claim_filing(&c).approved_amount, 0);
+}
+
+#[test]
 fn approve_claim_needs_a_filed_claim() {
     let (mut f, g) = book(30_000 * BRL, 30_000 * BRL, 0);
     // No filing for this notice.
@@ -293,11 +364,11 @@ fn approve_claim_refuses_unknown_layouts() {
 fn approve_claim_preserves_padding() {
     let (mut f, g, c) = filed(OVER);
     let mut x = f.claim_filing(&c);
-    x._reserved = [0x3c; 192];
+    x._reserved = [0x3c; 190];
     f.write_claim_filing(&c, &x);
     let gg_before = f.raw(&guarantee_pda(&f.pdas.config, &g.id));
     f.approve_claim(c).unwrap();
-    assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 192]);
+    assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 190]);
     assert_eq!(f.raw(&guarantee_pda(&f.pdas.config, &g.id)), gg_before);
 }
 
@@ -321,12 +392,30 @@ fn approve_claim_works_while_paused_under_covered_and_halted() {
 
 #[test]
 fn approve_claim_works_with_the_operator_revoked() {
-    // Operator-compromise recovery (ADR 0020): approvals stay with the admin.
+    // Operator-compromise recovery (ADR 0020): approvals stay with the admin;
+    // the revoked operator cannot pay, a newly appointed one can.
     let (mut f, _, c) = filed(OVER);
     let pauser = f.pauser.insecure_clone();
     f.send(f.revoke_operator_ix(&pauser.pubkey()), &pauser)
         .unwrap();
     f.approve_claim(c).expect("admin only");
+
+    let old = f.operator.insecure_clone();
+    let payments = f.config().payments_account;
+    let ix = f.pay_claim_ix(&old.pubkey(), c, &payments);
+    assert_mutav_err(f.send(ix, &old), MutavError::Unauthorized);
+
+    let new = Keypair::new();
+    f.svm.airdrop(&new.pubkey(), 1_000_000_000).unwrap();
+    let admin = f.admin.insecure_clone();
+    let ix = f.propose_role_ix(&admin.pubkey(), ROLE_OPERATOR, new.pubkey());
+    f.send(ix, &admin).unwrap();
+    let ix = f.accept_role_ix(&new.pubkey(), ROLE_OPERATOR);
+    f.send(ix, &new).unwrap();
+    let ix = f.pay_claim_ix(&new.pubkey(), c, &payments);
+    f.send(ix, &new)
+        .expect("the new operator pays the approved claim");
+    assert_eq!(f.balance(&payments), OVER);
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +436,8 @@ fn an_approved_claim_still_counts_toward_the_period_cap() {
     }
     let c = Claim::on(&g, OVER);
     f.file_claim(c).unwrap();
-    f.approve_claim(c).expect("approval does not read the window");
+    f.approve_claim(c)
+        .expect("approval does not read the window");
     assert_mutav_err(f.pay_claim(c), MutavError::ClaimPeriodCapExceeded);
 }
 
@@ -407,6 +497,7 @@ proptest! {
         extra_cover in 0u64..=1u64 << 50,
         extra_provisions in 0u64..=1u64 << 50,
         under_covered: bool,
+        under_covered_at_approval: bool,
         paused: bool,
         stress_buffer in prop_oneof![Just(0u64), 0u64..=1u64 << 50, Just(u64::MAX)],
     ) {
@@ -414,9 +505,17 @@ proptest! {
         let (mut f, g) = book(30_000 * BRL, 30_000 * BRL, 0);
         let c = Claim::on(&g, amount);
         f.file_claim(c).unwrap();
+        // Pause and mode are set before the approval, so neither gate can
+        // refuse `approve_claim` either.
         if paused {
             let pauser = f.pauser.insecure_clone();
             f.send(f.pause_ix(&pauser.pubkey()), &pauser).unwrap();
+        }
+        if under_covered_at_approval {
+            let mut s = f.state();
+            s.mode = MODE_UNDER_COVERED;
+            s.remaining_cover_total += extra_cover;
+            f.write_state(&s);
         }
         f.approve_claim(c).unwrap();
         let mut cfg = f.config();
@@ -424,7 +523,9 @@ proptest! {
         f.write_config(&cfg);
         let mut s = f.state();
         s.mode = if under_covered { MODE_UNDER_COVERED } else { MODE_NORMAL };
-        s.remaining_cover_total += extra_cover;
+        if !under_covered_at_approval {
+            s.remaining_cover_total += extra_cover;
+        }
         s.provisions += extra_provisions;
         f.write_state(&s);
 

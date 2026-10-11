@@ -430,8 +430,19 @@ impl Fixture {
         )
     }
 
-    /// `approve_claim` of `c.notice` for `amount` (ADR 0021).
+    /// `approve_claim` of `c.notice` for `amount` at revision 0 (ADR 0021).
     pub fn approve_claim_ix(&self, signer: &Pubkey, c: Claim, amount: u64) -> Instruction {
+        self.approve_claim_rev_ix(signer, c, amount, 0)
+    }
+
+    /// `approve_claim` of `c.notice` for `amount` at `expected_revision`.
+    pub fn approve_claim_rev_ix(
+        &self,
+        signer: &Pubkey,
+        c: Claim,
+        amount: u64,
+        expected_revision: u16,
+    ) -> Instruction {
         let config = self.pdas.config;
         let guarantee = guarantee_pda(&config, &c.id);
         Instruction::new_with_bytes(
@@ -439,6 +450,7 @@ impl Fixture {
             &mutav::instruction::ApproveClaim {
                 notice_ref_hash: c.notice,
                 amount,
+                expected_revision,
             }
             .data(),
             mutav::accounts::ApproveClaim {

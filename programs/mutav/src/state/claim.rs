@@ -45,10 +45,17 @@ pub struct ClaimFiling {
     /// Written by `approve_claim` (always the provision); read by
     /// `pay_claim` above the per-call cap.
     pub approved_amount: u64,
+    /// Carved from `_reserved` (ADR 0021 decision 8). `0` for a filing as
+    /// `file_claim` creates it; every amendment or re-file (`amend_claim`,
+    /// `refile_claim`, later upgrades) increments it and resets
+    /// `approved_amount`. `approve_claim` must name it, so a proposal composed
+    /// against an earlier version of the filing is refused even when the
+    /// amount is the same again.
+    pub revision: u16,
     /// Zeroed. Never read or written by logic. Holds the ADR 0012 claim and
     /// settlement fields (114 bytes) with room to spare after the freeze,
     /// without a migration (spec §14.2, ADR 0019).
-    pub _reserved: [u8; 192],
+    pub _reserved: [u8; 190],
 }
 
 const _: () = assert!(8 + ClaimFiling::INIT_SPACE == CLAIM_FILING_SIZE);

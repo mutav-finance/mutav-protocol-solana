@@ -101,4 +101,6 @@ pub enum MutavError {
     ReserveUnderwater,
     #[msg("No shares are outstanding")]
     NoSharesOutstanding,
+    #[msg("The claim filing changed since the approval was proposed")]
+    ClaimRevisionMismatch,
 }

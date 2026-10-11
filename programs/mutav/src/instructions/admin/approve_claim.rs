@@ -1,4 +1,4 @@
-//! `approve_claim(notice_ref_hash, amount)` (spec §5.4; ADR 0021 decisions 2
+//! `approve_claim(notice_ref_hash, amount, expected_revision)` (spec §5.4; ADR 0021 decisions 2
 //! and 8): the reserve admin approves the exact amount a filed claim takes
 //! out of the reserve, so `pay_claim` can pay it above `max_claim_per_call`.
 //!
@@ -53,6 +53,7 @@ pub fn handle_approve_claim(
     ctx: Context<ApproveClaim>,
     notice_ref_hash: [u8; 32],
     amount: u64,
+    expected_revision: u16,
 ) -> Result<()> {
     let x = &mut ctx.accounts.claim_filing;
     // Rule 1: a filed claim. A paid or settled filing takes no approval.
@@ -61,9 +62,15 @@ pub fn handle_approve_claim(
     // approval.
     require!(amount > 0, MutavError::InvalidParameter);
     // Rule 3: the exact amount the claim pays, which is its provision
-    // (ADR 0021 decision 3). An approval proposed before an amendment no
-    // longer matches and is refused when it executes.
+    // (ADR 0021 decision 3).
     require!(amount == x.provision, MutavError::ExpectedAmountMismatch);
+    // Rule 4: the version of the filing the proposal was composed against.
+    // An amendment X → Y → X restores the amount but not the revision, so an
+    // approval proposed for the first X cannot execute on the second.
+    require!(
+        expected_revision == x.revision,
+        MutavError::ClaimRevisionMismatch
+    );
 
     let previous_amount = x.approved_amount;
     x.approved_amount = amount;
@@ -75,6 +82,7 @@ pub fn handle_approve_claim(
         leg: x.leg,
         notice_ref_hash,
         amount,
+        revision: x.revision,
         previous_amount,
         max_claim_per_call: ctx.accounts.config.caps.max_claim_per_call,
     });
