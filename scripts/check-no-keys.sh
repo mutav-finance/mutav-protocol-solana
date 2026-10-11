@@ -10,7 +10,9 @@
 # the repository root:
 #
 #   <path glob>            every hit in the matching files is allowed
-#   <path glob> <regex>    only hits whose line matches <regex> (grep -iE)
+#   <path glob> <regex>    only hits whose line matches <regex> (grep -iE);
+#                          the line must hold no other forbidden pattern
+#                          once the <regex> matches are removed
 #
 # '#' starts a comment. Keep each entry as narrow as it can be and say why.
 set -euo pipefail
@@ -80,16 +82,35 @@ if [ -n "$allowlist" ]; then
   done <"$allowlist"
 fi
 
+# strip <regex> <text>: <text> with every case-insensitive match removed.
+strip() {
+  local re="$1" rem="$2" m
+  shopt -s nocasematch
+  while [[ "$rem" =~ $re ]]; do
+    m="${BASH_REMATCH[0]}"
+    [ -z "$m" ] && break
+    rem="${rem/"$m"/}"
+  done
+  shopt -u nocasematch
+  printf '%s' "$rem"
+}
+
+# A hit is allowed when a glob-only entry names its file, or when the regex
+# entries for its file match the line and, with every allowed match removed,
+# nothing forbidden is left (an allowed API cannot hide a second one).
 allowed() { # $1 = repo-relative path, $2 = line content
-  local i
+  local i rem="$2" matched=0
   [ ${#globs[@]} -eq 0 ] && return 1
   for i in "${!globs[@]}"; do
     # shellcheck disable=SC2053 # glob match on purpose
-    if [[ "$1" == ${globs[$i]} ]]; then
-      if [ -z "${res[$i]}" ] || grep -qiE -- "${res[$i]}" <<<"$2"; then return 0; fi
+    [[ "$1" == ${globs[$i]} ]] || continue
+    [ -z "${res[$i]}" ] && return 0
+    if grep -qiE -- "${res[$i]}" <<<"$rem"; then
+      matched=1
+      rem="$(strip "${res[$i]}" "$rem")"
     fi
   done
-  return 1
+  [ "$matched" -eq 1 ] && ! grep -qiE -- "$regex" <<<"$rem"
 }
 
 hits=()

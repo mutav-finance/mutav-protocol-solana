@@ -73,6 +73,17 @@ describe('guardCluster', () => {
     await expect(guardCluster(url, 'devnet', stub(hash))).rejects.toThrow();
   });
 
+  test.each([
+    'https://rpc.example.com/solana-mainnet/abc123',
+    'https://rpc.example.com/v1/MAINNET-BETA',
+    'https://Mainnet.helius-rpc.com/',
+    'https://api.MAINNET-beta.solana.com',
+  ])('refuses %p by name even when it answers the devnet genesis hash', async (url) => {
+    const err = await guardCluster(url, 'devnet', stub(DEVNET_GENESIS)).then(() => null, (e: Error) => e);
+    expect(err?.message).toContain('names mainnet');
+    expect(err?.message).not.toContain('abc123');
+  });
+
   test('a localhost RPC that answers the mainnet genesis hash is refused', async () => {
     await expect(guardCluster('http://localhost:8899', undefined, stub(MAINNET_GENESIS))).rejects.toThrow('mainnet');
   });

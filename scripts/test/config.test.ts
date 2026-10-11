@@ -121,7 +121,7 @@ describe('parseConfig multisigs', () => {
 
 describe('keypair paths', () => {
   test('must be outside the repo (target/deploy excepted)', () => {
-    expect(() => assertOutsideRepo(join(REPO_ROOT, 'keys', 'id.json'), 'payer')).toThrow('inside the repository');
+    expect(() => assertOutsideRepo(join(REPO_ROOT, 'keys', 'payer.json'), 'payer')).toThrow('inside the repository');
     expect(assertOutsideRepo(join(REPO_ROOT, 'target', 'deploy', 'mutav-keypair.json'), 'program')).toContain('target');
     expect(assertOutsideRepo('/tmp/x.json', 'payer')).toBe('/tmp/x.json');
   });

@@ -5,10 +5,11 @@ import { TOKEN_PROGRAM } from '../devnet/lib/compose';
 import { testAddress } from './fixtures';
 
 const OTHER_PROGRAM = testAddress(40);
+const TOKEN_2022 = address('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
 
 /** SPL Token Mint: COption<Pubkey> authority (36) | u64 supply | u8 decimals | bool initialized | COption<Pubkey> freeze (36). */
-function mintBytes(decimals: number, initialized = true): Uint8Array {
-  const b = new Uint8Array(82);
+function mintBytes(decimals: number, initialized = true, len = 82): Uint8Array {
+  const b = new Uint8Array(len);
   b[44] = decimals;
   b[45] = initialized ? 1 : 0;
   return b;
@@ -30,5 +31,25 @@ describe('checkReserveMint', () => {
     expect(checkReserveMint(null, cfg).join()).toContain('not found');
     expect(checkReserveMint({ owner: TOKEN_PROGRAM, data: new Uint8Array(40) }, cfg).join()).toContain('not a mint');
     expect(checkReserveMint({ owner: TOKEN_PROGRAM, data: mintBytes(6, false) }, cfg).join()).toContain('not initialised');
+  });
+  test('a 165-byte token account (initialised, decimals byte 6) is refused', () => {
+    // A token account's bytes 44/45 fall inside its amount field, so they can read as decimals 6 / initialised.
+    for (const owner of [TOKEN_PROGRAM, TOKEN_2022]) {
+      const c = { ...cfg, reserveTokenProgram: owner };
+      expect(checkReserveMint({ owner, data: mintBytes(6, true, 165) }, c).join()).toContain('not a mint (165 bytes)');
+    }
+  });
+  test('a classic mint must be exactly 82 bytes', () => {
+    expect(checkReserveMint({ owner: TOKEN_PROGRAM, data: mintBytes(6, true, 83) }, cfg).join()).toContain('not a mint');
+  });
+  test('Token-2022: 82 bytes, or > 165 with account type Mint', () => {
+    const c = { ...cfg, reserveTokenProgram: TOKEN_2022 };
+    expect(checkReserveMint({ owner: TOKEN_2022, data: mintBytes(6) }, c)).toEqual([]);
+    const ext = mintBytes(6, true, 234);
+    ext[165] = 1;
+    expect(checkReserveMint({ owner: TOKEN_2022, data: ext }, c)).toEqual([]);
+    ext[165] = 2; // Account
+    expect(checkReserveMint({ owner: TOKEN_2022, data: ext }, c).join()).toContain('not a mint');
+    expect(checkReserveMint({ owner: TOKEN_2022, data: mintBytes(6, true, 120) }, c).join()).toContain('not a mint');
   });
 });

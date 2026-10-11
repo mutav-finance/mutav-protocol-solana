@@ -96,6 +96,22 @@ describe('check-no-keys.sh allowlist', () => {
     expect(r.out).not.toContain('readFileSync(p)');
   });
 
+  test('an allowlisted line that also holds a second forbidden pattern still fails', () => {
+    const dir = fixture('const k = readFileSync(Keypair.fromSecretKey(x));');
+    const list = join(root, `allow-${n++}.txt`);
+    writeFileSync(list, `${dir}/bad.ts readFileSync\n`);
+    const r = run(['--allowlist', list, dir]);
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('fromSecretKey');
+  });
+
+  test('a line whose hits are all covered by its entries passes', () => {
+    const dir = fixture("const a = readFileSync('x-keypair.json');");
+    const list = join(root, `allow-${n++}.txt`);
+    writeFileSync(list, `${dir}/bad.ts readFileSync\n${dir}/bad.ts -KEYPAIR\\.json\n`);
+    expect(run(['--allowlist', list, dir]).code).toBe(0);
+  });
+
   test('a glob entry allows the whole file', () => {
     const dir = fixture('const b = Keypair.fromSecretKey(x);');
     const list = join(root, `allow-${n++}.txt`);

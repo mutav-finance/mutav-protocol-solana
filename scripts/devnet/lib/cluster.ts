@@ -9,7 +9,8 @@
  *
  * - mainnet's genesis hash is always refused, local URLs included;
  * - a loopback URL is `local` (a validator or a Surfpool fork);
- * - any other URL needs `--confirm-cluster devnet` and devnet's genesis hash.
+ * - any other URL needs `--confirm-cluster devnet` and devnet's genesis hash,
+ *   and is refused when its host or path names mainnet.
  */
 import { createSolanaRpc } from '@solana/kit';
 
@@ -61,7 +62,12 @@ export async function guardCluster(
   const url = u.href;
   const local = LOCAL_HOSTS.has(u.hostname);
   if (!local) {
-    if (u.hostname.includes('mainnet')) throw new Error(`${u.host} is a mainnet host; mainnet goes through the spec §14.5 runbook`);
+    // Host and path, case-insensitive: providers put the network in either
+    // (`mainnet.helius-rpc.com`, `…quiknode.pro/<token>/solana-mainnet`). The
+    // path is not printed; it can hold an API token.
+    if (`${u.host}${u.pathname}`.toLowerCase().includes('mainnet')) {
+      throw new Error(`${u.host} names mainnet in its URL; mainnet goes through the spec §14.5 runbook`);
+    }
     if (confirm !== 'devnet') throw new Error(`${u.host} is not local: pass --confirm-cluster devnet to run against devnet`);
   }
   let hash: string;

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Address } from '@solana/kit';
 import { MUTAV_PROGRAM_ADDRESS } from '../../clients/js/src';
-import { deploy, type DeployDeps } from '../devnet/deploy';
+import { deploy, READBACK_ATTEMPTS, READBACK_INTERVAL_MS, type DeployDeps } from '../devnet/deploy';
 import { DEVNET_GENESIS } from '../devnet/lib/cluster';
 import { programDataAddress } from '../devnet/lib/compose';
 import { parseConfig, type DeployConfig } from '../devnet/lib/config';
@@ -21,8 +21,19 @@ const payerFile = (mode: number) => {
   return p;
 };
 const BPF = 'BPFLoaderUpgradeab1e11111111111111111111111' as Address;
+/** Stands for the deployer's key in a stale ProgramData read. */
+const DEPLOYER = testAddress(92);
 
-async function setup(o: { ownerOverride?: Address; threshold?: number; authorityAfter?: Address | null; failHandover?: boolean } = {}) {
+async function setup(
+  o: {
+    ownerOverride?: Address;
+    threshold?: number;
+    /** Authorities the ProgramData read-backs return, in order; the last one repeats. */
+    authorityReads?: (Address | null | 'vault')[];
+    failHandover?: boolean;
+    failDeploy?: boolean;
+  } = {},
+) {
   const cfg: DeployConfig = parseConfig(filled());
   cfg.admin = await squadsVaultAddress(cfg.squads.multisig, cfg.squads.vaultIndex);
   cfg.upgradeAuthority = await squadsVaultAddress(cfg.upgradeSquads.multisig, cfg.upgradeSquads.vaultIndex);
@@ -34,16 +45,29 @@ async function setup(o: { ownerOverride?: Address; threshold?: number; authority
   const accounts = new Map<string, { owner: Address; data: Uint8Array }>([
     [cfg.squads.multisig, ms(cfg.squads)],
     [cfg.upgradeSquads.multisig, ms(cfg.upgradeSquads, o.threshold)],
-    [pdAddr, { owner: BPF, data: programData(o.authorityAfter === undefined ? cfg.upgradeAuthority : o.authorityAfter) }],
   ]);
+  const reads = (o.authorityReads ?? ['vault']).map((r) => (r === 'vault' ? cfg.upgradeAuthority : r));
+  const pdReads: { commitment?: string }[] = [];
   const calls: string[][] = [];
+  const sleeps: number[] = [];
   const deps: DeployDeps = {
     genesis: { genesisHash: async () => DEVNET_GENESIS },
-    account: async (_url, a) => accounts.get(a) ?? null,
+    account: async (_url, a, opts) => {
+      if (a !== pdAddr) return accounts.get(a) ?? null;
+      const ua = reads[Math.min(pdReads.length, reads.length - 1)]!;
+      pdReads.push({ commitment: opts?.commitment });
+      return { owner: BPF, data: programData(ua) };
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
     run: (cmd) => {
       calls.push(cmd);
       if (cmd[0] === 'solana-keygen') return `${MUTAV_PROGRAM_ADDRESS}\n`;
-      if (cmd[2] === 'set-upgrade-authority' && o.failHandover) throw new Error('blockhash not found');
+      if (cmd[2] === 'set-upgrade-authority' && o.failHandover) {
+        throw new Error(`error sending request for url (${cmd[cmd.indexOf('--url') + 1]})`);
+      }
+      if (cmd[2] === 'deploy' && o.failDeploy) throw new Error('insufficient funds');
       return '';
     },
   };
@@ -56,7 +80,7 @@ async function setup(o: { ownerOverride?: Address; threshold?: number; authority
     upgradeAuthority: cfg.upgradeAuthority as string,
     cfg,
   };
-  return { cfg, deps, calls, opts };
+  return { cfg, deps, calls, opts, pdReads, sleeps };
 }
 
 describe('deploy.ts preflight (refuses before any CLI run)', () => {
@@ -125,14 +149,48 @@ describe('deploy.ts handover', () => {
     expect(err).not.toBeNull();
     const msg = err!.message;
     expect(msg).toContain('still holds the upgrade authority');
+    expect(msg).toContain('error sending request for url ($RPC_URL)');
     expect(msg).toContain(
-      `solana program set-upgrade-authority ${MUTAV_PROGRAM_ADDRESS} --upgrade-authority ${opts.payer} --new-upgrade-authority ${cfg.upgradeAuthority} --skip-new-upgrade-authority-signer-check --keypair ${opts.payer} --url https://api.devnet.solana.com/ --commitment confirmed`,
+      `solana program set-upgrade-authority ${MUTAV_PROGRAM_ADDRESS} --upgrade-authority ${opts.payer} --new-upgrade-authority ${cfg.upgradeAuthority} --skip-new-upgrade-authority-signer-check --keypair ${opts.payer} --url "$RPC_URL" --commitment confirmed`,
     );
+    expect(msg).not.toContain('api.devnet.solana.com');
     expect(calls).toHaveLength(3);
   });
 
-  test('ProgramData not showing the vault after the handover fails with the retry command', async () => {
-    const { deps, opts } = await setup({ authorityAfter: testAddress(92) });
-    await expect(deploy(opts, deps)).rejects.toThrow('solana program set-upgrade-authority');
+  test('recovery text never prints the RPC URL, which may carry an API key', async () => {
+    const { deps, opts } = await setup({ failHandover: true });
+    const err = await deploy({ ...opts, url: 'https://user:pw@rpc.example.com/devnet?api-key=SECRET' }, deps).then(() => null, (e: Error) => e);
+    expect(err!.message).toContain('--url "$RPC_URL"');
+    expect(err!.message).not.toMatch(/SECRET|user:pw|rpc\.example\.com/);
+  });
+
+  test('a failed deploy prints buffer recovery and stops before the handover', async () => {
+    const { deps, calls, opts } = await setup({ failDeploy: true });
+    const err = await deploy(opts, deps).then(() => null, (e: Error) => e);
+    const msg = err!.message;
+    expect(msg).toContain('solana program deploy failed: insufficient funds');
+    expect(msg).toContain(`solana program show --buffers --keypair ${opts.payer} --url "$RPC_URL"`);
+    expect(msg).toContain(`solana program close <BUFFER> --keypair ${opts.payer} --url "$RPC_URL"`);
+    expect(msg).not.toContain('api.devnet.solana.com');
+    expect(calls.map((c) => c[2])).toEqual(['/outside/mutav-keypair.json', 'deploy']);
+  });
+
+  test('the read-back is at confirmed and tolerates a lagging node', async () => {
+    const { deps, opts, pdReads, sleeps } = await setup({ authorityReads: [DEPLOYER, 'vault'] });
+    expect(await deploy(opts, deps)).toEqual({ programId: MUTAV_PROGRAM_ADDRESS });
+    expect(pdReads).toEqual([{ commitment: 'confirmed' }, { commitment: 'confirmed' }]);
+    expect(sleeps).toEqual([READBACK_INTERVAL_MS]);
+  });
+
+  test('a read-back that never shows the vault says to check first, never that the deployer holds it', async () => {
+    const { deps, opts, pdReads } = await setup({ authorityReads: [DEPLOYER] });
+    const err = await deploy(opts, deps).then(() => null, (e: Error) => e);
+    expect(err).not.toBeNull();
+    const msg = err!.message;
+    expect(pdReads).toHaveLength(READBACK_ATTEMPTS);
+    expect(msg).toContain(`Check \`solana program show ${MUTAV_PROGRAM_ADDRESS} --url "$RPC_URL"\` first`);
+    expect(msg).toContain('nothing to do');
+    expect(msg).not.toContain('still holds');
+    expect(msg).not.toContain('api.devnet.solana.com');
   });
 });
