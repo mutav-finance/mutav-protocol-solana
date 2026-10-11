@@ -8,7 +8,7 @@ use crate::{
     constants::{RESERVE_SEED, STATE_SEED},
     errors::MutavError,
     events::FulfilHaltCleared,
-    instructions::{capital::NavBounds, operator::solvency_snapshot},
+    instructions::{capital::NavBounds, operator::coverage_snapshot},
     pricing::published_nav,
     state::{VaultConfig, VaultState},
 };
@@ -61,7 +61,7 @@ pub fn handle_clear_fulfil_halt(
     );
     require!(!ctx.accounts.reserve.is_frozen(), MutavError::ReserveFrozen);
     // Same price rule as `refresh`: a TESOURO position fails closed.
-    let sol = solvency_snapshot(&ctx.accounts.config, &ctx.accounts.state)?;
+    let sol = coverage_snapshot(&ctx.accounts.config, &ctx.accounts.state)?;
     let state = &mut ctx.accounts.state;
     let nav = published_nav(sol.net_assets, state.shares_outstanding)?;
     nav_bounds.check(nav)?;

@@ -79,11 +79,11 @@ const shareBps = (part: bigint, whole: bigint) => (whole === 0n ? null : (part *
 /** No adapter holds anything allocated. */
 const nothingAllocated = (adapters: AdapterRow[]) => adapters.every((a) => a.allocated === 0n);
 
-export function reserveComposition(r: Pick<ReserveView, "state" | "config" | "solvency" | "incomeInbox">): Composition {
+export function reserveComposition(r: Pick<ReserveView, "state" | "config" | "coverage" | "incomeInbox">): Composition {
   const brs = r.state.brsBalance;
   // BRS only (ADR 0018, ADR 0019): no adapter value and a 100% floor.
   const adapterValue = 0n;
-  const stableAssets = r.solvency.stableAssets;
+  const stableAssets = r.coverage.stableAssets;
   const floorBps = BPS_MAX;
   const floorValue = (BigInt(floorBps) * stableAssets + 9_999n) / 10_000n;
   const adapters = adapterRows();

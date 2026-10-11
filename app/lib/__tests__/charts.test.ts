@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "../charts";
+import { claimSpeed, coverBars, flowBars, frac, navBasis, coverageMeter } from "../charts";
 import type { ClaimRow, CoverageRow } from "../view";
 import { BRL } from "./fixtures";
 
@@ -12,18 +12,18 @@ describe("chart shaping", () => {
   });
 
   it("splits a covered reserve into backing and surplus", () => {
-    const m = solvencyMeter({ stableAssets: 28_300n * BRL, coverageRequired: 19_500n * BRL, freeCapital: 8_800n * BRL });
+    const m = coverageMeter({ stableAssets: 28_300n * BRL, coverageRequired: 19_500n * BRL, freeCapital: 8_800n * BRL });
     expect(m).toMatchObject({ axis: 28_300n * BRL, backing: 19_500n * BRL, surplus: 8_800n * BRL, shortfall: 0n, underCovered: false });
     expect(m.coveredBps).toBe(14_512n);
   });
 
   it("shows the shortfall of an under-covered reserve on the same axis", () => {
-    const m = solvencyMeter({ stableAssets: 10_000n * BRL, coverageRequired: 15_000n * BRL, freeCapital: 0n });
+    const m = coverageMeter({ stableAssets: 10_000n * BRL, coverageRequired: 15_000n * BRL, freeCapital: 0n });
     expect(m).toMatchObject({ axis: 15_000n * BRL, backing: 10_000n * BRL, surplus: 0n, shortfall: 5_000n * BRL, underCovered: true });
   });
 
   it("reports no coverage ratio when nothing is covered", () => {
-    expect(solvencyMeter({ stableAssets: 1n, coverageRequired: 0n, freeCapital: 1n }).coveredBps).toBeNull();
+    expect(coverageMeter({ stableAssets: 1n, coverageRequired: 0n, freeCapital: 1n }).coveredBps).toBeNull();
   });
 
   it("splits stable assets into net assets and provisions", () => {

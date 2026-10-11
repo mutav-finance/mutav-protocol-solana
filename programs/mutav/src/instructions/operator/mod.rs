@@ -22,13 +22,13 @@ pub use sweep_income::*;
 use anchor_lang::prelude::*;
 
 use crate::{
-    solvency::{Solvency, SolvencyInputs},
+    coverage::{Coverage, CoverageInputs},
     state::{VaultConfig, VaultState},
 };
 
 /// The spec §4 quantities for the current state.
-pub(crate) fn solvency_snapshot(config: &VaultConfig, state: &VaultState) -> Result<Solvency> {
-    Solvency::compute(&SolvencyInputs {
+pub(crate) fn coverage_snapshot(config: &VaultConfig, state: &VaultState) -> Result<Coverage> {
+    Coverage::compute(&CoverageInputs {
         brs_balance: state.brs_balance,
         remaining_cover_total: state.remaining_cover_total,
         coverage_ratio_bps: config.coverage_ratio_bps,

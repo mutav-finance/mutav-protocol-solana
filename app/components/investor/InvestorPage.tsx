@@ -64,7 +64,7 @@ function Position({ r, inv, pending }: { r: ReserveView; inv: InvestorView | nul
   if (!address || !inv || inv.owner !== address) return <Note>Connect a wallet to see its position.</Note>;
   const s = r.state;
   const shares = inv.shares.amount ?? 0n;
-  const value = assetsFor(shares, s.sharesOutstanding, r.solvency.netAssets);
+  const value = assetsFor(shares, s.sharesOutstanding, r.coverage.netAssets);
   const ownBps = s.sharesOutstanding === 0n ? 0n : (shares * 10_000n) / s.sharesOutstanding;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -87,7 +87,7 @@ function Requests({ owner }: { owner: string | null }) {
   if (!owner) return <Note>Connect a wallet to see its requests. The whole queue is public on <Link href="/reserve#queue" className="ext-link">/reserve</Link>.</Note>;
   if (rows.length === 0) return <Note>This wallet has no open request.</Note>;
   // Why a request at the head of its queue would not fill now (preview).
-  const heads = [depositHead(reserve.config, reserve.state, reserve.solvency, ledger, null), redeemHead(reserve.config, reserve.state, reserve.solvency, ledger)]
+  const heads = [depositHead(reserve.config, reserve.state, reserve.coverage, ledger, null), redeemHead(reserve.config, reserve.state, reserve.coverage, ledger)]
     .filter((h): h is HeadStatus => h !== null && h.owner === owner && h.stuck.length > 0);
   return (
     <>
@@ -150,7 +150,7 @@ function RequestForms({ allowed, inv }: { allowed: boolean; inv: InvestorView | 
   const { reserve } = useLive();
   const caps = reserve.config.caps;
   const so = reserve.state.sharesOutstanding;
-  const net = reserve.solvency.netAssets;
+  const net = reserve.coverage.netAssets;
   const [amount, setAmount] = useState("10000");
   const [minShares, setMinShares] = useState("");
   const [sharesIn, setSharesIn] = useState("2000");

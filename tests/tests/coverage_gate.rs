@@ -1,17 +1,17 @@
-//! The solvency gate on `register_guarantee` (spec §4, §5.2 rule 5; plan
+//! The coverage gate on `register_guarantee` (spec §4, §5.2 rule 5; plan
 //! Task 3): `coverage_required_after ≤ stable_assets`, at the boundary, with
 //! `c > 1`, with `c < 1` (ADR 0016) and with provisions.
 
 use mutav::{
     constants::MIN_COVERAGE_RATIO_BPS,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
-    solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
 };
 use mutav_tests::helpers::*;
 
-fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
-    Solvency::compute(&SolvencyInputs {
+fn coverage(c: &VaultConfig, s: &VaultState) -> Coverage {
+    Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
@@ -22,7 +22,7 @@ fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
 }
 
 fn free_capital(f: &Fixture) -> u64 {
-    solvency(&f.config(), &f.state()).free_capital
+    coverage(&f.config(), &f.state()).free_capital
 }
 
 /// Demo step: "the gate refusing an over-capacity registration" (plan
@@ -153,7 +153,7 @@ fn provisions_bind_coverage_below_one_and_block_registration() {
     // R$9k filed: the provisions term binds (9k > 0.10 × 60k).
     f.file_claim(Claim::on(&g1, 6_000 * BRL)).unwrap();
     f.file_claim(Claim::on(&g2, 3_000 * BRL)).unwrap();
-    let sol = solvency(&f.config(), &f.state());
+    let sol = coverage(&f.config(), &f.state());
     assert_eq!(sol.coverage_required, 9_000 * BRL);
     assert_eq!(f.state().coverage_required, 9_000 * BRL, "cached on file");
     assert_eq!(sol.free_capital, 1_000 * BRL);
@@ -168,7 +168,7 @@ fn provisions_bind_coverage_below_one_and_block_registration() {
     // assets. The ratio term alone (0.10 × 91k = 9.1k) would allow the next
     // registration; the provisions term refuses it.
     f.file_claim(Claim::on(&g2, 2_000 * BRL)).unwrap();
-    let sol = solvency(&f.config(), &f.state());
+    let sol = coverage(&f.config(), &f.state());
     assert_eq!(sol.coverage_required, 11_000 * BRL);
     assert!(sol.under_covered());
     let before = f.raw(&f.pdas.state);

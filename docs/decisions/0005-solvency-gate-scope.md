@@ -3,6 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-10-01
 
+> **Terminology (2026-10-11).** The code now calls this the *coverage gate*: `programs/mutav/src/coverage.rs`, `Coverage`/`CoverageInputs`, `coverage_snapshot`, `tests/tests/coverage_gate.rs`, and `computeCoverage`/`coverageFromAccounts` in the client. "Solvency" below means the same rule (`stable_assets ≥ coverage_required`), not MUTAV's financial solvency. This ADR keeps its text and filename so links stay valid.
+
 ## Context
 
 MUTAV's promise to agencies and landlords is that claims are paid. A gate that could stop a claim payment when the reserve is short would break that promise exactly when it matters. At the same time, capital must not leave, and new liability must not be taken on, while the reserve cannot cover the guarantees already registered.

@@ -102,7 +102,7 @@ export const MUTAV_ERROR__HANDOVER_PENDING = 0x1799; // 6041
 export const MUTAV_ERROR__REFRESH_REQUIRED = 0x179a; // 6042
 /** PriceLimitNotMet: The head request's price limit is not met */
 export const MUTAV_ERROR__PRICE_LIMIT_NOT_MET = 0x179b; // 6043
-/** ReserveUnderwater: Net assets are zero while shares are outstanding */
+/** ReserveUnderwater: NAV per share is below the smallest published unit while shares are outstanding */
 export const MUTAV_ERROR__RESERVE_UNDERWATER = 0x179c; // 6044
 /** NoSharesOutstanding: No shares are outstanding */
 export const MUTAV_ERROR__NO_SHARES_OUTSTANDING = 0x179d; // 6045
@@ -197,7 +197,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [MUTAV_ERROR__REQUEST_TOO_LARGE]: `Request is above the maximum`,
     [MUTAV_ERROR__REQUEST_TOO_SMALL]: `Request is below the minimum`,
     [MUTAV_ERROR__RESERVE_FROZEN]: `A reserve token account is frozen`,
-    [MUTAV_ERROR__RESERVE_UNDERWATER]: `Net assets are zero while shares are outstanding`,
+    [MUTAV_ERROR__RESERVE_UNDERWATER]: `NAV per share is below the smallest published unit while shares are outstanding`,
     [MUTAV_ERROR__ROLES_NOT_DISTINCT]: `Roles must be distinct keys`,
     [MUTAV_ERROR__TVL_CAP_EXCEEDED]: `TVL cap exceeded`,
     [MUTAV_ERROR__UNAUTHORIZED]: `Signer is not authorized for this instruction`,

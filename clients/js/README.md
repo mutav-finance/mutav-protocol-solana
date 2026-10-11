@@ -11,15 +11,15 @@ It **composes** instructions and **reads** accounts. It holds no keys and never 
 | `generated/` | Codama output from the Anchor IDL: instruction builders, account decoders, events, errors, PDAs with IDL seeds. Do not edit; run `bun run generate:client` at the repo root after `anchor build`. |
 | `pdas.ts` | `findReserveAddresses(reserveMint)` (config, state, vault authority, share mint, the four token accounts, event authority), the PDAs the IDL cannot describe: `findDepositRequestPda`, `findRedeemRequestPda` (seeded by queue `seq`), and `findIncomeInboxAddress` (the vault authority's associated token account for BRS, where Nora pays issuer income; ADR 0017; the token program is required, pass `config.reserveTokenProgram`). |
 | `config.ts` | `capsInputFromConfig(caps, overrides)` builds the `CapsInput` that `initialize` / `set_config` take from a read config, leaving out the padding and the fields carved for later instructions (ADR 0019). |
-| `math.ts` | Mirror of the program's `math.rs` and `solvency.rs` (spec §4) in `bigint`: `mulDiv`, `sharesFor`, `assetsFor`, `conversionNav`, `liquidBudget`, `netAssets`, `navPerShare`, `computeSolvency` (BRS only, ADR 0019); the 31-day claim window (`claimWindowPaid`); the fee take split of `contribute_fees` (`takeSplit`) and `isValidIncomePeriod`. Same rounding; throws `MathOverflowError` where the program fails with `MathOverflow`. |
-| `preview.ts` | `solvencyFromAccounts`, `previewDepositFulfil`, `previewRedeemFulfil` (whole fills, as the pilot program). |
+| `math.ts` | Mirror of the program's `math.rs` and `coverage.rs` (spec §4) in `bigint`: `mulDiv`, `sharesFor`, `assetsFor`, `conversionNav`, `liquidBudget`, `netAssets`, `navPerShare`, `computeCoverage` (BRS only, ADR 0019); the 31-day claim window (`claimWindowPaid`); the fee take split of `contribute_fees` (`takeSplit`) and `isValidIncomePeriod`. Same rounding; throws `MathOverflowError` where the program fails with `MathOverflow`. |
+| `preview.ts` | `coverageFromAccounts`, `previewDepositFulfil`, `previewRedeemFulfil` (whole fills, as the pilot program). |
 | `reads.ts` | `fetchReserve`, `fetchGuaranteesForReserve`, `fetchClaimFilingsForGuarantee` (each filing carries its payment and settlement), `getRedeemQueuePosition`, `getDepositQueuePosition`, `fetchIncomeInbox` (the untracked inbox balance, never in NAV; mint and token program from the reserve's `VaultConfig`) and `fetchIncomeReceiptsForReserve` (one per swept statement or guarantee fee, told apart by `kind`). |
 
 Partial fills at the queue head (ADR 0010) are not built in the pilot program, so their sizing is not mirrored yet.
 
 ## Parity with the program
 
-`tests/tests/client_vectors.rs` (Rust) computes math, solvency, PDA, allowlist and instruction-encoding vectors from the program crate into `tests/fixtures/client/vectors.json` and fails if the committed file is stale. `test/*.test.ts` (Bun) checks this package against the same file.
+`tests/tests/client_vectors.rs` (Rust) computes math, coverage, PDA, allowlist and instruction-encoding vectors from the program crate into `tests/fixtures/client/vectors.json` and fails if the committed file is stale. `test/*.test.ts` (Bun) checks this package against the same file.
 
 ```sh
 bun test                       # in clients/js
@@ -35,7 +35,7 @@ import { fetchReserve, previewDepositFulfil } from '@mutav-finance/mutav-protoco
 
 const rpc = createSolanaRpc('https://api.devnet.solana.com');
 const r = await fetchReserve(rpc, address('BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4'));
-console.log(r.solvency.freeCapital, r.state.data.navPerShare);
+console.log(r.coverage.freeCapital, r.state.data.navPerShare);
 const [fill] = previewDepositFulfil(r.config.data, r.state.data, [1_000_000_000n]);
 ```
 

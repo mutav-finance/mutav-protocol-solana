@@ -315,7 +315,7 @@ fn revoked_operator_cannot_contribute() {
 
 #[test]
 fn contribute_works_while_paused_and_in_under_coverage() {
-    // Never paused, never solvency-gated (ADR 0009).
+    // Never paused, never coverage-gated (ADR 0009).
     let mut f = reserve();
     let pauser = f.pauser.insecure_clone();
     f.send(f.pause_ix(&pauser.pubkey()), &pauser).unwrap();

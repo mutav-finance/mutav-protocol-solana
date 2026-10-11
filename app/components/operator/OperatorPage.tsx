@@ -11,7 +11,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Page, ReadError, Section } from "@/components/Section";
-import { ClaimCapChart, ClaimSpeedChart, SolvencyChart } from "@/components/charts/Charts";
+import { ClaimCapChart, ClaimSpeedChart, CoverageChart } from "@/components/charts/Charts";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -127,7 +127,7 @@ function RegisterBound() {
   const c = reserve.config.caps;
   return (
     <Bound>
-      {kv("Free capital (new cover must fit)", fmtBrs(reserve.solvency.freeCapital))}
+      {kv("Free capital (new cover must fit)", fmtBrs(reserve.coverage.freeCapital))}
       {kv("Max cover per guarantee", fmtBrs(c.maxCoverPerGuarantee, 0))}
       {kv("Coverage ratio", fmtBps(reserve.config.coverageRatioBps))}
       <span>Refused while paused or under-covered. The gate preview below replays the rules with the client&apos;s math mirror.</span>
@@ -216,7 +216,7 @@ function Limits({ r, l }: { r: ReserveView; l: Ledger }) {
         <ClaimCapChart cap={claimCap(r.config, r.state, r.now)} />
         <div style={{ border: "1px solid var(--color-border)", background: "var(--color-surface)", padding: "14px 16px" }}>
           <p className="font-body" style={{ fontSize: 13, fontWeight: 600, margin: "0 0 12px" }}>Room for new guarantees</p>
-          <SolvencyChart s={r.solvency} ratioBps={r.config.coverageRatioBps} compact />
+          <CoverageChart s={r.coverage} ratioBps={r.config.coverageRatioBps} compact />
         </div>
       </div>
       {open.length > 0 ? <ClaimSpeedChart rows={open} now={r.now} /> : <Note>No claim is waiting for the operator. Settled claims are on <Link href="/reserve#claims" className="ext-link">/reserve</Link>.</Note>}

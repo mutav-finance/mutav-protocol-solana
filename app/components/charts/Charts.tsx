@@ -10,12 +10,12 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { RoleTag } from "@/components/RoleTag";
-import { agencyCoverShare, claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "@/lib/charts";
+import { agencyCoverShare, claimSpeed, coverBars, flowBars, frac, navBasis, coverageMeter } from "@/lib/charts";
 import { fmtBps, fmtBrs, fmtDuration, fmtPct } from "@/lib/format";
 import type { ClaimCap } from "@/lib/operator";
 import type { Composition } from "@/lib/reserve-assets";
 import type { AgencyRow, ClaimRow, CoverageRow, FlowTotals } from "@/lib/view";
-import type { Solvency } from "@mutav-finance/mutav-protocol-solana";
+import type { Coverage } from "@mutav-finance/mutav-protocol-solana";
 
 const pct = (f: number) => `${(f * 100).toFixed(3)}%`;
 const short = (hex: string) => `${hex.slice(0, 8)}…`;
@@ -106,8 +106,8 @@ const C = {
 };
 
 /** Stable assets against coverage required, on one axis. Used on /reserve and on the landing strip (`compact`). */
-export function SolvencyChart({ s, ratioBps, compact = false }: { s: Pick<Solvency, "stableAssets" | "coverageRequired" | "freeCapital">; ratioBps: number; compact?: boolean }) {
-  const m = solvencyMeter(s);
+export function CoverageChart({ s, ratioBps, compact = false }: { s: Pick<Coverage, "stableAssets" | "coverageRequired" | "freeCapital">; ratioBps: number; compact?: boolean }) {
+  const m = coverageMeter(s);
   const verdict = m.coveredBps === null ? "No cover outstanding" : m.underCovered ? `Under-covered: short ${fmtBrs(m.shortfall)}` : `Covered ${fmtBps(m.coveredBps)} · surplus ${fmtBrs(m.surplus)}`;
   const rows = (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -156,7 +156,7 @@ export function SolvencyChart({ s, ratioBps, compact = false }: { s: Pick<Solven
 }
 
 /** Stable assets split into net assets (the NAV basis) and open claim provisions. */
-export function NavBasisChart({ s, navNow }: { s: Pick<Solvency, "stableAssets" | "netAssets">; navNow: string }) {
+export function NavBasisChart({ s, navNow }: { s: Pick<Coverage, "stableAssets" | "netAssets">; navNow: string }) {
   const b = navBasis(s);
   return (
     <ChartFrame

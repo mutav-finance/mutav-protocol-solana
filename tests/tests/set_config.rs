@@ -421,7 +421,7 @@ fn a_new_coverage_ratio_recomputes_the_cached_coverage_required() {
 
 #[test]
 fn a_change_to_c_the_nav_bound_or_the_stress_buffer_needs_a_refresh_first() {
-    // These fields move the solvency figures or the NAV-move guard: the
+    // These fields move the coverage figures or the NAV-move guard: the
     // admin bundles `refresh` before `set_config` in the same transaction.
     let mut f = Fixture::new();
     // Away from slot 0, where a never-refreshed state would look current.

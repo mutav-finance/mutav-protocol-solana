@@ -16,7 +16,7 @@ Work that existed before this repository and that this build relies on:
 |---|---|---|
 | `mutav-finance/mutav` | Business model, market research, compliance work, pitch material | Source of the business rules that [`spec.md`](spec.md) implements |
 | `mutav-finance/mutav-app` | The guarantee-operations platform: agency onboarding, leases and guarantees, pricing, claim verification, invoices and PIX collection, admin console | Consumes this repo's client; the integration tasks (plan Tasks 14–18) are built there |
-| `mutav-finance/mutav-pulse` | An earlier reserve-vault prototype | Reference design for the reserve accounting, solvency gate and investor flows. Logic carried over from it is reimplemented for this program and noted here as it lands |
+| `mutav-finance/mutav-pulse` | An earlier reserve-vault prototype | Reference design for the reserve accounting, coverage gate and investor flows. Logic carried over from it is reimplemented for this program and noted here as it lands |
 
 ## Third-party code
 

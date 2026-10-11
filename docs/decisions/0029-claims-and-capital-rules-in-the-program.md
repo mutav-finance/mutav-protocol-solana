@@ -22,7 +22,7 @@ ADR 0022 and ADR 0023 decided the economics; the v1 layout (ADR 0019) and the fr
 
 ### 3. Underwater reserve (ADR 0022 decision 4)
 
-- **Underwater means NAV per share below the smallest published unit** while shares are outstanding: `net_assets × NAV_SCALE < shares_outstanding` (`solvency::is_underwater`). Net assets of exactly 0 are the extreme case. A reserve with BRS just above its provisions is underwater too: it would price a deposit near zero and pay redemption heads 0 or near 0.
+- **Underwater means NAV per share below the smallest published unit** while shares are outstanding: `net_assets × NAV_SCALE < shares_outstanding` (`coverage::is_underwater`). Net assets of exactly 0 are the extreme case. A reserve with BRS just above its provisions is underwater too: it would price a deposit near zero and pay redemption heads 0 or near 0.
 - **Both fills refuse it** with the new error **`ReserveUnderwater`**. ADR 0022 relied on the solvency gate to hold redemptions, but a reserve whose BRS equals its provisions can be underwater without being under-covered.
 - An empty reserve (no shares) is not underwater: the first deposit fills at 1.0.
 - **Interim recovery, until the Wave 2 `BACKSTOP` booking (ADR 0024) ships:** MUTAV recapitalizes through `contribute_fees`.

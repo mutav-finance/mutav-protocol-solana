@@ -92,7 +92,7 @@ pub fn handle_sweep_income(
     period: u32,
     amount: u64,
 ) -> Result<()> {
-    // Not paused, never solvency-gated, no mode check, not gated by claim
+    // Not paused, never coverage-gated, no mode check, not gated by claim
     // notices: money coming in is always accepted, as with `contribute_fees`
     // (ADR 0017).
     require!(amount > 0, MutavError::InvalidParameter);

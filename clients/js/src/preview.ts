@@ -8,7 +8,7 @@
  */
 import type { VaultConfig } from './generated/accounts/vaultConfig';
 import type { VaultState } from './generated/accounts/vaultState';
-import { assetsFor, computeSolvency, conversionNav, isUnderwater, sharesFor, U64_MAX, type Solvency } from './math';
+import { assetsFor, computeCoverage, conversionNav, isUnderwater, sharesFor, U64_MAX, type Coverage } from './math';
 
 /**
  * The config fields the previews read. `caps.stressBuffer` enters
@@ -22,12 +22,12 @@ type StateView = Pick<
 >;
 
 /** The §4 snapshot the program computes from these accounts. */
-export function solvencyFromAccounts(
+export function coverageFromAccounts(
   config: ConfigView,
   state: Pick<StateView, 'brsBalance' | 'remainingCoverTotal' | 'provisions'>,
   opts: { brsBalance?: bigint } = {},
-): Solvency {
-  return computeSolvency({
+): Coverage {
+  return computeCoverage({
     brsBalance: opts.brsBalance ?? state.brsBalance,
     remainingCoverTotal: state.remainingCoverTotal,
     coverageRatioBps: config.coverageRatioBps,
@@ -35,6 +35,9 @@ export function solvencyFromAccounts(
     stressBuffer: config.caps?.stressBuffer ?? 0n,
   });
 }
+
+/** @deprecated Renamed to {@link coverageFromAccounts}; kept for existing consumers. */
+export const solvencyFromAccounts = coverageFromAccounts;
 
 export type DepositFill = { assets: bigint; shares: bigint; nav: bigint };
 /** A pending deposit: its BRS and the owner's price limit (`0n` or omitted = none). */
@@ -54,7 +57,7 @@ export function previewDepositFulfil(
   state: StateView,
   requests: (bigint | DepositHead)[],
 ): { fills: DepositFill[]; stoppedBy: DepositStop | null } {
-  let net = solvencyFromAccounts(config, state).netAssets;
+  let net = coverageFromAccounts(config, state).netAssets;
   let shares = state.sharesOutstanding;
   const fills: DepositFill[] = [];
   if (isUnderwater(net, shares)) return { fills, stoppedBy: 'ReserveUnderwater' };
@@ -103,7 +106,7 @@ export function previewRedeemFulfil(
   if (config.paused) return refuse('Paused');
   if (state.mode !== 0) return refuse('UnderCovered');
   if (state.fulfilHalted) return refuse('FulfilHalted');
-  const start = solvencyFromAccounts(config, state);
+  const start = coverageFromAccounts(config, state);
   if (start.underCovered) return refuse('UnderCovered');
   // NAV per share below the smallest unit with shares outstanding (ADR 0029).
   if (isUnderwater(start.netAssets, state.sharesOutstanding)) return refuse('ReserveUnderwater');
@@ -115,7 +118,7 @@ export function previewRedeemFulfil(
   for (const r of requests) {
     if (fills.length >= count) break;
     if (r.shares === 0n) continue;
-    const sol = solvencyFromAccounts(config, state, { brsBalance: brs });
+    const sol = coverageFromAccounts(config, state, { brsBalance: brs });
     const adminLeft = maxAssets - paid;
     const budget = [adminLeft, sol.freeCapital, sol.liquidBudget].reduce((m, x) => (x < m ? x : m));
     const value = assetsFor(r.shares, shares, sol.netAssets);

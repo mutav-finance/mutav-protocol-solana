@@ -5,18 +5,18 @@
 use anchor_lang::prelude::Pubkey;
 use mutav::{
     constants::*,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::IncomeSwept,
     math::shares_for,
-    solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
 };
 use mutav_tests::helpers::*;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
-fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
-    Solvency::compute(&SolvencyInputs {
+fn coverage(c: &VaultConfig, s: &VaultState) -> Coverage {
+    Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
@@ -479,7 +479,7 @@ fn a_newer_vault_state_is_refused() {
 
 #[test]
 fn sweep_works_while_paused_and_under_covered() {
-    // Not paused, never solvency-gated, no mode check: money coming in is
+    // Not paused, never coverage-gated, no mode check: money coming in is
     // always accepted (ADR 0017).
     let mut f = funded();
     let pauser = f.pauser.insecure_clone();
@@ -498,7 +498,7 @@ fn sweep_works_while_paused_and_under_covered() {
 }
 
 #[test]
-fn income_raises_free_capital_for_the_solvency_gate() {
+fn income_raises_free_capital_for_the_coverage_gate() {
     // c = 1.0: 100,000 of capital backs 100,000 of cover. A registration
     // that does not fit before the sweep fits after it.
     let mut f = funded();
@@ -514,10 +514,10 @@ fn income_raises_free_capital_for_the_solvency_gate() {
     // Unswept income in the inbox does not help.
     f.pay_income(2_000 * BRL);
     assert_mutav_err(f.register(g.clone()), MutavError::InsufficientFreeCapital);
-    assert_eq!(solvency(&f.config(), &f.state()).free_capital, 10_000 * BRL);
+    assert_eq!(coverage(&f.config(), &f.state()).free_capital, 10_000 * BRL);
 
     f.sweep(2_000 * BRL).0.unwrap();
-    assert_eq!(solvency(&f.config(), &f.state()).free_capital, 12_000 * BRL);
+    assert_eq!(coverage(&f.config(), &f.state()).free_capital, 12_000 * BRL);
     f.register(g).expect("fits after the sweep");
 }
 

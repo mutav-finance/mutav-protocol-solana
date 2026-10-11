@@ -10,7 +10,7 @@ Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto
   - `app/`, `components/`, `lib/` never build a signer from bytes (ESLint enforces it). Server routes compose **unsigned** transactions (fee payer = the connected wallet) and relay **already-signed** ones; they hold no key.
   - `scripts/` is localnet-only tooling. It may sign with throwaway local keys, and refuses any non-local RPC URL.
 - **Cluster by env:** `NEXT_PUBLIC_CLUSTER` = `localnet` or `devnet`. Mainnet is refused (`lib/cluster.ts`): in the env parser, the RPC URL check, the tx relay and the scripts.
-- **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts via the client's read helpers (`@mutav-finance/mutav-protocol-solana`). Previews (the solvency gate) use the client's math mirror and are **labelled as previews**. Never hardcode or cache a number the chain owns.
+- **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts via the client's read helpers (`@mutav-finance/mutav-protocol-solana`). Previews (the coverage gate) use the client's math mirror and are **labelled as previews**. Never hardcode or cache a number the chain owns.
 - **Language:** English. MUTAV's guarantee is a *fiança*: say "guarantee fee", "claim payment", "reserve". Never "premium", "insurance", "policy", "yield vault" (a unit test greps the UI for these).
 - **Not open to public investment.** The pilot runs on MUTAV's own capital; investor actions are gated by the on-chain allowlist (KYC off-chain). Investor-facing copy leads with that.
 

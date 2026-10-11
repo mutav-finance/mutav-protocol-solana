@@ -86,7 +86,7 @@ type Snap = Record<string, { v: bigint | number | string; fmt: (x: never) => str
 
 export function snapshot(r: ReserveView): Snap {
   const s = r.state;
-  const sol = r.solvency;
+  const sol = r.coverage;
   return {
     "Stable assets": { v: sol.stableAssets, fmt: fmtBrs as never },
     "Coverage required": { v: sol.coverageRequired, fmt: fmtBrs as never },

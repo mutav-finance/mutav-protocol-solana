@@ -5,7 +5,7 @@
  * Amounts stay `bigint` until the last step, where a share of the axis is
  * turned into a fraction for layout only.
  */
-import type { Solvency } from "@mutav-finance/mutav-protocol-solana";
+import type { Coverage } from "@mutav-finance/mutav-protocol-solana";
 import type { AgencyRow, ClaimRow, CoverageRow, FlowTotals } from "./view";
 import { FLOW_ROLES, type Role } from "./roles";
 
@@ -20,7 +20,7 @@ const max = (xs: bigint[]) => xs.reduce((m, x) => (x > m ? x : m), 0n);
 
 // ── Coverage vs the reserve ─────────────────────────────────────────────────
 
-export type SolvencyMeter = {
+export type CoverageMeter = {
   /** Axis maximum: the larger of stable assets and coverage required. */
   axis: bigint;
   stableAssets: bigint;
@@ -37,7 +37,7 @@ export type SolvencyMeter = {
   underCovered: boolean;
 };
 
-export function solvencyMeter(s: Pick<Solvency, "stableAssets" | "coverageRequired" | "freeCapital">): SolvencyMeter {
+export function coverageMeter(s: Pick<Coverage, "stableAssets" | "coverageRequired" | "freeCapital">): CoverageMeter {
   const { stableAssets, coverageRequired, freeCapital } = s;
   const backing = stableAssets < coverageRequired ? stableAssets : coverageRequired;
   return {
@@ -56,7 +56,7 @@ export function solvencyMeter(s: Pick<Solvency, "stableAssets" | "coverageRequir
 /** What NAV is computed on: stable assets split into net assets and open claim provisions. */
 export type NavBasis = { stableAssets: bigint; netAssets: bigint; provisions: bigint };
 
-export function navBasis(s: Pick<Solvency, "stableAssets" | "netAssets">): NavBasis {
+export function navBasis(s: Pick<Coverage, "stableAssets" | "netAssets">): NavBasis {
   const provisions = s.stableAssets > s.netAssets ? s.stableAssets - s.netAssets : 0n;
   return { stableAssets: s.stableAssets, netAssets: s.netAssets, provisions };
 }

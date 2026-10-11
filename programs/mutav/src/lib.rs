@@ -6,12 +6,12 @@
 
 pub mod allowlist;
 pub mod constants;
+pub mod coverage;
 pub mod errors;
 pub mod events;
 pub mod instructions;
 pub mod math;
 pub mod pricing;
-pub mod solvency;
 #[allow(clippy::module_inception)]
 pub mod state;
 pub mod token_guard;
@@ -120,7 +120,7 @@ pub mod mutav {
         instructions::admin::revoke_operator::handle_revoke_operator(ctx)
     }
 
-    /// Register a guarantee: solvency-gated and capped per guarantee.
+    /// Register a guarantee: coverage-gated and capped per guarantee.
     /// Operator.
     pub fn register_guarantee(
         ctx: Context<RegisterGuarantee>,
@@ -137,7 +137,7 @@ pub mod mutav {
     }
 
     /// Record one invoice's guarantee fee: MUTAV's take to the treasury, the
-    /// rest to the reserve. Never paused, never solvency-gated. Operator.
+    /// rest to the reserve. Never paused, never coverage-gated. Operator.
     pub fn contribute_fees(
         ctx: Context<ContributeFees>,
         invoice_ref_hash: [u8; 32],
@@ -152,7 +152,7 @@ pub mod mutav {
 
     /// Sweep one issuer income statement from the income inbox into the
     /// reserve and book it (ADR 0017): NAV rises, never shares. Never paused,
-    /// never solvency-gated. Operator.
+    /// never coverage-gated. Operator.
     pub fn sweep_income(
         ctx: Context<SweepIncome>,
         income_ref_hash: [u8; 32],
@@ -168,7 +168,7 @@ pub mod mutav {
     }
 
     /// File an approved claim: books the provision, so NAV reflects it at
-    /// once. Never paused, never solvency-gated. Operator.
+    /// once. Never paused, never coverage-gated. Operator.
     pub fn file_claim(
         ctx: Context<FileClaim>,
         leg: u8,
@@ -180,7 +180,7 @@ pub mod mutav {
 
     /// Pay a filed claim's provision, exactly (`expected_amount`), to the
     /// whitelisted payments account (ADR 0021). Never paused, never
-    /// solvency-gated, no mode check. Operator.
+    /// coverage-gated, no mode check. Operator.
     pub fn pay_claim(
         ctx: Context<PayClaim>,
         notice_ref_hash: [u8; 32],

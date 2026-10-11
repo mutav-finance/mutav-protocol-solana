@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   assetsFor,
-  computeSolvency,
+  computeCoverage,
   conversionNav,
   coverageRequired,
   MIN_COVERAGE_RATIO_BPS,
@@ -21,7 +21,7 @@ import {
   isUnderwater,
   redeemSizeError,
   SUB_MINIMUM_EXIT_FLOOR_DIVISOR,
-  type SolvencyInputs,
+  type CoverageInputs,
 } from '../src';
 import { outcome, vectors } from './vectors';
 
@@ -75,10 +75,10 @@ describe('share conversion parity', () => {
   });
 });
 
-describe('solvency parity (free_capital, liquid_budget, …)', () => {
-  test.each(vectors.solvency.map((v: any, i: number) => [i, v]))('case %i', (_i, v: any) => {
+describe('coverage parity (free_capital, liquid_budget, …)', () => {
+  test.each(vectors.coverage.map((v: any, i: number) => [i, v]))('case %i', (_i, v: any) => {
     const i = v.input;
-    const input: SolvencyInputs = {
+    const input: CoverageInputs = {
       brsBalance: BigInt(i.brsBalance),
       remainingCoverTotal: BigInt(i.remainingCoverTotal),
       coverageRatioBps: i.coverageRatioBps,
@@ -86,10 +86,10 @@ describe('solvency parity (free_capital, liquid_budget, …)', () => {
       stressBuffer: BigInt(i.stressBuffer),
     };
     if (v.output === 'error') {
-      expect(() => computeSolvency(input)).toThrow(MathOverflowError);
+      expect(() => computeCoverage(input)).toThrow(MathOverflowError);
       return;
     }
-    const s = computeSolvency(input);
+    const s = computeCoverage(input);
     expect({
       stableAssets: s.stableAssets.toString(),
       coverageRequired: s.coverageRequired.toString(),
@@ -103,8 +103,8 @@ describe('solvency parity (free_capital, liquid_budget, …)', () => {
   });
 
   test('the vectors cover the branches', () => {
-    const outs = vectors.solvency.filter((v: any) => v.output !== 'error');
-    expect(vectors.solvency.some((v: any) => v.output === 'error')).toBe(true);
+    const outs = vectors.coverage.filter((v: any) => v.output !== 'error');
+    expect(vectors.coverage.some((v: any) => v.output === 'error')).toBe(true);
     expect(outs.some((v: any) => v.output.mode === 1)).toBe(true);
     // c < 1 with the provisions term binding.
     expect(

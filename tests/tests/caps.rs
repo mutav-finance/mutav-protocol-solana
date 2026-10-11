@@ -69,7 +69,7 @@ fn caps_follow_set_config() {
 #[test]
 fn rules_are_checked_in_spec_order() {
     // Rule 1 (pause) before rule 2 (parameters) before rule 3 (per guarantee)
-    // before rule 4 (solvency).
+    // before rule 4 (coverage).
     let mut f = Fixture::new();
     let ag = unique_hash();
     f.fund_reserve(2 * PER_GUARANTEE);

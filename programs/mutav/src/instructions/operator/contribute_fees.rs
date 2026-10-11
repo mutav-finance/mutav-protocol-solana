@@ -80,7 +80,7 @@ pub fn handle_contribute_fees(
     invoice_ref_hash: [u8; 32],
     amount: u64,
 ) -> Result<()> {
-    // Never paused, never solvency-gated (ADR 0009).
+    // Never paused, never coverage-gated (ADR 0009).
     require!(amount > 0, MutavError::InvalidParameter);
     // Inflows wait for the first shares (ADR 0023): with no shares, the fee
     // would be priced into the first deposit instead of the reserve's

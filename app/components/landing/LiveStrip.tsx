@@ -3,7 +3,7 @@
 /** The live reserve strip on the landing page: six on-chain numbers linking to /reserve, and coverage against the reserve as a chart. */
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
-import { SolvencyChart } from "@/components/charts/Charts";
+import { CoverageChart } from "@/components/charts/Charts";
 import { usePoll } from "@/lib/client/use-poll";
 import { fmtBrs, fmtNav } from "@/lib/format";
 import { MODE_LABEL, type ReserveView } from "@/lib/view";
@@ -12,9 +12,9 @@ export function LiveStrip() {
   const { data, error } = usePoll<ReserveView>("/api/reserve", 15_000);
   const cells: [string, string, string?][] = data
     ? [
-        ["Reserve", fmtBrs(data.solvency.stableAssets)],
-        ["Coverage required", fmtBrs(data.solvency.coverageRequired)],
-        ["Free capital", fmtBrs(data.solvency.freeCapital)],
+        ["Reserve", fmtBrs(data.coverage.stableAssets)],
+        ["Coverage required", fmtBrs(data.coverage.coverageRequired)],
+        ["Free capital", fmtBrs(data.coverage.freeCapital)],
         ["NAV per share", fmtNav(data.state.navPerShare)],
         ["Active guarantees", String(data.state.activeGuarantees)],
         ["Mode", MODE_LABEL(data.state.mode), data.state.mode === 0 ? "var(--color-success)" : "var(--color-error)"],
@@ -45,7 +45,7 @@ export function LiveStrip() {
       </Link>
       {data && (
         <div style={{ padding: "0 0 18px", maxWidth: 720 }}>
-          <SolvencyChart s={data.solvency} ratioBps={data.config.coverageRatioBps} compact />
+          <CoverageChart s={data.coverage} ratioBps={data.config.coverageRatioBps} compact />
         </div>
       )}
     </section>

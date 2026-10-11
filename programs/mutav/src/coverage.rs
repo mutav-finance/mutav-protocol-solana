@@ -1,4 +1,4 @@
-//! Solvency quantities (spec §4).
+//! Coverage quantities (spec §4).
 //!
 //! Pure functions over plain numbers, no accounts: instructions read their
 //! accounts, call these and act on the result. The pilot reserve holds BRS
@@ -119,7 +119,7 @@ pub fn is_underwater(net_assets: u64, shares_outstanding: u64) -> bool {
 
 /// Everything §4 derives from one snapshot of state and config.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct SolvencyInputs {
+pub struct CoverageInputs {
     pub brs_balance: u64,
     pub remaining_cover_total: u64,
     pub coverage_ratio_bps: u16,
@@ -130,7 +130,7 @@ pub struct SolvencyInputs {
 
 /// The §4 quantities for one snapshot.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Solvency {
+pub struct Coverage {
     pub stable_assets: u64,
     pub coverage_required: u64,
     pub surplus: u64,
@@ -139,8 +139,8 @@ pub struct Solvency {
     pub net_assets: u64,
 }
 
-impl Solvency {
-    pub fn compute(i: &SolvencyInputs) -> Result<Self> {
+impl Coverage {
+    pub fn compute(i: &CoverageInputs) -> Result<Self> {
         let stable_assets = i.brs_balance;
         let coverage_required = coverage_required(
             i.remaining_cover_total,
@@ -298,21 +298,21 @@ mod tests {
 
     #[test]
     fn compute_below_one_with_provisions_binding() {
-        let i = SolvencyInputs {
+        let i = CoverageInputs {
             brs_balance: 30_000,
             remaining_cover_total: 100_000,
             coverage_ratio_bps: 1_000,
             provisions: 2_000,
             stress_buffer: 0,
         };
-        let s = Solvency::compute(&i).unwrap();
+        let s = Coverage::compute(&i).unwrap();
         assert_eq!(s.coverage_required, 10_000);
         assert_eq!(s.surplus, 20_000);
         assert_eq!(s.free_capital, 20_000);
         // BRS only: liquid_budget ≥ free_capital (fulfil_redeems relies on it).
         assert_eq!(s.liquid_budget, 28_000);
 
-        let s = Solvency::compute(&SolvencyInputs {
+        let s = Coverage::compute(&CoverageInputs {
             provisions: 18_000,
             ..i
         })
@@ -322,7 +322,7 @@ mod tests {
         assert_eq!(s.liquid_budget, 12_000);
         assert!(!s.under_covered());
 
-        let s = Solvency::compute(&SolvencyInputs {
+        let s = Coverage::compute(&CoverageInputs {
             provisions: 31_000,
             ..i
         })
@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn mode_and_deficit() {
         use crate::constants::{MODE_NORMAL, MODE_UNDER_COVERED};
-        let s = |stable_assets, coverage_required| Solvency {
+        let s = |stable_assets, coverage_required| Coverage {
             stable_assets,
             coverage_required,
             ..Default::default()
@@ -370,14 +370,14 @@ mod tests {
 
     #[test]
     fn compute_matches_the_formulas() {
-        let i = SolvencyInputs {
+        let i = CoverageInputs {
             brs_balance: 100_200,
             remaining_cover_total: 80_000,
             coverage_ratio_bps: 10_000,
             provisions: 2_000,
             stress_buffer: 0,
         };
-        let s = Solvency::compute(&i).unwrap();
+        let s = Coverage::compute(&i).unwrap();
         assert_eq!(s.stable_assets, 100_200);
         assert_eq!(s.coverage_required, 80_000);
         assert_eq!(s.surplus, 20_200);
@@ -386,7 +386,7 @@ mod tests {
         assert_eq!(s.net_assets, 98_200);
         assert!(!s.under_covered());
 
-        let under = Solvency::compute(&SolvencyInputs {
+        let under = Coverage::compute(&CoverageInputs {
             remaining_cover_total: 200_000,
             ..i
         })
@@ -398,18 +398,18 @@ mod tests {
 
     #[test]
     fn compute_saturates_never_wraps() {
-        let i = SolvencyInputs {
+        let i = CoverageInputs {
             brs_balance: u64::MAX,
             remaining_cover_total: u64::MAX,
             coverage_ratio_bps: 10_000,
             provisions: u64::MAX,
             stress_buffer: 0,
         };
-        let s = Solvency::compute(&i).unwrap();
+        let s = Coverage::compute(&i).unwrap();
         assert_eq!(s.stable_assets, u64::MAX);
         assert_eq!(s.surplus, 0);
         assert_eq!(s.net_assets, 0);
-        assert!(Solvency::compute(&SolvencyInputs {
+        assert!(Coverage::compute(&CoverageInputs {
             coverage_ratio_bps: 10_001,
             ..i
         })
@@ -418,7 +418,7 @@ mod tests {
 
     // -- property tests ---------------------------------------------------
 
-    fn inputs() -> impl Strategy<Value = SolvencyInputs> {
+    fn inputs() -> impl Strategy<Value = CoverageInputs> {
         (
             0u64..=1u64 << 50,
             0u64..=1u64 << 50,
@@ -426,7 +426,7 @@ mod tests {
             0u64..=1u64 << 50,
             prop_oneof![Just(0u64), 0u64..=1u64 << 50, Just(u64::MAX)],
         )
-            .prop_map(|(brs, cover, c, prov, stress)| SolvencyInputs {
+            .prop_map(|(brs, cover, c, prov, stress)| CoverageInputs {
                 brs_balance: brs,
                 remaining_cover_total: cover,
                 coverage_ratio_bps: c,
@@ -436,7 +436,7 @@ mod tests {
     }
 
     /// Independent oracle for `coverage_required`, in `u128` (ADR 0022).
-    fn oracle_coverage(i: &SolvencyInputs) -> u128 {
+    fn oracle_coverage(i: &CoverageInputs) -> u128 {
         let unprovisioned = (i.remaining_cover_total as u128).saturating_sub(i.provisions as u128);
         let stress = i.provisions as u128 + (i.stress_buffer as u128).min(unprovisioned);
         (i.remaining_cover_total as u128 * i.coverage_ratio_bps as u128)
@@ -445,7 +445,7 @@ mod tests {
     }
 
     /// Independent oracle for `surplus`, in `u128`.
-    fn oracle_surplus(i: &SolvencyInputs) -> u64 {
+    fn oracle_surplus(i: &CoverageInputs) -> u64 {
         (i.brs_balance as u128).saturating_sub(oracle_coverage(i)) as u64
     }
 
@@ -456,7 +456,7 @@ mod tests {
         /// never below it (`fulfil_redeems` relies on it).
         #[test]
         fn free_capital_is_surplus(i in inputs()) {
-            let s = Solvency::compute(&i).unwrap();
+            let s = Coverage::compute(&i).unwrap();
             prop_assert_eq!(s.coverage_required as u128, oracle_coverage(&i));
             prop_assert!(s.coverage_required >= i.provisions);
             prop_assert!(
@@ -489,21 +489,21 @@ mod tests {
             let a = (brs.min(cover) * a_frac / 100).max(1).min(brs.min(cover));
             prop_assume!(a > 0);
             let other = (cover - a) * other_prov_frac / 100;
-            let before_i = SolvencyInputs {
+            let before_i = CoverageInputs {
                 brs_balance: brs,
                 remaining_cover_total: cover,
                 coverage_ratio_bps: c,
                 provisions: other + a,
                 stress_buffer: 0,
             };
-            let after_i = SolvencyInputs {
+            let after_i = CoverageInputs {
                 brs_balance: brs - a,
                 remaining_cover_total: cover - a,
                 provisions: other,
                 ..before_i
             };
-            let before = Solvency::compute(&before_i).unwrap();
-            let after = Solvency::compute(&after_i).unwrap();
+            let before = Coverage::compute(&before_i).unwrap();
+            let after = Coverage::compute(&after_i).unwrap();
             prop_assert!(after.coverage_required >= after_i.provisions);
             let ratio = |cv: u64| (cv as u128 * c as u128).div_ceil(10_000);
             let ratio_binds = ratio(cover) >= before_i.provisions as u128

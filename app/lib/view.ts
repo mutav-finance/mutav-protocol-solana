@@ -9,7 +9,7 @@ import type {
   Guarantee,
   IncomeReceipt,
   RedeemRequest,
-  Solvency,
+  Coverage,
   VaultConfig,
   VaultState,
 } from "@mutav-finance/mutav-protocol-solana";
@@ -75,7 +75,7 @@ export type ReserveView = {
   config: VaultConfig;
   state: VaultState;
   /** The §4 quantities recomputed from these accounts with the client's math mirror. */
-  solvency: Solvency;
+  coverage: Coverage;
   /** Cluster time (unix seconds) and slot of the read. */
   now: bigint;
   slot: bigint;

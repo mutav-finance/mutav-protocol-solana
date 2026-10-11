@@ -7,13 +7,13 @@ use anchor_lang::prelude::Pubkey;
 use anchor_spl::token::spl_token::instruction::approve;
 use mutav::{
     constants::*,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::{
         AssetsClaimed, DepositCancelled, DepositRequested, DepositsFulfilled, QueueHeadsAdvanced,
         RedeemCancelled, RedeemFilled, RedeemRequested, RedeemsFulfilled, SharesClaimed,
     },
     math::{assets_for, conversion_nav, shares_for},
-    solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
 };
 use mutav_tests::helpers::*;
@@ -32,8 +32,8 @@ fn setup(n: usize, brs: u64) -> (Fixture, Allowlist, Vec<Investor>) {
     (f, list, invs)
 }
 
-fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
-    Solvency::compute(&SolvencyInputs {
+fn coverage(c: &VaultConfig, s: &VaultState) -> Coverage {
+    Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
@@ -44,7 +44,7 @@ fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
 }
 
 fn net_assets(f: &Fixture) -> u64 {
-    solvency(&f.config(), &f.state()).net_assets
+    coverage(&f.config(), &f.state()).net_assets
 }
 
 fn lamports(f: &Fixture, k: &Pubkey) -> u64 {
@@ -99,7 +99,7 @@ fn request_deposit_escrows_and_queues() {
     // Pending deposits are excluded from `stable_assets` and NAV.
     assert_eq!(s.brs_balance, before.brs_balance);
     assert_eq!(s.shares_outstanding, before.shares_outstanding);
-    assert_eq!(solvency(&f.config(), &s).stable_assets, 0);
+    assert_eq!(coverage(&f.config(), &s).stable_assets, 0);
 
     assert_eq!(f.balance(&f.pdas.pending_deposits), 5_000 * BRL);
     assert_eq!(f.balance(&a.brs), 45_000 * BRL);
@@ -730,7 +730,7 @@ fn queue_book() -> (Fixture, Allowlist, Vec<Investor>) {
     let (mut f, list, inv) = holders(3, 30_000 * BRL);
     f.register(guarantee_args(unique_hash(), 30_000 * BRL, 0))
         .unwrap();
-    assert_eq!(solvency(&f.config(), &f.state()).free_capital, 60_000 * BRL);
+    assert_eq!(coverage(&f.config(), &f.state()).free_capital, 60_000 * BRL);
     (f, list, inv)
 }
 
@@ -792,7 +792,7 @@ fn fulfil_redeems_fills_the_head_at_the_nav_of_the_fill() {
     );
     assert_eq!(
         batch[0].idle_free_capital,
-        solvency(&f.config(), &f.state()).free_capital
+        coverage(&f.config(), &f.state()).free_capital
     );
     f.assert_capital_invariants("after fill");
 
@@ -822,7 +822,7 @@ fn whole_fills_stop_at_a_head_that_does_not_fit() {
     // A second guarantee leaves free capital 30,000.
     f.register(guarantee_args(unique_hash(), 30_000 * BRL, 0))
         .unwrap();
-    assert_eq!(solvency(&f.config(), &f.state()).free_capital, 30_000 * BRL);
+    assert_eq!(coverage(&f.config(), &f.state()).free_capital, 30_000 * BRL);
 
     let meta = f
         .fulfil_redeems(3, u64::MAX, &[sa, sb, sc])

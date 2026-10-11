@@ -32,7 +32,7 @@ import {
   getProposeRoleInstruction,
   publishedNav,
   navBoundsAround,
-  solvencyFromAccounts,
+  coverageFromAccounts,
   type NavBounds,
   fetchGuarantee,
   getCancelDepositInstruction,
@@ -179,7 +179,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       if (draft.min > draft.max) throw new ComposeError("NAV bounds: min must be ≤ max");
       return draft;
     }
-    const sol = solvencyFromAccounts(r.config, r.state);
+    const sol = coverageFromAccounts(r.config, r.state);
     const nav = published ? publishedNav(sol.netAssets, r.state.sharesOutstanding) : conversionNav(r.state.sharesOutstanding, sol.netAssets);
     return navBoundsAround(nav, DEFAULT_NAV_TOLERANCE_BPS);
   };

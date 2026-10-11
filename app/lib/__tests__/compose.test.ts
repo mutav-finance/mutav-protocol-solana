@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { address, type Address } from "@solana/kit";
-import { conversionNav, findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getClearFulfilHaltInstructionDataDecoder, getFulfilDepositsInstructionDataDecoder, getSetConfigInstructionDataDecoder, navBoundsAround, publishedNav, solvencyFromAccounts, identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
+import { conversionNav, findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getClearFulfilHaltInstructionDataDecoder, getFulfilDepositsInstructionDataDecoder, getSetConfigInstructionDataDecoder, navBoundsAround, publishedNav, coverageFromAccounts, identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
 import { fromHex } from "../serde";
 import { composeInstructions, DEFAULT_NAV_TOLERANCE_BPS, describeInstructions, queueSeqs, refuseOverlappingSetConfig, unsignedTransaction } from "../server/compose";
 import { assertRelayable, invokedPrograms, isFullySigned, RelayRefusedError } from "../server/relay";
@@ -31,7 +31,7 @@ async function reserve(): Promise<ReserveView> {
       investorAllowlistRoot: new Uint8Array(32),
     } as never,
     state: state({ depositHead: 2n, nextDepositSeq: 5n } as never),
-    solvency: {} as never,
+    coverage: {} as never,
     now: 0n,
     slot: 0n,
     token: { mint: MINT, mintOwner: null, freezeAuthority: null, supply: null, reserveFrozen: false },
@@ -99,7 +99,7 @@ describe("compose", () => {
     // No shares: the published NAV is 0, so the default bounds are [0, 0].
     expect(await halt(base)).toEqual({ min: 0n, max: 0n });
     const v: ReserveView = { ...base, state: { ...base.state, brsBalance: 2_000n * 1_000_000n, sharesOutstanding: 1_000n * 1_000_000n } };
-    const sol = solvencyFromAccounts(v.config, v.state);
+    const sol = coverageFromAccounts(v.config, v.state);
     expect(await halt(v)).toEqual(navBoundsAround(publishedNav(sol.netAssets, v.state.sharesOutstanding), DEFAULT_NAV_TOLERANCE_BPS));
     const fill = (await composeInstructions({ kind: "fulfil_deposits", count: 1 }, WALLET, { reserve: v }))[0]!;
     expect(getFulfilDepositsInstructionDataDecoder().decode(fill.data!).navBounds).toEqual(navBoundsAround(conversionNav(v.state.sharesOutstanding, sol.netAssets), DEFAULT_NAV_TOLERANCE_BPS));

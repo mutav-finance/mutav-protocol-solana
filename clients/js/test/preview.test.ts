@@ -3,7 +3,7 @@ import {
   NAV_SCALE,
   previewDepositFulfil,
   previewRedeemFulfil,
-  solvencyFromAccounts,
+  coverageFromAccounts,
 } from '../src';
 import { blankConfig, blankState } from './fakes';
 
@@ -15,14 +15,14 @@ function reserve(over: Partial<ReturnType<typeof blankState>> = {}) {
   return { config, state };
 }
 
-describe('solvencyFromAccounts', () => {
+describe('coverageFromAccounts', () => {
   test('reads the snapshot the program reads (BRS only)', () => {
     const { config, state } = reserve({
       brsBalance: 100_000n * BRL,
       remainingCoverTotal: 60_000n * BRL,
       provisions: 5_000n * BRL,
     });
-    const s = solvencyFromAccounts(config, state);
+    const s = coverageFromAccounts(config, state);
     expect(s.surplus).toBe(40_000n * BRL);
     expect(s.stableAssets).toBe(100_000n * BRL);
     expect(s.freeCapital).toBe(s.surplus);
@@ -36,11 +36,11 @@ describe('solvencyFromAccounts', () => {
       remainingCoverTotal: 60_000n * BRL,
       provisions: 9_000n * BRL,
     });
-    const s = solvencyFromAccounts({ ...config, coverageRatioBps: 1_000 }, state);
+    const s = coverageFromAccounts({ ...config, coverageRatioBps: 1_000 }, state);
     expect(s.coverageRequired).toBe(9_000n * BRL);
     expect(s.freeCapital).toBe(1_000n * BRL);
     expect(s.liquidBudget).toBe(1_000n * BRL);
-    const low = solvencyFromAccounts({ ...config, coverageRatioBps: 1_000 }, { ...state, provisions: 0n });
+    const low = coverageFromAccounts({ ...config, coverageRatioBps: 1_000 }, { ...state, provisions: 0n });
     expect(low.coverageRequired).toBe(6_000n * BRL);
     expect(low.freeCapital).toBe(4_000n * BRL);
   });
@@ -52,7 +52,7 @@ describe('solvencyFromAccounts', () => {
       provisions: 4_000n * BRL,
     });
     const c = { ...config, coverageRatioBps: 1_000, caps: { ...config.caps, stressBuffer: 19_000n * BRL } };
-    const s = solvencyFromAccounts(c, state);
+    const s = coverageFromAccounts(c, state);
     expect(s.coverageRequired).toBe(23_000n * BRL);
     expect(s.freeCapital).toBe(7_000n * BRL);
   });
@@ -173,7 +173,7 @@ describe('previewRedeemFulfil (whole fills only)', () => {
       sharesOutstanding: 1_200n,
     });
     const c = { ...config, coverageRatioBps: 1_000 };
-    const sol = solvencyFromAccounts(c, state);
+    const sol = coverageFromAccounts(c, state);
     expect([sol.coverageRequired, sol.freeCapital, sol.liquidBudget]).toEqual([9_000n, 1_000n, 1_000n]);
     const reqs = [0n, 1n].map((seq) => ({ seq, shares: 600n }));
     const r = previewRedeemFulfil(c, state, reqs);

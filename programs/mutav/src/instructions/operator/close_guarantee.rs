@@ -1,4 +1,4 @@
-//! `close_guarantee(id, reason)` (spec §5.2; ADR 0020). Not solvency-gated
+//! `close_guarantee(id, reason)` (spec §5.2; ADR 0020). Not coverage-gated
 //! and not paused: it only releases liability, and `reinstate_guarantee` (a
 //! later upgrade) can reverse it.
 
@@ -6,9 +6,9 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
+    coverage::coverage_required_saturating,
     errors::MutavError,
     events::GuaranteeClosed,
-    solvency::coverage_required_saturating,
     state::{Guarantee, VaultConfig, VaultState},
 };
 
