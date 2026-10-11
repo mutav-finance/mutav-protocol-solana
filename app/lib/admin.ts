@@ -40,7 +40,9 @@ export const CONFIG_FIELD_HOME = {
 export const CONFIG_FIELD_NOT_EDITED: Record<string, string> = {
   featureFlags: "SUPPORTED_FEATURES = 0 in the pilot binary: no feature can be switched on",
   mutavCapitalWallet: "the allowlisted capital wallet; fixed for the pilot",
-  treasuryAccount: "fixed for the pilot; set_config carries the current one",
+  stressBuffer: "edited with the coverage screens of a later app change (ADR 0022); read by no rule of this binary yet",
+  maxQueueWaitSecs: "the exit fallback is off (0) until it is built (ADR 0025)",
+  maxReinstateAge: "edited with reinstate_guarantee, a later upgrade (ADR 0020)",
 };
 
 // ── General controls ────────────────────────────────────────────────────────
@@ -58,7 +60,7 @@ export function generalConfigError(req: { coverageRatioBps?: number; feeTakeBps?
   const n = req.maxNavMoveBps;
   if (n !== undefined && (!Number.isInteger(n) || n < 0 || n > 10_000)) return "max_nav_move_bps must be 0–10000";
   const c = req.coverageRatioBps;
-  if (c !== undefined && (!Number.isInteger(c) || c < MIN_COVERAGE_RATIO_BPS || c > 65_535)) return `coverage_ratio_bps must be ≥ ${MIN_COVERAGE_RATIO_BPS} (c ≥ 0.10, ADR 0016)`;
+  if (c !== undefined && (!Number.isInteger(c) || c < MIN_COVERAGE_RATIO_BPS || c > 10_000)) return `coverage_ratio_bps must be ${MIN_COVERAGE_RATIO_BPS}–10000 (0.10 ≤ c ≤ 1.0, ADRs 0016, 0022)`;
   const f = req.feeTakeBps;
   if (f !== undefined && (!Number.isInteger(f) || f < 0 || f > MAX_FEE_TAKE_BPS)) return `fee_take_bps must be 0–${MAX_FEE_TAKE_BPS}`;
   return null;

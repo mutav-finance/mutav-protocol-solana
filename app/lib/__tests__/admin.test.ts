@@ -40,7 +40,7 @@ describe("set_config field homes", () => {
     const key = (id: string) =>
       id === "EXIT_BARRED_0" ? "barred" : id.replace(/^(CAPS|PRICE|EXIT)_/, "").toLowerCase().replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
     const fields = [...written].map(key).sort();
-    expect(fields.length).toBe(12);
+    expect(fields.length).toBe(14);
     const covered = [...Object.keys(CONFIG_FIELD_HOME), ...Object.keys(CONFIG_FIELD_NOT_EDITED)];
     expect(new Set(covered).size).toBe(covered.length);
     expect(covered.sort()).toEqual(fields);

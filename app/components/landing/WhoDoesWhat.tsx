@@ -55,7 +55,7 @@ export function WhoDoesWhat() {
         })}
       </ol>
       <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-3)", margin: 0, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-        <RoleTag role="anyone" /> can send <code className="font-mono">refresh</code> and <code className="font-mono">advance_queue_heads</code>: cranks that move no funds.
+        <RoleTag role="anyone" /> can send <code className="font-mono">refresh</code> and <code className="font-mono">advance_queue_head</code>: cranks that move no funds.
       </p>
     </div>
   );
