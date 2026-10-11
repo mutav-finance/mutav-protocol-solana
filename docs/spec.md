@@ -987,17 +987,17 @@ An asynchronous conversion path for TESOURO (PC-18) is **TBD**; the pilot adapte
 
 ## 8. Caps
 
-All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). The devnet column holds the devnet starting values (ADR 0016, ADR 0019); final pilot values are **TBD** (§12 Q3).
+All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). The devnet column holds the devnet and pilot values the founders set in ADR 0028 (superseding the devnet caps of ADR 0016 / ADR 0022); `verify.ts` locks them on devnet.
 
 | Field | Type | Enforced in | Devnet |
 |---|---|---|---|
-| `max_tvl` | `u64` | `fulfil_deposits` | R$300k |
-| `max_cover_per_guarantee` | `u64` | `register_guarantee` | R$40k |
+| `max_tvl` | `u64` | `fulfil_deposits` | R$1M |
+| `max_cover_per_guarantee` | `u64` | `register_guarantee` | R$120k |
 | `max_claim_per_call` | `u64` | `pay_claim`: above it, only with an `approve_claim` approval of the exact amount (ADR 0021) | R$10k |
 | `max_claim_per_period` | `u64` | `pay_claim`: the payments of the last **31 UTC days**, this one included (a sliding window of daily buckets, ADR 0019) | R$20k per 31 days |
 | `min_request`, `max_request` | `u64`, `u64` | `request_deposit`, `request_redeem` | R$1,000 / R$100,000 |
 | `max_nav_move_bps` | `u16` | `refresh` (NAV-move guard, §7). A change needs a `refresh` in the same slot | `10_000` on devnet on purpose (a claim against a small demo reserve is a real NAV move); lower for the real pilot |
-| `stress_buffer` | `u64` | *Carve (ADR 0019), set by `initialize` and `set_config`; read by no rule yet.* The R$ stress term of `coverage_required` (claims that could be filed next; ADR 0022, a later change). A change needs a `refresh` in the same slot | R$19k (planned) |
+| `stress_buffer` | `u64` | *Carve (ADR 0019), set by `initialize` and `set_config`; read by no rule yet.* The R$ stress term of `coverage_required` (claims that could be filed next; ADR 0022, a later change). A change needs a `refresh` in the same slot | R$19k (ADR 0028) |
 | `max_queue_wait_secs` | `i64` | *Carve, settable, `0` = off, `≥ 0`.* Exit fallback (ADR 0025): after this wait anyone may fill the head redemption under the same rules. Built before outside capital | `0` |
 | `max_reinstate_age` | `i64` | *Carve, settable, `0` = never, `≥ 0`.* How long after closing a guarantee may be reinstated (`reinstate_guarantee`, Wave 2) | `0` (planned 30 days once built) |
 
@@ -1005,7 +1005,7 @@ Outside `Caps`, in `VaultConfig`:
 
 | Field | Type | Enforced in | Devnet |
 |---|---|---|---|
-| `coverage_ratio_bps` (`c`) | `u16` | all gates. `1_000 ≤ c ≤ 10_000`; a change needs a `refresh` in the same slot | `1_000` (0.10, the program floor; ADR 0016) |
+| `coverage_ratio_bps` (`c`) | `u16` | all gates. `1_000 ≤ c ≤ 10_000`; a change needs a `refresh` in the same slot | `2_500` (0.25; ADR 0028. Program floor 0.10, ADR 0016) |
 | `fee_take_bps` | `u16` | `contribute_fees` | TBD (§12 Q4), program max `3_000` |
 | `claims_tail_secs` | `i64` | *ADR 0012 carve, built later.* `notify_exoneration`, `record_keys_returned` (fixes `claims_tail_until_ts`); `0` blocks both | TBD (§12 Q35); never longer than the 3-year prescription of rent claims (CC 206 §3º I) |
 | `payment_term_secs` | `i64` | *ADR 0012 carve.* Disclosure only (contractual term from a complete payment request) | TBD (§12 Q36) |
