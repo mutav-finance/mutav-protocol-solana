@@ -299,9 +299,9 @@ export function Disclosures({ r }: { r: ReserveView }) {
         </>,
       )}
       {item(
-        "Claim payments are never blocked by solvency",
+        "Claim payments are never blocked by required coverage",
         <>
-          The solvency gate stops new guarantees and redemptions when free capital runs out; it never stops <Mono>pay_claim</Mono>. Claim payments are capped per call
+          The coverage gate stops new guarantees and redemptions when free capital runs out; it never stops <Mono>pay_claim</Mono>. Claim payments are capped per call
           ({fmtBrs(r.config.caps.maxClaimPerCall)}) and per period ({fmtBrs(r.config.caps.maxClaimPerPeriod)} in any 31 days).
         </>,
       )}

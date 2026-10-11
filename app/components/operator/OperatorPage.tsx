@@ -105,7 +105,7 @@ function PayBound() {
         const refusal = claimCapRefusal(cap, c.provision);
         return kv(`PREVIEW · ${c.guaranteeId.slice(0, 8)}… ${fmtBrs(c.provision, 0)}`, <span style={{ color: refusal ? "var(--color-error)" : "var(--color-success)" }}>{refusal ? `refused: ${refusal}` : "within the caps"}</span>);
       })}
-      <span>Never solvency-gated: under-coverage does not stop a claim payment. The destination is fixed to the payments account.</span>
+      <span>Never gated by required coverage: under-coverage does not stop a claim payment. The destination is fixed to the payments account.</span>
     </Bound>
   );
 }
@@ -178,7 +178,7 @@ function Console({ locked }: { locked: boolean }) {
         </TabsContent>
         <TabsContent value="file">
           <Bound>
-            <span>The amount may not exceed the leg&apos;s cover not yet paid or provisioned (shown as &quot;left&quot; for each guarantee). Filing lowers NAV at once. Not solvency-gated.</span>
+            <span>The amount may not exceed the leg&apos;s cover not yet paid or provisioned (shown as &quot;left&quot; for each guarantee). Filing lowers NAV at once. Not gated by required coverage.</span>
           </Bound>
           <FileClaimForm p="op-" />
         </TabsContent>
@@ -294,7 +294,7 @@ function Safety({ r }: { r: ReserveView }) {
   return (
     <ul style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 18, maxWidth: 860 }}>
       {item("Issuer income only moves into the reserve", <>The operator key can move income-inbox BRS only into the reserve (there is no take on issuer income). At worst a stolen key books a stray transfer as income. No instruction lets anyone take BRS out of the inbox elsewhere.</>)}
-      {item("Caps bound every outflow", <>A stolen operator key can pay claims only to the fixed payments account, at most {fmtBrs(c.maxClaimPerCall, 0)} per call and {fmtBrs(c.maxClaimPerPeriod, 0)} in any 31 days, and only against filed claims within remaining cover. New guarantees stay inside the per-guarantee cap and the solvency gate.</>)}
+      {item("Caps bound every outflow", <>A stolen operator key can pay claims only to the fixed payments account, at most {fmtBrs(c.maxClaimPerCall, 0)} per call and {fmtBrs(c.maxClaimPerPeriod, 0)} in any 31 days, and only against filed claims within remaining cover. New guarantees stay inside the per-guarantee cap and the coverage gate.</>)}
       {item("The operator cannot touch config or capital", <>Config, caps, roles, the allowlist and the capital queue are Reserve Admin instructions (a time-locked Squads multisig). The operator never signs them.</>)}
       {item("The pauser can revoke it at once", <><Mono>revoke_operator</Mono>, signed by the pauser key or the admin with no time lock, sets the operator to the default key. Every operator instruction then fails, claim payments included, until the Reserve Admin proposes a new key with <Mono>propose_role</Mono> and that key takes the role with <Mono>accept_role</Mono>. The pilot binary has no admin-only claim-payment path.</>)}
       {item("Everything it does is public", <>Every guarantee, fee, claim, payment and settlement is an account on <Link href="/reserve" className="ext-link">/reserve</Link>, with its on-chain timestamps.</>)}

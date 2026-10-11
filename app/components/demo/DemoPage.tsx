@@ -131,7 +131,7 @@ export function DemoPage() {
                 <FileClaimForm />
               </Step>
 
-              <Step n={5} title="Under-coverage: claims are still paid" instruction="pay_claim (with mode = UnderCovered)" roles={["admin", "operator"]} why={<>When stable assets fall below coverage required, the reserve is under-covered: new guarantees and redemptions are frozen. Claim payments are not. They never pass the solvency gate.</>}>
+              <Step n={5} title="Under-coverage: claims are still paid" instruction="pay_claim (with mode = UnderCovered)" roles={["admin", "operator"]} why={<>When stable assets fall below coverage required, the reserve is under-covered: new guarantees and redemptions are frozen. Claim payments are not. They never pass the coverage gate.</>}>
                 <Sub title="a. Put the reserve under coverage (set_config)" role="admin">
                   <BlockedPreview />
                   <Note>
