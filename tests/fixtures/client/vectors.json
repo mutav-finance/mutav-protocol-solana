@@ -46,6 +46,2222 @@
       }
     ]
   },
+  "capitalRules": {
+    "redeemSize": [
+      {
+        "canonical": true,
+        "error": "RequestTooSmall",
+        "maxRequest": "100000",
+        "minRequest": "1000",
+        "remainder": "0",
+        "value": "0"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "100000",
+        "minRequest": "1000",
+        "remainder": "0",
+        "value": "100001"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "100000",
+        "minRequest": "1000",
+        "remainder": "50000",
+        "value": "1000"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "100000",
+        "minRequest": "1000",
+        "remainder": "0",
+        "value": "500"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "100000",
+        "minRequest": "1000",
+        "remainder": "999",
+        "value": "500"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooSmall",
+        "maxRequest": "100000",
+        "minRequest": "1000",
+        "remainder": "1000",
+        "value": "500"
+      },
+      {
+        "canonical": false,
+        "error": "RequestTooSmall",
+        "maxRequest": "100000",
+        "minRequest": "1000",
+        "remainder": "0",
+        "value": "500"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "100000",
+        "minRequest": "1000",
+        "remainder": "0",
+        "value": "100"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooSmall",
+        "maxRequest": "100000",
+        "minRequest": "1000",
+        "remainder": "0",
+        "value": "99"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "10",
+        "minRequest": "5",
+        "remainder": "0",
+        "value": "1"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "29232205936",
+        "minRequest": "1942158678",
+        "remainder": "2482971501",
+        "value": "21687904680"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "62467306812",
+        "minRequest": "1930778356",
+        "remainder": "1029033545",
+        "value": "20300314200"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "86101957451",
+        "minRequest": "1237876361",
+        "remainder": "566673215",
+        "value": "30669430746"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "86316113436",
+        "minRequest": "455200164",
+        "remainder": "600869113",
+        "value": "14355792811"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "152703403448",
+        "minRequest": "1578905325",
+        "remainder": "236781969",
+        "value": "151132226800"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "173429292303",
+        "minRequest": "419025941",
+        "remainder": "420322109",
+        "value": "38759253112"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "192268893945",
+        "minRequest": "879948211",
+        "remainder": "1599891634",
+        "value": "142512230998"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "27727310701",
+        "minRequest": "615680406",
+        "remainder": "443079142",
+        "value": "15498502363"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "146059480438",
+        "minRequest": "1925553325",
+        "remainder": "2062299369",
+        "value": "115516960255"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "34244210245",
+        "minRequest": "1300550129",
+        "remainder": "2359323115",
+        "value": "33685139526"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "149148296234",
+        "minRequest": "1419090241",
+        "remainder": "1075780251",
+        "value": "162227798548"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "64715096559",
+        "minRequest": "1639511148",
+        "remainder": "2606395325",
+        "value": "2149099300"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "188299278071",
+        "minRequest": "1873194064",
+        "remainder": "2589849554",
+        "value": "133779431271"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "125179172274",
+        "minRequest": "1480618347",
+        "remainder": "2105284746",
+        "value": "121268762215"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "22013692224",
+        "minRequest": "352621489",
+        "remainder": "273003351",
+        "value": "10154384384"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "169766047700",
+        "minRequest": "10516652",
+        "remainder": "17806021",
+        "value": "1227402604"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "34080262685",
+        "minRequest": "144028013",
+        "remainder": "36324942",
+        "value": "32120699500"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "186768220621",
+        "minRequest": "45746687",
+        "remainder": "77851625",
+        "value": "112212067295"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "5211489128",
+        "minRequest": "1700121211",
+        "remainder": "3033333898",
+        "value": "3239035350"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "138692039151",
+        "minRequest": "1403967655",
+        "remainder": "1241524381",
+        "value": "12675285898"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "37315693608",
+        "minRequest": "1530992955",
+        "remainder": "854925818",
+        "value": "4944709215"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "185523204541",
+        "minRequest": "130940445",
+        "remainder": "94391537",
+        "value": "83728832737"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "84082855456",
+        "minRequest": "226107775",
+        "remainder": "258214165",
+        "value": "76932190259"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "3705016317",
+        "minRequest": "1724947665",
+        "remainder": "1491287477",
+        "value": "2719382538"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "50732367458",
+        "minRequest": "309946445",
+        "remainder": "590487866",
+        "value": "34441905827"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "177548174118",
+        "minRequest": "1716801862",
+        "remainder": "1607252832",
+        "value": "175625583829"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "177214914381",
+        "minRequest": "1134803553",
+        "remainder": "1565750134",
+        "value": "64555623109"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "187378251837",
+        "minRequest": "1577093347",
+        "remainder": "2778055022",
+        "value": "122793203559"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "101785251598",
+        "minRequest": "1376721478",
+        "remainder": "332567114",
+        "value": "56023351421"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "185150742643",
+        "minRequest": "1135413383",
+        "remainder": "527445641",
+        "value": "152922031810"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "129745533279",
+        "minRequest": "1281428046",
+        "remainder": "860511421",
+        "value": "135342014824"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "38829725359",
+        "minRequest": "97851755",
+        "remainder": "161101861",
+        "value": "31878004805"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "168348923678",
+        "minRequest": "228957293",
+        "remainder": "197528254",
+        "value": "32642512671"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "176266601369",
+        "minRequest": "1263834695",
+        "remainder": "2434655088",
+        "value": "41943762719"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "77148971483",
+        "minRequest": "111239977",
+        "remainder": "124681457",
+        "value": "50013839665"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "162545735376",
+        "minRequest": "779029433",
+        "remainder": "978896684",
+        "value": "76259779463"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "19815458641",
+        "minRequest": "1011597524",
+        "remainder": "1213901971",
+        "value": "13267872151"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "101229791130",
+        "minRequest": "233793469",
+        "remainder": "312403253",
+        "value": "50360028311"
+      },
+      {
+        "canonical": false,
+        "error": "RequestTooLarge",
+        "maxRequest": "15250632420",
+        "minRequest": "1829780784",
+        "remainder": "221024903",
+        "value": "16397675046"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "132774191577",
+        "minRequest": "1291060828",
+        "remainder": "1880145465",
+        "value": "3462409492"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "114358850601",
+        "minRequest": "156803554",
+        "remainder": "137402649",
+        "value": "106649984961"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "115827377959",
+        "minRequest": "1284287739",
+        "remainder": "1117534234",
+        "value": "74414808767"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "8731831607",
+        "minRequest": "1258135293",
+        "remainder": "1514238979",
+        "value": "8150533683"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "165910821757",
+        "minRequest": "159830701",
+        "remainder": "206793664",
+        "value": "93706371351"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "171181175286",
+        "minRequest": "1539668347",
+        "remainder": "2304661778",
+        "value": "152500260911"
+      },
+      {
+        "canonical": false,
+        "error": "RequestTooLarge",
+        "maxRequest": "185886723159",
+        "minRequest": "1171247588",
+        "remainder": "86751545",
+        "value": "199899451576"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "10547540396",
+        "minRequest": "708561032",
+        "remainder": "1067147170",
+        "value": "2820334191"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "163909677872",
+        "minRequest": "1539493781",
+        "remainder": "1016879019",
+        "value": "13318420840"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "123261258124",
+        "minRequest": "1547252917",
+        "remainder": "432293039",
+        "value": "122190509388"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "163326213249",
+        "minRequest": "564758751",
+        "remainder": "321981551",
+        "value": "26458591595"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "44270183086",
+        "minRequest": "1797687907",
+        "remainder": "2498063574",
+        "value": "40713960817"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "140316672433",
+        "minRequest": "1950905296",
+        "remainder": "1084805480",
+        "value": "118203267824"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "24135447857",
+        "minRequest": "89127172",
+        "remainder": "36984435",
+        "value": "8977135788"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "133959197487",
+        "minRequest": "858033892",
+        "remainder": "786568026",
+        "value": "28221584674"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "126120451681",
+        "minRequest": "490758702",
+        "remainder": "973662359",
+        "value": "67097879468"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "33897352131",
+        "minRequest": "828114545",
+        "remainder": "789882523",
+        "value": "31205783968"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "85515631538",
+        "minRequest": "138995138",
+        "remainder": "262390437",
+        "value": "78736138824"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "102623031491",
+        "minRequest": "1944822978",
+        "remainder": "2291457032",
+        "value": "7679519772"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "63855529868",
+        "minRequest": "53199941",
+        "remainder": "44159190",
+        "value": "53583896170"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "133556084170",
+        "minRequest": "1919474315",
+        "remainder": "2292260423",
+        "value": "129604543035"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "159368819020",
+        "minRequest": "739099773",
+        "remainder": "784039047",
+        "value": "14838744270"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "59893907186",
+        "minRequest": "1034785533",
+        "remainder": "1584269234",
+        "value": "50232665447"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "169667697604",
+        "minRequest": "1237821785",
+        "remainder": "188261873",
+        "value": "162414760400"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "111575565521",
+        "minRequest": "1580566977",
+        "remainder": "1233860707",
+        "value": "86284225805"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "134500385570",
+        "minRequest": "160873519",
+        "remainder": "173591220",
+        "value": "111348791066"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "184609873842",
+        "minRequest": "196050888",
+        "remainder": "290998257",
+        "value": "94519196679"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "133087970411",
+        "minRequest": "683121386",
+        "remainder": "760103894",
+        "value": "116449062088"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "63605366522",
+        "minRequest": "1858297679",
+        "remainder": "732313934",
+        "value": "18442159118"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "14708999175",
+        "minRequest": "1279262045",
+        "remainder": "1118077209",
+        "value": "13858275117"
+      },
+      {
+        "canonical": false,
+        "error": "RequestTooSmall",
+        "maxRequest": "2549689460",
+        "minRequest": "439328671",
+        "remainder": "129767725",
+        "value": "142370522"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "108860469135",
+        "minRequest": "1644870770",
+        "remainder": "2939481838",
+        "value": "16702367888"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "58521994193",
+        "minRequest": "1305452601",
+        "remainder": "1866684319",
+        "value": "50704712413"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "185562895203",
+        "minRequest": "34816920",
+        "remainder": "54935630",
+        "value": "188137875934"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "8536444631",
+        "minRequest": "476717005",
+        "remainder": "708240839",
+        "value": "2698764010"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "114183112065",
+        "minRequest": "551053969",
+        "remainder": "30937663",
+        "value": "9919439371"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "173203699215",
+        "minRequest": "664681235",
+        "remainder": "1990353",
+        "value": "126946844481"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "180203825082",
+        "minRequest": "702948590",
+        "remainder": "1391092808",
+        "value": "65317029326"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooSmall",
+        "maxRequest": "154749361260",
+        "minRequest": "1732450599",
+        "remainder": "1812414842",
+        "value": "1073467164"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "20487508735",
+        "minRequest": "1323656185",
+        "remainder": "931805320",
+        "value": "9112915870"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "61828719299",
+        "minRequest": "243048604",
+        "remainder": "304943082",
+        "value": "33200499986"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "12370864491",
+        "minRequest": "1838740610",
+        "remainder": "2693681484",
+        "value": "7251676652"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "79888105303",
+        "minRequest": "1457164767",
+        "remainder": "2745151263",
+        "value": "5880768408"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "171721388031",
+        "minRequest": "767809615",
+        "remainder": "179460188",
+        "value": "137912400393"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "135484292264",
+        "minRequest": "1136093643",
+        "remainder": "1734267103",
+        "value": "23519884481"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "57245410592",
+        "minRequest": "556535916",
+        "remainder": "912808196",
+        "value": "41682807887"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "139398056546",
+        "minRequest": "1947991010",
+        "remainder": "5184894",
+        "value": "152880171246"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "157123298657",
+        "minRequest": "708356765",
+        "remainder": "631012705",
+        "value": "51079890811"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "46862899337",
+        "minRequest": "258377370",
+        "remainder": "117064457",
+        "value": "32054662293"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "138760256214",
+        "minRequest": "1546660987",
+        "remainder": "684312680",
+        "value": "90778378548"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "127753601061",
+        "minRequest": "705799932",
+        "remainder": "763593295",
+        "value": "104581709536"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "74699052297",
+        "minRequest": "1488219843",
+        "remainder": "447239757",
+        "value": "58278071837"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "53590871167",
+        "minRequest": "1971632460",
+        "remainder": "3845003530",
+        "value": "4436741214"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "107943100638",
+        "minRequest": "1780597385",
+        "remainder": "761104183",
+        "value": "62281208155"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "151942390538",
+        "minRequest": "442391868",
+        "remainder": "198570886",
+        "value": "15047049291"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "134311773170",
+        "minRequest": "1931589611",
+        "remainder": "1563781133",
+        "value": "120176162414"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "22119525173",
+        "minRequest": "1362954626",
+        "remainder": "2276675811",
+        "value": "15249860576"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "87781616700",
+        "minRequest": "820965928",
+        "remainder": "894281256",
+        "value": "92092388230"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "33604430310",
+        "minRequest": "1444659336",
+        "remainder": "1094975936",
+        "value": "12989825214"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "89685772126",
+        "minRequest": "368360928",
+        "remainder": "468493914",
+        "value": "71343603907"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "38826180956",
+        "minRequest": "1192596876",
+        "remainder": "1565286277",
+        "value": "12528032583"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "15268542591",
+        "minRequest": "412422104",
+        "remainder": "371051866",
+        "value": "15941161526"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "173713442568",
+        "minRequest": "397080838",
+        "remainder": "582371881",
+        "value": "25213367981"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "30853700860",
+        "minRequest": "754804922",
+        "remainder": "387790643",
+        "value": "6739158676"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "54318639255",
+        "minRequest": "469348674",
+        "remainder": "64563469",
+        "value": "49515238135"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "120567490471",
+        "minRequest": "1939960468",
+        "remainder": "2151629763",
+        "value": "30285395953"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "30479771295",
+        "minRequest": "1348583827",
+        "remainder": "2494700091",
+        "value": "17990759697"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "53899636437",
+        "minRequest": "1476390093",
+        "remainder": "1231483770",
+        "value": "48990692780"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "80945844616",
+        "minRequest": "126258605",
+        "remainder": "84558926",
+        "value": "18472538487"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "24529443971",
+        "minRequest": "981501843",
+        "remainder": "1947840165",
+        "value": "24466348404"
+      },
+      {
+        "canonical": false,
+        "error": "RequestTooLarge",
+        "maxRequest": "139149172688",
+        "minRequest": "1580851504",
+        "remainder": "688239337",
+        "value": "139723511508"
+      },
+      {
+        "canonical": false,
+        "error": "RequestTooLarge",
+        "maxRequest": "99794256573",
+        "minRequest": "689806120",
+        "remainder": "374436331",
+        "value": "100255378310"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "59323266613",
+        "minRequest": "1488391964",
+        "remainder": "1767753651",
+        "value": "34893231963"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "6741875670",
+        "minRequest": "1492513556",
+        "remainder": "751917106",
+        "value": "7064605490"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "151733593738",
+        "minRequest": "460170620",
+        "remainder": "131857995",
+        "value": "36089882311"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "84607423509",
+        "minRequest": "833400559",
+        "remainder": "1591755459",
+        "value": "66130090974"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "158404998933",
+        "minRequest": "490656429",
+        "remainder": "389809293",
+        "value": "104784864749"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "117961282659",
+        "minRequest": "727191845",
+        "remainder": "607362882",
+        "value": "47343736745"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "82464667689",
+        "minRequest": "1742546327",
+        "remainder": "1438125948",
+        "value": "75886860328"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "8383234750",
+        "minRequest": "993245265",
+        "remainder": "1518149774",
+        "value": "4095502110"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "201541482593",
+        "minRequest": "1567662792",
+        "remainder": "875714547",
+        "value": "110339951332"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "102927517683",
+        "minRequest": "155145998",
+        "remainder": "211768091",
+        "value": "91269919618"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "44817568526",
+        "minRequest": "1803747673",
+        "remainder": "1883930613",
+        "value": "28938662918"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "90825619313",
+        "minRequest": "590591572",
+        "remainder": "182716916",
+        "value": "45775406492"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "92465055410",
+        "minRequest": "960278705",
+        "remainder": "332323527",
+        "value": "26319996903"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "127868577726",
+        "minRequest": "666250385",
+        "remainder": "449346345",
+        "value": "116186613875"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "73631098278",
+        "minRequest": "1006947435",
+        "remainder": "1511949659",
+        "value": "33718512549"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "143058051980",
+        "minRequest": "137576125",
+        "remainder": "17692310",
+        "value": "39623166245"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "123338787638",
+        "minRequest": "1910001682",
+        "remainder": "3787003888",
+        "value": "123669528856"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "133160285569",
+        "minRequest": "1661218514",
+        "remainder": "1568535237",
+        "value": "65975979984"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "102862180780",
+        "minRequest": "1499269163",
+        "remainder": "1151989976",
+        "value": "72308472860"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "54572910455",
+        "minRequest": "936634867",
+        "remainder": "84387632",
+        "value": "42893029726"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "111637558777",
+        "minRequest": "953934716",
+        "remainder": "1571116152",
+        "value": "17973445658"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "70460437425",
+        "minRequest": "359124811",
+        "remainder": "346344540",
+        "value": "15096077033"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "14909482862",
+        "minRequest": "1726397924",
+        "remainder": "3286557460",
+        "value": "7584623922"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "168895006095",
+        "minRequest": "1784491185",
+        "remainder": "1834707018",
+        "value": "23534345935"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "117932505801",
+        "minRequest": "1284148760",
+        "remainder": "531111158",
+        "value": "114136300984"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "45280600572",
+        "minRequest": "1091932964",
+        "remainder": "27738537",
+        "value": "35370791334"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "27498398486",
+        "minRequest": "1664436527",
+        "remainder": "2763871218",
+        "value": "1904221437"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "28623639568",
+        "minRequest": "939864385",
+        "remainder": "793694337",
+        "value": "23943809527"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "190339119913",
+        "minRequest": "256350350",
+        "remainder": "119204717",
+        "value": "80811347187"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "155985810595",
+        "minRequest": "1420772270",
+        "remainder": "1144915640",
+        "value": "143425459610"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "39358892070",
+        "minRequest": "991548621",
+        "remainder": "959320218",
+        "value": "21686760370"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "127562525907",
+        "minRequest": "1118847564",
+        "remainder": "1246863664",
+        "value": "65325265375"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "181978254121",
+        "minRequest": "86093889",
+        "remainder": "3092411",
+        "value": "188769114317"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "56335496877",
+        "minRequest": "263356606",
+        "remainder": "444186107",
+        "value": "3308326540"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "20680305314",
+        "minRequest": "300771087",
+        "remainder": "420137993",
+        "value": "7522236453"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "112904859362",
+        "minRequest": "1364362738",
+        "remainder": "1266656442",
+        "value": "11399486234"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "40477986172",
+        "minRequest": "1943322549",
+        "remainder": "3681129085",
+        "value": "26499205915"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "22023402779",
+        "minRequest": "1889669693",
+        "remainder": "712686769",
+        "value": "18703135694"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "183688939394",
+        "minRequest": "1845889270",
+        "remainder": "1512581140",
+        "value": "109522325848"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "195901887118",
+        "minRequest": "1071601018",
+        "remainder": "247051576",
+        "value": "202061659860"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "186622292719",
+        "minRequest": "1379456190",
+        "remainder": "678822690",
+        "value": "160707776586"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "66027787421",
+        "minRequest": "835561593",
+        "remainder": "721077127",
+        "value": "14532327063"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "146018385937",
+        "minRequest": "141489982",
+        "remainder": "39901657",
+        "value": "138917785159"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "4245428882",
+        "minRequest": "245403739",
+        "remainder": "317080894",
+        "value": "2106087661"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "156500770787",
+        "minRequest": "1926062617",
+        "remainder": "3356768156",
+        "value": "77754469315"
+      },
+      {
+        "canonical": false,
+        "error": "RequestTooSmall",
+        "maxRequest": "9774482943",
+        "minRequest": "1551613458",
+        "remainder": "1830933929",
+        "value": "208287476"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "129568327993",
+        "minRequest": "400598701",
+        "remainder": "665022263",
+        "value": "118911083728"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "99283602634",
+        "minRequest": "1723247537",
+        "remainder": "2629940610",
+        "value": "37510931954"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "115181801252",
+        "minRequest": "51631272",
+        "remainder": "89272149",
+        "value": "67030819085"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "124599177354",
+        "minRequest": "1067888340",
+        "remainder": "977757778",
+        "value": "117769972855"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "89008184050",
+        "minRequest": "1832214215",
+        "remainder": "947585806",
+        "value": "64878920839"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "13237185832",
+        "minRequest": "937007746",
+        "remainder": "391846114",
+        "value": "12416082001"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "170444328371",
+        "minRequest": "550110085",
+        "remainder": "649742386",
+        "value": "9559090953"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "179212327820",
+        "minRequest": "511130",
+        "remainder": "90925",
+        "value": "173915280809"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "102533871268",
+        "minRequest": "314502146",
+        "remainder": "386089967",
+        "value": "38394942262"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "140645435980",
+        "minRequest": "1149617672",
+        "remainder": "1637570364",
+        "value": "61391110989"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "69210644000",
+        "minRequest": "753281848",
+        "remainder": "1033731952",
+        "value": "30820137737"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "192598424994",
+        "minRequest": "514797898",
+        "remainder": "738245474",
+        "value": "60304112445"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "20988485936",
+        "minRequest": "1011110036",
+        "remainder": "829961466",
+        "value": "1412683343"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "100918049508",
+        "minRequest": "427010805",
+        "remainder": "447645053",
+        "value": "102199238248"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "39725306371",
+        "minRequest": "168988480",
+        "remainder": "295825020",
+        "value": "37890161399"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "139257945977",
+        "minRequest": "592269827",
+        "remainder": "98908636",
+        "value": "113299053092"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "7833907415",
+        "minRequest": "267796077",
+        "remainder": "478930497",
+        "value": "4495530245"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "100341936880",
+        "minRequest": "1554519210",
+        "remainder": "1482384025",
+        "value": "84722316905"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "157535472684",
+        "minRequest": "1528066292",
+        "remainder": "3035935970",
+        "value": "133948068980"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "119341728338",
+        "minRequest": "928591246",
+        "remainder": "287769869",
+        "value": "71786257629"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "70316253220",
+        "minRequest": "523090942",
+        "remainder": "314659076",
+        "value": "33224632093"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "27335780835",
+        "minRequest": "976557795",
+        "remainder": "1086053899",
+        "value": "21841904109"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "139362975042",
+        "minRequest": "595033928",
+        "remainder": "76394818",
+        "value": "63273344134"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "64099129684",
+        "minRequest": "1084891943",
+        "remainder": "430403232",
+        "value": "28067198691"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "158898795054",
+        "minRequest": "722624455",
+        "remainder": "777867686",
+        "value": "106947398169"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "66734512686",
+        "minRequest": "312735614",
+        "remainder": "68197039",
+        "value": "35348960111"
+      },
+      {
+        "canonical": true,
+        "error": "RequestTooLarge",
+        "maxRequest": "122960435687",
+        "minRequest": "1472124649",
+        "remainder": "2014755253",
+        "value": "123965183393"
+      },
+      {
+        "canonical": false,
+        "error": "RequestTooLarge",
+        "maxRequest": "184912533177",
+        "minRequest": "295530075",
+        "remainder": "416302484",
+        "value": "198162408719"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "29740004587",
+        "minRequest": "1925810788",
+        "remainder": "3117467271",
+        "value": "22971507385"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "104955929132",
+        "minRequest": "1797469701",
+        "remainder": "373624181",
+        "value": "12303096595"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "88734428894",
+        "minRequest": "1627635430",
+        "remainder": "1707418646",
+        "value": "16374074036"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "158941774228",
+        "minRequest": "1309433041",
+        "remainder": "284918323",
+        "value": "26621645981"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "85977040747",
+        "minRequest": "501536064",
+        "remainder": "61452022",
+        "value": "19776946191"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "170950963166",
+        "minRequest": "247593574",
+        "remainder": "415162082",
+        "value": "117755377951"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "139759287855",
+        "minRequest": "597812508",
+        "remainder": "884330077",
+        "value": "59915932237"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "101787596368",
+        "minRequest": "1048445394",
+        "remainder": "497226234",
+        "value": "87023557291"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "182968011291",
+        "minRequest": "1162429499",
+        "remainder": "581629584",
+        "value": "49827962921"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "182138102590",
+        "minRequest": "1577091827",
+        "remainder": "278972652",
+        "value": "152699947223"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "77187348779",
+        "minRequest": "756546103",
+        "remainder": "945978839",
+        "value": "13215267699"
+      },
+      {
+        "canonical": false,
+        "error": "RequestTooLarge",
+        "maxRequest": "148291121010",
+        "minRequest": "1657619691",
+        "remainder": "231716444",
+        "value": "152079450700"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "156797052853",
+        "minRequest": "1760277365",
+        "remainder": "2776267841",
+        "value": "32970050623"
+      },
+      {
+        "canonical": false,
+        "error": null,
+        "maxRequest": "69390477701",
+        "minRequest": "1969407403",
+        "remainder": "3851955284",
+        "value": "56706750189"
+      },
+      {
+        "canonical": true,
+        "error": null,
+        "maxRequest": "149214147253",
+        "minRequest": "11535207",
+        "remainder": "22871309",
+        "value": "1137344776"
+      }
+    ],
+    "underwater": [
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "0",
+        "underwater": false
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "1",
+        "underwater": true
+      },
+      {
+        "netAssets": "1",
+        "sharesOutstanding": "1000000000",
+        "underwater": false
+      },
+      {
+        "netAssets": "1",
+        "sharesOutstanding": "1000000001",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073709551615",
+        "sharesOutstanding": "18446744073709551615",
+        "underwater": false
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "18446744073709551615",
+        "underwater": true
+      },
+      {
+        "netAssets": "50510681",
+        "sharesOutstanding": "50510682492917762",
+        "underwater": true
+      },
+      {
+        "netAssets": "35",
+        "sharesOutstanding": "36359771431",
+        "underwater": true
+      },
+      {
+        "netAssets": "211344094",
+        "sharesOutstanding": "211344095608886652",
+        "underwater": true
+      },
+      {
+        "netAssets": "13",
+        "sharesOutstanding": "13786573281",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744072",
+        "sharesOutstanding": "18446744073709550912",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "485",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073",
+        "sharesOutstanding": "18446744073709551522",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "295",
+        "underwater": true
+      },
+      {
+        "netAssets": "246405790326",
+        "sharesOutstanding": "375",
+        "underwater": false
+      },
+      {
+        "netAssets": "832375294",
+        "sharesOutstanding": "832375294870502942",
+        "underwater": true
+      },
+      {
+        "netAssets": "5771520",
+        "sharesOutstanding": "5771521957716602",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073709551407",
+        "sharesOutstanding": "980407971793061277",
+        "underwater": false
+      },
+      {
+        "netAssets": "651635267",
+        "sharesOutstanding": "651635268160783707",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "180",
+        "underwater": true
+      },
+      {
+        "netAssets": "481440906",
+        "sharesOutstanding": "481440906831444902",
+        "underwater": true
+      },
+      {
+        "netAssets": "252",
+        "sharesOutstanding": "252622199226",
+        "underwater": true
+      },
+      {
+        "netAssets": "8007005133305544394",
+        "sharesOutstanding": "18446744073709550762",
+        "underwater": false
+      },
+      {
+        "netAssets": "2373514941",
+        "sharesOutstanding": "2373514942616621009",
+        "underwater": true
+      },
+      {
+        "netAssets": "33",
+        "sharesOutstanding": "33285505596",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "405",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "275",
+        "underwater": true
+      },
+      {
+        "netAssets": "298",
+        "sharesOutstanding": "299413695286",
+        "underwater": true
+      },
+      {
+        "netAssets": "429",
+        "sharesOutstanding": "430135422581",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "750",
+        "underwater": true
+      },
+      {
+        "netAssets": "115530281",
+        "sharesOutstanding": "115530282891412332",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "135",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "490",
+        "underwater": true
+      },
+      {
+        "netAssets": "570",
+        "sharesOutstanding": "501003388521",
+        "underwater": false
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "90",
+        "underwater": true
+      },
+      {
+        "netAssets": "65320051",
+        "sharesOutstanding": "65320051766403114",
+        "underwater": true
+      },
+      {
+        "netAssets": "12521912144",
+        "sharesOutstanding": "12521912144839084909",
+        "underwater": true
+      },
+      {
+        "netAssets": "795952138",
+        "sharesOutstanding": "795952138218798462",
+        "underwater": true
+      },
+      {
+        "netAssets": "2872579644329749129",
+        "sharesOutstanding": "750",
+        "underwater": false
+      },
+      {
+        "netAssets": "782",
+        "sharesOutstanding": "783298677706",
+        "underwater": true
+      },
+      {
+        "netAssets": "699",
+        "sharesOutstanding": "700258624911",
+        "underwater": true
+      },
+      {
+        "netAssets": "104679980431",
+        "sharesOutstanding": "595003615771",
+        "underwater": false
+      },
+      {
+        "netAssets": "163",
+        "sharesOutstanding": "164968834611",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "900",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "500",
+        "underwater": true
+      },
+      {
+        "netAssets": "845653576751",
+        "sharesOutstanding": "900",
+        "underwater": false
+      },
+      {
+        "netAssets": "12228362423",
+        "sharesOutstanding": "12228362423818030444",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073709550792",
+        "sharesOutstanding": "18446744073709551262",
+        "underwater": false
+      },
+      {
+        "netAssets": "899",
+        "sharesOutstanding": "899041728761",
+        "underwater": true
+      },
+      {
+        "netAssets": "163",
+        "sharesOutstanding": "163780731511",
+        "underwater": true
+      },
+      {
+        "netAssets": "15",
+        "sharesOutstanding": "15553721346",
+        "underwater": true
+      },
+      {
+        "netAssets": "757662002982737609",
+        "sharesOutstanding": "18446744073709551462",
+        "underwater": false
+      },
+      {
+        "netAssets": "765300422101",
+        "sharesOutstanding": "435494343977386512",
+        "underwater": false
+      },
+      {
+        "netAssets": "473180451916696557",
+        "sharesOutstanding": "665",
+        "underwater": false
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "455",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073",
+        "sharesOutstanding": "18446744073709550802",
+        "underwater": true
+      },
+      {
+        "netAssets": "13335801332",
+        "sharesOutstanding": "13335801333309736539",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073709550667",
+        "sharesOutstanding": "34612380321",
+        "underwater": false
+      },
+      {
+        "netAssets": "18446744073709550897",
+        "sharesOutstanding": "17269439924049218159",
+        "underwater": false
+      },
+      {
+        "netAssets": "18446744072",
+        "sharesOutstanding": "18446744073709550887",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073709551132",
+        "sharesOutstanding": "760224758956",
+        "underwater": false
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "195",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073709550872",
+        "sharesOutstanding": "17583215063286125249",
+        "underwater": false
+      },
+      {
+        "netAssets": "363116189",
+        "sharesOutstanding": "363116189194651862",
+        "underwater": true
+      },
+      {
+        "netAssets": "322056730551",
+        "sharesOutstanding": "781487829211",
+        "underwater": false
+      },
+      {
+        "netAssets": "179108698",
+        "sharesOutstanding": "179108699214211577",
+        "underwater": true
+      },
+      {
+        "netAssets": "163026733811",
+        "sharesOutstanding": "265",
+        "underwater": false
+      },
+      {
+        "netAssets": "5987486681",
+        "sharesOutstanding": "5987486682421973644",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073",
+        "sharesOutstanding": "18446744073709551427",
+        "underwater": true
+      },
+      {
+        "netAssets": "12175292899",
+        "sharesOutstanding": "12175292899715058679",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "0",
+        "underwater": false
+      },
+      {
+        "netAssets": "18446744073",
+        "sharesOutstanding": "18446744073709551107",
+        "underwater": true
+      },
+      {
+        "netAssets": "10534585956",
+        "sharesOutstanding": "10534585957446952959",
+        "underwater": true
+      },
+      {
+        "netAssets": "40",
+        "sharesOutstanding": "18446744073709551402",
+        "underwater": true
+      },
+      {
+        "netAssets": "16941052246079582709",
+        "sharesOutstanding": "735",
+        "underwater": false
+      },
+      {
+        "netAssets": "20",
+        "sharesOutstanding": "158339820136",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073709550902",
+        "sharesOutstanding": "18446744073709551497",
+        "underwater": false
+      },
+      {
+        "netAssets": "867318110806863217",
+        "sharesOutstanding": "2665257376688624329",
+        "underwater": false
+      },
+      {
+        "netAssets": "962524705",
+        "sharesOutstanding": "962524706440934207",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "540",
+        "underwater": true
+      },
+      {
+        "netAssets": "155569386",
+        "sharesOutstanding": "155569387402227952",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "540",
+        "underwater": true
+      },
+      {
+        "netAssets": "5166698385",
+        "sharesOutstanding": "5166698385702909334",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073",
+        "sharesOutstanding": "18446744073709551522",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073709551612",
+        "sharesOutstanding": "398232577058615372",
+        "underwater": false
+      },
+      {
+        "netAssets": "835",
+        "sharesOutstanding": "978231211939971327",
+        "underwater": true
+      },
+      {
+        "netAssets": "337111105172602127",
+        "sharesOutstanding": "110376297246733802",
+        "underwater": false
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "590",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "445",
+        "underwater": true
+      },
+      {
+        "netAssets": "597671188",
+        "sharesOutstanding": "597671189487670477",
+        "underwater": true
+      },
+      {
+        "netAssets": "653699567",
+        "sharesOutstanding": "653699568673434742",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "900",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744073",
+        "sharesOutstanding": "18446744073709551487",
+        "underwater": true
+      },
+      {
+        "netAssets": "91217097",
+        "sharesOutstanding": "91217098389775562",
+        "underwater": true
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "430",
+        "underwater": true
+      },
+      {
+        "netAssets": "18446744072",
+        "sharesOutstanding": "18446744073709551177",
+        "underwater": true
+      },
+      {
+        "netAssets": "741712841951",
+        "sharesOutstanding": "527382438631",
+        "underwater": false
+      },
+      {
+        "netAssets": "374",
+        "sharesOutstanding": "375351941796",
+        "underwater": true
+      },
+      {
+        "netAssets": "445",
+        "sharesOutstanding": "75031448111",
+        "underwater": false
+      },
+      {
+        "netAssets": "14960804977722648004",
+        "sharesOutstanding": "8426783936304069159",
+        "underwater": false
+      },
+      {
+        "netAssets": "0",
+        "sharesOutstanding": "535",
+        "underwater": true
+      },
+      {
+        "netAssets": "17057295490",
+        "sharesOutstanding": "17057295490842441544",
+        "underwater": true
+      },
+      {
+        "netAssets": "747630535",
+        "sharesOutstanding": "747630535979542537",
+        "underwater": true
+      },
+      {
+        "netAssets": "629806823",
+        "sharesOutstanding": "629806824386673172",
+        "underwater": true
+      },
+      {
+        "netAssets": "545",
+        "sharesOutstanding": "18446744073709551217",
+        "underwater": true
+      },
+      {
+        "netAssets": "13",
+        "sharesOutstanding": "13918681851",
+        "underwater": true
+      }
+    ]
+  },
   "constants": {
     "bpsDenominator": 10000,
     "instantExit": "1",
@@ -55,6 +2271,7 @@
     "modeNormal": 0,
     "modeUnderCovered": 1,
     "navScale": "1000000000",
+    "subMinimumExitFloorDivisor": "10",
     "virtualOffset": "1"
   },
   "conversion": [

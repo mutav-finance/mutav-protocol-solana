@@ -26,8 +26,9 @@ use anchor_lang::{prelude::Pubkey, InstructionData};
 use mutav::{
     allowlist,
     constants::*,
-    math::{assets_for, conversion_nav, mul_div, shares_for, Rounding},
-    solvency::{nav_per_share, Solvency, SolvencyInputs},
+    errors::MutavError,
+    math::{assets_for, conversion_nav, mul_div, redeem_size_error, shares_for, Rounding},
+    solvency::{is_underwater, nav_per_share, Solvency, SolvencyInputs},
     state::CapsInput,
     ConfigParam, Eligibility, InitializeArgs, NavBounds, RegisterGuaranteeArgs,
 };
@@ -282,6 +283,66 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
         });
     }
     Value::Array(cases.iter().map(solvency_case).collect())
+}
+
+/// The underwater test and the `request_redeem` size rule (ADR 0029).
+fn capital_rule_vectors(rng: &mut Rng) -> Value {
+    let mut under: Vec<(u64, u64)> = vec![
+        (0, 0),
+        (0, 1),
+        (1, 1_000_000_000),
+        (1, 1_000_000_001),
+        (MAX, MAX),
+        (0, MAX),
+    ];
+    for _ in 0..100 {
+        let shares = rng.amount();
+        let net = match rng.next() % 3 {
+            0 => shares / 1_000_000_000,
+            1 => (shares / 1_000_000_000).saturating_sub(1),
+            _ => rng.amount(),
+        };
+        under.push((net, shares));
+    }
+    let name = |e: Option<MutavError>| match e {
+        None => Value::Null,
+        Some(MutavError::RequestTooSmall) => Value::String("RequestTooSmall".into()),
+        Some(MutavError::RequestTooLarge) => Value::String("RequestTooLarge".into()),
+        Some(other) => panic!("unexpected {}", other as u32),
+    };
+    let mut sizes: Vec<(u64, u64, bool, u64, u64)> = vec![
+        (0, 0, true, 1_000, 100_000),
+        (100_001, 0, true, 1_000, 100_000),
+        (1_000, 50_000, false, 1_000, 100_000),
+        (500, 0, true, 1_000, 100_000),
+        (500, 999, true, 1_000, 100_000),
+        (500, 1_000, true, 1_000, 100_000),
+        (500, 0, false, 1_000, 100_000),
+        (100, 0, true, 1_000, 100_000),
+        (99, 0, true, 1_000, 100_000),
+        (1, 0, true, 5, 10),
+    ];
+    for _ in 0..200 {
+        let min = 1 + rng.next() % 2_000_000_000;
+        let max = min + rng.next() % 200_000_000_000;
+        let value = rng.next() % (max + max / 10 + 1);
+        let remainder = rng.next() % (2 * min);
+        sizes.push((value, remainder, rng.next() % 2 == 0, min, max));
+    }
+    json!({
+        "underwater": under
+            .iter()
+            .map(|(n, sh)| json!({ "netAssets": s(*n), "sharesOutstanding": s(*sh), "underwater": is_underwater(*n, *sh) }))
+            .collect::<Vec<_>>(),
+        "redeemSize": sizes
+            .iter()
+            .map(|(v, r, c, mn, mx)| json!({
+                "value": s(*v), "remainder": s(*r), "canonical": c,
+                "minRequest": s(*mn), "maxRequest": s(*mx),
+                "error": name(redeem_size_error(*v, *r, *c, *mn, *mx)),
+            }))
+            .collect::<Vec<_>>(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -650,6 +711,7 @@ fn build() -> Value {
             "modeUnderCovered": MODE_UNDER_COVERED,
             "maxAllowlistProofLen": MAX_ALLOWLIST_PROOF_LEN,
             "maxFulfilBatch": MAX_FULFIL_BATCH,
+            "subMinimumExitFloorDivisor": s(SUB_MINIMUM_EXIT_FLOOR_DIVISOR),
         },
         "mulDiv": mul_div_vectors(&mut rng),
         "conversion": conversion_vectors(&mut rng),
@@ -657,6 +719,8 @@ fn build() -> Value {
         "pdas": pda_vectors(&mut rng),
         "allowlist": allowlist_vectors(&mut rng),
         "instructions": instruction_vectors(&mut rng),
+        // Own seed, after the others, so the vectors above do not move.
+        "capitalRules": capital_rule_vectors(&mut Rng(0x4558_4954_5f52_554c)),
     })
 }
 

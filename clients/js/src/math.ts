@@ -207,6 +207,41 @@ export function computeSolvency(i: SolvencyInputs): Solvency {
   };
 }
 
+/**
+ * An underwater reserve (`solvency::is_underwater`, ADR 0022, ADR 0029):
+ * shares outstanding and `net_assets × NAV_SCALE < shares_outstanding`
+ * (NAV per share below the smallest published unit). Both fills refuse
+ * with `ReserveUnderwater`.
+ */
+export function isUnderwater(netAssets: bigint, sharesOutstanding: bigint): boolean {
+  const so = u64(sharesOutstanding, 'sharesOutstanding');
+  return so > 0n && u64(netAssets, 'netAssets') * NAV_SCALE < so;
+}
+
+/** `min_request / SUB_MINIMUM_EXIT_FLOOR_DIVISOR` is the floor of a sub-minimum exit (ADR 0029). */
+export const SUB_MINIMUM_EXIT_FLOOR_DIVISOR = 10n;
+
+/**
+ * The `request_redeem` size rule (`math::redeem_size_error`, ADR 0029), on
+ * values in BRS at the current NAV: `null` when accepted, else the error.
+ * `remainder` is what the request leaves in the debited share account;
+ * `canonical` says that account is the owner's share associated token account.
+ */
+export function redeemSizeError(
+  value: bigint,
+  remainder: bigint,
+  canonical: boolean,
+  minRequest: bigint,
+  maxRequest: bigint,
+): 'RequestTooSmall' | 'RequestTooLarge' | null {
+  if (value === 0n) return 'RequestTooSmall';
+  if (value > maxRequest) return 'RequestTooLarge';
+  if (value >= minRequest) return null;
+  const q = minRequest / SUB_MINIMUM_EXIT_FLOOR_DIVISOR;
+  const floor = q > 1n ? q : 1n;
+  return canonical && remainder < minRequest && value >= floor ? null : 'RequestTooSmall';
+}
+
 /** Length of the claim-payment window in days (ADR 0019). */
 export const CLAIM_WINDOW_DAYS = 31;
 
