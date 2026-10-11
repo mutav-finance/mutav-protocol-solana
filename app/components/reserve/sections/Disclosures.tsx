@@ -11,11 +11,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
-import { fmtDuration } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { type ReserveView } from "@/lib/view";
 
 import { Section } from "@/components/Section";
+import { BlockHead, Lead, fmtSpan } from "@/components/reserve/sections/shared";
 import type { Data } from "@/components/reserve/sections/shared";
 
 const LABEL = { letterSpacing: "0.01em" } as const;
@@ -29,24 +29,12 @@ function Label({ children }: { children: ReactNode }) {
   );
 }
 
-/** Block heading: Geist 16 bold, optional one-line intro (≤ 20 words) and a link on the right. */
-function BlockHead({ id, title, intro, link }: { id: string; title: string; intro?: string; link?: [string, string] }) {
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-      <div className="flex max-w-[720px] flex-col gap-1">
-        <h3 id={id} className="font-display text-(--color-text) m-0 text-base font-bold">
-          {title}
-        </h3>
-        {intro && <p className="font-body text-(--color-text-2) m-0 text-sm leading-relaxed">{intro}</p>}
-      </div>
-      {link && (
-        <Link href={link[0]} className="ext-link font-body text-xs">
-          {link[1]} →
-        </Link>
-      )}
-    </div>
-  );
-}
+/** A link on the right of a block heading. */
+const HeadLink = ({ href, children }: { href: string; children: string }) => (
+  <Link href={href} className="ext-link font-body text-xs">
+    {children} →
+  </Link>
+);
 
 /** Block 1 · claim payments: two caps in one strip. */
 function ClaimLimits({ r }: { r: ReserveView }) {
@@ -64,12 +52,12 @@ function ClaimLimits({ r }: { r: ReserveView }) {
       <BlockHead
         id="risk-claims-h"
         title="Claim payment caps"
-        intro="Remaining cover, liquid BRS and two caps bound each claim payment."
-        link={["/reserve/claims", "See claims"]}
+        note={<Lead lead="Each claim payment has two caps." className="text-sm">The guarantee&apos;s remaining cover and the BRS on hand bound it too.</Lead>}
+        aside={<HeadLink href="/reserve/claims">See claims</HeadLink>}
       />
       <div className="grid grid-cols-1 gap-px border sm:grid-cols-2" style={{ background: "var(--color-border)" }}>
-        {cell("Cap per call", fmtBrs(caps.maxClaimPerCall), "largest single claim payment")}
-        {cell("Cap per period", fmtBrs(caps.maxClaimPerPeriod), `in total, every ${fmtDuration(caps.claimPeriodSecs)}`)}
+        {cell("Max per claim payment", fmtBrs(caps.maxClaimPerCall), "for one claim payment")}
+        {cell(`Max in any ${fmtSpan(caps.claimPeriodSecs)}`, fmtBrs(caps.maxClaimPerPeriod), "all claim payments together")}
       </div>
     </section>
   );
@@ -79,16 +67,14 @@ function ClaimLimits({ r }: { r: ReserveView }) {
 function CapitalTerms() {
   return (
     <section aria-labelledby="risk-capital-h" className="flex flex-col gap-4">
-      <div className="bg-(--color-surface) border-l-(--color-text-3) border border-l-2 px-6 py-3">
-        <h3 id="risk-capital-h" className="font-display text-(--color-text) m-0 text-base font-bold">
-          Who provides capital
-        </h3>
-      </div>
+      <BlockHead id="risk-capital-h" title="Who provides capital" />
       <div className="flex flex-col">
         <article className="bg-(--color-surface) flex flex-col gap-3 border p-6">
           <h4 className="font-display text-(--color-text) m-0 text-lg leading-snug font-bold">Approved wallets only</h4>
-          <p className="font-body text-(--color-text-2) m-0 text-sm leading-relaxed">
-            An on-chain allowlist gates deposits and redemptions (KYC off-chain). Every approved wallet waits in the same FIFO queue.
+          <p className="m-0">
+            <Lead lead="An on-chain allowlist gates deposits and redemptions (KYC off-chain)." className="text-sm">
+              Every approved wallet waits in the same line, oldest first.
+            </Lead>
           </p>
         </article>
       </div>
@@ -111,7 +97,7 @@ export function DisclosuresSection({ d }: { d: Data }) {
     <Section
       id="disclosures"
       title="Risks"
-      subtitle="What could stop this reserve, and what limits each risk?"
+      subtitle="What limits each payment, and who can move money."
     >
       <Disclosures r={d.reserve} />
     </Section>

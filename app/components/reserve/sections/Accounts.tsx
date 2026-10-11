@@ -7,15 +7,17 @@
  * account it uses, grouped by job, each with copy and Explorer. Addresses come
  * from /api/ledger; nothing is hardcoded.
  */
+import type { ReactNode } from "react";
 import { RoleTag } from "@/components/RoleTag";
 import { type ReserveView } from "@/lib/view";
 import { ACCOUNT_ROLES, type AccountRole } from "@/lib/roles";
 import { Section } from "@/components/Section";
 import { ProofCards } from "@/components/reserve/ProofCards";
 import { AddressLine } from "@/components/reserve/accounts/AddressLine";
+import { BlockHead, PlusMark } from "@/components/reserve/sections/shared";
 import type { Data } from "@/components/reserve/sections/shared";
 
-type Signer = { name: string; address: string; a: AccountRole; does: string };
+type Signer = { name: string; address: string; a: AccountRole; does: string; tag?: ReactNode };
 type Row = { name: string; address: string; a: AccountRole };
 type Group = { id: string; title: string; open?: boolean; rows: Row[] };
 
@@ -28,7 +30,7 @@ const LABEL_STYLE = { letterSpacing: "0.01em" } as const;
  */
 const PLAIN_NOTE: Record<string, string> = {
   "written only by admin instructions": "The reserve's settings",
-  "receives the fee take of contribute_fees": "Receives MUTAV's fee take",
+  "receives the fee take of contribute_fees": "Receives the MUTAV fee",
   "receives pay_claim": "Receives claim payments",
   "program-owned; Nora pays issuer income here, outside NAV until swept": "Issuer income waits here until swept",
   "upgrade authority: the Reserve Admin": "Upgradable by the Reserve Admin",
@@ -69,10 +71,24 @@ export function Accounts({ r }: { r: ReserveView }) {
 
   // Hero: the keys that sign. What a verifier checks first.
   const signers: Signer[] = [
-    { name: "Admin (Squads multisig)", address: r.config.admin, a: ACCOUNT_ROLES.admin, does: "Governs the reserve. Also the program's upgrade authority." },
-    { name: "Pauser", address: r.config.pauser, a: ACCOUNT_ROLES.pauser, does: "Can pause and revoke the operator. Nothing else." },
+    { name: "Reserve Admin (Squads multisig)", address: r.config.admin, a: ACCOUNT_ROLES.admin, does: "Governs the reserve. Also the program's upgrade authority." },
+    {
+      name: "Pauser",
+      address: r.config.pauser,
+      a: ACCOUNT_ROLES.pauser,
+      does: "Can pause and revoke the operator. Nothing else.",
+      // Its own key, held on the Reserve Admin side: a PAUSER tag, so it does not read as the admin.
+      tag: (
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <span className="font-mono text-(--color-text) text-2xs uppercase" style={{ letterSpacing: "0.06em" }}>
+            Pauser
+          </span>
+          <span className="font-body text-(--color-text-3) text-2xs">held on the Reserve Admin side</span>
+        </span>
+      ),
+    },
     { name: "Operator", address: r.config.operator, a: ACCOUNT_ROLES.operator, does: "Registers guarantees and pays claims, within the caps." },
-    { name: "MUTAV capital wallet", address: r.config.mutavCapitalWallet, a: ACCOUNT_ROLES.capital, does: "Requests deposits and redemptions through the queue, like any allowlisted wallet." },
+    { name: "MUTAV capital wallet", address: r.config.mutavCapitalWallet, a: ACCOUNT_ROLES.capital, does: "Requests deposits and redemptions through the queue, like any approved wallet." },
   ];
 
   // The root every account below derives from: always visible.
@@ -85,8 +101,8 @@ export function Accounts({ r }: { r: ReserveView }) {
       title: "Money accounts",
       open: true,
       rows: [
-        { name: "Income inbox", address: r.incomeInbox.address, a: ACCOUNT_ROLES.incomeInbox },
-        { name: "Treasury account", address: r.config.treasuryAccount, a: ACCOUNT_ROLES.treasury },
+        { name: "Issuer income account", address: r.incomeInbox.address, a: ACCOUNT_ROLES.incomeInbox },
+        { name: "MUTAV fee account", address: r.config.treasuryAccount, a: ACCOUNT_ROLES.treasury },
         { name: "Payments account", address: r.config.paymentsAccount, a: ACCOUNT_ROLES.payments },
       ],
     },
@@ -101,12 +117,12 @@ export function Accounts({ r }: { r: ReserveView }) {
     },
     {
       id: "token",
-      title: "Token accounts and escrows",
+      title: "Token accounts and the line",
       rows: [
         { name: "Reserve token account", address: r.addresses.reserve, a: P },
-        { name: "Pending deposits escrow", address: r.addresses.pendingDeposits, a: P },
-        { name: "Pending redemptions escrow", address: r.addresses.pendingRedemptions, a: P },
-        { name: "Filled redemptions escrow", address: r.addresses.claims, a: P },
+        { name: "Deposits waiting in line", address: r.addresses.pendingDeposits, a: P },
+        { name: "Redemptions waiting in line", address: r.addresses.pendingRedemptions, a: P },
+        { name: "Collection account (redeemed BRS)", address: r.addresses.claims, a: P },
       ],
     },
     {
@@ -123,16 +139,14 @@ export function Accounts({ r }: { r: ReserveView }) {
     <div className="flex flex-col gap-8">
       {/* [B] Hero: who signs. One strip, 1px dividers, full addresses. */}
       <div className="flex flex-col gap-3">
-        <h3 id="accounts-signers" className={LABEL} style={LABEL_STYLE}>
-          Who signs
-        </h3>
+        <BlockHead id="accounts-signers" title="Who signs" />
         <ul aria-labelledby="accounts-signers" className="bg-(--color-border) m-0 grid list-none grid-cols-1 gap-px border p-0 md:grid-cols-2">
           {signers.map((s) => (
             <li key={s.name} className="bg-(--color-surface) flex flex-col gap-4 p-6">
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                   <span className="font-display text-(--color-text) text-base font-bold">{s.name}</span>
-                  <Owner a={s.a} />
+                  {s.tag ?? <Owner a={s.a} />}
                 </div>
                 <span className="font-body text-(--color-text-2) text-sm">{s.does}</span>
               </div>
@@ -144,11 +158,7 @@ export function Accounts({ r }: { r: ReserveView }) {
 
       {/* [E] Detail: the program, then every account it uses, grouped by job. */}
       <div className="flex flex-col gap-3">
-        <div className="bg-(--color-surface) border-l-(--color-text-3) border border-l-2 px-6 py-3">
-          <h3 id="accounts-all" className="font-body text-(--color-text) m-0 text-sm font-medium">
-            Every account
-          </h3>
-        </div>
+        <BlockHead id="accounts-all" title="Every account" />
 
         <div className="flex flex-col border" aria-labelledby="accounts-all" role="group">
           <ul className="bg-(--color-surface) m-0 list-none border-b p-0">
@@ -157,8 +167,7 @@ export function Accounts({ r }: { r: ReserveView }) {
           {groups.map((g, gi) => (
             <details key={g.id} open={g.open} className={`group ${gi < groups.length - 1 ? "border-b" : ""}`}>
               <summary className="font-body text-(--color-text-2) hover:text-(--color-text) flex cursor-pointer list-none items-center gap-3 px-6 py-3 [&::-webkit-details-marker]:hidden">
-                <span aria-hidden="true" className="font-mono text-(--color-text-3) inline-block w-3 group-open:hidden">+</span>
-                <span aria-hidden="true" className="font-mono text-(--color-text-3) hidden w-3 group-open:inline-block">−</span>
+                <PlusMark />
                 <span id={`accounts-${g.id}`} className={LABEL} style={LABEL_STYLE}>
                   {g.title}
                 </span>

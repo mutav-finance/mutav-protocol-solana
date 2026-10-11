@@ -3,12 +3,12 @@
 /**
  * /reserve Overview answers one question: "Can the reserve cover every open
  * guarantee?" Main column, top to bottom:
- *   1. Hero: stable assets, their share of what is required, four figures
- *      that open their tab, and the program state.
- *   2. Where the capital sits: stable assets split by what they back.
+ *   1. Hero: the reserve balance, one status line against what it must hold,
+ *      four figures that open their tab, and what the program has open.
+ *   2. Where the capital sits: the reserve balance split by what it backs.
  *   3. What never changes: the two spec promises.
- * Side column: the latest movements of the ledger, then stable assets over
- * time rebuilt from those movements.
+ * Side column: the latest movements of the ledger, then the reserve balance
+ * over time rebuilt from those movements.
  * Renders on-chain values from /api/ledger; nothing beyond sums and shares.
  */
 import type { ReactNode } from "react";
@@ -18,15 +18,16 @@ import { Explorer } from "@/components/Explorer";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { useReserve } from "@/components/reserve/ReserveShell";
 import { HistoryChart } from "@/components/reserve/HistoryChart";
+import { HeroAmount, Lead, fmtAgo } from "@/components/reserve/sections/shared";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
-import { fmtBps, fmtDuration, fmtNav, fmtRatio } from "@/lib/format";
+import { fmtBps, fmtNav, fmtPct, fmtRatio } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, claimsTimeline, coverageRows, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
 
 /** The two promises the spec makes, each linked to the view that shows them. */
 const PROMISES: [string, string, string, string][] = [
   ["Claim payments are never blocked by solvency.", "The gate stops new guarantees and redemptions only.", "/reserve/claims", "See claims"],
-  ["Capital requests need an approved wallet.", "Deposits and redemptions are gated by an on-chain allowlist (KYC off-chain).", "/reserve/risks", "Read the risks"],
+  ["Capital requests need an approved wallet.", "An on-chain allowlist gates deposits and redemptions (KYC off-chain). Every approved wallet waits in the same line.", "/reserve/capital#queue", "See the capital queue"],
 ];
 
 const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" } as const;
@@ -39,11 +40,18 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 const abs = (v: bigint) => (v < 0n ? -v : v);
 const share = (part: bigint, whole: bigint) => (whole === 0n ? "—" : fmtBps(Number((part * 10_000n) / whole)));
 
+/** `a` as a multiple of `b`, one decimal, rounded down: 23.6×. */
+function multiple(a: bigint, b: bigint): string {
+  if (b === 0n) return "—";
+  const tenths = (a * 10n) / b;
+  return `${(tenths / 10n).toLocaleString("en-US")}.${(tenths % 10n).toString()}×`;
+}
+
 /** Inter Medium 12px caps label (STYLE.md card label), with an optional definition tooltip. */
-function Label({ children, tip, dim }: { children: string; tip?: string; dim?: boolean }) {
+function Label({ children, tip }: { children: string; tip?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className={`font-body text-xs font-medium uppercase ${dim ? "text-(--color-text-3)" : "text-(--color-text-2)"}`} style={{ letterSpacing: "0.01em" }}>
+      <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>
         {children}
       </span>
       {tip && (
@@ -86,6 +94,32 @@ export function Overview() {
 
 // ── 1 · Hero ────────────────────────────────────────────────────────────────
 
+const ALL_OPS = ["guarantees", "deposits", "redemptions"] as const;
+
+/** What the program has open, in one plain line; when something is stopped, it says what and why. */
+function programLine(r: ReserveView): { text: string; fine: boolean } {
+  const stopped = new Set<string>();
+  const why: string[] = [];
+  if (r.config.paused) {
+    ALL_OPS.forEach((x) => stopped.add(x));
+    why.push("paused");
+  }
+  if (r.state.mode !== 0) {
+    stopped.add("guarantees");
+    stopped.add("redemptions");
+    why.push("under-covered");
+  }
+  if (r.state.fulfilHalted) {
+    stopped.add("deposits");
+    stopped.add("redemptions");
+    why.push("queue fills halted");
+  }
+  if (stopped.size === 0) return { text: "All open: guarantees, deposits, redemptions.", fine: true };
+  const open = ALL_OPS.filter((x) => !stopped.has(x));
+  const list = ALL_OPS.filter((x) => stopped.has(x)).join(", ");
+  return { text: `Stopped: new ${list} (${why.join("; ")}).${open.length ? ` Open: ${open.join(", ")}.` : ""} Claim payments are never stopped.`, fine: false };
+}
+
 function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
   const fmtBrs = useFmt();
   const s = r.state;
@@ -94,52 +128,57 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
   const status = covered ? "var(--color-success)" : "var(--color-error)";
   const ratio = fmtRatio(sol.stableAssets, sol.coverageRequired);
   const noCover = sol.coverageRequired === 0n;
-  const comparison = noCover
-    ? "No cover outstanding."
-    : covered
-      ? `Against ${fmtBrs(sol.coverageRequired)} required.`
-      : `Short ${fmtBrs(sol.coverageRequired - sol.stableAssets)} of what is required. New guarantees and redemptions are stopped; claim payments are not.`;
+  const statusLine = noCover ? (
+    <>
+      <span className="text-(--color-text) font-semibold">Covered:</span> no cover outstanding.
+    </>
+  ) : covered ? (
+    <>
+      <span className="text-(--color-text) font-semibold">Covered:</span> holds <Mono style={{ ...NUM, color: "var(--color-text)" }}>{multiple(sol.stableAssets, sol.coverageRequired)}</Mono> the{" "}
+      <Mono style={{ ...NUM, color: "var(--color-text)" }}>{fmtBrs(sol.coverageRequired)}</Mono> it must hold.
+    </>
+  ) : (
+    <>
+      <span className="font-semibold">Short {fmtBrs(sol.coverageRequired - sol.stableAssets)} of what it must hold.</span> New guarantees and redemptions are stopped; claim payments are not.
+    </>
+  );
 
   const active = coverageRows(l.guarantees).filter((g) => g.active);
   const agencies = new Set(active.map((g) => g.agencyId)).size;
   const awaiting = claimsTimeline(l, r.config.payoutSlaSecs, r.now).filter((c) => c.stage === "filed").length;
 
   const kpis: { label: string; value: string; def: string; href?: string }[] = [
-    { label: "Coverage ratio", value: ratio, def: "Stable assets held against the cover the reserve must hold." },
-    { label: "NAV per share", value: fmtNav(s.navPerShare), def: "What each share is worth, after open claims are set aside." },
+    { label: "Free capital", value: fmtBrs(sol.freeCapital), def: "Free for new guarantees and redemptions." },
+    { label: "Share price", value: fmtNav(s.navPerShare), def: "What each share is worth, after claims are set aside." },
     {
       label: "Remaining cover",
       value: fmtBrs(s.remainingCoverTotal),
       def: `Still guaranteed on ${plural(active.length, "active guarantee")} at ${plural(agencies, "agency", "agencies")}.`,
       href: "/reserve/coverage",
     },
-    { label: "Open provisions", value: fmtBrs(s.provisions), def: `Set aside for ${plural(awaiting, "claim")} filed and not yet paid.`, href: "/reserve/claims" },
+    { label: "Set aside for claims", value: fmtBrs(s.provisions), def: `For ${plural(awaiting, "claim")} filed, not yet paid.`, href: "/reserve/claims" },
   ];
 
-  const ok = "var(--color-success)";
-  const stop = "var(--color-error)";
-  const badges: [string, boolean][] = [
-    [`${s.mode === 0 ? "NORMAL" : "UNDERCOVERED"} MODE`, s.mode === 0],
-    [s.fulfilHalted ? "QUEUE FILLS HALTED" : "QUEUE FILLS OPEN", !s.fulfilHalted],
-    [r.config.paused ? "PAUSED" : "NOT PAUSED", !r.config.paused],
-  ];
+  const program = programLine(r);
 
   return (
     <section aria-label="Reserve health" className="flex flex-col gap-6">
-      <div role="status" aria-label={`Coverage status: ${covered ? "COVERED" : "UNDER-COVERED"}, ratio ${ratio}`} className="flex flex-col gap-3">
-        <Label tip="BRS in the reserve token account. Excludes pending deposits and assets owed to filled redemptions.">Stable assets in the reserve</Label>
-        <Mono style={{ ...NUM, fontSize: "clamp(40px, 6vw, 64px)", fontWeight: 700, lineHeight: 1, letterSpacing: "-0.03em", color: "var(--color-text)" }}>{fmtBrs(sol.stableAssets)}</Mono>
-        <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-          {!noCover && (
-            <span className="inline-flex items-center gap-2">
-              <Dot color={status} />
-              <Mono style={{ ...NUM, fontSize: 13, color: status }}>{ratio} of required</Mono>
-            </span>
-          )}
-          <span className="font-body" style={{ color: covered ? "var(--color-text-2)" : "var(--color-error)" }}>
-            {comparison}
+      <div role="status" aria-label={`Coverage status: ${covered ? "COVERED" : "UNDER-COVERED"}, ratio ${ratio}`}>
+        {/* The one amber figure of the view. */}
+        <HeroAmount
+          phrase="Reserve balance"
+          tip="BRS in the reserve token account. Deposits waiting in line and BRS owed to filled redemptions are not counted."
+          value={fmtBrs(sol.stableAssets)}
+          color="var(--color-accent)"
+          size="clamp(44px, 6.5vw, 72px)"
+        >
+          <span className="relative top-[-1px] inline-flex">
+            <Dot color={status} />
           </span>
-        </span>
+          <span className="font-body leading-relaxed" style={{ color: covered ? "var(--color-text-2)" : "var(--color-error)" }}>
+            {statusLine}
+          </span>
+        </HeroAmount>
       </div>
 
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
@@ -167,15 +206,12 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
         })}
       </div>
 
-      <div role="group" aria-label="Program state" className="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <Label dim>Program state</Label>
-        {badges.map(([label, fine]) => (
-          <span key={label} className="inline-flex items-center gap-2">
-            <Dot color={fine ? ok : stop} />
-            <Mono style={{ fontSize: 11, letterSpacing: "0.06em", color: fine ? "var(--color-text-2)" : "var(--color-text)" }}>{label}</Mono>
-          </span>
-        ))}
-      </div>
+      <p role="group" aria-label="Program state" className="font-body m-0 flex items-baseline gap-2.5 text-[13px]">
+        <span className="relative top-[-1px] inline-flex">
+          <Dot color={program.fine ? "var(--color-success)" : "var(--color-error)"} />
+        </span>
+        <span style={{ color: program.fine ? "var(--color-text-2)" : "var(--color-text)" }}>{program.text}</span>
+      </p>
     </section>
   );
 }
@@ -218,15 +254,14 @@ function Donut({ parts, axis, center, centerLabel, centerColor }: { parts: [bigi
 
 type SplitRow = { label: string; sub: string; value: bigint; color: string; outline?: boolean; negative?: boolean };
 
-function splitRows(c: CapitalSplit, filed: number, coverageRatioBps: number, remainingCover: bigint, fmtBrs: (b: bigint) => string): SplitRow[] {
+function splitRows(c: CapitalSplit, filed: number, coverageRatioBps: number): SplitRow[] {
   const under = c.shortfall > 0n;
   const rows: SplitRow[] = [
-    { label: "Committed to open claims", sub: filed ? `provisions on ${plural(filed, "filed claim")}, already out of NAV` : "provisions, booked when a claim is filed", value: c.provisions, color: PROVISION },
+    { label: "Set aside for claims", sub: filed ? `${plural(filed, "claim")} filed, not yet paid` : "booked when a claim is filed", value: c.provisions, color: PROVISION },
   ];
-  if (!under || c.restRequired > 0n)
-    rows.push({ label: "Rest of coverage required", sub: `${fmtBps(coverageRatioBps)} of ${fmtBrs(remainingCover)} remaining cover, beyond provisions`, value: c.restRequired, color: REST });
+  if (!under || c.restRequired > 0n) rows.push({ label: "Required buffer", sub: `rest of the ${fmtPct(coverageRatioBps)} held on remaining cover`, value: c.restRequired, color: REST });
   if (c.earmark > 0n) rows.push({ label: "Buffer earmark", sub: "surplus held back from free capital", value: c.earmark, color: EARMARK });
-  rows.push({ label: "Free capital", sub: under ? "nothing free while under-covered" : "for new guarantees and redemptions", value: c.freeCapital, color: FREE });
+  rows.push({ label: "Free capital", sub: under ? "nothing free while under-covered" : "Free for new guarantees and redemptions.", value: c.freeCapital, color: FREE });
   if (under) rows.push({ label: "Shortfall", sub: "required, not held", value: c.shortfall, color: SHORT, outline: true, negative: true });
   return rows;
 }
@@ -236,18 +271,18 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
   const c = capitalSplit(r.solvency, r.state.provisions);
   const under = c.shortfall > 0n;
   const filed = claimsTimeline(l, r.config.payoutSlaSecs, r.now).filter((x) => x.stage === "filed").length;
-  const rows = splitRows(c, filed, r.config.coverageRatioBps, r.state.remainingCoverTotal, fmtBrs);
+  const rows = splitRows(c, filed, r.config.coverageRatioBps);
   const committed = c.provisions + c.restRequired;
 
   const pending = capitalQueue(r.state, l).deposits.reduce((s, x) => s + x.waiting, 0n);
-  const outside = [pending > 0n && `${fmtBrs(pending)} pending deposits (escrow)`, r.incomeInbox.amount > 0n && `${fmtBrs(r.incomeInbox.amount)} in the income inbox, until swept`].filter(Boolean);
+  const outside = [pending > 0n && `${fmtBrs(pending)} deposits in line`, r.incomeInbox.amount > 0n && `${fmtBrs(r.incomeInbox.amount)} issuer income to sweep in`].filter(Boolean);
 
   const head = under
     ? {
         label: "Shortfall",
         value: `−${fmtBrs(c.shortfall)}`,
         color: SHORT,
-        note: "Every BRS held is committed. New guarantees and redemptions are stopped until the reserve covers what is required; claim payments are not.",
+        note: "Every BRS held is committed. New guarantees and redemptions are stopped until the reserve holds what it must; claim payments are not.",
       }
     : {
         label: "Free capital",
@@ -255,8 +290,8 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
         color: "var(--color-text)",
         note:
           committed === 0n
-            ? "Nothing is committed. All of it can back new guarantees and redemptions."
-            : `${fmtBrs(committed)} is committed${c.provisions > 0n ? `: ${fmtBrs(c.provisions)} to ${plural(filed, "filed claim")}, ${fmtBrs(c.restRequired)} to the rest of the coverage required` : " to the coverage required"}.${c.earmark > 0n ? ` ${fmtBrs(c.earmark)} is held as the buffer earmark.` : ""} The rest can back new guarantees and redemptions.`,
+            ? "Nothing is committed. All of it is free for new guarantees and redemptions."
+            : `${fmtBrs(committed)} is committed to claims and cover.${c.earmark > 0n ? ` ${fmtBrs(c.earmark)} is held back as the buffer earmark.` : ""} The rest is free for new guarantees and redemptions.`,
       };
 
   const grid = "grid grid-cols-[minmax(0,1fr)_auto_72px] items-center gap-x-6 gap-y-1 border-t px-6 py-3.5 sm:px-8";
@@ -264,7 +299,7 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
     <section aria-labelledby="capital-h" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <H3 id="capital-h">Where the capital sits</H3>
-        <span className="font-body text-(--color-text-2) text-[13px]">Stable assets split by what they are committed to. Free capital gates new guarantees and redemptions, never a claim payment.</span>
+        <span className="font-body text-(--color-text-2) text-[13px]">What the reserve&apos;s assets back today.</span>
       </div>
       <div className="bg-(--color-surface) flex flex-col border">
         <div className="flex flex-wrap items-center gap-x-12 gap-y-8 p-6 sm:p-8">
@@ -297,12 +332,12 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
           </div>
         ))}
         <div className={`${grid} bg-(--color-surface-2) [border-color:#3A3D44]`}>
-          <span className="font-body text-(--color-text) text-[13px] font-medium">Stable assets</span>
+          <span className="font-body text-(--color-text) text-[13px] font-medium">Reserve balance</span>
           <Mono style={{ ...NUM, fontSize: 14, fontWeight: 700, textAlign: "right", color: "var(--color-text)" }}>{fmtBrs(c.stableAssets)}</Mono>
           <Mono style={{ ...NUM, fontSize: 12, textAlign: "right", color: "var(--color-text-2)" }}>100%</Mono>
         </div>
       </div>
-      {outside.length > 0 && <Mono style={{ ...NUM, fontSize: 11, color: "var(--color-text-3)" }}>Not counted until they land: {outside.join(" · ")}.</Mono>}
+      {outside.length > 0 && <Mono style={{ ...NUM, fontSize: 11, color: "var(--color-text-3)" }}>Not yet in the reserve: {outside.join(" · ")}.</Mono>}
     </section>
   );
 }
@@ -316,9 +351,10 @@ function Promises() {
       <ol className="m-0 grid gap-4 p-0" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))" }}>
         {PROMISES.map(([text, note, href, cta], i) => (
           <li key={href} className="bg-(--color-surface) flex list-none flex-col gap-2 border p-6">
-            <Mono style={{ ...NUM, fontSize: 12, color: "var(--color-accent)" }}>{String(i + 1).padStart(2, "0")}</Mono>
-            <span className="font-body text-(--color-text) text-sm font-medium text-pretty">{text}</span>
-            <span className="font-body text-(--color-text-2) text-[13px]">{note}</span>
+            <Mono style={{ ...NUM, fontSize: 12, color: "var(--color-text-3)" }}>{String(i + 1).padStart(2, "0")}</Mono>
+            <Lead lead={text} className="text-sm">
+              {note}
+            </Lead>
             <Link href={href} className="ext-link font-body mt-1 self-start text-xs">
               {cta} →
             </Link>
@@ -364,21 +400,23 @@ function RecentActivity({ r, rows }: { r: ReserveView; rows: FlowRow[] }) {
 function ActivityRow({ x, now, rpc, last }: { x: FlowRow; now: bigint; rpc: string; last: boolean }) {
   const fmtBrs = useFmt();
   const into = x.reserveDelta >= 0n;
+  // A bare "slot N" says nothing to a reader; the slot stays in the hover title (as in the ledger).
+  const slotOnly = /^slot \d+$/.test(x.detail);
   return (
     <li className="grid list-none grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3.5 py-3" style={{ borderBottom: last ? "none" : "1px solid var(--color-border)" }}>
       <span aria-hidden="true" className="bg-(--color-surface-2) inline-flex size-9 items-center justify-center border">
         <Mono style={{ fontSize: 14, color: "var(--color-text-2)" }}>{into ? "↓" : "↑"}</Mono>
       </span>
-      <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="flex min-w-0 flex-col gap-0.5" title={slotOnly ? x.detail : undefined}>
         <span className="font-body text-(--color-text) text-[13px]">{FLOW_LABEL[x.kind]}</span>
-        <Mono style={{ ...NUM, fontSize: 11, color: "var(--color-text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.detail}</Mono>
+        {!slotOnly && <Mono style={{ ...NUM, fontSize: 11, color: "var(--color-text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.detail}</Mono>}
       </span>
       <span className="flex flex-col items-end gap-0.5">
         <Mono style={{ ...NUM, fontSize: 13, color: "var(--color-text)" }}>
           {into ? "+" : "−"}
           {fmtBrs(abs(x.reserveDelta))}
         </Mono>
-        <Explorer value={x.account} kind={x.isTx ? "tx" : "address"} rpc={rpc} label={x.at === null ? "open" : `${fmtDuration(now - x.at)} ago`} />
+        <Explorer value={x.account} kind={x.isTx ? "tx" : "address"} rpc={rpc} label={x.at === null ? "open" : fmtAgo(now, x.at)} />
       </span>
     </li>
   );

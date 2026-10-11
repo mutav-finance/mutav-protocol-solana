@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * /reserve · Claims detail table: five reading columns plus a Details toggle.
+ * /reserve · Claims detail table: five reading columns plus a chevron; the
+ * whole row opens its detail.
  * Timestamps, explorer links and the leg live in the expand row (progressive
  * disclosure), so the main row reads as status → guarantee → amount → speed.
- * Exceptions (late, past SLA) sort first, then newest filing.
+ * Exceptions (paid late, past the deadline) sort first, then newest filing.
  */
 import { Fragment, useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
@@ -18,18 +19,18 @@ import { Num, Table, short } from "@/components/reserve/sections/shared";
 const PAGE = 10;
 
 const TIPS = {
-  SLA: "The settlement deadline set by the Reserve Admin. A payment not settled in time is marked late on-chain at the next refresh.",
+  Status: "Against the deadline to reach the landlord, set by the Reserve Admin. A payment not received in time is marked paid late on-chain at the next refresh.",
   "Filed → paid": "From when the claim was filed to when it was paid.",
-  "Paid → settled": "From payment to settlement by PIX.",
+  "Paid → settled": "From payment to the landlord receiving it by PIX.",
 };
 
 type Status = { label: string; color: string; title?: string; rank: number };
 
-/** SLA status of one claim: late (recorded on-chain), past SLA (not yet recorded), awaiting payment, or on time. */
+/** Status of one claim against the deadline: paid late (recorded on-chain), past the deadline (not yet recorded), awaiting payment, or on time. */
 export function slaStatus(c: ClaimRow): Status {
-  if (c.lateOnChain) return { label: "late", color: "var(--color-error)", rank: 0 };
-  if (c.overdue) return { label: "past SLA", color: "var(--color-copper)", title: "Marked late on-chain at the next refresh.", rank: 1 };
-  if (c.stage === "filed") return { label: "awaiting payment", color: "var(--color-text-3)", title: "Filed, not paid yet. The settlement deadline starts at payment.", rank: 2 };
+  if (c.lateOnChain) return { label: "paid late", color: "var(--color-error)", rank: 0 };
+  if (c.overdue) return { label: "past deadline", color: "var(--color-copper)", title: "Marked paid late on-chain at the next refresh.", rank: 1 };
+  if (c.stage === "filed") return { label: "awaiting payment", color: "var(--color-text-3)", title: "Filed, not paid yet. The deadline to reach the landlord starts at payment.", rank: 2 };
   return { label: "on time", color: "var(--color-text-3)", rank: 3 };
 }
 
@@ -69,13 +70,20 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Table label="Claims timeline" head={["SLA", "Guarantee", ["Amount", "num"], ["Filed → paid", "num"], ["Paid → settled", "num"], ["Details", "num"]]} tips={TIPS}>
+      <Table label="Claims timeline" head={["Status", "Guarantee", ["Amount", "num"], ["Filed → paid", "num"], ["Paid → settled", "num"], ["Details", "num"]]} tips={TIPS}>
         {visible.map((c) => {
           const isOpen = open.has(c.filing);
           const detailId = `claim-${c.filing}`;
           return (
             <Fragment key={c.filing}>
-              <tr>
+              <tr
+                className="cursor-pointer hover:bg-(--color-surface-2)"
+                onClick={(e) => {
+                  // Links and the chevron button handle their own clicks.
+                  if ((e.target as HTMLElement).closest("a, button")) return;
+                  toggle(c.filing);
+                }}
+              >
                 <td><StatusBadge s={slaStatus(c)} /></td>
                 <td>
                   <span className="inline-flex items-baseline gap-2">
@@ -87,8 +95,19 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                 <Num>{c.fileToPay !== null ? fmtDuration(c.fileToPay) : "—"}</Num>
                 <Num>{c.payToSettle !== null ? fmtDuration(c.payToSettle) : c.paidAt !== null ? "pending" : "—"}</Num>
                 <td className="num">
-                  <Button type="button" variant="ghost" size="sm" aria-expanded={isOpen} aria-controls={detailId} onClick={() => toggle(c.filing)} className="font-body text-2xs">
-                    {isOpen ? "Hide" : "Show"}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-expanded={isOpen}
+                    aria-controls={isOpen ? detailId : undefined}
+                    aria-label={`${isOpen ? "Hide" : "Show"} details of the claim on ${short(c.guaranteeId)}`}
+                    onClick={() => toggle(c.filing)}
+                    className="text-(--color-text-3) hover:text-(--color-text) h-6 w-6 px-0 font-mono"
+                  >
+                    <span aria-hidden="true" className={`inline-block transition-transform duration-150 motion-reduce:transition-none ${isOpen ? "rotate-90" : ""}`}>
+                      ›
+                    </span>
                   </Button>
                 </td>
               </tr>
@@ -100,7 +119,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                         <Explorer value={c.filing} label={fmtTime(c.filedAt)} />
                       </Detail>
                       <Detail label="Paid">{c.payout && c.paidAt !== null ? <Explorer value={c.payout} label={fmtTime(c.paidAt)} /> : <span className="font-body text-(--color-text-3)">not paid yet</span>}</Detail>
-                      <Detail label="Settled by PIX">
+                      <Detail label="Received by landlord (PIX)">
                         {c.settledAt !== null ? <Mono style={{ fontSize: 12 }}>{fmtTime(c.settledAt)}</Mono> : <span className="font-body text-(--color-text-3)" style={{ fontSize: 12 }}>pending</span>}
                       </Detail>
                       <Detail label="Guarantee">

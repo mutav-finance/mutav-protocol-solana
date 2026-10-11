@@ -50,3 +50,114 @@ export const Num = ({ children, color }: { children: ReactNode; color?: string }
   </td>
 );
 
+/** Splits a formatted amount into currency sign, whole part and decimals: "R$ ", "28,300", ".00". */
+export function moneyParts(s: string): [string, string, string] {
+  const m = /^([^\d]*)(\d[\d,.\s]*?)([.,]\d{2})?([^\d]*)$/.exec(s);
+  if (!m) return ["", s, ""];
+  return [m[1] ?? "", m[2] ?? "", `${m[3] ?? ""}${m[4] ?? ""}`];
+}
+
+/**
+ * A tab's hero figure: an uppercase display phrase, the amount in the display
+ * face at weight 800 (a deliberate exception to mono, for the hero only) with
+ * the sign and decimals at 0.55em in text-2, then a context line after a 1px
+ * rule. One amber hero per view; the others pass `color` text.
+ */
+export function HeroAmount({ phrase, tip, value, color = "var(--color-text)", size = "clamp(40px, 5vw, 60px)", children }: { phrase: string; tip?: ReactNode; value: string; color?: string; size?: string; children?: ReactNode }) {
+  const [sign, whole, cents] = moneyParts(value);
+  const small = { fontSize: "0.55em", color: "var(--color-text-2)", letterSpacing: 0 } as const;
+  return (
+    <div className="flex flex-col gap-3">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="font-display text-(--color-text) text-[15px] font-extrabold uppercase" style={{ letterSpacing: "0.02em" }}>
+          {phrase}
+        </span>
+        {tip && (
+          <InfoTooltip label={`Info: ${phrase}`} width={240}>
+            {tip}
+          </InfoTooltip>
+        )}
+      </span>
+      <span className="font-display" style={{ fontVariantNumeric: "tabular-nums", fontSize: size, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em", color, overflowWrap: "anywhere" }}>
+        {sign && <span style={small}>{sign}</span>}
+        {whole}
+        {cents && <span style={small}>{cents}</span>}
+      </span>
+      {children && <div className="flex max-w-[640px] items-baseline gap-2.5 border-t pt-3 text-sm">{children}</div>}
+    </div>
+  );
+}
+
+/** Seconds in plain words: "5 days", "3 hours", "12 minutes". */
+export function fmtSpan(secs: bigint): string {
+  const s = secs < 0n ? 0n : secs;
+  const unit = (n: bigint, one: string) => `${n} ${one}${n === 1n ? "" : "s"}`;
+  if (s >= 86_400n) return unit(s / 86_400n, "day");
+  if (s >= 3_600n) return unit(s / 3_600n, "hour");
+  if (s >= 60n) return unit(s / 60n, "minute");
+  return "under a minute";
+}
+
+/** How long before `now` a timestamp was: "5 days ago", "just now". */
+export const fmtAgo = (now: bigint, at: bigint) => (now - at < 60n ? "just now" : `${fmtSpan(now - at)} ago`);
+
+/**
+ * Block heading inside a tab. One style for every block: a plain heading, an
+ * optional one-line note under it, an optional control on the right.
+ */
+export function BlockHead({ id, title, note, aside }: { id?: string; title: ReactNode; note?: ReactNode; aside?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+      <div className="flex max-w-[720px] min-w-0 flex-col gap-1">
+        <h3 id={id} className="font-display text-(--color-text) m-0 text-base font-bold">
+          {title}
+        </h3>
+        {note && <p className="font-body text-(--color-text-2) m-0 text-sm leading-relaxed">{note}</p>}
+      </div>
+      {aside}
+    </div>
+  );
+}
+
+/** Helper text with a bold lead: the first phrase in text colour, the rest in text-2. */
+export function Lead({ lead, children, className = "text-[13px]" }: { lead: string; children?: ReactNode; className?: string }) {
+  return (
+    <span className={`font-body text-(--color-text-2) leading-relaxed text-pretty ${className}`}>
+      <span className="text-(--color-text) font-semibold">{lead}</span>
+      {children ? <> {children}</> : null}
+    </span>
+  );
+}
+
+/**
+ * Mount-only motion for bars, compositor-only (transform). `.mv-grow` grows
+ * one bar from its left edge; `.mv-grow-bars` does the same for the chart
+ * bars inside it (right-aligned tracks grow from the right). Off under
+ * reduced motion.
+ */
+const MOTION_CSS = `
+@keyframes mv-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.mv-grow, .mv-grow-bars .chart-bar { transform-origin: left center; animation: mv-grow 400ms cubic-bezier(0.2, 0, 0, 1) both; }
+.mv-grow-bars [style*="flex-end"] > .chart-bar { transform-origin: right center; }
+@media (prefers-reduced-motion: reduce) { .mv-grow, .mv-grow-bars .chart-bar { animation: none; } }
+`;
+
+/** Render once per view that uses `.mv-grow`; React hoists and dedupes it by `href`. */
+export function MotionStyle() {
+  return (
+    <style href="mv-reserve-motion" precedence="default">
+      {MOTION_CSS}
+    </style>
+  );
+}
+
+/** The "+" of an expander: turns 45° (into a ×) when open. Inside a `group` <details>, leave `open` unset. */
+export function PlusMark({ open }: { open?: boolean }) {
+  const turn = open === undefined ? "group-open:rotate-45" : open ? "rotate-45" : "";
+  return (
+    <span aria-hidden="true" className={`font-mono text-(--color-text-3) inline-block w-3 text-center transition-transform duration-150 motion-reduce:transition-none ${turn}`}>
+      +
+    </span>
+  );
+}
+

@@ -10,13 +10,12 @@
 import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
-import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { fmtShares, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, type Ledger, type QueueRow, type ReserveView } from "@/lib/view";
 
-import { Empty, Num, Table } from "@/components/reserve/sections/shared";
+import { BlockHead, Empty, Num, PlusMark, Table, fmtAgo } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -37,6 +36,16 @@ const Sub = ({ children }: { children: ReactNode }) => <span className="font-mon
 /** One plain-English definition line under a headline figure (body font). */
 const Def = ({ children }: { children: ReactNode }) => <span className="font-body text-(--color-text-2) text-xs leading-snug">{children}</span>;
 
+/** 6px-square badge with a mono label; `mark` colours the square only. */
+const Badge = ({ mark, label }: { mark: string; label: string }) => (
+  <span className="inline-flex items-center gap-2">
+    <span aria-hidden="true" className="inline-block size-1.5 shrink-0" style={{ background: mark }} />
+    <span className="font-mono text-(--color-text-2) text-xs font-medium" style={{ letterSpacing: "0.06em" }}>
+      {label}
+    </span>
+  </span>
+);
+
 /** One support cell: label, one value, one definition line. */
 function Cell({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
@@ -49,7 +58,7 @@ function Cell({ label, value, sub }: { label: string; value: string; sub: string
 }
 
 /** [B + C] Hero (BRS waiting to deposit) and a three-cell support strip, sharing one border. */
-function Summary({ deposits, redeems, capital, owed }: { deposits: QueueRow[]; redeems: QueueRow[]; capital: string; owed: bigint }) {
+function Summary({ deposits, redeems, capital, owed, now }: { deposits: QueueRow[]; redeems: QueueRow[]; capital: string; owed: bigint; now: bigint }) {
   const fmtBrs = useFmt();
   const all = [...deposits, ...redeems];
   const oldest = all.reduce<QueueRow | null>((m, x) => (m === null || x.requestedAt < m.requestedAt ? x : m), null);
@@ -59,12 +68,12 @@ function Summary({ deposits, redeems, capital, owed }: { deposits: QueueRow[]; r
       <div className="bg-(--color-surface) flex min-w-0 flex-col justify-center gap-2 p-6 lg:col-span-5">
         <Label>Waiting to deposit</Label>
         <Mono style={{ fontSize: "clamp(36px, 5vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)", overflowWrap: "anywhere" }}>{fmtBrs(sum(deposits))}</Mono>
-        <span className="font-body text-(--color-text-2) text-sm">{deposits.length === 0 ? "No deposit is waiting." : `BRS held in escrow until the Reserve Admin fills it into the reserve: ${plural(deposits.length, "request", "requests")}, oldest first.`}</span>
+        <span className="font-body text-(--color-text-2) text-sm">{deposits.length === 0 ? "No deposit is waiting." : `${plural(deposits.length, "deposit", "deposits")} waiting. Filled in order.`}</span>
       </div>
       <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:col-span-7">
         <Cell label="Shares to redeem" value={fmtShares(sum(redeems))} sub={`Shares investors asked to turn back into BRS, in ${plural(redeems.length, "request", "requests")}.`} />
-        <Cell label="Oldest request" value={oldest ? fmtTime(oldest.requestedAt) : "none"} sub={oldest ? `The ${oldest.side === "deposit" ? "deposit" : "redemption"} waiting longest; it fills next on its side.` : "Nothing is waiting in either line."} />
-        <Cell label="Owed to redemptions" value={fmtBrs(owed)} sub="Filled, waiting in the claims account until the investor collects it. Outside stable assets." />
+        <Cell label="Oldest request" value={oldest ? fmtAgo(now, oldest.requestedAt) : "none"} sub={oldest ? `The ${oldest.side === "deposit" ? "deposit" : "redemption"} waiting longest; it fills next on its side.` : "Nothing is waiting in either line."} />
+        <Cell label="Ready to collect" value={fmtBrs(owed)} sub="Redeemed BRS not yet withdrawn." />
         <Cell label="MUTAV capital" value={`${ours} of ${all.length}`} sub="Requests from the MUTAV capital wallet. They wait in the same line, with no priority." />
       </div>
     </div>
@@ -72,7 +81,7 @@ function Summary({ deposits, redeems, capital, owed }: { deposits: QueueRow[]; r
 }
 
 /** [E] One FIFO line: position (NEXT badge on #1), owner, amount, requested, request account. */
-function Line({ title, empty, rows, unitHead, unit, capital }: { title: string; empty: string; rows: QueueRow[]; unitHead: string; unit: (v: bigint) => string; capital: string }) {
+function Line({ title, empty, rows, unitHead, unit, capital, now }: { title: string; empty: string; rows: QueueRow[]; unitHead: string; unit: (v: bigint) => string; capital: string; now: bigint }) {
   const [all, setAll] = useState(false);
   const shown = all ? rows : rows.slice(0, PAGE);
   return (
@@ -92,19 +101,21 @@ function Line({ title, empty, rows, unitHead, unit, capital }: { title: string; 
               <tr key={x.address}>
                 <td className="num" title={`seq ${x.seq.toString()}`}>
                   <span className="inline-flex items-center justify-end gap-3">
-                    {x.position === 1 && <StatusBadge color="var(--color-text-2)" label="NEXT" />}
+                    {x.position === 1 && <Badge mark="var(--color-accent)" label="NEXT" />}
                     <Mono>{x.position}</Mono>
                   </span>
                 </td>
                 <td>
                   <span className="inline-flex items-center gap-3">
                     <Explorer value={x.owner} />
-                    {x.owner === capital && <StatusBadge color="var(--color-text-3)" label="MUTAV" />}
+                    {x.owner === capital && <Badge mark="var(--color-text-3)" label="MUTAV" />}
                   </span>
                 </td>
                 <Num>{unit(x.waiting)}</Num>
                 <td>
-                  <Mono dim>{fmtTime(x.requestedAt)}</Mono>
+                  <span title={fmtTime(x.requestedAt)}>
+                    <Mono dim>{fmtAgo(now, x.requestedAt)}</Mono>
+                  </span>
                 </td>
                 <td>
                   <Explorer value={x.address} label="account" />
@@ -115,7 +126,7 @@ function Line({ title, empty, rows, unitHead, unit, capital }: { title: string; 
           {rows.length > PAGE && (
             <div className="border-t px-6 py-3">
               <Button type="button" variant="ghost" size="sm" onClick={() => setAll((v) => !v)}>
-                {all ? "Show first 10" : `Show all (${rows.length})`}
+                {all ? "Show fewer" : `Show all (${rows.length})`}
               </Button>
             </div>
           )}
@@ -131,24 +142,24 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
   const capital = r.config.mutavCapitalWallet;
   return (
     <div className="flex flex-col gap-6">
-      <Summary deposits={q.deposits} redeems={q.redeems} capital={capital} owed={r.state.claimableAssetsTotal} />
+      <Summary deposits={q.deposits} redeems={q.redeems} capital={capital} owed={r.state.claimableAssetsTotal} now={r.now} />
 
-      <div className="bg-(--color-surface) border-l-(--color-text-3) border border-l-2 px-6 py-3">
-        <p className="font-body text-(--color-text) m-0 text-sm font-medium">One line, oldest first. No request skips it.</p>
-      </div>
-
-      <div className="flex flex-col gap-6">
-        <Line title="Deposits" empty="No deposits waiting. New requests join the end of the line." rows={q.deposits} unitHead="Amount" unit={fmtBrs} capital={capital} />
-        <Line title="Redemptions" empty="No redemptions waiting. New requests join the end of the line." rows={q.redeems} unitHead="Shares" unit={fmtShares} capital={capital} />
+      <div className="flex flex-col gap-4">
+        <BlockHead title="Waiting in line" note="One line, oldest first. No request skips it." />
+        <Line title="Deposits" empty="No deposits waiting. New requests join the end of the line." rows={q.deposits} unitHead="Amount" unit={fmtBrs} capital={capital} now={r.now} />
+        <Line title="Redemptions" empty="No redemptions waiting. New requests join the end of the line." rows={q.redeems} unitHead="Shares" unit={fmtShares} capital={capital} now={r.now} />
       </div>
 
       {/* [F] Explanation below the data, collapsed. */}
-      <details className="group border-t pt-4">
-        <summary className="font-body text-(--color-text-2) hover:text-(--color-text) cursor-pointer text-sm font-medium">How the queue works</summary>
+      <details className="bg-(--color-surface) group border px-6 py-4">
+        <summary className="font-body text-(--color-text-2) hover:text-(--color-text) flex cursor-pointer list-none items-center gap-3 text-sm [&::-webkit-details-marker]:hidden">
+          <PlusMark />
+          How the queue works
+        </summary>
         <ol className="font-body text-(--color-text-2) m-0 mt-4 flex max-w-[720px] list-decimal flex-col gap-2 pl-5 text-sm leading-relaxed">
           <li>An allowlisted investor requests a deposit (BRS) or a redemption (shares).</li>
           <li>The Reserve Admin fills requests oldest first. No request skips the line.</li>
-          <li>The investor then collects their shares or BRS.</li>
+          <li>The investor then collects their shares or BRS from the collection account.</li>
         </ol>
       </details>
     </div>

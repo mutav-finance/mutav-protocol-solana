@@ -7,11 +7,12 @@
  */
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
+import { Lead } from "@/components/reserve/sections/shared";
 import type { ReserveView } from "@/lib/view";
 
 type Extra = { label: string; value: React.ReactNode; note?: string };
 
-function Card({ title, address, what, extra, rpc }: { title: string; address: string; what: string; extra?: Extra; rpc: string }) {
+function Card({ title, address, what, extra, rpc }: { title: string; address: string; what: [string, string]; extra?: Extra; rpc: string }) {
   return (
     <li className="bg-(--color-surface) flex min-w-0 list-none flex-col gap-3 border p-6">
       <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>
@@ -20,7 +21,7 @@ function Card({ title, address, what, extra, rpc }: { title: string; address: st
       <span className="min-w-0 text-sm">
         <Explorer value={address} rpc={rpc} />
       </span>
-      <span className="font-body text-(--color-text-2) text-[13px] leading-relaxed text-pretty">{what}</span>
+      <Lead lead={what[0]}>{what[1]}</Lead>
       {extra && (
         <span className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t pt-3">
           <span className="font-body text-(--color-text-3) text-xs">{extra.label}</span>
@@ -44,15 +45,15 @@ export function ProofCards({ r }: { r: ReserveView }) {
           title="Program"
           address={r.programId}
           rpc={rpc}
-          what="The code that enforces the reserve's rules. Every deposit, fee and claim payment runs through it."
-          extra={{ label: "Upgrade authority", value: <Explorer value={r.config.admin} rpc={rpc} />, note: "Squads multisig" }}
+          what={["The code that enforces the reserve's rules.", "Every deposit, fee and claim payment runs through it."]}
+          extra={{ label: "Upgrade authority", value: <Explorer value={r.config.admin} rpc={rpc} />, note: "Reserve Admin (Squads multisig)" }}
         />
-        <Card title="Reserve token account" address={r.addresses.reserve} rpc={rpc} what="Where the stable assets sit. Only the program can move them, and only by its rules." />
+        <Card title="Reserve token account" address={r.addresses.reserve} rpc={rpc} what={["Where the reserve balance sits.", "Only the program can move it, and only by its rules."]} />
         <Card
           title="BRS mint"
           address={r.token.mint}
           rpc={rpc}
-          what="The token the reserve holds: BRS, a stablecoin pegged to the Brazilian real."
+          what={["The token the reserve holds.", "BRS, a stablecoin pegged to the Brazilian real, from the BRS issuer (Nora)."]}
           extra={{
             label: "Freeze authority",
             value: r.token.freezeAuthority ? <Explorer value={r.token.freezeAuthority} rpc={rpc} /> : <Mono style={{ fontSize: 12 }}>none</Mono>,
