@@ -151,14 +151,16 @@ bun scripts/devnet/deploy.ts --config $CFG --url $RPC --confirm-cluster devnet \
 bun scripts/devnet/init.ts      --config $CFG --url $RPC --confirm-cluster devnet --out init.json
 bun scripts/devnet/allowlist.ts --config $CFG --proofs allowlist-proofs.json --out allowlist.json
 #    … execute both, then if needed:
-#    roles.ts also cancels any pending handover the config does not ask for
-#    (a pending admin is kept only if the config names it as `nextAdmin`).
+#    roles.ts also cancels any pending operator or pauser handover the config does not ask for.
+#    A pending admin is kept if the config names it as `nextAdmin`; otherwise roles.ts refuses unless --cancel-admin is passed.
 bun scripts/devnet/roles.ts     --config $CFG --out roles.json
 bun scripts/devnet/caps.ts      --config $CFG --url $RPC --confirm-cluster devnet --out caps.json
 
 # 4. Post-deploy checks.
 bun scripts/devnet/verify.ts --config $CFG --url $RPC --confirm-cluster devnet --expected-hash $HASH
 ```
+
+Before the devnet deploy, follow [Turning on idl-compat at deploy](docs/technical-resources/deployment-and-operations.md#turning-on-idl-compat-at-deploy). Tag the deployed commit `v1.0.0-devnet` with a GitHub release carrying the verified `mutav.json`, `mutav.so` and `mutav.hash`.
 
 Program upgrades go through `scripts/release/upgrade-proposal.ts` (run by `.github/workflows/release.yml`), which also takes `--expected-hash`: it refuses unless the buffer is owned by BPF Loader Upgradeable, its authority is the upgrade vault and its program bytes hash to the expected value (as `solana-verify get-buffer-hash`), and ProgramData's upgrade authority is the vault.
 

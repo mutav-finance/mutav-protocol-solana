@@ -65,11 +65,11 @@ sequenceDiagram
 | Step | Command | What it does |
 |---|---|---|
 | 0. Rehearse | `bun scripts/devnet/dry-run.ts --program-keypair <path>` | Full flow on a throwaway local validator, plus one allowlisted `request_deposit` that proves the root and proofs match the program. The validator always stops and its temp dir is deleted. |
-| 1. Deploy | `bun scripts/devnet/deploy.ts --config <cfg> --url <rpc> --confirm-cluster devnet --payer <path> --upgrade-authority <upgrade vault>` | Runs the guards below, then `solana program deploy` with the deployer as temporary upgrade authority, then `set-upgrade-authority` to the upgrade vault. If the handover fails, it prints the exact retry command and exits non-zero. It re-reads ProgramData to confirm. Build with `solana-verify build` first so the hash is reproducible. |
+| 1. Deploy | `bun scripts/devnet/deploy.ts --config <cfg> --url <rpc> --confirm-cluster devnet --payer <path> --upgrade-authority <upgrade vault> --expected-hash <hash>` | Refuses a `.so` whose executable hash (`solana-verify get-executable-hash`) is not `--expected-hash`. Runs the guards below, then `solana program deploy` with the deployer as temporary upgrade authority, then `set-upgrade-authority` to the upgrade vault. If the handover fails, it prints the exact retry command and exits non-zero. It re-reads ProgramData to confirm. Build with `solana-verify build` first so the hash is reproducible. |
 | 2. Initialize | `bun scripts/devnet/init.ts --config <cfg> --url <rpc> --confirm-cluster devnet --out init.json` | Writes `initialize` as an unsigned proposal for the upgrade multisig, whose vault signs and pays rent. Send the vault about 0.1 SOL first. Reads the chain first: the reserve mint must be owned by the configured token program and have 6 decimals. |
 | 3. Allowlist | `bun scripts/devnet/allowlist.ts --config <cfg> --proofs proofs.json --out allowlist.json` | Builds the Merkle tree, writes every owner's proof for the app to serve, and the `set_allowlist_root` proposal. |
-| 4. Roles and caps | `roles.ts`, `caps.ts` | Optional. Role changes are two-step: the admin proposes (`propose_role`, with `cancel_pending` first when another handover is pending), the new key accepts with `accept_role` within 72 hours. `set_config` proposals are sparse: they carry only the fields they change, put `refresh` first when `c`, the NAV-move bound or the stress buffer changes, and the proposal memo lists them. Guardians are set with a separate `set_guardians` proposal. |
-| 5. Verify | `bun scripts/devnet/verify.ts --config <cfg> --url <rpc> --confirm-cluster devnet` | Read-only post-deploy checks, below. |
+| 4. Roles and caps | `roles.ts`, `caps.ts` | Optional. Role changes are two-step: the admin proposes (`propose_role`, with `cancel_pending` first when another handover is pending), the new key accepts with `accept_role` within 72 hours. `roles.ts` also cancels a pending operator or pauser handover the config does not ask for. A pending admin handover is kept if the config names it as `nextAdmin`; otherwise `roles.ts` refuses unless `--cancel-admin` is passed. Every cancellation is logged and named in the proposal title. `set_config` proposals are sparse: they carry only the fields they change, and are wrapped as `refresh, set_config, refresh` when `c`, the NAV-move bound or the stress buffer changes, and the proposal memo lists them. Guardians are set with a separate `set_guardians` proposal. |
+| 5. Verify | `bun scripts/devnet/verify.ts --config <cfg> --url <rpc> --confirm-cluster devnet --expected-hash <hash>` | Read-only post-deploy checks, below. |
 
 Members create, approve and execute each proposal from the admin console or the Squads app. The time lock counts from approval.
 
@@ -86,9 +86,10 @@ Members create, approve and execute each proposal from the admin console or the 
 
 ### Post-deploy checks (`verify.ts`)
 
+- The deployed program is the verified build: the ProgramData program bytes hash to `--expected-hash` (computed as `solana-verify get-program-hash` does).
 - Upgrade authority equals the configured upgrade vault.
 - `feature_flags == 0`.
-- Admin, operator, pauser and the allowlist root are as configured.
+- Admin, operator, pauser and the allowlist root are as configured. No operator, pauser or admin handover is pending.
 - Every other `VaultConfig` field equals the config file: `c`, fee take, every cap including `max_nav_move_bps` and the stress buffer, decimals 6, mint, token program, money accounts, capital wallet.
 - On devnet, the locked devnet values of ADR 0028 (`DEVNET_LOCKED` in `scripts/devnet/lib/compare.ts`).
 - The reserve mint is owned by the configured token program and has 6 decimals.
@@ -96,6 +97,16 @@ Members create, approve and execute each proposal from the admin console or the 
 - Both multisigs: Squads v4 owner, no config authority, exact members and threshold, time lock at or above the floor.
 
 After the deploy, live accounts are dumped into `tests/fixtures/layout/v1/` and decoded in CI, so every later upgrade is checked against real bytes.
+
+### Turning on idl-compat at deploy
+
+The `idl-compat` CI job stays inactive until a `v*` tag exists. Once it is active, it downloads `mutav.json` from that tag's GitHub release with `gh release download`, so the tag needs a release object, not only a git tag. Turn it on with the devnet deploy:
+
+1. Tag the exact commit you deploy as `v1.0.0-devnet` and push the tag. Create its release: `gh release create v1.0.0-devnet --verify-tag --prerelease --notes "devnet deploy"`.
+2. Run `release.yml` with `ref: v1.0.0-devnet`, `cluster: devnet` and `attach_to_release` on. The release then carries `mutav.json`, `mutav.so` and `mutav.hash` from the verified build. Deploy that `mutav.so`, and pass the contents of `mutav.hash` as `--expected-hash` to `deploy.ts` and `verify.ts`.
+3. Confirm that `mutav.hash` equals `solana-verify get-program-hash 8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9 --url <rpc>`. `verify.ts` checks the same thing.
+
+From then on, every PR's IDL is compared against that release. Enum variants, error codes and instruction accounts (including PDA seeds and fixed addresses) are append-only or frozen. Type forms the check does not model make it fail closed.
 
 ### First money in
 
@@ -116,7 +127,7 @@ Summary of [spec §14.5](../spec.md#145-upgrade-runbook).
 
 1. **Before merge.** ADR and spec update in the same PR. No diff in the `pay_claim` path. Layout, padding-preservation, `idl-compat` and full test suites green. Client published as a minor version, and indexers updated to tolerate new fields and events before the program changes.
 2. **Rehearse.** On a fork of the live cluster against real accounts, then on devnet with the same threshold and time lock.
-3. **Build and buffer.** `solana-verify build`; write the buffer; set the buffer authority to the upgrade vault; the buffer hash must equal the build hash.
+3. **Build and buffer.** `solana-verify build`; write the buffer; set the buffer authority to the upgrade vault; the buffer hash must equal the build hash. `upgrade-proposal.ts --expected-hash` re-checks this at `confirmed`: buffer owner, buffer authority, buffer hash, and ProgramData's upgrade authority. It sizes `ExtendProgramChecked` from the buffer itself.
 4. **Propose.** One Squads vault transaction: `ExtendProgramChecked` first if ProgramData is too small, then `Upgrade`, the IDL write and the verify record. Each signer reproduces the hash and decodes every instruction in the stored message. Any `SetAuthority` is a reason to reject.
 5. **Execute and verify.** After the time lock. Check the on-chain hash with `solana-verify`, then smoke-check that `refresh` succeeds and carved fields read zero.
 6. **Enable features separately.** A feature bit is set later by its own time-locked `set_config`, after an observation period.
