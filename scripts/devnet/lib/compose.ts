@@ -13,14 +13,22 @@ import {
   type TransactionSigner,
 } from '@solana/kit';
 import {
+  configParamsDiff,
+  configParamsNeedRefresh,
   findIncomeInboxAddress,
   findReserveAddresses,
+  getAcceptRoleInstruction,
   getInitializeInstruction,
+  getProposeRoleInstruction,
+  getRefreshInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
-  getSetRolesInstruction,
   type VaultConfig,
 } from '../../../clients/js/src';
+
+/** Role ids of `propose_role` / `accept_role` (ADR 0020). */
+export const ROLE_OPERATOR = 1;
+export const ROLE_PAUSER = 2;
 import type { DeployConfig } from './config';
 
 export const BPF_LOADER_UPGRADEABLE = address('BPFLoaderUpgradeab1e11111111111111111111111');
@@ -69,6 +77,7 @@ export async function composeInitialize(
       pendingDeposits: a.pendingDeposits,
       pendingRedemptions: a.pendingRedemptions,
       claims: a.claims,
+      unsolicited: a.unsolicited,
       // ADR 0017: the income inbox Nora pays, created idempotently.
       incomeInbox: await findIncomeInboxAddress({
         vaultAuthority: a.vaultAuthority,
@@ -94,34 +103,76 @@ export async function composeInitialize(
   );
 }
 
-/** `set_roles(operator, pauser)` from the config. Admin. */
-export async function composeSetRoles(cfg: DeployConfig, admin: TransactionSigner): Promise<Instruction> {
+/**
+ * `propose_role` for the config's operator and pauser where they differ from
+ * the chain (`current`) (ADR 0020). Admin. Each proposed key then accepts
+ * with `accept_role` within 72 hours (`composeAcceptRole`).
+ */
+export async function composeProposeRoles(
+  cfg: DeployConfig,
+  current: VaultConfig,
+  admin: TransactionSigner,
+): Promise<Instruction[]> {
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
-  return getSetRolesInstruction(
+  const out: Instruction[] = [];
+  for (const [role, key, now] of [
+    [ROLE_OPERATOR, cfg.operator, current.operator],
+    [ROLE_PAUSER, cfg.pauser, current.pauser],
+  ] as const) {
+    if (key === now) continue;
+    out.push(
+      getProposeRoleInstruction(
+        { admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId, role, key },
+        opts(cfg),
+      ),
+    );
+  }
+  return out;
+}
+
+/** `accept_role(role)`, signed by the proposed key. */
+export async function composeAcceptRole(
+  cfg: DeployConfig,
+  current: VaultConfig,
+  role: number,
+  newKey: TransactionSigner,
+): Promise<Instruction> {
+  const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
+  return getAcceptRoleInstruction(
     {
-      admin,
+      newKey,
       config: a.config,
+      treasuryAccount: current.treasuryAccount,
+      paymentsAccount: current.paymentsAccount,
       eventAuthority: a.eventAuthority,
       program: cfg.programId,
-      operator: cfg.operator,
-      pauser: cfg.pauser,
+      role,
     },
     opts(cfg),
   );
 }
 
 /**
- * `set_config` writing the file's caps, coverage ratio and take rate, and
- * keeping every other field as it is on-chain (`current`). `feature_flags`
- * and the capital wallet are carried over unchanged, never set here.
+ * `set_config` with only the fields where the file's caps, coverage ratio
+ * and take rate differ from the chain (`current`), sparse (ADR 0026), with
+ * `refresh` first when a change needs it. `feature_flags` and the capital
+ * wallet are never set here. Empty when nothing differs.
  */
 export async function composeSetCaps(
   cfg: DeployConfig,
   current: VaultConfig,
   admin: TransactionSigner,
-): Promise<Instruction> {
+): Promise<Instruction[]> {
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
-  return getSetConfigInstruction(
+  const params = configParamsDiff(current, {
+    coverageRatioBps: cfg.coverageRatioBps,
+    feeTakeBps: cfg.feeTakeBps,
+    featureFlags: current.featureFlags,
+    mutavCapitalWallet: current.mutavCapitalWallet,
+    caps: cfg.caps,
+  });
+  if (params.length === 0) return [];
+  const setConfig = getSetConfigInstruction(
     {
       admin,
       config: a.config,
@@ -130,14 +181,25 @@ export async function composeSetCaps(
       paymentsAccount: current.paymentsAccount,
       eventAuthority: a.eventAuthority,
       program: cfg.programId,
-      coverageRatioBps: cfg.coverageRatioBps,
-      feeTakeBps: cfg.feeTakeBps,
-      featureFlags: current.featureFlags,
-      mutavCapitalWallet: current.mutavCapitalWallet,
-      caps: cfg.caps,
+      params,
     },
     opts(cfg),
   );
+  if (!configParamsNeedRefresh(params)) return [setConfig];
+  const refresh = getRefreshInstruction(
+    {
+      config: a.config,
+      state: a.state,
+      reserve: a.reserve,
+      pendingDeposits: a.pendingDeposits,
+      pendingRedemptions: a.pendingRedemptions,
+      claims: a.claims,
+      eventAuthority: a.eventAuthority,
+      program: cfg.programId,
+    },
+    opts(cfg),
+  );
+  return [refresh, setConfig];
 }
 
 /** `set_allowlist_root(root)`. Admin. */

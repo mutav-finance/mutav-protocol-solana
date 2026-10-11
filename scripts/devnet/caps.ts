@@ -22,10 +22,14 @@ export async function main(args: Args) {
   const { url } = guarded;
   await assertAdminIsVault(cfg);
   const r = await fetchReserve(rpcFor(url), cfg.reserveMint, { programAddress: cfg.programId });
-  const ix = await composeSetCaps(cfg, r.config.data, createNoopSigner(cfg.admin));
+  const ixs = await composeSetCaps(cfg, r.config.data, createNoopSigner(cfg.admin));
+  if (ixs.length === 0) {
+    console.log('caps already match the config; nothing to propose');
+    return;
+  }
   writePayload(
     req(args, 'out'),
-    toPayload({ title: 'MUTAV: set caps and parameters', cluster: cfg.cluster, multisig: cfg.squads.multisig, vaultIndex: cfg.squads.vaultIndex, vault: cfg.admin }, [ix]),
+    toPayload({ title: 'MUTAV: set caps and parameters', cluster: cfg.cluster, multisig: cfg.squads.multisig, vaultIndex: cfg.squads.vaultIndex, vault: cfg.admin }, ixs),
   );
 }
 

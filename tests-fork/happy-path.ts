@@ -40,6 +40,7 @@ import {
   getClaimSharesInstruction,
   getContributeFeesInstruction,
   getFileClaimInstruction,
+  ANY_NAV,
   getFulfilDepositsInstruction,
   getPayClaimInstruction,
   getRegisterGuaranteeInstruction,
@@ -199,7 +200,8 @@ export async function forkHappyPath(programKeypair?: string) {
         {
           owner: investor!, config: a.config, state: a.state, depositRequest, source: investorBrs,
           pendingDeposits: a.pendingDeposits, reserveMint: BRS_DEVNET_MINT, tokenProgram: TOKEN_PROGRAM,
-          eventAuthority: a.eventAuthority, program: programId, assets: deposit, proof: tree.proofs.get(investor!.address)!,
+          eventAuthority: a.eventAuthority, program: programId, assets: deposit, minSharesOut: 0n,
+          eligibility: { __kind: 'Merkle', proof: tree.proofs.get(investor!.address)! },
         },
         po,
       ),
@@ -208,7 +210,7 @@ export async function forkHappyPath(programKeypair?: string) {
       {
         admin: vault!, config: a.config, state: a.state, pendingDeposits: a.pendingDeposits, reserve: a.reserve,
         vaultAuthority: a.vaultAuthority, reserveMint: BRS_DEVNET_MINT, tokenProgram: TOKEN_PROGRAM,
-        eventAuthority: a.eventAuthority, program: programId, count: 1,
+        eventAuthority: a.eventAuthority, program: programId, count: 1, navBounds: ANY_NAV,
       },
       po,
     );
@@ -236,7 +238,7 @@ export async function forkHappyPath(programKeypair?: string) {
     await sendAs(operator!, [
       getRegisterGuaranteeInstruction(
         {
-          ...op, state: a.state, guarantee, payer: operator!,
+          ...op, state: a.state, guarantee, reserve: a.reserve, payer: operator!,
           id, agencyId, refsHash: bytes32('refs'), defaultCover: 1_000n * BRL, exitCover: 500n * BRL,
         },
         po,
@@ -271,7 +273,7 @@ export async function forkHappyPath(programKeypair?: string) {
         {
           ...op, state: a.state, guarantee, claimFiling, reserve: a.reserve,
           paymentsAccount: payments, vaultAuthority: a.vaultAuthority, reserveMint: BRS_DEVNET_MINT,
-          tokenProgram: TOKEN_PROGRAM, leg: 0, amount: claim, noticeRefHash: notice,
+          tokenProgram: TOKEN_PROGRAM, noticeRefHash: notice, expectedAmount: claim,
         },
         po,
       ),
