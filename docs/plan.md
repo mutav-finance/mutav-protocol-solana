@@ -1,5 +1,7 @@
 # Implementation plan — hackathon build
 
+> Superseded wording: this plan describes forking `solana-foundation/vault` code. The program was written for MUTAV and no upstream code remains; see [provenance](provenance.md).
+
 *Window: 2026-10-01 → 2026-10-12. Submission due **2026-10-12, 23:59 BRT**. Business rules: [`spec.md`](spec.md). Decisions: [`decisions/`](decisions/).*
 
 > **Superseded layout (2026-10-10).** [ADR 0019](decisions/0019-v1-layout-for-the-devnet-release.md) fixed the v1 layout for the devnet release after these tasks were written. Where a task below names `AgencyExposure`, `Payout`, `HolderState`, `FeeReceipt`, `PriceParams`, `ExitParams`, the buffer earmark, `pending_notices`, the partial-fill request fields, `min_fill_assets`, the payout SLA, the per-agency cap or the settlement floor, the current layout is in spec §3 and §14.2: those were removed or merged before the freeze, and the ones still planned return as carves.

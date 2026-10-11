@@ -193,4 +193,10 @@ The program is **unaudited and pre-pilot**. Do not deposit funds you are not pre
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). Third-party code adapted under the MIT license is attributed in `NOTICE` and in the affected file headers.
+- **Code:** MIT, Copyright (c) 2026 MUTAV. See [LICENSE](LICENSE). Versions up to commit `9c883d5` were published under Apache-2.0 and remain available under those terms.
+- **Brand:** the MUTAV name, logo (`app/public/brand/logo-mutav.svg`) and brand assets are not licensed under MIT.
+- **Fonts:** the app and the simulator use Geist, Inter and JetBrains Mono under the SIL Open Font License 1.1.
+
+### Acknowledgements
+
+[`solana-foundation/vault`](https://github.com/solana-foundation/vault) (MIT) and [`onre-finance/onre-sol`](https://github.com/onre-finance/onre-sol) (MIT) informed MUTAV's design: the account and authority structure, the async request lifecycle, the mint-extension guard and the upgrade-readiness patterns. No code from either is included. See [docs/provenance.md](docs/provenance.md).

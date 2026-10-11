@@ -1,10 +1,8 @@
 //! Investor capital, async (spec §5.5, §5.6; ADRs 0008, 0010). MUTAV's
 //! capital wallet uses the same flow as every investor.
 //!
-//! Async deposit/redeem core adapted from `solana-foundation/vault`
-//! (`programs/async_vault/src/instructions/`, commit c359962), MIT License,
-//! Copyright (c) 2026 Solana Foundation. See `NOTICE`.
-//! Changes: Merkle allowlist, request-size limits, strict FIFO queues by
+//! Design reference: the async request lifecycle of `solana-foundation/vault`;
+//! no code is copied (see docs/provenance.md). Design notes: Merkle allowlist, request-size limits, strict FIFO queues by
 //! `seq` with a skip proof, admin fulfilment at the NAV at fulfil, gated by
 //! pause, the NAV-move guard, `free_capital` and
 //! `liquid_budget`; owner-only debits.

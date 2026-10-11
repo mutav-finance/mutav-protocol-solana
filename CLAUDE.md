@@ -55,6 +55,8 @@ The pilot web app lives in [`app/`](app/) (Next.js 16, Bun). Its full rules are 
 
 ## Git
 
+- **Licence:** MIT, Copyright (c) 2026 MUTAV. Code copied from a third party keeps its original licence header and is listed in the README acknowledgements; patterns and design references need no header. The MUTAV name and brand are not MIT-licensed.
+
 - Work on a branch and open a PR to `main`. Never push to `main`.
 - Keep commits bounded: one concern per commit (e.g. one instruction plus its tests), conventional-commit messages (`feat(mutav): …`, `test: …`, `docs: …`).
 - CI must be green (build, tests, Codama client diff, app checks) before merge.

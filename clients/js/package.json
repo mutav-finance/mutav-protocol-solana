@@ -2,7 +2,7 @@
   "name": "@mutav-finance/mutav-protocol-solana",
   "version": "0.1.0",
   "description": "TypeScript client for the MUTAV Solana program. Composes instructions and reads accounts; holds no keys.",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mutav-finance/mutav-protocol-solana.git",
@@ -23,7 +23,8 @@
   "files": [
     "dist",
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"
@@ -32,7 +33,7 @@
     "build": "rm -rf dist && bun build src/index.ts --outdir dist --target node --format esm --packages external && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "prepack": "bun run build"
+    "prepack": "cp ../../LICENSE LICENSE && bun run build"
   },
   "peerDependencies": {
     "@solana/kit": "^8.4.0"

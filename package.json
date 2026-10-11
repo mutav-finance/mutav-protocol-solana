@@ -1,7 +1,7 @@
 {
   "name": "mutav-protocol-solana",
   "private": true,
-  "license": "Apache-2.0",
+  "license": "MIT",
   "workspaces": [
     "clients/js"
   ],

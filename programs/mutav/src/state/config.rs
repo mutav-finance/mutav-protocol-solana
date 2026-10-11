@@ -1,9 +1,7 @@
 //! `VaultConfig` and its nested `Caps` (spec §3.1, §8).
 //!
-//! Account and authority skeleton adapted from `solana-foundation/vault`
-//! (`programs/async_vault/src/state/async_vault.rs`, commit c359962), MIT
-//! License, Copyright (c) 2026 Solana Foundation. See `NOTICE`.
-//! Changes: per-reserve seeds, separate admin / operator / pauser roles, caps,
+//! Design reference: `solana-foundation/vault` (`async_vault` state); no code
+//! is copied (see docs/provenance.md). Design notes: per-reserve seeds, separate admin / operator / pauser roles, caps,
 //! fixed-size layout with `_reserved` padding.
 
 use anchor_lang::prelude::*;
