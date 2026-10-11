@@ -1,5 +1,7 @@
 # Deposits and redemptions
 
+During the pilot the reserve is not open to public investment.
+
 Capital enters and leaves the reserve through two asynchronous, first-in first-out (FIFO) queues. A capital provider makes a request; the reserve admin fills the queue in order at the NAV of the fill; the provider then collects shares or BRS. Nobody, MUTAV included, can move capital in or out any other way.
 
 ## The two queues at a glance

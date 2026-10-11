@@ -23,7 +23,7 @@ Details are in [Share value](share-value.md) and [Risks](risks.md).
 |---|---|
 | Who may deposit? | Only wallets on the on-chain allowlist. Each deposit request carries `Eligibility::Merkle { proof }`, a Merkle proof against `investor_allowlist_root`. Identity checks (KYC) happen off-chain, before a wallet is added. |
 | Who is on the allowlist? | MUTAV's own capital wallet. Its address is recorded on-chain in `VaultConfig.mutav_capital_wallet` (set at deploy) so anyone can see MUTAV's position. |
-| Is the reserve open to public investment? | No. The pilot runs on MUTAV's own capital. |
+| Is the reserve open to public investment? | No. During the pilot the reserve is not open to public investment. |
 | Does MUTAV's wallet get special treatment? | No. It uses the same queues, the same NAV and the same rules as any other holder. There is no instruction that lets MUTAV add or take capital outside the queues. |
 | Can a holder leave after being removed from the allowlist? | Yes. Entry is allowlisted; exit is open to any wallet that already holds shares. See [Deposits and redemptions](deposits-and-redemptions.md#exit-rights). |
 | What asset do I deposit and receive? | BRS, a BRL token on Solana issued by Nora (classic SPL Token, 6 decimals, 1 BRS = R$1). The reserve holds BRS only in the pilot. |

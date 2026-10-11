@@ -2,6 +2,8 @@
 
 Reserve shares absorb claim payments and receive net guarantee fees and issuer income. Their value can fall as well as rise. This page lists what can lower the share value or delay an exit, and how the design bounds each risk.
 
+During the pilot the reserve is not open to public investment.
+
 The program is new, upgradeable and unaudited. An internal security audit comes before the devnet deploy; an independent audit comes before mainnet. Nothing here is legal, tax or investment advice, an offer of securities, or a promise of any return.
 
 ## Summary
@@ -138,7 +140,7 @@ None of these is a feature of the devnet release.
 
 ## Planned protections before outside capital
 
-The pilot runs on MUTAV's own capital. Before any outside capital provider joins, MUTAV:
+During the pilot the reserve is not open to public investment. Before any outside capital provider joins, MUTAV:
 
 1. builds the claim-notice gate;
 2. builds the exit fallback;

@@ -1,5 +1,7 @@
 # Share value
 
+During the pilot the reserve is not open to public investment.
+
 The program computes the value of a reserve share on-chain. No admin pushes a price. Anyone can call `refresh` and get the same number from public accounts.
 
 ## The formula
