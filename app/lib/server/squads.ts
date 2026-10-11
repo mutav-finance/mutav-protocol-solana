@@ -27,7 +27,7 @@ import {
 } from "@mutav-finance/mutav-protocol-solana";
 import type { ServerEnv } from "./env";
 import { baselineCovers, isLiveProposal, parseBaselineMemo, setConfigFields, staleCarry, staleCarryText } from "../config-diff";
-import { decodeInstruction, foreignPrograms, newMoneyAccount, tokenAccountFacts, type DecodeContext, type DecodedInstruction, type RawInstruction } from "../proposal-decode";
+import { decodeInstruction, foreignPrograms, newMoneyAccount, squadsConfigChange, tokenAccountFacts, type DecodeContext, type DecodedInstruction, type RawInstruction } from "../proposal-decode";
 import { bytesToHex } from "../serde";
 import type { ReserveView } from "../view";
 
@@ -107,7 +107,7 @@ async function readMoneyAccounts(c: Connection, addrs: string[]): Promise<Decode
  * once the facts they need: the token accounts set_payments_account /
  * set_treasury_account point at, the NAV now, and the ALLOWLIST root.
  */
-async function decodeProposals<P extends Omit<ProposalView, "decoded" | "foreign"> & { raw: RawInstruction[] | null }>(
+async function decodeProposals<P extends Omit<ProposalView, "decoded" | "foreign"> & { raw: RawInstruction[] | null; configActions: string[] | null }>(
   env: ServerEnv,
   c: Connection,
   shown: P[],
@@ -131,9 +131,10 @@ async function decodeProposals<P extends Omit<ProposalView, "decoded" | "foreign
     }
   };
   if (flat.some(isRoot)) ctx.allowlistRoot = env.allowlist.length > 0 ? bytesToHex((await buildAllowlist(env.allowlist)).root) : null;
-  return shown.map(({ raw, ...p }) => {
-    const decoded = raw ? raw.map((ix) => decodeInstruction(ix, ctx)) : [];
-    const instructions = raw ? decoded.map((d) => (d.program === "foreign" ? `foreign instruction (${d.programId})` : d.name)) : ["(not a vault transaction)"];
+  return shown.map(({ raw, configActions, ...p }) => {
+    // Not a vault transaction: a Squads config change (or unknown), flagged.
+    const decoded = raw ? raw.map((ix) => decodeInstruction(ix, ctx)) : [squadsConfigChange(SQUADS_PROGRAM, configActions)];
+    const instructions = decoded.map((d) => (d.program === "foreign" ? `${d.name} (${d.programId})` : d.name));
     return { ...p, instructions, decoded, foreign: foreignPrograms(decoded) };
   });
 }
@@ -176,18 +177,24 @@ export async function readMultisig(env: ServerEnv, now: bigint, reserve?: Pick<R
   ]);
   const infos: Awaited<ReturnType<Connection["getMultipleAccountsInfo"]>> = [];
   for (let k = 0; k < pdas.length; k += BATCH) infos.push(...(await c.getMultipleAccountsInfo(pdas.slice(k, k + BATCH))));
-  type Scanned = Omit<ProposalView, "decoded" | "foreign"> & { raw: RawInstruction[] | null };
+  type Scanned = Omit<ProposalView, "decoded" | "foreign"> & { raw: RawInstruction[] | null; configActions: string[] | null };
   const all: Scanned[] = indices.map((i, n) => {
     const txPda = pdas[2 * n]!;
     const propPda = pdas[2 * n + 1]!;
     const txInfo = infos[2 * n] ?? null;
     const propInfo = infos[2 * n + 1] ?? null;
     let raw: RawInstruction[] | null = [];
+    let configActions: string[] | null = null;
     if (txInfo) {
       try {
         raw = rawInstructions(multisig.accounts.VaultTransaction.fromAccountInfo(txInfo)[0]);
       } catch {
         raw = null;
+        try {
+          configActions = multisig.accounts.ConfigTransaction.fromAccountInfo(txInfo)[0].actions.map((a) => a.__kind);
+        } catch {
+          configActions = null;
+        }
       }
     }
     let view: Omit<ProposalView, "instructions" | "decoded" | "foreign" | "index" | "transaction" | "proposal" | "stale"> = {
@@ -213,7 +220,7 @@ export async function readMultisig(env: ServerEnv, now: bigint, reserve?: Pick<R
         executableAt,
       };
     }
-    return { index: i, transaction: txPda.toBase58(), proposal: propPda.toBase58(), instructions: [], raw, stale: i <= staleIndex, ...view };
+    return { index: i, transaction: txPda.toBase58(), proposal: propPda.toBase58(), instructions: [], raw, configActions, stale: i <= staleIndex, ...view };
   });
   const live = all.filter((p) => isLiveProposal(p));
   const finished = all.filter((p) => !isLiveProposal(p) && p.status !== "None").slice(0, RECENT_FINISHED);
@@ -303,11 +310,42 @@ export async function composeProposalAction(env: ServerEnv, member: string, inde
       // Approved proposals: `threshold` cancel votes make it Cancelled (V2 reallocates the vote list).
       return unsigned(env, member, [multisig.instructions.proposalCancelV2(args)]);
     case "execute": {
+      // Cheap reads first: only a member may ask, only for an Approved
+      // proposal, before any history read (the stale-carry memo lookup).
+      await assertExecutable(env, member, index);
       if (config) await assertNoStaleCarry(env, index, config);
       const { instruction } = await multisig.instructions.vaultTransactionExecute({ connection: conn(env), ...args });
       return unsigned(env, member, [instruction]);
     }
   }
+}
+
+export class ProposalRefusedError extends Error {
+  override name = "ProposalRefusedError";
+}
+
+/** `member` holds a seat in the configured multisig (one account read). Returns the multisig. */
+export async function assertMember(env: ServerEnv, member: string): Promise<multisig.accounts.Multisig> {
+  if (!env.squadsMultisig) throw new ProposalRefusedError("SQUADS_MULTISIG is not set");
+  const ms = await multisig.accounts.Multisig.fromAccountAddress(conn(env), pk(env.squadsMultisig));
+  if (!ms.members.some((m) => m.key.toBase58() === member)) throw new ProposalRefusedError(`${member} is not a member of the multisig ${env.squadsMultisig}`);
+  return ms;
+}
+
+/** Execute is composed only for a member, and only for an Approved proposal. */
+async function assertExecutable(env: ServerEnv, member: string, index: bigint) {
+  await assertMember(env, member);
+  const [propPda] = multisig.getProposalPda({ multisigPda: pk(env.squadsMultisig!), transactionIndex: index });
+  const info = await conn(env).getAccountInfo(propPda, "confirmed");
+  let status: string | null = null;
+  if (info) {
+    try {
+      status = multisig.accounts.Proposal.fromAccountInfo(info)[0].status.__kind;
+    } catch {
+      status = null;
+    }
+  }
+  if (status !== "Approved") throw new ProposalRefusedError(`proposal #${index} is ${status ?? "missing"}, not Approved: nothing to execute`);
 }
 
 // ── The memo a proposal was created with (A3 stale-carry baseline) ─────────
@@ -403,6 +441,24 @@ export async function readCreateMemo(env: ServerEnv, index: bigint, creator: str
   if (!env.squadsMultisig) return null;
   const c = conn(env);
   const [txPda] = multisig.getTransactionPda({ multisigPda: pk(env.squadsMultisig), index });
+  // A found memo never changes (the create is final): one lookup per transaction PDA and creator.
+  const cacheKey = `${txPda.toBase58()}:${creator}`;
+  const hit = memoCache.get(cacheKey);
+  if (hit !== undefined) return hit;
+  const memo = await lookupCreateMemo(c, env.squadsMultisig, txPda, creator);
+  if (memo !== null) {
+    if (memoCache.size >= MAX_MEMO_CACHE) memoCache.delete(memoCache.keys().next().value!);
+    memoCache.set(cacheKey, memo);
+  }
+  return memo;
+}
+
+/** Found create memos, by transaction PDA and creator (never a miss: a create may land later). */
+const memoCache = new Map<string, string>();
+const MAX_MEMO_CACHE = 512;
+export const clearMemoCache = () => memoCache.clear();
+
+async function lookupCreateMemo(c: Connection, multisigAddress: string, txPda: PublicKey, creator: string): Promise<string | null> {
   const sigs = await signaturesOldestFirst((before) => c.getSignaturesForAddress(txPda, { limit: SIGNATURE_PAGE, before }, "confirmed"));
   return findCreateMemo(
     sigs,
@@ -413,7 +469,7 @@ export async function readCreateMemo(env: ServerEnv, index: bigint, creator: str
       const keys = msg.getAccountKeys({ accountKeysFromLookups: tx.meta?.loadedAddresses ?? undefined }).keySegments().flat().map((k) => k.toBase58());
       return { keys, instructions: msg.compiledInstructions.map((ix) => ({ programIdIndex: ix.programIdIndex, accountKeyIndexes: ix.accountKeyIndexes, data: ix.data })) };
     },
-    { multisig: env.squadsMultisig, transaction: txPda.toBase58(), creator },
+    { multisig: multisigAddress, transaction: txPda.toBase58(), creator },
   );
 }
 

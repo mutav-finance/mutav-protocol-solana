@@ -18,7 +18,7 @@ import { Note } from "@/components/demo/shared";
 import { postJson } from "@/lib/client/api";
 import { useTx } from "@/lib/client/use-tx";
 import { fmtDuration, fmtTime } from "@/lib/format";
-import type { DecodedInstruction } from "@/lib/proposal-decode";
+import { SQUADS_CONFIG_CHANGE, type DecodedInstruction } from "@/lib/proposal-decode";
 
 export type ProposalView = {
   index: bigint;
@@ -59,21 +59,23 @@ function useNow(serverNow: bigint | null) {
 
 type Act = "approve" | "reject" | "cancel" | "execute";
 
+const isConfigChange = (p: ProposalView) => p.decoded.some((d) => d.name === SQUADS_CONFIG_CHANGE);
+
 /** What the vault transaction will do: each instruction, its decoded arguments and red flags (A3). */
 function ProposalInstructions({ p }: { p: ProposalView }) {
   if (p.decoded.length === 0) return <Mono style={{ fontSize: 12 }}>{p.instructions.join(", ") || "—"}</Mono>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {p.foreign.length > 0 && <StatusBadge bordered color="var(--color-error)" label="FOREIGN INSTRUCTION" />}
+      {p.foreign.length > 0 && <StatusBadge bordered color="var(--color-error)" label={isConfigChange(p) ? "SQUADS CONFIG CHANGE" : "FOREIGN INSTRUCTION"} />}
       <ol aria-label={`instructions in proposal ${p.index}`} style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
         {p.decoded.map((d, k) => (
           <li key={k}>
             {d.program === "foreign" ? (
-              <Mono style={{ fontSize: 12, color: "var(--color-error)" }}>foreign instruction · program {d.programId}</Mono>
+              <Mono style={{ fontSize: 12, color: "var(--color-error)" }}>{d.name} · program {d.programId}</Mono>
             ) : (
               <Mono style={{ fontSize: 12 }}>{d.name}</Mono>
             )}
-            {d.program !== "foreign" && d.details.length > 0 && (
+            {d.details.length > 0 && (
               <ul className="font-mono" style={{ margin: "2px 0 0", paddingLeft: 14, fontSize: 11, color: "var(--color-text-2)", listStyle: "square", overflowWrap: "anywhere" }}>
                 {d.details.map((x, j) => (
                   <li key={j} style={x.warn ? { color: "var(--color-error)" } : undefined}>
@@ -121,7 +123,9 @@ function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold
       <td style={{ whiteSpace: "normal" }}>
         {(canVote || canExecute) && p.foreign.length > 0 && (
           <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>
-            Foreign instruction ({p.foreign.join(", ")}): the vault would sign it. Approve only if you know what it does.
+            {isConfigChange(p)
+              ? "Squads config change: members/threshold — review in the Squads UI."
+              : `Foreign instruction (${p.foreign.join(", ")}): the vault would sign it. Approve only if you know what it does.`}
           </Mono>
         )}
         {(canVote || canExecute) && p.foreign.length === 0 && p.decoded.some((d) => d.details.some((x) => x.warn)) && (

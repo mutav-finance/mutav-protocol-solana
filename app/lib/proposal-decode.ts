@@ -96,8 +96,13 @@ const roleName = (r: number) => ROLE_NAMES[r] ?? `unknown role ${r}`;
 
 const COMPUTE_BUDGET_NAMES = ["RequestUnits", "RequestHeapFrame", "SetComputeUnitLimit", "SetComputeUnitPrice", "SetLoadedAccountsDataSizeLimit"];
 
-/** MUTAV admin instructions whose `config` account sits at index 1 (0 for advance_queue_head). */
+/**
+ * The MUTAV instructions the admin vault signs, with the index of their
+ * `config` account (1, or 0 for advance_queue_head). Any other MUTAV
+ * instruction in a proposal is flagged.
+ */
 const CONFIG_AT = new Map<MutavInstruction, number>([
+  [MutavInstruction.AcceptAdmin, 1],
   [MutavInstruction.ProposeRole, 1],
   [MutavInstruction.CancelPending, 1],
   [MutavInstruction.ProposeAdmin, 1],
@@ -237,8 +242,9 @@ export function decodeInstruction(ix: RawInstruction, ctx: DecodeContext): Decod
   }
   if (ix.programId === COMPUTE_BUDGET_PROGRAM) {
     const tag = ix.data[0];
-    const name = (tag !== undefined && COMPUTE_BUDGET_NAMES[tag]) || "unknown";
-    const details: ProposalDetail[] = [];
+    const known = tag !== undefined && tag >= 1 && tag < COMPUTE_BUDGET_NAMES.length;
+    const name = known ? COMPUTE_BUDGET_NAMES[tag]! : "unknown";
+    const details: ProposalDetail[] = known ? [] : [{ label: "data", value: `unknown Compute Budget instruction${tag === undefined ? "" : ` (tag ${tag})`}`, warn: true }];
     if (tag === 2 && ix.data.length >= 5) details.push({ label: "units", value: String(new DataView(ix.data.buffer, ix.data.byteOffset).getUint32(1, true)) });
     if (tag === 3 && ix.data.length >= 9) details.push({ label: "micro-lamports per unit", value: String(new DataView(ix.data.buffer, ix.data.byteOffset).getBigUint64(1, true)) });
     return { program: "compute-budget", programId: ix.programId, name, details };
@@ -255,6 +261,7 @@ export function decodeInstruction(ix: RawInstruction, ctx: DecodeContext): Decod
   const name = MUTAV_NAMES[kind] ?? "unknown";
   const details: ProposalDetail[] = [];
   const at = CONFIG_AT.get(kind);
+  if (at === undefined) details.push({ label: "instruction", value: "not an admin instruction: the reserve admin vault does not normally sign it", warn: true });
   if (ctx.configAddress && at !== undefined && ix.accounts[at] !== ctx.configAddress) {
     details.push({ label: "config", value: `${ix.accounts[at] ?? "not resolvable"}, not this reserve's ${ctx.configAddress}`, warn: true });
   }
@@ -265,6 +272,25 @@ export function decodeInstruction(ix: RawInstruction, ctx: DecodeContext): Decod
     details.push({ label: "arguments", value: "could not be decoded", warn: true });
   }
   return { program: "mutav", programId: ix.programId, name, details };
+}
+
+export const SQUADS_CONFIG_CHANGE = "Squads config change";
+
+/**
+ * A proposal whose transaction is a Squads ConfigTransaction (not a vault
+ * transaction): it changes the multisig itself (members, threshold, time
+ * lock), so it is flagged and left to the Squads UI.
+ */
+export function squadsConfigChange(squadsProgram: string, actions: string[] | null): DecodedInstruction {
+  return {
+    program: "foreign",
+    programId: squadsProgram,
+    name: SQUADS_CONFIG_CHANGE,
+    details: [
+      { label: "changes", value: "members/threshold — review in the Squads UI", warn: true },
+      ...(actions && actions.length > 0 ? [{ label: "actions", value: actions.join(", "), warn: true }] : []),
+    ],
+  };
 }
 
 /** Program ids of the foreign instructions in a decoded proposal. */

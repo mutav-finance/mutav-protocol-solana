@@ -14,9 +14,10 @@ import {
   getSetTreasuryAccountInstruction,
   MUTAV_PROGRAM_ADDRESS,
   NAV_SCALE,
+  REFRESH_DISCRIMINATOR,
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
-import { COMPUTE_BUDGET_PROGRAM, decodeInstruction, foreignPrograms, newMoneyAccount, tokenAccountFacts, type DecodeContext, type RawInstruction, type TokenAccountFacts } from "../proposal-decode";
+import { COMPUTE_BUDGET_PROGRAM, decodeInstruction, squadsConfigChange, foreignPrograms, newMoneyAccount, tokenAccountFacts, type DecodeContext, type RawInstruction, type TokenAccountFacts } from "../proposal-decode";
 import { bytesToHex } from "../serde";
 import { config as baseConfig } from "./fixtures";
 
@@ -195,5 +196,24 @@ describe("A3 proposal decoding: foreign instructions", () => {
   });
   it("flags data the MUTAV program does not know", () => {
     expect(warns(decodeInstruction({ programId: PROGRAM, accounts: [], data: new Uint8Array(8) }, ctx()))).toEqual(["data"]);
+  });
+});
+
+describe("A3 proposal decoding: outside the admin set", () => {
+  it("flags a MUTAV instruction the admin vault does not normally sign", () => {
+    const d = decodeInstruction({ programId: PROGRAM, accounts: [CONFIG], data: new Uint8Array(REFRESH_DISCRIMINATOR) }, ctx());
+    expect(d.name).toBe("Refresh");
+    expect(warns(d)).toContain("instruction");
+  });
+  it("flags an unknown Compute Budget instruction", () => {
+    const d = decodeInstruction({ programId: COMPUTE_BUDGET_PROGRAM, accounts: [], data: new Uint8Array([9]) }, ctx());
+    expect(d.name).toBe("unknown");
+    expect(warns(d)).toEqual(["data"]);
+  });
+  it("flags a Squads config change as foreign, pointing to the Squads UI", () => {
+    const d = squadsConfigChange("SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf", ["AddMember", "ChangeThreshold"]);
+    expect(d.program).toBe("foreign");
+    expect(d.details[0]).toEqual({ label: "changes", value: "members/threshold — review in the Squads UI", warn: true });
+    expect(d.details[1]?.value).toBe("AddMember, ChangeThreshold");
   });
 });
