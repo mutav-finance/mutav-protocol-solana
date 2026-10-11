@@ -133,6 +133,53 @@ pub(crate) enum Installing {
     Neither,
 }
 
+/// One money account (treasury or payments) as the money-flow rules see it:
+/// its address and, unless it is closed, its token account. The account
+/// being installed is always decoded; a current one is read leniently
+/// ([`load_money_account`]).
+#[derive(Clone, Copy)]
+pub(crate) struct Money<'a> {
+    pub key: Pubkey,
+    pub account: Option<&'a TokenAccount>,
+}
+
+impl<'a> Money<'a> {
+    /// A decoded token account (the one being installed).
+    pub fn of(a: &'a InterfaceAccount<TokenAccount>) -> Self {
+        Self {
+            key: a.key(),
+            account: Some(a),
+        }
+    }
+
+    /// A current account read with [`load_money_account`].
+    pub fn loaded(key: Pubkey, account: &'a Option<TokenAccount>) -> Self {
+        Self {
+            key,
+            account: account.as_ref(),
+        }
+    }
+}
+
+/// Reads a **current** money account (the one recorded in `VaultConfig`)
+/// leniently: `None` when it is closed (no data; it may still hold
+/// lamports), so a closed treasury or payments account never blocks
+/// `set_config`, `accept_role` or replacing either account. An account with
+/// data must be a token account of `token_program`, else `err`.
+pub(crate) fn load_money_account(
+    info: &AccountInfo,
+    token_program: &Pubkey,
+    err: MutavError,
+) -> Result<Option<TokenAccount>> {
+    if info.data_is_empty() {
+        return Ok(None);
+    }
+    require_keys_eq!(*info.owner, *token_program, err);
+    let data = info.try_borrow_data()?;
+    let a = TokenAccount::try_deserialize(&mut &data[..]).map_err(|_| error!(err))?;
+    Ok(Some(a))
+}
+
 /// The three MUTAV money flows stay apart (spec §2.1): the treasury and
 /// payments token accounts are different BRS accounts, the capital wallet owns
 /// neither of them, neither is one of the reserve's own token accounts (owned
@@ -142,38 +189,44 @@ pub(crate) enum Installing {
 /// account being installed (`installing`) may not have a delegate or a close
 /// authority (someone other than the owner could move or close it) or be
 /// frozen (a frozen payments account would stop `pay_claim` until it is
-/// replaced).
+/// replaced). A closed current account has no owner to compare: its rules
+/// are skipped, and the admin replaces it.
 pub(crate) fn validate_money_accounts(
     reserve_mint: &Pubkey,
-    treasury: &InterfaceAccount<TokenAccount>,
-    payments: &InterfaceAccount<TokenAccount>,
+    treasury: Money,
+    payments: Money,
     mutav_capital_wallet: &Pubkey,
     vault_authority: &Pubkey,
     operator: &Pubkey,
     installing: Installing,
 ) -> Result<()> {
-    require_keys_eq!(treasury.mint, *reserve_mint, MutavError::InvalidMint);
-    require_keys_eq!(payments.mint, *reserve_mint, MutavError::InvalidMint);
-    require_keys_neq!(treasury.key(), payments.key(), MutavError::InvalidParameter);
+    let (t, p) = (treasury.account, payments.account);
+    for a in t.iter().chain(p.iter()) {
+        require_keys_eq!(a.mint, *reserve_mint, MutavError::InvalidMint);
+    }
+    require_keys_neq!(treasury.key, payments.key, MutavError::InvalidParameter);
     if matches!(installing, Installing::Both | Installing::Treasury) {
-        require_plain_account(treasury, MutavError::InvalidTreasuryAccount)?;
+        let a = t.ok_or(MutavError::InvalidTreasuryAccount)?;
+        require_plain_account(a, MutavError::InvalidTreasuryAccount)?;
     }
     if matches!(installing, Installing::Both | Installing::Payments) {
-        require_plain_account(payments, MutavError::InvalidPaymentsAccount)?;
+        let a = p.ok_or(MutavError::InvalidPaymentsAccount)?;
+        require_plain_account(a, MutavError::InvalidPaymentsAccount)?;
     }
-    require!(
-        *mutav_capital_wallet != treasury.owner && *mutav_capital_wallet != payments.owner,
-        MutavError::InvalidParameter
-    );
-    require!(
-        *vault_authority != treasury.owner && *vault_authority != payments.owner,
-        MutavError::InvalidParameter
-    );
-    require_not_operator_owned(treasury, payments, operator)
+    for a in t.iter().chain(p.iter()) {
+        require!(
+            *mutav_capital_wallet != a.owner,
+            MutavError::InvalidParameter
+        );
+    }
+    for a in t.iter().chain(p.iter()) {
+        require!(*vault_authority != a.owner, MutavError::InvalidParameter);
+    }
+    require_not_operator_owned(t, p, operator)
 }
 
 /// `a` has no delegate, no close authority and is not frozen.
-fn require_plain_account(a: &InterfaceAccount<TokenAccount>, err: MutavError) -> Result<()> {
+fn require_plain_account(a: &TokenAccount, err: MutavError) -> Result<()> {
     if a.delegate.is_some() || a.close_authority.is_some() || a.is_frozen() {
         return Err(error!(err));
     }
@@ -181,25 +234,22 @@ fn require_plain_account(a: &InterfaceAccount<TokenAccount>, err: MutavError) ->
 }
 
 /// Neither money account is owned by `operator` (ADR 0020). Also checked
-/// when a new operator accepts its role.
+/// when a new operator accepts its role. A closed account (`None`) is owned
+/// by no one and passes.
 pub(crate) fn require_not_operator_owned(
-    treasury: &InterfaceAccount<TokenAccount>,
-    payments: &InterfaceAccount<TokenAccount>,
+    treasury: Option<&TokenAccount>,
+    payments: Option<&TokenAccount>,
     operator: &Pubkey,
 ) -> Result<()> {
     if *operator == Pubkey::default() {
         return Ok(());
     }
-    require_keys_neq!(
-        treasury.owner,
-        *operator,
-        MutavError::InvalidTreasuryAccount
-    );
-    require_keys_neq!(
-        payments.owner,
-        *operator,
-        MutavError::InvalidPaymentsAccount
-    );
+    if let Some(t) = treasury {
+        require_keys_neq!(t.owner, *operator, MutavError::InvalidTreasuryAccount);
+    }
+    if let Some(p) = payments {
+        require_keys_neq!(p.owner, *operator, MutavError::InvalidPaymentsAccount);
+    }
     Ok(())
 }
 

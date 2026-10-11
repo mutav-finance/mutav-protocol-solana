@@ -131,6 +131,8 @@ export const CLAIM_PAID = 1;
 export const CLAIM_SETTLED = 3;
 export const DEPOSIT_PENDING = 0;
 export const DEPOSIT_FULFILLED = 1;
+/** Parked by the admin's cancel (ADR 0030): the escrow is still the owner's to collect with `cancel_deposit`. */
+export const DEPOSIT_CANCELLED = 2;
 
 export const MODE_LABEL = (mode: number) => (mode === 0 ? "Normal" : "UnderCovered");
 
@@ -400,7 +402,8 @@ export function configSummary(c: VaultConfig) {
 // ── Investor ────────────────────────────────────────────────────────────────
 
 export const REDEEM_PENDING = 0;
-export const REDEEM_STATUS = ["pending", "filled"] as const;
+/** `REDEEM_CANCELLED = 2`: parked by the admin's cancel (ADR 0030); the owner collects with `cancel_redeem`. */
+export const REDEEM_STATUS = ["pending", "filled", "parked"] as const;
 
 /** One of the connected investor's queue entries, with the actions the program would accept now. */
 export type InvestorRequest = {
@@ -432,16 +435,17 @@ export function investorRequests(
     .filter((d) => d.data.owner === owner)
     .map((d): InvestorRequest => {
       const pending = d.data.status === DEPOSIT_PENDING;
+      const parked = d.data.status === DEPOSIT_CANCELLED;
       return {
         side: "deposit",
         address: d.address,
         seq: d.data.seq,
-        status: pending ? "pending" : "fulfilled",
+        status: pending ? "pending" : parked ? "parked" : "fulfilled",
         requestedAt: d.data.requestedAt,
-        waiting: pending ? d.data.assets : 0n,
-        claimable: pending ? 0n : d.data.sharesOut,
+        waiting: pending || parked ? d.data.assets : 0n,
+        claimable: pending || parked ? 0n : d.data.sharesOut,
         position: depPos.get(d.address) ?? null,
-        actions: pending ? ["cancel_deposit"] : ["claim_shares"],
+        actions: pending || parked ? ["cancel_deposit"] : ["claim_shares"],
       };
     });
   const redeems = ledger.redeems
@@ -449,7 +453,9 @@ export function investorRequests(
     .map((r): InvestorRequest => {
       const actions: InvestorRequest["actions"] = [];
       const pending = r.data.status === REDEEM_PENDING;
-      if (pending) actions.push("cancel_redeem");
+      // A parked request (ADR 0030) is out of the queue; its owner collects the shares.
+      const parked = r.data.status === REDEEM_STATUS.indexOf("parked");
+      if (pending || parked) actions.push("cancel_redeem");
       else actions.push("claim_assets");
       return {
         side: "redeem",
@@ -457,8 +463,8 @@ export function investorRequests(
         seq: r.data.seq,
         status: REDEEM_STATUS[r.data.status] ?? `status ${r.data.status}`,
         requestedAt: r.data.requestedAt,
-        waiting: pending ? r.data.shares : 0n,
-        claimable: pending ? 0n : r.data.assetsOut,
+        waiting: pending || parked ? r.data.shares : 0n,
+        claimable: pending || parked ? 0n : r.data.assetsOut,
         position: redPos.get(r.address) ?? null,
         actions,
       };

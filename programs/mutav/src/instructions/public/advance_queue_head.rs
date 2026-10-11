@@ -35,7 +35,8 @@ pub struct AdvanceQueueHead<'info> {
 }
 
 /// Moves the head of `queue` over dead seqs (the spec §5.8 skip proof): a
-/// closed request, a filled redemption or a fulfilled deposit. It stops at
+/// closed request, or one that is no longer pending (filled or fulfilled,
+/// or parked by the admin's cancel, ADR 0030). It stops at
 /// the first live request, which is never skipped, or at the tail. An
 /// unknown `queue` is `InvalidParameter`.
 pub fn handle_advance_queue_head(ctx: Context<AdvanceQueueHead>, queue: u8, max: u8) -> Result<()> {
@@ -65,7 +66,7 @@ pub fn handle_advance_queue_head(ctx: Context<AdvanceQueueHead>, queue: u8, max:
                 Slot::Open(r) => {
                     require!(r.is_supported(), MutavError::UnsupportedVersion);
                     require!(r.seq == head, MutavError::QueueOrderViolation);
-                    r.status == DEPOSIT_FULFILLED
+                    r.status != DEPOSIT_PENDING
                 }
             },
             _ => match load_slot::<RedeemRequest>(info, &at)? {

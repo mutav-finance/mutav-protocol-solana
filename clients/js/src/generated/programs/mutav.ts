@@ -315,6 +315,7 @@ export enum MutavEvent {
   ConfigUpdated,
   DepositCancelled,
   DepositFilled,
+  DepositParked,
   DepositRequested,
   DepositsFulfilled,
   FeesContributed,
@@ -334,6 +335,7 @@ export enum MutavEvent {
   QueueHeadsAdvanced,
   RedeemCancelled,
   RedeemFilled,
+  RedeemParked,
   RedeemRequested,
   RedeemsFulfilled,
   ReserveFrozenDetected,
@@ -426,6 +428,17 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.DepositFilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([94, 67, 14, 73, 111, 71, 167, 58]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.DepositParked;
   }
   if (
     containsBytes(
@@ -635,6 +648,17 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.RedeemFilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([105, 228, 211, 176, 218, 13, 48, 93]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemParked;
   }
   if (
     containsBytes(

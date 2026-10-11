@@ -30,7 +30,9 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::{ConfigChanges, VaultInitialized},
-    instructions::admin::{validate_config, validate_money_accounts, validate_roles, Installing},
+    instructions::admin::{
+        validate_config, validate_money_accounts, validate_roles, Installing, Money,
+    },
     state::{CapsInput, VaultConfig, VaultState},
     token_guard,
 };
@@ -186,8 +188,8 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
     validate_roles(&args.admin, &args.operator, &args.pauser)?;
     validate_money_accounts(
         &ctx.accounts.reserve_mint.key(),
-        &ctx.accounts.treasury_account,
-        &ctx.accounts.payments_account,
+        Money::of(&ctx.accounts.treasury_account),
+        Money::of(&ctx.accounts.payments_account),
         &args.mutav_capital_wallet,
         &ctx.accounts.vault_authority.key(),
         &args.operator,

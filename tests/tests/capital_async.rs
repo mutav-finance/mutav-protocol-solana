@@ -10,8 +10,9 @@ use mutav::{
     coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::{
-        AssetsClaimed, DepositCancelled, DepositRequested, DepositsFulfilled, QueueHeadsAdvanced,
-        RedeemCancelled, RedeemFilled, RedeemRequested, RedeemsFulfilled, SharesClaimed,
+        AssetsClaimed, DepositCancelled, DepositParked, DepositRequested, DepositsFulfilled,
+        QueueHeadsAdvanced, RedeemCancelled, RedeemFilled, RedeemParked, RedeemRequested,
+        RedeemsFulfilled, SharesClaimed,
     },
     math::{assets_for, conversion_nav, shares_for},
     state::{VaultConfig, VaultState},
@@ -268,16 +269,16 @@ fn cancel_deposit_is_owner_or_admin_and_pending_only() {
 }
 
 #[test]
-fn the_admin_cancels_a_deposit_back_to_its_owner() {
+fn the_admin_parks_a_deposit_and_its_owner_collects_it() {
     let (mut f, list, inv) = setup(2, 10_000 * BRL);
     let (a, b) = (&inv[0], &inv[1]);
     let (res, seq) = f.request_deposit(a, &list, 2_000 * BRL);
     res.unwrap();
     let (res, seq_b) = f.request_deposit(b, &list, 1_000 * BRL);
     res.unwrap();
-    // The investor is de-listed and its BRS account closed: the admin's
-    // cancel recreates the owner's ATA (the admin pays) and returns
-    // everything to the owner, never to the signer. Paused: still allowed.
+    // The investor is de-listed and its BRS account closed. The admin's
+    // cancel parks the request (ADR 0030): nothing moves, no account is
+    // created, the BRS stays owed. Paused: still allowed.
     let close = anchor_spl::token::spl_token::instruction::close_account(
         &TOKEN_PROGRAM,
         &a.brs,
@@ -302,29 +303,50 @@ fn the_admin_cancels_a_deposit_back_to_its_owner() {
     let admin = f.admin.insecure_clone();
     f.send(f.pause_ix(&admin.pubkey()), &admin).unwrap();
 
-    let owner_lamports = f.svm.get_account(&a.pubkey()).unwrap().lamports;
-    let meta = f.admin_cancel_deposit(a, seq).expect("admin cancel");
-    assert_eq!(f.balance(&a.brs), 2_000 * BRL, "refund in the owner's ATA");
-    assert!(f.deposit_request(seq).is_none(), "request closed");
-    assert!(
-        f.svm.get_account(&a.pubkey()).unwrap().lamports > owner_lamports,
-        "the request's rent goes to the owner"
-    );
-    let ev = events::<DepositCancelled>(&meta);
+    let meta = f.admin_cancel_deposit(a, seq).expect("admin parks");
+    assert!(f.svm.get_account(&a.brs).is_none_or(|x| x.data.is_empty()));
+    let r = f.deposit_request(seq).expect("parked, not closed");
+    assert_eq!(r.status, DEPOSIT_CANCELLED);
+    assert_eq!(f.state().pending_deposits_total, 3_000 * BRL, "still owed");
+    assert_eq!(f.balance(&f.pdas.pending_deposits), 3_000 * BRL);
+    let ev = events::<DepositParked>(&meta);
     assert_eq!(
         (ev[0].owner, ev[0].seq, ev[0].assets, ev[0].by),
         (a.pubkey(), seq, 2_000 * BRL, admin.pubkey())
     );
-    // The head can now move past it to the next live request.
+    assert!(events::<DepositCancelled>(&meta).is_empty());
+    f.assert_capital_invariants("after the park");
+    // A parked request is not the admin's to move again, nor claimable.
+    assert_mutav_err(
+        f.admin_cancel_deposit(a, seq),
+        MutavError::InvalidRequestStatus,
+    );
+    assert_mutav_err(f.claim_shares(a, seq), MutavError::InvalidRequestStatus);
+    // The head can move past it to the next live request.
     f.advance_queue_head(QUEUE_DEPOSIT, 2, &[seq, seq_b])
         .unwrap();
     assert_eq!(f.state().deposit_head, seq_b);
-    f.assert_capital_invariants("after the admin cancel");
 
-    // The owner's own cancel, while paused, names the owner as `by`.
-    let meta = f.cancel_deposit(b, seq_b).expect("owner cancel");
-    assert_eq!(events::<DepositCancelled>(&meta)[0].by, b.pubkey());
-    let _ = list;
+    // The owner collects: its ATA is recreated (the owner pays), the BRS
+    // and the request's rent go back to it.
+    let rent = lamports(&f, &deposit_pda(&f.pdas.config, seq));
+    let owner_sol = lamports(&f, &a.pubkey());
+    let meta = f.cancel_deposit(a, seq).expect("the owner collects");
+    assert_eq!(f.balance(&a.brs), 2_000 * BRL, "refund in the owner's ATA");
+    assert!(f.deposit_request(seq).is_none(), "request closed");
+    let ata_rent = lamports(&f, &a.brs);
+    assert_eq!(
+        lamports(&f, &a.pubkey()),
+        owner_sol + rent - ata_rent - 5_000,
+        "the request's rent to the owner, which paid its ATA and the fee"
+    );
+    let ev = events::<DepositCancelled>(&meta);
+    assert_eq!(
+        (ev[0].owner, ev[0].seq, ev[0].assets, ev[0].by),
+        (a.pubkey(), seq, 2_000 * BRL, a.pubkey())
+    );
+    assert_eq!(f.state().pending_deposits_total, 1_000 * BRL);
+    f.assert_capital_invariants("after the owner collects");
 }
 
 // ===========================================================================
@@ -639,10 +661,10 @@ fn cancel_redeem_returns_the_shares_closes_and_keeps_the_head() {
 }
 
 #[test]
-fn the_admin_cancels_a_redeem_head_that_cannot_fill() {
+fn the_admin_parks_a_redeem_head_that_cannot_fill() {
     // A head whose price limit no fill can meet blocks the queue. The admin
-    // removes it: the shares and the rent go back to the owner, and the next
-    // request fills.
+    // parks it (ADR 0030): nothing moves, the shares stay escrowed and owed
+    // to the owner, and the next request fills.
     let (mut f, list, inv) = holders(2, 10_000 * BRL);
     let (a, b) = (&inv[0], &inv[1]);
     let seq = f.state().next_redeem_seq;
@@ -668,40 +690,57 @@ fn the_admin_cancels_a_redeem_head_that_cannot_fill() {
 
     // Paused: the admin path is not gated either.
     pause(&mut f);
-    let owner_sol = lamports(&f, &a.pubkey());
-    let rent = lamports(&f, &redeem_pda(&f.pdas.config, seq));
+    let (supply, outstanding) = (f.share_supply(), f.state().shares_outstanding);
     let admin = f.admin.pubkey();
-    let meta = f.admin_cancel_redeem(a, seq).expect("admin cancel");
-    assert!(f.redeem_request(seq).is_none());
+    let meta = f.admin_cancel_redeem(a, seq).expect("admin parks");
+    let r = f.redeem_request(seq).expect("parked, not closed");
+    assert_eq!(r.status, REDEEM_CANCELLED);
+    assert_eq!(f.balance(&a.shares), 7_000 * BRL, "nothing moved");
+    let s = f.state();
+    assert_eq!(s.pending_redeem_shares, 5_000 * BRL, "still escrowed");
+    assert_eq!(s.shares_outstanding, outstanding);
+    assert_eq!(f.share_supply(), supply);
+    let ev = events::<RedeemParked>(&meta);
     assert_eq!(
-        f.balance(&a.shares),
-        10_000 * BRL,
-        "shares back to the owner"
-    );
-    assert_eq!(
-        lamports(&f, &a.pubkey()),
-        owner_sol + rent,
-        "rent to the owner"
-    );
-    let ev = events::<RedeemCancelled>(&meta);
-    assert_eq!(
-        (ev[0].owner, ev[0].seq, ev[0].shares_returned, ev[0].by),
+        (ev[0].owner, ev[0].seq, ev[0].shares, ev[0].by),
         (a.pubkey(), seq, 3_000 * BRL, admin)
     );
-    f.assert_capital_invariants("after the admin cancel");
+    f.assert_capital_invariants("after the park");
+    assert_mutav_err(
+        f.admin_cancel_redeem(a, seq),
+        MutavError::InvalidRequestStatus,
+    );
+    assert_mutav_err(f.claim_assets(a, seq), MutavError::InvalidRequestStatus);
 
     let admin = f.admin.insecure_clone();
     f.send(f.unpause_ix(&admin.pubkey()), &admin).unwrap();
     f.fulfil_redeems(1, u64::MAX, &[seq, seq_b])
         .expect("the next request fills");
     assert_eq!(f.redeem_request(seq_b).unwrap().status, REDEEM_FILLED);
+    assert_eq!(f.redeem_request(seq).unwrap().status, REDEEM_CANCELLED);
     assert_eq!(f.state().redeem_head, seq_b + 1);
+
+    // The owner collects its shares and the rent.
+    let rent = lamports(&f, &redeem_pda(&f.pdas.config, seq));
+    let owner_sol = lamports(&f, &a.pubkey());
+    let meta = f.cancel_redeem(a, seq).expect("the owner collects");
+    assert!(f.redeem_request(seq).is_none());
+    assert_eq!(f.balance(&a.shares), 10_000 * BRL);
+    assert_eq!(lamports(&f, &a.pubkey()), owner_sol + rent - 5_000);
+    let ev = events::<RedeemCancelled>(&meta);
+    assert_eq!(
+        (ev[0].seq, ev[0].shares_returned, ev[0].by),
+        (seq, 3_000 * BRL, a.pubkey())
+    );
+    assert_eq!(f.state().pending_redeem_shares, 0);
+    f.assert_capital_invariants("after the owner collects");
 }
 
 #[test]
-fn the_admin_cancel_recreates_the_owners_share_account() {
-    // The owner closed its (empty) share account: the admin pays to recreate
-    // it, and the shares land there, never with the signer.
+fn the_owners_cancel_recreates_its_share_account() {
+    // The owner closed its (empty) share account; the admin parked the
+    // request. The owner's cancel recreates the account and the shares land
+    // there.
     let (mut f, list, inv) = holders(1, 10_000 * BRL);
     let a = &inv[0];
     let (r, seq) = f.request_redeem(a, &list, 10_000 * BRL);
@@ -716,7 +755,12 @@ fn the_admin_cancel_recreates_the_owners_share_account() {
     )
     .unwrap();
     f.send_as(close, &a.key).unwrap();
-    f.admin_cancel_redeem(a, seq).expect("admin cancel");
+    f.admin_cancel_redeem(a, seq).expect("admin parks");
+    assert!(f
+        .svm
+        .get_account(&a.shares)
+        .is_none_or(|x| x.data.is_empty()));
+    f.cancel_redeem(a, seq).expect("the owner collects");
     assert_eq!(f.balance(&a.shares), 10_000 * BRL);
 }
 

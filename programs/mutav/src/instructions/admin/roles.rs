@@ -14,7 +14,6 @@
 //! None of them is pause-gated (ADR 0020).
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::TokenAccount;
 
 use crate::constants::CONFIG_SEED;
 use crate::{
@@ -24,7 +23,7 @@ use crate::{
         emit_config_changes, ConfigChanges, GuardiansUpdated, HandoverCancelled, RoleAccepted,
         RoleProposed,
     },
-    instructions::admin::{require_not_operator_owned, validate_role_key},
+    instructions::admin::{load_money_account, require_not_operator_owned, validate_role_key},
     state::VaultConfig,
 };
 
@@ -224,12 +223,15 @@ pub struct AcceptRole<'info> {
 
     /// The money accounts, to check a new operator owns neither (ADR 0020).
     /// Required for `ROLE_OPERATOR`; omitted for `ROLE_PAUSER`, so a pauser
-    /// handover never depends on the money accounts' state.
+    /// handover never depends on the money accounts' state. Read leniently
+    /// in the handler (`load_money_account`): a closed account is skipped.
+    /// CHECK: address-bound to `config.treasury_account`; decoded in the handler.
     #[account(address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
-    pub treasury_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
+    pub treasury_account: Option<UncheckedAccount<'info>>,
 
+    /// CHECK: address-bound to `config.payments_account`; decoded in the handler.
     #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
-    pub payments_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
+    pub payments_account: Option<UncheckedAccount<'info>>,
 }
 
 /// The pending operator or pauser takes its role.
@@ -249,7 +251,12 @@ pub fn handle_accept_role(ctx: Context<AcceptRole>, role: u8) -> Result<()> {
         ) else {
             return err!(MutavError::InvalidParameter);
         };
-        require_not_operator_owned(treasury, payments, &key)?;
+        let token_program = config.reserve_token_program;
+        let treasury =
+            load_money_account(treasury, &token_program, MutavError::InvalidTreasuryAccount)?;
+        let payments =
+            load_money_account(payments, &token_program, MutavError::InvalidPaymentsAccount)?;
+        require_not_operator_owned(treasury.as_ref(), payments.as_ref(), &key)?;
         let old = config.operator;
         ch.set(field::OPERATOR, &mut config.operator, key);
         old
