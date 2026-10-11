@@ -7,7 +7,9 @@
 //!
 //! ```text
 //! stable_assets     = brs_balance
-//! coverage_required = max(ceil(c × remaining_cover_total / 10_000), provisions)
+//! unprovisioned     = max(0, remaining_cover_total − provisions)
+//! coverage_required = max(ceil(c × remaining_cover_total / 10_000),
+//!                         provisions + min(stress_buffer, unprovisioned))
 //! surplus           = max(0, stable_assets − coverage_required)
 //! free_capital      = surplus
 //! liquid_budget     = max(0, brs_balance − provisions)
@@ -23,14 +25,18 @@ use crate::{
     math::{mul_div, Rounding},
 };
 
-/// `max(ceil(c × remaining_cover_total / 10_000), provisions)` (spec §4,
-/// ADR 0016). The ratio term is rounded up, in the reserve's favour. The
-/// provisions term keeps filed claims fully covered when `c < 1`; at
-/// `c ≥ 1` it never binds, because `provisions ≤ remaining_cover_total`.
+/// `max(ceil(c × remaining_cover_total / 10_000), provisions +
+/// min(stress_buffer, unprovisioned))` (spec §4; ADR 0016, ADR 0022). The
+/// ratio term is rounded up, in the reserve's favour. The second term keeps
+/// filed claims fully covered when `c < 1`, plus the claims that could be
+/// filed next (`stress_buffer`, an admin-set amount in BRS units), never more
+/// than the book could still claim (`unprovisioned`). It saturates
+/// ([`stress_term`]); only the ratio term can fail, and only for `c > 1`.
 pub fn coverage_required(
     remaining_cover_total: u64,
     coverage_ratio_bps: u16,
     provisions: u64,
+    stress_buffer: u64,
 ) -> Result<u64> {
     let by_ratio = mul_div(
         remaining_cover_total,
@@ -38,7 +44,39 @@ pub fn coverage_required(
         BPS_DENOMINATOR as u64,
         Rounding::Up,
     )?;
-    Ok(by_ratio.max(provisions))
+    Ok(by_ratio.max(stress_term(
+        remaining_cover_total,
+        provisions,
+        stress_buffer,
+    )))
+}
+
+/// `provisions + min(stress_buffer, max(0, remaining_cover_total −
+/// provisions))`, saturating (ADR 0022). While invariant 2 holds
+/// (`provisions ≤ remaining_cover_total`) it never exceeds
+/// `remaining_cover_total`, so the saturation never binds.
+pub fn stress_term(remaining_cover_total: u64, provisions: u64, stress_buffer: u64) -> u64 {
+    let unprovisioned = remaining_cover_total.saturating_sub(provisions);
+    provisions.saturating_add(stress_buffer.min(unprovisioned))
+}
+
+/// [`coverage_required`] for the claim-payment path, which never fails on it
+/// (ADR 0022 decision 3): an error saturates to `u64::MAX`. `validate_config`
+/// keeps `c ≤ 1.0`, where the ratio term always fits, so this is defence in
+/// depth for a cached value.
+pub fn coverage_required_saturating(
+    remaining_cover_total: u64,
+    coverage_ratio_bps: u16,
+    provisions: u64,
+    stress_buffer: u64,
+) -> u64 {
+    coverage_required(
+        remaining_cover_total,
+        coverage_ratio_bps,
+        provisions,
+        stress_buffer,
+    )
+    .unwrap_or(u64::MAX)
 }
 
 /// Capital above required coverage, saturating at 0.
@@ -76,6 +114,8 @@ pub struct SolvencyInputs {
     pub remaining_cover_total: u64,
     pub coverage_ratio_bps: u16,
     pub provisions: u64,
+    /// `Caps.stress_buffer` (ADR 0022).
+    pub stress_buffer: u64,
 }
 
 /// The §4 quantities for one snapshot.
@@ -92,8 +132,12 @@ pub struct Solvency {
 impl Solvency {
     pub fn compute(i: &SolvencyInputs) -> Result<Self> {
         let stable_assets = i.brs_balance;
-        let coverage_required =
-            coverage_required(i.remaining_cover_total, i.coverage_ratio_bps, i.provisions)?;
+        let coverage_required = coverage_required(
+            i.remaining_cover_total,
+            i.coverage_ratio_bps,
+            i.provisions,
+            i.stress_buffer,
+        )?;
         let surplus = surplus(stable_assets, coverage_required);
         Ok(Self {
             stable_assets,
@@ -149,33 +193,86 @@ mod tests {
 
     #[test]
     fn coverage_required_rounds_up() {
-        assert_eq!(coverage_required(1, 10_000, 0).unwrap(), 1);
+        assert_eq!(coverage_required(1, 10_000, 0, 0).unwrap(), 1);
         // 1 × 1.5 = 1.5 → 2.
-        assert_eq!(coverage_required(1, 15_000, 0).unwrap(), 2);
+        assert_eq!(coverage_required(1, 15_000, 0, 0).unwrap(), 2);
         // 3 × 0.3333 = 0.9999 → 1.
-        assert_eq!(coverage_required(3, 3_333, 0).unwrap(), 1);
-        assert_eq!(coverage_required(0, 15_000, 0).unwrap(), 0);
-        assert_eq!(coverage_required(u64::MAX, 10_000, 0).unwrap(), u64::MAX);
-        assert!(coverage_required(u64::MAX, 10_001, 0).is_err());
+        assert_eq!(coverage_required(3, 3_333, 0, 0).unwrap(), 1);
+        assert_eq!(coverage_required(0, 15_000, 0, 0).unwrap(), 0);
+        assert_eq!(coverage_required(u64::MAX, 10_000, 0, 0).unwrap(), u64::MAX);
+        assert!(coverage_required(u64::MAX, 10_001, 0, 0).is_err());
         // c = 0.10 (the floor): 11 × 0.1 = 1.1 → 2.
-        assert_eq!(coverage_required(11, MIN_COVERAGE_RATIO_BPS, 0).unwrap(), 2);
+        assert_eq!(
+            coverage_required(11, MIN_COVERAGE_RATIO_BPS, 0, 0).unwrap(),
+            2
+        );
     }
 
     #[test]
     fn coverage_required_is_never_below_provisions() {
         // ADR 0016. c = 0.10 on 100,000 of cover is 10,000.
-        assert_eq!(coverage_required(100_000, 1_000, 4_000).unwrap(), 10_000);
+        assert_eq!(coverage_required(100_000, 1_000, 4_000, 0).unwrap(), 10_000);
         // Provisions above the ratio term bind.
-        assert_eq!(coverage_required(100_000, 1_000, 25_000).unwrap(), 25_000);
-        assert_eq!(coverage_required(0, 1_000, 7).unwrap(), 7);
+        assert_eq!(
+            coverage_required(100_000, 1_000, 25_000, 0).unwrap(),
+            25_000
+        );
+        assert_eq!(coverage_required(0, 1_000, 7, 0).unwrap(), 7);
         // At c ≥ 1, provisions ≤ remaining_cover_total never bind.
         assert_eq!(
-            coverage_required(100_000, 10_000, 100_000).unwrap(),
+            coverage_required(100_000, 10_000, 100_000, 0).unwrap(),
             100_000
         );
         assert_eq!(
-            coverage_required(100_000, 15_000, 100_000).unwrap(),
+            coverage_required(100_000, 15_000, 100_000, 0).unwrap(),
             150_000
+        );
+    }
+
+    #[test]
+    fn the_stress_buffer_covers_the_next_claims() {
+        // ADR 0022. c = 0.10 on 100,000 of cover is 10,000; provisions 4,000
+        // plus a 19,000 buffer bind instead.
+        assert_eq!(
+            coverage_required(100_000, 1_000, 4_000, 19_000).unwrap(),
+            23_000
+        );
+        // The buffer never asks for more than the book could still claim:
+        // 4,000 filed + min(19,000, 6,000 unprovisioned) = 10,000 = the cover.
+        assert_eq!(
+            coverage_required(10_000, 1_000, 4_000, 19_000).unwrap(),
+            10_000
+        );
+        // The ratio term still binds on a large book.
+        assert_eq!(
+            coverage_required(1_000_000, 1_000, 4_000, 19_000).unwrap(),
+            100_000
+        );
+        // Zero buffer is ADR 0016's formula.
+        assert_eq!(coverage_required(100_000, 1_000, 4_000, 0).unwrap(), 10_000);
+        // Empty book: nothing to cover, whatever the buffer.
+        assert_eq!(coverage_required(0, 1_000, 0, 19_000).unwrap(), 0);
+    }
+
+    #[test]
+    fn the_stress_term_saturates() {
+        assert_eq!(stress_term(u64::MAX, 0, u64::MAX), u64::MAX);
+        assert_eq!(stress_term(u64::MAX, u64::MAX - 1, u64::MAX), u64::MAX);
+        // Provisions above the cover (a broken invariant 2): no buffer on top,
+        // and no wrap.
+        assert_eq!(stress_term(5, 9, u64::MAX), 9);
+        assert_eq!(
+            coverage_required(u64::MAX, 10_000, 1, u64::MAX).unwrap(),
+            u64::MAX
+        );
+        // The claim path never fails on the recompute.
+        assert_eq!(
+            coverage_required_saturating(u64::MAX, 10_001, 0, 0),
+            u64::MAX
+        );
+        assert_eq!(
+            coverage_required_saturating(100_000, 1_000, 4_000, 19_000),
+            23_000
         );
     }
 
@@ -186,6 +283,7 @@ mod tests {
             remaining_cover_total: 100_000,
             coverage_ratio_bps: 1_000,
             provisions: 2_000,
+            stress_buffer: 0,
         };
         let s = Solvency::compute(&i).unwrap();
         assert_eq!(s.coverage_required, 10_000);
@@ -257,6 +355,7 @@ mod tests {
             remaining_cover_total: 80_000,
             coverage_ratio_bps: 10_000,
             provisions: 2_000,
+            stress_buffer: 0,
         };
         let s = Solvency::compute(&i).unwrap();
         assert_eq!(s.stable_assets, 100_200);
@@ -284,6 +383,7 @@ mod tests {
             remaining_cover_total: u64::MAX,
             coverage_ratio_bps: 10_000,
             provisions: u64::MAX,
+            stress_buffer: 0,
         };
         let s = Solvency::compute(&i).unwrap();
         assert_eq!(s.stable_assets, u64::MAX);
@@ -304,21 +404,29 @@ mod tests {
             0u64..=1u64 << 50,
             MIN_COVERAGE_RATIO_BPS..=20_000,
             0u64..=1u64 << 50,
+            prop_oneof![Just(0u64), 0u64..=1u64 << 50, Just(u64::MAX)],
         )
-            .prop_map(|(brs, cover, c, prov)| SolvencyInputs {
+            .prop_map(|(brs, cover, c, prov, stress)| SolvencyInputs {
                 brs_balance: brs,
                 remaining_cover_total: cover,
                 coverage_ratio_bps: c,
                 provisions: prov,
+                stress_buffer: stress,
             })
+    }
+
+    /// Independent oracle for `coverage_required`, in `u128` (ADR 0022).
+    fn oracle_coverage(i: &SolvencyInputs) -> u128 {
+        let unprovisioned = (i.remaining_cover_total as u128).saturating_sub(i.provisions as u128);
+        let stress = i.provisions as u128 + (i.stress_buffer as u128).min(unprovisioned);
+        (i.remaining_cover_total as u128 * i.coverage_ratio_bps as u128)
+            .div_ceil(10_000)
+            .max(stress)
     }
 
     /// Independent oracle for `surplus`, in `u128`.
     fn oracle_surplus(i: &SolvencyInputs) -> u64 {
-        let cov = (i.remaining_cover_total as u128 * i.coverage_ratio_bps as u128)
-            .div_ceil(10_000)
-            .max(i.provisions as u128);
-        (i.brs_balance as u128).saturating_sub(cov) as u64
+        (i.brs_balance as u128).saturating_sub(oracle_coverage(i)) as u64
     }
 
     proptest! {
@@ -329,6 +437,13 @@ mod tests {
         #[test]
         fn free_capital_is_surplus(i in inputs()) {
             let s = Solvency::compute(&i).unwrap();
+            prop_assert_eq!(s.coverage_required as u128, oracle_coverage(&i));
+            prop_assert!(s.coverage_required >= i.provisions);
+            prop_assert!(
+                s.coverage_required
+                    >= coverage_required(i.remaining_cover_total, i.coverage_ratio_bps, i.provisions, 0).unwrap(),
+                "the buffer never lowers coverage"
+            );
             prop_assert_eq!(s.surplus, oracle_surplus(&i));
             prop_assert_eq!(s.free_capital, s.surplus);
             prop_assert_eq!(s.liquid_budget, i.brs_balance.saturating_sub(i.provisions));
@@ -359,6 +474,7 @@ mod tests {
                 remaining_cover_total: cover,
                 coverage_ratio_bps: c,
                 provisions: other + a,
+                stress_buffer: 0,
             };
             let after_i = SolvencyInputs {
                 brs_balance: brs - a,

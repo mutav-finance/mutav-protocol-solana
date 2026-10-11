@@ -100,6 +100,7 @@ pub fn handle_register_guarantee(
         cover_total_after,
         config.coverage_ratio_bps,
         state.provisions,
+        config.caps.stress_buffer,
     )?;
     require!(
         coverage_after <= before.stable_assets,

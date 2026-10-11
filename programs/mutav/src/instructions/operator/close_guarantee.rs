@@ -8,7 +8,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::GuaranteeClosed,
-    solvency::coverage_required,
+    solvency::coverage_required_saturating,
     state::{Guarantee, VaultConfig, VaultState},
 };
 
@@ -74,11 +74,12 @@ pub fn handle_close_guarantee(
         .remaining_cover_total
         .checked_sub(released)
         .ok_or(MutavError::MathOverflow)?;
-    state.coverage_required = coverage_required(
+    state.coverage_required = coverage_required_saturating(
         state.remaining_cover_total,
         ctx.accounts.config.coverage_ratio_bps,
         state.provisions,
-    )?;
+        ctx.accounts.config.caps.stress_buffer,
+    );
     state.active_guarantees = state
         .active_guarantees
         .checked_sub(1)

@@ -120,6 +120,7 @@ pub fn handle_fulfil_redeems(
             remaining_cover_total: state.remaining_cover_total,
             coverage_ratio_bps: config.coverage_ratio_bps,
             provisions: state.provisions,
+            stress_buffer: config.caps.stress_buffer,
         })
     };
     require!(

@@ -17,7 +17,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::ClaimPaid,
-    solvency::coverage_required,
+    solvency::coverage_required_saturating,
     state::{ClaimFiling, Guarantee, VaultConfig, VaultState},
 };
 
@@ -208,11 +208,14 @@ pub fn handle_pay_claim(
         .remaining_cover_total
         .checked_sub(amount)
         .ok_or(MutavError::MathOverflow)?;
-    state.coverage_required = coverage_required(
+    // The cached value saturates: a claim payment is never refused for it
+    // (ADR 0022 decision 3).
+    state.coverage_required = coverage_required_saturating(
         state.remaining_cover_total,
         ctx.accounts.config.coverage_ratio_bps,
         state.provisions,
-    )?;
+        ctx.accounts.config.caps.stress_buffer,
+    );
     let bucket = state.claim_bucket_mut(day);
     *bucket = bucket.checked_add(amount).ok_or(MutavError::MathOverflow)?;
     state.claims_paid_total = state

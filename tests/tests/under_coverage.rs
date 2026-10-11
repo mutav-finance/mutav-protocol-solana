@@ -21,6 +21,7 @@ fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
         provisions: s.provisions,
+        stress_buffer: c.caps.stress_buffer,
     })
     .unwrap()
 }
@@ -388,6 +389,7 @@ fn admin_clears_the_halt_and_resets_the_baseline() {
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: f.config().coverage_ratio_bps,
         provisions: s.provisions,
+        stress_buffer: f.config().caps.stress_buffer,
     })
     .unwrap();
     let nav = mutav::pricing::published_nav(sol.net_assets, s.shares_outstanding).unwrap();

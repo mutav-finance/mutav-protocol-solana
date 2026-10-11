@@ -102,6 +102,9 @@ pub(crate) fn validate_config(c: &VaultConfig) -> Result<()> {
         k.min_request > 0 && k.min_request <= k.max_request,
         MutavError::InvalidParameter
     );
+    // The stress buffer asks for capital the reserve could hold: never more
+    // than `max_tvl` (ADR 0022). `0` = no stress term.
+    require!(k.stress_buffer <= k.max_tvl, MutavError::InvalidParameter);
     require!(
         k.max_queue_wait_secs >= 0 && k.max_reinstate_age >= 0,
         MutavError::InvalidParameter
