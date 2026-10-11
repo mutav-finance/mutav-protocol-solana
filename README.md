@@ -156,7 +156,8 @@ bun scripts/devnet/allowlist.ts --config $CFG --proofs allowlist-proofs.json --o
 bun scripts/devnet/roles.ts     --config $CFG --out roles.json
 bun scripts/devnet/caps.ts      --config $CFG --url $RPC --confirm-cluster devnet --out caps.json
 
-# 4. Post-deploy checks.
+# 4. Post-deploy checks. initialize does not set the allowlist root: run this only after
+#    allowlist.json (and roles.json, if any) has executed.
 bun scripts/devnet/verify.ts --config $CFG --url $RPC --confirm-cluster devnet --expected-hash $HASH
 ```
 
@@ -169,7 +170,7 @@ Program upgrades go through `scripts/release/upgrade-proposal.ts` (run by `.gith
 - the deployed program is the verified build: the ProgramData program bytes hash to `--expected-hash` (as `solana-verify get-program-hash`);
 - the upgrade authority is the upgrade multisig's vault;
 - `feature_flags == 0`;
-- admin, operator, pauser and the allowlist root are as configured, with no pending operator, pauser or admin handover;
+- admin, operator, pauser and the allowlist root are as configured, with no pending operator, pauser or admin handover, and the guardians are exactly the config's `guardians` (none when empty);
 - every other `VaultConfig` field equals the config file, field by field (c, fee take, every cap including `max_nav_move_bps`, 6 decimals, mint, token program, money accounts, capital wallet);
 - on devnet, the locked devnet values (`scripts/devnet/lib/compare.ts`); a `max_claim_per_period` raised for a large claim payment is reported until it is lowered again;
 - the treasury and payments accounts hold the reserve mint and are not owned by the operator;
