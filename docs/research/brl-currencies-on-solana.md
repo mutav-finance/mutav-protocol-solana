@@ -16,7 +16,7 @@ One point needed correcting at the time. MUTAV's design documents called TESOURO
 
 The ranking weighed feasibility for the October pilot and its caps (R$10k per claim call, 50% TESOURO ceiling) against the blockers in the evidence. Everything in this table is an **[inference]** assembled from the cited facts in the sections below.
 
-> **Since this research:** the pilot reserve holds BRS only, and the TESOURO ceiling was replaced by a settlement floor. Other assets arrive later through adapters, each starting at a cap of zero ([ADR 0018](../decisions/0018-brs-only-pilot-reserve.md), [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md), proposed). The R$10k per-call claim cap stands; a claim above it is paid after the reserve admin approves the exact amount ([ADR 0021](../decisions/0021-claims-approval-amendment-exact-payment.md)).
+> **Since this research:** the pilot reserve holds BRS only, and the TESOURO ceiling was replaced by a settlement floor. Other assets arrive later through adapters, each starting at a cap of zero ([ADR 0018](../decisions/0018-brs-only-pilot-reserve.md), [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md), proposed). The per-call claim cap is now R$15k ([ADR 0028](../decisions/0028-pilot-parameters.md)); a claim above it is paid after the reserve admin approves the exact amount ([ADR 0021](../decisions/0021-claims-approval-amendment-exact-payment.md)), an instruction planned for a later upgrade, and bank-first until then.
 
 | Rank | Move | Tier | Feasibility | Main blockers |
 |---|---|---|---|---|
