@@ -399,9 +399,9 @@ fn pay_claim_only_to_the_payments_account() {
 #[test]
 fn pay_claim_per_call_cap_at_the_boundary() {
     // Test caps: R$10k per call. Above it only an approval of the exact
-    // amount lets the reserve pay (ADR 0021); `approve_claim` comes later, so
-    // the approval is injected here. Until then such claims are paid
-    // bank-first.
+    // amount lets the reserve pay (ADR 0021). The approval is injected here
+    // to test `pay_claim`'s check on its own: `approve_claim` refuses any
+    // amount but the provision (`approve_claim.rs`).
     let (mut f, g) = book(40_000 * BRL, 30_000 * BRL, 0);
     // The admin raises the period cap so the window does not bind here.
     f.set_config(vec![mutav::ConfigParam::MaxClaimPerPeriod(30_000 * BRL)])

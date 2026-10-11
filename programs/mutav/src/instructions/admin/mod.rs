@@ -1,6 +1,7 @@
 //! Admin and role instructions (spec §5.1; ADR 0020, ADR 0026). Planned
 //! later: `whitelist_adapter`, `remove_adapter`.
 
+pub mod approve_claim;
 pub mod clear_fulfil_halt;
 pub mod initialize;
 pub mod pause;
@@ -11,6 +12,7 @@ pub mod set_config;
 pub mod set_payments_account;
 pub mod set_treasury_account;
 
+pub use approve_claim::*;
 pub use clear_fulfil_halt::*;
 pub use initialize::*;
 pub use pause::*;

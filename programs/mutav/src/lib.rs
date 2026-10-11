@@ -120,6 +120,18 @@ pub mod mutav {
         instructions::admin::revoke_operator::handle_revoke_operator(ctx)
     }
 
+    /// Approve the exact amount a filed claim takes out of the reserve, so
+    /// `pay_claim` can pay it above `max_claim_per_call` (ADR 0021). The
+    /// amount must equal the filing's provision. Moves no funds; never
+    /// paused, never coverage-gated. Admin.
+    pub fn approve_claim(
+        ctx: Context<ApproveClaim>,
+        notice_ref_hash: [u8; 32],
+        amount: u64,
+    ) -> Result<()> {
+        instructions::admin::approve_claim::handle_approve_claim(ctx, notice_ref_hash, amount)
+    }
+
     /// Register a guarantee: coverage-gated and capped per guarantee.
     /// Operator.
     pub fn register_guarantee(

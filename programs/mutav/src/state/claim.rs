@@ -41,8 +41,9 @@ pub struct ClaimFiling {
     /// `0` until settled.
     pub settled_at: i64,
     /// The exact amount the reserve admin approved for a claim above
-    /// `max_claim_per_call` (`approve_claim`, a later upgrade). `0` = not
-    /// approved. Written zero and not read by this binary.
+    /// `max_claim_per_call` (`approve_claim`, ADR 0021). `0` = not approved.
+    /// Written by `approve_claim` (always the provision); read by
+    /// `pay_claim` above the per-call cap.
     pub approved_amount: u64,
     /// Zeroed. Never read or written by logic. Holds the ADR 0012 claim and
     /// settlement fields (114 bytes) with room to spare after the freeze,

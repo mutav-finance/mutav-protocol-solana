@@ -553,6 +553,22 @@ pub struct RedeemParked {
     pub by: Pubkey,
 }
 
+/// The reserve admin approved `amount` for one filed claim (`approve_claim`,
+/// ADR 0021): above `max_claim_per_call`, `pay_claim` pays the filing only at
+/// this amount. `previous_amount` is the approval it replaces (`0` = none);
+/// `max_claim_per_call` is the cap at approval time.
+#[event]
+pub struct ClaimApproved {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub guarantee_id: [u8; 32],
+    pub leg: u8,
+    pub notice_ref_hash: [u8; 32],
+    pub amount: u64,
+    pub previous_amount: u64,
+    pub max_claim_per_call: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
