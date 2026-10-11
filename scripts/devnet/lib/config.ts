@@ -54,6 +54,9 @@ export type DeployConfig = {
     minRequest: bigint;
     maxRequest: bigint;
     maxNavMoveBps: number;
+    stressBuffer: bigint;
+    maxQueueWaitSecs: bigint;
+    maxReinstateAge: bigint;
   };
   /** Owners allowlisted for `request_deposit` / `request_redeem`. */
   allowlist: Address[];
@@ -137,6 +140,10 @@ export function parseConfig(raw: any): DeployConfig {
       minRequest: big(raw.caps?.minRequest, 'caps.minRequest'),
       maxRequest: big(raw.caps?.maxRequest, 'caps.maxRequest'),
       maxNavMoveBps: bps(raw.caps?.maxNavMoveBps, 'caps.maxNavMoveBps'),
+      // ADR 0019 carves; absent means 0 (off).
+      stressBuffer: big(raw.caps?.stressBuffer ?? '0', 'caps.stressBuffer'),
+      maxQueueWaitSecs: big(raw.caps?.maxQueueWaitSecs ?? '0', 'caps.maxQueueWaitSecs'),
+      maxReinstateAge: big(raw.caps?.maxReinstateAge ?? '0', 'caps.maxReinstateAge'),
     },
     allowlist: (raw.allowlist ?? []).map((a: unknown, i: number) => addr(a, `allowlist[${i}]`)),
   };

@@ -8,7 +8,7 @@
  * ~/.config/solana/mutav/mutav-keypair.json). It is only handed to the
  * Solana CLI, which deploys to the local validator.
  *
- * deploy (deploy.ts) → initialize → set_roles → set_config (caps) →
+ * deploy (deploy.ts) → initialize → propose_role / accept_role → set_config (caps) →
  * set_allowlist_root → post-deploy checks, plus one allowlisted
  * `request_deposit` to prove the root and proofs match the program.
  *
@@ -46,7 +46,10 @@ import {
   composeInitialize,
   composeSetAllowlistRoot,
   composeSetCaps,
-  composeSetRoles,
+  composeAcceptRole,
+  composeProposeRoles,
+  ROLE_OPERATOR,
+  ROLE_PAUSER,
   programDataAddress,
   TOKEN_PROGRAM,
 } from './lib/compose';
@@ -166,15 +169,19 @@ export async function dryRun(programKeypair?: string) {
     step('initialize (signed by the upgrade authority = vault stand-in)');
     await sendAs(vault!, [await composeInitialize(cfg, { upgradeAuthority: vault!, payer: vault! })]);
 
-    step('set_roles (rotate operator and pauser)');
-    const rotated = { ...cfg, operator: op2!.address, pauser: pause2!.address };
-    await sendAs(vault!, [await composeSetRoles(rotated, vault!)]);
-
-    step('set_config (caps from the config file)');
+    step('propose_role + accept_role (rotate operator and pauser, ADR 0020)');
     const a = await findReserveAddresses(mint, { programAddress: programId });
+    const rotated = { ...cfg, operator: op2!.address, pauser: pause2!.address };
+    const before = (await fetchVaultConfig(rpc, a.config)).data;
+    await sendAs(vault!, await composeProposeRoles(rotated, before, vault!));
+    for (const s of [op2!, pause2!]) await airdrop(rpc, s.address, 1);
+    await sendAs(op2!, [await composeAcceptRole(rotated, before, ROLE_OPERATOR, op2!)]);
+    await sendAs(pause2!, [await composeAcceptRole(rotated, before, ROLE_PAUSER, pause2!)]);
+
+    step('set_config (sparse: only the caps that differ from the chain)');
     const current = (await fetchVaultConfig(rpc, a.config)).data;
     const raised = { ...cfg, caps: { ...cfg.caps, maxTvl: 100_000n * BRL } };
-    await sendAs(vault!, [await composeSetCaps(raised, current, vault!)]);
+    await sendAs(vault!, await composeSetCaps(raised, current, vault!));
 
     step('set_allowlist_root');
     const tree = await buildAllowlist(cfg.allowlist);
@@ -213,7 +220,8 @@ export async function dryRun(programKeypair?: string) {
           eventAuthority: a.eventAuthority,
           program: programId,
           assets: 1_000n * BRL,
-          proof: tree.proofs.get(investor!.address)!,
+          minSharesOut: 0n,
+          eligibility: { __kind: 'Merkle', proof: tree.proofs.get(investor!.address)! },
         },
         { programAddress: programId },
       ),
