@@ -2,21 +2,24 @@ import { address } from "@solana/kit";
 import { guardedEnv, readReserve } from "@/lib/server/chain";
 import { ComposeError } from "@/lib/server/compose";
 import { errorResponse, readResponse } from "@/lib/server/respond";
+import { cachedRead, isFresh } from "@/lib/server/read-cache";
 import { boundedBody } from "@/lib/server/relay";
 import { composeProposalAction, readMultisig, vaultAddress, type ProposalAction } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 
 /** The admin multisig and its recent proposals, or why there is none. */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const env = await guardedEnv();
-    const reserve = await readReserve(env);
-    if (!env.squadsMultisig) {
-      return readResponse({ configured: false, admin: reserve.config.admin, cluster: env.cluster });
-    }
-    const vault = vaultAddress(env.squadsMultisig);
-    const ms = await readMultisig(env, reserve.now, reserve.config);
-    return readResponse({ configured: true, adminIsVault: reserve.config.admin === vault, multisig: ms, now: reserve.now });
+    return readResponse(
+      await cachedRead("squads", async () => {
+        const reserve = await readReserve(env);
+        if (!env.squadsMultisig) return { configured: false, admin: reserve.config.admin, cluster: env.cluster };
+        const vault = vaultAddress(env.squadsMultisig);
+        const ms = await readMultisig(env, reserve.now, reserve.config);
+        return { configured: true, adminIsVault: reserve.config.admin === vault, multisig: ms, now: reserve.now };
+      }, { fresh: isFresh(req) }),
+    );
   } catch (e) {
     return errorResponse(e);
   }
