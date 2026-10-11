@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { address, AccountRole, getAddressEncoder, type Address } from '@solana/kit';
@@ -122,11 +122,9 @@ describe('checkUpgradeSources', () => {
 describe('upgrade-proposal main', () => {
   const dir = mkdtempSync(join(tmpdir(), 'mutav-upgrade-'));
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
-  const so = join(dir, 'mutav.so');
-  writeFileSync(so, ELF);
   const out = join(dir, 'proposal.json');
 
-  async function run(o: { buffer?: Uint8Array; hash?: string | null } = {}) {
+  async function run(o: { buffer?: Uint8Array; programData?: Uint8Array; hash?: string | null } = {}) {
     const vault = await squadsVaultAddress(VAULT, 0);
     const pd = await programDataAddress(PROGRAM);
     const reads: Address[] = [];
@@ -134,12 +132,12 @@ describe('upgrade-proposal main', () => {
       genesis: { genesisHash: async () => DEVNET_GENESIS },
       account: async (_url, a) => {
         reads.push(a);
-        if (a === pd) return { owner: BPF_LOADER_UPGRADEABLE, data: programData(vault) };
+        if (a === pd) return { owner: BPF_LOADER_UPGRADEABLE, data: o.programData ?? programData(vault) };
         if (a === BUFFER) return { owner: BPF_LOADER_UPGRADEABLE, data: o.buffer ?? bufferBytes(vault) };
         return null;
       },
     };
-    const args: Record<string, string> = { url: 'http://127.0.0.1:8899', program: PROGRAM, buffer: BUFFER, multisig: VAULT, so, out };
+    const args: Record<string, string> = { url: 'http://127.0.0.1:8899', program: PROGRAM, buffer: BUFFER, multisig: VAULT, out };
     if (o.hash !== null) args['expected-hash'] = o.hash ?? HASH.toUpperCase();
     await main(args, deps);
     return reads;
@@ -161,5 +159,16 @@ describe('upgrade-proposal main', () => {
     const p = JSON.parse(readFileSync(out, 'utf8'));
     expect(p.title).toContain(HASH);
     expect(p.instructions).toHaveLength(1);
+  });
+
+  test('ExtendProgramChecked is sized from the buffer (data length - 37), not a local .so', async () => {
+    const vault = await squadsVaultAddress(VAULT, 0);
+    // ProgramData holds 4 program bytes; the buffer holds ELF (9) + 7 zero padding = 16.
+    const small = programData(vault).subarray(0, PROGRAM_DATA_HEADER + 4);
+    await run({ programData: small });
+    const p = JSON.parse(readFileSync(out, 'utf8'));
+    expect(p.instructions).toHaveLength(2);
+    const ext = Buffer.from(p.instructions[0].dataBase64, 'base64');
+    expect([...ext]).toEqual([9, 0, 0, 0, 12, 0, 0, 0]);
   });
 });

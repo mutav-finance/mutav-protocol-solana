@@ -1,12 +1,12 @@
 /**
  * Spec §14.5 step 6: the program-upgrade instructions for one Squads vault
  * transaction, as an unsigned proposal payload. `ExtendProgramChecked`
- * (signed by the upgrade-authority vault) goes first when the new `.so` is
- * larger than ProgramData.
+ * (signed by the upgrade-authority vault) goes first when the buffered
+ * program (`buffer.data.length - 37`) is larger than ProgramData.
  *
  *   bun scripts/release/upgrade-proposal.ts --url <rpc> [--confirm-cluster devnet] \
  *     --program <id> --buffer <buffer> --multisig <upgrade multisig> [--vault-index 0] \
- *     --so target/deploy/mutav.so --expected-hash <sha256> --out upgrade-proposal.json
+ *     --expected-hash <sha256> --out upgrade-proposal.json
  *
  * `--expected-hash` is the output of `solana-verify get-executable-hash` for
  * the verified build. Before composing anything it reads, at `confirmed`:
@@ -20,7 +20,6 @@
  * their own CLIs (see .github/workflows/release.yml) and added to the same
  * vault transaction by the proposer. Reads the chain; signs nothing.
  */
-import { statSync } from 'node:fs';
 import {
   AccountRole,
   address,
@@ -33,12 +32,15 @@ import { guardCluster, opt, parseArgs, req, type Args } from '../devnet/lib/cli'
 import { rpcGenesis, type GenesisSource } from '../devnet/lib/cluster';
 import { BPF_LOADER_UPGRADEABLE, programDataAddress, SYSTEM_PROGRAM } from '../devnet/lib/compose';
 import { programDataUpgradeAuthority } from '../devnet/lib/checks';
-import { bufferAuthority, bufferHash, parseExpectedHash, PROGRAM_DATA_HEADER } from '../devnet/lib/hash';
+import { BUFFER_HEADER, bufferAuthority, bufferHash, parseExpectedHash, PROGRAM_DATA_HEADER } from '../devnet/lib/hash';
 import { toPayload, writePayload } from '../devnet/lib/proposal';
 import { accountInfo, rpcFor } from '../devnet/lib/rpc';
 import { parseVaultIndex, squadsVaultAddress } from '../devnet/lib/squads';
 
 export { PROGRAM_DATA_HEADER };
+
+/** Program bytes a loader Buffer holds: its data after the 37-byte header (what Upgrade copies). */
+export const bufferProgramLen = (data: Uint8Array) => data.length - BUFFER_HEADER;
 type Account = { owner: Address; data: Uint8Array } | null;
 
 /**
@@ -140,17 +142,19 @@ export async function main(args: Args, deps: UpgradeDeps = defaultDeps) {
   const buffer = address(req(args, 'buffer'));
   const vault = await squadsVaultAddress(multisig, vaultIndex);
   const pd = await deps.account(url, await programDataAddress(programId));
-  const failures = checkUpgradeSources({ buffer: await deps.account(url, buffer), programData: pd, vault, expectedHash });
+  const bufferAccount = await deps.account(url, buffer);
+  const failures = checkUpgradeSources({ buffer: bufferAccount, programData: pd, vault, expectedHash });
   if (failures.length) throw new Error(`refusing to propose the upgrade of ${programId}:\n  ${failures.join('\n  ')}`);
   const ixs = await composeUpgrade({
     programId,
     buffer,
     vault,
     spill: vault,
-    soLen: statSync(req(args, 'so')).size,
+    // The program length of the hash-checked buffer, never a local file.
+    soLen: bufferProgramLen(bufferAccount!.data),
     programDataLen: pd!.data.length,
   });
-  if (ixs.length > 1) console.log('new .so is larger than ProgramData: ExtendProgramChecked bundled first');
+  if (ixs.length > 1) console.log('the buffered program is larger than ProgramData: ExtendProgramChecked bundled first');
   writePayload(req(args, 'out'), toPayload({ title: `MUTAV: upgrade ${programId} from buffer ${buffer} (executable hash ${expectedHash})`, cluster, multisig, vaultIndex, vault }, ixs));
 }
 
