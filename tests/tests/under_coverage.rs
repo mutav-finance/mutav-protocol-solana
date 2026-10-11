@@ -8,15 +8,15 @@
 
 use mutav::{
     constants::*,
+    coverage::{nav_per_share, Coverage, CoverageInputs},
     errors::MutavError,
     events::{FulfilHaltCleared, ModeChanged, StateRefreshed},
-    solvency::{nav_per_share, Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
 };
 use mutav_tests::helpers::*;
 
-fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
-    Solvency::compute(&SolvencyInputs {
+fn coverage(c: &VaultConfig, s: &VaultState) -> Coverage {
+    Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
@@ -139,7 +139,7 @@ fn below_one_a_claim_payment_tips_into_under_coverage_and_is_not_refused() {
             .unwrap();
     }
     // R$90k of cover at c = 0.10: coverage R$9k, free capital R$1k.
-    let sol = solvency(&f.config(), &f.state());
+    let sol = coverage(&f.config(), &f.state());
     assert_eq!(
         (sol.coverage_required, sol.free_capital),
         (9_000 * BRL, 1_000 * BRL)
@@ -149,7 +149,7 @@ fn below_one_a_claim_payment_tips_into_under_coverage_and_is_not_refused() {
     f.file_claim(c).unwrap();
     let meta = f
         .pay_claim(c)
-        .expect("pay_claim is never refused for solvency");
+        .expect("pay_claim is never refused by the coverage gate");
     assert!(
         events::<ModeChanged>(&meta).is_empty(),
         "pay_claim does not switch mode"
@@ -158,7 +158,7 @@ fn below_one_a_claim_payment_tips_into_under_coverage_and_is_not_refused() {
     let s = f.state();
     assert_eq!(s.coverage_required, 8_500 * BRL);
     assert_eq!(s.mode, MODE_NORMAL, "not refreshed yet");
-    assert!(solvency(&f.config(), &s).under_covered());
+    assert!(coverage(&f.config(), &s).under_covered());
 
     let meta = f.refresh().unwrap();
     assert_eq!(f.state().mode, MODE_UNDER_COVERED);
@@ -232,7 +232,7 @@ fn refresh_publishes_the_math_modules_values() {
     set_time(&mut f.svm, 1_760_000_500);
     let meta = f.refresh().expect("any signer");
     let (c, s) = (f.config(), f.state());
-    let sol = solvency(&c, &s);
+    let sol = coverage(&c, &s);
     let nav = nav_per_share(sol.net_assets, s.shares_outstanding).unwrap();
     assert_eq!(s.coverage_required, sol.coverage_required);
     assert_eq!(s.nav_per_share, nav);
@@ -388,7 +388,7 @@ fn admin_clears_the_halt_and_resets_the_baseline() {
     s.provisions += 50 * BRL;
     f.write_state(&s);
     let s = f.state();
-    let sol = Solvency::compute(&SolvencyInputs {
+    let sol = Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: f.config().coverage_ratio_bps,

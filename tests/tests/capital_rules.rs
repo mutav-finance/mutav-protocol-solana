@@ -8,11 +8,11 @@ use anchor_lang::prelude::Pubkey;
 use anchor_spl::token::spl_token::instruction::transfer;
 use mutav::{
     constants::*,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::FulfilHaltRaised,
     math::assets_for,
     pricing::published_nav,
-    solvency::{Solvency, SolvencyInputs},
     ConfigParam::*,
     RegisterGuaranteeArgs,
 };
@@ -39,9 +39,9 @@ fn holders(n: usize, each: u64) -> (Fixture, Allowlist, Vec<Investor>) {
     (f, list, inv)
 }
 
-fn solvency(f: &Fixture) -> Solvency {
+fn coverage(f: &Fixture) -> Coverage {
     let (c, s) = (f.config(), f.state());
-    Solvency::compute(&SolvencyInputs {
+    Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
@@ -106,7 +106,7 @@ fn set_config_recomputes_coverage_with_the_stress_buffer() {
     f.refresh().unwrap();
     let s = f.state();
     assert_eq!(s.mode, MODE_UNDER_COVERED);
-    assert_eq!(s.coverage_required, solvency(&f).coverage_required);
+    assert_eq!(s.coverage_required, coverage(&f).coverage_required);
 
     f.set_config(vec![StressBuffer(0)]).unwrap();
     assert_eq!(f.state().coverage_required, 3_000 * BRL);
@@ -209,8 +209,8 @@ fn fills_refuse_an_underwater_reserve() {
     s.provisions = s.brs_balance;
     s.remaining_cover_total = s.brs_balance;
     f.write_state(&s);
-    assert_eq!(solvency(&f).net_assets, 0);
-    assert!(!solvency(&f).under_covered());
+    assert_eq!(coverage(&f).net_assets, 0);
+    assert!(!coverage(&f).under_covered());
 
     assert_mutav_err(f.fulfil_deposits(1, &[dseq]), MutavError::ReserveUnderwater);
     assert_mutav_err(
@@ -431,9 +431,9 @@ fn a_head_worth_zero_is_not_filled_and_the_admin_cancels_it() {
     let g = guarantee_args(unique_hash(), 30_000 * BRL, 0);
     f.register(g.clone()).unwrap();
     f.file_claim(Claim::on(&g, 10_000 * BRL)).unwrap();
-    let (so, na) = (f.state().shares_outstanding, solvency(&f).net_assets);
+    let (so, na) = (f.state().shares_outstanding, coverage(&f).net_assets);
     assert_eq!(assets_for(1, so, na).unwrap(), 0, "worth 0 at fill time");
-    assert!(!mutav::solvency::is_underwater(na, so));
+    assert!(!mutav::coverage::is_underwater(na, so));
     assert_mutav_err(
         f.fulfil_redeems(2, u64::MAX, &[seq, next]),
         MutavError::RequestTooSmall,
@@ -457,7 +457,7 @@ fn a_near_underwater_reserve_burns_no_shares() {
     s.provisions = s.brs_balance - 1;
     s.remaining_cover_total = s.brs_balance;
     f.write_state(&s);
-    let sol = solvency(&f);
+    let sol = coverage(&f);
     assert_eq!(sol.net_assets, 1);
     assert!(!sol.under_covered());
     assert_mutav_err(
@@ -469,8 +469,8 @@ fn a_near_underwater_reserve_burns_no_shares() {
     f.contribute(2_000 * BRL)
         .0
         .expect("fees are accepted underwater");
-    assert!(!mutav::solvency::is_underwater(
-        solvency(&f).net_assets,
+    assert!(!mutav::coverage::is_underwater(
+        coverage(&f).net_assets,
         f.state().shares_outstanding
     ));
 }

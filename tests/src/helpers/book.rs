@@ -232,7 +232,7 @@ impl Fixture {
     /// NAV per share (`NAV_SCALE`) computed from the current state with the
     /// spec §4 formulas, as `refresh` (Task 10) publishes it.
     pub fn nav(&self) -> u64 {
-        use mutav::solvency::{nav_per_share, net_assets};
+        use mutav::coverage::{nav_per_share, net_assets};
         let s = self.state();
         nav_per_share(
             net_assets(s.brs_balance, s.provisions),

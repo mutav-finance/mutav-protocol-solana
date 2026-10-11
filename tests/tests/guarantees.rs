@@ -297,7 +297,7 @@ fn close_rejects_a_non_operator() {
 
 #[test]
 fn close_works_while_paused_and_in_under_coverage() {
-    // Not solvency-gated, not paused: it only releases liability (spec §5.2,
+    // Not coverage-gated, not paused: it only releases liability (spec §5.2,
     // ADR 0008).
     let mut f = Fixture::new();
     let ag = agency();

@@ -5916,7 +5916,7 @@
     },
     "programAddress": "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9"
   },
-  "solvency": [
+  "coverage": [
     {
       "input": {
         "brsBalance": "60000",

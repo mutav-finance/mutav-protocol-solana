@@ -22,7 +22,7 @@ use crate::{
     errors::MutavError,
     events::RedeemRequested,
     instructions::capital::{owner_ata, require_eligible, Eligibility},
-    instructions::operator::solvency_snapshot,
+    instructions::operator::coverage_snapshot,
     math::{assets_for, redeem_size_error},
     state::{RedeemRequest, VaultConfig, VaultState},
 };
@@ -94,7 +94,7 @@ pub fn handle_request_redeem(
     }
     require!(shares > 0, MutavError::InvalidParameter);
     // Size in BRS at the current NAV; later NAV drift is ignored.
-    let sol = solvency_snapshot(config, &ctx.accounts.state)?;
+    let sol = coverage_snapshot(config, &ctx.accounts.state)?;
     let value = assets_for(
         shares,
         ctx.accounts.state.shares_outstanding,

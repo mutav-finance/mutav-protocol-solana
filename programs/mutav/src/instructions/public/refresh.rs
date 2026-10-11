@@ -7,10 +7,10 @@ use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
     constants::*,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::{FulfilHaltRaised, ModeChanged, ReserveFrozenDetected, StateRefreshed},
     pricing::{guard_nav, nav_move_exceeds, published_nav},
-    solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
 };
 
@@ -73,7 +73,7 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
 
     // 2. The spec §4 quantities.
     let state = &ctx.accounts.state;
-    let sol = Solvency::compute(&SolvencyInputs {
+    let sol = Coverage::compute(&CoverageInputs {
         brs_balance: if reserve_frozen { 0 } else { state.brs_balance },
         remaining_cover_total: state.remaining_cover_total,
         coverage_ratio_bps: config.coverage_ratio_bps,

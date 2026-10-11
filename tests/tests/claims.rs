@@ -3,9 +3,9 @@
 
 use mutav::{
     constants::*,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::{ClaimFiled, ClaimPaid, PayoutSettled},
-    solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
     RegisterGuaranteeArgs,
 };
@@ -24,8 +24,8 @@ fn book(capital: u64, default_cover: u64, exit_cover: u64) -> (Fixture, Register
     (f, args)
 }
 
-fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
-    Solvency::compute(&SolvencyInputs {
+fn coverage(c: &VaultConfig, s: &VaultState) -> Coverage {
+    Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
@@ -101,11 +101,11 @@ fn demo_filed_claim_lowers_nav() {
     let (mut f, g) = book(100_000 * BRL, 20_000 * BRL, 0);
     f.inject_shares(100_000 * BRL);
     assert_eq!(f.nav(), NAV_SCALE);
-    let stable = solvency(&f.config(), &f.state()).stable_assets;
+    let stable = coverage(&f.config(), &f.state()).stable_assets;
 
     f.file_claim(Claim::on(&g, 2_000 * BRL)).expect("file");
     assert_eq!(f.nav(), 980_000_000); // 0.98
-    assert_eq!(solvency(&f.config(), &f.state()).stable_assets, stable);
+    assert_eq!(coverage(&f.config(), &f.state()).stable_assets, stable);
 }
 
 #[test]
@@ -533,9 +533,9 @@ fn paying_at_c_one_leaves_free_capital_unchanged() {
     let (mut f, g) = book(50_000 * BRL, 30_000 * BRL, 0);
     let c = Claim::on(&g, 7_000 * BRL);
     f.file_claim(c).unwrap();
-    let before = solvency(&f.config(), &f.state());
+    let before = coverage(&f.config(), &f.state());
     f.pay_claim(c).unwrap();
-    let after = solvency(&f.config(), &f.state());
+    let after = coverage(&f.config(), &f.state());
     assert_eq!(after.free_capital, before.free_capital);
     assert_eq!(after.free_capital, 20_000 * BRL);
     assert_eq!(before.stable_assets - after.stable_assets, 7_000 * BRL);
@@ -567,10 +567,10 @@ fn demo_pay_claim_succeeds_while_under_covered() {
     s.mode = MODE_UNDER_COVERED;
     s.remaining_cover_total += 50_000 * BRL; // coverage far above stable assets
     f.write_state(&s);
-    assert!(solvency(&f.config(), &f.state()).under_covered());
+    assert!(coverage(&f.config(), &f.state()).under_covered());
 
     let payments = f.config().payments_account;
-    f.pay_claim(c).expect("never refused for solvency");
+    f.pay_claim(c).expect("never refused by the coverage gate");
     assert_eq!(f.balance(&payments), 8_000 * BRL);
     assert_eq!(f.state().mode, MODE_UNDER_COVERED);
 }
@@ -578,7 +578,7 @@ fn demo_pay_claim_succeeds_while_under_covered() {
 proptest! {
     #![proptest_config(ProptestConfig { cases: 32, failure_persistence: None, ..ProptestConfig::default() })]
 
-    /// `pay_claim` is never refused for solvency or under-coverage (spec §1
+    /// `pay_claim` is never refused by the coverage gate or for under-coverage (spec §1
     /// principle 4, §5.4 rule 7): fuzz `stable_assets` far below
     /// `coverage_required`, the stored mode, other provisions, the pause
     /// flag, any coverage ratio in `[0.10, 2.0]` (ADR 0016; above 1.0 only
@@ -586,7 +586,7 @@ proptest! {
     /// `u64::MAX` as a stored value (ADR 0022: the recompute saturates), and
     /// issuer income, partly swept and partly still in the inbox (ADR 0017).
     #[test]
-    fn pay_claim_is_never_refused_for_solvency(
+    fn pay_claim_is_never_refused_for_coverage(
         cover in 1u64..=10_000,
         filed_frac in 1u64..=100,
         extra_cover in 0u64..=1u64 << 50,

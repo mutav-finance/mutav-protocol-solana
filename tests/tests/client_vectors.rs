@@ -26,9 +26,9 @@ use anchor_lang::{prelude::Pubkey, InstructionData};
 use mutav::{
     allowlist,
     constants::*,
+    coverage::{is_underwater, nav_per_share, Coverage, CoverageInputs},
     errors::MutavError,
     math::{assets_for, conversion_nav, mul_div, redeem_size_error, shares_for, Rounding},
-    solvency::{is_underwater, nav_per_share, Solvency, SolvencyInputs},
     state::CapsInput,
     ConfigParam, Eligibility, InitializeArgs, NavBounds, RegisterGuaranteeArgs,
 };
@@ -166,8 +166,8 @@ fn conversion_vectors(rng: &mut Rng) -> Value {
     )
 }
 
-fn solvency_case(i: &SolvencyInputs) -> Value {
-    let out = match Solvency::compute(i) {
+fn coverage_case(i: &CoverageInputs) -> Value {
+    let out = match Coverage::compute(i) {
         Ok(o) => json!({
             "stableAssets": s(o.stable_assets),
             "coverageRequired": s(o.coverage_required),
@@ -192,8 +192,8 @@ fn solvency_case(i: &SolvencyInputs) -> Value {
     })
 }
 
-fn solvency_vectors(rng: &mut Rng) -> Value {
-    let base = SolvencyInputs {
+fn coverage_vectors(rng: &mut Rng) -> Value {
+    let base = CoverageInputs {
         brs_balance: 60_000,
         remaining_cover_total: 80_000,
         coverage_ratio_bps: 10_000,
@@ -203,33 +203,33 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
     let mut cases = vec![
         base,
         // Under-covered.
-        SolvencyInputs {
+        CoverageInputs {
             remaining_cover_total: 200_000,
             ..base
         },
         // Provisions bind.
-        SolvencyInputs {
+        CoverageInputs {
             provisions: 58_000,
             ..base
         },
         // c at the 0.10 floor (ADR 0016): the ratio term binds, then the
         // provisions term binds.
-        SolvencyInputs {
+        CoverageInputs {
             coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
             ..base
         },
-        SolvencyInputs {
+        CoverageInputs {
             coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
             provisions: 30_000,
             ..base
         },
         // Overflow paths.
-        SolvencyInputs {
+        CoverageInputs {
             remaining_cover_total: MAX,
             coverage_ratio_bps: 10_001,
             ..base
         },
-        SolvencyInputs {
+        CoverageInputs {
             brs_balance: MAX,
             provisions: MAX,
             remaining_cover_total: MAX,
@@ -237,32 +237,32 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
         },
         // The stress buffer (ADR 0022): it binds over the ratio term, is
         // limited by the unprovisioned cover, and saturates.
-        SolvencyInputs {
+        CoverageInputs {
             coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
             provisions: 4_000,
             stress_buffer: 19_000,
             ..base
         },
-        SolvencyInputs {
+        CoverageInputs {
             remaining_cover_total: 10_000,
             coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
             provisions: 4_000,
             stress_buffer: 19_000,
             ..base
         },
-        SolvencyInputs {
+        CoverageInputs {
             remaining_cover_total: MAX,
             provisions: MAX - 1,
             stress_buffer: MAX,
             ..base
         },
-        SolvencyInputs {
+        CoverageInputs {
             remaining_cover_total: 5,
             provisions: 9,
             stress_buffer: MAX,
             ..base
         },
-        SolvencyInputs::default(),
+        CoverageInputs::default(),
     ];
     for k in 0..300u64 {
         let (brs, cover, c, prov) = (rng.amount(), rng.amount(), rng.bps(), rng.amount());
@@ -274,7 +274,7 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
             2 => brs ^ prov,
             _ => MAX,
         };
-        cases.push(SolvencyInputs {
+        cases.push(CoverageInputs {
             brs_balance: brs,
             remaining_cover_total: cover,
             coverage_ratio_bps: c,
@@ -282,7 +282,7 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
             stress_buffer: stress,
         });
     }
-    Value::Array(cases.iter().map(solvency_case).collect())
+    Value::Array(cases.iter().map(coverage_case).collect())
 }
 
 /// The underwater test and the `request_redeem` size rule (ADR 0029).
@@ -715,7 +715,7 @@ fn build() -> Value {
         },
         "mulDiv": mul_div_vectors(&mut rng),
         "conversion": conversion_vectors(&mut rng),
-        "solvency": solvency_vectors(&mut rng),
+        "coverage": coverage_vectors(&mut rng),
         "pdas": pda_vectors(&mut rng),
         "allowlist": allowlist_vectors(&mut rng),
         "instructions": instruction_vectors(&mut rng),

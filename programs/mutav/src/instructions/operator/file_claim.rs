@@ -4,9 +4,9 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
+    coverage::coverage_required_saturating,
     errors::MutavError,
     events::ClaimFiled,
-    solvency::coverage_required_saturating,
     state::{ClaimFiling, Guarantee, VaultConfig, VaultState},
 };
 
@@ -59,7 +59,7 @@ pub fn handle_file_claim(
     amount: u64,
     notice_ref_hash: [u8; 32],
 ) -> Result<()> {
-    // Never paused, never solvency-gated.
+    // Never paused, never coverage-gated.
     // TODO(spec: §5.4, PC-2 — an on-chain check of the 15-day filing window
     // is TBD). The window is enforced in the platform.
     let g = &mut ctx.accounts.guarantee;

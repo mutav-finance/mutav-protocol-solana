@@ -6,7 +6,7 @@
 //! `max_claim_per_period ≥ max_claim_per_call` holds whichever fields a
 //! proposal touches. A refusal reverts every param of the call.
 //!
-//! A change of a field that moves the solvency figures or the NAV-move
+//! A change of a field that moves the coverage figures or the NAV-move
 //! guard (`coverage_ratio_bps`, `max_nav_move_bps`, `stress_buffer`) needs a
 //! `refresh` in the same slot first (`RefreshRequired`): `/admin` puts the
 //! `refresh` in the same transaction, so the change applies to the state
@@ -23,12 +23,12 @@ use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
     constants::{field, CONFIG_SEED, MAX_CONFIG_PARAMS, STATE_SEED},
+    coverage::coverage_required,
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges},
     instructions::admin::{
         validate_config, validate_money_accounts, vault_authority_key, Installing,
     },
-    solvency::coverage_required,
     state::{VaultConfig, VaultState},
 };
 

@@ -1,6 +1,6 @@
 //! `pay_claim(notice_ref_hash, expected_amount)` (spec §5.4; ADR 0021): pays
 //! a filed claim's provision, exactly, to the whitelisted payments account.
-//! **Never solvency-gated, no mode check, not paused** (spec §1 principle 4).
+//! **Never coverage-gated, no mode check, not paused** (spec §1 principle 4).
 //!
 //! Above `max_claim_per_call` the filing needs the reserve admin's approval
 //! of that exact amount (`ClaimFiling.approved_amount`, written by
@@ -15,9 +15,9 @@ use anchor_spl::token_interface::{
 
 use crate::{
     constants::*,
+    coverage::coverage_required_saturating,
     errors::MutavError,
     events::ClaimPaid,
-    solvency::coverage_required_saturating,
     state::{ClaimFiling, Guarantee, VaultConfig, VaultState},
 };
 
@@ -154,7 +154,7 @@ pub fn handle_pay_claim(
         MutavError::InsufficientLiquidBalance
     );
     require!(!ctx.accounts.reserve.is_frozen(), MutavError::ReserveFrozen);
-    // Rule 8: no solvency check, no mode check, no pause check.
+    // Rule 8: no coverage check, no mode check, no pause check.
 
     let config_key = ctx.accounts.config.key();
     let authority_seeds: &[&[u8]] = &[

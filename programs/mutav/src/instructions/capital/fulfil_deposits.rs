@@ -18,7 +18,7 @@ use crate::{
         deposit_request_address, load_slot, require_nav_within_guard, require_not_underwater,
         split_adapter_accounts, store, NavBounds, Slot,
     },
-    instructions::operator::solvency_snapshot,
+    instructions::operator::coverage_snapshot,
     math::{conversion_nav, shares_for},
     pricing::published_nav,
     state::{DepositRequest, VaultConfig, VaultState},
@@ -80,7 +80,7 @@ pub fn handle_fulfil_deposits(
     // Rules, in the spec's order. Under-coverage is allowed (ADR 0008).
     require!(!config.paused, MutavError::Paused);
     require!(!state.fulfil_halted, MutavError::FulfilHalted);
-    let before = solvency_snapshot(config, state)?;
+    let before = coverage_snapshot(config, state)?;
     require_not_underwater(state.shares_outstanding, before.net_assets)?;
     require_nav_within_guard(state, before.net_assets, config.caps.max_nav_move_bps)?;
 

@@ -16,6 +16,7 @@ use anchor_spl::{
 
 use crate::{
     constants::*,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::{RedeemFilled, RedeemsFulfilled},
     instructions::capital::{
@@ -23,7 +24,6 @@ use crate::{
         split_adapter_accounts, store, NavBounds, Slot,
     },
     math::{assets_for, conversion_nav},
-    solvency::{Solvency, SolvencyInputs},
     state::{RedeemRequest, VaultConfig, VaultState},
 };
 
@@ -119,7 +119,7 @@ pub fn handle_fulfil_redeems(
     require!(!state.fulfil_halted, MutavError::FulfilHalted);
 
     let snapshot = |brs_balance: u64| {
-        Solvency::compute(&SolvencyInputs {
+        Coverage::compute(&CoverageInputs {
             brs_balance,
             remaining_cover_total: state.remaining_cover_total,
             coverage_ratio_bps: config.coverage_ratio_bps,
