@@ -53,9 +53,10 @@ Deposit fills are allowed while the reserve is below its coverage target. New ca
 stateDiagram-v2
     [*] --> PENDING: request_redeem
     PENDING --> FILLED: fulfil_redeems (whole fill)
-    PENDING --> CANCELLED: cancel_redeem
+    PENDING --> [*]: cancel_redeem (owner, shares returned, closes)
+    PENDING --> CANCELLED: cancel_redeem (admin parks)
     FILLED --> [*]: claim_assets (closes)
-    CANCELLED --> [*]: shares returned (closes)
+    CANCELLED --> [*]: cancel_redeem (owner, shares returned, closes)
 ```
 
 1. **Request.** The provider escrows shares from its own share token account; delegates are never used. The size is checked in BRS at the current NAV, `value = assets_for(shares)`: 0 is refused, above `max_request` is refused, and from `min_request` up is a normal request. Below `min_request` only an exit of the balance is allowed (see [Exit rights](#exit-rights)). `min_assets_out` is the provider's own price limit.
@@ -99,9 +100,9 @@ These owner actions never depend on the admin, and a pause does not stop them. T
 | `cancel_redeem` | Request pending, or parked by the admin | Shares returned to the owner; request closed. The admin's cancel only parks a pending request |
 | `claim_assets` | Redemption filled | BRS paid from `claims` to the owner |
 
-- `cancel_deposit`, `cancel_redeem`, `claim_shares` and `claim_assets` create the owner's associated token account if it does not exist. The caller pays its rent.
+- The owner's `cancel_deposit` and `cancel_redeem`, `claim_shares` and `claim_assets` create the owner's associated token account if it does not exist. The caller pays its rent. The admin's cancel creates nothing.
 - Closed requests return their rent to the owner.
-- A cancelled request leaves a gap in the queue. The permissionless `advance_queue_head(queue, max)` crank skips closed requests in one queue per call. It moves no money.
+- A cancelled request leaves a gap in the queue. The permissionless `advance_queue_head(queue, max)` crank skips closed and parked requests in one queue per call. It moves no money.
 
 ## Exit rights
 
@@ -164,4 +165,5 @@ The pauser and up to three guardians can pause with no time lock; the admin can 
 - [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (`advance_queue_head`, no `refund_deposit`)
 - [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md) (underwater test, inline guard and baseline, exit size rule, a head worth 0)
+- [ADR 0030: The admin's cancel parks the request](../decisions/0030-admin-cancel-parks-the-request.md)
 - ADR 0019: v1 layout for the devnet release

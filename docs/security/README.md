@@ -26,7 +26,7 @@ The model rests on six rules.
 | 2 | **A compromised operator can lose at most the claim caps.** | Registry actions are reversible by another operator action (in the devnet binary a fake registration by `close_guarantee(VOID)`; withdrawal of a filing and reinstatement come with Wave 2, and until then a fake filing stays provisioned and unpaid). Only `pay_claim` is irreversible, and it is bounded by admin-set caps and lands in MUTAV's own payments account. |
 | 3 | **Claim payments are never coverage-gated.** | Within the caps, `pay_claim` goes through whatever the reserve's coverage, mode, pause state or NAV guard. The coverage gate applies to capital flows and new guarantees. |
 | 4 | **Internal accounting.** | The program counts only money it moved itself. A transfer into a reserve account does not move NAV until an authorised instruction books it. |
-| 5 | **No arbitrary outflows.** | BRS leaves the reserve only to a fixed list of destinations: the payments account, the treasury (fee take), the claims escrow on to its owner, or a cancelled request back to its owner. A later upgrade adds a return of unsolicited money to its original sender, from the separate `unsolicited` account. |
+| 5 | **No arbitrary outflows.** | BRS leaves the reserve only to a fixed list of destinations: the payments account, the treasury (fee take), the claims escrow on to its owner, or a request the owner cancels back to that owner (the admin's cancel only parks it). A later upgrade adds a return of unsolicited money to its original sender, from the separate `unsolicited` account. |
 | 6 | **No keys in the audited surface.** | The program, the client and the pilot app hold no signing keys. Wallets and multisigs sign. |
 
 ```mermaid

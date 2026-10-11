@@ -89,7 +89,7 @@ All reserve token accounts are ordinary SPL Token accounts owned by the vault au
 | Role | Key | Reserve duties |
 |---|---|---|
 | Operator | Hot key (devnet: generated at deploy) | Registers and closes guarantees, books guarantee fees and issuer income, files and pays claims, records settlement. Reinstating guarantees and amending (including to 0, a withdrawal) and re-filing claims come in Wave 2 |
-| Reserve admin | Squads v4 multisig vault, time-locked | Sets caps, the coverage ratio and the stress buffer (`set_config`); fills the capital queues; cancels a stuck request back to its owner; clears a NAV halt; appoints roles and guardians. In Wave 2 also approves claim amounts above the per-call cap, books or returns unsolicited money and books MUTAV's backstop |
+| Reserve admin | Squads v4 multisig vault, time-locked | Sets caps, the coverage ratio and the stress buffer (`set_config`); fills the capital queues; parks a stuck request for its owner to collect; approves claim amounts above the per-call cap; clears a NAV halt; appoints roles and guardians. In Wave 2 also books or returns unsolicited money and books MUTAV's backstop |
 | Pauser and guardians | Separate keys | Pause capital flows and new guarantees. The pauser can also revoke the operator. Up to three guardians, one on devnet |
 | Anyone | Any signer | `refresh`, `advance_queue_head` (`skim` in Wave 2) |
 

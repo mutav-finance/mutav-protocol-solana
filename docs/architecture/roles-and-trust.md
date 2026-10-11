@@ -7,7 +7,7 @@ Who can sign what, who can move money, and what each key can cost if it is lost.
 | | Operator | Reserve admin |
 |---|---|---|
 | Owns | Contracts, agencies and the whole guarantee and claim cycle | The reserve's financial health and security |
-| Acts through | Registry actions: register, close, file, pay, settle; booking guarantee fees and issuer income. Later: reinstate, amend (including withdraw), re-file | Ceilings: caps, coverage ratio, stress buffer, roles, accounts, allowlist, capital fills, cancels on an owner's behalf, unpause. Later: approval of claim amounts above the per-call cap, unsolicited money |
+| Acts through | Registry actions: register, close, file, pay, settle; booking guarantee fees and issuer income. Later: reinstate, amend (including withdraw), re-file | Ceilings: caps, coverage ratio, stress buffer, roles, accounts, allowlist, capital fills, parking a pending request for its owner to collect, approval of claim amounts above the per-call cap, unpause. Later: unsolicited money |
 | Judges | Whether a lease is valid and whether a claim is owed. It holds the information | How much may leave the reserve. It does not judge contracts |
 | Key | A hot key | A Squads v4 multisig vault with a time lock |
 
@@ -23,7 +23,7 @@ Two properties follow from the split:
 | Role | Key and custody | Powers | Time lock |
 |---|---|---|---|
 | **Upgrade authority** | Upgrade multisig vault (Squads v4) | Program upgrades, IDL writes, `initialize` | Long: 1 hour on devnet, 7 days on a real-money pilot |
-| **Reserve admin** (`VaultConfig.admin`) | Admin multisig vault (Squads v4), same members as the upgrade multisig | Configuration, roles, guardians, `revoke_pauser`, accounts, allowlist, capital fills, `cancel_deposit` and `cancel_redeem` on an owner's behalf, `unpause`, `clear_fulfil_halt`. Later: `approve_claim`, unsolicited money | Short: 5 minutes on devnet, 24 hours on a real-money pilot |
+| **Reserve admin** (`VaultConfig.admin`) | Admin multisig vault (Squads v4), same members as the upgrade multisig | Configuration, roles, guardians, `revoke_pauser`, accounts, allowlist, capital fills, parking a pending request with `cancel_deposit` or `cancel_redeem` (the owner collects it), `approve_claim`, `unpause`, `clear_fulfil_halt`. Later: unsolicited money | Short: 5 minutes on devnet, 24 hours on a real-money pilot |
 | **Operator** (`VaultConfig.operator`) | Hot key. On devnet, a keypair generated at deploy and used by hand from `/operator`. Later a KMS-backed key in `mutav-app` | The guarantee and claim cycle, guarantee fees, issuer income | None. Bounded by caps |
 | **Pauser** (`VaultConfig.pauser`) | A separate key generated at deploy. The admin removes it at once with `revoke_pauser` | `pause`, `revoke_operator` | None |
 | **Guardians** | Up to 3 keys set by the admin in one step with `set_guardians`. One on devnet, held by a founder, separate from the pauser | `pause` only. With the first adapter upgrade, also the risk-reducing adapter actions of [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) | None |
@@ -53,10 +53,10 @@ On devnet the two multisigs are 2-of-2 with two devnet wallets standing in for t
 | `reinstate_guarantee` (*later*) | Operator | Runs | No, and no caps. Only within `max_reinstate_age` |
 | `contribute_fees`, `sweep_income` | Operator | Runs | No. Refused with `NoSharesOutstanding` while no shares exist |
 | `file_claim` (later also `amend_claim`, `refile_claim`) | Operator | Runs | Never |
-| `approve_claim` (*later*, Wave 2) | Admin | Runs | Never |
+| `approve_claim` | Admin | Runs | Never |
 | `pay_claim`, `settle_payout` | Operator | Runs | Never |
 | `request_deposit`, `request_redeem` | Investor | **Stopped** | No |
-| `cancel_deposit`, `cancel_redeem` | Owner or admin | Runs | No |
+| `cancel_deposit`, `cancel_redeem` | Owner (collects); admin (parks a `PENDING` request) | Runs | No |
 | `claim_shares`, `claim_assets` | Investor | Runs | No |
 | `fulfil_deposits` | Admin | **Stopped** | No. Bound by the TVL cap and `nav_bounds`, and refused when the reserve is underwater |
 | `fulfil_redeems` | Admin | **Stopped** | **Yes**, and refused when the reserve is underwater |
@@ -76,8 +76,8 @@ Every path by which BRS or shares leave a program-owned account, and who signs i
 | `reserve` | `claims` escrow | `fulfil_redeems` | Admin | Free capital, liquid budget, strict FIFO, inside the admin's `nav_bounds` |
 | `claims` | Owner's BRS account | `claim_assets` | Owner | What the owner is owed |
 | `pending_deposits` | `reserve` | `fulfil_deposits` | Admin | TVL cap, strict FIFO, inside `nav_bounds` |
-| `pending_deposits` | Owner's own BRS account | `cancel_deposit` | Owner or admin | The escrowed amount, to the owner's associated token account only |
-| `pending_redemptions` | Owner's share account | `cancel_redeem` | Owner or admin | Unfilled shares |
+| `pending_deposits` | Owner's own BRS account | `cancel_deposit` | Owner | The escrowed amount, to the owner's associated token account only. The admin's cancel parks the request and moves nothing ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)) |
+| `pending_redemptions` | Owner's share account | `cancel_redeem` | Owner | Unfilled shares. The admin's cancel parks the request and moves nothing |
 | Income inbox | `reserve` | `sweep_income` | Operator | The amount on one issuer statement, once per statement. No take on issuer income |
 | Income inbox | `unsolicited` | `classify_unsolicited` (*later*) | Admin | Money not on an issuer statement |
 | `reserve`, `pending_deposits`, `claims` | `unsolicited` | `skim` (*later*) | Anyone | Only the untracked surplus over the tracked total |
@@ -85,7 +85,7 @@ Every path by which BRS or shares leave a program-owned account, and who signs i
 | `unsolicited`, surplus in `pending_redemptions`, foreign tokens, lamports above rent-exempt | The original sender | `return_unsolicited(source, ...)` (*later*) | Admin | Only to the source of the original transfer. Never from the income inbox or `reserve`. Foreign tokens: classic SPL Token mints only, never BRS, the share mint or an adapter mint |
 | Surplus in `pending_redemptions` | Burned | Burn of surplus escrowed shares (*later*) | Admin | Only shares above escrowed requests |
 
-The operator cannot send reserve money anywhere except the payments account. The admin cannot send reserve BRS to an arbitrary address: it can only fill queues and cancel a request back to its owner (later also return unsolicited money to its source). With the first adapter upgrade it also moves value between `reserve` and whitelisted adapters ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)). Changing the payments account is an admin action and waits for the time lock.
+The operator cannot send reserve money anywhere except the payments account. The admin cannot send reserve BRS to an arbitrary address: it can only fill queues and park a request for its owner to collect (later also return unsolicited money to its source). With the first adapter upgrade it also moves value between `reserve` and whitelisted adapters ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)). Changing the payments account is an admin action and waits for the time lock.
 
 ## What each key can cost
 
@@ -110,7 +110,7 @@ The operator cannot send reserve money anywhere except the payments account. The
 Two more design rules keep the loss within the caps:
 
 - **Fills carry `nav_bounds`.** `fulfil_deposits` and `fulfil_redeems` take a minimum and maximum NAV that `/admin` composes when it builds the proposal. A fill outside that range is refused with `NavOutOfBounds`.
-- **An above-cap payment needs an exact approval.** In the devnet binary the operator cannot pay above `max_claim_per_call` at all; MUTAV pays bank-first. With Wave 2, `approve_claim` binds one amount on one filing, and re-filing or amending a claim resets the approval.
+- **An above-cap payment needs an exact approval.** The operator alone cannot pay above `max_claim_per_call`. The admin's `approve_claim` binds one amount, equal to the provision, on one filing at one revision; the later `amend_claim` and `refile_claim` reset the approval.
 
 ## Operator-compromise recovery
 
@@ -156,7 +156,7 @@ Every role change takes two signatures: one to propose, one from the new key to 
 - **Entry is allowlisted.** `request_deposit` needs `Eligibility::Merkle { proof }` against `investor_allowlist_root`. KYC happens off-chain. The KYC-attestation fields are carved in the config but unused.
 - **Exit is open.** `request_redeem` checks the allowlist only when the debited share account is empty, so a holder, including a wallet removed from the allowlist, can always leave.
 - **An exit of the balance can be below the minimum request,** from the owner's canonical share associated token account only, if it leaves a remainder worth less than `min_request` and is worth at least `max(1, min_request / 10)` ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)).
-- **A pending request from a de-listed or unreachable wallet** is returned by the admin with `cancel_deposit` or `cancel_redeem`, to the owner's own account only.
+- **A pending request from a de-listed or unreachable wallet** is parked by the admin with `cancel_deposit` or `cancel_redeem`: the queue moves past it, nothing moves, and only the owner can later collect it, into the owner's own account ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)).
 - MUTAV's own capital wallet uses the same queues with no special treatment. Its address is disclosed in `VaultConfig.mutav_capital_wallet`.
 
 ## Trust outside the program
@@ -191,4 +191,5 @@ Every role change takes two signatures: one to propose, one from the new key to 
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
 - [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
 - [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)
+- [ADR 0030: The admin's cancel parks the request](../decisions/0030-admin-cancel-parks-the-request.md)
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; the emergency path and who moves assets are decided)

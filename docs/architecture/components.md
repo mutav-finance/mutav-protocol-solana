@@ -23,7 +23,7 @@ What lives where in this repo, and why it lives there. The split follows two rul
 | Module | Responsibility |
 |---|---|
 | [`lib.rs`](../../programs/mutav/src/lib.rs) | Thin dispatch. Each handler lives under `instructions/`, grouped by the role allowed to call it |
-| [`instructions/admin/`](../../programs/mutav/src/instructions/admin/) | `initialize`, configuration, roles and handover, guardians, payments and treasury accounts, allowlist root, pause and unpause, `revoke_operator`, `revoke_pauser`, `clear_fulfil_halt`. Claim approval and the unsolicited-money instructions arrive in later upgrades |
+| [`instructions/admin/`](../../programs/mutav/src/instructions/admin/) | `initialize`, configuration, roles and handover, guardians, payments and treasury accounts, allowlist root, pause and unpause, `revoke_operator`, `revoke_pauser`, `clear_fulfil_halt`, `approve_claim`. The unsolicited-money instructions arrive in later upgrades |
 | [`instructions/operator/`](../../programs/mutav/src/instructions/operator/) | The guarantee and claim cycle, guarantee fees and issuer income |
 | [`instructions/capital/`](../../programs/mutav/src/instructions/capital/) | Deposit and redemption requests, fills, cancels and claims |
 | [`instructions/public/`](../../programs/mutav/src/instructions/public/) | Permissionless cranks: `refresh`, `advance_queue_head` |
@@ -44,11 +44,11 @@ The devnet release adds instructions to the existing set and removes a few that 
 
 | Group | Signer | Instructions |
 |---|---|---|
-| Admin and roles | Upgrade authority (`initialize` only), admin multisig | `initialize`, `set_config` (sparse params), `set_payments_account`, `set_treasury_account`, `set_allowlist_root`, `propose_role` (admin) with `accept_role` (the new key), `propose_admin` (admin) with `accept_admin` (the new admin), `cancel_pending(role)`, `set_guardians` (one step), `revoke_pauser`, `clear_fulfil_halt(nav_bounds)`, `unpause` |
+| Admin and roles | Upgrade authority (`initialize` only), admin multisig | `initialize`, `set_config` (sparse params), `set_payments_account`, `set_treasury_account`, `set_allowlist_root`, `propose_role` (admin) with `accept_role` (the new key), `propose_admin` (admin) with `accept_admin` (the new admin), `cancel_pending(role)`, `set_guardians` (one step), `revoke_pauser`, `clear_fulfil_halt(nav_bounds)`, `unpause`, `approve_claim(notice_ref_hash, amount, expected_revision)` for a claim above the per-call cap |
 | Emergency | Pauser, guardians, admin | `pause` (all three), `revoke_operator` (pauser or admin), `revoke_pauser` (admin) |
 | Guarantees, fees, income | Operator | `register_guarantee`, `close_guarantee(id, reason)`, `contribute_fees`, `sweep_income`. *Later:* `reinstate_guarantee` |
-| Claims | Operator | `file_claim(leg, amount, notice_ref_hash)`, `pay_claim(notice_ref_hash, expected_amount)`, `settle_payout`. *Later (Wave 2):* `amend_claim`, `refile_claim`, the claim withdrawal (operator) and `approve_claim` (admin) for a claim above the per-call cap |
-| Capital | Investor, admin | `request_deposit`, `cancel_deposit`, `claim_shares`, `request_redeem`, `cancel_redeem`, `claim_assets` (investor); `fulfil_deposits(count, nav_bounds)`, `fulfil_redeems(count, nav_bounds)`, and `cancel_deposit` or `cancel_redeem` on the owner's behalf (admin) |
+| Claims | Operator | `file_claim(leg, amount, notice_ref_hash)`, `pay_claim(notice_ref_hash, expected_amount)`, `settle_payout`. The admin's `approve_claim` (above) unlocks a payment above the per-call cap. *Later (Wave 2):* `amend_claim`, `refile_claim` and the claim withdrawal (operator) |
+| Capital | Investor, admin | `request_deposit`, `cancel_deposit`, `claim_shares`, `request_redeem`, `cancel_redeem`, `claim_assets` (investor); `fulfil_deposits(count, nav_bounds)`, `fulfil_redeems(count, nav_bounds)`, and `cancel_deposit` or `cancel_redeem` to park a pending request for its owner to collect (admin) |
 | Unsolicited money (*later*) | Anyone, admin | `skim` (anyone); `classify_unsolicited`, `book_unsolicited(kind)` for `UNSOLICITED` or `BACKSTOP`, `return_unsolicited(source, ...)` for BRS, surplus escrowed shares, foreign classic SPL tokens or lamports, and the burn of surplus escrowed shares (admin) |
 | Public | Anyone | `refresh`, `advance_queue_head(queue, max)` |
 
@@ -91,7 +91,7 @@ A typical integration reads with `fetchReserve`, previews with the math mirror, 
 | `/reserve` | Everyone, no wallet | Health, coverage, claims timeline, money flows, the capital queue, tracked against actual balances per account, an operator-activity feed, every account on the explorer |
 | `/operator` | Operator | One form per operator instruction with its on-chain bound and the gate preview. On devnet MUTAV's team signs by hand with the operator wallet |
 | `/investor` | Investors | Allowlist status, position, queue entries, new requests, "redeem all" |
-| `/admin` | Admin multisig members | Squads proposal builders: create, approve, execute after the time lock, reject and cancel. Includes `nav_bounds` for fills and role handovers with their expiry. The `approve_claim` flow and the unsolicited-money to-do list come with their instructions |
+| `/admin` | Admin multisig members | Squads proposal builders: create, approve, execute after the time lock, reject and cancel. Includes `nav_bounds` for fills and role handovers with their expiry. `approve_claim` is in the program; its proposal builder is still to come in the console, and the unsolicited-money to-do list comes with its instructions |
 | `/demo` | Judges, team | A guided walkthrough with the coverage-gate preview |
 | `/simulator` | Everyone | Static reserve simulator (`public/simulator.html`) |
 

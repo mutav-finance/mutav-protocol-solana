@@ -323,7 +323,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
   <div class="stat"><div class="k">Capital requests</div><div class="v">R$1k–R$100k</div><div class="d">Per request. A holder may exit a smaller balance worth at least R$100.</div></div>
   <div class="stat"><div class="k">Fee take</div><div class="v">20%</div><div class="d">MUTAV's share of each guarantee fee. The rest goes to the reserve.</div></div>
 </div>
-<p>At c = 0.25 each R$39,600 lease (12× + 6× a R$2,200 rent) needs R$9,900 of required coverage. A 6×-rent eviction (R$13,200) fits the per-call cap, so the most common large claim is paid without waiting for the multisig. Every payment counts toward the 31-day cap, so no 30-day span pays out more than R$20k. A claim above the per-call cap needs the Reserve Admin to approve the exact amount; that approval ships in an upgrade, and until then MUTAV pays such a claim from its bank first.</p>
+<p>At c = 0.25 each R$39,600 lease (12× + 6× a R$2,200 rent) needs R$9,900 of required coverage. A 6×-rent eviction (R$13,200) fits the per-call cap, so the most common large claim is paid without waiting for the multisig. Every payment counts toward the 31-day cap, so no 30-day span pays out more than R$20k. A claim above the per-call cap needs the Reserve Admin to approve the exact amount, which is live in the program; while that approval waits on the time lock, MUTAV can pay such a claim from its bank first.</p>
 </section>
 
 <section class="level2" id="safety">
@@ -395,7 +395,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <ul>
 <li>A security audit, then a capped mainnet pilot with real guarantees.</li>
 <li>The operator moves from the hand-signed console to MUTAV's platform backend, with a key held in a key-management service.</li>
-<li>The first upgrade: claim approval above the per-call cap, claim amendment and withdrawal, guarantee reinstatement, partial fills at the head of the capital queue, and a cumulative baseline for the share-value guard with a tighter bound for the real pilot.</li>
+<li>The first upgrade: claim amendment and withdrawal, guarantee reinstatement, partial fills at the head of the capital queue, and a cumulative baseline for the share-value guard with a tighter bound for the real pilot.</li>
 <li>Before any outside capital: the claim-notice gate, which holds capital fills while a missed-rent notice is open, and the exit fallback, which lets anyone fill the head redemption after a maximum queue wait.</li>
 <li>Booking and returning unsolicited money, and a booked MUTAV backstop.</li>
 <li>The full <em>fiança</em> lifecycle: exoneration notice, claims tail and settlement records. Space is already reserved in the accounts.</li>
