@@ -94,7 +94,7 @@ The reserve also receives issuer income: the BRS issuer's monthly partnership re
 
 ## Sources
 
-- [Specification §2.1 Three separate MUTAV money flows](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017), [§3.11 `FeeReceipt`](../spec.md#311-feereceipt) (now an `IncomeReceipt` kind, ADR 0026), [§5.3 Guarantee fees (operator)](../spec.md#53-guarantee-fees-operator) and [§8 Caps](../spec.md#8-caps)
+- [Specification §2.1 Three separate MUTAV money flows](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017), [§3.11 `FeeReceipt`](../spec.md#311-feereceipt-folded-into-incomereceipt) (now an `IncomeReceipt` kind, ADR 0026), [§5.3 Guarantee fees (operator)](../spec.md#53-guarantee-fees-operator) and [§8 Caps](../spec.md#8-caps)
 - [Specification §12 Open questions](../spec.md#12-open-questions) (Q4 take rate)
 - [Litepaper §2.1 Business model in one table](../litepaper.md#21-business-model-in-one-table) and [§7 Monthly billing of partner agencies](../litepaper.md#monthly-billing-of-partner-agencies)
 - Code: [`programs/mutav/src/instructions/operator/contribute_fees.rs`](../../programs/mutav/src/instructions/operator/contribute_fees.rs), [`programs/mutav/src/state/income.rs`](../../programs/mutav/src/state/income.rs), [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs) (`MAX_FEE_TAKE_BPS`)
