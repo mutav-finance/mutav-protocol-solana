@@ -163,7 +163,7 @@ The items still to decide are tracked in [Open questions](../meta/open-questions
 ## Decisions
 
 - [ADR 0004: on-chain NAV with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
-- [ADR 0005: solvency gate scope](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0008: one capital flow; pause scope](../decisions/0008-uniform-capital-flow-and-pause-scope.md)
 - [ADR 0010: partial fills at the queue head](../decisions/0010-partial-fills-at-queue-head.md)
 - [ADR 0015: admin clear for the NAV-move halt](../decisions/0015-admin-clear-fulfil-halt.md)

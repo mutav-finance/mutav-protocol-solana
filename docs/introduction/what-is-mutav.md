@@ -85,7 +85,7 @@ The devnet release is the first step. It runs under hard on-chain caps that only
 
 - [ADR 0003: Claim payments operated by MUTAV through a whitelisted payments account](../decisions/0003-payments-operated-by-mutav.md)
 - [ADR 0004: NAV computed on-chain with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
-- [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)

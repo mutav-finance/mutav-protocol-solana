@@ -134,7 +134,7 @@ stateDiagram-v2
 
 ## Decisions
 
-- [ADR 0005: Solvency gate scope: capital flows and new guarantees, never claim payments](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0006: Per-lease coverage stored as absolute amounts](../decisions/0006-per-lease-absolute-coverage.md) (its per-agency cap is removed)
 - [ADR 0008: One capital flow for everyone; FIFO deposits; pause never blocks claims](../decisions/0008-uniform-capital-flow-and-pause-scope.md)
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md) (the lifecycle is planned; space is reserved now)

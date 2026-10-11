@@ -368,7 +368,7 @@ Open at the time of research:
 ## Decisions
 
 - [ADR 0004: NAV computed on-chain with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
-- [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0007: Fee take direct to the treasury](../decisions/0007-fee-take-direct-to-treasury.md)
 - [ADR 0008: Uniform capital flow and pause scope](../decisions/0008-uniform-capital-flow-and-pause-scope.md) (strict FIFO; cancels stay open under pause)
 - [ADR 0009: Separate MUTAV money flows](../decisions/0009-separate-mutav-money-flows.md)

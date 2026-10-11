@@ -460,7 +460,7 @@ For adapter CPI tests, load dumped venue `.so` files and account snapshots into 
 
 - [ADR 0002: Core program and capped adapters](../decisions/0002-core-program-and-capped-adapters.md)
 - [ADR 0004: On-chain NAV with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
-- [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0008: Uniform capital flow and pause scope](../decisions/0008-uniform-capital-flow-and-pause-scope.md)
 - [ADR 0010: Partial fills at the queue head](../decisions/0010-partial-fills-at-queue-head.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)

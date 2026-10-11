@@ -72,7 +72,7 @@ The binding sources behind every page are the [specification](../spec.md) and th
 ## Decisions
 
 - [ADR 0001: Record architecture decisions](../decisions/0001-record-architecture-decisions.md)
-- [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0016: Coverage ratio below 1.0](../decisions/0016-coverage-ratio-below-one.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)

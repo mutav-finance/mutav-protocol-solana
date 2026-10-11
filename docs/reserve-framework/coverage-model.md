@@ -147,7 +147,7 @@ Inflows that raise NAV without minting shares are guarantee fees (`contribute_fe
 ## Decisions
 
 - [ADR 0004: On-chain NAV with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
-- [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0006: Per-lease absolute coverage](../decisions/0006-per-lease-absolute-coverage.md)
 - [ADR 0008: Uniform capital flow and pause scope](../decisions/0008-uniform-capital-flow-and-pause-scope.md) (deposit fills allowed in under-coverage)
 - [ADR 0015: Admin clears the fulfil halt](../decisions/0015-admin-clear-fulfil-halt.md)

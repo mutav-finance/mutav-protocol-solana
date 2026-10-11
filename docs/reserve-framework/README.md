@@ -123,7 +123,7 @@ All reserve token accounts are ordinary SPL Token accounts owned by the vault au
 - [ADR 0002: Core program and capped adapters](../decisions/0002-core-program-and-capped-adapters.md)
 - [ADR 0003: Payments operated by MUTAV](../decisions/0003-payments-operated-by-mutav.md)
 - [ADR 0004: On-chain NAV with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
-- [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0009: Separate MUTAV money flows](../decisions/0009-separate-mutav-money-flows.md)
 - [ADR 0016: Coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)

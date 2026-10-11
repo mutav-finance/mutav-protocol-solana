@@ -89,7 +89,7 @@
   * [ADR 0002: One core program plus adapter programs with capped sub-authorities](decisions/0002-core-program-and-capped-adapters.md)
   * [ADR 0003: Claim payments operated by MUTAV through a whitelisted payments account](decisions/0003-payments-operated-by-mutav.md)
   * [ADR 0004: NAV computed on-chain with internal accounting, provisions at filing and bounded prices](decisions/0004-onchain-nav-internal-accounting.md)
-  * [ADR 0005: Solvency gate scope: capital flows and new guarantees, never claim payments](decisions/0005-solvency-gate-scope.md)
+  * [ADR 0005: Coverage gate scope](decisions/0005-solvency-gate-scope.md)
   * [ADR 0006: Per-lease coverage stored as absolute amounts](decisions/0006-per-lease-absolute-coverage.md)
   * [ADR 0007: MUTAV's fee take goes directly to the treasury](decisions/0007-fee-take-direct-to-treasury.md)
   * [ADR 0008: One capital flow for everyone; FIFO deposits; pause never blocks claims](decisions/0008-uniform-capital-flow-and-pause-scope.md)

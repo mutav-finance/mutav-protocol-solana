@@ -34,7 +34,7 @@ The full table of contents is in [SUMMARY.md](SUMMARY.md).
 ## Decisions
 
 - [Decisions index](meta/decisions.md)
-- [ADR 0005: Solvency gate scope](decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](decisions/0005-solvency-gate-scope.md)
 - [ADR 0018: BRS-only pilot reserve](decisions/0018-brs-only-pilot-reserve.md)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](decisions/0020-operator-admin-separation-and-recovery.md)
 - [ADR 0022: Coverage: stress buffer and underwater reserve](decisions/0022-coverage-stress-buffer-underwater-reserve.md)
