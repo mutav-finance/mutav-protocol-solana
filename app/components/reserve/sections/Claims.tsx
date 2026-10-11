@@ -10,7 +10,8 @@
  */
 import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
-import { fmtBrs, fmtDuration } from "@/lib/format";
+import { fmtDuration } from "@/lib/format";
+import { useFmt } from "@/components/MoneyProvider";
 import { claimsTimeline, type ClaimRow, type Ledger, type ReserveView } from "@/lib/view";
 import { claimSpeed, frac } from "@/lib/charts";
 import { C, ChartFrame, Legend, Row, RowLabel, Swatch, Track, type Seg } from "@/components/charts/Charts";
@@ -59,6 +60,7 @@ function Cell({ label, value, sub, color, first }: { label: string; value: strin
 
 /** Block 1: hero (claim payments in the period) over a 3-cell support strip, with the period picker. */
 function Summary({ rows, total, slaSecs, period, onPeriod }: { rows: ClaimRow[]; total: number; slaSecs: bigint; period: Period; onPeriod: (p: Period) => void }) {
+  const fmtBrs = useFmt();
   const paidRows = rows.filter((c) => c.paidAt !== null);
   const paidSum = paidRows.reduce((s, c) => s + (c.amount ?? 0n), 0n);
   const settled = rows.filter((c) => c.settledAt !== null).length;

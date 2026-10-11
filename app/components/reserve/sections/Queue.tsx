@@ -13,7 +13,8 @@ import { Explorer } from "@/components/Explorer";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { ImageSlot } from "@/components/ImageSlot";
-import { fmtBrs, fmtShares, fmtTime } from "@/lib/format";
+import { fmtShares, fmtTime } from "@/lib/format";
+import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, type Ledger, type QueueRow, type ReserveView } from "@/lib/view";
 
 import { Empty, Num, Table } from "@/components/reserve/sections/shared";
@@ -47,6 +48,7 @@ function Cell({ label, value, sub }: { label: string; value: string; sub: string
 
 /** [B + C] Hero (BRS waiting to deposit) and a three-cell support strip, sharing one border. */
 function Summary({ deposits, redeems, capital }: { deposits: QueueRow[]; redeems: QueueRow[]; capital: string }) {
+  const fmtBrs = useFmt();
   const all = [...deposits, ...redeems];
   const oldest = all.reduce<QueueRow | null>((m, x) => (m === null || x.requestedAt < m.requestedAt ? x : m), null);
   const ours = all.filter((x) => x.owner === capital).length;
@@ -121,6 +123,7 @@ function Line({ title, empty, rows, unitHead, unit, capital }: { title: string; 
 }
 
 export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
+  const fmtBrs = useFmt();
   const q = capitalQueue(r.state, l);
   const capital = r.config.mutavCapitalWallet;
   return (
@@ -133,7 +136,7 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
         </div>
       </ImageSlot>
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+      <div className="flex flex-col gap-6">
         <Line title="Deposits" empty="No deposits waiting. New requests join the end of the line." rows={q.deposits} unitHead="Amount" unit={fmtBrs} capital={capital} />
         <Line title="Redemptions" empty="No redemptions waiting. New requests join the end of the line." rows={q.redeems} unitHead="Shares" unit={fmtShares} capital={capital} />
       </div>

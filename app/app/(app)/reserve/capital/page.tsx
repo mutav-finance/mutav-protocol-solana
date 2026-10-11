@@ -3,7 +3,7 @@ import { CapitalTab } from "@/components/reserve/ReserveTabs";
 
 export const metadata: Metadata = {
   title: "Capital · Transparency",
-  description: "Money into and out of the MUTAV pilot reserve, the FIFO capital queue and the dated ledger, read live from Solana.",
+  description: "Money into and out of the MUTAV reserve, the FIFO capital queue and the dated ledger, read live from Solana.",
 };
 
 export default function Page() {

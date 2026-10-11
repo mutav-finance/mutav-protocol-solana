@@ -73,7 +73,7 @@ export function Accounts({ r }: { r: ReserveView }) {
     { name: "Admin (Squads multisig)", address: r.config.admin, a: ACCOUNT_ROLES.admin, does: "Governs the reserve. Also the program's upgrade authority." },
     { name: "Pauser", address: r.config.pauser, a: ACCOUNT_ROLES.pauser, does: "Can pause and revoke the operator. Nothing else." },
     { name: "Operator", address: r.config.operator, a: ACCOUNT_ROLES.operator, does: "Registers guarantees and pays claims, within the caps." },
-    { name: "MUTAV capital wallet", address: r.config.mutavCapitalWallet, a: ACCOUNT_ROLES.capital, does: "The only depositor in the pilot queue." },
+    { name: "MUTAV capital wallet", address: r.config.mutavCapitalWallet, a: ACCOUNT_ROLES.capital, does: "Requests deposits and redemptions through the queue, like any allowlisted wallet." },
   ];
 
   // The root every account below derives from: always visible.

@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { fmtBrs } from "@/lib/format";
+import { useFmt } from "@/components/MoneyProvider";
 import type { ReserveView } from "@/lib/view";
 
 /** localStorage key: set once the reader finishes or skips the steps. */
@@ -30,6 +30,7 @@ function markSeen() {
 }
 
 export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => void }) {
+  const fmtBrs = useFmt();
   const [step, setStep] = useState(0);
   const next = useRef<HTMLButtonElement>(null);
   const covered = r.solvency.stableAssets >= r.solvency.coverageRequired;

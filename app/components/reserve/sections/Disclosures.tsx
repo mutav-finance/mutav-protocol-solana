@@ -13,7 +13,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
-import { fmtBrs, fmtDuration } from "@/lib/format";
+import { fmtDuration } from "@/lib/format";
+import { useFmt } from "@/components/MoneyProvider";
 import { type ReserveView } from "@/lib/view";
 
 import { ImageSlot } from "@/components/ImageSlot";
@@ -129,6 +130,7 @@ function FreezeHero({ r }: { r: ReserveView }) {
 
 /** Block 2 · claim payments: one statement, two caps in one strip. */
 function ClaimLimits({ r }: { r: ReserveView }) {
+  const fmtBrs = useFmt();
   const caps = r.config.caps;
   const cell = (k: string, v: string, sub: ReactNode) => (
     <div className="bg-(--color-surface) flex min-w-0 flex-col gap-2 px-6 py-4">
@@ -154,12 +156,12 @@ function ClaimLimits({ r }: { r: ReserveView }) {
 }
 
 /** Block 3 · who provides capital, and what is not built yet. Text only, no figures. */
-function PilotTerms() {
+function CapitalTerms() {
   return (
-    <section aria-labelledby="risk-pilot-h" className="flex flex-col gap-4">
+    <section aria-labelledby="risk-capital-h" className="flex flex-col gap-4">
       <ImageSlot slot="reserve-risks" aspect="8:1" opacity={0.12} className="h-14">
         <div className="flex h-full items-end px-6 pb-3">
-          <h3 id="risk-pilot-h" className="font-display text-(--color-text) m-0 text-base font-bold">
+          <h3 id="risk-capital-h" className="font-display text-(--color-text) m-0 text-base font-bold">
             Who provides capital, and what comes later
           </h3>
         </div>
@@ -176,7 +178,7 @@ function PilotTerms() {
         <article className="bg-(--color-surface) flex flex-col gap-3 border p-6">
           <div className="flex flex-col gap-1">
             <h4 className="font-display text-(--color-text) m-0 text-lg leading-snug font-bold">Built later</h4>
-            <p className="font-body text-(--color-text-2) m-0 text-sm">Designed, not in this pilot yet.</p>
+            <p className="font-body text-(--color-text-2) m-0 text-sm">Designed, not live yet.</p>
           </div>
           <ul className="font-body text-(--color-text) m-0 flex flex-col gap-2 border-t p-0 pt-4 text-sm">
             {BUILT_LATER.map((x) => (
@@ -197,7 +199,7 @@ export function Disclosures({ r }: { r: ReserveView }) {
     <div className="flex flex-col gap-10 md:gap-12">
       <FreezeHero r={r} />
       <ClaimLimits r={r} />
-      <PilotTerms />
+      <CapitalTerms />
       <VerifyStrip r={r} />
     </div>
   );

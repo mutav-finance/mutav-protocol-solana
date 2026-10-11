@@ -14,7 +14,8 @@ import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
-import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
+import { fmtBps, fmtTime } from "@/lib/format";
+import { useFmt } from "@/components/MoneyProvider";
 import { frac } from "@/lib/charts";
 import { activeRemainingCover, agencyRows, coverageRows, type AgencyRow, type CoverageRow, type Ledger, type ReserveView } from "@/lib/view";
 import { C } from "@/components/charts/Charts";
@@ -125,6 +126,7 @@ function StripCell({ label, swatch, value, sub, color }: { label: string; swatch
 
 /** A guarantee row; its secondary fields open in a detail row under it (rendered only when open). */
 function GuaranteeRow({ g, axis, agency }: { g: CoverageRow; axis: bigint; agency: ReactNode }) {
+  const fmtBrs = useFmt();
   const [open, setOpen] = useState(false);
   const detailId = `g-${g.address}`;
   return (
@@ -198,6 +200,7 @@ function Detail({ term, children }: { term: string; children: ReactNode }) {
 }
 
 export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
+  const fmtBrs = useFmt();
   const rows = byRemaining(coverageRows(l.guarantees));
   const cap = r.config.caps.maxCoverPerAgency;
   const agencies = agencyRows(l.exposures, cap);

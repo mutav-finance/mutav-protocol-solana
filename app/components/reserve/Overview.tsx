@@ -18,7 +18,8 @@ import { Explorer } from "@/components/Explorer";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { useReserve } from "@/components/reserve/ReserveShell";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
-import { fmtBps, fmtBrs, fmtDuration, fmtNav, fmtRatio, fmtShares } from "@/lib/format";
+import { fmtBps, fmtDuration, fmtNav, fmtRatio, fmtShares } from "@/lib/format";
+import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, claimsTimeline, coverageRows, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
 
 /** The two promises the spec makes, each linked to the view that shows them. */
@@ -82,6 +83,7 @@ export function Overview() {
 // ── 1 · Hero ────────────────────────────────────────────────────────────────
 
 function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
+  const fmtBrs = useFmt();
   const s = r.state;
   const sol = r.solvency;
   const covered = sol.stableAssets >= sol.coverageRequired;
@@ -91,7 +93,7 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
   const comparison = noCover
     ? "No cover outstanding."
     : covered
-      ? `${fmtBrs(sol.stableAssets - sol.coverageRequired)} above what is required.`
+      ? `Against ${fmtBrs(sol.coverageRequired)} required.`
       : `Short ${fmtBrs(sol.coverageRequired - sol.stableAssets)} of what is required. New guarantees and redemptions are stopped; claim payments are not.`;
 
   const active = coverageRows(l.guarantees).filter((g) => g.active);
@@ -219,7 +221,7 @@ function Donut({ parts, axis, center, centerLabel, centerColor }: { parts: [bigi
 
 type SplitRow = { label: string; sub: string; value: bigint; color: string; outline?: boolean; negative?: boolean };
 
-function splitRows(c: CapitalSplit, filed: number, coverageRatioBps: number, remainingCover: bigint): SplitRow[] {
+function splitRows(c: CapitalSplit, filed: number, coverageRatioBps: number, remainingCover: bigint, fmtBrs: (b: bigint) => string): SplitRow[] {
   const under = c.shortfall > 0n;
   const rows: SplitRow[] = [
     { label: "Committed to open claims", sub: filed ? `provisions on ${plural(filed, "filed claim")}, already out of NAV` : "provisions, booked when a claim is filed", value: c.provisions, color: PROVISION },
@@ -233,10 +235,11 @@ function splitRows(c: CapitalSplit, filed: number, coverageRatioBps: number, rem
 }
 
 function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
+  const fmtBrs = useFmt();
   const c = capitalSplit(r.solvency, r.state.provisions);
   const under = c.shortfall > 0n;
   const filed = claimsTimeline(l, r.config.payoutSlaSecs, r.now).filter((x) => x.stage === "filed").length;
-  const rows = splitRows(c, filed, r.config.coverageRatioBps, r.state.remainingCoverTotal);
+  const rows = splitRows(c, filed, r.config.coverageRatioBps, r.state.remainingCoverTotal, fmtBrs);
   const committed = c.provisions + c.restRequired;
 
   const pending = capitalQueue(r.state, l).deposits.reduce((s, x) => s + x.waiting, 0n);
@@ -379,6 +382,7 @@ function RecentActivity({ r, l }: { r: ReserveView; l: Ledger }) {
 }
 
 function ActivityRow({ x, now, rpc, last }: { x: FlowRow; now: bigint; rpc: string; last: boolean }) {
+  const fmtBrs = useFmt();
   const into = x.reserveDelta >= 0n;
   return (
     <li className="grid list-none grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-3.5 py-3" style={{ borderBottom: last ? "none" : "1px solid var(--color-border)" }}>

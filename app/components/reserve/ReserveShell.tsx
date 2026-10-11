@@ -9,6 +9,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { MoneyProvider } from "@/components/MoneyProvider";
 import { ReadError } from "@/components/Section";
 import { Button } from "@/components/ui/button";
 import { IntroDialog, introSeen } from "@/components/reserve/IntroDialog";
@@ -123,9 +124,17 @@ export function ReserveShell({ children }: { children: ReactNode }) {
       <main id="reserve-view" className="flex w-full flex-1 flex-col gap-14 pt-10 pb-20" style={PAD}>
         {poll.error && !d && <ReadError error={poll.error} onRetry={poll.refresh} />}
         {poll.loading && !d && <Skeleton />}
-        {d && <ReserveCtx.Provider value={{ d, refresh: poll.refresh }}>{children}</ReserveCtx.Provider>}
+        {d && (
+          <MoneyProvider>
+            <ReserveCtx.Provider value={{ d, refresh: poll.refresh }}>{children}</ReserveCtx.Provider>
+          </MoneyProvider>
+        )}
       </main>
-      {introOpen && <IntroDialog r={d.reserve} onClose={() => setIntro(false)} />}
+      {introOpen && (
+        <MoneyProvider>
+          <IntroDialog r={d.reserve} onClose={() => setIntro(false)} />
+        </MoneyProvider>
+      )}
     </div>
   );
 }
