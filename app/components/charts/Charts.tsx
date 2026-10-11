@@ -39,7 +39,7 @@ export function ChartFrame({ title, caption, legend, children, id }: { title: st
 
 export function Swatch({ color, label, outline }: { color: string; label: string; outline?: boolean }) {
   return (
-    <span className="font-mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--color-text-2)" }}>
+    <span className="font-body" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--color-text-2)", fontVariantNumeric: "tabular-nums" }}>
       <span aria-hidden="true" style={{ width: 10, height: 10, background: outline ? "transparent" : color, border: outline ? `1px solid ${color}` : undefined, display: "inline-block" }} />
       {label}
     </span>
@@ -144,7 +144,7 @@ export function SolvencyChart({ s, ratioBps, compact = false }: { s: Pick<Solven
         {rows}
         <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           {legend}
-          <Mono style={{ fontSize: 11, color: m.underCovered ? "var(--color-error)" : "var(--color-text-3)" }}>{verdict}</Mono>
+          <span className="font-body" style={{ fontSize: 11, color: m.underCovered ? "var(--color-error)" : "var(--color-text-3)", fontVariantNumeric: "tabular-nums" }}>{verdict}</span>
         </div>
       </div>
     );
@@ -229,7 +229,7 @@ export function ClaimSpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaS
   if (claims.length === 0) return null;
   const panel = (title: string, axis: bigint, pick: (c: (typeof claims)[number]) => { v: bigint | null; seg: Seg | null; text: string }, marker?: { f: number; label: string }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
-      <p className="font-mono" style={{ fontSize: 11, color: "var(--color-text-2)", margin: 0, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+      <p className="font-body" style={{ fontSize: 11, color: "var(--color-text-2)", margin: 0, letterSpacing: "0.06em", textTransform: "uppercase", fontVariantNumeric: "tabular-nums" }}>
         {title} <span style={{ color: "var(--color-text-3)" }}>· axis 0 – {fmtDuration(axis)}</span>
       </p>
       {claims.map((c) => {
@@ -382,16 +382,16 @@ export function CompositionChart({ c }: { c: Composition }) {
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Row
-          label={<RowLabel sub={<Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>{c.brsOnly ? "100% BRS (pilot)" : `BRS ${share(c.brsShareBps)} · adapters ${share(c.adapterShareBps)}`}</Mono>}>{c.brsOnly ? "BRS in reserve" : "Counted (stable assets)"}</RowLabel>}
+          label={<RowLabel sub={<span className="font-body" style={{ fontSize: 11, color: "var(--color-text-3)", fontVariantNumeric: "tabular-nums" }}>{c.brsOnly ? "100% BRS (pilot)" : `BRS ${share(c.brsShareBps)} · adapters ${share(c.adapterShareBps)}`}</span>}>{c.brsOnly ? "BRS in reserve" : "Counted (stable assets)"}</RowLabel>}
           value={fmtBrs(c.stableAssets, 0)}
           summary={`Stable assets ${fmtBrs(c.stableAssets)}: BRS ${fmtBrs(c.brs)}${c.brsOnly ? "" : `, through adapters ${fmtBrs(c.adapterValue)}`}. ${floor}.`}
           labelWidth={190}
         >
           <Track segs={[{ f: frac(c.brs, axis), color: c.belowFloor ? C.bad : C.ink }, { f: frac(c.adapterValue, axis), color: C.mid }]} marker={{ f: frac(c.floorValue, axis), label: floor }} />
         </Row>
-        <Mono style={{ fontSize: 11, color: c.belowFloor ? "var(--color-error)" : "var(--color-text-3)", alignSelf: "flex-end" }}>
+        <span className="font-body" style={{ fontSize: 11, color: c.belowFloor ? "var(--color-error)" : "var(--color-text-3)", alignSelf: "flex-end", fontVariantNumeric: "tabular-nums" }}>
           ┆ {floor}{c.belowFloor ? " · BRS is below it" : ""}
-        </Mono>
+        </span>
         <Row
           label={<RowLabel sub={<RoleTag role="operator" prefix="swept by the" />}>Income inbox</RowLabel>}
           value={fmtBrs(c.inbox, 0)}

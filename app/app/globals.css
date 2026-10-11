@@ -631,9 +631,10 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 }
 
-/* Data tables (web investidor): a surface card, mono uppercase header in
-   text-3, roomy hairline rows with a surface-2 hover, mono numbers right-aligned,
-   horizontal scroll on phones. */
+/* Data tables (web investidor): a surface card, body-font uppercase header in
+   text-3, roomy hairline rows with a surface-2 hover, mono numbers right-aligned
+   with tabular figures, horizontal scroll on phones. Cells default to the body
+   font; figures, addresses and timestamps opt into mono (<Mono>, Num). */
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--color-border);
@@ -646,7 +647,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 .data-table th {
   text-align: left;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 12px;
   font-weight: 400;
   letter-spacing: 0.05em;
@@ -674,6 +675,7 @@ input[type="number"]::-webkit-outer-spin-button {
 .data-table td.num,
 .data-table th.num {
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .ext-link {
@@ -687,7 +689,7 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 .preview-label {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;

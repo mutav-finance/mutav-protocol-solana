@@ -25,7 +25,7 @@ export function Glossary() {
         <span aria-hidden="true" className="font-mono text-(--color-text-3) inline-block w-3 group-open:hidden">+</span>
         <span aria-hidden="true" className="font-mono text-(--color-text-3) hidden w-3 group-open:inline-block">−</span>
         <span className="font-display text-(--color-text) font-bold">How to read this page</span>
-        <span className="font-mono text-(--color-text-3) text-xs">{TERMS.length} terms</span>
+        <span className="font-body text-(--color-text-3) text-xs tabular-nums">{TERMS.length} terms</span>
       </summary>
       <dl className="m-0 mt-4 grid grid-cols-1 gap-x-12 gap-y-4 border-t pt-4 md:grid-cols-2">
         {TERMS.map(([k, v]) => (

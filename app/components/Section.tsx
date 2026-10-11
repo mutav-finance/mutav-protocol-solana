@@ -3,7 +3,7 @@ import { InfoTooltip } from "@/components/InfoTooltip";
 import { Button } from "@/components/ui/button";
 
 /**
- * A page section (web investidor rhythm): mono kicker, 24px Geist heading,
+ * A page section (web investidor rhythm): caps kicker (body font), 24px Geist heading,
  * optional explainer and actions; sections are separated by space, not rules.
  * `subtitle`: one line, at most ~12 words, under the heading.
  * `roles`: who signs or owns what this section shows (a RoleLine), under the heading.
@@ -13,7 +13,7 @@ export function Section({ id, title, kicker, subtitle, info, children, action, r
     <section id={id} aria-labelledby={id ? `${id}-h` : undefined} className="flex scroll-mt-20 flex-col gap-4 py-6 md:gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          {kicker && <p className="font-mono text-(--color-text-3) m-0 text-xs tracking-wider uppercase">{kicker}</p>}
+          {kicker && <p className="font-body text-(--color-text-3) m-0 text-xs tracking-wider uppercase">{kicker}</p>}
           <div className="flex items-center gap-2">
             <h2 id={id ? `${id}-h` : undefined} className="font-display text-(--color-text) m-0 text-2xl font-bold tracking-tight">
               {title}
@@ -78,7 +78,7 @@ export function ReadError({ error, onRetry }: { error: Error & { notConfigured?:
     );
   return (
     <div role="alert" className="flex flex-wrap items-center justify-between gap-3" style={{ border: "1px solid var(--color-error)", padding: "14px 16px", background: "var(--color-surface)" }}>
-      <p className="font-mono" style={{ fontSize: 12, color: "var(--color-error)", margin: 0 }}>
+      <p className="font-body" style={{ fontSize: 12, color: "var(--color-error)", margin: 0 }}>
         Could not read the chain: {error.message}
       </p>
       {onRetry && (

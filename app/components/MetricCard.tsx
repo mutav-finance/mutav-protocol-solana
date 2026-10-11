@@ -4,8 +4,8 @@
  * MetricCard — a single metric in the reserve dashboard metric grid.
  *
  * Design: brand card (STYLE.md §3.1) — Inter Medium 12px ALL CAPS label in
- * text-2, bold value in JetBrains Mono (numeric data is always mono), mono
- * sub-value in text-3.
+ * text-2, bold value in JetBrains Mono (figures are always mono), sub-value
+ * note in Inter (body font), text-3.
  * - Optional tooltip on label
  * - No rounded corners, no shadows, surface-1 background
  */
@@ -136,14 +136,14 @@ export function MetricCard({
         </p>
       )}
 
-      {/* Unit annotation — JetBrains Mono, dim */}
+      {/* Unit / sub-note — body font (prose), dim; tabular figures */}
       {unit && !loading && !error && (
         <p
+          className="font-body"
           style={{
             fontSize: "11px",
             color: "var(--color-text-3)",
-            fontFamily: "var(--font-mono)",
-            fontFeatureSettings: '"tnum" 1',
+            fontVariantNumeric: "tabular-nums",
             margin: 0,
             lineHeight: 1.4,
           }}

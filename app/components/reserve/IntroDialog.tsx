@@ -69,7 +69,7 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(14,15,17,.92)" }}>
       <div role="dialog" aria-modal="true" aria-labelledby="intro-h" className="bg-(--color-surface) flex w-full max-w-[520px] flex-col border" style={{ borderTop: "3px solid var(--color-accent)" }}>
         <div className="flex flex-col gap-4 p-8">
-          <span className="font-mono text-(--color-text-3) text-[11px] uppercase" style={{ letterSpacing: "0.08em" }}>
+          <span className="font-body text-(--color-text-3) text-[11px] uppercase tabular-nums" style={{ letterSpacing: "0.08em" }}>
             How to read this page · {step + 1} of {steps.length}
           </span>
           <h2 id="intro-h" className="font-display text-(--color-text) m-0 text-2xl leading-tight font-bold tracking-tight text-balance">

@@ -79,14 +79,14 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                 <td>
                   <span className="inline-flex items-baseline gap-2">
                     <Explorer value={c.guarantee} label={short(c.guaranteeId)} />
-                    <Mono dim style={{ fontSize: 11 }}>{c.leg}</Mono>
+                    <span className="font-body" style={{ fontSize: 11, color: "var(--color-text-3)" }}>{c.leg}</span>
                   </span>
                 </td>
                 <Num>{fmtBrs(c.amount ?? c.provision)}</Num>
                 <Num>{c.fileToPay !== null ? fmtDuration(c.fileToPay) : "—"}</Num>
                 <Num>{c.payToSettle !== null ? fmtDuration(c.payToSettle) : c.paidAt !== null ? "pending" : "—"}</Num>
                 <td className="num">
-                  <Button type="button" variant="ghost" size="sm" aria-expanded={isOpen} aria-controls={detailId} onClick={() => toggle(c.filing)} className="font-mono text-2xs">
+                  <Button type="button" variant="ghost" size="sm" aria-expanded={isOpen} aria-controls={detailId} onClick={() => toggle(c.filing)} className="font-body text-2xs">
                     {isOpen ? "Hide" : "Show"}
                   </Button>
                 </td>
@@ -98,9 +98,9 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                       <Detail label="Filed">
                         <Explorer value={c.filing} label={fmtTime(c.filedAt)} />
                       </Detail>
-                      <Detail label="Paid">{c.payout && c.paidAt !== null ? <Explorer value={c.payout} label={fmtTime(c.paidAt)} /> : <Mono dim>not paid yet</Mono>}</Detail>
+                      <Detail label="Paid">{c.payout && c.paidAt !== null ? <Explorer value={c.payout} label={fmtTime(c.paidAt)} /> : <span className="font-body text-(--color-text-3)">not paid yet</span>}</Detail>
                       <Detail label="Settled by PIX">
-                        <Mono dim={c.settledAt === null} style={{ fontSize: 12 }}>{c.settledAt !== null ? fmtTime(c.settledAt) : "pending"}</Mono>
+                        {c.settledAt !== null ? <Mono style={{ fontSize: 12 }}>{fmtTime(c.settledAt)}</Mono> : <span className="font-body text-(--color-text-3)" style={{ fontSize: 12 }}>pending</span>}
                       </Detail>
                       <Detail label="Guarantee">
                         <Explorer value={c.guarantee} />
