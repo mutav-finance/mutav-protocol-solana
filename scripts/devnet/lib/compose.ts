@@ -186,8 +186,11 @@ export async function composeAcceptRole(
 
 /**
  * `set_config` with only the fields where the file's caps, coverage ratio
- * and take rate differ from the chain (`current`), sparse (ADR 0026), with
- * `refresh` first when a change needs it. `feature_flags` and the capital
+ * and take rate differ from the chain (`current`), sparse (ADR 0026). When a
+ * change needs it (`configParamsNeedRefresh`) the proposal is
+ * `refresh, set_config, refresh`, as the app composes it: the first makes
+ * `set_config` pass its same-slot check, the trailing one applies the new
+ * values to the reserve mode at once. `feature_flags` and the capital
  * wallet are never set here; a stress buffer, queue wait or reinstate age
  * missing from the file keeps the chain's value. Empty when nothing differs.
  */
@@ -238,7 +241,7 @@ export async function composeSetCaps(
     },
     opts(cfg),
   );
-  return [refresh, setConfig];
+  return [refresh, setConfig, refresh];
 }
 
 /** `set_allowlist_root(root)`. Admin. */

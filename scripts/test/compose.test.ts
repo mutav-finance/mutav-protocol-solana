@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { address, createNoopSigner, type Address, type Instruction } from '@solana/kit';
 import {
   getCancelPendingInstructionDataDecoder,
+  REFRESH_DISCRIMINATOR,
+  SET_CONFIG_DISCRIMINATOR,
   getProposeRoleInstructionDataDecoder,
   type VaultConfig,
 } from '../../clients/js/src';
@@ -141,5 +143,32 @@ describe('composeSetCaps', () => {
       caps: { ...f.caps, stressBuffer: 7n, maxQueueWaitSecs: 8n, maxReinstateAge: 9n },
     } as unknown as VaultConfig;
     expect(await composeSetCaps(f, onChain, admin)).toEqual([]);
+  });
+
+  const onChain = (f = cfg) =>
+    ({
+      ...chain(),
+      coverageRatioBps: f.coverageRatioBps,
+      feeTakeBps: f.feeTakeBps,
+      featureFlags: 0n,
+      mutavCapitalWallet: f.mutavCapitalWallet,
+      caps: { ...f.caps, stressBuffer: f.caps.stressBuffer ?? 0n, maxQueueWaitSecs: f.caps.maxQueueWaitSecs ?? 0n, maxReinstateAge: f.caps.maxReinstateAge ?? 0n },
+    }) as unknown as VaultConfig;
+  const names = (ixs: readonly Instruction[]) =>
+    ixs.map((ix) => {
+      const d = Buffer.from(ix.data!.subarray(0, 8)).toString('hex');
+      if (d === Buffer.from(SET_CONFIG_DISCRIMINATOR).toString('hex')) return 'set_config';
+      if (d === Buffer.from(REFRESH_DISCRIMINATOR).toString('hex')) return 'refresh';
+      return d;
+    });
+
+  test('a change that needs a refresh is wrapped: refresh, set_config, refresh', async () => {
+    const ixs = await composeSetCaps({ ...cfg, coverageRatioBps: cfg.coverageRatioBps + 100 }, onChain(), admin);
+    expect(names(ixs)).toEqual(['refresh', 'set_config', 'refresh']);
+  });
+
+  test('a change that needs none is set_config alone', async () => {
+    const ixs = await composeSetCaps({ ...cfg, caps: { ...cfg.caps, maxTvl: cfg.caps.maxTvl + 1n } }, onChain(), admin);
+    expect(names(ixs)).toEqual(['set_config']);
   });
 });
