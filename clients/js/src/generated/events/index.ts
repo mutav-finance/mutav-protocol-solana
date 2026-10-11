@@ -8,6 +8,7 @@
 
 export * from "./allowlistRootUpdated";
 export * from "./assetsClaimed";
+export * from "./claimApproved";
 export * from "./claimFiled";
 export * from "./claimPaid";
 export * from "./configUpdated";

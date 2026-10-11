@@ -80,8 +80,9 @@ export type ClaimFiling = {
   settledAt: bigint;
   /**
    * The exact amount the reserve admin approved for a claim above
-   * `max_claim_per_call` (`approve_claim`, a later upgrade). `0` = not
-   * approved. Written zero and not read by this binary.
+   * `max_claim_per_call` (`approve_claim`, ADR 0021). `0` = not approved.
+   * Written by `approve_claim` (always the provision); read by
+   * `pay_claim` above the per-call cap.
    */
   approvedAmount: bigint;
   /**
@@ -120,8 +121,9 @@ export type ClaimFilingArgs = {
   settledAt: number | bigint;
   /**
    * The exact amount the reserve admin approved for a claim above
-   * `max_claim_per_call` (`approve_claim`, a later upgrade). `0` = not
-   * approved. Written zero and not read by this binary.
+   * `max_claim_per_call` (`approve_claim`, ADR 0021). `0` = not approved.
+   * Written by `approve_claim` (always the provision); read by
+   * `pay_claim` above the per-call cap.
    */
   approvedAmount: number | bigint;
   /**
