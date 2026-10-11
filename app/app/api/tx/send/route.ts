@@ -1,16 +1,21 @@
 import { rpcFor } from "@/lib/server/chain";
 import { serverEnv } from "@/lib/server/env";
-import { assertRelayable } from "@/lib/server/relay";
+import { assertRelayable, boundedBody, RelayRefusedError } from "@/lib/server/relay";
 import { errorResponse } from "@/lib/server/respond";
 import { SQUADS_PROGRAM } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 
-/** Relay a wallet-signed transaction to the configured cluster (never mainnet). */
+/**
+ * Relay a wallet-signed transaction: LOCALNET ONLY. On devnet the wallet sends
+ * it itself (`solana:signAndSendTransaction`), so this route refuses (A1).
+ */
 export async function POST(req: Request) {
   try {
-    const { tx } = decode<{ tx: string }>(await req.text());
     const env = serverEnv();
-    assertRelayable(tx, [env.programId, SQUADS_PROGRAM]);
+    if (env.cluster !== "localnet") throw new RelayRefusedError("the relay is localnet-only: on devnet the wallet sends the transaction itself");
+    const { tx } = decode<{ tx: string }>(await boundedBody(req));
+    if (typeof tx !== "string") throw new RelayRefusedError("body must be { tx: base64 }");
+    assertRelayable(tx, { mutav: env.programId, squadsProgram: SQUADS_PROGRAM, squadsMultisig: env.squadsMultisig });
     const signature = await rpcFor(env)
       .sendTransaction(tx as never, { encoding: "base64", preflightCommitment: "confirmed" })
       .send();
