@@ -8,7 +8,7 @@ v0.3 · October 2026 · Not legal advice. Not an offer of securities. Unaudited 
 
 ## Abstract
 
-MUTAV is an institutional *fiador*. It gives Brazilian tenants a paid rental guarantee (*fiança onerosa*, Lei 8.245/91 art. 37 II) through the real-estate agencies that already run their leases, so no personal guarantor or locked-up deposit is needed. Each partner agency pays MUTAV one consolidated bill a month, by boleto or PIX, for the guarantee fees of all its leases. The `mutav` Solana program is designed to record every guarantee with its remaining *valor afiançado* (the fiança's R$ ceiling) and to custody a BRL reserve that refuses any capital movement that would leave that cover under-backed by the governed coverage ratio `c`. It never refuses a claim payment for solvency, pause or price reasons: only the guarantee's remaining *valor afiançado* and the liquid BRS bound it. The operator's payment caps limit what a single hot key can move, and payments above them go through the time-locked admin multisig or a MUTAV advance that the reserve reimburses. The Colosseum submission delivers the program on devnet; a capped mainnet pilot follows once its start conditions are met (program cap R$1M with R$100k of starting capital plus R$100k a month, ADR 0028). The reserve is not a yield product, and nothing here promises a return.
+MUTAV is an institutional *fiador*. It gives Brazilian tenants a paid rental guarantee (*fiança onerosa*, Lei 8.245/91 art. 37 II) through the real-estate agencies that already run their leases, so no personal guarantor or locked-up deposit is needed. Each partner agency pays MUTAV one consolidated bill a month, by boleto or PIX, for the guarantee fees of all its leases. The `mutav` Solana program is designed to record every guarantee with its remaining *valor afiançado* (the fiança's R$ ceiling) and to custody a BRL reserve that refuses any capital movement that would leave that cover under-backed by the governed coverage ratio `c`. It never refuses a claim payment for coverage, pause or price reasons: only the guarantee's remaining *valor afiançado* and the liquid BRS bound it. The operator's payment caps limit what a single hot key can move, and payments above them go through the time-locked admin multisig or a MUTAV advance that the reserve reimburses. The Colosseum submission delivers the program on devnet; a capped mainnet pilot follows once its start conditions are met (program cap R$1M with R$100k of starting capital plus R$100k a month, ADR 0028). The reserve is not a yield product, and nothing here promises a return.
 
 **For Colosseum judges.**
 
@@ -16,7 +16,7 @@ MUTAV is an institutional *fiador*. It gives Brazilian tenants a paid rental gua
 |---|---|
 | Functionality | §12(a): devnet program, invariant tests, lifecycle demo |
 | Impact | §1: 17.8M rented households; 5 of 7 agencies interviewed front the landlord's rent |
-| Novelty | §8: per-guarantee liabilities on-chain gate every capital exit, and claim payments are never solvency-gated |
+| Novelty | §8: per-guarantee liabilities on-chain gate every capital exit, and claim payments are never gated by required coverage |
 | UX | §7: agencies keep their workflow (one monthly bill by boleto, PIX or BRS, a transparency page) and never call the program |
 | Open source | MIT, verified builds (§6, §11) |
 | Business plan | §2.1 and Figure 1b; open decisions in §13 |
@@ -49,7 +49,7 @@ We interviewed seven agency leaders in the South of Brazil (books of about 35 to
 
 ## 2. MUTAV in one page
 
-*MUTAV is a guarantor whose reserve can't be drained below what its rules say it must back, and whose claim payments are never blocked by the solvency gate or a pause.*
+*MUTAV is a guarantor whose reserve can't be drained below what its rules say it must back, and whose claim payments are never blocked by the coverage gate or a pause.*
 
 MUTAV is designed to act as an **institutional *fiador*** under Lei 8.245/91 art. 37 II and Civil Code arts. 818 ff. Each guarantee is a **limited fiança** (CC 823) whose ceiling, the *valor afiançado*, includes interest, penalties and court costs. MUTAV waives the *benefício de ordem* and signs as *principal pagador* (CC 827–828). The landlord signs the instrument and gives the agency a mandate to receive payments and give *quitação*. Payments come first from the on-chain reserve, with MUTAV's own funds behind it as a backstop disclosed on-chain (§8). Whether this structure remains a *fiança*, rather than a regulated insurance or securitisation activity, is under review with counsel; it is never sold or operated as *seguro-fiança* or a *título de capitalização*.
 
@@ -148,7 +148,7 @@ Six rules shape every mechanism ([spec §1](spec.md#1-principles)).
 1. **The business model is fixed and chain-agnostic.** The program does not price, underwrite or decide payment requests.
 2. **Only what is verifiable on-chain counts** toward the reserve, NAV or coverage. Losses are recognised early, when a payment request is approved. The trust that remains in token issuers is disclosed.
 3. **MUTAV operates every chain touchpoint.** Agencies, tenants and landlords never call the program; an agency paying in BRS signs only a token transfer.
-4. **The solvency gate protects the reserve. It never blocks a claim payment.**
+4. **The coverage gate protects the reserve. It never blocks a claim payment.**
 5. **Start tight.** Hard on-chain caps bound every outflow and every new liability. Only the time-locked multisig raises them.
 6. **Upgrade without migration** ([ADR 0011](decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)).
 
@@ -164,7 +164,7 @@ Six rules shape every mechanism ([spec §1](spec.md#1-principles)).
 
 The protocol has four components ([ADR 0002](decisions/0002-core-program-and-capped-adapters.md)):
 
-- **`mutav`**, the core program: custody, the share mint, NAV, the guarantee exposure registry, the solvency gate, the async queue, roles and claim payments.
+- **`mutav`**, the core program: custody, the share mint, NAV, the guarantee exposure registry, the coverage gate, the async queue, roles and claim payments.
 - **`mutav-adapter-interface`**, a crate fixing the discriminators and layouts every venue adapter implements (`deposit`, `withdraw`, `position_value`).
 - **`mutav-adapter-mock`**, for devnet and tests.
 - **One adapter program per venue, added later.** The pilot reserve holds BRS only ([ADR 0018](decisions/0018-brs-only-pilot-reserve.md)); more assets come in through adapters. TESOURO is the first candidate and ships as **interface and mock only** until the price-account layout and a BRS↔TESOURO conversion path are confirmed.
@@ -246,7 +246,7 @@ Bracket over steps 3–6: "fees in transit: excluded from NAV until recorded".
 
 **Filing.** The agency files the payment request (*pedido de pagamento*) with evidence in the platform, between day 3 and day 9 after the due date (working process; the spec's 15-day window is to be reconciled). MUTAV verifies it. On approval, `file_claim` books a provision under a named **category** of guaranteed debt and records `request_complete_ts`, which starts the contractual payment term. **NAV drops at filing**, while coverage is unchanged, because the payment already sits inside the guarantee's remaining cover.
 
-**Payment.** `pay_claim` sends BRS from the reserve to MUTAV's whitelisted payments account. **It applies no solvency, mode, price or earmark check.** The program enforces which leg may pay each category and refuses only the cases in Table 4's note ². The operator caps (R$15k per call, R$20k per 31 days, ADR 0028) limit what the hot key can move, not what MUTAV owes: a 6×-rent exit claim (R$13,200) fits the per-call cap, and a larger payment goes through `pay_claim_admin`, signed by the time-locked admin multisig under every other rule. If even that cannot pay within the contractual term, MUTAV advances the payment and the reserve reimburses it later (`PAYOUT_BACKSTOP_REIMBURSEMENT`). The reserve never pays more than the remaining *valor afiançado*; when total paid reaches it, the guarantee becomes `EXHAUSTED` in the same instruction, and MUTAV notifies the landlord that the fiança is extinguished.
+**Payment.** `pay_claim` sends BRS from the reserve to MUTAV's whitelisted payments account. **It applies no coverage, mode, price or earmark check.** The program enforces which leg may pay each category and refuses only the cases in Table 4's note ². The operator caps (R$15k per call, R$20k per 31 days, ADR 0028) limit what the hot key can move, not what MUTAV owes: a 6×-rent exit claim (R$13,200) fits the per-call cap, and a larger payment goes through `pay_claim_admin`, signed by the time-locked admin multisig under every other rule. If even that cannot pay within the contractual term, MUTAV advances the payment and the reserve reimburses it later (`PAYOUT_BACKSTOP_REIMBURSEMENT`). The reserve never pays more than the remaining *valor afiançado*; when total paid reaches it, the guarantee becomes `EXHAUSTED` in the same instruction, and MUTAV notifies the landlord that the fiança is extinguished.
 
 **Why exhaustion matters.** While a guarantee is in force, the landlord cannot obtain the 15-day eviction *liminar* (art. 59 §1º IX), so evictions run on the ordinary track and, by our research estimate, consume the full 6× exit sub-limit (uncapped ≈10×). If exhaustion extinguishes the fiança, the landlord can seek the liminar and the expected exit payout falls (base ≈5.5×, low ≈2.5× rent). Whether exhaustion counts as extinction for art. 59 is a question for counsel.
 
@@ -268,12 +268,12 @@ Sequence diagram, six lanes left to right: Agency | MUTAV platform | Operator ke
 8. Payments account -> offramp -> PIX -> Agency: "BRL by PIX"; Agency -> (off-diagram) landlord "under mandate".
 9. Operator -> program: settle_payout(pix_e2e_hash, quitacao_hash). Program note: "Settled; mandate hash copied; late flag if > payout_sla_secs after pay_claim".
 Two brackets: a long one spanning steps 3 to 8 labelled "working target: ≤4 days request -> PIX; ≤15 days due date -> PIX (under legal review)"; a shorter one spanning steps 6 to 9 labelled "on-chain clock: pay_claim -> settle_payout (payout_sla_secs)".
-Every on-chain step (2, 5, 6, 7, 9) carries a small badge "not solvency-gated".
+Every on-chain step (2, 5, 6, 7, 9) carries a small badge "not coverage-gated".
 ```
 
 ---
 
-## 8. Reserve, solvency and NAV
+## 8. Reserve, required coverage and NAV
 
 Anyone can recompute every quantity below from public accounts ([spec §4](spec.md#4-invariants-and-formulas)). Amounts are BRS base units (6 decimals), math is `u128`, and rounding favours the reserve.
 
@@ -297,7 +297,7 @@ NAV per share         = net_assets / shares_outstanding
 
 MUTAV chose the second, and the program now expresses it ([ADR 0016](decisions/0016-coverage-ratio-below-one.md)). `c` has a program floor of 0.10, the worst-case floor of the business rule that limits the book (grow only while the reserve holds at least 10% of total cover and at least two tail years). Devnet and the pilot run above it, at `c` = 0.25 (ADR 0028): R$100k backs about R$400k of cover, 10 working-product leases, and the R$1M cap about 101. `coverage_required` is never below the open provisions, so filed payment requests stay fully covered at any `c`. At `c` < 1 a claim payment lowers surplus by `(1 − c)` times the amount (invariant 7) and can move the reserve into under-coverage; it is still never refused. The two-tail-year check stays off-chain for now; a per-lease tail floor is a later ADR. Which coverage figure MUTAV publishes before counsel's opinion is still open; any figure published will be shown both against maximum exposure and against a tail year, because either alone misleads.
 
-**What is gated** ([ADR 0005](decisions/0005-solvency-gate-scope.md)). Table 4 has the full matrix. In short: new guarantees and redemption fills must fit in the `free_capital` computed before them; nothing on the claim-payment path, nor fees, issuer income, closes or `refresh`, is gated on solvency. Redemption fills are also capped by `liquid_budget`, so no capital exit or allocation can spend BRS a filed payment request needs. Fee receivables are not reserve assets: a missed agency payment lowers fee inflow, not coverage.
+**What is gated** ([ADR 0005](decisions/0005-solvency-gate-scope.md)). Table 4 has the full matrix. In short: new guarantees and redemption fills must fit in the `free_capital` computed before them; nothing on the claim-payment path, nor fees, issuer income, closes or `refresh`, is gated on required coverage. Redemption fills are also capped by `liquid_budget`, so no capital exit or allocation can spend BRS a filed payment request needs. Fee receivables are not reserve assets: a missed agency payment lowers fee inflow, not coverage.
 
 **Under-coverage mode.** The program enters under-coverage when `stable_assets < coverage_required`, for example after a TESOURO mark-down or an issuer freeze. Registration, redemption fills and allocation freeze. Deallocation runs only if it doesn't worsen coverage, so de-risking TESOURO into BRS stays possible. Claim payments, fees, capital requests and deposit fills keep running, and deposits recapitalise at a NAV that already reflects the loss ([spec §6](spec.md#6-under-coverage-mode)). On public surfaces this mode reads "reserve below target; MUTAV backstop active", never "insolvent". The landlord's claim is against MUTAV's whole patrimony, not the reserve alone. MUTAV's backstop is disclosed on-chain as a separate layer (`backstop_amount`, `backstop_commitment_hash`, `backstop_reimbursed_total`) and never counts in `stable_assets` or NAV. Its amount is **open**; its disclosure is specified.
 
@@ -316,13 +316,13 @@ Right bar "coverage_required = c × remaining cover", shorter than the left bar.
 The vertical gap between the top of the right bar and the top of the left bar is shaded and labelled "surplus = free capital".
 Inside the surplus, a dotted slice labelled "earmark (phase 2; 0 in pilot)".
 Arrow pointing into the surplus: "register_guarantee / fulfil_redeems draw from here".
-Separate arrow from the BRS segment out to the right: "claim payments draw from BRS — never solvency-gated".
+Separate arrow from the BRS segment out to the right: "claim payments draw from BRS — never coverage-gated".
 Small inset, right, titled "Same 170-lease book, two sizings (working parameters; open, §8)": bar A "c = 1: ≈R$6.7M in the reserve"; bar B "expected loss + tail year: R$300k target", with a dashed segment above it labelled "MUTAV backstop (disclosed, not in NAV)".
 ```
 
 **Table 4. Gate matrix** (✓ runs · ✗ refused · *gated* = must fit in `free_capital` computed before · *limited* = see note)
 
-| Instruction | Paused | Under-coverage | Open notice | Stale price | `fulfil_halted` | Solvency |
+| Instruction | Paused | Under-coverage | Open notice | Stale price | `fulfil_halted` | Coverage gate |
 |---|---|---|---|---|---|---|
 | **`pay_claim`**² | **✓** | **✓** | **✓** | **✓** | **✓** | **✓ never gated** |
 | **`pay_claim_admin`**² | **✓** | **✓** | **✓** | **✓** | **✓** | **✓ never gated** (time-locked) |
@@ -578,7 +578,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 
 **Platform.** Boleto issuance through a licensed PSP, BRL→BRS conversion through an authorized minter, `contribute_fees` per agency bill with automated reconciliation, on-chain claim payments wired to platform approvals, the landlord mandate and *quitação* records, a recoveries flow, and an external completeness attestation.
 
-**Multi-currency reserves.** One protocol can run one reserve per currency and market, each its own `VaultConfig`. A guarantee always matches its reserve's currency, so solvency never carries FX risk; a USD reserve, for example, could serve markets where USD-denominated leases are legal. In Brazil, Lei 8.245/91 art. 17 forbids stipulating rent in foreign currency or indexing it to the exchange rate, so Brazilian guarantees stay in BRL.
+**Multi-currency reserves.** One protocol can run one reserve per currency and market, each its own `VaultConfig`. A guarantee always matches its reserve's currency, so required coverage never carries FX risk; a USD reserve, for example, could serve markets where USD-denominated leases are legal. In Brazil, Lei 8.245/91 art. 17 forbids stipulating rent in foreign currency or indexing it to the exchange rate, so Brazilian guarantees stay in BRL.
 
 **Scale gates.** Caps rise only through the time-locked multisig, after an external audit, and only while the KPIs in §12 hold.
 
@@ -735,7 +735,7 @@ Phase 2 only, not deployed:
 | What it is | Guarantee reserve for rental *fiança* | Tokenized risk-transfer yield | Private credit | Receivables financing | Institutional lending | On-chain mutual cover |
 | Denomination | BRL | USD | USDC on-chain; BRL off-chain | USDC | USDC | ETH and stables |
 | Liabilities on-chain? | Yes, one account per guarantee | Aggregate NAV only | Deal state only | Pool state only | Loan state (Ethereum) | Yes, active covers |
-| Exit gated on on-chain solvency? | Yes: exits only from surplus over `c` × remaining cover (`c` governed) | No | No | Tranche-ratio gate | No | Partly: MCR% > 100% |
+| Exit gated on on-chain required coverage? | Yes: exits only from surplus over `c` × remaining cover (`c` governed) | No | No | Tranche-ratio gate | No | Partly: MCR% > 100% |
 | Audited / open source | **Unaudited**; MIT | Audited; open | Closed source¹ | Audited; Solana programs private¹ | Audited; open (Ethereum) | Audited; open |
 
 ¹ Where programs are closed source, the entries are inferred from public documentation.

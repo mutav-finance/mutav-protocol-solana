@@ -153,7 +153,7 @@ function Redemptions({ mode }: { mode: Mode }) {
           <Facts
             now={m(`${q.redeems.length} waiting · free capital ${fmtBrs(reserve.solvency.freeCapital, 0)}`)}
             bound={m("each fill ≤ free capital · whole requests only · up to 8 per call")}
-            does="Pays redemptions in FIFO order at NAV, from free capital only (the solvency gate). Frozen in under-coverage and while paused or halted; a head that does not fit stops the batch."
+            does="Pays redemptions in FIFO order at NAV, from free capital only (the coverage gate). Frozen in under-coverage and while paused or halted; a head that does not fit stops the batch."
           />
           <Grid>
             <TextField id="adm-red" label="Count" value={count} onChange={setCount} numeric />
@@ -173,7 +173,7 @@ function Claims({ mode }: { mode: Mode }) {
     <Sub id="money-claims" title="Claim payments" badge={<RoleTag role="operator" prefix="paid by the" />}>
       <Contexts>
         <Context who="operator" figure={m(`−${fmtBrs(reserve.state.claimsPaidTotal, 0)} · ${fmtBrs(cap.paid, 0)} this window`)} href="/operator">
-          pay_claim sends BRS to the payments account within the claim caps (claims_paid_total); never blocked by solvency or pause.
+          pay_claim sends BRS to the payments account within the claim caps (claims_paid_total); never blocked by required coverage or pause.
         </Context>
         <Context who="anyone" href="/reserve#claims" linkLabel="/reserve">
           The claims timeline (filed → paid → settled) is public.

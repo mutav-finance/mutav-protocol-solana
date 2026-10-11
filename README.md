@@ -13,7 +13,7 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 | [`/operator`](https://reserve.mutav.finance/operator) | Operator console. During the pilot MUTAV's team signs by hand with the operator wallet; later mutav-app's backend sends the same instructions with a KMS-held key |
 | [`/investor`](https://reserve.mutav.finance/investor) | Capital-provider view, gated by the on-chain allowlist. The pilot runs on MUTAV's own capital and is not open to public investment |
 | [`/admin`](https://reserve.mutav.finance/admin) | Reserve Admin: Squads v4 proposals (create, approve, execute after the time lock) |
-| [`/demo`](https://reserve.mutav.finance/demo) | Guided six-step walkthrough, with the solvency-gate preview |
+| [`/demo`](https://reserve.mutav.finance/demo) | Guided six-step walkthrough, with the coverage-gate preview |
 | [`/simulator`](https://reserve.mutav.finance/simulator) | Reserve simulator: size the reserve, coverage, yield against Selic |
 
 > **Status:** the app is live; the program (`8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9`) is being deployed to devnet under a Squads multisig. Until the reserve is initialized, the live pages show a "being deployed" notice instead of numbers. To see every page with data today, run the app against a seeded local validator ([Pilot app](#pilot-app)).
@@ -45,7 +45,7 @@ This repo ships the on-chain program, a TypeScript client that composes transact
 mutav-protocol-solana/
 ├── programs/
 │   ├── mutav/                    # core program: custody, shares, NAV, exposure registry,
-│   │                             # solvency gate, async queue, roles, claim payments
+│   │                             # coverage gate, async queue, roles, claim payments
 │   ├── mutav-adapter-interface/  # crate: shared adapter discriminators and layouts
 │   └── mutav-adapter-mock/       # devnet and tests only
 ├── tests/                        # LiteSVM integration tests
@@ -102,7 +102,7 @@ No command in this repo runs in watch mode.
 
 ## Pilot app
 
-[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana, live at [reserve.mutav.finance](https://reserve.mutav.finance): `/` landing (story, live reserve strip, who does what, protocol diagram), `/reserve` public transparency (health, coverage, claims timeline, flows, every account on Explorer, with snapshot charts), `/operator` the operator console, `/investor` the allowlist-gated capital-provider view, `/admin` Squads v4 proposal builders, `/demo` a guided walkthrough with the solvency-gate preview, and `/simulator` the reserve simulator. Every action is tagged with the role that signs it: Reserve Admin, Operator or Investor. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
+[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana, live at [reserve.mutav.finance](https://reserve.mutav.finance): `/` landing (story, live reserve strip, who does what, protocol diagram), `/reserve` public transparency (health, coverage, claims timeline, flows, every account on Explorer, with snapshot charts), `/operator` the operator console, `/investor` the allowlist-gated capital-provider view, `/admin` Squads v4 proposal builders, `/demo` a guided walkthrough with the coverage-gate preview, and `/simulator` the reserve simulator. Every action is tagged with the role that signs it: Reserve Admin, Operator or Investor. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
 
 Run it locally against a seeded validator (port 3001, since 3000 is often taken):
 
