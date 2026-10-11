@@ -271,6 +271,54 @@ describe('compareIdl: enums are append-only', () => {
   });
 });
 
+describe('compareIdl: instruction account seeds and addresses', () => {
+  const withPda = () => {
+    const idl = base();
+    idl.instructions[0]!.accounts[0] = { name: 'config', pda: { seeds: [{ kind: 'const', value: [1, 2] }] } };
+    idl.instructions[0]!.accounts.push({ name: 'system_program', address: '11111111111111111111111111111111' });
+    return idl;
+  };
+  test('unchanged seeds and addresses pass', () => {
+    expect(compareIdl(withPda(), withPda())).toEqual([]);
+  });
+  test('changed PDA seeds fail', () => {
+    const next = withPda();
+    next.instructions[0]!.accounts[0] = { name: 'config', pda: { seeds: [{ kind: 'const', value: [1, 3] }] } };
+    expect(compareIdl(withPda(), next).join('\n')).toContain('refresh: accounts changed');
+  });
+  test('a changed fixed address fails', () => {
+    const next = withPda();
+    next.instructions[0]!.accounts[2]!.address = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+    expect(compareIdl(withPda(), next).join('\n')).toContain('refresh: accounts changed');
+  });
+});
+
+describe('compareIdl: fails closed on unmodelled types', () => {
+  const withType = (t: any, def?: any) => {
+    const idl = base();
+    idl.instructions[1]!.args.push({ name: 'x', type: t });
+    if (def) idl.types.push(def);
+    return idl;
+  };
+  test.each([
+    ['a type alias', { defined: { name: 'Alias' } }, { name: 'Alias', type: { kind: 'type', alias: 'u64' } }, "kind 'type'"],
+    ['a generic type', { defined: { name: 'G' } }, { name: 'G', generics: [{ kind: 'type', name: 'T' }], type: { kind: 'struct', fields: [] } }, 'generic types'],
+    ['generic arguments', { defined: { name: 'RegisterArgs', generics: [{ kind: 'type', type: 'u8' }] } }, undefined, 'generic arguments'],
+    ['a generic parameter', { generic: 'T' }, undefined, 'generic parameters'],
+    ['a coption', { coption: 'pubkey' }, undefined, 'coption'],
+    ['a generic array length', { array: ['u8', { generic: 'N' }] }, undefined, 'array length'],
+    ['an unknown form', { hashMap: ['u8', 'u8'] }, undefined, 'not supported'],
+  ])('%s throws', (_label, t, def, msg) => {
+    const idl = withType(t, def);
+    expect(() => compareIdl(idl, idl)).toThrow(msg as string);
+  });
+  test('an unmodelled type in account data throws too', () => {
+    const idl = base();
+    idl.types.find((t) => t.name === 'VaultState')!.type.fields!.splice(0, 0, { name: 'o', type: { coption: 'u64' } } as any);
+    expect(() => compareIdl(idl, idl)).toThrow('coption');
+  });
+});
+
 describe('compareIdl: errors are append-only', () => {
   test('a new error inserted into a gap below the last code fails', () => {
     const prev = base();

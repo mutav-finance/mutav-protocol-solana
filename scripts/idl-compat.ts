@@ -46,10 +46,37 @@ const PRIMITIVE_SIZE: Record<string, number> = {
 
 const isReserved = (f: Field | undefined) => !!f && f.name.startsWith('_reserved');
 
+/**
+ * A type definition, failing closed on anything this check does not model:
+ * a kind other than struct or enum (e.g. a `type` alias) and generic types.
+ */
 function lookup(idl: Idl, name: string): TypeDef {
   const t = idl.types.find((x) => x.name === name);
   if (!t) throw new Error(`type ${name} missing from IDL`);
+  if (t.type.kind !== 'struct' && t.type.kind !== 'enum') {
+    throw new Error(`type ${name}: kind '${t.type.kind}' is not supported by idl-compat (struct or enum only); extend the check before using it`);
+  }
+  if ('generics' in t && (t as { generics?: unknown[] }).generics?.length) {
+    throw new Error(`type ${name}: generic types are not supported by idl-compat; extend the check before using them`);
+  }
   return t;
+}
+
+/** Refuses type forms the check does not model (`generic`, `coption`, generic `defined` refs, generic array lengths). */
+function assertSupported(t: IdlType) {
+  if (typeof t === 'string') return;
+  const o = t as Record<string, unknown>;
+  if ('generic' in o) throw new Error(`type ${JSON.stringify(t)}: generic parameters are not supported by idl-compat`);
+  if ('coption' in o) throw new Error(`type ${JSON.stringify(t)}: coption is not supported by idl-compat`);
+  if ('defined' in o && (o.defined as { generics?: unknown[] }).generics?.length) {
+    throw new Error(`type ${JSON.stringify(t)}: generic arguments are not supported by idl-compat`);
+  }
+  if ('array' in o && typeof (o.array as unknown[])[1] !== 'number') {
+    throw new Error(`type ${JSON.stringify(t)}: array length must be a number for idl-compat`);
+  }
+  if (!('array' in o) && !('vec' in o) && !('option' in o) && !('defined' in o)) {
+    throw new Error(`type ${JSON.stringify(t)}: not supported by idl-compat`);
+  }
 }
 
 const isNamed = (f: Field | IdlType): f is Field => typeof f === 'object' && 'name' in f && 'type' in f;
@@ -57,6 +84,7 @@ const fieldType = (f: Field | IdlType): IdlType => (isNamed(f) ? f.type : f);
 const fieldsSize = (idl: Idl, fs: Fields | undefined) => (fs ?? []).reduce((n: number, f) => n + sizeOf(idl, fieldType(f)), 0);
 
 function sizeOf(idl: Idl, t: IdlType): number {
+  assertSupported(t);
   if (typeof t === 'string') {
     const s = PRIMITIVE_SIZE[t];
     if (s === undefined) throw new Error(`no fixed size for ${t}`);
@@ -80,6 +108,7 @@ const resolveFields = (idl: Idl, fs: Fields | undefined) =>
  * comparison. An enum keeps its variants in order, each with its fields.
  */
 function resolve(idl: Idl, t: IdlType): unknown {
+  assertSupported(t);
   if (typeof t === 'string') return t;
   if ('array' in t) return { array: [resolve(idl, t.array[0]), t.array[1]] };
   if ('vec' in t) return { vec: resolve(idl, t.vec) };
@@ -89,9 +118,9 @@ function resolve(idl: Idl, t: IdlType): unknown {
     if (d.kind === 'enum') {
       return { enum: t.defined.name, variants: (d.variants ?? []).map((v) => ({ name: v.name, fields: resolveFields(idl, v.fields) })) };
     }
-    return { [d.kind]: t.defined.name, fields: resolveFields(idl, d.fields) };
+    return { struct: t.defined.name, fields: resolveFields(idl, d.fields) };
   }
-  return t;
+  throw new Error(`type ${JSON.stringify(t)}: not supported by idl-compat`);
 }
 
 type ResolvedEnum = { enum: string; variants: { name: string; fields: unknown[] }[] };
@@ -190,8 +219,18 @@ function checkStruct(a: Idl, b: Idl, nameA: string, nameB: string, out: string[]
   }
 }
 
-const accountsShape = (xs: IxAccount[]) =>
-  xs.map((x) => ({ name: x.name, writable: !!x.writable, signer: !!x.signer, optional: !!x.optional }));
+/** Account metas, PDA seeds and fixed addresses included: changing either breaks callers. */
+function accountsShape(xs: IxAccount[]): unknown[] {
+  return xs.map((x) => ({
+    name: x.name,
+    writable: !!x.writable,
+    signer: !!x.signer,
+    optional: !!x.optional,
+    address: x.address ?? null,
+    pda: x.pda ?? null,
+    accounts: Array.isArray(x.accounts) ? accountsShape(x.accounts as IxAccount[]) : null,
+  }));
+}
 
 export function compareIdl(prev: Idl, next: Idl): string[] {
   const out: string[] = [];
