@@ -41,9 +41,9 @@ pub const INCOME_SEED: &[u8] = b"income";
 // freeze (ADR 0019). Never reuse it: see `RETIRED_SEEDS`.
 
 /// The `unsolicited` token account (BRS): `["unsolicited", config]`
-/// (ADR 0019). Holds money sent to the reserve unasked until the reserve
-/// admin books or returns it. The seed is reserved now; the account is
-/// created by a later change.
+/// (ADR 0019, ADR 0024). Holds money sent to the reserve unasked until the
+/// reserve admin books or returns it. Created by `initialize`; the
+/// instructions that move money in and out of it come in a later upgrade.
 pub const UNSOLICITED_SEED: &[u8] = b"unsolicited";
 
 /// `ClaimFiling`: `["claim", guarantee, notice_ref_hash]` (spec §3.6).
@@ -92,6 +92,21 @@ pub const MAX_FEE_TAKE_BPS: u16 = 3_000;
 
 /// Program minimum for `coverage_ratio_bps` (c ≥ 0.10; ADR 0016).
 pub const MIN_COVERAGE_RATIO_BPS: u16 = 1_000;
+/// Program maximum for `coverage_ratio_bps` (c ≤ 1.0; ADR 0022, ADR 0026).
+pub const MAX_COVERAGE_RATIO_BPS: u16 = 10_000;
+
+/// Reserve mint decimals: BRS has 6 (spec Conventions). `initialize` refuses
+/// any other mint, so every cap keeps its meaning in R$.
+pub const RESERVE_DECIMALS: u8 = 6;
+
+/// Most `ConfigParam`s one `set_config` call may carry (ADR 0026). There are
+/// fewer settable fields than this, and duplicates are refused.
+pub const MAX_CONFIG_PARAMS: usize = 16;
+
+/// How long a proposed role or admin key may be accepted, from the proposal
+/// (ADR 0020): 72 hours. After that `accept_role` / `accept_admin` fail and the
+/// admin proposes again.
+pub const HANDOVER_WINDOW_SECS: i64 = 72 * 3_600;
 
 /// Share mint decimals (spec Conventions).
 pub const SHARE_DECIMALS: u8 = 6;
@@ -140,6 +155,37 @@ pub const MODE_UNDER_COVERED: u8 = 1;
 /// `Guarantee.status` (spec §3.5).
 pub const GUARANTEE_ACTIVE: u8 = 0;
 pub const GUARANTEE_CLOSED: u8 = 1;
+
+// `u8` selectors taken as instruction arguments start at 1: a zero (an
+// unset or defaulted field in a client) is never a meaningful choice and
+// fails with `InvalidParameter`. Append-only.
+
+/// `close_guarantee` reasons (ADR 0020), stored in `Guarantee.close_reason`
+/// (`0` = closed before the reason was recorded, or still active).
+/// `RELEASED`: no open claim (pilot: the guarantee is `ACTIVE`).
+pub const CLOSE_RELEASED: u8 = 1;
+/// `VOID`: the reversal of a registration: `ACTIVE`, nothing paid on either
+/// leg, no open claim.
+pub const CLOSE_VOID: u8 = 2;
+
+/// Roles with a two-step handover (ADR 0020). `propose_role` /
+/// `accept_role` take `ROLE_OPERATOR` or `ROLE_PAUSER`; `cancel_pending` also
+/// takes `ROLE_ADMIN` (the admin handover of `propose_admin` /
+/// `accept_admin`).
+pub const ROLE_OPERATOR: u8 = 1;
+pub const ROLE_PAUSER: u8 = 2;
+pub const ROLE_ADMIN: u8 = 3;
+
+/// `FulfilHaltRaised.source`: the instruction that measured the move.
+/// `refresh` today; the inline guard in the fills (a later change) adds
+/// its own values.
+pub const HALT_SOURCE_REFRESH: u8 = 1;
+pub const HALT_SOURCE_FULFIL_DEPOSITS: u8 = 2;
+pub const HALT_SOURCE_FULFIL_REDEEMS: u8 = 3;
+
+/// Queues of `advance_queue_head` (spec §5.8).
+pub const QUEUE_DEPOSIT: u8 = 1;
+pub const QUEUE_REDEEM: u8 = 2;
 
 /// `ClaimFiling.leg` (spec §3.6).
 pub const LEG_DEFAULT: u8 = 0;
@@ -192,6 +238,7 @@ pub const INCOME_RECEIPT_SIZE: usize = 143;
 // ---------------------------------------------------------------------------
 
 pub mod field {
+    /// Changed by `accept_admin` (ADR 0020).
     pub const ADMIN: u16 = 1;
     pub const OPERATOR: u16 = 2;
     pub const PAUSER: u16 = 3;
@@ -207,6 +254,15 @@ pub mod field {
     pub const PAUSED: u16 = 14;
     pub const FEATURE_FLAGS: u16 = 15;
     pub const MUTAV_CAPITAL_WALLET: u16 = 16;
+    // ADR 0019 carves, written by the role instructions (ADR 0020). The
+    // pending keys' expiry times are bookkeeping of the handover, announced
+    // by `RoleProposed`, and have no id.
+    pub const PENDING_ADMIN: u16 = 18;
+    pub const PENDING_OPERATOR: u16 = 19;
+    pub const PENDING_PAUSER: u16 = 20;
+    pub const GUARDIAN_0: u16 = 21;
+    pub const GUARDIAN_1: u16 = 22;
+    pub const GUARDIAN_2: u16 = 23;
 
     pub const CAPS_MAX_TVL: u16 = 100;
     pub const CAPS_MAX_COVER_PER_GUARANTEE: u16 = 101;
@@ -214,6 +270,10 @@ pub mod field {
     pub const CAPS_MAX_CLAIM_PER_PERIOD: u16 = 104;
     pub const CAPS_MIN_REQUEST: u16 = 107;
     pub const CAPS_MAX_REQUEST: u16 = 108;
+    // ADR 0019 carves in `Caps`, set by `set_config` (ADR 0026).
+    pub const CAPS_STRESS_BUFFER: u16 = 110;
+    pub const CAPS_MAX_QUEUE_WAIT_SECS: u16 = 111;
+    pub const CAPS_MAX_REINSTATE_AGE: u16 = 112;
 
     /// `caps.max_nav_move_bps`. Keeps the id it had as
     /// `price.max_nav_move_bps` before the price parameters were retired
@@ -260,9 +320,9 @@ const fn fixed(id: u16, name: &'static str) -> ConfigField {
 /// Every `VaultConfig` field with a `ConfigUpdated` id. Tests walk this table
 /// and assert each mutable field has an event path.
 pub const CONFIG_FIELDS: &[ConfigField] = &[
-    // `admin` is the Squads vault address; membership changes inside Squads
-    // keep the address, so no instruction changes it.
-    fixed(field::ADMIN, "admin"),
+    // `admin` is the Squads vault address; it changes only through the
+    // two-step `propose_admin` / `accept_admin` (ADR 0020).
+    f(field::ADMIN, "admin"),
     f(field::OPERATOR, "operator"),
     f(field::PAUSER, "pauser"),
     fixed(field::RESERVE_MINT, "reserve_mint"),
@@ -290,6 +350,15 @@ pub const CONFIG_FIELDS: &[ConfigField] = &[
     f(field::CAPS_MIN_REQUEST, "caps.min_request"),
     f(field::CAPS_MAX_REQUEST, "caps.max_request"),
     f(field::MAX_NAV_MOVE_BPS, "caps.max_nav_move_bps"),
+    f(field::PENDING_ADMIN, "pending_admin"),
+    f(field::PENDING_OPERATOR, "pending_operator"),
+    f(field::PENDING_PAUSER, "pending_pauser"),
+    f(field::GUARDIAN_0, "guardians[0]"),
+    f(field::GUARDIAN_1, "guardians[1]"),
+    f(field::GUARDIAN_2, "guardians[2]"),
+    f(field::CAPS_STRESS_BUFFER, "caps.stress_buffer"),
+    f(field::CAPS_MAX_QUEUE_WAIT_SECS, "caps.max_queue_wait_secs"),
+    f(field::CAPS_MAX_REINSTATE_AGE, "caps.max_reinstate_age"),
 ];
 
 #[cfg(test)]

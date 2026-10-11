@@ -43,12 +43,16 @@ pub struct Guarantee {
     pub registered_at: i64,
     /// `0` while active.
     pub closed_at: i64,
-    /// Zeroed. Never read or written by logic. The 192-byte pilot budget
-    /// (spec §14.2) holds the ADR 0012 lifecycle fields (88 bytes) without a
-    /// migration; it was grown from 64 before the layout freeze, and the 12
-    /// bytes of the removed display fields (`rent`, `default_multiplier_bps`,
-    /// `exit_multiplier_bps`) returned to it (ADR 0019).
-    pub _reserved: [u8; 204],
+    /// `CLOSE_RELEASED` or `CLOSE_VOID`, written by `close_guarantee`
+    /// (ADR 0020). `0` while active.
+    pub close_reason: u8,
+    /// Zeroed. Never read or written by logic. The pilot budget (spec §14.2)
+    /// holds the ADR 0012 lifecycle fields (88 bytes) without a migration; it
+    /// was grown from 64 before the layout freeze, the 12 bytes of the
+    /// removed display fields (`rent`, `default_multiplier_bps`,
+    /// `exit_multiplier_bps`) returned to it, and `close_reason` took one
+    /// (ADR 0019).
+    pub _reserved: [u8; 203],
 }
 
 const _: () = assert!(8 + Guarantee::INIT_SPACE == GUARANTEE_SIZE);

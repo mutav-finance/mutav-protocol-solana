@@ -137,12 +137,44 @@ pub struct ConfigUpdated {
     pub new: [u8; 32],
 }
 
+/// A role or admin handover was proposed (ADR 0020). `role` is
+/// `ROLE_OPERATOR`, `ROLE_PAUSER` or `ROLE_ADMIN`; `key` must accept before
+/// `expires_at`.
 #[event]
-pub struct RolesUpdated {
+pub struct RoleProposed {
     pub config: Pubkey,
     pub ts: i64,
-    pub operator: Pubkey,
-    pub pauser: Pubkey,
+    pub role: u8,
+    pub key: Pubkey,
+    pub expires_at: i64,
+}
+
+/// The proposed key accepted its role: `old` is replaced by `new`.
+#[event]
+pub struct RoleAccepted {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub role: u8,
+    pub old: Pubkey,
+    pub new: Pubkey,
+}
+
+/// The admin cleared a pending handover (`cancel_pending`).
+#[event]
+pub struct HandoverCancelled {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub role: u8,
+    pub key: Pubkey,
+}
+
+/// The admin set the pause-only guardian keys (ADR 0020). Default = empty
+/// slot.
+#[event]
+pub struct GuardiansUpdated {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub guardians: [Pubkey; 3],
 }
 
 #[event]
@@ -152,8 +184,24 @@ pub struct OperatorRevoked {
     pub by: Pubkey,
 }
 
+/// The admin removed the pauser in one step (ADR 0020).
+#[event]
+pub struct PauserRevoked {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub by: Pubkey,
+}
+
 #[event]
 pub struct PaymentsAccountUpdated {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub old: Pubkey,
+    pub new: Pubkey,
+}
+
+#[event]
+pub struct TreasuryAccountUpdated {
     pub config: Pubkey,
     pub ts: i64,
     pub old: Pubkey,
@@ -194,14 +242,24 @@ pub struct GuaranteeRegistered {
     pub refs_hash: [u8; 32],
     pub default_cover: u64,
     pub exit_cover: u64,
+    /// Running totals after the registration.
+    pub remaining_cover_total: u64,
+    pub coverage_required: u64,
+    pub active_guarantees: u32,
 }
 
+/// `reason`: `CLOSE_RELEASED` or `CLOSE_VOID` (ADR 0020).
 #[event]
 pub struct GuaranteeClosed {
     pub config: Pubkey,
     pub ts: i64,
     pub id: [u8; 32],
+    pub reason: u8,
     pub released_cover: u64,
+    /// Running totals after the close.
+    pub remaining_cover_total: u64,
+    pub coverage_required: u64,
+    pub active_guarantees: u32,
 }
 
 #[event]
@@ -212,6 +270,10 @@ pub struct FeesContributed {
     pub gross: u64,
     pub take: u64,
     pub net: u64,
+    /// Running totals after the contribution.
+    pub fees_in_total: u64,
+    pub fee_take_total: u64,
+    pub brs_balance: u64,
 }
 
 /// Issuer income swept from the income inbox into the reserve (ADR 0017).
@@ -224,6 +286,9 @@ pub struct IncomeSwept {
     pub period: u32,
     pub amount: u64,
     pub inbox_after: u64,
+    /// Running totals after the sweep.
+    pub income_total: u64,
+    pub brs_balance: u64,
 }
 
 #[event]
@@ -234,6 +299,10 @@ pub struct ClaimFiled {
     pub leg: u8,
     pub amount: u64,
     pub notice_ref_hash: [u8; 32],
+    /// `VaultState.provisions` and the cached `coverage_required` after the
+    /// filing.
+    pub provisions_after: u64,
+    pub coverage_required_after: u64,
 }
 
 #[event]
@@ -245,6 +314,14 @@ pub struct ClaimPaid {
     pub amount: u64,
     pub notice_ref_hash: [u8; 32],
     pub payments_account: Pubkey,
+    /// After the payment: provisions, the cached `coverage_required`, the
+    /// claim payments of the 31-day window (this one included), the tracked
+    /// BRS in `reserve`, and lifetime claim payments.
+    pub provisions_after: u64,
+    pub coverage_required_after: u64,
+    pub window_paid: u64,
+    pub brs_balance_after: u64,
+    pub claims_paid_total: u64,
 }
 
 #[event]
@@ -269,6 +346,7 @@ pub struct DepositRequested {
     pub assets: u64,
 }
 
+/// `by` is the signer: the owner, or the admin (ADR 0023).
 #[event]
 pub struct DepositCancelled {
     pub config: Pubkey,
@@ -276,6 +354,7 @@ pub struct DepositCancelled {
     pub owner: Pubkey,
     pub seq: u64,
     pub assets: u64,
+    pub by: Pubkey,
 }
 
 #[event]
@@ -296,6 +375,23 @@ pub struct DepositsFulfilled {
     pub assets: u64,
     pub shares: u64,
     pub nav: u64,
+    /// Lifetime counters after the batch.
+    pub deposited_assets_total: u64,
+    pub minted_shares_total: u64,
+}
+
+/// One per deposit fill, with the totals after it.
+#[event]
+pub struct DepositFilled {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub owner: Pubkey,
+    pub seq: u64,
+    pub assets: u64,
+    pub shares: u64,
+    pub nav: u64,
+    pub shares_outstanding_after: u64,
+    pub net_assets_after: u64,
 }
 
 #[event]
@@ -330,6 +426,9 @@ pub struct RedeemsFulfilled {
     pub assets: u64,
     pub nav: u64,
     pub idle_free_capital: u64,
+    /// Lifetime counters after the batch.
+    pub redeemed_shares_total: u64,
+    pub redeemed_assets_total: u64,
 }
 
 #[event]
@@ -372,6 +471,29 @@ pub struct StateRefreshed {
     pub provisions: u64,
     pub nav_per_share: u64,
     pub mode: u8,
+    /// The NAV-move guard's inputs (spec §7): the previous published NAV,
+    /// the NAV per share verified inflows added since, and the NAV the guard
+    /// compared (net of those inflows).
+    pub prev_nav_per_share: u64,
+    pub inflow_nav: u64,
+    pub guard_nav: u64,
+    pub shares_outstanding: u64,
+    pub net_assets: u64,
+    pub fulfil_halted: bool,
+}
+
+/// `fulfil_halted` went from clear to set: NAV per share moved beyond
+/// `max_nav_move_bps` (spec §7). `source` names the instruction that
+/// measured it (`HALT_SOURCE_*`).
+#[event]
+pub struct FulfilHaltRaised {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub prev_nav_per_share: u64,
+    pub guard_nav: u64,
+    pub inflow_nav: u64,
+    pub max_nav_move_bps: u16,
+    pub source: u8,
 }
 
 #[event]

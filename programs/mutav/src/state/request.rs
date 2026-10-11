@@ -31,8 +31,13 @@ pub struct DepositRequest {
     pub fulfilled_at: i64,
     /// `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED`.
     pub status: u8,
+    /// The owner's price limit: the fewest shares this request accepts
+    /// (ADR 0023). `0` = no limit. A fill that would mint fewer stops the
+    /// batch at this request; the request stays pending until the owner (or
+    /// the admin) cancels it or the price recovers.
+    pub min_shares_out: u64,
     /// Zeroed. Never read or written by logic.
-    pub _reserved: [u8; 64],
+    pub _reserved: [u8; 56],
 }
 
 const _: () = assert!(8 + DepositRequest::INIT_SPACE == DEPOSIT_REQUEST_SIZE);
@@ -73,9 +78,13 @@ pub struct RedeemRequest {
     /// fill. The remainder is derived, `shares − shares_filled`, so the
     /// partial fills of ADR 0010 only add their own counters later.
     pub shares_filled: u64,
+    /// The owner's price limit: the least BRS this request accepts
+    /// (ADR 0023). `0` = no limit. A fill that would pay less stops the
+    /// batch at this request.
+    pub min_assets_out: u64,
     /// Zeroed. Never read or written by logic. Holds the rest of the ADR 0010
     /// partial-fill fields without a migration (ADR 0019).
-    pub _reserved: [u8; 56],
+    pub _reserved: [u8; 48],
 }
 
 const _: () = assert!(8 + RedeemRequest::INIT_SPACE == REDEEM_REQUEST_SIZE);

@@ -53,10 +53,20 @@ pub struct VaultState {
     pub claim_day_buckets: [u64; CLAIM_WINDOW_DAYS],
     /// The day (`unix_ts / 86_400`) the ring was last rolled to. `0` = never.
     pub claim_day_anchor: i64,
+    // -- Lifetime capital counters (ADR 0019 carve, written from the first
+    // fill). Monotonic; for the transparency page and reconciliation. --
+    /// BRS moved into `reserve` by deposit fills.
+    pub deposited_assets_total: u64,
+    /// Shares created by deposit fills.
+    pub minted_shares_total: u64,
+    /// Shares burned by redemption fills.
+    pub redeemed_shares_total: u64,
+    /// BRS moved to `claims` by redemption fills.
+    pub redeemed_assets_total: u64,
     /// Zeroed. Holds the planned carves (phase-2 `InstantExitState` 88 bytes
     /// and the buffer earmark, the claim-notice counter, the ADR 0012
     /// counters) without a migration (spec §14.2, ADR 0019).
-    pub _reserved: [u8; 256],
+    pub _reserved: [u8; 224],
 }
 
 const _: () = assert!(8 + VaultState::INIT_SPACE == VAULT_STATE_SIZE);
