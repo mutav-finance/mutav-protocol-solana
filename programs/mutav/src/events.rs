@@ -527,6 +527,32 @@ pub struct FulfilHaltCleared {
     pub nav_per_share: u64,
 }
 
+/// The admin removed a pending deposit from the queue (ADR 0030). Nothing
+/// moved: the BRS stays in `pending_deposits`, owed to the owner, who
+/// collects it with `cancel_deposit` (`DepositCancelled`).
+#[event]
+pub struct DepositParked {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub owner: Pubkey,
+    pub seq: u64,
+    pub assets: u64,
+    pub by: Pubkey,
+}
+
+/// The admin removed a pending redemption from the queue (ADR 0030).
+/// Nothing moved: the shares stay in `pending_redemptions`, owed to the
+/// owner, who collects them with `cancel_redeem` (`RedeemCancelled`).
+#[event]
+pub struct RedeemParked {
+    pub config: Pubkey,
+    pub ts: i64,
+    pub owner: Pubkey,
+    pub seq: u64,
+    pub shares: u64,
+    pub by: Pubkey,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

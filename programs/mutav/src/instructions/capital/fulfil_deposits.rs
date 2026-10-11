@@ -157,7 +157,8 @@ pub fn handle_fulfil_deposits(
                     net_assets_after: net_assets,
                 });
             }
-            // A fulfilled (unclaimed) request is dead for the queue.
+            // A fulfilled (unclaimed) or parked (ADR 0030) request is dead
+            // for the queue: skipped, never filled.
         }
         // A closed seq passes the skip proof.
         seq += 1;

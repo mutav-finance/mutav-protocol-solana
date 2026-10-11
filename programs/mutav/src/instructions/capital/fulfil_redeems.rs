@@ -159,7 +159,8 @@ pub fn handle_fulfil_redeems(
         require!(r.is_supported(), MutavError::UnsupportedVersion);
         require!(r.seq == seq, MutavError::QueueOrderViolation);
         if r.status != REDEEM_PENDING {
-            // Filled: dead for the queue.
+            // Filled, or parked by the admin (ADR 0030): dead for the queue,
+            // skipped, never filled.
             seq += 1;
             continue;
         }

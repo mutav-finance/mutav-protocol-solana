@@ -219,10 +219,18 @@ pub const INCOME_KIND_BACKSTOP: u8 = 3;
 /// `DepositRequest.status` (spec §3.8).
 pub const DEPOSIT_PENDING: u8 = 0;
 pub const DEPOSIT_FULFILLED: u8 = 1;
+/// Removed from the queue by the admin (ADR 0030): the BRS stays in
+/// `pending_deposits`, owed to the owner, who alone collects it with
+/// `cancel_deposit`. Dead for the queue; never filled or claimed.
+pub const DEPOSIT_CANCELLED: u8 = 2;
 
 /// `RedeemRequest.status` (spec §3.8).
 pub const REDEEM_PENDING: u8 = 0;
 pub const REDEEM_FILLED: u8 = 1;
+/// Removed from the queue by the admin (ADR 0030): the shares stay in
+/// `pending_redemptions`, owed to the owner, who alone collects them with
+/// `cancel_redeem`. Dead for the queue; never filled or claimed.
+pub const REDEEM_CANCELLED: u8 = 2;
 
 // ---------------------------------------------------------------------------
 // Pinned account sizes, discriminator included (spec §14.2 R7). Asserted

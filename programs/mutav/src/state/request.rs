@@ -7,12 +7,13 @@
 use anchor_lang::prelude::*;
 
 use crate::constants::{
-    DEPOSIT_FULFILLED, DEPOSIT_PENDING, DEPOSIT_REQUEST_SIZE, PROGRAM_LAYOUT_VERSION,
-    REDEEM_FILLED, REDEEM_PENDING, REDEEM_REQUEST_SIZE,
+    DEPOSIT_CANCELLED, DEPOSIT_FULFILLED, DEPOSIT_PENDING, DEPOSIT_REQUEST_SIZE,
+    PROGRAM_LAYOUT_VERSION, REDEEM_CANCELLED, REDEEM_FILLED, REDEEM_PENDING, REDEEM_REQUEST_SIZE,
 };
 
 /// Seeds: `["deposit", config, seq]` (`seq` as `u64` little-endian). Rent is
-/// paid by the owner and returned on `claim_shares` or `cancel_deposit`.
+/// paid by the owner and returned on `claim_shares` or the owner's
+/// `cancel_deposit` (an admin cancel parks the request; ADR 0030).
 #[account]
 #[derive(InitSpace)]
 pub struct DepositRequest {
@@ -29,7 +30,8 @@ pub struct DepositRequest {
     pub nav_at_fulfil: u64,
     pub requested_at: i64,
     pub fulfilled_at: i64,
-    /// `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED`.
+    /// `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED` / `DEPOSIT_CANCELLED`
+    /// (ADR 0030).
     pub status: u8,
     /// The owner's price limit: the fewest shares this request accepts
     /// (ADR 0023). `0` = no limit. A fill that would mint fewer stops the
@@ -46,14 +48,18 @@ impl DepositRequest {
     /// Version guard (spec §14.2 R1b): known version and status.
     pub fn is_supported(&self) -> bool {
         self.version <= PROGRAM_LAYOUT_VERSION
-            && matches!(self.status, DEPOSIT_PENDING | DEPOSIT_FULFILLED)
+            && matches!(
+                self.status,
+                DEPOSIT_PENDING | DEPOSIT_FULFILLED | DEPOSIT_CANCELLED
+            )
     }
 }
 
 /// Seeds: `["redeem", config, seq]` (`seq` as `u64` little-endian). Filled
 /// whole, at the NAV of the fill; the partial fills of ADR 0010 are carved
 /// from `_reserved` when they are built (ADR 0019). Rent is paid by the owner
-/// and returned on `claim_assets` or `cancel_redeem`.
+/// and returned on `claim_assets` or the owner's `cancel_redeem` (an admin
+/// cancel parks the request; ADR 0030).
 #[account]
 #[derive(InitSpace)]
 pub struct RedeemRequest {
@@ -71,7 +77,7 @@ pub struct RedeemRequest {
     pub requested_at: i64,
     /// `0` until filled.
     pub filled_at: i64,
-    /// `REDEEM_PENDING` / `REDEEM_FILLED`.
+    /// `REDEEM_PENDING` / `REDEEM_FILLED` / `REDEEM_CANCELLED` (ADR 0030).
     pub status: u8,
     // -- carved from `_reserved` by ADR 0019 (8 bytes) --
     /// Shares burned by fills: `0` while pending, `shares` after the whole
@@ -93,7 +99,10 @@ impl RedeemRequest {
     /// Version guard (spec §14.2 R1b): known version and status.
     pub fn is_supported(&self) -> bool {
         self.version <= PROGRAM_LAYOUT_VERSION
-            && matches!(self.status, REDEEM_PENDING | REDEEM_FILLED)
+            && matches!(
+                self.status,
+                REDEEM_PENDING | REDEEM_FILLED | REDEEM_CANCELLED
+            )
     }
 
     /// Shares still escrowed: `shares − shares_filled`.
