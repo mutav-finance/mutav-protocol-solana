@@ -79,12 +79,77 @@ pub fn conversion_nav(shares_outstanding: u64, net_assets: u64) -> Result<u64> {
     )?)
 }
 
+/// The size rule of `request_redeem` (spec §5.5; ADR 0023, ADR 0029), on
+/// values in BRS at the current NAV. `remainder` is what the request leaves
+/// in the debited share account; `canonical` says that account is the
+/// owner's share associated token account. Returns the error, if any.
+///
+/// - `value == 0` is refused: no reference pays nothing (SF vault
+///   `InsufficientRedeemAmount`, OnRe after OtterSec SUG-00).
+/// - `value > max_request` is refused.
+/// - `value ≥ min_request` is a normal request (the SF vault's
+///   `MinRedemption` threshold).
+/// - Below `min_request`, only an **exit of the balance**: from the
+///   canonical account, leaving a remainder worth less than `min_request`
+///   (ADR 0010's rule that a remainder is never left below the minimum), and
+///   worth at least `max(1, min_request / SUB_MINIMUM_EXIT_FLOOR_DIVISOR)`.
+pub fn redeem_size_error(
+    value: u64,
+    remainder: u64,
+    canonical: bool,
+    min_request: u64,
+    max_request: u64,
+) -> Option<MutavError> {
+    if value == 0 {
+        return Some(MutavError::RequestTooSmall);
+    }
+    if value > max_request {
+        return Some(MutavError::RequestTooLarge);
+    }
+    if value >= min_request {
+        return None;
+    }
+    let floor = (min_request / crate::constants::SUB_MINIMUM_EXIT_FLOOR_DIVISOR).max(1);
+    if canonical && remainder < min_request && value >= floor {
+        None
+    } else {
+        Some(MutavError::RequestTooSmall)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
 
     use crate::constants::VIRTUAL_OFFSET;
+
+    #[test]
+    fn the_redeem_size_rule() {
+        use MutavError::*;
+        let e = |v, r, c| redeem_size_error(v, r, c, 1_000, 100_000).map(|e| e as u32);
+        assert_eq!(e(0, 0, true), Some(RequestTooSmall as u32));
+        assert_eq!(e(100_001, 0, true), Some(RequestTooLarge as u32));
+        assert_eq!(e(1_000, 50_000, false), None, "a normal request");
+        // Below the minimum: an exit of the balance from the canonical account.
+        assert_eq!(e(500, 0, true), None, "full exit");
+        assert_eq!(
+            e(500, 999, true),
+            None,
+            "the remainder is below the minimum too"
+        );
+        assert_eq!(e(500, 1_000, true), Some(RequestTooSmall as u32));
+        assert_eq!(
+            e(500, 0, false),
+            Some(RequestTooSmall as u32),
+            "not canonical"
+        );
+        // The floor: 1,000 / 10.
+        assert_eq!(e(100, 0, true), None);
+        assert_eq!(e(99, 0, true), Some(RequestTooSmall as u32));
+        // A minimum below the divisor floors at 1 base unit.
+        assert!(redeem_size_error(1, 0, true, 5, 10).is_none());
+    }
 
     #[test]
     fn virtual_offset_is_pinned_to_one() {

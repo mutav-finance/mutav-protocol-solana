@@ -78,6 +78,7 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
         remaining_cover_total: state.remaining_cover_total,
         coverage_ratio_bps: config.coverage_ratio_bps,
         provisions: state.provisions,
+        stress_buffer: config.caps.stress_buffer,
     })?;
     let nav = published_nav(sol.net_assets, state.shares_outstanding)?;
 

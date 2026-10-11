@@ -97,6 +97,12 @@ pub fn handle_sweep_income(
     // (ADR 0017).
     require!(amount > 0, MutavError::InvalidParameter);
     require!(is_valid_period(period), MutavError::InvalidParameter);
+    // Inflows wait for the first shares (ADR 0023): the income stays in the
+    // inbox until the first deposit is filled.
+    require!(
+        ctx.accounts.state.shares_outstanding > 0,
+        MutavError::NoSharesOutstanding
+    );
 
     let a = &ctx.accounts;
     let inbox = get_associated_token_address_with_program_id(

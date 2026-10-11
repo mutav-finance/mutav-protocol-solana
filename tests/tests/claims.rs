@@ -30,6 +30,7 @@ fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
         provisions: s.provisions,
+        stress_buffer: c.caps.stress_buffer,
     })
     .unwrap()
 }
@@ -581,8 +582,9 @@ proptest! {
     /// principle 4, §5.4 rule 7): fuzz `stable_assets` far below
     /// `coverage_required`, the stored mode, other provisions, the pause
     /// flag, any coverage ratio in `[0.10, 2.0]` (ADR 0016; above 1.0 only
-    /// as a stored value from an older binary) and issuer
-    /// income, partly swept and partly still in the inbox (ADR 0017).
+    /// as a stored value from an older binary), any stress buffer, up to
+    /// `u64::MAX` as a stored value (ADR 0022: the recompute saturates), and
+    /// issuer income, partly swept and partly still in the inbox (ADR 0017).
     #[test]
     fn pay_claim_is_never_refused_for_solvency(
         cover in 1u64..=10_000,
@@ -593,6 +595,7 @@ proptest! {
         paused: bool,
         drain in 0u64..=100,
         coverage_ratio_bps in MIN_COVERAGE_RATIO_BPS..=20_000,
+        stress_buffer in prop_oneof![Just(0u64), 0u64..=1u64 << 50, Just(u64::MAX)],
         income in 0u64..=10_000,
     ) {
         let cover = cover * BRL;
@@ -605,6 +608,8 @@ proptest! {
         // Issuer income: half swept into the reserve, the rest left in the
         // inbox, where `pay_claim` never reaches.
         let income = income * BRL;
+        // Income is swept only once shares exist (ADR 0023).
+        f.inject_shares(cover);
         f.pay_income(income);
         if income / 2 > 0 {
             f.sweep(income / 2).0.unwrap();
@@ -617,6 +622,7 @@ proptest! {
         let mut cfg = f.config();
         // Any c the program accepts, below and above 1.0 (ADR 0016).
         cfg.coverage_ratio_bps = coverage_ratio_bps;
+        cfg.caps.stress_buffer = stress_buffer;
         f.write_config(&cfg);
         let mut s = f.state();
         s.mode = if under_covered { MODE_UNDER_COVERED } else { MODE_NORMAL };

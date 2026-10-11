@@ -134,6 +134,8 @@ fn request_padding_is_zero_at_init_and_preserved() {
 #[test]
 fn income_receipt_padding_is_zero_at_init_and_never_written() {
     let mut f = Fixture::new();
+    // Income is swept once shares exist (ADR 0023).
+    f.inject_shares(1_000 * BRL);
     let r = f.pay_and_sweep(1_000 * BRL);
     let raw = f.raw(&income_receipt_pda(&f.pdas.config, &r));
     assert_eq!(raw.len(), mutav::constants::INCOME_RECEIPT_SIZE);

@@ -26,8 +26,9 @@ use anchor_lang::{prelude::Pubkey, InstructionData};
 use mutav::{
     allowlist,
     constants::*,
-    math::{assets_for, conversion_nav, mul_div, shares_for, Rounding},
-    solvency::{nav_per_share, Solvency, SolvencyInputs},
+    errors::MutavError,
+    math::{assets_for, conversion_nav, mul_div, redeem_size_error, shares_for, Rounding},
+    solvency::{is_underwater, nav_per_share, Solvency, SolvencyInputs},
     state::CapsInput,
     ConfigParam, Eligibility, InitializeArgs, NavBounds, RegisterGuaranteeArgs,
 };
@@ -185,6 +186,7 @@ fn solvency_case(i: &SolvencyInputs) -> Value {
             "remainingCoverTotal": s(i.remaining_cover_total),
             "coverageRatioBps": i.coverage_ratio_bps,
             "provisions": s(i.provisions),
+            "stressBuffer": s(i.stress_buffer),
         },
         "output": out,
     })
@@ -196,6 +198,7 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
         remaining_cover_total: 80_000,
         coverage_ratio_bps: 10_000,
         provisions: 2_000,
+        stress_buffer: 0,
     };
     let mut cases = vec![
         base,
@@ -232,17 +235,114 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
             remaining_cover_total: MAX,
             ..base
         },
+        // The stress buffer (ADR 0022): it binds over the ratio term, is
+        // limited by the unprovisioned cover, and saturates.
+        SolvencyInputs {
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            provisions: 4_000,
+            stress_buffer: 19_000,
+            ..base
+        },
+        SolvencyInputs {
+            remaining_cover_total: 10_000,
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            provisions: 4_000,
+            stress_buffer: 19_000,
+            ..base
+        },
+        SolvencyInputs {
+            remaining_cover_total: MAX,
+            provisions: MAX - 1,
+            stress_buffer: MAX,
+            ..base
+        },
+        SolvencyInputs {
+            remaining_cover_total: 5,
+            provisions: 9,
+            stress_buffer: MAX,
+            ..base
+        },
         SolvencyInputs::default(),
     ];
-    for _ in 0..300 {
+    for k in 0..300u64 {
+        let (brs, cover, c, prov) = (rng.amount(), rng.amount(), rng.bps(), rng.amount());
+        // Derived without drawing from `rng`, so the vectors after these
+        // stay where they were.
+        let stress = match k % 4 {
+            0 => 0,
+            1 => cover / 7,
+            2 => brs ^ prov,
+            _ => MAX,
+        };
         cases.push(SolvencyInputs {
-            brs_balance: rng.amount(),
-            remaining_cover_total: rng.amount(),
-            coverage_ratio_bps: rng.bps(),
-            provisions: rng.amount(),
+            brs_balance: brs,
+            remaining_cover_total: cover,
+            coverage_ratio_bps: c,
+            provisions: prov,
+            stress_buffer: stress,
         });
     }
     Value::Array(cases.iter().map(solvency_case).collect())
+}
+
+/// The underwater test and the `request_redeem` size rule (ADR 0029).
+fn capital_rule_vectors(rng: &mut Rng) -> Value {
+    let mut under: Vec<(u64, u64)> = vec![
+        (0, 0),
+        (0, 1),
+        (1, 1_000_000_000),
+        (1, 1_000_000_001),
+        (MAX, MAX),
+        (0, MAX),
+    ];
+    for _ in 0..100 {
+        let shares = rng.amount();
+        let net = match rng.next() % 3 {
+            0 => shares / 1_000_000_000,
+            1 => (shares / 1_000_000_000).saturating_sub(1),
+            _ => rng.amount(),
+        };
+        under.push((net, shares));
+    }
+    let name = |e: Option<MutavError>| match e {
+        None => Value::Null,
+        Some(MutavError::RequestTooSmall) => Value::String("RequestTooSmall".into()),
+        Some(MutavError::RequestTooLarge) => Value::String("RequestTooLarge".into()),
+        Some(other) => panic!("unexpected {}", other as u32),
+    };
+    let mut sizes: Vec<(u64, u64, bool, u64, u64)> = vec![
+        (0, 0, true, 1_000, 100_000),
+        (100_001, 0, true, 1_000, 100_000),
+        (1_000, 50_000, false, 1_000, 100_000),
+        (500, 0, true, 1_000, 100_000),
+        (500, 999, true, 1_000, 100_000),
+        (500, 1_000, true, 1_000, 100_000),
+        (500, 0, false, 1_000, 100_000),
+        (100, 0, true, 1_000, 100_000),
+        (99, 0, true, 1_000, 100_000),
+        (1, 0, true, 5, 10),
+    ];
+    for _ in 0..200 {
+        let min = 1 + rng.next() % 2_000_000_000;
+        let max = min + rng.next() % 200_000_000_000;
+        let value = rng.next() % (max + max / 10 + 1);
+        let remainder = rng.next() % (2 * min);
+        sizes.push((value, remainder, rng.next() % 2 == 0, min, max));
+    }
+    json!({
+        "underwater": under
+            .iter()
+            .map(|(n, sh)| json!({ "netAssets": s(*n), "sharesOutstanding": s(*sh), "underwater": is_underwater(*n, *sh) }))
+            .collect::<Vec<_>>(),
+        "redeemSize": sizes
+            .iter()
+            .map(|(v, r, c, mn, mx)| json!({
+                "value": s(*v), "remainder": s(*r), "canonical": c,
+                "minRequest": s(*mn), "maxRequest": s(*mx),
+                "error": name(redeem_size_error(*v, *r, *c, *mn, *mx)),
+            }))
+            .collect::<Vec<_>>(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -611,6 +711,7 @@ fn build() -> Value {
             "modeUnderCovered": MODE_UNDER_COVERED,
             "maxAllowlistProofLen": MAX_ALLOWLIST_PROOF_LEN,
             "maxFulfilBatch": MAX_FULFIL_BATCH,
+            "subMinimumExitFloorDivisor": s(SUB_MINIMUM_EXIT_FLOOR_DIVISOR),
         },
         "mulDiv": mul_div_vectors(&mut rng),
         "conversion": conversion_vectors(&mut rng),
@@ -618,6 +719,8 @@ fn build() -> Value {
         "pdas": pda_vectors(&mut rng),
         "allowlist": allowlist_vectors(&mut rng),
         "instructions": instruction_vectors(&mut rng),
+        // Own seed, after the others, so the vectors above do not move.
+        "capitalRules": capital_rule_vectors(&mut Rng(0x4558_4954_5f52_554c)),
     })
 }
 

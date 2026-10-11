@@ -485,6 +485,9 @@ impl Fixture {
         let op = self.operator.insecure_clone();
         let cover = 10_000 * BRL;
         self.fund_reserve(cover);
+        // Inflows wait for the first shares (ADR 0023): the list runs on a
+        // reserve with holders.
+        self.inject_shares(cover);
         let args = guarantee_args(unique_hash(), cover, 0);
         let id = args.id;
         let source = self.operator_brs(1_000 * BRL);

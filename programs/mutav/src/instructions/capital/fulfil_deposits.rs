@@ -1,6 +1,9 @@
 //! `fulfil_deposits(count, nav_bounds)` (spec §5.5; ADR 0023). Admin. Strict FIFO from
 //! `deposit_head`, priced at the NAV at fulfil. Allowed in under-coverage: it
-//! is the recapitalization path (ADR 0008).
+//! is the recapitalization path (ADR 0008). Refused while the reserve is
+//! underwater (`ReserveUnderwater`, ADR 0022) and across a NAV move the guard
+//! would halt (inline guard, ADR 0023). The first shares seed the guard's
+//! baseline.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
@@ -12,10 +15,12 @@ use crate::{
     errors::MutavError,
     events::{DepositFilled, DepositsFulfilled},
     instructions::capital::{
-        deposit_request_address, load_slot, split_adapter_accounts, store, NavBounds, Slot,
+        deposit_request_address, load_slot, require_nav_within_guard, require_not_underwater,
+        split_adapter_accounts, store, NavBounds, Slot,
     },
     instructions::operator::solvency_snapshot,
     math::{conversion_nav, shares_for},
+    pricing::published_nav,
     state::{DepositRequest, VaultConfig, VaultState},
 };
 
@@ -76,6 +81,8 @@ pub fn handle_fulfil_deposits(
     require!(!config.paused, MutavError::Paused);
     require!(!state.fulfil_halted, MutavError::FulfilHalted);
     let before = solvency_snapshot(config, state)?;
+    require_not_underwater(state.shares_outstanding, before.net_assets)?;
+    require_nav_within_guard(state, before.net_assets, config.caps.max_nav_move_bps)?;
 
     let config_key = config.key();
     let now = Clock::get()?.unix_timestamp;
@@ -199,6 +206,14 @@ pub fn handle_fulfil_deposits(
     }
 
     let state = &mut ctx.accounts.state;
+    // The first shares seed the NAV-move guard's baseline (ADR 0023), so the
+    // window up to the next `refresh` is measured from the NAV the first
+    // depositors received. Inflows are refused at zero supply, so there is
+    // nothing to net out.
+    if state.shares_outstanding == 0 && shares_outstanding > 0 {
+        state.nav_per_share = published_nav(net_assets, shares_outstanding)?;
+        state.inflow_nav = 0;
+    }
     state.brs_balance = state
         .brs_balance
         .checked_add(total_assets)

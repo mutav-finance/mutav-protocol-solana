@@ -137,6 +137,13 @@ pub const SECONDS_PER_DAY: i64 = 86_400;
 // of whole fills fits the default 200k CU in LiteSVM.
 pub const MAX_FULFIL_BATCH: u8 = 8;
 
+/// A redemption below `caps.min_request` (an exit of the balance, ADR 0029)
+/// must still be worth at least `min_request / SUB_MINIMUM_EXIT_FLOOR_DIVISOR`
+/// (at least 1 base unit): R$100 at the devnet R$1,000 minimum. A floor in
+/// the manner of the SF vault's `MinRedemption` threshold; the value is
+/// MUTAV's, the references are silent on it (ADR 0029).
+pub const SUB_MINIMUM_EXIT_FLOOR_DIVISOR: u64 = 10;
+
 /// Deepest allowlist Merkle proof accepted (2^32 leaves).
 pub const MAX_ALLOWLIST_PROOF_LEN: usize = 32;
 

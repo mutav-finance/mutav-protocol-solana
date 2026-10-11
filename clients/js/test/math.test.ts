@@ -16,6 +16,11 @@ import {
   isValidIncomePeriod,
   takeSplit,
   claimWindowPaid,
+  stressTerm,
+  U64_MAX,
+  isUnderwater,
+  redeemSizeError,
+  SUB_MINIMUM_EXIT_FLOOR_DIVISOR,
   type SolvencyInputs,
 } from '../src';
 import { outcome, vectors } from './vectors';
@@ -39,6 +44,16 @@ describe('coverageRequired (ADR 0016)', () => {
     // At c ≥ 1 provisions ≤ cover never bind.
     expect(coverageRequired(100_000n, 10_000, 100_000n)).toBe(100_000n);
     expect(coverageRequired(100_000n, 15_000, 100_000n)).toBe(150_000n);
+  });
+
+  test('the stress buffer covers the next claims, up to the unprovisioned cover (ADR 0022)', () => {
+    expect(coverageRequired(100_000n, 1_000, 4_000n, 19_000n)).toBe(23_000n);
+    expect(coverageRequired(10_000n, 1_000, 4_000n, 19_000n)).toBe(10_000n);
+    expect(coverageRequired(1_000_000n, 1_000, 4_000n, 19_000n)).toBe(100_000n);
+    expect(coverageRequired(0n, 1_000, 0n, 19_000n)).toBe(0n);
+    // Saturates instead of exceeding u64.
+    expect(stressTerm(U64_MAX, U64_MAX - 1n, U64_MAX)).toBe(U64_MAX);
+    expect(stressTerm(5n, 9n, U64_MAX)).toBe(9n);
   });
 });
 
@@ -68,6 +83,7 @@ describe('solvency parity (free_capital, liquid_budget, …)', () => {
       remainingCoverTotal: BigInt(i.remainingCoverTotal),
       coverageRatioBps: i.coverageRatioBps,
       provisions: BigInt(i.provisions),
+      stressBuffer: BigInt(i.stressBuffer),
     };
     if (v.output === 'error') {
       expect(() => computeSolvency(input)).toThrow(MathOverflowError);
@@ -144,5 +160,25 @@ describe('publishedNav', () => {
     expect(publishedNav(0n, 0n)).toBe(0n);
     expect(publishedNav(0n, 1_000n)).toBe(1n);
     expect(publishedNav(1_000n, 1_000n)).toBe(1_000_000_000n);
+  });
+});
+
+describe('capital rules parity (ADR 0029)', () => {
+  test('the sub-minimum exit floor divisor matches the program', () => {
+    expect(SUB_MINIMUM_EXIT_FLOOR_DIVISOR.toString()).toBe(vectors.constants.subMinimumExitFloorDivisor);
+  });
+  test.each(vectors.capitalRules.underwater.map((v: any, i: number) => [i, v]))('underwater %i', (_i, v: any) => {
+    expect(isUnderwater(BigInt(v.netAssets), BigInt(v.sharesOutstanding))).toBe(v.underwater);
+  });
+  test.each(vectors.capitalRules.redeemSize.map((v: any, i: number) => [i, v]))('redeem size %i', (_i, v: any) => {
+    expect(
+      redeemSizeError(BigInt(v.value), BigInt(v.remainder), v.canonical, BigInt(v.minRequest), BigInt(v.maxRequest)),
+    ).toBe(v.error);
+  });
+  test('the vectors cover every outcome', () => {
+    const errs = new Set(vectors.capitalRules.redeemSize.map((v: any) => v.error));
+    expect(errs).toEqual(new Set([null, 'RequestTooSmall', 'RequestTooLarge']));
+    const u = vectors.capitalRules.underwater.map((v: any) => v.underwater);
+    expect(u.includes(true) && u.includes(false)).toBe(true);
   });
 });

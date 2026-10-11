@@ -105,18 +105,35 @@ export function conversionNav(sharesOutstanding: bigint, netAssets: bigint): big
 }
 
 /**
- * `max(ceil(c × remaining_cover_total / 10_000), provisions)` (ADR 0016).
- * Filed claims stay fully covered when `c < 1`; at `c ≥ 1` the provisions
- * term never binds.
+ * `provisions + min(stress_buffer, max(0, remaining_cover_total − provisions))`,
+ * saturating at `u64::MAX` (`solvency::stress_term`, ADR 0022).
+ */
+export function stressTerm(remainingCoverTotal: bigint, provisions: bigint, stressBuffer: bigint): bigint {
+  const p = u64(provisions, 'provisions');
+  const unprovisioned = satSub(u64(remainingCoverTotal, 'remainingCoverTotal'), p);
+  const b = u64(stressBuffer, 'stressBuffer');
+  const sum = p + (b < unprovisioned ? b : unprovisioned);
+  return sum > U64_MAX ? U64_MAX : sum;
+}
+
+/**
+ * `max(ceil(c × remaining_cover_total / 10_000), provisions + min(stress_buffer,
+ * unprovisioned))` (ADR 0016, ADR 0022). Filed claims, plus the claims that
+ * could be filed next (`stressBuffer`, `VaultConfig.caps.stressBuffer`), stay
+ * covered when `c < 1`.
+ *
+ * `stressBuffer` defaults to `0n` (ADR 0016's formula) only so existing
+ * callers keep compiling: pass the config's value to match the program.
  */
 export function coverageRequired(
   remainingCoverTotal: bigint,
   coverageRatioBps: number | bigint,
   provisions: bigint,
+  stressBuffer = 0n,
 ): bigint {
   const byRatio = mulDiv(remainingCoverTotal, BigInt(coverageRatioBps), BPS_DENOMINATOR, 'up');
-  const p = u64(provisions, 'provisions');
-  return byRatio > p ? byRatio : p;
+  const floor = stressTerm(remainingCoverTotal, provisions, stressBuffer);
+  return byRatio > floor ? byRatio : floor;
 }
 
 /** `max(0, stable_assets − coverage_required)`. */
@@ -151,6 +168,8 @@ export type SolvencyInputs = {
   remainingCoverTotal: bigint;
   coverageRatioBps: number;
   provisions: bigint;
+  /** `VaultConfig.caps.stressBuffer` (ADR 0022). Omitted = `0n`. */
+  stressBuffer?: bigint;
 };
 
 export type Solvency = {
@@ -172,7 +191,7 @@ export type Solvency = {
 /** Every spec §4 quantity for one snapshot (the program's `Solvency::compute`). */
 export function computeSolvency(i: SolvencyInputs): Solvency {
   const stable = u64(i.brsBalance);
-  const required = coverageRequired(i.remainingCoverTotal, i.coverageRatioBps, i.provisions);
+  const required = coverageRequired(i.remainingCoverTotal, i.coverageRatioBps, i.provisions, i.stressBuffer ?? 0n);
   const sur = surplus(stable, required);
   const underCovered = stable < required;
   return {
@@ -186,6 +205,41 @@ export function computeSolvency(i: SolvencyInputs): Solvency {
     underCovered,
     deficit: satSub(required, stable),
   };
+}
+
+/**
+ * An underwater reserve (`solvency::is_underwater`, ADR 0022, ADR 0029):
+ * shares outstanding and `net_assets × NAV_SCALE < shares_outstanding`
+ * (NAV per share below the smallest published unit). Both fills refuse
+ * with `ReserveUnderwater`.
+ */
+export function isUnderwater(netAssets: bigint, sharesOutstanding: bigint): boolean {
+  const so = u64(sharesOutstanding, 'sharesOutstanding');
+  return so > 0n && u64(netAssets, 'netAssets') * NAV_SCALE < so;
+}
+
+/** `min_request / SUB_MINIMUM_EXIT_FLOOR_DIVISOR` is the floor of a sub-minimum exit (ADR 0029). */
+export const SUB_MINIMUM_EXIT_FLOOR_DIVISOR = 10n;
+
+/**
+ * The `request_redeem` size rule (`math::redeem_size_error`, ADR 0029), on
+ * values in BRS at the current NAV: `null` when accepted, else the error.
+ * `remainder` is what the request leaves in the debited share account;
+ * `canonical` says that account is the owner's share associated token account.
+ */
+export function redeemSizeError(
+  value: bigint,
+  remainder: bigint,
+  canonical: boolean,
+  minRequest: bigint,
+  maxRequest: bigint,
+): 'RequestTooSmall' | 'RequestTooLarge' | null {
+  if (value === 0n) return 'RequestTooSmall';
+  if (value > maxRequest) return 'RequestTooLarge';
+  if (value >= minRequest) return null;
+  const q = minRequest / SUB_MINIMUM_EXIT_FLOOR_DIVISOR;
+  const floor = q > 1n ? q : 1n;
+  return canonical && remainder < minRequest && value >= floor ? null : 'RequestTooSmall';
 }
 
 /** Length of the claim-payment window in days (ADR 0019). */

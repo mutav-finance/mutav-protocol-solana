@@ -32,7 +32,8 @@ use crate::{
     allowlist,
     constants::{DEPOSIT_SEED, REDEEM_SEED},
     errors::MutavError,
-    state::VaultConfig,
+    pricing::{guard_nav, nav_move_exceeds, published_nav},
+    state::{VaultConfig, VaultState},
 };
 
 /// The NAV per share range (`NAV_SCALE`) a fill may run at (ADR 0023).
@@ -66,6 +67,41 @@ impl NavBounds {
         );
         Ok(())
     }
+}
+
+/// The fills' own NAV-move guard (ADR 0023): the rule `refresh` applies,
+/// evaluated inline at the NAV the fill would use. Measured from the last
+/// published NAV (`state.nav_per_share`, the guard's baseline) to the NAV
+/// now, net of the NAV per share verified inflows added since
+/// (`state.inflow_nav`, ADR 0017). A move beyond `max_nav_move_bps` refuses
+/// with `FulfilHalted`: no fill runs across a move the guard would halt,
+/// even before a `refresh` records it. The refusal changes nothing; the next
+/// `refresh` raises the halt.
+pub(crate) fn require_nav_within_guard(
+    state: &VaultState,
+    net_assets: u64,
+    max_nav_move_bps: u16,
+) -> Result<()> {
+    let published = published_nav(net_assets, state.shares_outstanding)?;
+    let moved = guard_nav(published, state.inflow_nav);
+    require!(
+        !nav_move_exceeds(state.nav_per_share, moved, max_nav_move_bps),
+        MutavError::FulfilHalted
+    );
+    Ok(())
+}
+
+/// An underwater reserve ([`crate::solvency::is_underwater`]; ADR 0022,
+/// ADR 0029): NAV per share below the smallest published unit while shares
+/// are outstanding. A deposit would buy the holders' losses at a near-zero
+/// price and a redemption would pay nothing, so both fills refuse with
+/// `ReserveUnderwater` until NAV is restored (spec §6: interim recovery).
+pub(crate) fn require_not_underwater(shares_outstanding: u64, net_assets: u64) -> Result<()> {
+    require!(
+        !crate::solvency::is_underwater(net_assets, shares_outstanding),
+        MutavError::ReserveUnderwater
+    );
+    Ok(())
 }
 
 /// How an investor shows it may enter the reserve (spec §5.5).

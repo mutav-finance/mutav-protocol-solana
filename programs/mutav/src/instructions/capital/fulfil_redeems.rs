@@ -1,7 +1,10 @@
 //! `fulfil_redeems(count, max_assets, nav_bounds)` (spec §5.5; ADR 0023).
 //! Admin. Strict FIFO from
 //! `redeem_head`, out of `free_capital` and `liquid_budget` only, whole fills
-//! each at its own NAV.
+//! each at its own NAV. Refused while the reserve is underwater
+//! (`ReserveUnderwater`, ADR 0022) and across a NAV move the guard would halt
+//! (inline guard, ADR 0023). A head worth 0 BRS is never filled (ADR 0029);
+//! the last shares out clear the guard's baseline.
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -16,7 +19,8 @@ use crate::{
     errors::MutavError,
     events::{RedeemFilled, RedeemsFulfilled},
     instructions::capital::{
-        load_slot, redeem_request_address, split_adapter_accounts, store, NavBounds, Slot,
+        load_slot, redeem_request_address, require_nav_within_guard, require_not_underwater,
+        split_adapter_accounts, store, NavBounds, Slot,
     },
     math::{assets_for, conversion_nav},
     solvency::{Solvency, SolvencyInputs},
@@ -120,12 +124,13 @@ pub fn handle_fulfil_redeems(
             remaining_cover_total: state.remaining_cover_total,
             coverage_ratio_bps: config.coverage_ratio_bps,
             provisions: state.provisions,
+            stress_buffer: config.caps.stress_buffer,
         })
     };
-    require!(
-        !snapshot(state.brs_balance)?.under_covered(),
-        MutavError::UnderCovered
-    );
+    let start = snapshot(state.brs_balance)?;
+    require!(!start.under_covered(), MutavError::UnderCovered);
+    require_not_underwater(state.shares_outstanding, start.net_assets)?;
+    require_nav_within_guard(state, start.net_assets, config.caps.max_nav_move_bps)?;
 
     let config_key = config.key();
     let now = Clock::get()?.unix_timestamp;
@@ -165,8 +170,9 @@ pub fn handle_fulfil_redeems(
         let budget = admin_left.min(sol.free_capital).min(sol.liquid_budget);
         let value = assets_for(r.shares, shares_outstanding, sol.net_assets)?;
         if value == 0 {
-            // Worth nothing at this NAV: no fill. Stop the batch with the head
-            // untouched.
+            // Worth nothing at this NAV: no fill, as every reference refuses
+            // a zero output (ADR 0029). The batch stops with the head
+            // untouched; the owner or the admin cancels it (ADR 0023).
             blocked = Some(MutavError::RequestTooSmall);
             break;
         }
@@ -265,6 +271,13 @@ pub fn handle_fulfil_redeems(
         .checked_add(paid)
         .ok_or(MutavError::MathOverflow)?;
     state.shares_outstanding = shares_outstanding;
+    // The last shares leave: the NAV-move guard's baseline is cleared, so the
+    // next first deposit seeds it afresh (ADR 0023) and no stale NAV is
+    // compared against a new supply.
+    if shares_outstanding == 0 {
+        state.nav_per_share = 0;
+        state.inflow_nav = 0;
+    }
     state.pending_redeem_shares = state
         .pending_redeem_shares
         .checked_sub(burned)

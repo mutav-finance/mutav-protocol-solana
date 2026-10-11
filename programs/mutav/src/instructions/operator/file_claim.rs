@@ -6,7 +6,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::ClaimFiled,
-    solvency::coverage_required,
+    solvency::coverage_required_saturating,
     state::{ClaimFiling, Guarantee, VaultConfig, VaultState},
 };
 
@@ -86,12 +86,15 @@ pub fn handle_file_claim(
         .provisions
         .checked_add(amount)
         .ok_or(MutavError::MathOverflow)?;
-    // Below c = 1 the provisions can bind `coverage_required` (ADR 0016).
-    state.coverage_required = coverage_required(
+    // Below c = 1 the provisions and the stress buffer can bind
+    // `coverage_required` (ADR 0016, ADR 0022). A cached value: it saturates
+    // rather than fail a filing.
+    state.coverage_required = coverage_required_saturating(
         state.remaining_cover_total,
         ctx.accounts.config.coverage_ratio_bps,
         state.provisions,
-    )?;
+        ctx.accounts.config.caps.stress_buffer,
+    );
 
     let now = Clock::get()?.unix_timestamp;
     let guarantee_key = ctx.accounts.guarantee.key();

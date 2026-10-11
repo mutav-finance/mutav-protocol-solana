@@ -1,6 +1,6 @@
 # 0023 — Capital flows and exit rights
 
-- **Status:** Accepted (2026-10-10), decided by the founders. Amends ADR 0008 (who may cancel a deposit; exit for holders), ADR 0010 (whole fills in the pilot), ADR 0015 and ADR 0017 (the NAV-move guard also runs inline in fills) and resolves spec §12 Q27. Builds on ADR 0020 (pause scope) and ADR 0022 (`ReserveUnderwater`).
+- **Status:** Accepted (2026-10-10), decided by the founders. Amends ADR 0008 (who may cancel a deposit; exit for holders), ADR 0010 (whole fills in the pilot), ADR 0015 and ADR 0017 (the NAV-move guard also runs inline in fills) and resolves spec §12 Q27. Builds on ADR 0020 (pause scope) and ADR 0022 (`ReserveUnderwater`). The fill and exit rules of decisions 1 and 2 are implemented by ADR 0029, which records how the inline guard reports a move, and the guard baseline across an empty supply. ADR 0029 replaces decision 2's 0-asset fill with the references' zero-output refusal, and defines the sub-minimum exit rule.
 
 ## Context
 

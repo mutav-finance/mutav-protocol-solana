@@ -482,7 +482,8 @@ capital_in(m)        = min(starting_capital [m = 1] + monthly_raise [from ≤ m 
 // coverage (on-chain)
 cover_per_lease      = rent × (default_leg + exit_leg)              // default_cover + exit_cover
 remaining_cover(m)   = Σ over active leases (cover_per_lease − claims paid on that lease)
-coverage_required(m) = max(ceil(c × remaining_cover(m) / 10_000), provisions)   // c in bps, c ≥ 1_000
+coverage_required(m) = max(ceil(c × remaining_cover(m) / 10_000),              // c in bps, c ≥ 1_000
+                           provisions + min(stress_buffer, remaining_cover(m) − provisions))   // ADR 0022
                        provisions ≈ 0 here: claims are paid in the month they arise
 free_capital(m)      = max(0, stable_assets − coverage_required)
 
@@ -593,7 +594,7 @@ var MUTAV_DEFAULTS = {
   startCapital: 300000, monthlyRaise: 0, raiseFrom: 2, raiseUntil: 0,
   coverageRatio: 0.25, tailMult: 2.33,
   maxTvl: 1000000, maxCoverPerGuarantee: 120000, maxCoverPerAgency: 10000000,
-  maxClaimPerCall: 15000, maxClaimPerPeriod: 20000, maxTesouroSharePct: 0,
+  maxClaimPerCall: 15000, maxClaimPerPeriod: 20000, stressBuffer: 19000, maxTesouroSharePct: 0,
   tesouroSharePct: 0, tesouroPct: 11.58, selicPct: 13.75,
   /* issuer income (Nora): CDI-linked tiers on the whole balance; public planning default one tier at 70% of CDI.
      brsYieldPct: a flat % of TVL a year from older links; null = use the tiers. */
@@ -607,29 +608,33 @@ var MUTAV_PROTOCOL = { BPS: 10000, MIN_COVERAGE_RATIO_BPS: 1000, MAX_FEE_TAKE_BP
 
 /* ---- on-chain coverage maths, in base units (BRS, 6 decimals). Inputs are integers (Number or BigInt); outputs are Numbers. ---- */
 function mutavBig(x){ return typeof x === 'bigint' ? x : BigInt(Math.round(x)); }
-/* coverage_required = max(ceil(c × remaining_cover_total / 10_000), provisions)  (spec §4, ADR 0016) */
-function mutavCoverageRequired(remainingCover, coverageRatioBps, provisions) {
-  var prod = mutavBig(remainingCover) * mutavBig(coverageRatioBps), d = BigInt(MUTAV_PROTOCOL.BPS);
+/* coverage_required = max(ceil(c × remaining_cover_total / 10_000),
+                           provisions + min(stress_buffer, remaining_cover_total − provisions))  (spec §4, ADR 0016, ADR 0022).
+   stressBuffer in base units; omitted = 0 (ADR 0016's formula). */
+function mutavCoverageRequired(remainingCover, coverageRatioBps, provisions, stressBuffer) {
+  var rem = mutavBig(remainingCover), prod = rem * mutavBig(coverageRatioBps), d = BigInt(MUTAV_PROTOCOL.BPS);
   var q = prod / d; if (prod % d !== BigInt(0)) q = q + BigInt(1);
-  var pv = mutavBig(provisions || 0);
-  return Number(q > pv ? q : pv);
+  var pv = mutavBig(provisions || 0), sb = mutavBig(stressBuffer || 0);
+  var unprov = rem > pv ? rem - pv : BigInt(0);
+  var st = pv + (sb < unprov ? sb : unprov);
+  return Number(q > st ? q : st);
 }
 /* free_capital = max(0, stable_assets − coverage_required)  (pilot: earmark_eff = 0) */
-function mutavFreeCapital(stableAssets, remainingCover, coverageRatioBps, provisions) {
-  return Math.max(0, Number(mutavBig(stableAssets) - mutavBig(mutavCoverageRequired(remainingCover, coverageRatioBps, provisions))));
+function mutavFreeCapital(stableAssets, remainingCover, coverageRatioBps, provisions, stressBuffer) {
+  return Math.max(0, Number(mutavBig(stableAssets) - mutavBig(mutavCoverageRequired(remainingCover, coverageRatioBps, provisions, stressBuffer))));
 }
 /* register_guarantee rule 5: coverage_required_after + earmark_eff_before ≤ stable_assets */
-function mutavGateAdmits(stableAssets, remainingCover, newCover, coverageRatioBps, provisions) {
-  var after = mutavCoverageRequired(mutavBig(remainingCover) + mutavBig(newCover), coverageRatioBps, provisions);
+function mutavGateAdmits(stableAssets, remainingCover, newCover, coverageRatioBps, provisions, stressBuffer) {
+  var after = mutavCoverageRequired(mutavBig(remainingCover) + mutavBig(newCover), coverageRatioBps, provisions, stressBuffer);
   return mutavBig(after) <= mutavBig(stableAssets);
 }
 /* How many identical guarantees of `cover` (base units) the gate admits one after another, at most `max`. */
-function mutavGateCount(stableAssets, remainingCover, cover, coverageRatioBps, provisions, max) {
+function mutavGateCount(stableAssets, remainingCover, cover, coverageRatioBps, provisions, max, stressBuffer) {
   if (!(cover > 0) || !(max > 0)) return 0;
   var est = Math.floor((stableAssets - remainingCover * coverageRatioBps / MUTAV_PROTOCOL.BPS) / (cover * coverageRatioBps / MUTAV_PROTOCOL.BPS));
   var k = Math.max(0, Math.min(max, isFinite(est) ? est : 0));
-  while (k > 0 && !mutavGateAdmits(stableAssets, remainingCover, k * cover, coverageRatioBps, provisions)) k--;
-  while (k < max && mutavGateAdmits(stableAssets, remainingCover, (k + 1) * cover, coverageRatioBps, provisions)) k++;
+  while (k > 0 && !mutavGateAdmits(stableAssets, remainingCover, k * cover, coverageRatioBps, provisions, stressBuffer)) k--;
+  while (k < max && mutavGateAdmits(stableAssets, remainingCover, (k + 1) * cover, coverageRatioBps, provisions, stressBuffer)) k++;
   return k;
 }
 function mutavUnits(brl){ return Math.round(brl * MUTAV_PROTOCOL.UNITS_PER_BRL); }
@@ -692,6 +697,7 @@ function mutavCompute(p) {
      It accrues on the BRS share of the stable assets, i.e. what the effective TESOURO share leaves. */
   var bShare = 1 - tShare, issuer = mutavIssuerRate(p, 0), bRate = 0;
   var pay = mutavPayouts(p), req = mutavRequirement(p, pay), cBps = req.cBps, cover = req.cover, coverU = mutavUnits(cover);
+  var sbU = mutavUnits(Math.max(0, p.stressBuffer || 0));   /* caps.stress_buffer (ADR 0022) */
   var until = p.raiseUntil > 0 ? p.raiseUntil : N;
   var cohorts = [], remPer = [], rows = [], balance = 0, capital = 0, cum = 0, cumW = 0, cumTake = 0, tvlRefused = 0;
   var minHead = Infinity, minHeadMonth = 0, blocked = 0, firstBlocked = 0, below = 0, firstBelow = 0, selfFundMonth = 0;
@@ -713,12 +719,12 @@ function mutavCompute(p) {
     var allowed = planned, refusal = null;
     if (planned > 0) {
       var openU = mutavUnits(opening), remU = mutavUnits(remBefore);
-      if (mutavCoverageRequired(remU, cBps, 0) > openU) { allowed = 0; refusal = 'under-covered'; }
+      if (mutavCoverageRequired(remU, cBps, 0, sbU) > openU) { allowed = 0; refusal = 'under-covered'; }
       else if (req.overGuaranteeCap) { allowed = 0; refusal = 'guarantee-cap'; }
       else {
         var byAgency = cover > 0 ? Math.max(0, Math.floor((p.maxCoverPerAgency - remBefore) / cover + 1e-9)) : planned;
         if (byAgency < allowed) { allowed = byAgency; refusal = 'agency-cap'; }
-        var byGate = mutavGateCount(openU, remU, coverU, cBps, 0, allowed);
+        var byGate = mutavGateCount(openU, remU, coverU, cBps, 0, allowed, sbU);
         if (byGate < allowed) { allowed = byGate; refusal = 'free-capital'; }
       }
     }
@@ -751,7 +757,7 @@ function mutavCompute(p) {
     var uw = netFees - claimsPaid, selicOpp = Math.max(0, opening) * selic / 12;
     sumOpening += Math.max(0, opening); sumUW += uw; cumSelic += selicOpp;
     var pre = opening + gain;
-    var required = mutavBrl(mutavCoverageRequired(mutavUnits(remAfter), cBps, 0));
+    var required = mutavBrl(mutavCoverageRequired(mutavUnits(remAfter), cBps, 0, sbU));
     var surplus = Math.max(0, pre - required);
     /* redemptions are paid only out of free capital */
     var w = 0;
@@ -920,6 +926,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       { k: 'maxCoverPerAgency', l: 'Max cover per agency', code: 'max_cover_per_agency', u: 'R$', step: 100000, min: 0, src: 'protocol', i: 'Outstanding cover one agency may hold. The simulator assumes a single agency, so every lease counts. Not a program cap since ADR 0019; the simulator keeps R$10M, well above max_tvl ÷ 0,25 (R$4M) plus fee growth, so it never binds.' },
       { k: 'maxClaimPerCall', l: 'Max claim per call', code: 'max_claim_per_call', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'Largest operator claim payment in one call. Above it, pay_claim_admin. Devnet: R$15k (ADR 0028), so a 6×-rent eviction fits.' },
       { k: 'maxClaimPerPeriod', l: 'Max claims per 31 days', code: 'max_claim_per_period', u: 'R$/31 d', step: 1000, min: 0, src: 'protocol', i: 'Operator claim payments per 31 days (the simulator checks each month). A month above it needs pay_claim_admin for the excess. Devnet: R$20k.' },
+      { k: 'stressBuffer', l: 'Stress buffer', code: 'stress_buffer', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'caps.stress_buffer: claims that could be filed next, held on top of open provisions (ADR 0022). Coverage required = max(c × remaining cover, provisions + min(stress buffer, unprovisioned cover)), so on a small book the buffer binds. Devnet: R$19k (ADR 0028).' },
       { k: 'maxTesouroSharePct', inv: 100, l: 'Min held in settlement token (BRS)', code: 'min_settlement_bps', u: '%', step: 5, min: 0, max: 100, src: 'protocol', i: 'Claims and redemptions pay out in BRS, so the reserve keeps at least this share in BRS; adapters can use the rest. 100% in the pilot.' }
     ]},
     { id: 'contracts', t: 'Guarantee contracts', s: 'Contracts', sm: 'the leases you write', f: [
@@ -993,7 +1000,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
 
   var PILOT = { months: 6, perMonth: 10, rent: 2200, feePct: 12, periods: 12, takePct: 20, defaultCover: 12, exitCover: 6, scope: 'B',
     evictRatePct: 0.25, coverageRatio: 0.25, startCapital: 100000, monthlyRaise: 100000, raiseFrom: 1, raiseUntil: 0, growthTarget: 60,
-    maxTvl: 1000000, maxCoverPerGuarantee: 120000, maxClaimPerCall: 15000, maxClaimPerPeriod: 20000,
+    maxTvl: 1000000, maxCoverPerGuarantee: 120000, maxClaimPerCall: 15000, maxClaimPerPeriod: 20000, stressBuffer: 19000,
     withdraw: 'buffer', tesouroSharePct: 0, maxTesouroSharePct: 0, tesouroPct: 11.58, selicPct: 13.75 };
   var SCEN = [
     { id: 'default', g: '', l: 'Default (02 parameters)', d: '02 inputs on the devnet config: 28 new leases a month for 6 months, R$300k start, no raise, c = 0,25, BRS only (issuer income 70% of CDI, ≈ 9,6% a year). R$300k backs 30 leases; the book stalls at 33 (insufficient free capital). max_tvl (R$1M) would back about 101 leases at c = 0,25.', o: {} },
@@ -1843,7 +1850,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     try {
       var head = ['month','planned_new','guarantees_registered','registrations_refused','refusal','active_guarantees','capital_in','capital_refused_max_tvl','opening_stable_assets','remaining_cover_total','coverage_required','stable_assets','free_capital','stable_minus_coverage_required','guarantee_fees','fee_take','net_fees_to_reserve','claims_paid','claims_over_period_cap','adapter_yield','brs_income','net_gain','redemptions','cumulative_net_gain','cumulative_redemptions','cumulative_fee_take','operating_cost','net_fees_minus_claims','yield_annualized','selic_on_capital','cumulative_selic'];
       var lines = ['# coverage_ratio_bps=' + last.req.cBps + ' starting_capital=' + state.startCapital + ' monthly_raise=' + state.monthlyRaise + ' raise_from=' + state.raiseFrom + ' raise_until=' + (state.raiseUntil > 0 ? state.raiseUntil : last.months) +
-        ' max_tvl=' + state.maxTvl + ' max_cover_per_guarantee=' + state.maxCoverPerGuarantee + ' max_cover_per_agency=' + state.maxCoverPerAgency + ' max_claim_per_call=' + state.maxClaimPerCall + ' max_claim_per_period=' + state.maxClaimPerPeriod + ' min_settlement_bps=' + Math.round((100 - state.maxTesouroSharePct) * 100) + ' adapter_share_wanted_pct=' + state.tesouroSharePct + ' adapter_yield_pct=' + state.tesouroPct + ' issuer_income_pct_tvl=' + (last.brsRate * 100).toFixed(4) + ' issuer_tier=' + last.issuer.tier + (last.issuer.flat ? ' issuer_flat=1' : '') + ' issuer_cdi_pct=' + state.issuerCdiPct + ' fee_take_bps=' + Math.round(last.take * 10000), head.join(',')];
+        ' max_tvl=' + state.maxTvl + ' max_cover_per_guarantee=' + state.maxCoverPerGuarantee + ' max_cover_per_agency=' + state.maxCoverPerAgency + ' max_claim_per_call=' + state.maxClaimPerCall + ' max_claim_per_period=' + state.maxClaimPerPeriod + ' stress_buffer=' + state.stressBuffer + ' min_settlement_bps=' + Math.round((100 - state.maxTesouroSharePct) * 100) + ' adapter_share_wanted_pct=' + state.tesouroSharePct + ' adapter_yield_pct=' + state.tesouroPct + ' issuer_income_pct_tvl=' + (last.brsRate * 100).toFixed(4) + ' issuer_tier=' + last.issuer.tier + (last.issuer.flat ? ' issuer_flat=1' : '') + ' issuer_cdi_pct=' + state.issuerCdiPct + ' fee_take_bps=' + Math.round(last.take * 10000), head.join(',')];
       function num(v){ return (Math.round(v * 10000) / 10000).toString(); }
       last.rows.forEach(function(x){
         lines.push([num(x.month), num(x.planned), num(x.newLeases), x.blocked ? 1 : 0, x.refusal || '', num(x.active), num(x.deposit), num(x.depositRefused), num(x.opening), num(x.remaining), num(x.required), num(x.balance), num(x.surplus), num(x.headroom), num(x.gross), num(x.take), num(x.netFees), num(x.claims), x.overClaimCap ? 1 : 0, num(x.tesouro), num(x.brsIncome), num(x.gain), num(x.withdrawal), num(x.cumGain), num(x.cumW), num(x.cumTake), num(x.opCost), num(x.uw), num(x.yieldAnn), num(x.selicOpp), num(x.cumSelic)].join(','));

@@ -82,6 +82,13 @@ pub fn handle_contribute_fees(
 ) -> Result<()> {
     // Never paused, never solvency-gated (ADR 0009).
     require!(amount > 0, MutavError::InvalidParameter);
+    // Inflows wait for the first shares (ADR 0023): with no shares, the fee
+    // would be priced into the first deposit instead of the reserve's
+    // holders. The fee waits with the operator.
+    require!(
+        ctx.accounts.state.shares_outstanding > 0,
+        MutavError::NoSharesOutstanding
+    );
 
     let take = mul_div(
         amount,
