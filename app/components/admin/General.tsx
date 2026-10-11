@@ -330,7 +330,7 @@ export function General({ mode, sq, sqError, onSquadsDone }: { mode: Mode; sq: S
       <Watch />
       <Sub id="general-roles" title="Roles & multisig">
         <Note>
-          Every admin change on this page is a Squads vault-transaction proposal: one member creates and approves it, the others approve from their own wallets, and anyone executes it once the threshold is met and the time lock has passed. Members reject a proposal while it is Active, or vote to cancel it once Approved; a live set_config blocks the next one until it runs or is rejected or cancelled. Execute refuses a set_config whose fields moved on-chain since it was proposed. This page holds no key.
+          Every admin change on this page is a Squads vault-transaction proposal: one member creates and approves it, the others approve from their own wallets, and anyone executes it once the threshold is met and the time lock has passed. Members reject a proposal while it is Active, or vote to cancel it once Approved; a live set_config blocks the next one until it runs or is rejected or cancelled. This app refuses to execute a set_config whose fields moved on-chain since it was proposed; the check is the app&apos;s own, so executing from the Squads UI skips it: read the diff before approving. This page holds no key.
         </Note>
         <SquadsPanel sq={sq} error={sqError} onDone={onSquadsDone} />
         <div className="grid-2">

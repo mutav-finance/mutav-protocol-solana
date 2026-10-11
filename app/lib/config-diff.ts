@@ -101,16 +101,31 @@ export function pendingSetConfig(proposals: readonly ProposalLike[]): bigint | n
 // each field it writes at the time it was proposed. At execute, a field whose
 // on-chain value has moved since means another change landed in between:
 // executing would silently overwrite it, so the app refuses.
+//
+// APP-SIDE ONLY: the Squads program does not know about it. A member who
+// executes from the Squads UI (or any other client) bypasses the check, so
+// approvers still read the diff before approving.
 
 const MEMO_PREFIX = "mutav set_config|";
 /** Keep the memo small: the create transaction must stay under 1,232 bytes. */
 export const MAX_BASELINE_MEMO = 240;
 
-/** `mutav set_config|caps.max_tvl=100;fee_take_bps=2000`, or the bare memo when the baseline would not fit. */
-export function baselineMemo(fields: string[], config: VaultConfig): string {
+/**
+ * `mutav set_config|caps.max_tvl=100;fee_take_bps=2000`, or null when the
+ * baseline would not fit (the caller refuses to build such a proposal: its
+ * execute could never pass the stale-carry check).
+ */
+export function baselineMemo(fields: string[], config: VaultConfig): string | null {
   const now = configFieldValues(config);
   const memo = MEMO_PREFIX + fields.map((f) => `${f}=${now[f] ?? ""}`).join(";");
-  return memo.length <= MAX_BASELINE_MEMO ? memo : "mutav set_config";
+  return memo.length <= MAX_BASELINE_MEMO ? memo : null;
+}
+
+/** The baseline must name exactly the fields the set_config writes; else it cannot vouch for the proposal. */
+export function baselineCovers(baseline: Record<string, string>, fields: string[]): boolean {
+  const keys = Object.keys(baseline);
+  const want = new Set(fields);
+  return fields.length > 0 && keys.length === want.size && keys.every((k) => want.has(k));
 }
 
 /** The baseline a memo records, or null when it records none. */

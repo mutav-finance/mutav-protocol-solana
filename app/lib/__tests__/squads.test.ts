@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { baselineMemo, isLiveProposal, MAX_BASELINE_MEMO, parseBaselineMemo, staleCarry, staleCarryText } from "../config-diff";
+import { baselineCovers, baselineMemo, isLiveProposal, MAX_BASELINE_MEMO, parseBaselineMemo, staleCarry, staleCarryText } from "../config-diff";
 import { scanIndices } from "../server/squads";
 import { config, BRL } from "./fixtures";
 
@@ -24,17 +24,23 @@ describe("A3 proposal scan", () => {
 describe("A3 stale-carry check", () => {
   const c = config();
   it("records the baseline of each written field and reads it back", () => {
-    const memo = baselineMemo(["caps.max_tvl", "fee_take_bps"], c);
+    const memo = baselineMemo(["caps.max_tvl", "fee_take_bps"], c)!;
     expect(memo).toBe(`mutav set_config|caps.max_tvl=${100_000n * BRL};fee_take_bps=2000`);
     expect(parseBaselineMemo(memo)).toEqual({ "caps.max_tvl": String(100_000n * BRL), fee_take_bps: "2000" });
     expect(parseBaselineMemo("mutav unpause")).toBeNull();
     expect(parseBaselineMemo(null)).toBeNull();
   });
-  it("drops the baseline rather than overflow the create transaction", () => {
+  it("returns no baseline (the build refuses) rather than overflow the create transaction", () => {
     const fields = Array.from({ length: 40 }, () => "caps.max_claim_per_period");
-    const memo = baselineMemo(fields, c);
-    expect(memo.length).toBeLessThanOrEqual(MAX_BASELINE_MEMO);
-    expect(parseBaselineMemo(memo)).toBeNull();
+    expect(baselineMemo(fields, c)).toBeNull();
+    expect(baselineMemo(["fee_take_bps"], c)!.length).toBeLessThanOrEqual(MAX_BASELINE_MEMO);
+  });
+  it("accepts a baseline only when it names exactly the fields written", () => {
+    const b = parseBaselineMemo(baselineMemo(["caps.max_tvl", "fee_take_bps"], c))!;
+    expect(baselineCovers(b, ["caps.max_tvl", "fee_take_bps"])).toBe(true);
+    expect(baselineCovers(b, ["caps.max_tvl"])).toBe(false);
+    expect(baselineCovers(b, ["caps.max_tvl", "fee_take_bps", "coverage_ratio_bps"])).toBe(false);
+    expect(baselineCovers(parseBaselineMemo("mutav set_config|")!, ["fee_take_bps"])).toBe(false);
   });
   it("flags a field that moved since the proposal was made", () => {
     const baseline = parseBaselineMemo(baselineMemo(["caps.max_tvl", "fee_take_bps"], c))!;

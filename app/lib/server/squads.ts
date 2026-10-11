@@ -17,7 +17,7 @@ import {
 import { AccountRole, type Address, type Instruction } from "@solana/kit";
 import { identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, type VaultConfig } from "@mutav-finance/mutav-protocol-solana";
 import type { ServerEnv } from "./env";
-import { isLiveProposal, parseBaselineMemo, setConfigChanges, staleCarry, staleCarryText, type ConfigChange } from "../config-diff";
+import { baselineCovers, isLiveProposal, parseBaselineMemo, setConfigChanges, setConfigFields, staleCarry, staleCarryText, type ConfigChange } from "../config-diff";
 
 export type ProposalStatus = "None" | "Draft" | "Active" | "Rejected" | "Approved" | "Executing" | "Executed" | "Cancelled";
 
@@ -305,13 +305,32 @@ async function assertNoStaleCarry(env: ServerEnv, index: bigint, config: VaultCo
   const info = await conn(env).getAccountInfo(txPda, "confirmed");
   if (!info) return;
   const [vt] = multisig.accounts.VaultTransaction.fromAccountInfo(info);
-  if (!instructionNames(vt, env.programId).includes("SetConfig")) return;
+  const fields = setConfigFieldsOf(vt, env.programId);
+  if (fields === null) return;
   const baseline = parseBaselineMemo(await readCreateMemo(env, index));
-  if (!baseline) {
-    throw new StaleCarryError(`proposal #${index} writes set_config but records no baseline the app can check (made outside this app, or its creation is not in this RPC's history): reject or cancel it and propose again`);
+  if (!baseline || !baselineCovers(baseline, fields)) {
+    throw new StaleCarryError(`proposal #${index} writes set_config but its memo does not record the values of exactly the fields it writes (made outside this app, or its creation is not in this RPC's history): reject or cancel it and propose again`);
   }
   const moved = staleCarry(baseline, config);
   if (moved.length > 0) throw new StaleCarryError(staleCarryText(index, moved));
+}
+
+/** The fields the vault transaction's set_config writes, or null when it has none. */
+function setConfigFieldsOf(tx: multisig.generated.VaultTransaction, programId: string): string[] | null {
+  const keys = tx.message.accountKeys.map((k) => k.toBase58());
+  let out: string[] | null = null;
+  for (const ix of tx.message.instructions) {
+    if (keys[ix.programIdIndex] !== programId) continue;
+    const data = new Uint8Array(ix.data);
+    let isSetConfig = false;
+    try {
+      isSetConfig = identifyMutavInstruction(data) === MutavInstruction.SetConfig;
+    } catch {
+      isSetConfig = false;
+    }
+    if (isSetConfig) out = [...(out ?? []), ...setConfigFields(data)];
+  }
+  return out;
 }
 
 export class StaleCarryError extends Error {
