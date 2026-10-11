@@ -19,7 +19,6 @@
 //! input.
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
     constants::{field, CONFIG_SEED, MAX_CONFIG_PARAMS, STATE_SEED},
@@ -27,7 +26,8 @@ use crate::{
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges},
     instructions::admin::{
-        validate_config, validate_money_accounts, vault_authority_key, Installing,
+        load_money_account, validate_config, validate_money_accounts, vault_authority_key,
+        Installing, Money,
     },
     state::{VaultConfig, VaultState},
 };
@@ -132,13 +132,19 @@ pub struct SetConfig<'info> {
     pub state: Box<Account<'info, VaultState>>,
 
     /// The current treasury token account, to check the money flows of the
-    /// resulting config (spec §2.1).
+    /// resulting config (spec §2.1). Read leniently in the handler
+    /// (`load_money_account`): a closed account is skipped, so it never
+    /// blocks a config change.
+    /// CHECK: address-bound to `config.treasury_account`; decoded in the
+    /// handler.
     #[account(address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
-    pub treasury_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub treasury_account: UncheckedAccount<'info>,
 
     /// The current payments token account, likewise.
+    /// CHECK: address-bound to `config.payments_account`; decoded in the
+    /// handler.
     #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
-    pub payments_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub payments_account: UncheckedAccount<'info>,
 }
 
 /// Fields whose change needs a `refresh` in the same slot.
@@ -176,10 +182,20 @@ pub fn handle_set_config(ctx: Context<SetConfig>, params: Vec<ConfigParam>) -> R
         );
     }
     let vault_authority = vault_authority_key(&config.key(), config.authority_bump)?;
+    let treasury = load_money_account(
+        &ctx.accounts.treasury_account,
+        &config.reserve_token_program,
+        MutavError::InvalidTreasuryAccount,
+    )?;
+    let payments = load_money_account(
+        &ctx.accounts.payments_account,
+        &config.reserve_token_program,
+        MutavError::InvalidPaymentsAccount,
+    )?;
     validate_money_accounts(
         &config.reserve_mint,
-        &ctx.accounts.treasury_account,
-        &ctx.accounts.payments_account,
+        Money::loaded(ctx.accounts.treasury_account.key(), &treasury),
+        Money::loaded(ctx.accounts.payments_account.key(), &payments),
         &config.mutav_capital_wallet,
         &vault_authority,
         &config.operator,

@@ -9,7 +9,9 @@ use crate::{
     constants::field,
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges, TreasuryAccountUpdated},
-    instructions::admin::{validate_money_accounts, vault_authority_key, Installing},
+    instructions::admin::{
+        load_money_account, validate_money_accounts, vault_authority_key, Installing, Money,
+    },
     state::VaultConfig,
 };
 
@@ -32,9 +34,13 @@ pub struct SetTreasuryAccount<'info> {
     /// not be owned by the operator (ADR 0020).
     pub treasury_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// The current payments token account, to compare (spec §2.1).
+    /// The current payments token account, to compare (spec §2.1). Read
+    /// leniently in the handler (`load_money_account`): a closed account is
+    /// skipped, so it never blocks replacing the treasury.
+    /// CHECK: address-bound to `config.payments_account`; decoded in the
+    /// handler.
     #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
-    pub payments_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub payments_account: UncheckedAccount<'info>,
 }
 
 pub fn handle_set_treasury_account(ctx: Context<SetTreasuryAccount>) -> Result<()> {
@@ -42,10 +48,15 @@ pub fn handle_set_treasury_account(ctx: Context<SetTreasuryAccount>) -> Result<(
         &ctx.accounts.config.key(),
         ctx.accounts.config.authority_bump,
     )?;
+    let payments = load_money_account(
+        &ctx.accounts.payments_account,
+        &ctx.accounts.config.reserve_token_program,
+        MutavError::InvalidPaymentsAccount,
+    )?;
     validate_money_accounts(
         &ctx.accounts.config.reserve_mint,
-        &ctx.accounts.treasury_account,
-        &ctx.accounts.payments_account,
+        Money::of(&ctx.accounts.treasury_account),
+        Money::loaded(ctx.accounts.payments_account.key(), &payments),
         &ctx.accounts.config.mutav_capital_wallet,
         &vault_authority,
         &ctx.accounts.config.operator,
