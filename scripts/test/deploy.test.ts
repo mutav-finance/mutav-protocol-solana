@@ -64,7 +64,10 @@ async function setup(
     run: (cmd) => {
       calls.push(cmd);
       if (cmd[0] === 'solana-keygen') return `${MUTAV_PROGRAM_ADDRESS}\n`;
-      if (cmd[2] === 'set-upgrade-authority' && o.failHandover) throw new Error('blockhash not found');
+      if (cmd[2] === 'set-upgrade-authority' && o.failHandover) {
+        throw new Error(`error sending request for url (${cmd[cmd.indexOf('--url') + 1]})`);
+      }
+      if (cmd[2] === 'deploy' && o.failDeploy) throw new Error('insufficient funds');
       return '';
     },
   };
@@ -146,10 +149,30 @@ describe('deploy.ts handover', () => {
     expect(err).not.toBeNull();
     const msg = err!.message;
     expect(msg).toContain('still holds the upgrade authority');
+    expect(msg).toContain('error sending request for url ($RPC_URL)');
     expect(msg).toContain(
-      `solana program set-upgrade-authority ${MUTAV_PROGRAM_ADDRESS} --upgrade-authority ${opts.payer} --new-upgrade-authority ${cfg.upgradeAuthority} --skip-new-upgrade-authority-signer-check --keypair ${opts.payer} --url https://api.devnet.solana.com/ --commitment confirmed`,
+      `solana program set-upgrade-authority ${MUTAV_PROGRAM_ADDRESS} --upgrade-authority ${opts.payer} --new-upgrade-authority ${cfg.upgradeAuthority} --skip-new-upgrade-authority-signer-check --keypair ${opts.payer} --url "$RPC_URL" --commitment confirmed`,
     );
+    expect(msg).not.toContain('api.devnet.solana.com');
     expect(calls).toHaveLength(3);
+  });
+
+  test('recovery text never prints the RPC URL, which may carry an API key', async () => {
+    const { deps, opts } = await setup({ failHandover: true });
+    const err = await deploy({ ...opts, url: 'https://user:pw@rpc.example.com/devnet?api-key=SECRET' }, deps).then(() => null, (e: Error) => e);
+    expect(err!.message).toContain('--url "$RPC_URL"');
+    expect(err!.message).not.toMatch(/SECRET|user:pw|rpc\.example\.com/);
+  });
+
+  test('a failed deploy prints buffer recovery and stops before the handover', async () => {
+    const { deps, calls, opts } = await setup({ failDeploy: true });
+    const err = await deploy(opts, deps).then(() => null, (e: Error) => e);
+    const msg = err!.message;
+    expect(msg).toContain('solana program deploy failed: insufficient funds');
+    expect(msg).toContain(`solana program show --buffers --keypair ${opts.payer} --url "$RPC_URL"`);
+    expect(msg).toContain(`solana program close <BUFFER> --keypair ${opts.payer} --url "$RPC_URL"`);
+    expect(msg).not.toContain('api.devnet.solana.com');
+    expect(calls.map((c) => c[2])).toEqual(['/outside/mutav-keypair.json', 'deploy']);
   });
 
   test('the read-back is at confirmed and tolerates a lagging node', async () => {

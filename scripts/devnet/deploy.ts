@@ -22,7 +22,9 @@
  * the temporary upgrade authority, and `solana program set-upgrade-authority`
  * to the vault (`--skip-new-upgrade-authority-signer-check`: a vault PDA
  * cannot co-sign). If the handover fails, the deployer still holds the
- * authority: the script prints the exact retry command and exits non-zero.
+ * authority: the script prints the exact retry command and exits non-zero;
+ * a failed deploy prints how to find and close the leftover buffer. Recovery
+ * commands name `--url "$RPC_URL"`, never the URL itself.
  * Finally it re-reads ProgramData at `confirmed` (polling up to ~20 s) and
  * confirms the authority; a read-back that disagrees says to check
  * `solana program show` first, since the handover itself succeeded. The keypair
@@ -131,21 +133,40 @@ export async function deploy(o: DeployOptions, deps: DeployDeps = defaultDeps): 
     throw new Error(`${programKeypair} is ${programId}; the program declares ${MUTAV_PROGRAM_ADDRESS} and the config says ${cfg.programId}`);
   }
 
-  deps.run(['solana', 'program', 'deploy', so, '--program-id', programKeypair, '--keypair', payer,
-    '--upgrade-authority', payer, '--url', url, '--commitment', 'confirmed']);
-
-  const handover = ['solana', 'program', 'set-upgrade-authority', programId, '--upgrade-authority', payer,
-    '--new-upgrade-authority', authority, '--skip-new-upgrade-authority-signer-check',
-    '--keypair', payer, '--url', url, '--commitment', 'confirmed'];
-  const recovery = (why: string) => {
-    const msg = `${why}\nThe deployer ${payer} still holds the upgrade authority of ${programId}. Retry the handover with:\n\n  ${handover.join(' ')}\n`;
+  // Recovery text never prints the RPC URL (it may carry an API key); the
+  // operator sets RPC_URL in their shell instead. CLI errors can echo the URL
+  // (`error sending request for url (…)`), so it is scrubbed from them too.
+  const secrets = [url, url.replace(/\/$/, ''), o.url?.trim()].filter((v): v is string => !!v);
+  const fail = (msg: string) => {
+    for (const v of secrets) msg = msg.split(v).join('$RPC_URL');
     console.error(msg);
     return new Error(msg);
   };
+
   try {
-    deps.run(handover);
+    deps.run(['solana', 'program', 'deploy', so, '--program-id', programKeypair, '--keypair', payer,
+      '--upgrade-authority', payer, '--url', url, '--commitment', 'confirmed']);
   } catch (e) {
-    throw recovery(`set-upgrade-authority failed: ${(e as Error).message}`);
+    throw fail(
+      `solana program deploy failed: ${(e as Error).message}\n` +
+        `A failed deploy can leave a buffer account holding the program's rent. List the deployer's buffers with:\n\n` +
+        `  solana program show --buffers --keypair ${payer} --url "$RPC_URL"\n\n` +
+        `then reclaim one with:\n\n` +
+        `  solana program close <BUFFER> --keypair ${payer} --url "$RPC_URL"\n`,
+    );
+  }
+
+  const handover = (u: string) => ['solana', 'program', 'set-upgrade-authority', programId, '--upgrade-authority', payer,
+    '--new-upgrade-authority', authority, '--skip-new-upgrade-authority-signer-check',
+    '--keypair', payer, '--url', u, '--commitment', 'confirmed'];
+  try {
+    deps.run(handover(url));
+  } catch (e) {
+    throw fail(
+      `set-upgrade-authority failed: ${(e as Error).message}\n` +
+        `The deployer ${payer} still holds the upgrade authority of ${programId}. Retry the handover with:\n\n` +
+        `  ${handover('"$RPC_URL"').join(' ')}\n`,
+    );
   }
 
   const pdAddr = await programDataAddress(programId);
@@ -160,11 +181,10 @@ export async function deploy(o: DeployOptions, deps: DeployDeps = defaultDeps): 
     // The handover command succeeded; only the read-back disagrees, so it
     // may be stale. Never tell the operator the deployer still holds it.
     const seen = ua === undefined ? 'ProgramData was not found' : `the upgrade authority read back as ${ua ?? 'none'}`;
-    const msg =
+    throw fail(
       `set-upgrade-authority succeeded, but after ${READBACK_ATTEMPTS} reads at confirmed ${seen}, expected ${authority}.\n` +
-      `Check \`solana program show ${programId} --url "$RPC_URL"\` first; if the authority is already the vault ${authority}, nothing to do.\n`;
-    console.error(msg);
-    throw new Error(msg);
+        `Check \`solana program show ${programId} --url "$RPC_URL"\` first; if the authority is already the vault ${authority}, nothing to do.\n`,
+    );
   }
   console.log(`deployed ${programId}; upgrade authority ${ua}`);
   return { programId };
