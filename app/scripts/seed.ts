@@ -110,7 +110,10 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     programId: MUTAV_PROGRAM_ADDRESS,
     reserveMint: mint,
     reserveTokenProgram: p.TOKEN_PROGRAM,
-    squads: { multisig: s("deployer").address, vaultIndex: 0, timeLockFloorSecs: 0 },
+    // Localnet: one throwaway key stands in for both multisigs (the admin
+    // signs directly); the parser needs their members and threshold.
+    squads: { multisig: s("deployer").address, vaultIndex: 0, members: [s("admin").address], threshold: 1, timeLockFloorSecs: 0 },
+    upgradeSquads: { multisig: s("deployer").address, vaultIndex: 0, members: [s("admin").address], threshold: 1, timeLockFloorSecs: 0 },
     admin: s("admin").address,
     upgradeAuthority: s("admin").address,
     operator: s("operator").address,
