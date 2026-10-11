@@ -1,6 +1,6 @@
 # 0021 — Claims: approval, amendment and exact payment
 
-- **Status:** Accepted (2026-10-10), decided by the founders. Supersedes, for the pilot, the `pay_claim_admin` path of ADR 0012 decision 3 and the separate `Payout` account of spec §3.7. Amends ADR 0014 (the payment amount is now the provision; amendment replaces payment above the provision). Builds on ADR 0020 (operator/admin separation). The layout carves are in ADR 0019.
+- **Status:** Accepted (2026-10-10), decided by the founders. Supersedes, for the pilot, the `pay_claim_admin` path of ADR 0012 decision 3 and the separate `Payout` account of spec §3.7. Amends ADR 0014 (the payment amount is now the provision; amendment replaces payment above the provision). Builds on ADR 0020 (operator/admin separation). The layout carves are in ADR 0019. Exact payment, the approval check and the 31-day window are in the devnet binary (ADR 0029 decision 7); `approve_claim`, `amend_claim` and `refile_claim` follow as upgrades.
 
 ## Context
 

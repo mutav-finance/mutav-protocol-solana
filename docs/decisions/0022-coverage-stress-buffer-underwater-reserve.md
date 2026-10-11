@@ -1,6 +1,6 @@
 # 0022 — Coverage: stress buffer and underwater reserve
 
-- **Status:** Accepted (2026-10-10), decided by the founders. Amends ADR 0016: the `coverage_required` formula gains a stress-buffer term (`c` stays 0.10), and the devnet caps lose the per-agency row, per ADR 0019. Uses the receipt kinds of ADR 0024.
+- **Status:** Accepted (2026-10-10), decided by the founders. Amends ADR 0016: the `coverage_required` formula gains a stress-buffer term (`c` stays 0.10), and the devnet caps lose the per-agency row, per ADR 0019. Uses the receipt kinds of ADR 0024. Implemented in the devnet binary by ADR 0029, which also refuses redemption fills on an underwater reserve and bounds `stress_buffer ≤ max_tvl`.
 
 ## Context
 
