@@ -3,7 +3,7 @@ import { InfoTooltip } from "@/components/InfoTooltip";
 import { Button } from "@/components/ui/button";
 
 /**
- * A page section (web investidor rhythm): caps kicker (body font), 24px Geist heading,
+ * A page section (web investidor rhythm, deck styling): amber mono caps kicker, 24px Geist ExtraBold heading,
  * optional explainer and actions; sections are separated by space, not rules.
  * `subtitle`: one line, at most ~12 words, under the heading.
  * `roles`: who signs or owns what this section shows (a RoleLine), under the heading.
@@ -13,9 +13,9 @@ export function Section({ id, title, kicker, subtitle, info, children, action, r
     <section id={id} aria-labelledby={id ? `${id}-h` : undefined} className="flex scroll-mt-20 flex-col gap-4 py-6 md:gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
-          {kicker && <p className="font-body text-(--color-text-3) m-0 text-xs tracking-wider uppercase">{kicker}</p>}
+          {kicker && <p className="font-mono text-(--color-accent) m-0 text-xs tracking-[0.12em] uppercase">{kicker}</p>}
           <div className="flex items-center gap-2">
-            <h2 id={id ? `${id}-h` : undefined} className="font-display text-(--color-text) m-0 text-2xl font-bold tracking-tight">
+            <h2 id={id ? `${id}-h` : undefined} className="font-display text-(--color-text) m-0 text-2xl tracking-tight" style={{ fontWeight: 800 }}>
               {title}
             </h2>
             {info && <InfoTooltip label={`About ${title}`}>{info}</InfoTooltip>}
@@ -47,7 +47,7 @@ export function Page({ children, title, lede, banner, intro }: { children: React
           <div className="relative flex h-[200px] w-full max-w-[960px] items-end justify-center overflow-hidden border pb-8 md:h-[280px] md:pb-12">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={banner} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover grayscale" style={{ objectPosition: "50% 55%", opacity: 0.16 }} />
-            <h1 className="font-display text-(--color-text) relative m-0 px-6 font-bold uppercase" style={{ fontSize: "clamp(24px, 4.2vw, 48px)", letterSpacing: "0.04em", lineHeight: 1.1 }}>
+            <h1 className="font-display text-(--color-text) relative m-0 px-6 font-bold uppercase" style={{ fontSize: "clamp(24px, 4.2vw, 48px)", letterSpacing: "-0.01em", lineHeight: 1.1 }}>
               {title}
             </h1>
           </div>

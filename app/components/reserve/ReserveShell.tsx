@@ -27,12 +27,12 @@ export function useReserve(): Ctx {
   return c;
 }
 
-/** The tabs, in order. `href` is the route; Overview is /reserve itself. */
+/** The tabs, in order. `href` is the route; Overview is /reserve itself. The capital view is labelled "Money". */
 export const TABS: [string, string][] = [
   ["/reserve", "Overview"],
   ["/reserve/coverage", "Coverage"],
   ["/reserve/claims", "Claims"],
-  ["/reserve/capital", "Capital"],
+  ["/reserve/capital", "Money"],
   ["/reserve/risks", "Risks"],
   ["/reserve/verify", "Verify"],
 ];
@@ -44,8 +44,8 @@ function Skeleton() {
   return (
     <div aria-busy="true" aria-label="Reading the chain" className="flex flex-col gap-4">
       <span className="sr-only">Reading the chain…</span>
-      <div className="bg-(--color-surface) h-[220px] border" />
-      <div className="bg-(--color-surface) h-[88px] border" />
+      <div className="mutav-skeleton bg-(--color-surface) h-[220px] border" />
+      <div className="mutav-skeleton bg-(--color-surface) h-[88px] border" />
     </div>
   );
 }
@@ -70,13 +70,22 @@ export function ReserveShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex w-full flex-1 flex-col">
-      <header className="bg-(--color-canvas)" style={PAD}>
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pt-7 pb-5">
+      <header className="bg-(--color-canvas) relative overflow-hidden" style={PAD}>
+        {/* Decorative photo bleeding from the right, behind the title only (never behind numbers); hidden on phones. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/img/dashboard-header.jpg"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 right-0 hidden h-full w-[40%] border-l object-cover grayscale select-none md:block"
+          style={{ objectPosition: "50% 40%", opacity: 0.12 }}
+        />
+        <div className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pt-7 pb-5">
           <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="font-mono text-(--color-text-3) text-xs uppercase" style={{ letterSpacing: "0.08em" }}>
+            <span className="font-mono text-(--color-accent) text-xs uppercase" style={{ letterSpacing: "0.12em" }}>
               Reserve · Solana {d ? d.reserve.cluster : ""}
             </span>
-            <h1 className="font-display text-(--color-text) m-0 text-[28px] leading-tight font-bold" style={{ letterSpacing: "-0.025em" }}>
+            <h1 className="font-display text-(--color-text) m-0 leading-[1.05] uppercase" style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-0.02em" }}>
               Transparency
             </h1>
             <p className="font-body text-(--color-text-2) m-0 max-w-[640px] text-sm text-pretty">
@@ -84,8 +93,8 @@ export function ReserveShell({ children }: { children: ReactNode }) {
               {!pathname.startsWith("/reserve/verify") && (
                 <>
                   {" "}
-                  <Link href="/reserve/verify" className="ext-link">
-                    Verify →
+                  <Link href="/reserve/verify" className="ext-link arrow-link">
+                    Verify <span aria-hidden="true">→</span>
                   </Link>
                 </>
               )}
@@ -95,7 +104,7 @@ export function ReserveShell({ children }: { children: ReactNode }) {
             {d && (
               <span title={liveTitle} className="inline-flex cursor-default items-center gap-2 whitespace-nowrap">
                 <span className="live-dot" aria-hidden="true" />
-                Live · NAV published {published ? `${fmtDuration(d.reserve.now - published)} ago` : "never"}
+                Live · {published ? `updated on-chain ${fmtDuration(d.reserve.now - published)} ago` : "not yet updated on-chain"}
               </span>
             )}
             <Button
@@ -133,7 +142,12 @@ export function ReserveShell({ children }: { children: ReactNode }) {
         {poll.loading && !d && <Skeleton />}
         {d && (
           <MoneyProvider>
-            <ReserveCtx.Provider value={{ d, refresh: poll.refresh }}>{children}</ReserveCtx.Provider>
+            <ReserveCtx.Provider value={{ d, refresh: poll.refresh }}>
+              {/* Keyed by route so each view fades up on entry (globals.css: .mutav-view). */}
+              <div key={pathname} className="mutav-view flex flex-col gap-14">
+                {children}
+              </div>
+            </ReserveCtx.Provider>
           </MoneyProvider>
         )}
       </main>

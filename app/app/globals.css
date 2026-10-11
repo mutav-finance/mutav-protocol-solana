@@ -414,12 +414,20 @@ input:disabled {
 .cta-fill:active {
   opacity: 0.8;
 }
+/* Outline CTA: fills amber on hover (intent only). !important beats the inline
+   border/colour the call sites set at rest. */
 .cta-outline {
-  transition: color 150ms ease-out, border-color 150ms ease-out;
+  transition: color 150ms cubic-bezier(.4, 0, .2, 1), background-color 150ms cubic-bezier(.4, 0, .2, 1), border-color 150ms cubic-bezier(.4, 0, .2, 1);
 }
 .cta-outline:hover {
-  border-color: var(--color-accent);
-  color: var(--color-text);
+  background-color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-canvas) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cta-outline {
+    transition: none;
+  }
 }
 .cta-outline:active {
   opacity: 0.85;
@@ -748,5 +756,46 @@ input[type="number"]::-webkit-outer-spin-button {
   }
   .context-row > :nth-child(4) {
     order: 4;
+  }
+}
+
+/* ── Deck motion ─────────────────────────────────────────────────────────────
+   Compositor-only (transform, opacity). Every animation lives under
+   no-preference, so reduced motion gets none. ── */
+
+/* View entry: each /reserve tab fades up when the route changes; the first
+   four children stagger by 40ms. */
+@keyframes mutav-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Skeleton: a slow opacity pulse while the first read is in flight. */
+@keyframes mutav-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mutav-view > * {
+    animation: mutav-rise 240ms cubic-bezier(.2, 0, 0, 1) both;
+    animation-delay: 120ms;
+  }
+  .mutav-view > :nth-child(1) { animation-delay: 0ms; }
+  .mutav-view > :nth-child(2) { animation-delay: 40ms; }
+  .mutav-view > :nth-child(3) { animation-delay: 80ms; }
+  .mutav-view > :nth-child(4) { animation-delay: 120ms; }
+
+  .mutav-skeleton {
+    animation: mutav-skeleton-pulse 1.6s ease-in-out infinite;
+  }
+
+  /* Link arrow nudge: the trailing "→" (wrapped in a span) moves 2px on hover. */
+  .arrow-link > span[aria-hidden="true"],
+  .ext-link > span[aria-hidden="true"] {
+    display: inline-block;
+    transition: transform 150ms ease-out;
+  }
+  .arrow-link:hover > span[aria-hidden="true"],
+  .ext-link:hover > span[aria-hidden="true"] {
+    transform: translateX(2px);
   }
 }
