@@ -2,7 +2,7 @@
 
 Material for MUTAV's ≤3-minute product demo video for the Colosseum Crypto World's Fair.
 
-**Status:** v3 cut: guarantee-led, ending on a capital payoff (R$4,000 in → R$4,057.45 out), with numbers checked against ADR 0028. The research recommendations (final section of the [research report](research/report.md)) are applied. A scripted capture harness is in progress on the branch `feat/demo-capture`.
+**Status:** v4 cut: opens on Ana, a clean refusal climax, and a payoff where each share is worth more even after her claim (R$4,000 in → R$4,086.18 out, on screen only). Numbers checked against ADR 0028 with a 6× + 6× cover. Overlays (devnet badge, coverage meter, architecture mini-map, chips, honesty labels) are made in the edit. A scripted capture harness is on the branch `feat/demo-capture`; [`app-requirements.md`](app-requirements.md) lists what it and the app must change for v4.
 
 Honesty labels used throughout: the agency platform predates the hackathon, the PIX transfer is simulated on devnet (only its settlement record is on-chain), and everything runs on devnet. Ana, the agency names and the lease references are fictional.
 
