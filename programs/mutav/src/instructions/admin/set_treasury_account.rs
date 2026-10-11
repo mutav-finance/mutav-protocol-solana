@@ -37,8 +37,7 @@ pub struct SetTreasuryAccount<'info> {
     /// The current payments token account, to compare (spec §2.1). Read
     /// leniently in the handler (`load_money_account`): a closed account is
     /// skipped, so it never blocks replacing the treasury.
-    /// CHECK: address-bound to `config.payments_account`; decoded in the
-    /// handler.
+    /// CHECK: address-bound to `config.payments_account`; decoded in the handler.
     #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
     pub payments_account: UncheckedAccount<'info>,
 }

@@ -135,14 +135,12 @@ pub struct SetConfig<'info> {
     /// resulting config (spec §2.1). Read leniently in the handler
     /// (`load_money_account`): a closed account is skipped, so it never
     /// blocks a config change.
-    /// CHECK: address-bound to `config.treasury_account`; decoded in the
-    /// handler.
+    /// CHECK: address-bound to `config.treasury_account`; decoded in the handler.
     #[account(address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
     pub treasury_account: UncheckedAccount<'info>,
 
     /// The current payments token account, likewise.
-    /// CHECK: address-bound to `config.payments_account`; decoded in the
-    /// handler.
+    /// CHECK: address-bound to `config.payments_account`; decoded in the handler.
     #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
     pub payments_account: UncheckedAccount<'info>,
 }

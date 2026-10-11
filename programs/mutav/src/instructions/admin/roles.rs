@@ -225,13 +225,11 @@ pub struct AcceptRole<'info> {
     /// Required for `ROLE_OPERATOR`; omitted for `ROLE_PAUSER`, so a pauser
     /// handover never depends on the money accounts' state. Read leniently
     /// in the handler (`load_money_account`): a closed account is skipped.
-    /// CHECK: address-bound to `config.treasury_account`; decoded in the
-    /// handler.
+    /// CHECK: address-bound to `config.treasury_account`; decoded in the handler.
     #[account(address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
     pub treasury_account: Option<UncheckedAccount<'info>>,
 
-    /// CHECK: address-bound to `config.payments_account`; decoded in the
-    /// handler.
+    /// CHECK: address-bound to `config.payments_account`; decoded in the handler.
     #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
     pub payments_account: Option<UncheckedAccount<'info>>,
 }
