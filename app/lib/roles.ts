@@ -85,6 +85,8 @@ export const INSTRUCTION_ROLE = {
   set_treasury_account: "admin",
   set_allowlist_root: "admin",
   clear_fulfil_halt: "admin",
+  // Approves the exact amount of a claim above the per-call cap (ADR 0021).
+  approve_claim: "admin",
   unpause: "admin",
   fulfil_deposits: "admin",
   fulfil_redeems: "admin",
