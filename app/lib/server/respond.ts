@@ -3,6 +3,7 @@ import { MainnetRefusedError, redactUrls } from "../cluster";
 import { NotConfiguredError } from "./chain";
 import { RelayRefusedError } from "./relay";
 import { ComposeError } from "./compose";
+import { StaleCarryError } from "./squads";
 
 /**
  * Map an error to a JSON response; never leaks a stack, and every URL in the
@@ -15,5 +16,6 @@ export function errorResponse(e: unknown): Response {
   if (e instanceof NotConfiguredError) return jsonResponse({ error: message, notConfigured: true }, { status: 503 });
   if (e instanceof MainnetRefusedError || e instanceof RelayRefusedError) return jsonResponse({ error: message }, { status: 403 });
   if (e instanceof ComposeError) return jsonResponse({ error: message }, { status: 400 });
+  if (e instanceof StaleCarryError) return jsonResponse({ error: message }, { status: 409 });
   return jsonResponse({ error: message, logs: logs ?? null }, { status: 502 });
 }

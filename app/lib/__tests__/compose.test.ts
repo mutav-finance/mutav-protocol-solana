@@ -167,9 +167,12 @@ describe("compose", () => {
 
   it("refuses a second set_config while one is live in the multisig", () => {
     const p = (index: bigint, status: string, instructions: string[]) => ({ index, status, instructions });
-    expect(() => refuseOverlappingSetConfig([p(4n, "Executed", ["SetConfig"]), p(3n, "Active", ["SetConfig"])])).toThrow(/execute or cancel proposal #3 first/);
+    expect(() => refuseOverlappingSetConfig([p(4n, "Executed", ["SetConfig"]), p(3n, "Active", ["SetConfig"])])).toThrow(/execute, reject or cancel proposal #3 first/);
     expect(() => refuseOverlappingSetConfig([p(5n, "Approved", ["Unpause", "SetConfig"])])).toThrow(/#5/);
     expect(() => refuseOverlappingSetConfig([p(3n, "Executed", ["SetConfig"]), p(2n, "Cancelled", ["SetConfig"]), p(1n, "Active", ["FulfilDeposits"])])).not.toThrow();
+    // A3: a stale Active one can no longer pass; a stale Approved one still executes.
+    expect(() => refuseOverlappingSetConfig([{ ...p(2n, "Active", ["SetConfig"]), stale: true }])).not.toThrow();
+    expect(() => refuseOverlappingSetConfig([{ ...p(2n, "Approved", ["SetConfig"]), stale: true }])).toThrow(/#2/);
   });
 
   it("sweep_income moves the statement from the income inbox, signed by the operator only", async () => {
