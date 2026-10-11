@@ -1,6 +1,7 @@
 # Known exceptions for scripts/check-no-keys.sh (CI: clients/js/src, app/, scripts/).
 # Format: <path glob> [regex]. A glob alone allows every hit in the file; with a
-# regex, only hits whose line matches it. Paths are relative to the repo root.
+# regex, only hits whose line matches it and holds no other forbidden pattern
+# once the matches are removed. Paths are relative to the repo root.
 # Keep entries narrow and say why. Never add a file that reads a real key.
 
 # Localnet-only tooling: throwaway keys in temp dirs or outside the repo,
@@ -19,13 +20,13 @@ app/components/WalletProvider.tsx signTransaction
 app/lib/client/use-tx.ts signTransaction
 
 # The app's own guards name the forbidden APIs.
-app/eslint.config.mjs createKeyPair|generateKeyPair
-app/lib/__tests__/guards.test.ts keyApis
+app/eslint.config.mjs createKeyPair[A-Za-z]*|generateKeyPair[A-Za-z]*
+app/lib/__tests__/guards.test.ts keyApis = /[^/]*/
 
 # Tests and the e2e harness read source, spec, JSON and pid files, never key files.
 app/lib/__tests__/* readFileSync
 app/e2e/* readFileSync
-scripts/test/* readFileSync|Bun\.file\(|-keypair\.json|id\.json
+scripts/test/* readFileSync|Bun\.file\(|-keypair\.json
 
 # Config, IDL and vector files (JSON), never keys.
 scripts/devnet/lib/config.ts readFileSync
