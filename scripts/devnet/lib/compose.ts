@@ -18,6 +18,7 @@ import {
   findIncomeInboxAddress,
   findReserveAddresses,
   getAcceptRoleInstruction,
+  getCancelPendingInstruction,
   getInitializeInstruction,
   getProposeRoleInstruction,
   getRefreshInstruction,
@@ -97,35 +98,47 @@ export async function composeInitialize(
       mutavCapitalWallet: cfg.mutavCapitalWallet,
       coverageRatioBps: cfg.coverageRatioBps,
       feeTakeBps: cfg.feeTakeBps,
-      caps: cfg.caps,
+      // ADR 0019 carves left out of the file start off (0).
+      caps: {
+        ...cfg.caps,
+        stressBuffer: cfg.caps.stressBuffer ?? 0n,
+        maxQueueWaitSecs: cfg.caps.maxQueueWaitSecs ?? 0n,
+        maxReinstateAge: cfg.caps.maxReinstateAge ?? 0n,
+      },
     },
     opts(cfg),
   );
 }
 
+const DEFAULT_ADDRESS = address('11111111111111111111111111111111');
+
 /**
- * `propose_role` for the config's operator and pauser where they differ from
- * the chain (`current`) (ADR 0020). Admin. Each proposed key then accepts
- * with `accept_role` within 72 hours (`composeAcceptRole`).
+ * `propose_role` for each role whose key differs from the file, as one
+ * proposal (ADR 0020). A handover already pending for the requested key is
+ * refused ("awaiting accept_role": the key signs `accept_role`, nothing to
+ * propose). Another unexpired pending key gets `cancel_pending(role)` first,
+ * in the same proposal, since `propose_role` refuses while one waits.
  */
 export async function composeProposeRoles(
   cfg: DeployConfig,
   current: VaultConfig,
   admin: TransactionSigner,
+  nowSecs: bigint = BigInt(Math.floor(Date.now() / 1000)),
 ): Promise<Instruction[]> {
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
+  const base = { admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId };
   const out: Instruction[] = [];
-  for (const [role, key, now] of [
-    [ROLE_OPERATOR, cfg.operator, current.operator],
-    [ROLE_PAUSER, cfg.pauser, current.pauser],
+  for (const [role, name, key, now, pending, expiresAt] of [
+    [ROLE_OPERATOR, 'operator', cfg.operator, current.operator, current.pendingOperator, current.pendingOperatorExpiresAt],
+    [ROLE_PAUSER, 'pauser', cfg.pauser, current.pauser, current.pendingPauser, current.pendingPauserExpiresAt],
   ] as const) {
     if (key === now) continue;
-    out.push(
-      getProposeRoleInstruction(
-        { admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId, role, key },
-        opts(cfg),
-      ),
-    );
+    const live = pending !== DEFAULT_ADDRESS && nowSecs <= expiresAt;
+    if (live && pending === key) {
+      throw new Error(`${name} ${key} is already proposed, awaiting accept_role (expires at ${expiresAt})`);
+    }
+    if (live) out.push(getCancelPendingInstruction({ ...base, role }, opts(cfg)));
+    out.push(getProposeRoleInstruction({ ...base, role, key }, opts(cfg)));
   }
   return out;
 }
@@ -142,8 +155,9 @@ export async function composeAcceptRole(
     {
       newKey,
       config: a.config,
-      treasuryAccount: current.treasuryAccount,
-      paymentsAccount: current.paymentsAccount,
+      // The money accounts are checked for the operator only (ADR 0020).
+      treasuryAccount: role === ROLE_OPERATOR ? current.treasuryAccount : undefined,
+      paymentsAccount: role === ROLE_OPERATOR ? current.paymentsAccount : undefined,
       eventAuthority: a.eventAuthority,
       program: cfg.programId,
       role,
@@ -156,7 +170,8 @@ export async function composeAcceptRole(
  * `set_config` with only the fields where the file's caps, coverage ratio
  * and take rate differ from the chain (`current`), sparse (ADR 0026), with
  * `refresh` first when a change needs it. `feature_flags` and the capital
- * wallet are never set here. Empty when nothing differs.
+ * wallet are never set here; a stress buffer, queue wait or reinstate age
+ * missing from the file keeps the chain's value. Empty when nothing differs.
  */
 export async function composeSetCaps(
   cfg: DeployConfig,
@@ -169,7 +184,13 @@ export async function composeSetCaps(
     feeTakeBps: cfg.feeTakeBps,
     featureFlags: current.featureFlags,
     mutavCapitalWallet: current.mutavCapitalWallet,
-    caps: cfg.caps,
+    // A carve left out of the file keeps the chain's value (no reset).
+    caps: {
+      ...cfg.caps,
+      stressBuffer: cfg.caps.stressBuffer ?? current.caps.stressBuffer,
+      maxQueueWaitSecs: cfg.caps.maxQueueWaitSecs ?? current.caps.maxQueueWaitSecs,
+      maxReinstateAge: cfg.caps.maxReinstateAge ?? current.caps.maxReinstateAge,
+    },
   });
   if (params.length === 0) return [];
   const setConfig = getSetConfigInstruction(

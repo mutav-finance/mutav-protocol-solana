@@ -264,7 +264,7 @@ export async function forkHappyPath(programKeypair?: string) {
     const [claimFiling] = await findClaimFilingPda({ guarantee, noticeRefHash: notice }, po);
     await sendAs(operator!, [
       getFileClaimInstruction(
-        { ...op, state: a.state, guarantee, claimFiling, payer: operator!, leg: 0, amount: claim, noticeRefHash: notice },
+        { ...op, state: a.state, guarantee, claimFiling, payer: operator!, leg: 1, amount: claim, noticeRefHash: notice },
         po,
       ),
     ]);
