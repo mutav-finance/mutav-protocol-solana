@@ -20,7 +20,7 @@ use anchor_spl::{
 use mutav::{
     constants::*,
     errors::MutavError,
-    events::{DepositParked, RedeemParked},
+    events::{DepositParked, RedeemFilled, RedeemParked},
 };
 use mutav_tests::helpers::{mints::*, *};
 use solana_keypair::Keypair;
@@ -215,12 +215,31 @@ fn only_the_owner_collects_a_parked_request() {
     let other = f.token_account(&a.pubkey());
     let ix = f.cancel_deposit_ix(&a.pubkey(), &a.pubkey(), dseq, &other);
     assert_mutav_err(f.send_as(ix, &a.key), MutavError::Unauthorized);
-    // A redemption request is not filled once parked, whatever the budget.
+    // Alone at the head, a parked request fills nothing.
     assert_mutav_err(
         f.fulfil_redeems(1, u64::MAX, &[rseq]),
         MutavError::QueueOrderViolation,
     );
+    // A fill passing from the head skips the parked request: it fills the
+    // next one, burns none of the parked shares and moves the head past
+    // both.
+    let (r, bseq) = f.request_redeem(b, &list, 2_000 * BRL);
+    r.unwrap();
+    assert_eq!(f.state().redeem_head, rseq);
+    let meta = f
+        .fulfil_redeems(2, u64::MAX, &[rseq, bseq])
+        .expect("fills past the parked head");
+    let fills = events::<RedeemFilled>(&meta);
+    assert_eq!(fills.len(), 1);
+    assert_eq!((fills[0].seq, fills[0].owner), (bseq, b.pubkey()));
     assert_eq!(f.redeem_request(rseq).unwrap().status, REDEEM_CANCELLED);
+    assert_eq!(f.redeem_request(bseq).unwrap().status, REDEEM_FILLED);
+    assert_eq!(f.state().redeem_head, bseq + 1);
+    assert_eq!(
+        f.state().pending_redeem_shares,
+        1_000 * BRL,
+        "parked shares stay"
+    );
     f.cancel_deposit(a, dseq).expect("owner collects BRS");
     f.cancel_redeem(a, rseq).expect("owner collects shares");
     assert_eq!(f.balance(&a.brs), 1_000 * BRL);

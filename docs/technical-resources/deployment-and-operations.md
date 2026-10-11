@@ -188,8 +188,8 @@ A pauser key can revoke the operator, which stops claim payments until the admin
 ### Claims above the per-call cap
 
 1. The operator files the claim for the full amount; `file_claim` has no per-call limit. NAV reflects it at once.
-2. MUTAV may pay the agency by Pix from its own bank first. Until `approve_claim` ships, this bank-first payment is the path for every claim above the per-call cap: `pay_claim` refuses it with `ClaimCallCapExceeded`, and the filing stays `FILED` with its provision booked.
-3. Once `approve_claim` ships (later upgrade), the admin proposal runs `approve_claim(notice, amount)` with the exact amount, plus a `set_config` raise of `max_claim_per_period` if the payment would not fit in the 31-day window.
+2. The admin proposal runs `approve_claim(notice, amount, expected_revision)` with the exact amount and the filing's current revision, plus a `set_config` raise of `max_claim_per_period` if the payment would not fit in the 31-day window. Until the approval executes, `pay_claim` refuses the claim with `ClaimCallCapExceeded`, and the filing stays `FILED` with its provision booked.
+3. While the approval waits on the time lock, MUTAV may pay the agency by Pix from its own bank first.
 4. After the time lock, the operator runs `pay_claim(notice, expected_amount)` for exactly the provision, which reimburses the payments account. A later `set_config` lowers the window cap back.
 
 To settle for less than filed, the operator will amend the claim down first with the later `amend_claim`. An amendment resets the approval.
@@ -211,11 +211,11 @@ The reserve is underwater when NAV per share falls below the smallest published 
 
 ### Stuck queue head
 
-v1 fills whole requests only. A redemption head larger than the available budget blocks the queue until free capital grows. The consoles show the amount needed against the amount available. Devnet request sizes stay below free capital. A head worth 0 BRS at fill time is never filled, and a head whose price limit (`min_shares_out`, `min_assets_out`) is not met stops the batch: the owner or the admin cancels it with `cancel_deposit` or `cancel_redeem`.
+v1 fills whole requests only. A redemption head larger than the available budget blocks the queue until free capital grows. The consoles show the amount needed against the amount available. Devnet request sizes stay below free capital. A head worth 0 BRS at fill time is never filled, and a head whose price limit (`min_shares_out`, `min_assets_out`) is not met stops the batch: the owner cancels it with `cancel_deposit` or `cancel_redeem`, or the admin parks it with the same instruction so the queue moves on, and the owner collects later ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)).
 
 ### Capital provider removed from the allowlist
 
-Exit stays open: a wallet that holds shares can still `request_redeem`. A pending deposit from that wallet is returned to the owner's own token account with `cancel_deposit`, signed by the owner or the admin.
+Exit stays open: a wallet that holds shares can still `request_redeem`. A pending deposit from that wallet can be parked by the admin with `cancel_deposit`: nothing moves, `DepositParked` is emitted and the deposit queue moves on. The BRS stays in `pending_deposits`, owed to the owner, who collects it into its own token account with its own `cancel_deposit`. The owner cannot make the park fail, and there is no expiry or sweep.
 
 ### Claim notices are not built yet
 

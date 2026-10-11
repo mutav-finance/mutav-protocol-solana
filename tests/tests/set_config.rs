@@ -548,16 +548,59 @@ fn an_open_operator_owned_money_account_still_blocks_the_operator() {
 }
 
 #[test]
-fn data_at_a_money_address_must_be_a_token_account() {
-    // A money address that holds data of another program is refused, not
-    // skipped.
-    let mut f = Fixture::new();
-    let treasury = f.treasury;
-    let mut acc = f.svm.get_account(&treasury).unwrap();
-    acc.owner = anchor_lang::solana_program::system_program::ID;
-    f.svm.set_account(treasury, acc).unwrap();
-    assert_mutav_err(
-        f.set_config(vec![MinRequest(f.config().caps.min_request + 1)]),
+fn only_a_token_account_or_a_closed_account_passes_at_a_money_address() {
+    // Only a system-owned account with no data counts as closed; anything
+    // else at the address must decode as a token account of the reserve
+    // mint.
+    let refused = |edit: &dyn Fn(&mut Fixture, &Pubkey), err: MutavError| {
+        let mut f = Fixture::new();
+        let treasury = f.treasury;
+        edit(&mut f, &treasury);
+        let min = f.config().caps.min_request + 1;
+        assert_mutav_err(f.set_config(vec![MinRequest(min)]), err);
+    };
+    // Data owned by the system program.
+    refused(
+        &|f, t| {
+            let mut acc = f.svm.get_account(t).unwrap();
+            acc.owner = anchor_lang::solana_program::system_program::ID;
+            f.svm.set_account(*t, acc).unwrap();
+        },
         MutavError::InvalidTreasuryAccount,
+    );
+    // An empty account owned by another program is not "closed".
+    refused(
+        &|f, t| {
+            let mut acc = f.svm.get_account(t).unwrap();
+            acc.data = vec![];
+            acc.owner = mutav::ID;
+            f.svm.set_account(*t, acc).unwrap();
+        },
+        MutavError::InvalidTreasuryAccount,
+    );
+    // A mint of the token program at the address.
+    refused(
+        &|f, t| {
+            let mint = f.svm.get_account(&f.reserve_mint).unwrap();
+            f.svm.set_account(*t, mint).unwrap();
+        },
+        MutavError::InvalidTreasuryAccount,
+    );
+    // A token account of another mint.
+    refused(
+        &|f, t| {
+            let payer = f.payer.insecure_clone();
+            let other_mint = create_brs_mint(&mut f.svm, &payer, &Pubkey::new_unique());
+            let other = create_token_account(
+                &mut f.svm,
+                &payer,
+                &other_mint,
+                &Pubkey::new_unique(),
+                &TOKEN_PROGRAM,
+            );
+            let acc = f.svm.get_account(&other).unwrap();
+            f.svm.set_account(*t, acc).unwrap();
+        },
+        MutavError::InvalidMint,
     );
 }

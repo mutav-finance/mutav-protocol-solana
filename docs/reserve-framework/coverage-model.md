@@ -76,8 +76,8 @@ net_assets     = max(0, stable_assets − provisions)
 | `register_guarantee` | Mode normal, reserve not frozen (the instruction loads `reserve`; a frozen one counts as 0 and refuses with `ReserveFrozen`), and `coverage_required` after the new cover ≤ `stable_assets` |
 | `fulfil_redeems` | Mode normal, not underwater (`ReserveUnderwater`, below), and each fill within `min(free_capital, liquid_budget)`. With adapters (ADR 0027, decided point), also never below the BRS liquidity floor while any adapter holds value |
 | `fulfil_deposits` | Not coverage-gated. Allowed in under-coverage, because new capital is the recapitalisation path. Refused when the reserve is underwater (below) |
-| `file_claim`, `pay_claim`, `settle_payout` (and the Wave 2 `amend_claim`, `refile_claim`, `approve_claim`) | Never gated |
-| `contribute_fees`, `sweep_income`, `close_guarantee`, cancels (owner or admin), `claim_shares`, `claim_assets`, `refresh`, `advance_queue_head` | Never gated. `contribute_fees` and `sweep_income` wait for the first shares (`NoSharesOutstanding`, below); that is not a coverage check |
+| `file_claim`, `approve_claim`, `pay_claim`, `settle_payout` (and the Wave 2 `amend_claim`, `refile_claim`) | Never gated |
+| `contribute_fees`, `sweep_income`, `close_guarantee`, cancels (the owner's, and the admin's park), `claim_shares`, `claim_assets`, `refresh`, `advance_queue_head` | Never gated. `contribute_fees` and `sweep_income` wait for the first shares (`NoSharesOutstanding`, below); that is not a coverage check |
 
 ## Reserve modes
 
@@ -105,7 +105,7 @@ The mode is `MODE_UNDER_COVERED` when `stable_assets < coverage_required`. `refr
 
 | Stops | Keeps working |
 |---|---|
-| `register_guarantee`, `fulfil_redeems` | Every claim instruction, `contribute_fees`, `sweep_income`, `fulfil_deposits`, `close_guarantee`, cancels (owner or admin), `claim_shares` and `claim_assets`, cranks, admin configuration |
+| `register_guarantee`, `fulfil_redeems` | Every claim instruction, `contribute_fees`, `sweep_income`, `fulfil_deposits`, `close_guarantee`, cancels (the owner's, and the admin's park), `claim_shares` and `claim_assets`, cranks, admin configuration |
 
 The reserve returns to normal on the next `refresh` once `stable_assets ≥ coverage_required` again: through guarantee fees, swept issuer income, new deposits, a MUTAV recapitalization, or the book running off.
 
@@ -136,7 +136,7 @@ Inflows that raise NAV without minting shares are guarantee fees (`contribute_fe
 
 - An on-chain tail floor per lease (bad years paid from capital alone) is a planning signal in the simulator, not a program rule.
 - A cumulative baseline for the NAV-move guard is planned for the first upgrade after the hackathon, with a tighter bound for the real pilot.
-- The `BACKSTOP` booking (`book_unsolicited`) and the claim instructions `amend_claim`, `refile_claim` and `approve_claim` are Wave 2.
+- The `BACKSTOP` booking (`book_unsolicited`) and the claim instructions `amend_claim` and `refile_claim` are Wave 2.
 
 ## Sources
 

@@ -14,7 +14,7 @@ No. The reserve is operational infrastructure that keeps the guarantees backed. 
 
 ### Does the program decide claims or price guarantees?
 
-No. MUTAV's platform reviews each payment request and prices each guarantee off-chain. The operator then files the claim on-chain. With the later `approve_claim`, the reserve admin will approve claim amounts above the per-call cap, a decision about how much money may leave the reserve, not about whether the claim is valid.
+No. MUTAV's platform reviews each payment request and prices each guarantee off-chain. The operator then files the claim on-chain. With `approve_claim`, the reserve admin approves claim amounts above the per-call cap, a decision about how much money may leave the reserve, not about whether the claim is valid.
 
 ### Does the program hold personal data?
 
@@ -44,7 +44,7 @@ The admin-set claim caps. Claim payments are the only irreversible operator acti
 
 ### Who can move BRS out of the reserve's accounts?
 
-BRS leaves only to: MUTAV's payments account (claim payments), the treasury (MUTAV's take of guarantee fees), the `claims` escrow and on to its owner (redemptions), and the owner of a pending deposit (`cancel_deposit`, by the owner or the admin). With a later upgrade, money that arrived outside a booking path can also be returned to its original sender, from the `unsolicited` account only.
+BRS leaves only to: MUTAV's payments account (claim payments), the treasury (MUTAV's take of guarantee fees), the `claims` escrow and on to its owner (redemptions), and the owner of a pending deposit (the owner's `cancel_deposit`; the admin's cancel only parks the request and moves nothing). With a later upgrade, money that arrived outside a booking path can also be returned to its original sender, from the `unsolicited` account only.
 
 ### Why can't a direct transfer change the share price?
 
@@ -56,7 +56,7 @@ A frozen reserve counts as 0 BRS in every coverage computation that reads it. Ne
 
 ### What happens to a claim above the per-call cap?
 
-It is filed and provisioned in full. Until `approve_claim` ships (later upgrade), `pay_claim` refuses it with `ClaimCallCapExceeded`, and MUTAV pays the agency first from its bank account. Once it ships, the admin approves the exact amount through its time lock, and the operator then pays exactly the provision with `pay_claim`, which reimburses MUTAV. Approved payments count toward the cap per sliding 31-day window; for an unusually large claim the admin raises that cap in the same proposal. See [Program reference](program-reference.md).
+It is filed and provisioned in full. `pay_claim` refuses it with `ClaimCallCapExceeded` until the admin approves the exact amount with `approve_claim` through its time lock; meanwhile MUTAV may pay the agency first from its bank account. The operator then pays exactly the provision with `pay_claim`, which reimburses MUTAV if it paid first. Approved payments count toward the cap per sliding 31-day window; for an unusually large claim the admin raises that cap in the same proposal. See [Program reference](program-reference.md).
 
 ### How are upgrades controlled?
 
@@ -88,7 +88,7 @@ NAV per share moved more than `max_nav_move_bps` in a way verified inflows do no
 
 ### Can I exit if I am removed from the allowlist?
 
-Yes. Entry is allowlisted; exit is open. A wallet that already holds shares can `request_redeem` without a proof: eligibility is checked only when the debited share account is empty. A pending deposit from that wallet can be cancelled by the owner or by the admin with `cancel_deposit`, which returns the BRS to the owner's own token account.
+Yes. Entry is allowlisted; exit is open. A wallet that already holds shares can `request_redeem` without a proof: eligibility is checked only when the debited share account is empty. A pending deposit from that wallet can be parked by the admin with `cancel_deposit`, which takes it out of the queue and moves nothing; the owner later collects the BRS into its own token account with its own `cancel_deposit` ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)).
 
 ### Can I redeem a balance below the minimum request?
 
@@ -100,7 +100,7 @@ Request PDAs are seeded by the global queue sequence. Two requests sent at the s
 
 ### Why is my redemption not filled yet?
 
-The admin fills in strict FIFO order, and v1 fills whole requests only. Each fill must fit in `min(max_assets − paid, free_capital, liquid_budget)`. A head request larger than that waits until free capital grows. A head worth 0 BRS, or one whose `min_assets_out` is not met, stops the batch until the owner or the admin cancels it. Partial fills at the head are planned for the first post-hackathon upgrade.
+The admin fills in strict FIFO order, and v1 fills whole requests only. Each fill must fit in `min(max_assets − paid, free_capital, liquid_budget)`. A head request larger than that waits until free capital grows. A head worth 0 BRS, or one whose `min_assets_out` is not met, stops the batch until the owner cancels it or the admin parks it. Partial fills at the head are planned for the first post-hackathon upgrade.
 
 ### Can shares be transferred?
 

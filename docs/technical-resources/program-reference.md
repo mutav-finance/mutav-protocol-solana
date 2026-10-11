@@ -14,7 +14,7 @@ These apply to every instruction.
 - **Seeds and owners.** Every program account is checked by seeds and canonical bump. Token accounts are checked for mint, owner and token program.
 - **Math.** `u128` intermediates, checked, rounded in the reserve's favour. Overflow fails with `MathOverflow`.
 - **Events.** Emitted with `emit_cpi!`. Every event carries `config: Pubkey` and `ts: i64`.
-- **Owner token accounts.** `cancel_deposit`, `claim_shares`, `cancel_redeem` and `claim_assets` create the owner's associated token account idempotently. The caller pays its rent.
+- **Owner token accounts.** The owner's `cancel_deposit` and `cancel_redeem`, `claim_shares` and `claim_assets` create the owner's associated token account idempotently. The caller pays its rent. The admin's cancel creates no account.
 - **Names.** Instruction, event and error names are those of [`lib.rs`](../../programs/mutav/src/lib.rs), [`events.rs`](../../programs/mutav/src/events.rs) and [`errors.rs`](../../programs/mutav/src/errors.rs). `u8` selectors (role, leg, queue, close reason) start at 1; 0 is `InvalidParameter`.
 
 ## Signer matrix
@@ -46,6 +46,7 @@ These apply to every instruction.
 | `file_claim` | | ● | | | | | Runs | Never |
 | `pay_claim` | | ● | | | | | Runs | Never |
 | `settle_payout` | | ● | | | | | Runs | Never |
+| `approve_claim` | ● | | | | | | Runs | Never |
 | `request_deposit` | | | | | ● | | Refused | No |
 | `cancel_deposit` | ● | | | | ● | | Runs | No |
 | `claim_shares` | | | | | ● | | Runs | No |
@@ -59,7 +60,7 @@ Note: `fulfil_deposits` is allowed while the reserve is under-covered, because i
 
 Pause stops only capital flows and new guarantees: `request_deposit`, `request_redeem`, `fulfil_deposits`, `fulfil_redeems` and `register_guarantee`. Every other instruction runs under pause. It never stops a claim and never traps a holder's money. Only the admin unpauses. The coverage gate (and the under-covered mode check) applies to `register_guarantee` and `fulfil_redeems` only ([ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md)).
 
-Planned for later upgrades, not in this binary: `approve_claim`, `amend_claim`, `refile_claim`, claim withdrawal, `reinstate_guarantee`, the unsolicited-money instructions (`classify_unsolicited`, `book_unsolicited`, `return_unsolicited`, `skim`, the surplus-share burn), the adapter instructions and instant exit. Their planned design is kept below, marked as a later upgrade.
+Planned for later upgrades, not in this binary: `amend_claim`, `refile_claim`, claim withdrawal, `reinstate_guarantee`, the unsolicited-money instructions (`classify_unsolicited`, `book_unsolicited`, `return_unsolicited`, `skim`, the surplus-share burn), the adapter instructions and instant exit. Their planned design is kept below, marked as a later upgrade.
 
 ## Upgrade authority
 
@@ -182,24 +183,24 @@ These instructions replace a one-step `set_roles` ([ADR 0020](../decisions/0020-
 | | |
 |---|---|
 | Args | `count` from 1 to 8. `max_assets`: the most BRS the batch may pay. `nav_bounds` as `fulfil_deposits`. |
-| Rules | Up to `count` requests in strict FIFO from `redeem_head`; closed seqs and filled requests are skipped. Not paused. Mode normal and the coverage gate passes (`stable_assets ≥ coverage_required`), else `UnderCovered`. Not halted. Not underwater. NAV-move guard evaluated inline, as `fulfil_deposits`. Per head, valued at the current NAV: a head worth 0 BRS is never filled, and the batch stops with it untouched (the owner or the admin cancels it); budget before every fill `min(max_assets − paid, free_capital, liquid_budget)`, whole fills only, so a head that does not fit stops the batch; a value below the owner's `min_assets_out` stops it too (`PriceLimitNotMet`). Fill NAV inside `nav_bounds`. `reserve` and `claims` not frozen. |
+| Rules | Up to `count` requests in strict FIFO from `redeem_head`; closed seqs and filled requests are skipped. Not paused. Mode normal and the coverage gate passes (`stable_assets ≥ coverage_required`), else `UnderCovered`. Not halted. Not underwater. NAV-move guard evaluated inline, as `fulfil_deposits`. Per head, valued at the current NAV: a head worth 0 BRS is never filled, and the batch stops with it untouched (the owner cancels it, or the admin parks it); budget before every fill `min(max_assets − paid, free_capital, liquid_budget)`, whole fills only, so a head that does not fit stops the batch; a value below the owner's `min_assets_out` stops it too (`PriceLimitNotMet`). Fill NAV inside `nav_bounds`. `reserve` and `claims` not frozen. |
 | Effects | Burns the escrowed shares, moves `assets_for(shares)` BRS from `reserve` to `claims`, status `FILLED`. The batch that burns the last shares clears the guard baseline to 0. A call that fills nothing fails with the reason the head stopped. |
 | Errors | `Unauthorized`, `InvalidParameter`, `Paused`, `UnderCovered`, `FulfilHalted`, `ReserveUnderwater`, `ReserveFrozen`, `InsufficientFreeCapital`, `InsufficientLiquidBalance`, `NavOutOfBounds`, `RequestTooSmall`, `PriceLimitNotMet`, `QueueOrderViolation` |
 | Events | `RedeemFilled` per fill, `RedeemsFulfilled { from_seq, to_seq, shares, assets, nav, idle_free_capital, redeemed_shares_total, redeemed_assets_total }` per batch. |
 
 The admin may also sign `cancel_deposit` for a pending deposit, for example when a wallet leaves the allowlist with a deposit pending, and `cancel_redeem` for a head that cannot fill. The admin's cancel **parks** the request ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)): nothing moves, the queue moves past it, and only the owner collects the escrow. See [`cancel_deposit`](#cancel_deposit-and-claim_shares) and [`cancel_redeem`](#cancel_redeem-and-claim_assets) under the capital provider.
 
-### Claims (later upgrade)
+### Claim approval
 
-Not in this binary: `approve_claim` ships with a later upgrade. Until then `pay_claim` refuses a claim above `max_claim_per_call` (`ClaimCallCapExceeded`), and MUTAV pays it bank-first. Planned design:
-
-#### `approve_claim(notice_ref_hash, amount)`
+#### `approve_claim(notice_ref_hash, amount, expected_revision)`
 
 | | |
 |---|---|
-| Rules | The filing is `FILED`. The admin approves the amount that may leave the reserve, not the claim's validity. |
-| Effects | Records `approved_amount` on the filing. It binds an exact amount: `pay_claim` then pays exactly that. The threshold is `max_claim_per_call`; there is no separate parameter. Approved payments count toward the sliding 31-day cap. If the payment would not fit, the same proposal bundles a `set_config` raise of `max_claim_per_period`, and a later `set_config` lowers it back. Any later `amend_claim` or `refile_claim` resets the approval to 0. Not pause-gated. |
-| Event | One approval event per call. |
+| Signer | Admin (the Squads vault, through the admin time lock). The operator, the pauser and the guardians cannot approve. Never paused, never coverage-gated, no mode check; it works with the operator revoked. |
+| Rules | (1) The filing is `FILED` (`ClaimNotFiled`); a paid or settled filing takes no approval. (2) `amount > 0` (`InvalidParameter`). (3) `amount == filing.provision` (`ExpectedAmountMismatch`). (4) `expected_revision == filing.revision` (`ClaimRevisionMismatch`), so a proposal composed against an earlier version of the filing is refused when it executes. (5) No cap is read. The admin approves the amount that may leave the reserve, not the claim's validity. |
+| Effects | Sets `approved_amount = amount` on the filing; re-approving the same amount is idempotent. It moves no funds. Above `max_claim_per_call`, `pay_claim` then pays the filing when `approved_amount` equals the provision. The threshold is `max_claim_per_call`; there is no separate parameter. Approved payments count toward the sliding 31-day cap. If the payment would not fit, the same proposal bundles a `set_config` raise of `max_claim_per_period`, and a later `set_config` lowers it back. The later `amend_claim` and `refile_claim` will reset the approval to 0. |
+| Errors | `Unauthorized`, `UnsupportedVersion`, `ClaimNotFiled`, `InvalidParameter`, `ExpectedAmountMismatch`, `ClaimRevisionMismatch` |
+| Event | `ClaimApproved { guarantee_id, leg, notice_ref_hash, amount, revision, previous_amount, max_claim_per_call }` (`previous_amount`: the approval it replaces, 0 = none) |
 
 ### Unsolicited money (later upgrade)
 
@@ -305,7 +306,8 @@ Not in this binary. `max_reinstate_age` is already in the config. Planned design
 ```mermaid
 stateDiagram-v2
   [*] --> FILED: file_claim
-  FILED --> FILED: amend_claim, approve_claim (later upgrade)
+  FILED --> FILED: approve_claim (admin)
+  FILED --> FILED: amend_claim (later upgrade)
   FILED --> PAID: pay_claim (exactly the provision)
   FILED --> WITHDRAWN: amend_claim(0) (later upgrade)
   WITHDRAWN --> FILED: refile_claim (later upgrade)
@@ -313,7 +315,7 @@ stateDiagram-v2
   SETTLED --> [*]
 ```
 
-In this binary a filing moves `FILED → PAID → SETTLED` only. `WITHDRAWN` (status 2) is reserved for the later upgrade.
+In this binary a filing moves `FILED → PAID → SETTLED` only, with `approve_claim` possible while it is `FILED`. `WITHDRAWN` (status 2) is reserved for the later upgrade.
 
 #### `file_claim(leg, amount, notice_ref_hash)`
 
@@ -351,12 +353,12 @@ Not in this binary. Planned design:
 | | |
 |---|---|
 | Signer | Operator. |
-| Rules | (1) Filing `FILED` (`ClaimNotFiled`). (2) `expected_amount == filing.provision` (`ExpectedAmountMismatch`): the payment is exactly the provision. (3) The ADR 0014 bound: the other open filings of the leg still fit in the cover left (`ExceedsRemainingCover`). (4) If `filing.provision > max_claim_per_call`, `approved_amount == filing.provision` (`ClaimCallCapExceeded`); only `approve_claim` writes `approved_amount`, so until it ships such a claim is refused. (5) The payments of the last 31 UTC days (daily buckets, `CLAIM_WINDOW_DAYS`) plus this one `≤ max_claim_per_period` (`ClaimPeriodCapExceeded`). (6) Destination is `payments_account`. (7) `brs_balance ≥ provision` (`InsufficientLiquidBalance`) and reserve not frozen. No coverage, mode, pause or NAV-guard check. |
+| Rules | (1) Filing `FILED` (`ClaimNotFiled`). (2) `expected_amount == filing.provision` (`ExpectedAmountMismatch`): the payment is exactly the provision. (3) The ADR 0014 bound: the other open filings of the leg still fit in the cover left (`ExceedsRemainingCover`). (4) If `filing.provision > max_claim_per_call`, `approved_amount == filing.provision` (`ClaimCallCapExceeded`); only `approve_claim` writes `approved_amount`. (5) The payments of the last 31 UTC days (daily buckets, `CLAIM_WINDOW_DAYS`) plus this one `≤ max_claim_per_period` (`ClaimPeriodCapExceeded`). (6) Destination is `payments_account`. (7) `brs_balance ≥ provision` (`InsufficientLiquidBalance`) and reserve not frozen. No coverage, mode, pause or NAV-guard check. |
 | Effects | Transfers BRS from `reserve` to the payments account. Leg paid rises by the provision and the leg's provision falls to 0. Filing `PAID` with `payments_account`, `paid_at` and `paid_amount` recorded, `open_claims −= 1`. `remaining_cover_total`, `provisions` and `brs_balance` fall. Today's bucket of the claim window and the lifetime counters rise. The stress term and the cached `coverage_required` write saturate and never fail. |
 | Errors | `Unauthorized`, `ClaimNotFiled`, `ExpectedAmountMismatch`, `InvalidParameter`, `ExceedsRemainingCover`, `ClaimCallCapExceeded`, `ClaimPeriodCapExceeded`, `InvalidPaymentsAccount`, `InsufficientLiquidBalance`, `ReserveFrozen` |
 | Event | `ClaimPaid { guarantee_id, leg, amount, notice_ref_hash, payments_account, provisions_after, coverage_required_after, window_paid, brs_balance_after, claims_paid_total }` |
 
-MUTAV may pay the agency by Pix from its own bank account first. The reserve then reimburses the payments account through `pay_claim`. This keeps payments on time while an above-cap approval waits for the time lock. Until `approve_claim` ships, claims above `max_claim_per_call` are paid this way; `file_claim` has no interim cap ([ADR 0021](../decisions/0021-claims-approval-amendment-exact-payment.md)).
+MUTAV may pay the agency by Pix from its own bank account first. The reserve then reimburses the payments account through `pay_claim`. This keeps payments on time while an above-cap approval waits for the time lock; it is an option, not the only path above `max_claim_per_call`. `file_claim` has no interim cap ([ADR 0021](../decisions/0021-claims-approval-amendment-exact-payment.md)).
 
 #### `settle_payout(notice_ref_hash, pix_e2e_hash)`
 
@@ -490,6 +492,7 @@ Every event carries `config` and `ts`. Existing events never change fields after
 | `PayoutSettled` | `guarantee_id, notice_ref_hash, pix_e2e_hash` |
 | `DepositRequested` | `owner, seq, assets, min_shares_out` |
 | `DepositCancelled` | `owner, seq, assets, by` |
+| `DepositParked` | `owner, seq, assets, by` (the admin's cancel, [ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)) |
 | `SharesClaimed` | `owner, seq, shares` |
 | `DepositFilled` | `owner, seq, assets, shares, nav, shares_outstanding_after, net_assets_after` |
 | `DepositsFulfilled` | `from_seq, to_seq, assets, shares, nav, deposited_assets_total, minted_shares_total` |
@@ -497,6 +500,7 @@ Every event carries `config` and `ts`. Existing events never change fields after
 | `RedeemFilled` | `owner, seq, shares, assets, nav` |
 | `RedeemsFulfilled` | `from_seq, to_seq, shares, assets, nav, idle_free_capital, redeemed_shares_total, redeemed_assets_total` |
 | `RedeemCancelled` | `owner, seq, shares_returned, by` |
+| `RedeemParked` | `owner, seq, shares, by` (the admin's cancel, ADR 0030) |
 | `AssetsClaimed` | `owner, seq, assets` |
 | `QueueHeadsAdvanced` | `redeem_head, deposit_head` |
 | `StateRefreshed` | `stable_assets, coverage_required, surplus, provisions, nav_per_share, mode, prev_nav_per_share, inflow_nav, guard_nav, shares_outstanding, net_assets, fulfil_halted` |
@@ -504,8 +508,9 @@ Every event carries `config` and `ts`. Existing events never change fields after
 | `ModeChanged` | `from, to, deficit` |
 | `ReserveFrozenDetected` | `token_account` |
 | `FulfilHaltCleared` | `nav_per_share` |
+| `ClaimApproved` | `guarantee_id, leg, notice_ref_hash, amount, revision, previous_amount, max_claim_per_call` |
 
-Events of the later upgrades (claim approval, amendment and withdrawal, reinstatement, unsolicited money, the claim-notice gate, adapters) are appended when those features are built. Dead events were removed before the freeze ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)).
+Events of the later upgrades (claim amendment and withdrawal, reinstatement, unsolicited money, the claim-notice gate, adapters) are appended when those features are built. Dead events were removed before the freeze ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)).
 
 ## Errors
 
@@ -549,7 +554,7 @@ Anchor numbers custom errors from 6000 in enum order. The list is append-only fr
 | `InvalidTokenProgram` | Not the reserve's token program. |
 | `ClaimNotPaid` | `settle_payout` on a filing that is not `PAID`. |
 | `DuplicateParam` | `set_config` received the same field twice. |
-| `ExpectedAmountMismatch` | `pay_claim`'s `expected_amount` is not the filing's provision. |
+| `ExpectedAmountMismatch` | `pay_claim`'s `expected_amount`, or `approve_claim`'s `amount`, is not the filing's provision. |
 | `NavOutOfBounds` | The NAV is outside the proposal's `nav_bounds`. |
 | `NoPendingHandover` | No handover is pending for this role. |
 | `HandoverExpired` | The pending handover is past its 72-hour window. |
@@ -559,6 +564,7 @@ Anchor numbers custom errors from 6000 in enum order. The list is append-only fr
 | `PriceLimitNotMet` | The head request's `min_shares_out` or `min_assets_out` is not met. |
 | `ReserveUnderwater` | A fill while the reserve is underwater (NAV per share below the smallest published unit, shares outstanding). |
 | `NoSharesOutstanding` | `contribute_fees` or `sweep_income` while no shares exist. |
+| `ClaimRevisionMismatch` | 6046. `approve_claim`'s `expected_revision` is not the filing's revision: the filing changed since the approval was proposed. |
 
 Dead errors (adapter, price and claim-notice errors that v1 never raises) and the per-agency cap error are removed before the freeze ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)). They return, appended, with the features that raise them.
 

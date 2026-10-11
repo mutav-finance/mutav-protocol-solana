@@ -36,9 +36,9 @@ At `c = 0.25`, a R$1,000,000 reserve backs about R$4,000,000 of cover. The found
 | Parameter | Field | Devnet value | Base units | Set by |
 |---|---|---|---|---|
 | Claim payment per call | `caps.max_claim_per_call` | R$15,000 | 15,000,000,000 | Admin. Must be > 0 |
-| Claim payments per sliding 31-day window | `caps.max_claim_per_period` | R$20,000 | 20,000,000,000 | Admin. Must be ≥ the per-call cap. Raised temporarily for a large approved claim once `approve_claim` ships (Wave 2) |
+| Claim payments per sliding 31-day window | `caps.max_claim_per_period` | R$20,000 | 20,000,000,000 | Admin. Must be ≥ the per-call cap. Raised temporarily for a large approved claim, in the same proposal as `approve_claim` |
 | Window length | None | 31 daily buckets | n/a | Program constant `CLAIM_WINDOW_DAYS = 31`; no parameter |
-| Approval threshold | (same as `max_claim_per_call`) | R$15,000 | n/a | No separate parameter. `approve_claim` is Wave 2; until then a larger claim is paid bank-first |
+| Approval threshold | (same as `max_claim_per_call`) | R$15,000 | n/a | No separate parameter. Above it, `pay_claim` needs the admin's `approve_claim` of the exact amount; MUTAV may pay bank-first while the approval waits |
 | Payout deadline | None | Not in the program. Kept in the MUTAV platform | n/a | n/a |
 
 ## Capital queue

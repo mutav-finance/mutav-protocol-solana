@@ -287,11 +287,11 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <thead><tr><th>Account</th><th>Seeds</th><th>Created by</th><th>Purpose</th></tr></thead>
 <tbody>
 <tr><td><code>Guarantee</code></td><td><code>["guarantee", config, id]</code></td><td><code>register_guarantee</code></td><td>One per lease. A second registration of the same <code>id</code> fails at account creation. Never closed.</td></tr>
-<tr><td><code>ClaimFiling</code></td><td><code>["claim", guarantee, notice_ref_hash]</code></td><td><code>file_claim</code></td><td>One per notice: provision, status, <code>approved_amount</code> (0 until the later <code>approve_claim</code>), and the payment and settlement record. A second payment of the same notice is refused by its status. Never closed.</td></tr>
+<tr><td><code>ClaimFiling</code></td><td><code>["claim", guarantee, notice_ref_hash]</code></td><td><code>file_claim</code></td><td>One per notice: provision, status, <code>approved_amount</code> (0 until the admin's <code>approve_claim</code>), <code>revision</code>, and the payment and settlement record. A second payment of the same notice is refused by its status. Never closed.</td></tr>
 <tr><td><code>IncomeReceipt</code> (fee)</td><td><code>["fee", config, invoice_ref_hash]</code></td><td><code>contribute_fees</code></td><td><code>kind = FEE</code>. Each invoice's guarantee fee counts once. The separate prefix keeps invoice and statement references from colliding. Never closed.</td></tr>
 <tr><td><code>IncomeReceipt</code></td><td><code>["income", config, ref_hash]</code></td><td><code>sweep_income</code></td><td><code>kind = ISSUER_STATEMENT</code>. Each swept statement counts once. The later <code>book_unsolicited</code> adds <code>UNSOLICITED</code> and <code>BACKSTOP</code>. Never closed.</td></tr>
-<tr><td><code>DepositRequest</code></td><td><code>["deposit", config, seq]</code>, <code>seq</code> u64 LE</td><td><code>request_deposit</code></td><td>One FIFO deposit request. Closed on claim or cancel.</td></tr>
-<tr><td><code>RedeemRequest</code></td><td><code>["redeem", config, seq]</code>, <code>seq</code> u64 LE</td><td><code>request_redeem</code></td><td>One FIFO redeem request. Closed on claim or cancel.</td></tr>
+<tr><td><code>DepositRequest</code></td><td><code>["deposit", config, seq]</code>, <code>seq</code> u64 LE</td><td><code>request_deposit</code></td><td>One FIFO deposit request. Closed on claim or on the owner's cancel; the admin's cancel parks it.</td></tr>
+<tr><td><code>RedeemRequest</code></td><td><code>["redeem", config, seq]</code>, <code>seq</code> u64 LE</td><td><code>request_redeem</code></td><td>One FIFO redeem request. Closed on claim or on the owner's cancel; the admin's cancel parks it.</td></tr>
 </tbody></table></div>
 <p>There is no per-holder account (the open-exit rule reads the owner's share balance) and no per-agency account (per-agency figures are derived off-chain from <code>Guarantee.agency_id</code>).</p>
 <div class="tbl-wrap"><table class="tbl">
@@ -307,7 +307,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <thead><tr><th>Authority</th><th>Holder</th><th>Devnet address</th><th>Can do</th></tr></thead>
 <tbody>
 <tr><td>Program upgrade authority</td><td>Upgrade multisig vault (Squads v4)</td><td>Set at deploy</td><td>Sign <code>initialize</code> and program upgrades.</td></tr>
-<tr><td>Reserve admin (<code>VaultConfig.admin</code>)</td><td>Admin multisig vault (Squads v4)</td><td>Set at deploy</td><td>Caps, coverage ratio, stress buffer, roles and guardians, <code>revoke_pauser</code>, money accounts, allowlist, capital fills, deposit and redeem cancels, unpause, halt clearing. Claim approvals above the per-call cap and unsolicited money come with a later upgrade. Rotated only by <code>propose_admin</code> then <code>accept_admin</code>.</td></tr>
+<tr><td>Reserve admin (<code>VaultConfig.admin</code>)</td><td>Admin multisig vault (Squads v4)</td><td>Set at deploy</td><td>Caps, coverage ratio, stress buffer, roles and guardians, <code>revoke_pauser</code>, money accounts, allowlist, capital fills, deposit and redeem cancels (which park the request), claim approvals above the per-call cap, unpause, halt clearing. Unsolicited money comes with a later upgrade. Rotated only by <code>propose_admin</code> then <code>accept_admin</code>.</td></tr>
 <tr><td>Operator (<code>VaultConfig.operator</code>)</td><td>Hot key</td><td>Set at deploy</td><td>Guarantees (register, close), guarantee fees, issuer income, claims (file, pay) and settlement records. <code>Pubkey::default()</code> when revoked. On devnet a keypair generated at deploy and used by hand from the operator console; later a KMS-backed key in the MUTAV platform.</td></tr>
 <tr><td>Pauser (<code>VaultConfig.pauser</code>)</td><td>Separate key</td><td>Set at deploy</td><td><code>pause</code> and <code>revoke_operator</code>, with no time lock.</td></tr>
 <tr><td>Guardians (<code>VaultConfig.guardians</code>)</td><td>Up to 3 keys, appointed by the admin in one step</td><td>Set at deploy</td><td><code>pause</code> only in the pilot. Devnet starts with 1 guardian, separate from the pauser. With the first adapter upgrade, also the risk-reducing adapter actions of ADR 0027.</td></tr>
@@ -391,8 +391,8 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <tr><td><code>Guarantee.close_reason</code></td><td><code>CLOSE_RELEASED = 1</code>, <code>CLOSE_VOID = 2</code>. 0 = still active.</td></tr>
 <tr><td><code>ClaimFiling.leg</code></td><td><code>LEG_DEFAULT = 1</code> (rent and charges in arrears), <code>LEG_EXIT = 2</code> (end-of-occupation debts)</td></tr>
 <tr><td><code>ClaimFiling.status</code></td><td><code>FILED = 0</code>, <code>PAID = 1</code>, <code>WITHDRAWN = 2</code>, <code>SETTLED = 3</code>. Append-only. This binary moves <code>FILED → PAID → SETTLED</code>; <code>WITHDRAWN</code> is reserved and neither written nor accepted.</td></tr>
-<tr><td><code>DepositRequest.status</code></td><td><code>PENDING = 0</code>, <code>FULFILLED = 1</code></td></tr>
-<tr><td><code>RedeemRequest.status</code></td><td><code>PENDING = 0</code>, <code>FILLED = 1</code>. A cancelled request is closed.</td></tr>
+<tr><td><code>DepositRequest.status</code></td><td><code>PENDING = 0</code>, <code>FULFILLED = 1</code>, <code>CANCELLED = 2</code> (parked by the admin's cancel, BRS still owed to the owner; ADR 0030)</td></tr>
+<tr><td><code>RedeemRequest.status</code></td><td><code>PENDING = 0</code>, <code>FILLED = 1</code>, <code>CANCELLED = 2</code> (parked by the admin's cancel, shares still owed to the owner; ADR 0030). The owner's cancel closes the request.</td></tr>
 <tr><td><code>IncomeReceipt.kind</code></td><td><code>ISSUER_STATEMENT = 0</code>, <code>FEE = 1</code>. Reserved: <code>UNSOLICITED = 2</code>, <code>BACKSTOP = 3</code>.</td></tr>
 <tr><td>Roles</td><td><code>ROLE_OPERATOR = 1</code>, <code>ROLE_PAUSER = 2</code>, <code>ROLE_ADMIN = 3</code> (<code>cancel_pending</code> only)</td></tr>
 <tr><td><code>advance_queue_head</code> queue</td><td><code>QUEUE_DEPOSIT = 1</code>, <code>QUEUE_REDEEM = 2</code></td></tr>
@@ -409,7 +409,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <thead><tr><th>Role</th><th>Owns</th><th>Key</th></tr></thead>
 <tbody>
 <tr><td><strong>Operator</strong></td><td>Contracts, agencies and the whole guarantee and claim cycle. Judges whether a lease is valid and whether a claim is owed. Registers and closes guarantees, books guarantee fees and issuer income, files and pays claims, records settlement. Only <code>pay_claim</code> is irreversible, and it is bounded by the admin's caps.</td><td>Hot key</td></tr>
-<tr><td><strong>Reserve admin</strong></td><td>The reserve's financial health and security through ceilings: caps, coverage ratio, stress buffer, roles, guardians, accounts, allowlist, capital fills, cancels on an owner's behalf, unpause, halt clearing. Later also approval of claim amounts above the per-call cap and unsolicited money. It does not judge contracts.</td><td>Admin multisig vault</td></tr>
+<tr><td><strong>Reserve admin</strong></td><td>The reserve's financial health and security through ceilings: caps, coverage ratio, stress buffer, roles, guardians, accounts, allowlist, capital fills, parking a request that blocks a queue, approval of claim amounts above the per-call cap, unpause, halt clearing. Later also unsolicited money. It does not judge contracts.</td><td>Admin multisig vault</td></tr>
 <tr><td><strong>Pauser</strong></td><td>Emergency stop. <code>pause</code> and <code>revoke_operator</code>, with no time lock.</td><td>Separate key</td></tr>
 <tr><td><strong>Guardians</strong></td><td><code>pause</code> only. Cannot revoke, unpause or change anything.</td><td>Up to 3 keys</td></tr>
 <tr><td><strong>Capital provider (owner)</strong></td><td>Own requests: deposit, redeem, cancel, claim. Entry is allowlisted; exit is open to any wallet that already holds shares.</td><td>Own wallet</td></tr>
@@ -444,10 +444,11 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <tr><td><code>close_guarantee</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
 <tr><td><code>contribute_fees</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
 <tr><td><code>sweep_income</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
-<tr class="grp"><td colspan="9">Claims (operator)</td></tr>
+<tr class="grp"><td colspan="9">Claims (operator; approval by the admin)</td></tr>
 <tr><td><code>file_claim</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">never</td></tr>
 <tr><td><code>pay_claim</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">never</td></tr>
 <tr><td><code>settle_payout</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">never</td></tr>
+<tr><td><code>approve_claim</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">never</td></tr>
 <tr class="grp"><td colspan="9">Capital (owner)</td></tr>
 <tr><td><code>request_deposit</code></td><td></td><td></td><td></td><td></td><td class="y">●</td><td></td><td>refused</td><td class="n">no</td></tr>
 <tr><td><code>cancel_deposit</code></td><td class="y">●</td><td></td><td></td><td></td><td class="y">●</td><td></td><td>runs</td><td class="n">no</td></tr>
@@ -461,7 +462,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 </tbody></table></div>
 <p class="muted">* <code>fulfil_deposits</code> is allowed while the reserve is under-covered, because it is the recapitalisation path. It is still refused with <code>ReserveUnderwater</code> when the reserve is underwater, and by the reserve-size cap.</p>
 <p><strong>Pause scope.</strong> Pause stops only capital flows and new guarantees: <code>request_deposit</code>, <code>request_redeem</code>, <code>fulfil_deposits</code>, <code>fulfil_redeems</code> and <code>register_guarantee</code>. Every other instruction runs under pause. It never stops a claim and never traps a holder's money. Only the admin unpauses. The coverage gate (and the under-covered mode check) applies to <code>register_guarantee</code> and <code>fulfil_redeems</code> only.</p>
-<p><strong>Not in this binary</strong> (planned for later upgrades): <code>approve_claim</code>, <code>amend_claim</code>, <code>refile_claim</code>, claim withdrawal, <code>reinstate_guarantee</code>, the unsolicited-money instructions (<code>skim</code>, <code>classify_unsolicited</code>, <code>book_unsolicited</code>, <code>return_unsolicited</code>, the surplus-share burn), the adapter instructions and instant exit.</p>
+<p><strong>Not in this binary</strong> (planned for later upgrades): <code>amend_claim</code>, <code>refile_claim</code>, claim withdrawal, <code>reinstate_guarantee</code>, the unsolicited-money instructions (<code>skim</code>, <code>classify_unsolicited</code>, <code>book_unsolicited</code>, <code>return_unsolicited</code>, the surplus-share burn), the adapter instructions and instant exit.</p>
 </section>
 
 <!-- ============================================================ 4 -->
@@ -597,7 +598,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 
 <div class="ix" id="ix-fulfil_deposits"><h4><code>fulfil_deposits(count, nav_bounds)</code><a class="anchor" href="#ix-fulfil_deposits">#</a></h4><dl>
 <dt>Args</dt><dd><code>count</code> 1 to 8. <code>nav_bounds: NavBounds { min, max }</code>, composed by the admin console when the proposal is created. Request accounts as remaining accounts.</dd>
-<dt>Rules</dt><dd>Strict FIFO from <code>deposit_head</code>, with the skip proof for closed seqs and fulfilled requests. Not paused. Not halted. Refused with <code>ReserveUnderwater</code> when the reserve is underwater. The NAV-move guard is evaluated inline at batch start (the <code>refresh</code> rule, net of <code>inflow_nav</code>): a move beyond <code>max_nav_move_bps</code> refuses with <code>FulfilHalted</code> but does not latch the halt; the next <code>refresh</code> does. Each fill's NAV is inside <code>nav_bounds</code>. A request that would mint 0 shares stops the batch (<code>RequestTooSmall</code>), and so does one below the owner's <code>min_shares_out</code> (<code>PriceLimitNotMet</code>); either fails the call only when nothing was filled. <code>stable_assets + Σ assets ≤ max_tvl</code>. <code>pending_deposits</code> and <code>reserve</code> not frozen.</dd>
+<dt>Rules</dt><dd>Strict FIFO from <code>deposit_head</code>, with the skip proof for closed seqs, fulfilled requests and requests parked by the admin. Not paused. Not halted. Refused with <code>ReserveUnderwater</code> when the reserve is underwater. The NAV-move guard is evaluated inline at batch start (the <code>refresh</code> rule, net of <code>inflow_nav</code>): a move beyond <code>max_nav_move_bps</code> refuses with <code>FulfilHalted</code> but does not latch the halt; the next <code>refresh</code> does. Each fill's NAV is inside <code>nav_bounds</code>. A request that would mint 0 shares stops the batch (<code>RequestTooSmall</code>), and so does one below the owner's <code>min_shares_out</code> (<code>PriceLimitNotMet</code>); either fails the call only when nothing was filled. <code>stable_assets + Σ assets ≤ max_tvl</code>. <code>pending_deposits</code> and <code>reserve</code> not frozen.</dd>
 <dt>Effects</dt><dd>Per request: <code>shares_out = shares_for(assets)</code> at the live NAV after the earlier fills, BRS from <code>pending_deposits</code> to <code>reserve</code>, status <code>FULFILLED</code>, head advanced. The batch that mints the first shares seeds the guard baseline. Shares are minted later by <code>claim_shares</code>.</dd>
 <dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>Paused</code>, <code>FulfilHalted</code>, <code>ReserveUnderwater</code>, <code>NavOutOfBounds</code>, <code>RequestTooSmall</code>, <code>PriceLimitNotMet</code>, <code>TvlCapExceeded</code>, <code>ReserveFrozen</code>, <code>QueueOrderViolation</code>, <code>FeatureNotSupported</code>.</dd>
 <dt>Events</dt><dd><code>DepositFilled</code> per fill; <code>DepositsFulfilled</code> per batch.</dd></dl></div>
@@ -607,7 +608,14 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <dt>Effects</dt><dd>Burns the escrowed shares, moves <code>assets_for(shares)</code> BRS from <code>reserve</code> to <code>claims</code>, status <code>FILLED</code>. The batch that burns the last shares clears the guard baseline to 0. A call that fills nothing fails with the reason the head stopped.</dd>
 <dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>Paused</code>, <code>UnderCovered</code>, <code>FulfilHalted</code>, <code>ReserveUnderwater</code>, <code>ReserveFrozen</code>, <code>InsufficientFreeCapital</code>, <code>InsufficientLiquidBalance</code>, <code>NavOutOfBounds</code>, <code>RequestTooSmall</code>, <code>PriceLimitNotMet</code>, <code>QueueOrderViolation</code>.</dd>
 <dt>Events</dt><dd><code>RedeemFilled</code> per fill; <code>RedeemsFulfilled</code> per batch (with <code>idle_free_capital</code>).</dd></dl></div>
-<p>The admin may also sign <code>cancel_deposit</code> and <code>cancel_redeem</code>: for a pending deposit of a wallet that left the allowlist, or a redemption head that cannot fill.</p>
+<p>The admin may also sign <code>cancel_deposit</code> for a pending deposit, for example when a wallet leaves the allowlist with a deposit pending, and <code>cancel_redeem</code> for a head that cannot fill. The admin's cancel <strong>parks</strong> the request (ADR 0030): nothing moves, the queue moves past it, and only the owner collects the escrow. See <a href="#ix-cancel_deposit"><code>cancel_deposit</code></a> and <a href="#ix-cancel_redeem"><code>cancel_redeem</code></a> under the capital provider.</p>
+
+<div class="ix" id="ix-approve_claim"><h4><code>approve_claim(notice_ref_hash, amount, expected_revision)</code><a class="anchor" href="#ix-approve_claim">#</a></h4><dl>
+<dt>Signer</dt><dd>Admin (the Squads vault, through the admin time lock). The operator, the pauser and the guardians cannot approve. Never paused, never coverage-gated, no mode check; it works with the operator revoked.</dd>
+<dt>Rules</dt><dd>(1) The filing is <code>FILED</code> (<code>ClaimNotFiled</code>); a paid or settled filing takes no approval. (2) <code>amount &gt; 0</code> (<code>InvalidParameter</code>). (3) <code>amount == filing.provision</code> (<code>ExpectedAmountMismatch</code>). (4) <code>expected_revision == filing.revision</code> (<code>ClaimRevisionMismatch</code>), so a proposal composed against an earlier version of the filing is refused when it executes. (5) No cap is read. The admin approves the amount that may leave the reserve, not the claim's validity.</dd>
+<dt>Effects</dt><dd>Sets <code>approved_amount = amount</code> on the filing; re-approving the same amount is idempotent. It moves no funds. Above <code>max_claim_per_call</code>, <code>pay_claim</code> then pays the filing when <code>approved_amount</code> equals the provision. Approved payments count toward the sliding 31-day cap. If the payment would not fit, the same proposal bundles a <code>set_config</code> raise of <code>max_claim_per_period</code>, and a later <code>set_config</code> lowers it back. The planned <code>amend_claim</code> and <code>refile_claim</code> will reset the approval to 0.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>UnsupportedVersion</code>, <code>ClaimNotFiled</code>, <code>InvalidParameter</code>, <code>ExpectedAmountMismatch</code>, <code>ClaimRevisionMismatch</code>.</dd>
+<dt>Event</dt><dd><code>ClaimApproved { guarantee_id, leg, notice_ref_hash, amount, revision, previous_amount, max_claim_per_call }</code> (<code>previous_amount</code>: the approval it replaces, 0 = none).</dd></dl></div>
 
 <h3 id="ix-operator">5.3 Operator: guarantees and money in<a class="anchor" href="#ix-operator">#</a></h3>
 <div class="ix" id="ix-register_guarantee"><h4><code>register_guarantee(args)</code><a class="anchor" href="#ix-register_guarantee">#</a></h4><dl>
@@ -649,7 +657,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <dt>Event</dt><dd><code>ClaimFiled</code>.</dd></dl></div>
 
 <div class="ix" id="ix-pay_claim"><h4><code>pay_claim(notice_ref_hash, expected_amount)</code><a class="anchor" href="#ix-pay_claim">#</a></h4><dl>
-<dt>Rules</dt><dd>(1) Filing <code>FILED</code> (<code>ClaimNotFiled</code>). (2) <code>expected_amount == filing.provision</code> (<code>ExpectedAmountMismatch</code>): the payment is exactly the provision. (3) The other open filings of the leg still fit in the cover left (<code>ExceedsRemainingCover</code>). (4) If the provision exceeds <code>max_claim_per_call</code>, <code>approved_amount == provision</code> (<code>ClaimCallCapExceeded</code>); only the later <code>approve_claim</code> writes it, so until then such a claim is refused. (5) Payments of the last 31 UTC days plus this one <code>≤ max_claim_per_period</code> (<code>ClaimPeriodCapExceeded</code>). (6) Destination is <code>payments_account</code>. (7) <code>brs_balance ≥ provision</code> (<code>InsufficientLiquidBalance</code>) and reserve not frozen. <strong>No coverage, mode, pause or NAV-guard check.</strong></dd>
+<dt>Rules</dt><dd>(1) Filing <code>FILED</code> (<code>ClaimNotFiled</code>). (2) <code>expected_amount == filing.provision</code> (<code>ExpectedAmountMismatch</code>): the payment is exactly the provision. (3) The other open filings of the leg still fit in the cover left (<code>ExceedsRemainingCover</code>). (4) If the provision exceeds <code>max_claim_per_call</code>, <code>approved_amount == provision</code> (<code>ClaimCallCapExceeded</code>); only the admin's <code>approve_claim</code> writes it. (5) Payments of the last 31 UTC days plus this one <code>≤ max_claim_per_period</code> (<code>ClaimPeriodCapExceeded</code>). (6) Destination is <code>payments_account</code>. (7) <code>brs_balance ≥ provision</code> (<code>InsufficientLiquidBalance</code>) and reserve not frozen. <strong>No coverage, mode, pause or NAV-guard check.</strong></dd>
 <dt>Effects</dt><dd>Transfers BRS from <code>reserve</code> to the payments account. Leg paid rises; the leg's provision falls. Filing <code>PAID</code> with <code>payments_account</code>, <code>paid_at</code>, <code>paid_amount</code>; <code>open_claims −= 1</code>. <code>remaining_cover_total</code>, <code>provisions</code> and <code>brs_balance</code> fall. Today's bucket and the lifetime counters rise. The stress term and the cached <code>coverage_required</code> write saturate and never fail.</dd>
 <dt>Errors</dt><dd><code>Unauthorized</code>, <code>ClaimNotFiled</code>, <code>ExpectedAmountMismatch</code>, <code>InvalidParameter</code>, <code>ExceedsRemainingCover</code>, <code>ClaimCallCapExceeded</code>, <code>ClaimPeriodCapExceeded</code>, <code>InvalidPaymentsAccount</code>, <code>InsufficientLiquidBalance</code>, <code>ReserveFrozen</code>.</dd>
 <dt>Event</dt><dd><code>ClaimPaid</code>.</dd></dl></div>
@@ -659,7 +667,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <dt>Rules</dt><dd>The filing is <code>PAID</code> (<code>PayoutAlreadySettled</code> if already <code>SETTLED</code>, else <code>ClaimNotPaid</code>). The hash is non-zero.</dd>
 <dt>Effects</dt><dd>Writes <code>pix_e2e_hash</code> and <code>settled_at</code> on the <code>ClaimFiling</code> and sets it <code>SETTLED</code>. A settlement record only: the program has no payout deadline; the service level lives in the operator platform.</dd>
 <dt>Event</dt><dd><code>PayoutSettled { guarantee_id, notice_ref_hash, pix_e2e_hash }</code>.</dd></dl></div>
-<p><strong>Bank-first payment.</strong> MUTAV may pay the agency by Pix from its own bank account first; the reserve then reimburses the payments account through <code>pay_claim</code>. Until <code>approve_claim</code> ships, every claim above <code>max_claim_per_call</code> is paid this way.</p>
+<p><strong>Bank-first payment.</strong> MUTAV may pay the agency by Pix from its own bank account first; the reserve then reimburses the payments account through <code>pay_claim</code>. A claim above <code>max_claim_per_call</code> may be paid this way while its approval waits on the admin time lock; it stays filed, and the reserve reimburses the payments account once the approval exists.</p>
 
 <h3 id="ix-capital">5.5 Capital provider (owner)<a class="anchor" href="#ix-capital">#</a></h3>
 <p>Entry is allowlisted. Exit is open to any wallet that already holds shares. MUTAV's capital wallet uses the same queues with no special treatment. During the pilot the reserve is not open to public investment.</p>
@@ -670,9 +678,11 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <dt>Event</dt><dd><code>DepositRequested { owner, seq, assets, min_shares_out }</code>.</dd></dl></div>
 
 <div class="ix" id="ix-cancel_deposit"><h4><code>cancel_deposit()</code> · <code>claim_shares()</code><a class="anchor" href="#ix-cancel_deposit">#</a></h4><dl>
-<dt>Signer</dt><dd>Cancel: the owner or the admin. Claim: the owner. Both run under pause.</dd>
-<dt>Effects</dt><dd>Cancel (<code>PENDING</code>) returns the BRS and the request's rent to the owner's associated token account, bound to the owner stored in the request, and closes the request. Claim (<code>FULFILLED</code>) mints <code>shares_out</code> and closes the request.</dd>
-<dt>Events</dt><dd><code>DepositCancelled { owner, seq, assets, by }</code>, <code>SharesClaimed { owner, seq, shares }</code>.</dd></dl></div>
+<dt>Signer</dt><dd>Cancel: the owner or the admin. Claim: the owner. All run under pause.</dd>
+<dt>Rules</dt><dd>Admin's cancel: <code>PENDING</code>. Owner's cancel: <code>PENDING</code> or <code>CANCELLED</code>. Claim: <code>FULFILLED</code>. When the admin cancels, the owner is not a signer; the owner account is bound to the address stored in the request.</dd>
+<dt>Effects</dt><dd>The admin's cancel parks the request (<code>status = CANCELLED</code>, ADR 0030): no transfer, no account creation, no close; the BRS stays in <code>pending_deposits</code> and in <code>pending_deposits_total</code>, owed to the owner. Fills skip it, <code>advance_queue_head</code> moves past it and <code>claim_shares</code> refuses it; the owner cannot make the park fail. The owner's cancel refunds the BRS into the owner's associated token account, created idempotently with the owner as payer, and closes the request with its rent to the owner. Claim (<code>FULFILLED</code>) mints <code>shares_out</code> and closes the request.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidRequestStatus</code>.</dd>
+<dt>Events</dt><dd><code>DepositParked { owner, seq, assets, by }</code> (admin), <code>DepositCancelled { owner, seq, assets, by }</code> (owner), <code>SharesClaimed { owner, seq, shares }</code>.</dd></dl></div>
 
 <div class="ix" id="ix-request_redeem"><h4><code>request_redeem(shares, min_assets_out, eligibility)</code><a class="anchor" href="#ix-request_redeem">#</a></h4><dl>
 <dt>Signer</dt><dd>Owner, never a delegate.</dd>
@@ -682,9 +692,11 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <dt>Event</dt><dd><code>RedeemRequested { owner, seq, shares, min_assets_out }</code>.</dd></dl></div>
 
 <div class="ix" id="ix-cancel_redeem"><h4><code>cancel_redeem()</code> · <code>claim_assets()</code><a class="anchor" href="#ix-cancel_redeem">#</a></h4><dl>
-<dt>Signer</dt><dd>Cancel: the owner or the admin. Claim: the owner. Both run under pause.</dd>
-<dt>Effects</dt><dd>Cancel (<code>PENDING</code>) returns the escrowed shares to the owner's share account and closes the request; the admin uses it for a head that cannot fill (worth 0 BRS, or a <code>min_assets_out</code> no fill can meet). Claim (<code>FILLED</code>) pays <code>assets_out</code> from <code>claims</code> to the owner's BRS account and closes the request.</dd>
-<dt>Events</dt><dd><code>RedeemCancelled { owner, seq, shares_returned, by }</code>, <code>AssetsClaimed { owner, seq, assets }</code>.</dd></dl></div>
+<dt>Signer</dt><dd>Cancel: the owner or the admin. Claim: the owner. All run under pause.</dd>
+<dt>Rules</dt><dd>Admin's cancel: <code>PENDING</code>. Owner's cancel: <code>PENDING</code> or <code>CANCELLED</code>. Claim: <code>FILLED</code>. When the admin cancels, the owner account is bound to the address stored in the request.</dd>
+<dt>Effects</dt><dd>The admin's cancel parks the request (<code>status = CANCELLED</code>, ADR 0030) to remove a head that cannot fill (worth 0 BRS, or a <code>min_assets_out</code> no fill can meet): nothing moves, and the shares stay in <code>pending_redemptions</code>, in <code>pending_redeem_shares</code> and in <code>shares_outstanding</code>, owed to the owner. Fills skip it, <code>advance_queue_head</code> moves past it and <code>claim_assets</code> refuses it. The owner's cancel returns the escrowed shares to the owner's share associated token account, created idempotently with the owner as payer, and closes the request with its rent to the owner. Claim (<code>FILLED</code>) pays <code>assets_out</code> from <code>claims</code> to the owner's BRS account and closes the request.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidRequestStatus</code>.</dd>
+<dt>Events</dt><dd><code>RedeemParked { owner, seq, shares, by }</code> (admin), <code>RedeemCancelled { owner, seq, shares_returned, by }</code> (owner), <code>AssetsClaimed { owner, seq, assets }</code>.</dd></dl></div>
 
 <h3 id="ix-public">5.6 Anyone<a class="anchor" href="#ix-public">#</a></h3>
 <div class="ix" id="ix-refresh"><h4><code>refresh()</code><a class="anchor" href="#ix-refresh">#</a></h4><dl>
@@ -692,7 +704,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <dt>Event</dt><dd><code>StateRefreshed</code>.</dd></dl></div>
 
 <div class="ix" id="ix-advance"><h4><code>advance_queue_head(queue, max)</code><a class="anchor" href="#ix-advance">#</a></h4><dl>
-<dt>Rules</dt><dd><code>queue</code> is <code>QUEUE_DEPOSIT</code> (1) or <code>QUEUE_REDEEM</code> (2). Skip proof per seq: the account is the PDA for that seq and is closed, or is a fulfilled deposit or filled redemption. Moves no money. Never paused.</dd>
+<dt>Rules</dt><dd><code>queue</code> is <code>QUEUE_DEPOSIT</code> (1) or <code>QUEUE_REDEEM</code> (2). Skip proof per seq: the account is the PDA for that seq and is closed, or is a fulfilled deposit, a filled redemption or a request parked by the admin (<code>CANCELLED</code>). Moves no money. Never paused.</dd>
 <dt>Effects</dt><dd>Advances one queue head over dead seqs; stops at the first live one.</dd>
 <dt>Errors</dt><dd><code>InvalidParameter</code>, <code>QueueOrderViolation</code>, <code>UnsupportedVersion</code>.</dd>
 <dt>Event</dt><dd><code>QueueHeadsAdvanced { redeem_head, deposit_head }</code>.</dd></dl></div>
@@ -702,7 +714,6 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <div class="tbl-wrap"><table class="tbl">
 <thead><tr><th>Instruction</th><th>Signer</th><th>Planned design</th></tr></thead>
 <tbody>
-<tr><td><code>approve_claim(notice_ref_hash, amount)</code></td><td>Admin</td><td>Records <code>approved_amount</code> on a <code>FILED</code> filing, binding the exact amount <code>pay_claim</code> then pays. The admin approves the amount leaving the reserve, not the claim's validity. If the payment would not fit in the 31-day window, the same proposal raises <code>max_claim_per_period</code>, and a later <code>set_config</code> lowers it back. Not pause-gated.</td></tr>
 <tr><td><code>amend_claim(notice_ref_hash, new_amount)</code></td><td>Operator</td><td><code>FILED</code> only. Lower releases the difference; higher books more within the leg's unprovisioned cover; 0 sets <code>WITHDRAWN</code> and releases the whole provision. Any amendment resets <code>approved_amount</code>.</td></tr>
 <tr><td><code>refile_claim(leg, amount, notice_ref_hash)</code></td><td>Operator</td><td><code>WITHDRAWN</code> only. Returns the filing to <code>FILED</code> with a fresh provision; an old approval is never reused.</td></tr>
 <tr><td><code>reinstate_guarantee(id)</code></td><td>Operator</td><td><code>CLOSED</code> and <code>now − closed_at ≤ max_reinstate_age</code> (30 days planned). No coverage gate, no cap check; runs under pause. Restores the remaining cover.</td></tr>
@@ -760,7 +771,7 @@ underwater            = shares_outstanding &gt; 0 and net_assets × 10^9 &lt; sh
 <tbody>
 <tr><td><code>register_guarantee</code></td><td>Mode normal, <code>stable_assets ≥ coverage_required</code> before, and <code>coverage_required</code> with the new cover <code>≤ stable_assets</code>. A frozen reserve counts as 0 BRS.</td></tr>
 <tr><td><code>fulfil_redeems</code></td><td>Mode normal, <code>stable_assets ≥ coverage_required</code> at batch start, not underwater, and each fill <code>≤ min(max_assets − paid, free_capital, liquid_budget)</code>, recomputed before every fill.</td></tr>
-<tr><td>Every other instruction</td><td>Not gated: <code>file_claim</code>, <code>pay_claim</code>, <code>settle_payout</code>, <code>contribute_fees</code>, <code>sweep_income</code>, <code>close_guarantee</code>, cancels and claims, the cranks. The later claim instructions and <code>reinstate_guarantee</code> are not gated either.</td></tr>
+<tr><td>Every other instruction</td><td>Not gated: <code>file_claim</code>, <code>pay_claim</code>, <code>settle_payout</code>, <code>approve_claim</code>, <code>contribute_fees</code>, <code>sweep_income</code>, <code>close_guarantee</code>, cancels and claims, the cranks. The later claim instructions and <code>reinstate_guarantee</code> are not gated either.</td></tr>
 </tbody></table></div>
 <p><code>fulfil_deposits</code> is not coverage-gated, because it brings capital in. It is refused while the reserve is underwater (<code>ReserveUnderwater</code>), so new money never buys the holders' losses at a near-zero price, and by <code>stable_assets + Σ assets ≤ max_tvl</code>.</p>
 
@@ -823,7 +834,7 @@ window:       day    = max(floor(now / 86,400), claim_day_anchor)
 <tbody>
 <tr><td><code>max_tvl</code></td><td><code>fulfil_deposits</code></td><td><code>stable_assets + Σ assets ≤ max_tvl</code></td></tr>
 <tr><td><code>max_cover_per_guarantee</code></td><td><code>register_guarantee</code></td><td><code>default_cover + exit_cover ≤ cap</code></td></tr>
-<tr><td><code>max_claim_per_call</code></td><td><code>pay_claim</code></td><td><code>&gt; 0</code>. Exceeded only with an exact <code>approved_amount</code>, written by the later <code>approve_claim</code></td></tr>
+<tr><td><code>max_claim_per_call</code></td><td><code>pay_claim</code></td><td><code>&gt; 0</code>. Exceeded only with an exact <code>approved_amount</code>, written by the admin's <code>approve_claim</code></td></tr>
 <tr><td><code>max_claim_per_period</code></td><td><code>pay_claim</code></td><td>Sliding 31-day window, strict, approved payments included; <code>≥ max_claim_per_call</code></td></tr>
 <tr><td><code>min_request</code>, <code>max_request</code></td><td>both requests</td><td>The redemption size rule of §5.5; a value of 0 is always refused</td></tr>
 <tr><td><code>stress_buffer</code></td><td>through <code>coverage_required</code></td><td><code>≤ max_tvl</code></td></tr>
@@ -866,7 +877,7 @@ window:       day    = max(floor(now / 86,400), claim_day_anchor)
 <li><strong>Register</strong> (operator): coverage-gated, capped per guarantee. Cover counts in <code>remaining_cover_total</code> at once.</li>
 <li><strong>Close</strong> (operator): <code>RELEASED</code> or <code>VOID</code>; requires no open claim. Releases remaining cover. The account is never closed, so the public claims history stays readable.</li>
 <li><strong>File</strong>: the operator books the provision; NAV drops at once.</li>
-<li><strong>Pay</strong>: exactly the provision, to the payments account. Never refused for coverage, mode, pause or the NAV guard. Above <code>max_claim_per_call</code> it needs the later <code>approve_claim</code>; until then MUTAV pays bank-first.</li>
+<li><strong>Pay</strong>: exactly the provision, to the payments account. Never refused for coverage, mode, pause or the NAV guard. Above <code>max_claim_per_call</code> it needs the admin's <code>approve_claim</code> of the exact provision; while the approval waits on the time lock, MUTAV may pay bank-first.</li>
 <li><strong>Settle</strong>: the operator records the Pix end-to-end hash after MUTAV pays the agency.</li>
 </ul>
 
@@ -875,7 +886,7 @@ window:       day    = max(floor(now / 86,400), claim_day_anchor)
 <li>Each request is its own PDA at a monotonically increasing <code>seq</code>. Seqs are never reused. Two requests sent at once may race on the seq; the client retries.</li>
 <li>The admin fills in strict FIFO order at the NAV of the fill, inside its <code>nav_bounds</code>. Up to 8 per call.</li>
 <li><strong>Whole fills only in v1.</strong> A head larger than the budget waits until free capital grows. The consoles show what a stuck head needs against what is available.</li>
-<li>Owners cancel or claim at any time, also under pause. The admin can cancel a pending request back to its owner. <code>advance_queue_head</code> clears dead seqs.</li>
+<li>Owners cancel or claim at any time, also under pause. The admin can park a pending request that blocks the queue (ADR 0030); the escrow stays owed to the owner, and only the owner collects it with its own cancel. There is no expiry and no sweep. <code>advance_queue_head</code> clears dead and parked seqs.</li>
 <li>Entry is allowlisted. Exit is open to any holder, with the sub-minimum exit rule of §5.5.</li>
 <li>MUTAV's capital wallet uses the same queues with no special treatment. During the pilot the reserve is not open to public investment.</li>
 </ul>
@@ -928,7 +939,7 @@ window:       day    = max(floor(now / 86,400), claim_day_anchor)
 <tr><td class="num">24</td><td>No inflow raises NAV while <code>shares_outstanding == 0</code> (<code>NoSharesOutstanding</code>).</td></tr>
 <tr><td class="num">25</td><td>No deposit or redemption fill while the reserve is underwater (<code>ReserveUnderwater</code>).</td></tr>
 <tr><td class="num">26</td><td>Every fill passes the inline NAV-move guard and falls inside the admin's <code>nav_bounds</code>. The inline refusal does not latch; <code>refresh</code> latches. The first-share batch seeds the baseline; the last-share batch clears it.</td></tr>
-<tr><td class="num">27</td><td>Strict FIFO; whole fills; a redeem head worth 0 BRS is never filled and is cancelled by the owner or the admin.</td></tr>
+<tr><td class="num">27</td><td>Strict FIFO; whole fills; a redeem head worth 0 BRS is never filled; the owner cancels it, or the admin parks it.</td></tr>
 <tr><td class="num">28</td><td>Entry is allowlisted; exit is open to holders. Below <code>min_request</code> only an exit of the balance from the canonical share account, leaving a remainder worth less than <code>min_request</code>, worth at least <code>max(1, min_request / 10)</code>.</td></tr>
 <tr><td class="num">29</td><td>NAV rises from guarantee fees only through <code>contribute_fees</code> and from issuer income only through <code>sweep_income</code> (later also <code>book_unsolicited</code>), each by exactly its net amount, with no shares minted.</td></tr>
 <tr><td class="num">30</td><td><code>inflow_nav</code> = Σ <code>ceil(net × 10^9 / shares_outstanding)</code> over inflows since the last refresh or halt clear, saturating.</td></tr>
@@ -951,7 +962,7 @@ window:       day    = max(floor(now / 86,400), claim_day_anchor)
 <thead><tr><th>Stopped by pause</th><th>Always open</th></tr></thead>
 <tbody><tr>
 <td><code>request_deposit</code>, <code>request_redeem</code>, <code>fulfil_deposits</code>, <code>fulfil_redeems</code>, <code>register_guarantee</code>.</td>
-<td>Every claim instruction (<code>file_claim</code>, <code>pay_claim</code>, <code>settle_payout</code>), <code>close_guarantee</code>, <code>contribute_fees</code>, <code>sweep_income</code>, <code>cancel_deposit</code>, <code>cancel_redeem</code>, <code>claim_shares</code>, <code>claim_assets</code>, <code>refresh</code>, <code>advance_queue_head</code>, admin configuration and role instructions, <code>revoke_operator</code>, <code>revoke_pauser</code>, <code>clear_fulfil_halt</code>.</td>
+<td>Every claim instruction (<code>file_claim</code>, <code>pay_claim</code>, <code>settle_payout</code>, <code>approve_claim</code>), <code>close_guarantee</code>, <code>contribute_fees</code>, <code>sweep_income</code>, <code>cancel_deposit</code>, <code>cancel_redeem</code>, <code>claim_shares</code>, <code>claim_assets</code>, <code>refresh</code>, <code>advance_queue_head</code>, admin configuration and role instructions, <code>revoke_operator</code>, <code>revoke_pauser</code>, <code>clear_fulfil_halt</code>.</td>
 </tr></tbody></table></div>
 <p>Pause never traps holders' money and never blocks a claim. The pauser and guardians pause with no time lock; the admin through its time lock. Only the admin unpauses.</p>
 
@@ -995,7 +1006,9 @@ window:       day    = max(floor(now / 86,400), claim_day_anchor)
 <tr><td><code>ClaimFiled</code></td><td><code>guarantee_id, leg, amount, notice_ref_hash, provisions_after, coverage_required_after</code></td></tr>
 <tr><td><code>ClaimPaid</code></td><td><code>guarantee_id, leg, amount, notice_ref_hash, payments_account, provisions_after, coverage_required_after, window_paid, brs_balance_after, claims_paid_total</code></td></tr>
 <tr><td><code>PayoutSettled</code></td><td><code>guarantee_id, notice_ref_hash, pix_e2e_hash</code></td></tr>
+<tr><td><code>ClaimApproved</code></td><td><code>guarantee_id, leg, notice_ref_hash, amount, revision, previous_amount, max_claim_per_call</code></td></tr>
 <tr><td><code>DepositRequested</code> · <code>DepositCancelled</code> · <code>SharesClaimed</code></td><td><code>owner, seq, assets, min_shares_out</code> · <code>owner, seq, assets, by</code> · <code>owner, seq, shares</code></td></tr>
+<tr><td><code>DepositParked</code> · <code>RedeemParked</code></td><td><code>owner, seq, assets, by</code> · <code>owner, seq, shares, by</code> (the admin's cancel; ADR 0030)</td></tr>
 <tr><td><code>DepositFilled</code></td><td><code>owner, seq, assets, shares, nav, shares_outstanding_after, net_assets_after</code></td></tr>
 <tr><td><code>DepositsFulfilled</code></td><td><code>from_seq, to_seq, assets, shares, nav, deposited_assets_total, minted_shares_total</code></td></tr>
 <tr><td><code>RedeemRequested</code></td><td><code>owner, seq, shares, min_assets_out</code></td></tr>
@@ -1009,7 +1022,7 @@ window:       day    = max(floor(now / 86,400), claim_day_anchor)
 <tr><td><code>ReserveFrozenDetected</code></td><td><code>token_account</code></td></tr>
 <tr><td><code>FulfilHaltCleared</code></td><td><code>nav_per_share</code></td></tr>
 </tbody></table></div>
-<p>Events of the later upgrades (claim approval, amendment and withdrawal, reinstatement, unsolicited money, the claim-notice gate, adapters) are appended when those features are built.</p>
+<p>Events of the later upgrades (claim amendment and withdrawal, reinstatement, unsolicited money, the claim-notice gate, adapters) are appended when those features are built.</p>
 
 <h3 id="errors">10.2 Errors<a class="anchor" href="#errors">#</a></h3>
 <p>Anchor custom errors, numbered from 6000 in the enum order of <code>errors.rs</code>. The list is append-only from the first devnet deploy. Dead errors (adapter, price and claim-notice errors v1 never raises) and the per-agency cap error were removed before the freeze; they return, appended, with the features that raise them.</p>
@@ -1052,7 +1065,7 @@ window:       day    = max(floor(now / 86,400), claim_day_anchor)
 <tr><td class="num">6033</td><td><code>InvalidTokenProgram</code></td><td>Not the reserve's token program.</td></tr>
 <tr><td class="num">6034</td><td><code>ClaimNotPaid</code></td><td><code>settle_payout</code> on a filing that is not <code>PAID</code>.</td></tr>
 <tr><td class="num">6035</td><td><code>DuplicateParam</code></td><td><code>set_config</code> received the same field twice.</td></tr>
-<tr><td class="num">6036</td><td><code>ExpectedAmountMismatch</code></td><td><code>expected_amount</code> is not the filing's provision.</td></tr>
+<tr><td class="num">6036</td><td><code>ExpectedAmountMismatch</code></td><td><code>pay_claim</code>'s <code>expected_amount</code>, or <code>approve_claim</code>'s <code>amount</code>, is not the filing's provision.</td></tr>
 <tr><td class="num">6037</td><td><code>NavOutOfBounds</code></td><td>The NAV is outside the proposal's <code>nav_bounds</code>.</td></tr>
 <tr><td class="num">6038</td><td><code>NoPendingHandover</code></td><td>No handover is pending for this role.</td></tr>
 <tr><td class="num">6039</td><td><code>HandoverExpired</code></td><td>The pending handover is past its 72-hour window.</td></tr>
@@ -1062,6 +1075,7 @@ window:       day    = max(floor(now / 86,400), claim_day_anchor)
 <tr><td class="num">6043</td><td><code>PriceLimitNotMet</code></td><td>The head's <code>min_shares_out</code> or <code>min_assets_out</code> is not met.</td></tr>
 <tr><td class="num">6044</td><td><code>ReserveUnderwater</code></td><td>A fill while the reserve is underwater.</td></tr>
 <tr><td class="num">6045</td><td><code>NoSharesOutstanding</code></td><td><code>contribute_fees</code> or <code>sweep_income</code> while no shares exist.</td></tr>
+<tr><td class="num">6046</td><td><code>ClaimRevisionMismatch</code></td><td><code>approve_claim</code>'s <code>expected_revision</code> is not the filing's revision: the filing changed since the approval was proposed.</td></tr>
 </tbody></table></div>
 </section>
 

@@ -60,8 +60,8 @@ Untracked balances never count toward stable assets, NAV or coverage. `reserve` 
 | `Guarantee` | `["guarantee", config, id]` | `register_guarantee` | Never | One per lease. Covers, paid and provisioned amounts per leg, status and close reason. A second registration of the same `id` fails at creation |
 | `ClaimFiling` | `["claim", guarantee, notice_ref_hash]` | `file_claim` | Never | One claim: its leg, provision, approval, payment and settlement, and status. Makes payment idempotent per notice. Withdrawal and re-filing under the same notice (`refile_claim`) are future work |
 | `IncomeReceipt` | `["fee", config, invoice_ref_hash]` for kind `FEE`; `["income", config, ref_hash]` for the other kinds | `contribute_fees` (`FEE`), `sweep_income` (`ISSUER_STATEMENT`). `UNSOLICITED` and `BACKSTOP` are reserved for the later `book_unsolicited` | Never | Each booked inflow counts once. The separate `fee` prefix keeps an invoice reference and a statement reference from ever colliding |
-| `DepositRequest` | `["deposit", config, seq]`, `seq` as `u64` little-endian | `request_deposit` | On claim or cancel (by the owner or the admin); rent to the owner | One FIFO deposit request |
-| `RedeemRequest` | `["redeem", config, seq]`, `seq` as `u64` little-endian | `request_redeem` | On claim or cancel (by the owner or the admin); rent to the owner | One FIFO redeem request. A head worth 0 BRS at fill time is never filled ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)) |
+| `DepositRequest` | `["deposit", config, seq]`, `seq` as `u64` little-endian | `request_deposit` | On claim or the owner's cancel; rent to the owner. The admin's cancel parks it as `CANCELLED` and does not close it ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)) | One FIFO deposit request |
+| `RedeemRequest` | `["redeem", config, seq]`, `seq` as `u64` little-endian | `request_redeem` | On claim or the owner's cancel; rent to the owner. The admin's cancel parks it as `CANCELLED` and does not close it | One FIFO redeem request. A head worth 0 BRS at fill time is never filled ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)) |
 
 **Removed before the freeze** ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md), [ADR 0019](../decisions/0019-v1-layout-for-the-devnet-release.md)):
 
@@ -107,7 +107,7 @@ Every carved field reads zero as the safe default on an account written before t
 | `Caps` | `max_reinstate_age` | `i64` | How long after a close the future `reinstate_guarantee` is allowed. Read by no instruction of this binary; 0 on devnet | No reinstatement |
 | `Caps` | `max_queue_wait_secs` | `i64` | Wait after which the future exit fallback may fill the head redemption | Off. Shipped at 0 |
 | `VaultState` | `claim_day_buckets`, `claim_day_anchor` | `[u64; 31]`, `i64` | Payment totals per day for the last 31 days, and the day of the last write | No payments in the window |
-| `ClaimFiling` | `approved_amount` | `u64` | Amount the admin approves with `approve_claim` (Wave 2). Written zero in this release | No approval; the per-call cap applies |
+| `ClaimFiling` | `approved_amount` | `u64` | Amount the admin approves with `approve_claim`, always the filing's provision. Zero until approved | No approval; the per-call cap applies |
 | `ClaimFiling` | `payments_account`, `paid_at`, `paid_amount`, `pix_e2e_hash`, `settled_at` | | Payment and settlement record, formerly on `Payout` | Not paid, not settled |
 | `IncomeReceipt` | `kind` | `u8` | `ISSUER_STATEMENT` (0), `FEE` (1), `UNSOLICITED` (2, reserved), `BACKSTOP` (3, reserved) | An issuer statement |
 
@@ -148,7 +148,7 @@ Fields **removed** before the freeze: `VaultConfig.payout_sla_secs`, `VaultState
 
 ### `ClaimFiling`
 
-`guarantee`, `leg` (`DEFAULT` 1 for rent arrears, `EXIT` 2 for end-of-occupation debts; 0 is invalid), `notice_ref_hash`, `provision`, `filed_at`, `status` (`FILED` 0, `PAID` 1, `WITHDRAWN` 2 reserved and refused by this binary, `SETTLED` 3), `approved_amount` (zero until Wave 2), `payments_account` at payment time, `paid_at`, `paid_amount`, `pix_e2e_hash`, `settled_at`.
+`guarantee`, `leg` (`DEFAULT` 1 for rent arrears, `EXIT` 2 for end-of-occupation debts; 0 is invalid), `notice_ref_hash`, `provision`, `filed_at`, `status` (`FILED` 0, `PAID` 1, `WITHDRAWN` 2 reserved and refused by this binary, `SETTLED` 3), `approved_amount` (zero until the admin's `approve_claim`), `revision`, `payments_account` at payment time, `paid_at`, `paid_amount`, `pix_e2e_hash`, `settled_at`.
 
 ### Requests
 
@@ -186,3 +186,4 @@ Fields **removed** before the freeze: `VaultConfig.payout_sla_secs`, `VaultState
 - [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
 - [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)
+- [ADR 0030: The admin's cancel parks the request](../decisions/0030-admin-cancel-parks-the-request.md)

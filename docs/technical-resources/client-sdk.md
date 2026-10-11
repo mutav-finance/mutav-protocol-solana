@@ -67,7 +67,7 @@ The record PDAs (`Guarantee`, `ClaimFiling`, `IncomeReceipt` under its `"income"
 |---|---|
 | `fetchReserve(rpc, reserveMint)` | `{ addresses, config, state, coverage }`. Config and state are read in one `getMultipleAccounts` call, so they come from the same slot. `coverage` is the program's spec §4 snapshot (stable assets, required coverage, surplus, free capital, liquid budget, net assets, mode) computed client-side. |
 | `fetchGuaranteesForReserve(rpc, config)` | Every `Guarantee` of the reserve. Each account is kept only if it is the PDA of `(config, id)`. |
-| `fetchClaimFilingsForGuarantee(rpc, guarantee)` | Every `ClaimFiling` of a guarantee, with its status (`FILED`, `PAID`, `SETTLED`; `WITHDRAWN` is reserved for a later upgrade), payment and settlement fields. `approved_amount` stays 0 until `approve_claim` ships. |
+| `fetchClaimFilingsForGuarantee(rpc, guarantee)` | Every `ClaimFiling` of a guarantee, with its status (`FILED`, `PAID`, `SETTLED`; `WITHDRAWN` is reserved for a later upgrade), payment and settlement fields. `approved_amount` (0 until the admin's `approve_claim`) and `revision`. |
 | `getDepositQueuePosition(rpc, config, seq)`, `getRedeemQueuePosition(rpc, config, seq)` | A request's place in its FIFO queue. |
 | `fetchIncomeInbox(rpc, { vaultAuthority, config })` | The income inbox address, whether it exists, and its balance. Untracked: it never counts toward NAV. |
 | `fetchIncomeReceiptsForReserve(rpc, config)` | One receipt per booked inflow, with its `kind`: issuer statement (0) or guarantee fee (1). Kinds 2 (unsolicited) and 3 (backstop) are reserved for a later upgrade. |
@@ -157,7 +157,8 @@ Admin instructions are signed by the admin multisig's vault, so they are wrapped
 - `set_config`: pass only the `ConfigParam` values being changed, at least 1, at most 16 and no duplicates (`configParamsDiff` builds the list). The program validates the whole resulting config. A change of `coverage_ratio_bps`, `max_nav_move_bps` or `stress_buffer` needs a `refresh` in the same slot (`RefreshRequired`); `configParamsNeedRefresh` tells the console to put `refresh` first in the same transaction. The admin console lists the edited fields in the proposal memo.
 - `set_payments_account`, `set_treasury_account`, `set_allowlist_root`, the role handover (`propose_role`, `propose_admin`, `cancel_pending`, `revoke_pauser`) and `set_guardians` are separate instructions, never part of `set_config`.
 - `fulfil_deposits`, `fulfil_redeems` and `clear_fulfil_halt`: compose `nav_bounds` from the NAV the signers see when the proposal is created (`navBoundsAround(nav, toleranceBps)`).
-- Planned for a later upgrade, not in this binary: `approve_claim` (bundled with a `set_config` raise of `max_claim_per_period` when the payment would not fit in the 31-day window) and `return_unsolicited` (with its `Source` and the original transfer's signature in `ref_hash`).
+- `approve_claim(notice_ref_hash, amount, expected_revision)`: `amount` is the filing's provision and `expected_revision` its current `revision`, read when the proposal is created. Bundle a `set_config` raise of `max_claim_per_period` when the payment would not fit in the 31-day window.
+- Planned for a later upgrade, not in this binary: `return_unsolicited` (with its `Source` and the original transfer's signature in `ref_hash`).
 
 ### Allowlist proofs
 

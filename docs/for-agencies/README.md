@@ -44,7 +44,7 @@ flowchart LR
   R -- "claim payment (BRS)" --> PA[(MUTAV payments account)]
   PA -- "Pix (BRL)" --> A
   A -- "under the landlord's mandate" --> L[Landlord]
-  AD[Reserve admin] -. "caps (approvals above the per-call cap: planned)" .-> P
+  AD[Reserve admin] -. "caps, approvals above the per-call cap" .-> P
 ```
 
 ## What the program promises an agency

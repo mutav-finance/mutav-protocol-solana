@@ -39,6 +39,11 @@ console.log(r.coverage.freeCapital, r.state.data.navPerShare);
 const [fill] = previewDepositFulfil(r.config.data, r.state.data, [1_000_000_000n]);
 ```
 
+## Compatibility notes
+
+- **Generated enums are renumbered by new names.** Codama orders `MutavEvent`, `MutavInstruction` and `MutavAccount` alphabetically, so a newly appended event or instruction is inserted in the middle and every later member's numeric value shifts. #53 inserted `ApproveClaim` into `MutavInstruction`; #54 inserted `DepositParked` and `RedeemParked` into `MutavEvent`. On-chain discriminators never change. Compare these enums by member name, never by number; anyone who persisted the numbers (a database, an indexer cursor) must remap them.
+- **Request statuses** (ADR 0030): `DEPOSIT_CANCELLED` / `REDEEM_CANCELLED` (`2`) mark a request the admin parked. Only `isQueued` requests wait in the queue; `isParked` ones are collected by their owner with `cancel_deposit` / `cancel_redeem`.
+
 ## Publishing (not automated; needs approval)
 
 The package is publish-ready: `bun run build` writes `dist/` (an ESM bundle with `@solana/kit` external, plus `.d.ts`), and `prepack` runs it.
