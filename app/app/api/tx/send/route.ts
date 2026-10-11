@@ -1,4 +1,4 @@
-import { rpcFor } from "@/lib/server/chain";
+import { assertClusterGenesis, rpcFor } from "@/lib/server/chain";
 import { serverEnv } from "@/lib/server/env";
 import { assertRelayable, boundedBody, RelayRefusedError } from "@/lib/server/relay";
 import { errorResponse } from "@/lib/server/respond";
@@ -13,6 +13,7 @@ export async function POST(req: Request) {
   try {
     const env = serverEnv();
     if (env.cluster !== "localnet") throw new RelayRefusedError("the relay is localnet-only: on devnet the wallet sends the transaction itself");
+    await assertClusterGenesis(env);
     const { tx } = decode<{ tx: string }>(await boundedBody(req));
     if (typeof tx !== "string") throw new RelayRefusedError("body must be { tx: base64 }");
     assertRelayable(tx, { mutav: env.programId, squadsProgram: SQUADS_PROGRAM, squadsMultisig: env.squadsMultisig });

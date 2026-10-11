@@ -1,6 +1,5 @@
 import { address } from "@solana/kit";
-import { readReserve } from "@/lib/server/chain";
-import { serverEnv } from "@/lib/server/env";
+import { guardedEnv, readReserve } from "@/lib/server/chain";
 import { errorResponse } from "@/lib/server/respond";
 import { composeProposalApprove, composeProposalExecute, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
@@ -8,7 +7,7 @@ import { decode, jsonResponse } from "@/lib/serde";
 /** The admin multisig and its recent proposals, or why there is none. */
 export async function GET() {
   try {
-    const env = serverEnv();
+    const env = await guardedEnv();
     const reserve = await readReserve(env);
     if (!env.squadsMultisig) {
       return jsonResponse({ configured: false, admin: reserve.config.admin, cluster: env.cluster });
@@ -25,7 +24,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = decode<{ action: "approve" | "execute"; index: bigint; member: string }>(await req.text());
-    const env = serverEnv();
+    const env = await guardedEnv();
     const member = address(body.member);
     const tx =
       body.action === "approve"

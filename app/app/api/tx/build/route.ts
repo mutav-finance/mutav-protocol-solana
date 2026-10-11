@@ -1,7 +1,6 @@
 import { address } from "@solana/kit";
-import { readLedger, readReserve, rpcFor } from "@/lib/server/chain";
+import { guardedEnv, readLedger, readReserve, rpcFor } from "@/lib/server/chain";
 import { ComposeError, composeInstructions, describeInstructions, isAdminKind, refuseOverlappingSetConfig, unsignedTransaction } from "@/lib/server/compose";
-import { serverEnv } from "@/lib/server/env";
 import { errorResponse } from "@/lib/server/respond";
 import { composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
@@ -22,7 +21,7 @@ export type BuildBody = {
 export async function POST(req: Request) {
   try {
     const body = decode<BuildBody>(await req.text());
-    const env = serverEnv();
+    const env = await guardedEnv();
     const signer = address(body.signer);
     const reserve = await readReserve(env);
     const ledger = body.request.kind === "refresh" ? await readLedger(env, reserve) : undefined;
