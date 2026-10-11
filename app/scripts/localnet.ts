@@ -1,7 +1,7 @@
 /**
  * A seeded local validator for the demo and the Playwright smoke test.
  *
- *   bun scripts/localnet.ts up   [--port 8899] [--keys-dir DIR] [--admin-keypair PATH] [--operator PUBKEY]
+ *   bun scripts/localnet.ts up   [--port 8899] [--keys-dir DIR] [--admin-keypair PATH] [--operator PUBKEY] [--seed default|demo]
  *   bun scripts/localnet.ts scenario under-covered|normal
  *   bun scripts/localnet.ts down
  *
@@ -17,6 +17,7 @@
  * exits during startup, and on a failed seed keeps `validator.log` in the
  * temp dir and prints its tail before stopping the validator. The seed's
  * transactions are re-sent until they land (scripts/devnet/lib/local.ts).
+ * `--seed demo` seeds the demo-video starting state instead (scripts/seed-demo.ts).
  */
 import { spawn } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -127,7 +128,8 @@ async function up() {
   try {
     await Promise.race([waitForRpc(url), died]);
     if (!alive(pid)) throw new Error("solana-test-validator exited during startup");
-    const r = await seed({ url, keysDir, adminKeypair: a["admin-keypair"], operator: a.operator });
+    const seedFn = a.seed === "demo" ? (await import("./seed-demo")).seedDemo : seed;
+    const r = await seedFn({ url, keysDir, adminKeypair: a["admin-keypair"], operator: a.operator });
     const state: State = { ...partial, config: r.config, operator: r.operator, allowlist: r.allowlist };
     writeFileSync(STATE, JSON.stringify(state, null, 2));
     writeFileSync(

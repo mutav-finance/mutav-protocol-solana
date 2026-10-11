@@ -50,6 +50,7 @@ package-lock.json
 # local cluster state written by scripts/localnet.ts (addresses only, no keys)
 /.localnet/
 /.localnet-e2e/
+/.localnet-demo/
 # never commit keypairs
 *-keypair.json
 keys/
