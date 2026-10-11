@@ -57,7 +57,7 @@ function base(): Idl {
   };
 }
 
-const typeOf = (idl: Idl, name: string) => idl.types.find((t) => t.name === name)!.type.fields!;
+const typeOf = (idl: Idl, name: string) => idl.types.find((t) => t.name === name)!.type.fields as { name: string; type: any }[];
 
 describe('compareIdl', () => {
   test('an identical IDL is compatible', () => {

@@ -65,7 +65,7 @@ async function setup(
     sleep: async (ms) => {
       sleeps.push(ms);
     },
-    readFile: (p) => {
+    readSo: (p) => {
       if (p !== '/outside/mutav.so') throw new Error(`unexpected read of ${p}`);
       return SO;
     },

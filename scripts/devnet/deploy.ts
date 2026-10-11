@@ -54,11 +54,11 @@ export type DeployDeps = {
   genesis: GenesisSource;
   account: (url: string, a: Address, o?: ReadOptions) => Promise<{ owner: Address; data: Uint8Array } | null>;
   sleep: (ms: number) => Promise<void>;
-  readFile: (path: string) => Uint8Array;
+  readSo: (path: string) => Uint8Array;
 };
 
 const defaultDeps: DeployDeps = {
-  readFile: (p) => readFileSync(p),
+  readSo: (p) => readFileSync(p),
   run,
   genesis: rpcGenesis,
   account: (url, a, o) => accountInfo(rpcFor(url), a, o),
@@ -128,7 +128,7 @@ export async function deploy(o: DeployOptions, deps: DeployDeps = defaultDeps): 
   if (o.expectedHash === undefined && !o.localStandIn) throw new Error('--expected-hash is required: deploy only the verified build');
   if (o.expectedHash !== undefined) {
     const want = parseExpectedHash(o.expectedHash);
-    const got = executableHash(deps.readFile(so));
+    const got = executableHash(deps.readSo(so));
     if (got !== want) throw new Error(`refusing to deploy ${so}: its executable hash is ${got}, expected ${want} (solana-verify get-executable-hash)`);
   }
 
