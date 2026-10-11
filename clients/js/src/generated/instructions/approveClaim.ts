@@ -14,6 +14,8 @@ import {
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU16Decoder,
+  getU16Encoder,
   getU64Decoder,
   getU64Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
@@ -96,11 +98,13 @@ export type ApproveClaimInstructionData = {
   discriminator: ReadonlyUint8Array;
   noticeRefHash: ReadonlyUint8Array;
   amount: bigint;
+  expectedRevision: number;
 };
 
 export type ApproveClaimInstructionDataArgs = {
   noticeRefHash: ReadonlyUint8Array;
   amount: number | bigint;
+  expectedRevision: number;
 };
 
 export function getApproveClaimInstructionDataEncoder(): FixedSizeEncoder<ApproveClaimInstructionDataArgs> {
@@ -109,6 +113,7 @@ export function getApproveClaimInstructionDataEncoder(): FixedSizeEncoder<Approv
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["noticeRefHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["amount", getU64Encoder()],
+      ["expectedRevision", getU16Encoder()],
     ]),
     (value) => ({ ...value, discriminator: APPROVE_CLAIM_DISCRIMINATOR }),
   );
@@ -119,6 +124,7 @@ export function getApproveClaimInstructionDataDecoder(): FixedSizeDecoder<Approv
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["noticeRefHash", fixDecoderSize(getBytesDecoder(), 32)],
     ["amount", getU64Decoder()],
+    ["expectedRevision", getU16Decoder()],
   ]);
 }
 
@@ -154,6 +160,7 @@ export type ApproveClaimAsyncInput<
   program: TAccountProgram;
   noticeRefHash: ApproveClaimInstructionDataArgs["noticeRefHash"];
   amount: ApproveClaimInstructionDataArgs["amount"];
+  expectedRevision: ApproveClaimInstructionDataArgs["expectedRevision"];
 };
 
 export async function getApproveClaimInstructionAsync<
@@ -323,6 +330,7 @@ export type ApproveClaimInput<
   program: TAccountProgram;
   noticeRefHash: ApproveClaimInstructionDataArgs["noticeRefHash"];
   amount: ApproveClaimInstructionDataArgs["amount"];
+  expectedRevision: ApproveClaimInstructionDataArgs["expectedRevision"];
 };
 
 export function getApproveClaimInstruction<

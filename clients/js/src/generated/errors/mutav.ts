@@ -106,12 +106,15 @@ export const MUTAV_ERROR__PRICE_LIMIT_NOT_MET = 0x179b; // 6043
 export const MUTAV_ERROR__RESERVE_UNDERWATER = 0x179c; // 6044
 /** NoSharesOutstanding: No shares are outstanding */
 export const MUTAV_ERROR__NO_SHARES_OUTSTANDING = 0x179d; // 6045
+/** ClaimRevisionMismatch: The claim filing changed since the approval was proposed */
+export const MUTAV_ERROR__CLAIM_REVISION_MISMATCH = 0x179e; // 6046
 
 export type MutavError =
   | typeof MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED
   | typeof MUTAV_ERROR__CLAIM_NOT_FILED
   | typeof MUTAV_ERROR__CLAIM_NOT_PAID
   | typeof MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__CLAIM_REVISION_MISMATCH
   | typeof MUTAV_ERROR__DUPLICATE_PARAM
   | typeof MUTAV_ERROR__EXCEEDS_REMAINING_COVER
   | typeof MUTAV_ERROR__EXPECTED_AMOUNT_MISMATCH
@@ -162,6 +165,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [MUTAV_ERROR__CLAIM_NOT_FILED]: `Claim has not been filed`,
     [MUTAV_ERROR__CLAIM_NOT_PAID]: `Claim has not been paid`,
     [MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED]: `Per-period claim payment cap exceeded`,
+    [MUTAV_ERROR__CLAIM_REVISION_MISMATCH]: `The claim filing changed since the approval was proposed`,
     [MUTAV_ERROR__DUPLICATE_PARAM]: `A config parameter appears more than once`,
     [MUTAV_ERROR__EXCEEDS_REMAINING_COVER]: `Amount exceeds the remaining cover`,
     [MUTAV_ERROR__EXPECTED_AMOUNT_MISMATCH]: `Expected amount does not match the claim's provision`,

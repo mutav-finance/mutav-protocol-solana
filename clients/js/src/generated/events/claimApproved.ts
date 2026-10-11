@@ -23,6 +23,8 @@ import {
   getI64Encoder,
   getStructDecoder,
   getStructEncoder,
+  getU16Decoder,
+  getU16Encoder,
   getU64Decoder,
   getU64Encoder,
   getU8Decoder,
@@ -50,6 +52,8 @@ export type ClaimApprovedEvent = {
   leg: number;
   noticeRefHash: ReadonlyUint8Array;
   amount: bigint;
+  /** `ClaimFiling.revision` the approval is bound to. */
+  revision: number;
   previousAmount: bigint;
   maxClaimPerCall: bigint;
 };
@@ -61,6 +65,8 @@ export type ClaimApprovedEventArgs = {
   leg: number;
   noticeRefHash: ReadonlyUint8Array;
   amount: number | bigint;
+  /** `ClaimFiling.revision` the approval is bound to. */
+  revision: number;
   previousAmount: number | bigint;
   maxClaimPerCall: number | bigint;
 };
@@ -75,6 +81,7 @@ export function getClaimApprovedEventEncoder(): FixedSizeEncoder<ClaimApprovedEv
       ["leg", getU8Encoder()],
       ["noticeRefHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["amount", getU64Encoder()],
+      ["revision", getU16Encoder()],
       ["previousAmount", getU64Encoder()],
       ["maxClaimPerCall", getU64Encoder()],
     ]),
@@ -92,6 +99,7 @@ export function getClaimApprovedEventDecoder(): FixedSizeDecoder<ClaimApprovedEv
       ["leg", getU8Decoder()],
       ["noticeRefHash", fixDecoderSize(getBytesDecoder(), 32)],
       ["amount", getU64Decoder()],
+      ["revision", getU16Decoder()],
       ["previousAmount", getU64Decoder()],
       ["maxClaimPerCall", getU64Decoder()],
     ]),
