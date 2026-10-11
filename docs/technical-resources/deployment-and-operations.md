@@ -19,9 +19,9 @@ The scripts compose instructions and never open a key file, with one exception: 
 | Program keypair | Outside the repo, for example `~/.config/solana/mutav/` | Holds the declared program ID. Only used by the CLI at deploy. |
 | Deployer (payer) | Outside the repo, mode `600` | Temporary upgrade authority during the first deploy. `deploy.ts` refuses a file readable by group or other. |
 | Admin multisig members | Their own wallets | Devnet: two wallets standing in for the founders. Hardware wallets before real money. |
-| Operator | Generated at deploy into `~/.config/solana/mutav/operator-devnet.json` (mode `600`) | Imported into a browser wallet for the operator console. Later a KMS-backed key in the MUTAV platform. |
+| Operator | A devnet test key generated before the deploy and kept outside the repo, for example under `~/.config/solana/mutav/` (mode `600`) | Imported into a browser wallet for the operator console. Later a KMS-backed key in the MUTAV platform. |
 | Pauser | Generated at deploy, separate key | |
-| Guardian | A separate key held by a founder | Devnet starts with 1. |
+| Guardian | A separate key held by a founder | Devnet starts with 1, set after `initialize` with a `set_guardians` proposal. |
 
 Keypair files are gitignored and refused if found in the repo. The client, the scripts and the app contain no signing code; a CI check enforces it.
 
@@ -34,8 +34,8 @@ Copy [`scripts/devnet/devnet.example.json`](../../scripts/devnet/devnet.example.
 | Cluster and program | `cluster: "devnet"`, `programId`, `reserveMint`, `reserveTokenProgram` |
 | `squads` | Admin multisig: address, vault index, exact members, threshold 2, time-lock floor 300 s |
 | `upgradeSquads` | Upgrade multisig: same members, threshold 2, time-lock floor 3,600 s |
-| Roles and accounts | `admin` and `upgradeAuthority` (the two vaults), `operator`, `pauser`, guardians, `mutavCapitalWallet`, `treasuryAccount`, `paymentsAccount` |
-| Parameters | `coverageRatioBps` 1,000, `feeTakeBps` 2,000, `caps` (including `maxNavMoveBps` 10,000, the stress buffer R$19k, `max_reinstate_age` 30 days and `max_queue_wait_secs` 0). There is no price section and no dust threshold: the R$10 dust threshold is a runbook value. |
+| Roles and accounts | `admin` and `upgradeAuthority` (the two vaults), `operator`, `pauser`, `mutavCapitalWallet`, `treasuryAccount`, `paymentsAccount`. Guardians are not in the config: the admin sets them with `set_guardians` after `initialize`. |
+| Parameters | `coverageRatioBps` 2,500, `feeTakeBps` 2,000, `caps` per [ADR 0028](../decisions/0028-pilot-parameters.md): `maxTvl` R$1M, `maxCoverPerGuarantee` R$120k, `maxClaimPerCall` R$15k, `maxClaimPerPeriod` R$20k, `minRequest` R$1k, `maxRequest` R$100k, `maxNavMoveBps` 10,000, `stressBuffer` R$19k. `maxQueueWaitSecs` and `maxReinstateAge` are optional and default to 0. There is no price section and no dust threshold: the R$10 dust threshold is a runbook value. |
 | `allowlist` | The capital wallet and any devnet capital-provider wallets |
 
 Values without `<FILL>` are the locked devnet values. `verify.ts` checks them on-chain. See [Configuration and reference](configuration-and-reference.md#devnet-parameters).
@@ -56,7 +56,7 @@ sequenceDiagram
   Dev->>Up: init.ts: initialize proposal
   Up->>Chain: execute after 1 h time lock
   Dev->>Ad: allowlist.ts: set_allowlist_root proposal
-  Dev->>Ad: roles and caps proposals, if needed
+  Dev->>Ad: roles, caps and set_guardians proposals
   Ad->>Chain: execute after 5 min time lock
   Keys->>Chain: accept_role, if roles were proposed
   Dev->>Chain: verify.ts: read-only checks
@@ -68,7 +68,7 @@ sequenceDiagram
 | 1. Deploy | `bun scripts/devnet/deploy.ts --config <cfg> --url <rpc> --confirm-cluster devnet --payer <path> --upgrade-authority <upgrade vault>` | Runs the guards below, then `solana program deploy` with the deployer as temporary upgrade authority, then `set-upgrade-authority` to the upgrade vault. If the handover fails, it prints the exact retry command and exits non-zero. It re-reads ProgramData to confirm. Build with `solana-verify build` first so the hash is reproducible. |
 | 2. Initialize | `bun scripts/devnet/init.ts --config <cfg> --url <rpc> --confirm-cluster devnet --out init.json` | Writes `initialize` as an unsigned proposal for the upgrade multisig, whose vault signs and pays rent. Send the vault about 0.1 SOL first. Reads the chain first: the reserve mint must be owned by the configured token program and have 6 decimals. |
 | 3. Allowlist | `bun scripts/devnet/allowlist.ts --config <cfg> --proofs proofs.json --out allowlist.json` | Builds the Merkle tree, writes every owner's proof for the app to serve, and the `set_allowlist_root` proposal. |
-| 4. Roles and caps | `roles.ts`, `caps.ts` | Optional. Role changes are two-step: the admin proposes, the new key accepts before the handover expires. `set_config` proposals are sparse: they carry only the fields they change, and the proposal memo lists them. |
+| 4. Roles and caps | `roles.ts`, `caps.ts` | Optional. Role changes are two-step: the admin proposes (`propose_role`, with `cancel_pending` first when another handover is pending), the new key accepts with `accept_role` within 72 hours. `set_config` proposals are sparse: they carry only the fields they change, put `refresh` first when `c`, the NAV-move bound or the stress buffer changes, and the proposal memo lists them. Guardians are set with a separate `set_guardians` proposal. |
 | 5. Verify | `bun scripts/devnet/verify.ts --config <cfg> --url <rpc> --confirm-cluster devnet` | Read-only post-deploy checks, below. |
 
 Members create, approve and execute each proposal from the admin console or the Squads app. The time lock counts from approval.
@@ -88,9 +88,10 @@ Members create, approve and execute each proposal from the admin console or the 
 
 - Upgrade authority equals the configured upgrade vault.
 - `feature_flags == 0`.
-- Admin, operator, pauser, guardians and the allowlist root are as configured, and no handover is pending.
-- Every other `VaultConfig` field equals the config file: `c`, fee take, every cap, `max_nav_move_bps`, the stress buffer, `max_reinstate_age` and `max_queue_wait_secs`, decimals 6, mint, token program, money accounts, capital wallet.
-- On devnet, the locked devnet values.
+- Admin, operator, pauser and the allowlist root are as configured.
+- Every other `VaultConfig` field equals the config file: `c`, fee take, every cap including `max_nav_move_bps` and the stress buffer, decimals 6, mint, token program, money accounts, capital wallet.
+- On devnet, the locked devnet values of ADR 0028 (`DEVNET_LOCKED` in `scripts/devnet/lib/compare.ts`).
+- The reserve mint is owned by the configured token program and has 6 decimals.
 - Treasury and payments accounts hold the reserve mint and are not owned by the operator.
 - Both multisigs: Squads v4 owner, no config authority, exact members and threshold, time lock at or above the floor.
 
@@ -98,7 +99,7 @@ After the deploy, live accounts are dumped into `tests/fixtures/layout/v1/` and 
 
 ### First money in
 
-The program refuses `contribute_fees`, `sweep_income` and `book_unsolicited` while no shares exist. The first step after the deploy is therefore a deposit from the MUTAV capital wallet: `request_deposit`, then an admin `fulfil_deposits`, then `claim_shares`. Guarantee fees and issuer income wait until that fill.
+The program refuses `contribute_fees` and `sweep_income` with `NoSharesOutstanding` while no shares exist. The first step after the deploy is therefore a deposit from the MUTAV capital wallet: `request_deposit`, then an admin `fulfil_deposits`, then `claim_shares`. Guarantee fees and issuer income wait until that fill.
 
 ## The layout freeze
 
@@ -135,18 +136,18 @@ The exit fallback (any signer may fill the head redemption after `max_queue_wait
 |---|---|---|
 | `refresh` | Anyone; the MUTAV app in practice | Regularly, so the published NAV, mode and coverage stay current. The cadence is not yet set ([open questions](../meta/open-questions.md#possible-improvements)). Fills evaluate the NAV guard inline, so they do not depend on a fresh `refresh`. |
 | `advance_queue_head(queue, max)` | Anyone; the MUTAV app in practice | Before every admin fill, once per queue, so the batch starts at a live head. Moves no money. |
-| `skim` | Anyone; a monitor | Whenever a tracked account holds more than its tracked total. Moves the surplus into `unsolicited`. |
+| `skim` (later upgrade) | Anyone; a monitor | Not in this binary. Once it ships: whenever a tracked account holds more than its tracked total, it moves the surplus into `unsolicited`. |
 
 ### Monitoring and alerts
 
 | Signal | Source | Action |
 |---|---|---|
-| Under-coverage | `ModeChanged { to: UNDER_COVERED, deficit }` | New guarantees and redemptions stop. Claims keep being paid. The admin decides on capital or a backstop. |
-| NAV halt | `FulfilHaltRaised` | Fills stop. The admin investigates, then runs `clear_fulfil_halt`. |
+| Under-coverage | `ModeChanged { to: MODE_UNDER_COVERED, deficit }` | New guarantees and redemption fills stop. Claims keep being paid. Deposit fills still run. The admin decides on capital or a backstop. |
+| NAV halt | `FulfilHaltRaised`; a fill refused with `FulfilHalted` before any `refresh` latched it | Fills stop. The admin investigates, then runs `clear_fulfil_halt(nav_bounds)`. |
 | Frozen reserve account | `ReserveFrozenDetected { token_account }` | Contact the issuer. A frozen reserve blocks `pay_claim`, so MUTAV pays agencies by Pix from its own bank and the reserve reimburses the payments account later. |
-| Untracked balance | Token balance above the tracked total, or a non-zero inbox outside a statement | `skim`, then the unsolicited-money runbook. |
+| Untracked balance | Token balance above the tracked total, or a non-zero inbox outside a statement | Record it. It stays outside NAV until the unsolicited-money instructions ship. |
 | Payments account owner change | Watcher on the payments token account | Investigate before the next `pay_claim`. |
-| Operator activity | Feed of registrations, closes, reinstatements, filings, amendments (withdrawals included) and payments in the last 24 h | Early detection of unexpected operator actions. |
+| Operator activity | Feed of registrations, closes, filings, payments and settlements in the last 24 h | Early detection of unexpected operator actions. |
 | Pending proposals | Scan of every live Squads proposal of both multisigs | Reject or cancel stale or unexpected proposals. A `set_config` proposal must not carry stale values over a newer one. |
 | Pending handovers | `pending_operator`, `pending_pauser` and `pending_admin` with their expiry | Expect only handovers the admin proposed; cancel any other with `cancel_pending`. |
 
@@ -158,31 +159,33 @@ The exit fallback (any signer may fill the head redemption after `max_queue_wait
 flowchart LR
   F[Freeze<br/>pauser: revoke_operator,<br/>pause if needed] --> A[Appoint<br/>admin: propose_role<br/>new key: accept_role]
   A --> R[Reconcile<br/>platform records vs<br/>on-chain events]
-  R --> C[Correct<br/>close_guarantee VOID,<br/>reinstate_guarantee,<br/>amend_claim 0]
+  R --> C[Correct<br/>close_guarantee VOID;<br/>later: reinstate_guarantee,<br/>amend_claim 0]
   C --> L[Resume<br/>admin signs fills again]
 ```
 
-1. **Freeze.** The pauser runs `revoke_operator` at once, and `pause` if needed. Operator instructions fail from the next slot. The pending operator and pauser keys are cleared.
-2. **Appoint.** The admin proposes a new operator with `propose_role(OPERATOR, key)`; the new key accepts with `accept_role(OPERATOR)` within 72 hours. If the pauser key is also suspect, propose a new pauser in the same Squads proposal.
+1. **Freeze.** The pauser (or the admin) runs `revoke_operator` at once, and `pause` if needed. Operator instructions fail from the next slot. The pending operator key is cleared; the pending pauser key is left alone.
+2. **Appoint.** The admin proposes a new operator with `propose_role(ROLE_OPERATOR, key)`; the new key accepts with `accept_role(ROLE_OPERATOR)` within 72 hours. If the pauser key is also suspect, the same Squads proposal runs `revoke_pauser` and `propose_role(ROLE_PAUSER, key)`.
 3. **Reconcile.** The new operator compares the platform's contract registry with on-chain events since the compromise.
-4. **Correct with ordinary operator actions.** Unknown registrations: `close_guarantee(VOID)`. Wrongful closes: `reinstate_guarantee`, within `max_reinstate_age`. Unknown filings: `amend_claim(0)`, which sets them to `WITHDRAWN`. Wrong amounts: `amend_claim`. There is no admin rollback instruction.
+4. **Correct with ordinary operator actions.** Unknown registrations: `close_guarantee(CLOSE_VOID)`. Wrongful closes (`reinstate_guarantee`) and unknown or wrong filings (`amend_claim`, `amend_claim(0)` to withdraw) need the later upgrade; until it ships they cannot be reversed on-chain, and the reconciliation records them. There is no admin rollback instruction.
 5. **Accept the bounded loss.** Claim payments are irreversible. They are bounded by the admin's claim caps and land in MUTAV's own payments account.
 6. The admin signs no redemption fill until reconciliation is done.
 
 ### Pauser compromise
 
-A pauser key can revoke the operator, which stops claim payments until the admin's time lock lets a new `propose_role` through and the new operator accepts. Replace the pauser in that same Squads proposal. Bank-first payment by Pix covers agencies in the meantime.
+A pauser key can revoke the operator, which stops claim payments until the admin's time lock lets a new `propose_role` through and the new operator accepts. `revoke_operator` leaves the pending pauser alone, so a suspect pauser cannot cancel its own replacement. In that same Squads proposal the admin runs `revoke_pauser` and proposes a new pauser. Bank-first payment by Pix covers agencies in the meantime.
 
 ### Claims above the per-call cap
 
 1. The operator files the claim for the full amount; `file_claim` has no per-call limit. NAV reflects it at once.
-2. MUTAV may pay the agency by Pix from its own bank first. Until `approve_claim` ships, this bank-first payment is the path for every claim above the per-call cap.
-3. The admin proposal runs `approve_claim(notice, amount)` with the exact amount, plus a `set_config` raise of `max_claim_per_period` if the payment would not fit in the 31-day window.
+2. MUTAV may pay the agency by Pix from its own bank first. Until `approve_claim` ships, this bank-first payment is the path for every claim above the per-call cap: `pay_claim` refuses it with `ClaimCallCapExceeded`, and the filing stays `FILED` with its provision booked.
+3. Once `approve_claim` ships (later upgrade), the admin proposal runs `approve_claim(notice, amount)` with the exact amount, plus a `set_config` raise of `max_claim_per_period` if the payment would not fit in the 31-day window.
 4. After the time lock, the operator runs `pay_claim(notice, expected_amount)` for exactly the provision, which reimburses the payments account. A later `set_config` lowers the window cap back.
 
-To settle for less than filed, the operator amends the claim down first. An amendment resets the approval.
+To settle for less than filed, the operator will amend the claim down first with the later `amend_claim`. An amendment resets the approval.
 
-### Unsolicited money
+### Unsolicited money (later upgrade)
+
+The instructions below are not in this binary. Until they ship, unsolicited BRS stays where it landed, outside NAV and coverage. Planned runbook:
 
 1. Run `skim` on tracked accounts; the admin runs `classify_unsolicited` for inbox money that is on no issuer statement.
 2. Screen the source.
@@ -193,11 +196,11 @@ To settle for less than filed, the operator amends the claim down first. An amen
 
 ### Underwater reserve
 
-When net assets reach 0 with shares outstanding, deposit fills are refused. MUTAV sends its own backstop BRS and the admin books it into the reserve with `book_unsolicited`, kind `BACKSTOP`. How the backstop transfer reaches the `unsolicited` account before booking is an [open question](../meta/open-questions.md#open-questions). No shares are minted, so the money raises NAV for every holder.
+The reserve is underwater when NAV per share falls below the smallest published unit while shares are outstanding (`net_assets × NAV_SCALE < shares_outstanding`). Both fills refuse with `ReserveUnderwater`; `cancel_deposit` and `cancel_redeem` stay open. Interim recovery ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)): MUTAV recapitalises through `contribute_fees`, signed by the operator with a fresh `invoice_ref_hash` recorded as a backstop. No shares are minted, so the money raises NAV for every holder. The fee take applies, so MUTAV sends `needed / (1 − take)`. Booking backstop money with `book_unsolicited` (kind `BACKSTOP`) comes with a later upgrade.
 
 ### Stuck queue head
 
-v1 fills whole requests only. A redemption head larger than the available budget blocks the queue until free capital grows. The consoles show the amount needed against the amount available. Devnet request sizes stay below free capital.
+v1 fills whole requests only. A redemption head larger than the available budget blocks the queue until free capital grows. The consoles show the amount needed against the amount available. Devnet request sizes stay below free capital. A head worth 0 BRS at fill time is never filled, and a head whose price limit (`min_shares_out`, `min_assets_out`) is not met stops the batch: the owner or the admin cancels it with `cancel_deposit` or `cancel_redeem`.
 
 ### Capital provider removed from the allowlist
 
@@ -230,7 +233,7 @@ Not in the pilot binary. With the first adapter upgrade, guardians, the pauser a
 - [ADR 0011: Phase-2 instant exit and upgrade readiness](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)
 - [ADR 0015: Admin clears the fulfil halt](../decisions/0015-admin-clear-fulfil-halt.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- ADR 0019: v1 layout for the devnet release
+- [ADR 0019: v1 layout for the devnet release](../decisions/0019-v1-layout-for-the-devnet-release.md)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
 - [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
 - [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
@@ -239,3 +242,5 @@ Not in the pilot binary. With the first adapter upgrade, guardians, the pauser a
 - [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; who moves assets and the emergency path are decided)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)

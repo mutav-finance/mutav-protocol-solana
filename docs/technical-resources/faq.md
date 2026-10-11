@@ -6,7 +6,7 @@ Short answers for integrators, reviewers and capital providers. Each answer link
 
 ### What does the `mutav` program do?
 
-It holds a BRL reserve in BRS and records every guarantee MUTAV gives, with its remaining cover. It mints reserve shares to allowlisted capital providers at an on-chain NAV. It refuses any capital movement or new guarantee that would leave the registered cover under-backed. It never refuses a claim payment for solvency reasons. See [Program reference](program-reference.md).
+It holds a BRL reserve in BRS and records every guarantee MUTAV gives, with its remaining cover. It mints reserve shares to allowlisted capital providers at an on-chain NAV. It refuses any capital movement or new guarantee that would leave the registered cover under-backed. It never refuses a claim payment for coverage reasons. See [Program reference](program-reference.md).
 
 ### Is the reserve a yield product?
 
@@ -14,7 +14,7 @@ No. The reserve is operational infrastructure that keeps the guarantees backed. 
 
 ### Does the program decide claims or price guarantees?
 
-No. MUTAV's platform reviews each payment request and prices each guarantee off-chain. The operator then files the claim on-chain. The reserve admin approves claim amounts above the per-call cap, which is a decision about how much money may leave the reserve, not about whether the claim is valid.
+No. MUTAV's platform reviews each payment request and prices each guarantee off-chain. The operator then files the claim on-chain. With the later `approve_claim`, the reserve admin will approve claim amounts above the per-call cap, a decision about how much money may leave the reserve, not about whether the claim is valid.
 
 ### Does the program hold personal data?
 
@@ -30,33 +30,33 @@ On [Configuration and reference](configuration-and-reference.md). The program ID
 
 ## Safety
 
-### Can the solvency gate block a claim payment?
+### Can the coverage gate block a claim payment?
 
-No. `pay_claim` is never checked against solvency, mode, pause or the NAV guard. Only the filing itself, the claim caps, liquid BRS or a frozen reserve account can stop it. If a payment is blocked, MUTAV can pay the agency by Pix from its own bank and the reserve reimburses MUTAV's payments account later.
+No. `pay_claim` is never checked against required coverage, mode, pause or the NAV guard. Only the filing itself, the claim caps, liquid BRS or a frozen reserve account can stop it. If a payment is blocked, MUTAV can pay the agency by Pix from its own bank and the reserve reimburses MUTAV's payments account later.
 
 ### What does pause stop?
 
-Only capital flows (`request_deposit`, `request_redeem`, `fulfil_deposits`, `fulfil_redeems`) and new guarantees (`register_guarantee`). Every claim instruction, guarantee changes other than new registrations, guarantee fees, issuer income, cancels and claims, unsolicited-money instructions, the cranks, role instructions and admin configuration keep running. Pause never traps a holder's money and never blocks a claim. The pauser and up to 3 guardians can pause with no time lock; the admin can too, through its multisig's time lock. Only the admin unpauses.
+Only capital flows (`request_deposit`, `request_redeem`, `fulfil_deposits`, `fulfil_redeems`) and new guarantees (`register_guarantee`). Every claim instruction, guarantee changes other than new registrations, guarantee fees, issuer income, cancels and claims, the cranks, role instructions and admin configuration keep running. Pause never traps a holder's money and never blocks a claim. The pauser and up to 3 guardians can pause with no time lock; the admin can too, through its multisig's time lock. Only the admin unpauses.
 
 ### What is the most a compromised operator key can cost?
 
-The admin-set claim caps. Claim payments are the only irreversible operator action, and they land in MUTAV's own payments account. Every other change can be undone by another operator action: a registration by `close_guarantee(VOID)`, a close by `reinstate_guarantee` (within 30 days), a filing by `amend_claim(0)`, which withdraws it. See the [operator-compromise runbook](deployment-and-operations.md#operator-compromise).
+The admin-set claim caps. Claim payments are the only irreversible operator action, and they land in MUTAV's own payments account. A registration can be undone by `close_guarantee(CLOSE_VOID)`. Undoing a close (`reinstate_guarantee`) or a filing (`amend_claim(0)`, which withdraws it) comes with a later upgrade; until then the reconciliation records them. See the [operator-compromise runbook](deployment-and-operations.md#operator-compromise).
 
 ### Who can move BRS out of the reserve's accounts?
 
-BRS leaves only to: MUTAV's payments account (claim payments), the treasury (MUTAV's take of guarantee fees), the `claims` escrow and on to its owner (redemptions), the owner of a pending deposit (`cancel_deposit`, by the owner or the admin), and, from the `unsolicited` account only, the original sender of money that arrived outside a booking path.
+BRS leaves only to: MUTAV's payments account (claim payments), the treasury (MUTAV's take of guarantee fees), the `claims` escrow and on to its owner (redemptions), and the owner of a pending deposit (`cancel_deposit`, by the owner or the admin). With a later upgrade, money that arrived outside a booking path can also be returned to its original sender, from the `unsolicited` account only.
 
 ### Why can't a direct transfer change the share price?
 
-The program prices shares from tracked balances, not raw token balances. BRS sent straight to a reserve account is untracked. Anyone can `skim` it into the `unsolicited` account, and the admin then returns it to the sender or books it.
+The program prices shares from tracked balances, not raw token balances. BRS sent straight to a reserve account is untracked and stays outside NAV. With a later upgrade, anyone can `skim` it into the `unsolicited` account, and the admin then returns it to the sender or books it.
 
 ### What happens if the issuer freezes a reserve account?
 
-A frozen reserve counts as 0 BRS in every solvency computation that reads it. New guarantees, fills and `clear_fulfil_halt` refuse with `ReserveFrozen`, and `refresh` emits `ReserveFrozenDetected`. A freeze also blocks `pay_claim`; MUTAV then pays by Pix and is reimbursed after. The reserve's money is split across separate token accounts so one freeze does not trap everything.
+A frozen reserve counts as 0 BRS in every coverage computation that reads it. New guarantees, fills and `clear_fulfil_halt` refuse with `ReserveFrozen`, and `refresh` emits `ReserveFrozenDetected`. A freeze also blocks `pay_claim`; MUTAV then pays by Pix and is reimbursed after. The reserve's money is split across separate token accounts so one freeze does not trap everything.
 
 ### What happens to a claim above the per-call cap?
 
-It is filed and provisioned in full. The admin approves the exact amount with `approve_claim` through its time lock, and the operator then pays exactly the provision with `pay_claim`. Approved payments count toward the cap per sliding 31-day window; for an unusually large claim the admin raises that cap in the same proposal. MUTAV may pay the agency first from its bank account and be reimbursed. See [Program reference](program-reference.md).
+It is filed and provisioned in full. Until `approve_claim` ships (later upgrade), `pay_claim` refuses it with `ClaimCallCapExceeded`, and MUTAV pays the agency first from its bank account. Once it ships, the admin approves the exact amount through its time lock, and the operator then pays exactly the provision with `pay_claim`, which reimburses MUTAV. Approved payments count toward the cap per sliding 31-day window; for an unusually large claim the admin raises that cap in the same proposal. See [Program reference](program-reference.md).
 
 ### How are upgrades controlled?
 
@@ -70,29 +70,29 @@ Not yet. The program is unaudited. A security audit pass runs before the devnet 
 
 ### Why doesn't the reserve hold the full cover of every lease?
 
-Claims arrive one event at a time: one month's rent per default claim, one exit payment at the end. The reserve holds `max(c × remaining cover, provisions + min(stress_buffer, unprovisioned cover))`. On devnet `c = 0.10` (the program floor) and the stress buffer is R$19,000. Filed claims are always held in full. See [Math reference](math-reference.md#solvency-quantities).
+Claims arrive one event at a time: one month's rent per default claim, one exit payment at the end. The reserve holds `max(c × remaining cover, provisions + min(stress_buffer, unprovisioned cover))`. On devnet and in the pilot `c = 0.25` (the program floor is 0.10) and the stress buffer is R$19,000 ([ADR 0028](../decisions/0028-pilot-parameters.md)). Filed claims are always held in full. See [Math reference](math-reference.md#coverage-quantities).
 
 ### What happens when the reserve is under-covered?
 
-New guarantees and redemptions stop until capital comes in or guarantees run off. Claims keep being paid. Deposit fills stay open, because they recapitalise the reserve, unless net assets are 0 with shares outstanding: then they refuse with `ReserveUnderwater`, and the recovery is MUTAV's backstop, booked by the admin with receipt kind `BACKSTOP` and no shares minted.
+New guarantees and redemption fills stop until capital comes in or guarantees run off. Claims keep being paid. Deposit fills stay open, because they recapitalise the reserve, unless the reserve is underwater (NAV per share below the smallest published unit while shares are outstanding): then both fills refuse with `ReserveUnderwater`. The interim recovery is MUTAV's recapitalisation through `contribute_fees`, recorded as a backstop, with no shares minted; cancels stay open.
 
 ### Why did fills stop with `FulfilHalted`?
 
-NAV per share moved more than `max_nav_move_bps` in a way verified inflows do not explain. The halt is sticky until the admin investigates and runs `clear_fulfil_halt`. On devnet the bound is 100%, so it does not trip during the demo.
+NAV per share moved more than `max_nav_move_bps` in a way verified inflows do not explain. A fill checks this inline and refuses without latching; `refresh` latches the halt. The halt is sticky until the admin investigates and runs `clear_fulfil_halt`. On devnet the bound is 100%, so it does not trip during the demo.
 
 ### Why are guarantee fees refused right after the deploy?
 
-`contribute_fees`, `sweep_income` and `book_unsolicited` are refused while no shares exist. The first deposit must be filled first, so no inflow is lost to share rounding.
+`contribute_fees` and `sweep_income` are refused with `NoSharesOutstanding` while no shares exist. The first deposit must be filled first, so no inflow is lost to share rounding.
 
 ## Capital providers
 
 ### Can I exit if I am removed from the allowlist?
 
-Yes. Entry is allowlisted; exit is open. A wallet that already holds shares can `request_redeem` without a proof. A pending deposit from that wallet can be cancelled by the owner or by the admin with `cancel_deposit`, which returns the BRS to the owner's own token account.
+Yes. Entry is allowlisted; exit is open. A wallet that already holds shares can `request_redeem` without a proof: eligibility is checked only when the debited share account is empty. A pending deposit from that wallet can be cancelled by the owner or by the admin with `cancel_deposit`, which returns the BRS to the owner's own token account.
 
 ### Can I redeem a balance below the minimum request?
 
-Yes, if you redeem everything. A full exit from your canonical share account skips `min_request`, as long as the shares are worth more than 0. Partial exits keep the minimum.
+Yes, as an exit of the balance. Below `min_request`, a redemption is accepted only from your canonical share associated token account, if it leaves a remainder worth less than `min_request` and is worth at least `max(1, min_request / 10)`: R$100 at the R$1,000 minimum. Below that floor the balance waits; it stays transferable and valued in NAV. Other requests keep the minimum.
 
 ### Why did my request fail with "account already in use"?
 
@@ -100,7 +100,7 @@ Request PDAs are seeded by the global queue sequence. Two requests sent at the s
 
 ### Why is my redemption not filled yet?
 
-The admin fills in strict FIFO order, and v1 fills whole requests only. Each fill must fit in `min(free_capital, liquid_budget)`. A head request larger than that waits until free capital grows. Partial fills at the head are planned for the first post-hackathon upgrade.
+The admin fills in strict FIFO order, and v1 fills whole requests only. Each fill must fit in `min(max_assets − paid, free_capital, liquid_budget)`. A head request larger than that waits until free capital grows. A head worth 0 BRS, or one whose `min_assets_out` is not met, stops the batch until the owner or the admin cancels it. Partial fills at the head are planned for the first post-hackathon upgrade.
 
 ### Can shares be transferred?
 
@@ -108,7 +108,7 @@ On devnet the share mint is a classic SPL Token mint. Shares will be transfer-re
 
 ### Is there a deadline for claim payments in the program?
 
-No. The program records each payment and its Pix settlement on the claim's `ClaimFiling`, but the payment deadline lives in the MUTAV platform and the guarantee contract. The program's only promise is that, within the caps, `pay_claim` is never refused for solvency or pause.
+No. The program records each payment and its Pix settlement on the claim's `ClaimFiling`, but the payment deadline lives in the MUTAV platform and the guarantee contract. The program's only promise is that, within the caps, `pay_claim` is never refused for coverage or pause.
 
 ## Integration
 
@@ -118,7 +118,7 @@ No. `@mutav-finance/mutav-protocol-solana` composes unsigned instructions and re
 
 ### How do I read the reserve's health?
 
-`fetchReserve(rpc, reserveMint)` returns the config, the state and a solvency snapshot computed with the same math as the program. Anyone can also send `refresh` to recompute and publish it on-chain.
+`fetchReserve(rpc, reserveMint)` returns the config, the state and a coverage snapshot (its `solvency` field) computed with the same math as the program. Anyone can also send `refresh` to recompute and publish it on-chain.
 
 ### Will instructions change shape after the deploy?
 
@@ -136,7 +136,7 @@ No. From the first devnet deploy, existing instructions, accounts and events kee
 
 - [ADR 0003: Payments operated by MUTAV](../decisions/0003-payments-operated-by-mutav.md)
 - [ADR 0004: On-chain NAV with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
-- [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0008: Uniform capital flow and pause scope](../decisions/0008-uniform-capital-flow-and-pause-scope.md)
 - [ADR 0010: Partial fills at the queue head](../decisions/0010-partial-fills-at-queue-head.md)
 - [ADR 0015: Admin clears the fulfil halt](../decisions/0015-admin-clear-fulfil-halt.md)
@@ -149,3 +149,5 @@ No. From the first devnet deploy, existing instructions, accounts and events kee
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)
