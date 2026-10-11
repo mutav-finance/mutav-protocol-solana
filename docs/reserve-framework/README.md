@@ -4,7 +4,7 @@ The MUTAV reserve is the money that backs MUTAV's rental guarantees. MUTAV is an
 
 The reserve is operational infrastructure. Its job is to keep the guarantees healthy and to pay claims on time. It is not a yield product, and nothing in this section should be read as an investment offer.
 
-This section describes the reserve as designed for the devnet release ([ADRs 0020 to 0027](../meta/decisions.md)). Where a value is chosen at deploy or still open, the page says so; open items are tracked in [Open questions](../meta/open-questions.md).
+This section describes the reserve as built for the devnet release ([ADRs 0019 to 0029](../meta/decisions.md)), with the pilot parameters of [ADR 0028](../decisions/0028-pilot-parameters.md). Where a feature is not in the devnet binary (Wave 2 or later), or a value is chosen at deploy or still open, the page says so; open items are tracked in [Open questions](../meta/open-questions.md).
 
 ## What the reserve does
 
@@ -12,20 +12,20 @@ This section describes the reserve as designed for the devnet release ([ADRs 002
 |---|---|
 | Holds the money that backs every guarantee | A program-owned BRS token account (`reserve`), tracked by an internal balance (`brs_balance`) |
 | Knows how much it must hold | `coverage_required`, computed on-chain from the remaining cover of every guarantee, the open claim provisions and an admin-set stress buffer ([Coverage model](coverage-model.md)) |
-| Pays claims | `pay_claim` sends BRS to MUTAV's whitelisted payments account. The solvency gate never refuses it ([Claims and payments](claims-and-payments.md)) |
-| Protects the backing | A solvency gate refuses new guarantees and redemption fills that would leave the cover under-backed |
-| Takes in money only through booking paths | Guarantee fees, issuer income, capital deposits and admin bookings. Anything else is held apart ([Assets and income](assets-and-income.md), [Unsolicited money](unsolicited-money.md)) |
+| Pays claims | `pay_claim` sends BRS to MUTAV's whitelisted payments account. The coverage gate never refuses it ([Claims and payments](claims-and-payments.md)) |
+| Protects the backing | A coverage gate refuses new guarantees and redemption fills that would leave the cover under-backed; both fills refuse an underwater reserve |
+| Takes in money only through booking paths | Guarantee fees, issuer income and capital deposits (admin bookings of unsolicited and backstop money come in Wave 2). Anything else stays untracked ([Assets and income](assets-and-income.md), [Unsolicited money](unsolicited-money.md)) |
 | Stays recomputable by anyone | Every guarantee, provision, payment and capital movement is an account or an event. `refresh` is permissionless |
 
 ## Principles
 
-1. **Claims are never blocked by the solvency gate.** The gate protects the reserve from capital leaving. It never stops a claim payment. Within the admin-set caps, a filed claim is always payable while liquid BRS is there.
+1. **Claims are never blocked by the coverage gate.** The gate protects the reserve from capital leaving. It never stops a claim payment. Within the admin-set caps, a filed claim is always payable while liquid BRS is there.
 2. **Capital leaves only from surplus.** Redemptions and new guarantees must fit in the free capital above `coverage_required`.
 3. **Internal accounting.** The program counts the amounts it moved itself, not raw token balances. A direct transfer into a reserve account does not change the share value.
 4. **Losses are recognised early.** A filed claim becomes a provision at once and lowers the share value before it is paid.
 5. **Separate money flows.** Guarantee fees, MUTAV's operating take, MUTAV's own capital and issuer income each have their own instruction and their own account. They never mix.
 6. **Operator and admin are separate.** The operator runs the guarantee and claim cycle. The reserve admin looks after financial health and security through ceilings. The most a compromised operator key can take is bounded by the admin-set claim caps.
-7. **No stuck money.** Every token that reaches a program account has a defined way out: booked into the reserve, paid to its owner, or returned to its sender.
+7. **No stuck money.** Every token that reaches a program account has a defined way out: booked into the reserve, paid to its owner, or returned to its sender. The paths for unsolicited money ship in Wave 2.
 
 ## Money map
 
@@ -56,18 +56,20 @@ flowchart LR
     F -- take --> T
     I --> INB
     INB -- sweep_income --> R
-    INB -- classify_unsolicited --> UN
+    INB -. classify_unsolicited, Wave 2 .-> UN
     D --> PD
     PD -- fulfil_deposits --> R
     R -- fulfil_redeems --> CL
     CL -- claim_assets --> H
-    U --> UN
-    R -- skim surplus --> UN
-    UN -- book_unsolicited / backstop --> R
-    UN -- return_unsolicited --> S[Original sender]
+    U -.-> UN
+    R -. skim surplus, Wave 2 .-> UN
+    UN -. book_unsolicited / backstop, Wave 2 .-> R
+    UN -. return_unsolicited, Wave 2 .-> S[Original sender]
     R -- pay_claim --> P
     P -- MUTAV pays off-chain --> A
 ```
+
+Dotted arrows are Wave 2 instructions, not in the devnet binary. Until they ship, unsolicited money stays where it lands, untracked and outside NAV.
 
 ## Accounts that hold money
 
@@ -80,24 +82,24 @@ All reserve token accounts are ordinary SPL Token accounts owned by the vault au
 | `pending_redemptions` | `["pending_redemptions", config]` | Shares escrowed by redeem requests | No (shares, not BRS) |
 | `claims` | `["claims", config]` | BRS owed to holders on filled redemptions | No |
 | Income inbox | Associated token account of the vault authority for BRS | Issuer income waiting to be swept | No, until `sweep_income` books a statement |
-| `unsolicited` | `["unsolicited", config]` | Money that arrived outside a booking path | No, until the admin books it |
+| `unsolicited` | `["unsolicited", config]` | Money that arrived outside a booking path. Created at `initialize`; its instructions are Wave 2 | No, until the admin books it |
 
 ## Who acts on the reserve
 
 | Role | Key | Reserve duties |
 |---|---|---|
-| Operator | Hot key (devnet: generated at deploy) | Registers, closes and reinstates guarantees, books guarantee fees and issuer income, files, amends (including to 0, a withdrawal), re-files and pays claims, records settlement |
-| Reserve admin | Squads v4 multisig vault, time-locked | Sets caps, the coverage ratio and the stress buffer; approves claim amounts above the per-call cap; fills the capital queues; books or returns unsolicited money; books MUTAV's backstop; appoints roles and guardians |
+| Operator | Hot key (devnet: generated at deploy) | Registers and closes guarantees, books guarantee fees and issuer income, files and pays claims, records settlement. Reinstating guarantees and amending (including to 0, a withdrawal) and re-filing claims come in Wave 2 |
+| Reserve admin | Squads v4 multisig vault, time-locked | Sets caps, the coverage ratio and the stress buffer (`set_config`); fills the capital queues; cancels a stuck request back to its owner; clears a NAV halt; appoints roles and guardians. In Wave 2 also approves claim amounts above the per-call cap, books or returns unsolicited money and books MUTAV's backstop |
 | Pauser and guardians | Separate keys | Pause capital flows and new guarantees. The pauser can also revoke the operator. Up to three guardians, one on devnet |
-| Anyone | Any signer | `refresh`, `advance_queue_head`, `skim` |
+| Anyone | Any signer | `refresh`, `advance_queue_head` (`skim` in Wave 2) |
 
 ## Pages in this section
 
-1. [Coverage model](coverage-model.md): how much the reserve must hold, the solvency gate, under-coverage and the backstop.
-2. [Claims and payments](claims-and-payments.md): filing, approval, amendment, withdrawal and exact payment of claims, within per-call and sliding 31-day caps.
+1. [Coverage model](coverage-model.md): how much the reserve must hold, the coverage gate, under-coverage, the underwater reserve and its recapitalization.
+2. [Claims and payments](claims-and-payments.md): filing, exact payment and settlement of claims, within per-call and sliding 31-day caps; approval, amendment and withdrawal in Wave 2.
 3. [Assets and income](assets-and-income.md): the BRS-only reserve, the settlement floor, adapters and the liquidity floor later, guarantee fees and issuer income.
-4. [Unsolicited money](unsolicited-money.md): how money that arrives outside a booking path is held, returned or booked.
-5. [Parameters](parameters.md): every devnet parameter, its value and who sets it.
+4. [Unsolicited money](unsolicited-money.md): how money that arrives outside a booking path will be held, returned or booked (Wave 2).
+5. [Parameters](parameters.md): every devnet and pilot parameter, its value and who sets it.
 
 ## Related sections
 
@@ -114,7 +116,7 @@ All reserve token accounts are ordinary SPL Token accounts owned by the vault au
 - [Specification §1 Principles](../spec.md#1-principles), [§2.1 Money flows](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017), [§3.3 Vault authority and token accounts](../spec.md#33-vault-authority-and-token-accounts)
 - [Litepaper](../litepaper.md)
 - Program seeds: [`programs/mutav/src/constants.rs`](../../programs/mutav/src/constants.rs)
-- Solvency math: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs)
+- Coverage math: [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs)
 
 ## Decisions
 
@@ -131,3 +133,5 @@ All reserve token accounts are ordinary SPL Token accounts owned by the vault au
 - [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (proposed)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)

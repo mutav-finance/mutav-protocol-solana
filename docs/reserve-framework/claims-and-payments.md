@@ -4,6 +4,8 @@ A claim is a payment request from the agency, on the landlord's behalf, under a 
 
 The program does not judge claims. It enforces how much can leave the reserve, and how fast, through caps the reserve admin sets.
 
+The devnet binary has `file_claim`, `pay_claim` and `settle_payout`. The admin approval above the per-call cap (`approve_claim`), amendment and withdrawal (`amend_claim`) and re-filing (`refile_claim`) are Wave 2 ([ADR 0021](../decisions/0021-claims-approval-amendment-exact-payment.md), [ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)); this page marks them where they appear.
+
 ## The claim cycle
 
 ```mermaid
@@ -17,7 +19,7 @@ sequenceDiagram
     Ag->>Op: Payment request with evidence
     Op->>Op: Review and approve off-chain
     Op->>Pg: file_claim (provision booked, NAV drops)
-    opt Amount above max_claim_per_call
+    opt Amount above max_claim_per_call (Wave 2)
         Ad->>Pg: approve_claim (exact amount)<br/>plus set_config raise if the window cap would not fit
     end
     Op->>Pg: pay_claim(notice_ref_hash, expected_amount)
@@ -31,11 +33,11 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> FILED: file_claim
-    FILED --> FILED: amend_claim to a new amount (resets any approval)
-    FILED --> FILED: approve_claim (admin, above per-call cap)
+    FILED --> FILED: amend_claim to a new amount, Wave 2<br/>(resets any approval)
+    FILED --> FILED: approve_claim, Wave 2<br/>(admin, above per-call cap)
     FILED --> PAID: pay_claim (exactly the provision)
-    FILED --> WITHDRAWN: amend_claim to 0
-    WITHDRAWN --> FILED: refile_claim<br/>(approval, provision and filed_at reset)
+    FILED --> WITHDRAWN: amend_claim to 0, Wave 2
+    WITHDRAWN --> FILED: refile_claim, Wave 2<br/>(approval, provision and filed_at reset)
     PAID --> SETTLED: settle_payout
     SETTLED --> [*]
 ```
@@ -46,31 +48,35 @@ stateDiagram-v2
 |---|---|---|
 | 0 | `FILED` | Provisioned, awaiting payment |
 | 1 | `PAID` | Paid by the reserve to `payments_account`; no longer amendable |
-| 2 | `WITHDRAWN` | Provision released; may be filed again only through `refile_claim` |
+| 2 | `WITHDRAWN` | Provision released; may be filed again only through `refile_claim`. Reached only through `amend_claim` to 0, so unused until Wave 2 |
 | 3 | `SETTLED` | Payment recorded as delivered off-chain; terminal |
 
 A notice can be paid only once: `pay_claim` requires `FILED`, and a `PAID` or `SETTLED` filing never returns to `FILED`.
 
 ## Instructions
 
-| Instruction | Signer | What it does | Pause | Solvency gate |
+| Instruction | Signer | What it does | Pause | Coverage gate |
 |---|---|---|---|---|
 | `file_claim(leg, amount, notice_ref_hash)` | Operator | Books a provision of `amount` on the leg. NAV reflects the claim at once. Requires an active guarantee and `amount ≤ leg_cover − leg_paid − leg_provision`. No cap applies at filing | Runs | Never |
-| `amend_claim(notice_ref_hash, new_amount)` | Operator | Lowers or raises a `FILED` claim. Lowering releases the difference. Raising books more, within the leg's unprovisioned cover. `new_amount = 0` withdraws the claim: status `WITHDRAWN`, the whole provision released, event `ClaimWithdrawn`. Any amendment resets `approved_amount` to 0. Refused on `PAID` and `SETTLED`. Emits `ClaimAmended { old, new }` | Runs | Never |
-| `refile_claim(leg, amount, notice_ref_hash)` | Operator | Same arguments as `file_claim`. Accepts only a `WITHDRAWN` filing and returns it to `FILED`, resetting `approved_amount`, `provision` and `filed_at`. An old approval is never reused | Runs | Never |
-| `approve_claim(notice_ref_hash, amount)` | Reserve admin | Records `approved_amount` on a `FILED` claim above the per-call cap. The admin approves the amount that may leave the reserve, not the claim's validity | Runs | Never |
-| `pay_claim(notice_ref_hash, expected_amount)` | Operator | Pays exactly the filing's provision to the payments account. Refuses unless `expected_amount` equals the provision | Runs | Never |
+| `amend_claim(notice_ref_hash, new_amount)` (Wave 2) | Operator | Lowers or raises a `FILED` claim. Lowering releases the difference. Raising books more, within the leg's unprovisioned cover. `new_amount = 0` withdraws the claim: status `WITHDRAWN`, the whole provision released, event `ClaimWithdrawn`. Any amendment resets `approved_amount` to 0. Refused on `PAID` and `SETTLED`. Emits `ClaimAmended { old, new }` | Runs | Never |
+| `refile_claim(leg, amount, notice_ref_hash)` (Wave 2) | Operator | Same arguments as `file_claim`. Accepts only a `WITHDRAWN` filing and returns it to `FILED`, resetting `approved_amount`, `provision` and `filed_at`. An old approval is never reused | Runs | Never |
+| `approve_claim(notice_ref_hash, amount)` (Wave 2) | Reserve admin | Records `approved_amount` on a `FILED` claim above the per-call cap. The admin approves the amount that may leave the reserve, not the claim's validity | Runs | Never |
+| `pay_claim(notice_ref_hash, expected_amount)` | Operator | Pays exactly the filing's provision to the payments account. Refuses with `ExpectedAmountMismatch` unless `expected_amount` equals the provision | Runs | Never |
 | `settle_payout(notice_ref_hash, pix_e2e_hash)` | Operator | Records the hash of the Pix end-to-end ID on the filing once MUTAV has paid the agency; status `SETTLED` | Runs | Never |
 
-Legs: `LEG_DEFAULT = 0` (rent and charges in arrears) and `LEG_EXIT = 1` (end-of-occupation debts). Each guarantee stores both leg covers as absolute amounts at registration, and they never change.
+Legs: `LEG_DEFAULT = 1` (rent and charges in arrears) and `LEG_EXIT = 2` (end-of-occupation debts); `0` is refused with `InvalidParameter`. Each guarantee stores both leg covers as absolute amounts at registration, and they never change.
 
 ## Exact payment
 
 `pay_claim` pays **exactly** the filing's provision. There is no partial payment and no hidden release.
 
+With Wave 2:
+
 - If the amount owed is smaller than filed, the operator runs `amend_claim` down, then pays.
 - If the amount owed grew (for example another month of arrears), the operator runs `amend_claim` up, within the leg's unprovisioned cover, then pays.
 - If the filing was a mistake, the operator runs `amend_claim` to 0, which withdraws it. A withdrawn notice can be filed again with `refile_claim`.
+
+Until then a filing is paid as filed, so the operator files only the amount owed; a further amount owed on the same leg is filed as a new notice.
 
 Because a payment equals its own provision, it can never spend cover that another open filing on the same leg has provisioned. Every open filing on a leg is always payable, and a guarantee can always reach zero open claims.
 
@@ -78,23 +84,23 @@ Because a payment equals its own provision, it can never spend cover that anothe
 
 In order:
 
-1. The filing is `FILED`.
-2. `expected_amount == filing.provision`. The payment amount is the provision.
-3. The provision is `≤ max_claim_per_call`, or `approved_amount == provision` on this filing.
-4. The payments of the last 31 days plus this one stay `≤ max_claim_per_period`. Approved payments count.
-5. The [ADR 0014](../decisions/0014-pay-claim-bound-with-concurrent-filings.md) bound on the leg, which an exact payment always meets.
-6. The destination is `config.payments_account`.
-7. `reserve` is not frozen and `brs_balance ≥ amount`.
+1. The filing is `FILED` (`ClaimNotFiled`).
+2. `expected_amount == filing.provision` (`ExpectedAmountMismatch`). The payment amount is the provision.
+3. The [ADR 0014](../decisions/0014-pay-claim-bound-with-concurrent-filings.md) bound on the leg, which an exact payment always meets (`ExceedsRemainingCover`).
+4. The provision is `≤ max_claim_per_call`, or `approved_amount == provision` on this filing (`ClaimCallCapExceeded`). `approved_amount` stays 0 until `approve_claim` ships, so in this binary a provision above the per-call cap cannot be paid.
+5. The payments of the last 31 days plus this one stay `≤ max_claim_per_period` (`ClaimPeriodCapExceeded`). Approved payments count.
+6. The destination is `config.payments_account` (`InvalidPaymentsAccount`).
+7. `brs_balance ≥ amount` (`InsufficientLiquidBalance`) and `reserve` is not frozen (`ReserveFrozen`).
 
-There is no solvency, mode, pause or NAV-guard check. The stress-buffer term and the cached `coverage_required` write saturate, so they can never make a payment fail.
+There is no coverage, mode, pause or NAV-guard check. The stress-buffer term and the cached `coverage_required` write saturate, so they can never make a payment fail.
 
 **Effects:** BRS moves from `reserve` to the payments account. The leg's paid amount rises, the provision is released, `open_claims` falls, and the filing becomes `PAID` with `payments_account`, `paid_at` and `paid_amount` written on it. `remaining_cover_total` and `brs_balance` fall by the amount. Today's claim bucket and the lifetime counters rise, and `ClaimPaid` is emitted.
 
 ## Caps
 
-| Cap | Devnet value | Rule |
+| Cap | Devnet and pilot value ([ADR 0028](../decisions/0028-pilot-parameters.md)) | Rule |
 |---|---|---|
-| `max_claim_per_call` | R$10,000 | Largest payment without an admin approval |
+| `max_claim_per_call` | R$15,000 | Largest payment without an admin approval |
 | `max_claim_per_period` | R$20,000 | Most paid in any sliding 31-day window, approved payments included |
 
 `set_config` requires `max_claim_per_call > 0` and `max_claim_per_period ≥ max_claim_per_call`. The window length is fixed by the program; there is no period-length parameter.
@@ -111,6 +117,8 @@ The rule is exact, with no weighting or estimate. Every 30-day span lies inside 
 
 ### Claims above the per-call cap
 
+The approval flow is Wave 2:
+
 1. The operator files the claim as usual. The provision is booked at once.
 2. The reserve admin proposes `approve_claim(notice_ref_hash, amount)` in the Squads multisig. The approval binds the exact amount.
 3. If the payment would not fit in the sliding window, the same proposal also raises `max_claim_per_period` with `set_config`. A later `set_config` lowers it back.
@@ -122,14 +130,16 @@ Until `approve_claim` ships, the reserve cannot pay above `max_claim_per_call`. 
 
 ### What the caps bound
 
-The claim caps bound what the operator key can move out of the reserve. They do not bound what MUTAV owes the landlord, which the guarantee's cover sets. `pay_claim` is the only irreversible operator action, so the claim caps are also the most a compromised operator key can take from the reserve. Every other operator action can be undone by another operator action:
+The claim caps bound what the operator key can move out of the reserve. They do not bound what MUTAV owes the landlord, which the guarantee's cover sets. `pay_claim` is the only irreversible operator action, so the claim caps are also the most a compromised operator key can take from the reserve. With Wave 2, every other operator action can be undone by another operator action:
 
 | Operator action | Undone by |
 |---|---|
-| `register_guarantee` | `close_guarantee(VOID)` |
-| `close_guarantee` | `reinstate_guarantee`, within `max_reinstate_age` (30 days) |
-| `file_claim` | `amend_claim` to 0 (`WITHDRAWN`) |
-| `amend_claim` | Another `amend_claim` |
+| `register_guarantee` | `close_guarantee(id, CLOSE_VOID)` (an active guarantee with nothing paid on either leg and no open claim) |
+| `close_guarantee` | `reinstate_guarantee`, within `max_reinstate_age` (Wave 2; planned 30 days) |
+| `file_claim` | `amend_claim` to 0, `WITHDRAWN` (Wave 2) |
+| `amend_claim` | Another `amend_claim` (Wave 2) |
+
+In the devnet binary only the void close exists; a close or a filing is corrected off-chain until Wave 2. Close reasons are `CLOSE_RELEASED = 1` (no open claim) and `CLOSE_VOID = 2`.
 
 Claim payments land only in MUTAV's own payments account.
 
@@ -145,7 +155,7 @@ The reimbursement follows every rule above: exact amount, caps, approval and the
 
 ## Settlement
 
-`settle_payout` records `pix_e2e_hash`, the hash of the Pix end-to-end ID, and `settled_at` on the `ClaimFiling`, and moves it from `PAID` to `SETTLED`. It is a settlement record only. The program keeps no payout deadline. The service level (review, information requests, approval and execution, with the contractual term plus a 48-hour target) lives in the MUTAV platform. The reserve's only on-chain promise: within the caps, `pay_claim` is never refused for solvency or pause.
+`settle_payout` records `pix_e2e_hash`, the hash of the Pix end-to-end ID, and `settled_at` on the `ClaimFiling`, and moves it from `PAID` to `SETTLED`. It is a settlement record only. The program keeps no payout deadline. The service level (review, information requests, approval and execution, with the contractual term plus a 48-hour target) lives in the MUTAV platform. The reserve's only on-chain promise: within the caps, `pay_claim` is never refused by the coverage gate or a pause.
 
 While MUTAV holds both the operator and admin roles, the Pix hash is the only settlement record. Once the roles are held by separate companies, an attestation of the registry and of claim settlements becomes required ([ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md)).
 
@@ -154,9 +164,9 @@ While MUTAV holds both the operator and admin roles, the Pix hash is the only se
 | Record | Where |
 |---|---|
 | Filed amount and filing time | `ClaimFiling.provision`, `filed_at`; event `ClaimFiled` |
-| Amendments | Event `ClaimAmended { old, new }` |
-| Approved amount | `ClaimFiling.approved_amount` |
-| Withdrawal | `ClaimFiling.status = WITHDRAWN`; event `ClaimWithdrawn` |
+| Amendments (Wave 2) | Event `ClaimAmended { old, new }` |
+| Approved amount (Wave 2) | `ClaimFiling.approved_amount`, 0 in this binary |
+| Withdrawal (Wave 2) | `ClaimFiling.status = WITHDRAWN`; event `ClaimWithdrawn` |
 | Payment | `ClaimFiling.payments_account`, `paid_at`, `paid_amount`, status `PAID`; event `ClaimPaid` |
 | Settlement | `ClaimFiling.pix_e2e_hash`, `settled_at`, status `SETTLED`; event `PayoutSettled` |
 
@@ -181,4 +191,6 @@ While MUTAV holds both the operator and admin roles, the Pix hash is the only se
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
 - [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (`Payout` merged into `ClaimFiling`)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md) (claim caps)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md) (ADR 0021 rules confirmed in the binary; approval, amendment and re-filing in Wave 2)
 - ADR 0019: v1 layout for the devnet release (payout deadline removed, claim fields and window buckets carved)

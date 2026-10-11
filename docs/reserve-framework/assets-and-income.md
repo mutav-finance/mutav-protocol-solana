@@ -1,6 +1,6 @@
 # Assets and income
 
-In this release the reserve holds one asset: BRS, a BRL token on Solana issued by Nora. Money enters the reserve through four booking paths: guarantee fees, issuer income, capital deposits and admin bookings of unsolicited or backstop money. Each has its own instruction and its own record.
+In this release the reserve holds one asset: BRS, a BRL token on Solana issued by Nora. Money enters the reserve through three booking paths in the devnet binary: guarantee fees, issuer income and capital deposits. A fourth, admin bookings of unsolicited or backstop money, comes in Wave 2. Each has its own instruction and its own record.
 
 ## The reserve asset: BRS only
 
@@ -17,7 +17,7 @@ The reserve mint is fixed in `VaultConfig` at `initialize` and never changes.
 
 **Mint guard.** `initialize` refuses a Token-2022 reserve mint with any of these extensions: permanent delegate, transfer hook, transfer fee or fee authority, non-transferable, default-frozen, scaled UI amount, interest-bearing or pausable. Each would let the mint move, block or rescale reserve balances outside the program's accounting.
 
-**Why one asset.** Every claim is paid in BRS, and every guarantee fee arrives in BRS. Holding only BRS means no price feed to trust and no mark-to-market: NAV moves only through fees, swept income, admin bookings, provisions and claim payments. The accepted cost is concentration on one issuer: a freeze, de-peg or redemption halt of BRS reaches the whole reserve. The reserve splits its money across separate token accounts, a frozen `reserve` counts as 0 in every solvency check, and MUTAV pays claims from its own bank account while the reserve cannot. Before the reserve caps rise above the pilot's, MUTAV will ask the issuer to move the BRS freeze authority to a multisig.
+**Why one asset.** Every claim is paid in BRS, and every guarantee fee arrives in BRS. Holding only BRS means no price feed to trust and no mark-to-market: NAV moves only through fees, swept income, provisions and claim payments (and admin bookings, once they ship). The accepted cost is concentration on one issuer: a freeze, de-peg or redemption halt of BRS reaches the whole reserve. The reserve splits its money across separate token accounts, a frozen `reserve` counts as 0 in every coverage check, and MUTAV pays claims from its own bank account while the reserve cannot. Before the reserve caps rise above the pilot's, MUTAV will ask the issuer to move the BRS freeze authority to a multisig.
 
 ## Settlement floor
 
@@ -58,12 +58,14 @@ net  = amount − take                           → reserve (NAV rises, no shar
 |---|---|
 | Signer | Operator, who also signs the BRS transfer from its own account |
 | Once per invoice | An `IncomeReceipt` with kind `FEE` at `["fee", config, invoice_ref_hash]` must not exist yet. The `"fee"` seed prefix keeps invoice and statement references apart |
-| Take | `fee_take_bps` = 2,000 (20%) on devnet; program maximum 3,000 (30%). Goes straight to the treasury; the program holds no fee balance |
-| Pause and solvency | Never paused, never solvency-gated. Money coming in is always accepted |
-| No shares yet | Refused while `shares_outstanding == 0`. The first deposit must be filled first |
-| Event | `FeesContributed { invoice_ref_hash, gross, take, net }` |
+| Take | `fee_take_bps` = 2,000 (20%) on devnet and the pilot ([ADR 0028](../decisions/0028-pilot-parameters.md)); program maximum 3,000 (30%). Goes straight to the treasury; the program holds no fee balance |
+| Pause and coverage | Never paused, never coverage-gated |
+| No shares yet | Refused with `NoSharesOutstanding` while `shares_outstanding == 0`. Fees wait with the operator until the first deposit is filled |
+| Event | `FeesContributed { invoice_ref_hash, gross, take, net, fees_in_total, fee_take_total, brs_balance }` |
 
 Fees never mint shares and never count as MUTAV capital. MUTAV benefits from them only through the shares it bought with its own capital, like every holder.
+
+`contribute_fees` is also MUTAV's interim way to recapitalize an underwater reserve, until the Wave 2 `BACKSTOP` booking ships: the operator sends MUTAV's own BRS under a fresh `invoice_ref_hash` that mutav-app records as a backstop, grossed up for the take (`needed / (1 − take)`, rounded up) ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md); [Coverage model](coverage-model.md#underwater)).
 
 ## Issuer income
 
@@ -74,7 +76,7 @@ The issuer shares part of its revenue with partners under a commercial agreement
 `initialize` creates the vault authority's associated token account for BRS: the **income inbox**. MUTAV gives this address to the issuer as its payee address.
 
 - The inbox is not reserve money. Nothing in it counts toward NAV, stable assets or coverage until it is swept.
-- Its only exits are `reserve` (through `sweep_income`) and the `unsolicited` account (through the admin's `classify_unsolicited`, once every issuer statement for the period is swept).
+- Its only exit in the devnet binary is `reserve`, through `sweep_income`. Wave 2 adds a second: the `unsolicited` account, through the admin's `classify_unsolicited`, once every issuer statement for the period is swept.
 - Income is never returned to a sender. Returns leave only from the `unsolicited` account.
 - `reserve` stays a PDA, not the associated token account, so a send to the vault authority's address lands in the inbox and never in the live reserve.
 
@@ -95,11 +97,11 @@ amount                                          → reserve (no take)
 | Freeze | Refused if the inbox or `reserve` is frozen |
 | Once per statement | An `IncomeReceipt` at `["income", config, income_ref_hash]` must not exist yet. Several statements in one month each have their own reference |
 | Post-CPI check | `reserve` rose by exactly `amount` and the inbox fell by exactly `amount` |
-| Pause and solvency | Never paused, never solvency-gated, no mode check |
-| No shares yet | Refused while `shares_outstanding == 0`. The income waits in the inbox |
-| Record | `IncomeReceipt` with kind `NORA_STATEMENT`; event `IncomeSwept { income_ref_hash, period, amount, inbox_after }` |
+| Pause and coverage | Never paused, never coverage-gated, no mode check |
+| No shares yet | Refused with `NoSharesOutstanding` while `shares_outstanding == 0`. The income waits in the inbox |
+| Record | `IncomeReceipt` with kind `ISSUER_STATEMENT`; event `IncomeSwept { income_ref_hash, period, amount, inbox_after, income_total, brs_balance }` |
 
-Anything in the inbox that is not on a statement stays there, untracked, until the admin classifies it as unsolicited.
+Anything in the inbox that is not on a statement stays there, untracked, until the admin classifies it as unsolicited (Wave 2).
 
 ### No take on issuer income
 
@@ -118,12 +120,12 @@ Allowlisted capital providers, including MUTAV's own capital wallet, deposit BRS
 | Inflow | Instruction | Signer | Mints shares | Record | Counts in `inflow_nav` |
 |---|---|---|---|---|---|
 | Guarantee fee (net) | `contribute_fees` | Operator | No | `IncomeReceipt` kind `FEE` | Yes |
-| Issuer income | `sweep_income` | Operator | No | `IncomeReceipt` kind `NORA_STATEMENT` | Yes |
+| Issuer income | `sweep_income` | Operator | No | `IncomeReceipt` kind `ISSUER_STATEMENT` | Yes |
 | Capital deposit | `fulfil_deposits` | Reserve admin | Yes, at NAV | `DepositRequest` | No (priced at NAV) |
-| Unsolicited money | `book_unsolicited` | Reserve admin | No | `IncomeReceipt` kind `UNSOLICITED` | Yes |
-| MUTAV backstop | `book_unsolicited` | Reserve admin | No | `IncomeReceipt` kind `BACKSTOP` | Yes |
+| Unsolicited money (Wave 2) | `book_unsolicited` | Reserve admin | No | `IncomeReceipt` kind `UNSOLICITED` | Yes |
+| MUTAV backstop (Wave 2) | `book_unsolicited` | Reserve admin | No | `IncomeReceipt` kind `BACKSTOP` | Yes |
 
-Receipt kinds are `NORA_STATEMENT` (0), `FEE` (1), `UNSOLICITED` (2) and `BACKSTOP` (3). Every booking path except a capital deposit is refused while `shares_outstanding == 0`.
+Receipt kinds are `ISSUER_STATEMENT` (0), `FEE` (1), `UNSOLICITED` (2, reserved) and `BACKSTOP` (3, reserved). Every booking path except a capital deposit is refused while `shares_outstanding == 0` (`NoSharesOutstanding`).
 
 ## Sources
 
@@ -143,3 +145,5 @@ Receipt kinds are `NORA_STATEMENT` (0), `FEE` (1), `UNSOLICITED` (2) and `BACKST
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md) (receipt kinds, `classify_unsolicited`)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (no income take, `FeeReceipt` folded into `IncomeReceipt`, adapter slots removed)
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (proposed; decided: admin moves assets, emergency path, floor on `fulfil_redeems`)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md) (fee take, 100% BRS)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md) (`NoSharesOutstanding`, interim recapitalization through `contribute_fees`)

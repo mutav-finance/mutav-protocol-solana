@@ -1,6 +1,6 @@
 # Parameters
 
-Every parameter of the reserve for the devnet release, with its value and who sets it.
+Every parameter of the reserve for the devnet release, with its value and who sets it. The values are the pilot parameters of [ADR 0028](../decisions/0028-pilot-parameters.md): devnet runs with the values the pilot will use, and the deploy check (`verify.ts`) refuses a devnet config that holds other ones.
 
 Amounts are in R$ and in BRS base units (6 decimals, 1 BRS = R$1). "Admin" means the reserve admin multisig, acting through a time-locked Squads proposal. Most admin parameters change with a sparse `set_config(params)`: each call lists only the fields it changes (at most 16, no duplicates), the program validates the whole resulting config, and it emits one `ConfigUpdated { field, old, new }` per changed field. Money accounts, the allowlist, roles and guardians have their own instructions.
 
@@ -17,35 +17,35 @@ Amounts are in R$ and in BRS base units (6 decimals, 1 BRS = R$1). "Admin" means
 
 | Parameter | Field | Devnet value | Base units | Set by |
 |---|---|---|---|---|
-| Coverage ratio `c` | `coverage_ratio_bps` | 0.10 | 1,000 bps | Admin. Floor 1,000 bps (program constant), cap 10,000 bps |
-| Stress buffer | `caps.stress_buffer` | R$19,000 | 19,000,000,000 | Admin. Sized from the book (three largest rents plus one exit payment). Bounded in `validate_params` |
+| Coverage ratio `c` | `coverage_ratio_bps` | 0.25 | 2,500 bps | Admin. Floor 1,000 bps (0.10, program constant), cap 10,000 bps |
+| Stress buffer | `caps.stress_buffer` | R$19,000 | 19,000,000,000 | Admin. Sized from the book (three largest rents plus one exit payment); set and locked on devnet. Must be ≤ `max_tvl`; 0 turns the term off |
 
 ## Reserve size and guarantees
 
 | Parameter | Field | Devnet value | Base units | Set by |
 |---|---|---|---|---|
-| Maximum reserve | `caps.max_tvl` | R$300,000 | 300,000,000,000 | Admin. Must be > 0 |
-| Cover per guarantee | `caps.max_cover_per_guarantee` | R$40,000 | 40,000,000,000 | Admin |
+| Maximum reserve | `caps.max_tvl` | R$1,000,000 | 1,000,000,000,000 | Admin. Must be > 0 |
+| Cover per guarantee | `caps.max_cover_per_guarantee` | R$120,000 | 120,000,000,000 | Admin. Must be > 0 |
 | Cover per agency | None | No per-agency cap in this release | n/a | n/a |
-| Reinstatement window | `caps.max_reinstate_age` | 30 days | 2,592,000 s | Admin |
+| Reinstatement window | `caps.max_reinstate_age` | 0 (`reinstate_guarantee` is not in this binary) | seconds | Admin. Field carved now; planned 30 days once `reinstate_guarantee` ships (Wave 2) |
 
-At `c = 0.10`, a R$300,000 reserve backs about R$3,000,000 of cover.
+At `c = 0.25`, a R$1,000,000 reserve backs about R$4,000,000 of cover. The founders' business plan for the pilot (R$39,600 of cover per lease, so R$9,900 of required coverage per lease) is a simulator input, not a program value ([ADR 0028](../decisions/0028-pilot-parameters.md)).
 
 ## Claims
 
 | Parameter | Field | Devnet value | Base units | Set by |
 |---|---|---|---|---|
-| Claim payment per call | `caps.max_claim_per_call` | R$10,000 | 10,000,000,000 | Admin. Must be > 0 |
-| Claim payments per sliding 31-day window | `caps.max_claim_per_period` | R$20,000 | 20,000,000,000 | Admin. Must be ≥ the per-call cap. Raised temporarily for a large approved claim |
+| Claim payment per call | `caps.max_claim_per_call` | R$15,000 | 15,000,000,000 | Admin. Must be > 0 |
+| Claim payments per sliding 31-day window | `caps.max_claim_per_period` | R$20,000 | 20,000,000,000 | Admin. Must be ≥ the per-call cap. Raised temporarily for a large approved claim once `approve_claim` ships (Wave 2) |
 | Window length | None | 31 daily buckets | n/a | Program constant `CLAIM_WINDOW_DAYS = 31`; no parameter |
-| Approval threshold | (same as `max_claim_per_call`) | R$10,000 | n/a | No separate parameter |
+| Approval threshold | (same as `max_claim_per_call`) | R$15,000 | n/a | No separate parameter. `approve_claim` is Wave 2; until then a larger claim is paid bank-first |
 | Payout deadline | None | Not in the program. Kept in the MUTAV platform | n/a | n/a |
 
 ## Capital queue
 
 | Parameter | Field | Devnet value | Base units | Set by |
 |---|---|---|---|---|
-| Smallest request | `caps.min_request` | R$1,000 | 1,000,000,000 | Admin. Must be > 0. A full exit may be below it |
+| Smallest request | `caps.min_request` | R$1,000 | 1,000,000,000 | Admin. Must be > 0. Below it, only an exit of the balance worth at least `min_request / 10` (R$100) |
 | Largest request | `caps.max_request` | R$100,000 | 100,000,000,000 | Admin. Must be ≥ `min_request` |
 | Requests per fill call | `count` | 1 to 8 | n/a | Program constant `MAX_FULFIL_BATCH = 8` |
 | Exit fallback wait | `caps.max_queue_wait_secs` | 0 (off) | seconds | Admin. Field carved now, feature built before outside capital. The upgrade time lock must be at least this wait once it is non-zero |
@@ -84,10 +84,10 @@ At `c = 0.10`, a R$300,000 reserve backs about R$3,000,000 of cover.
 | Upgrade multisig | Same members as the admin multisig | Set at deploy |
 | Admin time lock | 5 minutes on devnet; 24 hours on the real pilot | Squads multisig configuration |
 | Upgrade time lock | 1 hour on devnet; 7 days on the real pilot | Squads multisig configuration |
-| Operator | A key generated at deploy | Upgrade authority at `initialize`; then admin `propose_role` and the new key's `accept_role` within 72 hours |
-| Pauser | A separate key generated at deploy | Same as operator |
-| Guardians | 1 on devnet, separate from the pauser (program maximum 3). Pause only | Admin, in one step |
-| Pending handover expiry | 72 hours per role (operator, pauser, admin) | Program |
+| Operator | A key generated at deploy | Upgrade authority at `initialize`; then admin `propose_role(1, key)` and the new key's `accept_role(1)` within 72 hours. The pauser or the admin can `revoke_operator` at once |
+| Pauser | A separate key generated at deploy | Same as operator, with role id 2. The admin can `revoke_pauser` at once |
+| Guardians | 1 on devnet, separate from the pauser (program maximum 3). Pause only | Admin, in one step (`set_guardians`) |
+| Pending handover expiry | 72 hours per role (operator, pauser, admin). `cancel_pending(role)` clears one earlier | Program |
 | Admin rotation | `propose_admin`, then `accept_admin` by the new admin | Admin |
 | Allowlist root | Set after deploy | Admin (`set_allowlist_root`) |
 
@@ -98,6 +98,7 @@ Changed only by a program upgrade.
 | Constant | Value | Meaning |
 |---|---|---|
 | `MIN_COVERAGE_RATIO_BPS` | 1,000 | Floor on `c` (0.10) |
+| `MAX_COVERAGE_RATIO_BPS` | 10,000 | Cap on `c` (1.0) |
 | `MAX_FEE_TAKE_BPS` | 3,000 | Maximum guarantee-fee take (30%) |
 | `BPS_DENOMINATOR` | 10,000 | 100% |
 | `NAV_SCALE` | 10⁹ | Fixed-point scale of NAV per share |
@@ -108,7 +109,9 @@ Changed only by a program upgrade.
 | `SUPPORTED_FEATURES` | 0 | No optional feature can be switched on |
 | Maximum guardians | 3 | Pause-only keys |
 | `CLAIM_WINDOW_DAYS` | 31 | Daily buckets in the sliding claim window |
-| Maximum `coverage_ratio_bps` | 10,000 | Cap on `c` (1.0) |
+| `SUB_MINIMUM_EXIT_FLOOR_DIVISOR` | 10 | An exit of the balance below `min_request` must be worth at least `max(1, min_request / 10)` |
+| `MAX_CONFIG_PARAMS` | 16 | Most fields one `set_config` call may change |
+| `HANDOVER_WINDOW_SECS` | 259,200 (72 hours) | How long a proposed role key has to accept |
 | `PROGRAM_LAYOUT_VERSION` | 1 | Layout version written by every account init |
 
 ## Sources
@@ -119,15 +122,17 @@ Changed only by a program upgrade.
 
 ## Decisions
 
-- [ADR 0016: Coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md) (c floor; its per-agency cap is removed by ADR 0019 and ADR 0022)
+- [ADR 0016: Coverage ratio below one](../decisions/0016-coverage-ratio-below-one.md) (c floor; its per-agency cap is removed by ADR 0019 and ADR 0022; its devnet values superseded by ADR 0028)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md) (income take)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md) (settlement floor)
 - [ADR 0007: Fee take direct to treasury](../decisions/0007-fee-take-direct-to-treasury.md)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md) (two-step roles, guardians, two multisigs, `max_reinstate_age`)
 - [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md) (31-day window)
 - [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016; cap on `c`)
-- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md) (full exit below `min_request`)
+- [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md) (exit of the balance below `min_request`)
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md) (runbook values)
 - [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (sparse `set_config`; removed fields)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md) (the values on this page)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md) (`stress_buffer ≤ max_tvl`, the sub-minimum exit floor)
 - ADR 0019: v1 layout for the devnet release (payout deadline and per-agency cap removed; `stress_buffer`, `max_reinstate_age`, window and exit-fallback fields carved)

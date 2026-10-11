@@ -12,8 +12,8 @@ A reserve share is a claim on a part of the reserve's net assets. The program mi
 |---|---|
 | Net guarantee fees enter the reserve | A claim is filed and its provision is booked |
 | Issuer partnership income is swept into the reserve | A reserve token account is frozen (it counts as 0 BRS) |
-| The admin books unsolicited money or a MUTAV backstop | |
-| A filed claim is withdrawn or amended down | A filed claim is amended up |
+| MUTAV recapitalizes the reserve (today through `contribute_fees`; later through an admin booking) | |
+| A filed claim is withdrawn or amended down (Wave 2) | A filed claim is amended up (Wave 2) |
 
 Details are in [Share value](share-value.md) and [Risks](risks.md).
 
@@ -21,7 +21,7 @@ Details are in [Share value](share-value.md) and [Risks](risks.md).
 
 | Question | Answer in the devnet release and the pilot |
 |---|---|
-| Who may deposit? | Only wallets on the on-chain allowlist. Each deposit request carries a Merkle proof against `investor_allowlist_root`. Identity checks (KYC) happen off-chain, before a wallet is added. |
+| Who may deposit? | Only wallets on the on-chain allowlist. Each deposit request carries `Eligibility::Merkle { proof }`, a Merkle proof against `investor_allowlist_root`. Identity checks (KYC) happen off-chain, before a wallet is added. |
 | Who is on the allowlist? | MUTAV's own capital wallet. Its address is recorded on-chain in `VaultConfig.mutav_capital_wallet` (set at deploy) so anyone can see MUTAV's position. |
 | Is the reserve open to public investment? | No. The pilot runs on MUTAV's own capital. |
 | Does MUTAV's wallet get special treatment? | No. It uses the same queues, the same NAV and the same rules as any other holder. There is no instruction that lets MUTAV add or take capital outside the queues. |
@@ -40,7 +40,7 @@ MUTAV touches the reserve in separate roles. The program keeps each flow on its 
 | MUTAV's fee take | Same call, separate transfer | MUTAV's treasury account | Never; not part of the reserve |
 | Issuer partnership income | `sweep_income` (operator) | `reserve` | Never |
 | MUTAV as capital provider | `request_deposit` / `request_redeem` from the capital wallet | `pending_deposits`, then `reserve` | Yes, at NAV, like any holder |
-| MUTAV backstop | `book_unsolicited` (admin), receipt kind `BACKSTOP` | `reserve` | Never |
+| MUTAV backstop | Today `contribute_fees` (operator) from MUTAV's own BRS, under a fresh invoice reference recorded as a backstop; in Wave 2 `book_unsolicited` (admin), receipt kind `BACKSTOP` | `reserve` | Never |
 
 Fees, income and backstop money raise the value of every share pro rata. MUTAV benefits from them only through the shares it bought, like every holder.
 
@@ -49,21 +49,22 @@ Fees, income and backstop money raise the value of every share pro rata. MUTAV b
 | Role | Key | What it does for capital |
 |---|---|---|
 | Capital provider (owner) | Own wallet | Requests deposits and redemptions; cancels; claims shares and BRS. |
-| Reserve admin | Squads v4 multisig, time-locked | Fills the deposit and redemption queues in FIFO order, inside `nav_bounds` it fixes when proposing; sets caps; can cancel a pending deposit back to its owner; books unsolicited money and backstops; clears a NAV halt. |
-| Operator | Separate key | Books guarantee fees and issuer income; files, amends and pays claims. Cannot fill queues, mint shares or send reserve BRS anywhere but MUTAV's payments account. The most a misused operator key can cost the reserve is the admin-set claim caps. |
+| Reserve admin | Squads v4 multisig, time-locked | Fills the deposit and redemption queues in FIFO order, inside `nav_bounds` it fixes when proposing; sets caps; can cancel a pending deposit or redemption back to its owner; clears a NAV halt. In Wave 2 also books unsolicited money and backstops. |
+| Operator | Separate key | Books guarantee fees and issuer income; files and pays claims. Cannot fill queues, mint shares or send reserve BRS anywhere but MUTAV's payments account. The most a misused operator key can cost the reserve is the admin-set claim caps. |
 | Pauser and guardians | Separate keys | Pause (the pauser can also revoke the operator). A pause stops new requests, fills and new guarantees, never cancels, claims or claim payments. Up to three guardians, one on devnet. |
-| Anyone | Any signer | `refresh` (recomputes NAV), `advance_queue_head`, `skim`. |
+| Anyone | Any signer | `refresh` (recomputes NAV and records a NAV-move halt), `advance_queue_head`. |
 
-## Devnet values that matter to capital providers
+## Devnet and pilot values that matter to capital providers
 
-Amounts are in BRS. All of them are set by the reserve admin through the time-locked multisig.
+Amounts are in BRS. These are the pilot parameters of [ADR 0028](../decisions/0028-pilot-parameters.md), used on devnet too. The parameters are set by the reserve admin through the time-locked multisig; the time locks are Squads settings.
 
 | Parameter | Devnet value |
 |---|---|
-| Maximum reserve size (`max_tvl`) | R$300,000 |
-| Request size (`min_request` to `max_request`) | R$1,000 to R$100,000 |
-| Coverage ratio `c` | 0.10 (program floor) |
+| Maximum reserve size (`max_tvl`) | R$1,000,000 |
+| Request size (`min_request` to `max_request`) | R$1,000 to R$100,000. Below R$1,000 only an exit of the balance, worth at least R$100 |
+| Coverage ratio `c` | 0.25 (program floor 0.10) |
 | Stress buffer | R$19,000 |
+| Claim caps | R$15,000 per call; R$20,000 per sliding 31 days |
 | NAV-move bound (`max_nav_move_bps`) | 100% on devnet; lowered for the real pilot |
 | Fee take (`fee_take_bps`) | 20% |
 | Take from issuer income | None; v1 has no income-take field (spec §12 Q47 stays 0) |
@@ -110,3 +111,5 @@ Amounts are in BRS. All of them are set by the reserve admin through the time-lo
 - [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md)
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
 - [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)

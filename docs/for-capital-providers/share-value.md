@@ -60,21 +60,22 @@ So a fill never lowers the NAV per share of the holders who stay. Any rounding r
 |---|---|---|
 | Net guarantee fees booked | `contribute_fees` (operator) | Up. No shares minted. |
 | Issuer partnership income booked | `sweep_income` (operator) | Up. No shares minted. |
-| Unsolicited money booked | `book_unsolicited` (admin), kind `UNSOLICITED` | Up. No shares minted. |
-| MUTAV backstop booked | `book_unsolicited` (admin), kind `BACKSTOP` | Up. No shares minted. |
+| MUTAV recapitalization (interim) | `contribute_fees` (operator), from MUTAV's own BRS under a fresh invoice reference recorded as a backstop | Up by the net after the fee take. No shares minted. |
+| Unsolicited money booked (Wave 2) | `book_unsolicited` (admin), kind `UNSOLICITED` | Up. No shares minted. |
+| MUTAV backstop booked (Wave 2) | `book_unsolicited` (admin), kind `BACKSTOP` | Up. No shares minted. |
 | Claim filed | `file_claim` (operator) | Down by the provision, at once. |
-| Claim amended | `amend_claim` (operator) | Down if raised, up if lowered. |
-| Claim withdrawn | `amend_claim` to 0 (operator); status `WITHDRAWN` | Up by the released provision. |
-| Withdrawn claim filed again | `refile_claim` (operator) | Down by the new provision. |
+| Claim amended (Wave 2) | `amend_claim` (operator) | Down if raised, up if lowered. |
+| Claim withdrawn (Wave 2) | `amend_claim` to 0 (operator); status `WITHDRAWN` | Up by the released provision. |
+| Withdrawn claim filed again (Wave 2) | `refile_claim` (operator) | Down by the new provision. |
 | Claim paid | `pay_claim` (operator) | No change. The payment equals the provision exactly, so assets and provisions fall by the same amount. |
 | Reserve token account frozen | `refresh` | Down. A frozen reserve counts as 0 BRS. |
 | Deposit or redemption filled | `fulfil_deposits`, `fulfil_redeems` | No change, apart from rounding in the reserve's favour. |
 
 ### Guards on inflows
 
-- **No inflow while no shares exist.** `contribute_fees`, `sweep_income` and `book_unsolicited` are refused while `shares_outstanding == 0`. Money waits in the inbox or the `unsolicited` account until the first deposit is filled. This keeps the first depositor's shares priced correctly.
-- **Every deposit fill mints more than 0 shares.**
-- **No deposit into a reserve with nothing left.** When net assets are 0 and shares are outstanding, deposit fills are refused with `ReserveUnderwater`, so new money never pays for old losses. Recovery is a MUTAV backstop, booked by the admin with `book_unsolicited` (kind `BACKSTOP`), which mints no shares and so raises NAV for every holder.
+- **No inflow while no shares exist.** `contribute_fees` and `sweep_income` refuse with `NoSharesOutstanding` while `shares_outstanding == 0` (`book_unsolicited` will too). Fees wait with the operator and income waits in the inbox until the first deposit is filled. This keeps the first depositor's shares priced correctly.
+- **Every deposit fill mints more than 0 shares.** A request that would mint 0 stops the batch and stays pending.
+- **No fill in an underwater reserve.** When NAV per share is below the smallest published unit while shares are outstanding (`net_assets × 10^9 < shares_outstanding`), deposit and redemption fills are refused with `ReserveUnderwater`: new money never pays for old losses, and no exit is paid 0. An empty reserve is not underwater. Recovery is MUTAV's recapitalization, which mints no shares and so raises NAV for every holder: through `contribute_fees` until the Wave 2 `BACKSTOP` booking (`book_unsolicited`) ships ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)).
 
 ## Income from the BRS issuer partnership
 
@@ -82,7 +83,7 @@ BRS itself pays no yield. Nora, the BRS issuer, pays its partners a monthly reve
 
 1. Nora pays into the reserve's income inbox: the vault authority's associated token account for BRS. Nothing there counts toward NAV.
 2. Each month the operator calls `sweep_income(income_ref_hash, period, amount)` for the amount on Nora's statement. An `IncomeReceipt` makes each statement count once.
-3. The whole amount moves into `reserve` and raises NAV for every holder. The `IncomeReceipt` has kind `NORA_STATEMENT`. MUTAV takes nothing from this income: v1 has no income-take field, and a take would come back as a carve only after a commercial decision (spec §12 Q47).
+3. The whole amount moves into `reserve` and raises NAV for every holder. The `IncomeReceipt` has kind `ISSUER_STATEMENT`. MUTAV takes nothing from this income: v1 has no income-take field, and a take would come back as a carve only after a commercial decision (spec §12 Q47).
 
 What a holder should know about this income:
 
@@ -95,7 +96,7 @@ What a holder should know about this income:
 
 The program keeps internal accounting. It tracks the amounts it moved itself (`brs_balance` and the escrow totals), never raw token balances. A direct transfer of BRS into `reserve`, `pending_deposits` or `claims` leaves `brs_balance` unchanged, so NAV does not move.
 
-The extra BRS does not stay mixed with the reserve:
+The extra BRS stays untracked. In Wave 2 ([ADR 0024](../decisions/0024-unsolicited-money-and-backstop.md)) it is also moved out of the reserve's accounts:
 
 1. Anyone can call `skim(account)`. It moves the untracked surplus (balance minus the tracked total) into a separate `unsolicited` account. It books nothing and moves no tracked money. A monitor runs it.
 2. The reserve admin decides what to do with it, through the time-locked multisig:
@@ -104,21 +105,22 @@ The extra BRS does not stay mixed with the reserve:
    - book dust below R$10 directly.
 3. Foreign tokens sent to the reserve (classic SPL Token mints only, never Token-2022) and SOL above the rent-exempt minimum are returned to their source with `return_unsolicited` (source `Foreign` or `Lamports`). They never count and are never listed in the app.
 
-So unsolicited money can reach NAV only through a public, time-locked admin booking, and then for every holder pro rata.
+So unsolicited money can reach NAV only through a public, time-locked admin booking, and then for every holder pro rata. Until Wave 2 ships it cannot reach NAV at all.
 
 ## The NAV-move guard
 
 Fills convert at the live NAV. A sharp, unexplained move in NAV should stop fills until someone looks at it. The guard does that.
 
 ```text
-inflow_nav += ceil(net × 10^9 / shares_outstanding)        // at each fee, income or booking inflow
+inflow_nav += ceil(net × 10^9 / shares_outstanding)        // at each fee or income inflow
 guard_nav   = max(1, published_nav − inflow_nav)           // NAV net of verified inflows
 halt if |guard_nav − baseline| × 10,000 > max_nav_move_bps × baseline
 ```
 
 - The guard measures NAV net of verified inflows, per share. Fees and income booked by the program never trip it. Other moves, such as a claim filing or a freeze, do.
-- It runs in `refresh` and inline in both `fulfil_deposits` and `fulfil_redeems`, so a fill right after a shock is refused.
-- A trip sets `fulfil_halted`. The halt is sticky. Only the admin's time-locked `clear_fulfil_halt` clears it and resets the baseline to the current published NAV. `clear_fulfil_halt` refuses while a reserve account is frozen.
+- It runs in `refresh` and inline at the start of both `fulfil_deposits` and `fulfil_redeems`, so a fill right after a shock is refused (`FulfilHalted`).
+- A trip in `refresh` sets `fulfil_halted`. A trip inside a fill refuses the fill but does not latch the halt, because a failed instruction writes nothing; the next `refresh`, which anyone can send, records it. The halt is sticky. Only the admin's time-locked `clear_fulfil_halt(nav_bounds)` clears it and resets the baseline to the current published NAV, which must lie within the bounds. `clear_fulfil_halt` refuses while a reserve account is frozen.
+- The baseline is seeded by the deposit fill that mints the first shares, and cleared to 0 by the redemption fill that burns the last ones.
 - On devnet `max_nav_move_bps` is 10,000 (100%), on purpose: a claim against a small demo reserve is a real NAV move and would halt fills. The guard is proven in tests and is lowered for the real pilot.
 
 The guard works together with `nav_bounds`: the admin's fill proposal fixes a NAV range, and a fill outside it is refused (see [Deposits and redemptions](deposits-and-redemptions.md#nav-bounds-on-every-fill)).
@@ -126,7 +128,7 @@ The guard works together with `nav_bounds`: the admin's fill proposal fixes a NA
 ## Checking it yourself
 
 - The public `/reserve` page shows stable assets, provisions, NAV, tracked against actual balances per account, and every booked inflow, with no wallet needed.
-- The TypeScript client (`@mutav-finance/mutav-protocol-solana`) has an exact `bigint` mirror of the program's math (`sharesFor`, `assetsFor`, `navPerShare`, `netAssets` and the guard), kept in parity by shared test vectors.
+- The TypeScript client (`@mutav-finance/mutav-protocol-solana`) has an exact `bigint` mirror of the program's math (`sharesFor`, `assetsFor`, `navPerShare`, `netAssets`, `isUnderwater`, `redeemSizeError` and the guard), kept in parity by shared test vectors.
 - `refresh` is permissionless. Its `StateRefreshed` event carries the recomputed figures.
 
 ## Sources
@@ -134,7 +136,7 @@ The guard works together with `nav_bounds`: the admin's fill proposal fixes a NA
 - [Spec §4, invariants and formulas](../spec.md#4-invariants-and-formulas)
 - [Spec §7, price safety and the NAV-move guard](../spec.md#7-price-safety)
 - [Spec §2.1, money flows and issuer income](../spec.md#21-three-separate-mutav-money-flows-adr-0009-and-issuer-income-adr-0017)
-- [Litepaper §8, reserve, solvency and NAV](../litepaper.md#8-reserve-solvency-and-nav) and [§10, reserve assets](../litepaper.md#10-reserve-assets-and-brl-on-solana)
+- [Litepaper §8, reserve, required coverage and NAV](../litepaper.md#8-reserve-required-coverage-and-nav) and [§10, reserve assets](../litepaper.md#10-reserve-assets-and-brl-on-solana)
 - Program: [`programs/mutav/src/math.rs`](../../programs/mutav/src/math.rs), [`programs/mutav/src/pricing.rs`](../../programs/mutav/src/pricing.rs), [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), [`programs/mutav/src/instructions/operator/sweep_income.rs`](../../programs/mutav/src/instructions/operator/sweep_income.rs), [`programs/mutav/src/instructions/public/refresh.rs`](../../programs/mutav/src/instructions/public/refresh.rs)
 - Client: [`clients/js`](../../clients/js)
 
@@ -150,3 +152,4 @@ The guard works together with `nav_bounds`: the admin's fill proposal fixes a NA
 - [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md) (inflows refused while no shares exist, inline guard, `nav_bounds`)
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (no income take in v1)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md) (underwater test, inline guard, baseline, interim recapitalization)

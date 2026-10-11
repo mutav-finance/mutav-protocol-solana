@@ -2,6 +2,8 @@
 
 Unsolicited money is any token that reaches a program account outside a booking path: BRS sent straight to a reserve account, BRS in the income inbox that is not on an issuer statement, other tokens, or extra SOL. The program never counts it toward NAV or coverage on arrival. It holds it apart until the reserve admin books it into the reserve or returns it.
 
+**Status: design ([ADR 0024](../decisions/0024-unsolicited-money-and-backstop.md)), Wave 2.** The devnet binary creates the `unsolicited` account at `initialize` and reserves the receipt kinds `UNSOLICITED` (2) and `BACKSTOP` (3). `skim`, `classify_unsolicited`, `book_unsolicited`, `return_unsolicited` and the burn of surplus shares are not in it. Until they ship, unsolicited money stays where it lands, untracked and outside NAV and coverage, and MUTAV recapitalizes an underwater reserve through `contribute_fees` ([Backstop contributions](#backstop-contributions)).
+
 Two rules frame the design:
 
 - **No stuck money.** Every unsolicited balance has a way out.
@@ -27,7 +29,7 @@ flowchart TD
     F[Foreign classic SPL tokens<br/>or SOL above rent-exempt] -->|return_unsolicited, admin<br/>source Foreign or Lamports| S
 ```
 
-## Instructions
+## Instructions (Wave 2)
 
 | Instruction | Signer | What it does |
 |---|---|---|
@@ -48,7 +50,7 @@ Every booking or return is a Squads proposal under the admin time lock. `skim` i
 
 ## Booking rules
 
-- **No booking while no shares exist.** `book_unsolicited` is refused while `shares_outstanding == 0`, whatever its kind, like guarantee fees and issuer income.
+- **No booking while no shares exist.** `book_unsolicited` is refused while `shares_outstanding == 0`, whatever its kind, like guarantee fees and issuer income (`NoSharesOutstanding`).
 - **One receipt per booking.** Each booking creates an `IncomeReceipt` seeded by its `ref_hash`, so it counts once.
 - **Raises NAV for every holder.** A booking mints no shares. Its net counts in the NAV-move guard's `inflow_nav`, so it does not trip the guard.
 
@@ -71,11 +73,13 @@ The 30-day window and the R$10 dust threshold are runbook and app values. There 
 
 ## Backstop contributions
 
-MUTAV stands behind the reserve as *fiador*. When the reserve needs capital that new deposits cannot provide, for example when it is underwater and deposit fills are refused ([Coverage model](coverage-model.md#underwater)), MUTAV sends its own BRS. The reserve admin books it with `book_unsolicited`, kind `BACKSTOP`.
+MUTAV stands behind the reserve as *fiador*. When the reserve needs capital that new deposits cannot provide, for example when it is underwater and deposit fills are refused ([Coverage model](coverage-model.md#underwater)), MUTAV sends its own BRS. Once Wave 2 ships, the reserve admin books it with `book_unsolicited`, kind `BACKSTOP`.
 
 - No shares are minted. The booking raises NAV for every holder.
 - The receipt kind keeps backstop money apart from unsolicited money and issuer income in the public record.
 - Like every other inflow, it is refused while no shares exist.
+
+**Interim recovery in the devnet binary** ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)): MUTAV recapitalizes through `contribute_fees`. The operator signs from its own BRS account, under a fresh `invoice_ref_hash` that mutav-app records as a backstop. No shares are minted, and it counts as a verified inflow for the NAV-move guard. `fee_take_bps` of it goes to the treasury, so the operator sends `needed / (1 − take)`, rounded up. `cancel_deposit` and `cancel_redeem` stay open throughout.
 
 ## What the public sees
 
@@ -83,9 +87,9 @@ MUTAV stands behind the reserve as *fiador*. When the reserve needs capital that
 - The `/admin` console lists unsolicited balances that wait for a decision.
 - Foreign tokens are never listed in the app.
 
-## Pause and solvency
+## Pause and coverage
 
-`skim`, `classify_unsolicited`, `book_unsolicited`, `return_unsolicited` and the burn of surplus shares are not stopped by pause and are never solvency-gated. `skim` still refuses frozen accounts.
+`skim`, `classify_unsolicited`, `book_unsolicited`, `return_unsolicited` and the burn of surplus shares will not be stopped by pause and are never coverage-gated. `skim` still refuses frozen accounts.
 
 ## Sources
 
@@ -103,4 +107,5 @@ MUTAV stands behind the reserve as *fiador*. When the reserve needs capital that
 - [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md) (bookings refused while no shares exist)
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (one generic return; no on-chain dust field)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md) (interim recovery through `contribute_fees`)
 - ADR 0019: v1 layout for the devnet release (`IncomeReceipt.kind` carved)
