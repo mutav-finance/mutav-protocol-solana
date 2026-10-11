@@ -239,17 +239,6 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="bg-(--color-surface) border">
-        <div className="flex flex-col gap-2 p-6">
-          <Label>Earned net · since launch</Label>
-          <Mono style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{signed(earned, fmtBrs)}</Mono>
-          <span className="font-body text-(--color-text-2) text-sm">Guarantee fees + issuer income − claim payments</span>
-        </div>
-        <div className="border-l-(--color-text-3) border-t border-l-2 px-6 py-3">
-          <p className="font-body text-(--color-text) m-0 text-sm font-medium">A deposit is not income.</p>
-        </div>
-      </div>
-
       {/* [C+D] Both sides of the money in one bordered strip, as diverging bars. */}
       <div className="flex flex-col gap-4">
         <BlockHead
@@ -266,21 +255,12 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
           <FlowGroup title="Earnings" note="What the reserve earned from its guarantees, after the claim payments it made." net={earned} bars={earnings} />
           <FlowGroup title="Capital" note="Investor money filled in and out of the reserve. Not earnings." net={capital} bars={capitalBars} />
         </div>
-        <span className="font-body text-(--color-text-3) text-2xs">Each side has its own scale.</span>
-        <TotalsStrip
-          title="Money in and out · since launch"
-          groups={[
-            [
-              { label: "Guarantee fees, net", value: fmtBrs(totals.feesNetToReserve) },
-              { op: "+", label: "Issuer income, net", value: fmtBrs(totals.incomeNetToReserve) },
-              { op: "+", label: "Deposits filled", value: fmtBrs(totals.depositsIn) },
-              { op: "−", label: "Claim payments", value: fmtBrs(totals.claimsPaid) },
-              { op: "−", label: "Redemptions filled", value: fmtBrs(totals.redemptionsOut) },
-              { op: "=", label: "Net change", value: signed(earned + capital, fmtBrs), result: true },
-            ],
-          ]}
-          note="Fees, income and claim payments are lifetime totals from the reserve's state account. Deposits and redemptions sum the fills in the last 100 transactions of each escrow."
-        />
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+          <span className="font-body text-(--color-text-2) text-sm">
+            Net change since launch <Mono style={{ color: "var(--color-text)", fontWeight: 700 }}>{signed(earned + capital, fmtBrs)}</Mono>: earnings plus capital. A deposit is not income.
+          </span>
+          <span className="font-body text-(--color-text-3) text-2xs">Each side has its own scale. Capital sums the fills in the last 100 transactions of each escrow.</span>
+        </div>
       </div>
 
       {/* [E] The dated ledger; the period filter applies here only. */}

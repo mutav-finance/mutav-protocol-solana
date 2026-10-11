@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { fmtShares, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, type Ledger, type QueueRow, type ReserveView } from "@/lib/view";
-import { TotalsStrip } from "@/components/reserve/sections/Flows";
 
 import { Empty, Num, Table } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
@@ -50,7 +49,7 @@ function Cell({ label, value, sub }: { label: string; value: string; sub: string
 }
 
 /** [B + C] Hero (BRS waiting to deposit) and a three-cell support strip, sharing one border. */
-function Summary({ deposits, redeems, capital }: { deposits: QueueRow[]; redeems: QueueRow[]; capital: string }) {
+function Summary({ deposits, redeems, capital, owed }: { deposits: QueueRow[]; redeems: QueueRow[]; capital: string; owed: bigint }) {
   const fmtBrs = useFmt();
   const all = [...deposits, ...redeems];
   const oldest = all.reduce<QueueRow | null>((m, x) => (m === null || x.requestedAt < m.requestedAt ? x : m), null);
@@ -62,9 +61,10 @@ function Summary({ deposits, redeems, capital }: { deposits: QueueRow[]; redeems
         <Mono style={{ fontSize: "clamp(36px, 5vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)", overflowWrap: "anywhere" }}>{fmtBrs(sum(deposits))}</Mono>
         <span className="font-body text-(--color-text-2) text-sm">{deposits.length === 0 ? "No deposit is waiting." : `BRS held in escrow until the Reserve Admin fills it into the reserve: ${plural(deposits.length, "request", "requests")}, oldest first.`}</span>
       </div>
-      <div className="grid grid-cols-1 gap-px sm:grid-cols-3 lg:col-span-7">
+      <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:col-span-7">
         <Cell label="Shares to redeem" value={fmtShares(sum(redeems))} sub={`Shares investors asked to turn back into BRS, in ${plural(redeems.length, "request", "requests")}.`} />
         <Cell label="Oldest request" value={oldest ? fmtTime(oldest.requestedAt) : "none"} sub={oldest ? `The ${oldest.side === "deposit" ? "deposit" : "redemption"} waiting longest; it fills next on its side.` : "Nothing is waiting in either line."} />
+        <Cell label="Owed to redemptions" value={fmtBrs(owed)} sub="Filled, waiting in the claims account until the investor collects it. Outside stable assets." />
         <Cell label="MUTAV capital" value={`${ours} of ${all.length}`} sub="Requests from the MUTAV capital wallet. They wait in the same line, with no priority." />
       </div>
     </div>
@@ -131,7 +131,7 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
   const capital = r.config.mutavCapitalWallet;
   return (
     <div className="flex flex-col gap-6">
-      <Summary deposits={q.deposits} redeems={q.redeems} capital={capital} />
+      <Summary deposits={q.deposits} redeems={q.redeems} capital={capital} owed={r.state.claimableAssetsTotal} />
 
       <div className="bg-(--color-surface) border-l-(--color-text-3) border border-l-2 px-6 py-3">
         <p className="font-body text-(--color-text) m-0 text-sm font-medium">One line, oldest first. No request skips it.</p>
@@ -141,18 +141,6 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
         <Line title="Deposits" empty="No deposits waiting. New requests join the end of the line." rows={q.deposits} unitHead="Amount" unit={fmtBrs} capital={capital} />
         <Line title="Redemptions" empty="No redemptions waiting. New requests join the end of the line." rows={q.redeems} unitHead="Shares" unit={fmtShares} capital={capital} />
       </div>
-
-      <TotalsStrip
-        title="Totals · held outside stable assets"
-        groups={[
-          [
-            { label: "Deposits in escrow", value: fmtBrs(r.state.pendingDepositsTotal) },
-            { op: "+", label: "Owed to filled redemptions", value: fmtBrs(r.state.claimableAssetsTotal) },
-            { op: "=", label: "Held outside stable assets", value: fmtBrs(r.state.pendingDepositsTotal + r.state.claimableAssetsTotal), result: true },
-          ],
-        ]}
-        note="A deposit joins stable assets when it is filled. A filled redemption leaves them at the fill and waits in the claims account until the investor collects it. Neither counts toward coverage."
-      />
 
       {/* [F] Explanation below the data, collapsed. */}
       <details className="group border-t pt-4">

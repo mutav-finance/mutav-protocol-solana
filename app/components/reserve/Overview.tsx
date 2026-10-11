@@ -77,7 +77,6 @@ export function Overview() {
           <Hero r={r} l={d.ledger} />
           <WhereCapitalSits r={r} l={d.ledger} />
           <Promises />
-          <VerifyCta />
         </div>
         <aside className="flex min-w-0 flex-col gap-10">
           <RecentActivity r={r} rows={flows} />
@@ -374,22 +373,6 @@ function Promises() {
           </li>
         ))}
       </ol>
-    </section>
-  );
-}
-
-// ── 4 · Verify it yourself ──────────────────────────────────────────────────
-
-function VerifyCta() {
-  return (
-    <section aria-labelledby="verify-h" className="bg-(--color-surface) flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border px-6 py-7 sm:px-8">
-      <div className="flex max-w-[560px] flex-col gap-1.5">
-        <H3 id="verify-h">Verify it yourself</H3>
-        <span className="font-body text-(--color-text-2) text-[13px] leading-relaxed">The program, the keys that sign and every account it uses, each one on Solana Explorer.</span>
-      </div>
-      <Link href="/reserve/verify" className="font-body text-(--color-text) inline-flex h-10 items-center border px-5 text-sm font-medium whitespace-nowrap no-underline [border-color:#3A3D44] hover:[border-color:var(--color-text)]">
-        Open every account →
-      </Link>
     </section>
   );
 }

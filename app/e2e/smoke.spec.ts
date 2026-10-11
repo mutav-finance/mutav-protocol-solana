@@ -80,7 +80,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
 
     await page.goto("/reserve/risks");
-    await expect(page.getByText("BRS is issued by Nora, and Nora can freeze it")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Claim payment caps" })).toBeVisible();
     await noBannedWords(page);
 
     await page.goto("/reserve/verify");

@@ -2,17 +2,15 @@
 
 /**
  * /reserve · Risks (Disclosures). Answers one question: "What could stop this
- * reserve, and what limits each risk?" Four blocks, top to bottom:
- *   1. Hero: the one risk with a live on-chain state (Nora's freeze).
- *   2. Claim payments: never gated by solvency, bounded by the two caps.
- *   3. Who provides capital (the allowlist) and what is built later.
- *   4. Verify it yourself (shared with the Overview).
+ * reserve, and what limits each risk?" Two blocks, top to bottom:
+ *   1. Claim payments: bounded by the two caps.
+ *   2. Who provides capital (the allowlist).
+ * The BRS freeze authority is shown on the Overview's mint card.
  * Renders on-chain values from /api/ledger; nothing is computed here.
  */
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
-import { Explorer } from "@/components/Explorer";
 import { fmtDuration } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { type ReserveView } from "@/lib/view";
@@ -21,7 +19,6 @@ import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
 const LABEL = { letterSpacing: "0.01em" } as const;
-const KICKER = { letterSpacing: "0.08em" } as const;
 
 /** Inter Medium 12px caps label (STYLE.md card label). */
 function Label({ children }: { children: ReactNode }) {
@@ -51,83 +48,7 @@ function BlockHead({ id, title, intro, link }: { id: string; title: string; intr
   );
 }
 
-const BUILT_LATER = ["Partial redemption fills at the queue head", "On-chain claim notices", "More reserve assets through capped adapters"];
-
-/**
- * "Verify it yourself": what a verifier opens first (the program, the key that
- * governs it, the cluster) and the audit status, said plainly. Shared by the
- * Overview and Risks; every value is already on the page.
- */
-export function VerifyStrip({ r, accountsLink = true }: { r: ReserveView; accountsLink?: boolean }) {
-  const cell = (k: string, v: ReactNode) => (
-    <div className="bg-(--color-surface) flex min-w-0 flex-col gap-2 px-6 py-4">
-      <Label>{k}</Label>
-      <span className="min-w-0 text-sm">{v}</span>
-    </div>
-  );
-  return (
-    <section aria-labelledby="verify-h" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id="verify-h" className="font-display text-(--color-text) m-0 text-base font-bold">
-          Verify it yourself
-        </h2>
-        {accountsLink && (
-          <Link href="/reserve/verify" className="ext-link font-body text-xs">
-            Every account →
-          </Link>
-        )}
-      </div>
-      <div className="grid grid-cols-1 gap-px border sm:grid-cols-3" style={{ background: "var(--color-border)" }}>
-        {cell("Program", <Explorer value={r.programId} />)}
-        {cell(
-          "Governed by",
-          <span className="inline-flex flex-wrap items-center gap-2">
-            <Explorer value={r.config.admin} />
-            <span className="font-body text-(--color-text-3) text-xs">Squads multisig</span>
-          </span>,
-        )}
-        {cell("Cluster", <Mono style={{ fontSize: 12, color: "var(--color-text)" }}>{r.cluster.toUpperCase()}</Mono>)}
-      </div>
-    </section>
-  );
-}
-
-/** Block 1 · hero: the only risk with a live on-chain state. Error colour only when frozen. */
-function FreezeHero({ r }: { r: ReserveView }) {
-  const frozen = r.token.reserveFrozen;
-  const state = frozen ? "var(--color-error)" : "var(--color-text)";
-  return (
-    <article
-        aria-labelledby="risk-freeze-h"
-        className="bg-(--color-surface) flex flex-col gap-6 border p-6"
-        style={frozen ? { borderColor: "var(--color-error)" } : undefined}
-      >
-        <div className="flex flex-col gap-2">
-          <span className="font-mono text-(--color-text-3) text-2xs uppercase" style={KICKER}>
-            Live risk · reserve token account
-          </span>
-          <h3 id="risk-freeze-h" className="font-display text-(--color-text) m-0 text-xl leading-snug font-bold md:text-2xl">
-            BRS is issued by Nora, and Nora can freeze it
-          </h3>
-        </div>
-        <div className="flex flex-col gap-2" role="status">
-          <Mono style={{ fontSize: "clamp(32px, 6vw, 48px)", fontWeight: 700, lineHeight: 1, color: state }}>{frozen ? "FROZEN NOW" : "NOT FROZEN NOW"}</Mono>
-          <p className="font-body text-(--color-text-2) m-0 text-sm">A freeze stops every outflow, claim payments included, until thawed.</p>
-        </div>
-        <dl className="m-0 mt-auto flex flex-wrap items-baseline gap-x-4 gap-y-2 border-t pt-4">
-          <dt>
-            <Label>Freeze authority</Label>
-          </dt>
-          <dd className="m-0 inline-flex flex-wrap items-baseline gap-2 text-sm">
-            {r.token.freezeAuthority ? <Explorer value={r.token.freezeAuthority} /> : <Mono>none</Mono>}
-            {r.cluster !== "localnet" && <span className="font-body text-(--color-text-3) text-xs">a single Nora wallet</span>}
-          </dd>
-        </dl>
-      </article>
-  );
-}
-
-/** Block 2 · claim payments: one statement, two caps in one strip. */
+/** Block 1 · claim payments: two caps in one strip. */
 function ClaimLimits({ r }: { r: ReserveView }) {
   const fmtBrs = useFmt();
   const caps = r.config.caps;
@@ -142,8 +63,8 @@ function ClaimLimits({ r }: { r: ReserveView }) {
     <section aria-labelledby="risk-claims-h" className="flex flex-col gap-4">
       <BlockHead
         id="risk-claims-h"
-        title="Claim payments are never blocked by solvency"
-        intro="The solvency gate stops new guarantees and redemptions, not claims. Remaining cover, liquid BRS and two caps bound each payment."
+        title="Claim payment caps"
+        intro="Remaining cover, liquid BRS and two caps bound each claim payment."
         link={["/reserve/claims", "See claims"]}
       />
       <div className="grid grid-cols-1 gap-px border sm:grid-cols-2" style={{ background: "var(--color-border)" }}>
@@ -154,35 +75,21 @@ function ClaimLimits({ r }: { r: ReserveView }) {
   );
 }
 
-/** Block 3 · who provides capital, and what is not built yet. Text only, no figures. */
+/** Block 2 · who provides capital. Text only, no figures. */
 function CapitalTerms() {
   return (
     <section aria-labelledby="risk-capital-h" className="flex flex-col gap-4">
       <div className="bg-(--color-surface) border-l-(--color-text-3) border border-l-2 px-6 py-3">
         <h3 id="risk-capital-h" className="font-display text-(--color-text) m-0 text-base font-bold">
-          Who provides capital, and what comes later
+          Who provides capital
         </h3>
       </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="flex flex-col">
         <article className="bg-(--color-surface) flex flex-col gap-3 border p-6">
           <h4 className="font-display text-(--color-text) m-0 text-lg leading-snug font-bold">Approved wallets only</h4>
           <p className="font-body text-(--color-text-2) m-0 text-sm leading-relaxed">
             An on-chain allowlist gates deposits and redemptions (KYC off-chain). Every approved wallet waits in the same FIFO queue.
           </p>
-        </article>
-        <article className="bg-(--color-surface) flex flex-col gap-3 border p-6">
-          <div className="flex flex-col gap-1">
-            <h4 className="font-display text-(--color-text) m-0 text-lg leading-snug font-bold">Built later</h4>
-            <p className="font-body text-(--color-text-2) m-0 text-sm">Designed, not live yet.</p>
-          </div>
-          <ul className="font-body text-(--color-text) m-0 flex flex-col gap-2 border-t p-0 pt-4 text-sm">
-            {BUILT_LATER.map((x) => (
-              <li key={x} className="flex list-none items-start gap-3">
-                <span aria-hidden="true" className="bg-(--color-text-3) mt-2 inline-block size-1.5 shrink-0" />
-                {x}
-              </li>
-            ))}
-          </ul>
         </article>
       </div>
     </section>
@@ -192,10 +99,8 @@ function CapitalTerms() {
 export function Disclosures({ r }: { r: ReserveView }) {
   return (
     <div className="flex flex-col gap-10 md:gap-12">
-      <FreezeHero r={r} />
       <ClaimLimits r={r} />
       <CapitalTerms />
-      <VerifyStrip r={r} />
     </div>
   );
 }

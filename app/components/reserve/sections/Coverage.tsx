@@ -240,14 +240,6 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       { op: "or", label: "Open provisions", value: fmtBrs(r.state.provisions) },
       { op: "=", label: "Coverage required, the larger", value: fmtBrs(s.coverageRequired), result: true },
     ],
-    [
-      { label: "Stable assets", value: fmtBrs(s.stableAssets) },
-      { op: "−", label: "Coverage required", value: fmtBrs(s.coverageRequired) },
-      ...(s.earmarkEff > 0n ? [{ op: "−" as const, label: "Exit earmark", value: fmtBrs(s.earmarkEff) }] : []),
-      s.underCovered
-        ? { op: "=" as const, label: "Shortfall", value: `−${fmtBrs(s.deficit)}`, result: true, color: "var(--color-error)" }
-        : { op: "=" as const, label: "Free capital", value: fmtBrs(s.freeCapital), result: true },
-    ],
   ];
 
   return (
@@ -360,7 +352,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       <TotalsStrip
         title="Totals · cover against the reserve"
         groups={totals}
-        note="Coverage required is the larger of the coverage ratio times remaining cover (rounded up) and open provisions. Free capital is what stable assets hold beyond it: room for new guarantees."
+        note="Coverage required is the larger of the coverage ratio times remaining cover (rounded up) and open provisions. The Overview sets it against stable assets."
       />
     </div>
   );
