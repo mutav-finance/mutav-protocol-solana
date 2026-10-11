@@ -6,6 +6,15 @@ import { ComposeError } from "./compose";
 import { StaleCarryError } from "./squads";
 
 /**
+ * A2: public read routes are cached at the CDN for 3 s and served stale for
+ * 10 s more while one request refreshes, so a polling loop cannot exhaust
+ * the public devnet RPC. Errors and transaction routes stay no-store.
+ */
+export const READ_CACHE = "public, s-maxage=3, stale-while-revalidate=10";
+
+export const readResponse = (value: unknown) => jsonResponse(value, { headers: { "cache-control": READ_CACHE } });
+
+/**
  * Map an error to a JSON response; never leaks a stack, and every URL in the
  * message or logs is cut to its host (A5: an RPC URL may carry an API key).
  */
