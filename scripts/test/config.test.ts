@@ -48,13 +48,15 @@ describe('devnet.example.json', () => {
     expect(c.caps.maxNavMoveBps).toBe(10_000);
   });
 
-  test('starts at c = 0.10 with caps sized for it (ADR 0016)', () => {
+  test('holds the pilot parameters: c = 0.25 and its caps (ADR 0028)', () => {
     const c = parseConfig(filled());
     const BRL = 1_000_000n;
-    expect(c.coverageRatioBps).toBe(1_000);
-    expect(c.caps.maxTvl).toBe(300_000n * BRL);
-    expect(c.caps.maxCoverPerGuarantee).toBe(40_000n * BRL);
-    expect([c.caps.maxClaimPerCall, c.caps.maxClaimPerPeriod]).toEqual([10_000n * BRL, 20_000n * BRL]);
+    expect(c.coverageRatioBps).toBe(2_500);
+    expect(c.caps.maxTvl).toBe(1_000_000n * BRL);
+    expect(c.caps.maxCoverPerGuarantee).toBe(120_000n * BRL);
+    expect(c.caps.stressBuffer).toBe(19_000n * BRL);
+    expect(c.caps.maxRequest).toBeLessThanOrEqual(c.caps.maxTvl);
+    expect([c.caps.maxClaimPerCall, c.caps.maxClaimPerPeriod]).toEqual([15_000n * BRL, 20_000n * BRL]);
     expect([c.caps.minRequest, c.caps.maxRequest]).toEqual([1_000n * BRL, 100_000n * BRL]);
   });
 });

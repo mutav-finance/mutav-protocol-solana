@@ -99,7 +99,7 @@ For Squads members. A sticky in-page nav (General controls · Money in & out · 
 
 ## Seed scenario
 
-A script (`scripts/seed.ts`, localnet and devnet) that drives the program into the demo's starting state: a funded reserve from the capital wallet, a few guarantees (at c = 0.10, as on devnet), one paid fee, one swept month of issuer income with a remainder left in the income inbox, and an under-coverage scenario for step 5. It reuses the protocol's devnet scripts and outputs unsigned transactions where admin authority is needed.
+A script (`scripts/seed.ts`, localnet and devnet) that drives the program into the demo's starting state: a funded reserve from the capital wallet, a few guarantees (at c = 0.25, as on devnet; ADR 0028), one paid fee, one swept month of issuer income with a remainder left in the income inbox, and an under-coverage scenario for step 5. It reuses the protocol's devnet scripts and outputs unsigned transactions where admin authority is needed.
 
 ## Tests
 

@@ -61,18 +61,19 @@ export type LockedValue = {
 };
 
 /**
- * The locked devnet values (handoff "Devnet values"). A devnet deploy must
+ * The locked devnet values: the founders' pilot parameters (ADR 0028, which
+ * supersedes the devnet caps of ADR 0016 / ADR 0022). A devnet deploy must
  * hold every one of them.
  * The claim window is the program constant `CLAIM_WINDOW_DAYS` (31), so it
- * is not a config value. TODO(PR 2): add `stress_buffer` (R$19k) and the
- * unsolicited dust threshold (R$10) once `initialize` / `set_config` set them.
+ * is not a config value. TODO: add the unsolicited dust threshold (R$10) once
+ * `initialize` / `set_config` set it.
  */
 export const DEVNET_LOCKED: LockedValue[] = [
-  { field: 'coverage_ratio_bps', onChain: (c) => v(c.coverageRatioBps), value: 1_000n },
+  { field: 'coverage_ratio_bps', onChain: (c) => v(c.coverageRatioBps), value: 2_500n },
   { field: 'fee_take_bps', onChain: (c) => v(c.feeTakeBps), value: 2_000n },
-  { field: 'caps.max_tvl', onChain: (c) => v(c.caps.maxTvl), value: 300_000n * BRL },
-  { field: 'caps.max_cover_per_guarantee', onChain: (c) => v(c.caps.maxCoverPerGuarantee), value: 40_000n * BRL },
-  { field: 'caps.max_claim_per_call', onChain: (c) => v(c.caps.maxClaimPerCall), value: 10_000n * BRL },
+  { field: 'caps.max_tvl', onChain: (c) => v(c.caps.maxTvl), value: 1_000_000n * BRL },
+  { field: 'caps.max_cover_per_guarantee', onChain: (c) => v(c.caps.maxCoverPerGuarantee), value: 120_000n * BRL },
+  { field: 'caps.max_claim_per_call', onChain: (c) => v(c.caps.maxClaimPerCall), value: 15_000n * BRL },
   {
     field: 'caps.max_claim_per_period',
     onChain: (c) => v(c.caps.maxClaimPerPeriod),
@@ -82,6 +83,7 @@ export const DEVNET_LOCKED: LockedValue[] = [
   { field: 'caps.min_request', onChain: (c) => v(c.caps.minRequest), value: 1_000n * BRL },
   { field: 'caps.max_request', onChain: (c) => v(c.caps.maxRequest), value: 100_000n * BRL },
   { field: 'caps.max_nav_move_bps', onChain: (c) => v(c.caps.maxNavMoveBps), value: 10_000n },
+  { field: 'caps.stress_buffer', onChain: (c) => v(c.caps.stressBuffer), value: 19_000n * BRL },
   { field: 'reserve_decimals', onChain: (c) => v(c.reserveDecimals), value: v(RESERVE_DECIMALS) },
 ];
 
