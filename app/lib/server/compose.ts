@@ -130,8 +130,8 @@ const withRemaining = (ix: Instruction, accounts: { address: Address; role: Acco
 
 export type ComposeContext = {
   reserve: ReserveView;
-  /** The guarantees (operator instructions address one by account); the deposit queue (fills check head owners). */
-  ledger?: Pick<Ledger, "guarantees"> & Partial<Pick<Ledger, "deposits">>;
+  /** The pending deposit queue (fills check head owners); only `fulfil_deposits` reads it. */
+  ledger?: Partial<Pick<Ledger, "deposits">>;
   /** Allowlisted owners, to build the Merkle proof for `request_deposit` / `request_redeem`. */
   allowlist?: string[];
   /** Server env for re-reads (defaults to process.env). */
