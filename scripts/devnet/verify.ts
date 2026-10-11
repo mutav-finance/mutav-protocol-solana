@@ -6,7 +6,8 @@
  *   the verified `.so`; computed like `solana-verify get-program-hash`);
  * - upgrade authority == the config's `upgradeAuthority`;
  * - `feature_flags == 0`;
- * - admin, operator, pauser and the allowlist root as configured;
+ * - admin, operator, pauser and the allowlist root as configured, with no
+ *   pending operator, pauser or admin handover;
  * - every other `VaultConfig` field equals the config file (c, fee take,
  *   every cap including the NAV-move guard, decimals 6, mint, token program, money accounts, capital wallet);
  * - on devnet, the locked devnet values (lib/compare.ts `DEVNET_LOCKED`);

@@ -1,6 +1,8 @@
 /**
  * Task 12, step 3: `propose_role` for the config's operator and pauser, as an
- * unsigned Squads proposal (ADR 0020). `initialize` already sets both roles;
+ * unsigned Squads proposal (ADR 0020). It also cancels any pending handover
+ * the config does not ask for (`cancel_pending`), including a pending admin
+ * other than the config's `nextAdmin`, since verify.ts fails while one waits. `initialize` already sets both roles;
  * use this to rotate them (e.g. from a devnet test key to mutav-app's KMS
  * key). Each proposed key then signs `accept_role` itself within 72 hours.
  *
@@ -30,7 +32,7 @@ export async function main(args: Args) {
   }
   writePayload(
     req(args, 'out'),
-    toPayload({ title: `MUTAV: propose operator ${cfg.operator}, pauser ${cfg.pauser}`, cluster: cfg.cluster, multisig: cfg.squads.multisig, vaultIndex: cfg.squads.vaultIndex, vault: cfg.admin }, ixs),
+    toPayload({ title: `MUTAV: roles to the config (operator ${cfg.operator}, pauser ${cfg.pauser}; stray handovers cancelled)`, cluster: cfg.cluster, multisig: cfg.squads.multisig, vaultIndex: cfg.squads.vaultIndex, vault: cfg.admin }, ixs),
   );
 }
 

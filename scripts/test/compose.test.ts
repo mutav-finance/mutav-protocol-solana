@@ -5,7 +5,7 @@ import {
   getProposeRoleInstructionDataDecoder,
   type VaultConfig,
 } from '../../clients/js/src';
-import { composeAcceptRole, composeProposeRoles, composeSetCaps, ROLE_OPERATOR, ROLE_PAUSER } from '../devnet/lib/compose';
+import { composeAcceptRole, composeProposeRoles, composeSetCaps, ROLE_ADMIN, ROLE_OPERATOR, ROLE_PAUSER } from '../devnet/lib/compose';
 import { parseConfig } from '../devnet/lib/config';
 import { filled, testAddress } from './fixtures';
 
@@ -17,6 +17,9 @@ const NOW = 1_000_000n;
 /** The chain with other operator / pauser keys than the file, nothing pending. */
 const chain = (o: Partial<VaultConfig> = {}): VaultConfig =>
   ({
+    admin: cfg.admin,
+    pendingAdmin: DEFAULT,
+    pendingAdminExpiresAt: 0n,
     operator: testAddress(200),
     pauser: testAddress(201),
     pendingOperator: DEFAULT,
@@ -68,6 +71,46 @@ describe('composeProposeRoles', () => {
     });
     const ixs = await composeProposeRoles(cfg, c, admin, NOW);
     expect(kinds(ixs)).toEqual([`propose:${ROLE_OPERATOR}:${cfg.operator}`, `propose:${ROLE_PAUSER}:${cfg.pauser}`]);
+  });
+});
+
+describe('composeProposeRoles: stray pending handovers', () => {
+  const matching = (o: Partial<VaultConfig> = {}) => chain({ operator: cfg.operator, pauser: cfg.pauser, ...o });
+
+  test('roles that match with nothing pending: empty', async () => {
+    expect(await composeProposeRoles(cfg, matching(), admin, NOW)).toEqual([]);
+  });
+
+  test('a matching key with a live or expired pending slot gets cancel_pending', async () => {
+    const c = matching({
+      pendingOperator: testAddress(211),
+      pendingOperatorExpiresAt: NOW + 10n,
+      pendingPauser: testAddress(212),
+      pendingPauserExpiresAt: NOW - 10n,
+    });
+    expect(kinds(await composeProposeRoles(cfg, c, admin, NOW))).toEqual([`cancel:${ROLE_OPERATOR}`, `cancel:${ROLE_PAUSER}`]);
+  });
+
+  test('a pending admin the config does not name is cancelled', async () => {
+    const c = matching({ pendingAdmin: testAddress(213), pendingAdminExpiresAt: NOW + 10n });
+    expect(kinds(await composeProposeRoles(cfg, c, admin, NOW))).toEqual([`cancel:${ROLE_ADMIN}`]);
+  });
+
+  test('a pending admin the config names as nextAdmin is kept', async () => {
+    const c = matching({ pendingAdmin: testAddress(213), pendingAdminExpiresAt: NOW + 10n });
+    expect(await composeProposeRoles({ ...cfg, nextAdmin: testAddress(213) }, c, admin, NOW)).toEqual([]);
+  });
+
+  test('a chain admin other than the config is refused', async () => {
+    await expect(composeProposeRoles(cfg, matching({ admin: testAddress(214) }), admin, NOW)).rejects.toThrow('propose_admin');
+  });
+});
+
+describe('nextAdmin in the config', () => {
+  test('is optional and parsed as an address', () => {
+    expect(cfg.nextAdmin).toBeUndefined();
+    expect(parseConfig({ ...filled(), nextAdmin: testAddress(215) }).nextAdmin).toBe(testAddress(215));
+    expect(() => parseConfig({ ...filled(), nextAdmin: 'nope' })).toThrow('nextAdmin');
   });
 });
 

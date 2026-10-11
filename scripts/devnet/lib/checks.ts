@@ -2,9 +2,11 @@
  * Post-deploy checks (plan Task 12): read-only, pure over decoded data, so
  * they run the same against a local validator, a fork or devnet.
  */
-import { getAddressDecoder, type Address } from '@solana/kit';
+import { address, getAddressDecoder, type Address } from '@solana/kit';
 import type { VaultConfig, VaultState } from '../../../clients/js/src';
 import { programDataHash } from './hash';
+
+const DEFAULT_ADDRESS = address('11111111111111111111111111111111');
 
 /**
  * The deployed bytecode is the verified build: the ProgramData program
@@ -98,6 +100,14 @@ export function postDeployChecks(
     const got = Buffer.from(config.investorAllowlistRoot as Uint8Array).toString('hex');
     const want = Buffer.from(e.allowlistRoot).toString('hex');
     if (got !== want) out.push(`allowlist root is ${got}, expected ${want}`);
+  }
+  // A pending handover could hand a role over after the checks pass.
+  for (const [role, key] of [
+    ['operator', config.pendingOperator],
+    ['pauser', config.pendingPauser],
+    ['admin', config.pendingAdmin],
+  ] as const) {
+    if (key !== DEFAULT_ADDRESS) out.push(`pending ${role} handover to ${key}: accept or cancel_pending it first`);
   }
   if (config.paused) out.push('reserve is paused');
   return out;

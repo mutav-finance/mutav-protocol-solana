@@ -34,6 +34,16 @@ describe('postDeployChecks', () => {
     ).join('\n');
     for (const s of ['upgrade authority', 'feature_flags', 'allowlist root', 'paused']) expect(f).toContain(s);
   });
+  test('any pending handover fails, live or expired', () => {
+    for (const [field, label] of [
+      ['pendingOperator', 'pending operator'],
+      ['pendingPauser', 'pending pauser'],
+      ['pendingAdmin', 'pending admin'],
+    ] as const) {
+      const f = postDeployChecks(programData(VAULT), { ...config(), [field]: OTHER }, blankState(), { upgradeAuthority: VAULT, admin: VAULT });
+      expect(f).toEqual([`${label} handover to ${OTHER}: accept or cancel_pending it first`]);
+    }
+  });
 });
 
 describe('checkProgramHash', () => {

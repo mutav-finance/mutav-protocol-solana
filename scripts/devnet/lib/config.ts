@@ -36,6 +36,12 @@ export type DeployConfig = {
   upgradeSquads: MultisigConfig;
   /** `VaultConfig.admin`: the admin multisig's vault. */
   admin: Address;
+  /**
+   * Optional: the key an in-flight admin handover (`propose_admin`) is meant
+   * for. Any other pending admin is cancelled by roles.ts, and verify.ts
+   * fails while one is pending.
+   */
+  nextAdmin?: Address;
   /** Program upgrade authority: the upgrade multisig's vault. */
   upgradeAuthority: Address;
   operator: Address;
@@ -126,6 +132,7 @@ export function parseConfig(raw: any): DeployConfig {
     squads: multisigConfig(raw.squads, 'squads'),
     upgradeSquads: multisigConfig(raw.upgradeSquads, 'upgradeSquads'),
     admin: addr(raw.admin, 'admin'),
+    ...(raw.nextAdmin === undefined || raw.nextAdmin === null ? {} : { nextAdmin: addr(raw.nextAdmin, 'nextAdmin') }),
     upgradeAuthority: addr(raw.upgradeAuthority, 'upgradeAuthority'),
     operator: addr(raw.operator, 'operator'),
     pauser: addr(raw.pauser, 'pauser'),

@@ -30,6 +30,7 @@ import {
 /** Role ids of `propose_role` / `accept_role` (ADR 0020). */
 export const ROLE_OPERATOR = 1;
 export const ROLE_PAUSER = 2;
+export const ROLE_ADMIN = 3;
 import type { DeployConfig } from './config';
 
 export const BPF_LOADER_UPGRADEABLE = address('BPFLoaderUpgradeab1e11111111111111111111111');
@@ -113,11 +114,20 @@ export async function composeInitialize(
 const DEFAULT_ADDRESS = address('11111111111111111111111111111111');
 
 /**
- * `propose_role` for each role whose key differs from the file, as one
- * proposal (ADR 0020). A handover already pending for the requested key is
- * refused ("awaiting accept_role": the key signs `accept_role`, nothing to
- * propose). Another unexpired pending key gets `cancel_pending(role)` first,
- * in the same proposal, since `propose_role` refuses while one waits.
+ * The role proposal that brings the chain to the file, as one proposal
+ * (ADR 0020):
+ *
+ * - `propose_role` for each of operator and pauser whose key differs from
+ *   the file. A handover already pending for the requested key is refused
+ *   ("awaiting accept_role": the key signs `accept_role`, nothing to
+ *   propose). Another unexpired pending key gets `cancel_pending(role)`
+ *   first, since `propose_role` refuses while one waits.
+ * - When the key already matches, any pending handover of that role (live
+ *   or expired) is one the file does not ask for: `cancel_pending(role)`.
+ * - A pending admin handover is cancelled (`cancel_pending(ROLE_ADMIN)`)
+ *   unless the file names that key as `nextAdmin`. A chain admin other than
+ *   the file's is refused: the admin moves only by `propose_admin` /
+ *   `accept_admin`.
  */
 export async function composeProposeRoles(
   cfg: DeployConfig,
@@ -125,21 +135,29 @@ export async function composeProposeRoles(
   admin: TransactionSigner,
   nowSecs: bigint = BigInt(Math.floor(Date.now() / 1000)),
 ): Promise<Instruction[]> {
+  if (current.admin !== cfg.admin) {
+    throw new Error(`the chain admin is ${current.admin}, the config says ${cfg.admin}; the admin moves only through propose_admin / accept_admin`);
+  }
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
   const base = { admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId };
+  const cancel = (role: number) => getCancelPendingInstruction({ ...base, role }, opts(cfg));
   const out: Instruction[] = [];
   for (const [role, name, key, now, pending, expiresAt] of [
     [ROLE_OPERATOR, 'operator', cfg.operator, current.operator, current.pendingOperator, current.pendingOperatorExpiresAt],
     [ROLE_PAUSER, 'pauser', cfg.pauser, current.pauser, current.pendingPauser, current.pendingPauserExpiresAt],
   ] as const) {
-    if (key === now) continue;
+    if (key === now) {
+      if (pending !== DEFAULT_ADDRESS) out.push(cancel(role));
+      continue;
+    }
     const live = pending !== DEFAULT_ADDRESS && nowSecs <= expiresAt;
     if (live && pending === key) {
       throw new Error(`${name} ${key} is already proposed, awaiting accept_role (expires at ${expiresAt})`);
     }
-    if (live) out.push(getCancelPendingInstruction({ ...base, role }, opts(cfg)));
+    if (live) out.push(cancel(role));
     out.push(getProposeRoleInstruction({ ...base, role, key }, opts(cfg)));
   }
+  if (current.pendingAdmin !== DEFAULT_ADDRESS && current.pendingAdmin !== cfg.nextAdmin) out.push(cancel(ROLE_ADMIN));
   return out;
 }
 
