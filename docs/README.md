@@ -1,8 +1,8 @@
 # MUTAV documentation
 
-MUTAV is an institutional *fiador* for residential leases in Brazil: tenants get a paid rental guarantee (*fiança onerosa*) through the real-estate agencies that already run their leases, with no personal guarantor and no cash deposit. Every guarantee is backed by a BRL reserve held by a Solana program, `mutav`, which records the cover of every active guarantee, refuses any capital movement that would leave that cover under-backed, and never blocks a claim payment for solvency reasons. The reserve is operational infrastructure that keeps the guarantees healthy, not a yield product, and anyone can recompute its health from public on-chain state.
+MUTAV is an institutional *fiador* for residential leases in Brazil: tenants get a paid rental guarantee (*fiança onerosa*) through the real-estate agencies that already run their leases, with no personal guarantor and no cash deposit. Every guarantee is backed by a BRL reserve held by a Solana program, `mutav`, which records the cover of every active guarantee, refuses any capital movement that would leave that cover under-backed, and never gates a claim payment on required coverage. The reserve is operational infrastructure that keeps the guarantees healthy, not a yield product, and anyone can recompute its health from public on-chain state.
 
-> These pages describe the design of the devnet release. The program is unaudited. Values marked "devnet" are starting values for the devnet deployment, not commercial terms. Nothing here is legal advice or an offer of securities.
+> These pages describe the design of the devnet release. The program is unaudited. Values marked "devnet" or "pilot" are the pilot parameters of [ADR 0028](decisions/0028-pilot-parameters.md), not commercial terms. Nothing here is legal advice or an offer of securities.
 
 ## Start here
 
@@ -38,3 +38,5 @@ The full table of contents is in [SUMMARY.md](SUMMARY.md).
 - [ADR 0018: BRS-only pilot reserve](decisions/0018-brs-only-pilot-reserve.md)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](decisions/0020-operator-admin-separation-and-recovery.md)
 - [ADR 0022: Coverage: stress buffer and underwater reserve](decisions/0022-coverage-stress-buffer-underwater-reserve.md)
+- [ADR 0028: Pilot parameters](decisions/0028-pilot-parameters.md)
+- [ADR 0029: Claims and capital rules in the program](decisions/0029-claims-and-capital-rules-in-the-program.md)

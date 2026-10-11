@@ -1,6 +1,6 @@
 # What is MUTAV
 
-MUTAV is a rental guarantor for Brazil whose reserve can't be drained below what its rules say it must back, and whose claim payments are never blocked by the solvency gate or a pause.
+MUTAV is a rental guarantor for Brazil whose reserve can't be drained below what its rules say it must back, and whose claim payments are never blocked by the coverage gate or a pause.
 
 This page explains the problem MUTAV addresses and why the reserve lives on-chain.
 
@@ -49,7 +49,7 @@ The obvious alternative is a segregated bank account with a monthly statement. A
 | How often the state is visible | Once a month, as an aggregate balance. | Continuously. Anyone can call `refresh` and recompute coverage, free capital and NAV from public accounts. |
 | Per-guarantee liabilities | Not visible. | Each guarantee's cover, each provision and each claim payment is its own account or event. |
 | Limits on the people running it | Internal controls only. | The operator works within caps set by a separate reserve admin, and the admin acts through a time-locked multisig. |
-| Claim payments under stress | Depends on the owner. | The solvency gate never refuses a claim payment, and a pause does not stop claims. |
+| Claim payments under stress | Depends on the owner. | The coverage gate never refuses a claim payment, and a pause does not stop claims. |
 
 MUTAV argues for Solana on fit, not necessity. The business model does not depend on any one chain. Solana fits because transaction costs are low enough for one record per lease and one fee booking per agency per month, Squads v4 provides time-locked multisig governance, and a BRL stablecoin (BRS, issued by Nora) already exists on Solana.
 
@@ -59,7 +59,7 @@ MUTAV argues for Solana on fit, not necessity. The business model does not depen
 |---|---|
 | Hold the reserve in BRS and track every amount it moves | Price guarantees or assess tenants |
 | Record each guarantee's cover and each claim's provision | Decide whether a claim is valid |
-| Gate new guarantees and capital exits on a solvency check | Hold personal data or lease documents (only their hashes) |
+| Gate new guarantees and capital exits on required coverage | Hold personal data or lease documents (only their hashes) |
 | Pay claims to MUTAV's payments account within admin-set caps | Pay agencies or landlords directly. MUTAV pays them by Pix. |
 | Mint and burn reserve shares at an on-chain NAV | Promise a return to capital providers |
 | Enforce role separation, caps, pause scope and time locks | Track the contractual payment deadline. That lives in the MUTAV platform. |
@@ -68,7 +68,7 @@ Pricing, tenant assessment, claim review and the payment deadline stay in the MU
 
 ## The pilot
 
-The devnet release is the first step. It runs under a low ceiling of hard on-chain caps that only the time-locked admin multisig can raise. The reserve holds BRS only. During the pilot the reserve runs on MUTAV's own capital and is not open to public investment. A capped mainnet pilot with real guarantees follows a security audit.
+The devnet release is the first step. It runs under hard on-chain caps that only the time-locked admin multisig can raise ([ADR 0028](../decisions/0028-pilot-parameters.md): a R$1M reserve ceiling, R$120k of cover per guarantee, claim payments of up to R$15k per call and R$20k per 31 days). The reserve holds BRS only. During the pilot the reserve runs on MUTAV's own capital and is not open to public investment. A capped mainnet pilot with real guarantees follows a security audit.
 
 ## Sources
 

@@ -2,11 +2,11 @@
 
 MUTAV is an institutional *fiador* for residential leases in Brazil. It gives tenants a paid rental guarantee (*fiança onerosa*) through the real-estate agencies that already run their leases. The tenant needs no personal guarantor and no cash deposit.
 
-Every guarantee MUTAV gives is backed by a BRL reserve held by a Solana program, `mutav`. The program records the cover of every active guarantee. It refuses any capital movement that would leave that cover under-backed. It never blocks a claim payment for solvency reasons. Anyone can recompute the reserve's health from public on-chain state.
+Every guarantee MUTAV gives is backed by a BRL reserve held by a Solana program, `mutav`. The program records the cover of every active guarantee. It refuses any capital movement that would leave that cover under-backed. It never gates a claim payment on required coverage. Anyone can recompute the reserve's health from public on-chain state.
 
 The reserve is operational infrastructure that keeps the guarantees healthy. It is not a yield product.
 
-> These pages describe the design of the devnet release. The program is unaudited. Values marked "devnet" are the starting values for the devnet deployment, not commercial terms. Nothing here is legal advice or an offer of securities.
+> These pages describe the design of the devnet release. The program is unaudited. Values marked "devnet" or "pilot" are the pilot parameters of [ADR 0028](../decisions/0028-pilot-parameters.md), not commercial terms. Nothing here is legal advice or an offer of securities.
 
 ## Who MUTAV is for
 
@@ -21,7 +21,7 @@ The reserve is operational infrastructure that keeps the guarantees healthy. It 
 ## The idea in four sentences
 
 1. MUTAV, as **operator**, records each lease's guarantee on-chain with its cover, the R$ ceiling of the fiança.
-2. The **reserve** must hold a share of that cover, plus every filed claim in full, plus a stress buffer. A **solvency gate** checks this before any new guarantee and any capital exit.
+2. The **reserve** must hold a share of that cover, plus every filed claim in full, plus a stress buffer. This is the **required coverage**, and the **coverage gate** checks it before any new guarantee and any capital exit.
 3. When a tenant defaults, the operator files a **claim** and the program pays it from the reserve to MUTAV's payments account, within limits set by a separate **reserve admin**. MUTAV then pays the agency by Pix.
 4. Every guarantee, provision, claim payment and capital movement is a public account or event.
 
@@ -32,7 +32,7 @@ The reserve is operational infrastructure that keeps the guarantees healthy. It 
 | **Introduction** (this section) | What MUTAV is, the problem it solves, how it works end to end, what anyone can verify, and a glossary. | New to MUTAV |
 | [For rental agencies](../for-agencies/README.md) | The guarantee lifecycle, claims and guarantee fees, from the agency's side. | A real-estate agency |
 | [For capital providers](../for-capital-providers/README.md) | Deposits and redemptions, share value and the risks of holding reserve shares. | Providing capital to the reserve |
-| [Reserve framework](../reserve-framework/README.md) | Coverage and the solvency gate, claims and payments, assets and income, unsolicited money, and every parameter. | Evaluating the design |
+| [Reserve framework](../reserve-framework/README.md) | Coverage and the coverage gate, claims and payments, assets and income, unsolicited money, and every parameter. | Evaluating the design |
 | [Architecture](../architecture/README.md) | Components, roles and trust, accounts, money flows, state machines, upgrades and the account layout. | Reviewing how the system is built |
 | [Security and verification](../security/README.md) | Invariants, governance and keys, incident response, reviews and audits, known limitations. | Assessing risk |
 | [Technical resources](../technical-resources/README.md) | Addresses and configuration, instructions, events and errors, the math, the TypeScript client, deployment and operations, FAQ. | Integrating or auditing |
@@ -49,7 +49,7 @@ Pages in this section:
 | [Transparency](transparency.md) | What anyone can check on-chain and on the public `/reserve` page. |
 | [Glossary](glossary.md) | Brazilian legal terms, protocol terms and role names. |
 
-The binding sources behind every page are the [specification](../spec.md) and the [architecture decision records](../decisions/). Where a page and those files differ, the spec and the ADRs win. ADRs 0019 to 0027 record the devnet release design and supersede older spec text until the spec is updated. Items that are still undecided are listed in the [open questions register](../meta/open-questions.md).
+The binding sources behind every page are the [specification](../spec.md) and the [architecture decision records](../decisions/). Where a page and those files differ, the spec and the ADRs win. ADRs 0019 to 0029 record the devnet release design and supersede older spec text until the spec is updated. Items that are still undecided are listed in the [open questions register](../meta/open-questions.md).
 
 ## Where things live
 
@@ -77,3 +77,4 @@ The binding sources behind every page are the [specification](../spec.md) and th
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
 - [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)

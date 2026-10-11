@@ -10,11 +10,11 @@ This page follows a guarantee from signing to claim payment, then shows how capi
 | Landlord | The creditor of the fiança. Paid through the agency. | No |
 | Agency | Runs the lease, collects the fee, pays MUTAV one bill a month, sends payment requests when the tenant defaults. | No |
 | **Operator** (MUTAV) | Runs contracts, agencies and the whole guarantee and claim cycle. Registers guarantees, books fees and issuer income, files and pays claims. | Yes, a hot key |
-| **Reserve admin** | Looks after the reserve's financial health and security through ceilings: caps, coverage ratio, stress buffer, roles, the allowlist, capital fills, approval of large claim amounts, unsolicited money. It does not judge contracts. | Yes, a Squads v4 multisig with a time lock |
+| **Reserve admin** | Looks after the reserve's financial health and security through ceilings: caps, coverage ratio, stress buffer, roles, the allowlist, capital fills, and, once those instructions ship, approval of large claim amounts and unsolicited money. It does not judge contracts. | Yes, a Squads v4 multisig with a time lock |
 | **Pauser** | Emergency stop. Can pause and revoke the operator at once. | Yes, a separate key |
 | **Guardians** | Up to three keys that can pause and do nothing else. | Yes |
 | Capital providers | Hold reserve shares. Request deposits and redemptions. During the pilot this is MUTAV's own capital wallet only. | Yes, their own wallet |
-| Anyone | Runs cranks that need no judgment: `refresh`, `advance_queue_head`, `skim`. | Any signer |
+| Anyone | Runs cranks that need no judgment: `refresh` and `advance_queue_head` (and `skim`, once the unsolicited-money instructions ship). | Any signer |
 
 The operator and the reserve admin are separate parties and may be separate companies. That split is the core security rule. During the pilot MUTAV fills both roles with different keys.
 
@@ -30,7 +30,7 @@ flowchart LR
   subgraph ON["On-chain: mutav program on Solana"]
     REG["Guarantee registry<br/>cover, claims, provisions"]
     RES["Reserve<br/>BRS, tracked internally"]
-    GATE{"Solvency gate"}
+    GATE{"Coverage gate"}
     PAY["MUTAV payments account"]
     TRE["MUTAV treasury"]
   end
@@ -66,7 +66,7 @@ When a lease is signed, the operator calls `register_guarantee`. The guarantee r
 
 No personal data goes on-chain.
 
-Registration passes the **solvency gate**. The program computes what the reserve must hold after adding the new cover, and refuses if the reserve can't back it. Registration is also refused while the reserve is paused, if a BRS reserve account is frozen, or if the cover exceeds the per-guarantee cap.
+Registration passes the **coverage gate**. The program computes what the reserve must hold after adding the new cover, and refuses if the reserve can't back it. Registration is also refused while the reserve is paused, if a BRS reserve account is frozen, or if the cover exceeds the per-guarantee cap.
 
 The required amount is:
 
@@ -75,9 +75,9 @@ coverage_required = max( c × remaining cover,
                          provisions + min(stress buffer, unprovisioned cover) )
 ```
 
-- `c` is the coverage ratio, a share of all remaining cover. The program floor is 0.10.
+- `c` is the coverage ratio, a share of all remaining cover. The program floor is 0.10; devnet and the pilot run at 0.25.
 - **Provisions** are filed, unpaid claims. They are always held in full.
-- The **stress buffer** is an admin-set R$ amount for the claims that could be filed next. Claims arrive one event at a time (one month's rent, or one exit payment), so stress is the next few claims, not every full cover.
+- The **stress buffer** is an admin-set R$ amount (R$19k in the pilot) for the claims that could be filed next. Claims arrive one event at a time (one month's rent, or one exit payment), so stress is the next few claims, not every full cover.
 
 ## 2. Guarantee fees come in
 
@@ -104,7 +104,7 @@ sequenceDiagram
   Op->>Op: Review off-chain
   Op->>Pr: file_claim (amount booked as a provision)
   Note over Pr: NAV drops at once. Coverage required includes the provision.
-  opt Amount above the per-call cap
+  opt Amount above the per-call cap (approve_claim ships as an upgrade)
     Ad->>Pr: approve_claim (binds the exact amount, time-locked)
   end
   Op->>Pr: pay_claim (pays exactly the provision)
@@ -117,12 +117,12 @@ sequenceDiagram
 The claim rules:
 
 - **File.** The operator files a claim with `file_claim`. The program sets the amount aside as a provision immediately. Each claim is one event, such as one month's rent.
-- **Approve, only for large claims.** A claim above the per-call cap (`max_claim_per_call`) needs the reserve admin's `approve_claim`, which binds an exact amount. The admin approves the amount leaving the reserve, not the validity of the claim.
+- **Approve, only for large claims.** A claim above the per-call cap (`max_claim_per_call`) needs the reserve admin's `approve_claim`, which binds an exact amount. The admin approves the amount leaving the reserve, not the validity of the claim. The program already refuses a payment above the per-call cap without that approval; `approve_claim` itself ships as an upgrade (see bank-first payment below).
 - **Pay.** `pay_claim` pays exactly the filed provision to MUTAV's payments account. Every payment, approved or not, counts toward a strict cap per sliding 31-day window (`max_claim_per_period`), so no 30-day span pays out more than the cap. For an unusually large claim the admin raises that cap in the same proposal as the approval.
-- **Amend or withdraw.** The operator can change the amount with `amend_claim`. Amending to 0 withdraws the claim and releases its provision. Any amendment resets an approval. A withdrawn claim can be filed again with `refile_claim`, which starts from scratch and never reuses an old approval.
+- **Amend or withdraw (planned upgrade).** The operator will be able to change the amount with `amend_claim`. Amending to 0 withdraws the claim and releases its provision. Any amendment resets an approval. A withdrawn claim can be filed again with `refile_claim`, which starts from scratch and never reuses an old approval. Neither instruction is in the devnet binary.
 - **Settle.** After MUTAV pays the agency by Pix, the operator records the payment with `settle_payout`.
 
-What can stop a claim payment: the filing checks, the cover bound, the caps, the liquid BRS in the reserve, or a frozen reserve account. The solvency gate never stops one, and neither does a pause.
+What can stop a claim payment: the filing checks, the cover bound, the caps, the liquid BRS in the reserve, or a frozen reserve account. The coverage gate never stops one, and neither does a pause.
 
 **Bank-first payment.** MUTAV may pay the agency by Pix from its own bank account first. The reserve then reimburses MUTAV's payments account through `pay_claim`. This keeps payments on time while a large approval waits for the time lock, or while a reserve account is frozen. Until `approve_claim` ships, every claim above the per-call cap is paid this way and reimbursed once the approval exists.
 
@@ -137,7 +137,7 @@ The operator closes a guarantee with `close_guarantee`, giving a reason:
 | `VOID` | The lease never took effect: nothing was paid and no claim is open. |
 | `RELEASED` | The guarantee ended with no open claim. |
 
-Closing releases the remaining cover from the coverage math. The account is never deleted, so the history stays readable. A wrongful close can be undone by the operator with `reinstate_guarantee`, within an admin-set maximum age.
+Closing releases the remaining cover from the coverage math. The account is never deleted, so the history stays readable. A planned upgrade, `reinstate_guarantee`, will let the operator undo a wrongful close within an admin-set maximum age; it is not in the devnet binary.
 
 The fuller fiança lifecycle (exoneration notice, return of the keys, a claims tail after the lease ends, settlement receipts) is planned work. Space for it is already reserved in the accounts.
 
@@ -156,10 +156,10 @@ flowchart LR
 - Capital providers hold **reserve shares**. A share is a pro-rata claim on the reserve's net assets.
 - Deposits and redemptions are requests that wait in first-in, first-out queues. The reserve admin fills them at the NAV of the fill, inside price bounds set when the proposal is composed.
 - **Entry is allowlisted.** Only allowlisted wallets can request a deposit.
-- **Exit is open.** Any wallet that already holds shares can redeem, even if it was later removed from the allowlist. A full exit is allowed below the minimum request size.
-- **Redemptions are paid only from surplus** over what the guarantees need. This is the solvency gate again. If the head request is larger than the free capital, the queue waits. The pilot fills whole requests only.
+- **Exit is open.** Any wallet that already holds shares can redeem, even if it was later removed from the allowlist. Below the minimum request size, a holder may still exit the rest of a small balance, down to a floor of a tenth of the minimum (R$100 in the pilot); a smaller balance waits and stays transferable.
+- **Redemptions are paid only from surplus** over what the guarantees need. This is the coverage gate again. If the head request is larger than the free capital, the queue waits. The pilot fills whole requests only.
 - Owners can cancel a request or claim what is owed to them at any time, including while paused.
-- A pending deposit can be cancelled by its owner or by the admin with `cancel_deposit`. Either way the BRS goes back to the owner's own account.
+- A pending request can be cancelled by its owner or by the admin, with `cancel_deposit` or `cancel_redeem`. Either way the BRS or the shares go back to the owner's own account.
 - MUTAV's own capital uses the same queues with no special treatment.
 
 During the pilot the only capital provider is MUTAV. The reserve is not open to public investment.
@@ -170,24 +170,24 @@ An **exit fallback** is part of the design: after a maximum queue wait, anyone c
 
 | Situation | What happens |
 |---|---|
-| Claims push the reserve below target | New guarantees and redemptions stop. Claims keep being paid. Capital comes back through deposits, guarantee fees, or a MUTAV backstop booked by the admin. The public label is "reserve below target; MUTAV backstop active". |
-| Net assets reach zero with shares outstanding | Deposit fills are refused, so new money never pays for old losses. MUTAV recapitalises with backstop BRS, which mints no shares. |
-| The share value moves sharply without a booked inflow | Capital fills halt until the admin clears the halt. |
-| Someone sends money straight to a reserve account | It does not change the share value. Anyone can sweep it into a separate account for unsolicited money. The admin returns it to the sender or books it into the reserve. |
+| Claims push the reserve below target | New guarantees and redemptions stop. Claims keep being paid. Capital comes back through deposits, guarantee fees, or a MUTAV backstop. The public label is "reserve below target; MUTAV backstop active". |
+| The reserve is underwater: the value of a share falls below the smallest published unit while shares are outstanding | Deposit and redemption fills are refused, so new money never pays for old losses. Holders can still cancel their requests. MUTAV recapitalises through `contribute_fees`, with a fresh reference recorded as a backstop; it mints no shares. |
+| The share value moves sharply without a booked inflow | Capital fills refuse, and the next `refresh` latches a halt that only the admin clears. |
+| Someone sends money straight to a reserve account | It does not change the share value. A planned upgrade lets anyone sweep it into a separate account for unsolicited money, and the admin return it to the sender or book it into the reserve. |
 | The operator key is compromised | The pauser revokes the operator at once. The admin appoints a new operator, who reconciles the platform's records with on-chain events and corrects them with ordinary operator actions. The most a misused operator key can cost is the admin-set claim caps. |
 | An emergency | The pauser, a guardian or the admin pauses. Pause stops only capital flows and new guarantees. It never stops claims and never traps holders' money. Only the admin unpauses. |
 
-## Devnet values
+## Devnet and pilot values
 
-Every value below is set by the reserve admin and changes only through the time-locked multisig.
+Every value below is set by the reserve admin and changes only through the time-locked multisig. They are the pilot parameters of [ADR 0028](../decisions/0028-pilot-parameters.md).
 
 | Parameter | Devnet value |
 |---|---|
-| Coverage ratio `c` | 0.10 (the program floor) |
-| Stress buffer | R$19k |
-| Maximum reserve (`max_tvl`) | R$300k |
-| Cover per guarantee | R$40k |
-| Claim payments | R$10k per call, R$20k per sliding 31-day window |
+| Coverage ratio `c` | 0.25 (program floor 0.10) |
+| Stress buffer | R$19k, set and locked |
+| Maximum reserve (`max_tvl`) | R$1M |
+| Cover per guarantee | R$120k |
+| Claim payments | R$15k per call, R$20k per sliding 31-day window |
 | Capital requests | R$1k to R$100k |
 | Fee take | 20% (`fee_take_bps` 2000) |
 | Reserve asset | BRS only, 100% settlement floor |
@@ -218,7 +218,7 @@ Every value below is set by the reserve admin and changes only through the time-
 - [ADR 0016: Coverage ratio below 1.0](../decisions/0016-coverage-ratio-below-one.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- ADR 0019: v1 layout for the devnet release (agency-cap removal, carved fields)
+- [ADR 0019: v1 layout for the devnet release](../decisions/0019-v1-layout-for-the-devnet-release.md) (agency-cap removal, carved fields)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
 - [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md) (includes the payout SLA removal)
 - [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016)
@@ -226,3 +226,5 @@ Every value below is set by the reserve admin and changes only through the time-
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)
 - [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)

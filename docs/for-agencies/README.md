@@ -4,7 +4,7 @@ This section explains how a real-estate agency (*imobiliária*) works with MUTAV
 
 ## MUTAV in one paragraph
 
-MUTAV is an institutional *fiador*. It gives tenants a paid rental guarantee (*fiança onerosa*, Lei 8.245/91 art. 37 II) through the agencies that already run their leases. The tenant needs no personal guarantor and no cash deposit. Every guarantee is backed by a BRL reserve held by the `mutav` program on Solana. The program records the cover of every guarantee, refuses any capital movement that would leave that cover under-backed, and never blocks a claim payment for solvency reasons. The reserve is operational infrastructure that keeps the guarantees healthy. It is not a yield product.
+MUTAV is an institutional *fiador*. It gives tenants a paid rental guarantee (*fiança onerosa*, Lei 8.245/91 art. 37 II) through the agencies that already run their leases. The tenant needs no personal guarantor and no cash deposit. Every guarantee is backed by a BRL reserve held by the `mutav` program on Solana. The program records the cover of every guarantee, refuses any capital movement that would leave that cover under-backed, and never gates a claim payment on required coverage. The reserve is operational infrastructure that keeps the guarantees healthy. It is not a yield product.
 
 ## Agencies never sign on-chain
 
@@ -16,7 +16,7 @@ An agency works in the MUTAV platform, as it does with any guarantor today. It n
 | Collects the guarantee fee with the rent, and pays MUTAV one consolidated bill a month | `contribute_fees`: one income receipt of kind `FEE` per paid bill, split between the reserve and MUTAV's treasury |
 | Sends a payment request (*pedido de pagamento*) with evidence when the tenant defaults | `file_claim`: a `ClaimFiling` that sets the amount aside as a provision at once |
 | Receives the claim payment by Pix and pays the landlord under the landlord's mandate | `pay_claim` (reserve to MUTAV's payments account), then `settle_payout` (the Pix record on the same `ClaimFiling`) |
-| Reports the end of the lease | `close_guarantee`: the cover is released |
+| Reports the end of the lease | `close_guarantee(id, reason)` with reason `RELEASED`: the cover is released |
 
 One designed option touches the chain from the agency's side: paying the monthly bill in BRS through a Solana Pay link. Even then the agency only signs a token transfer to MUTAV. It never calls the program. See [Guarantee fees](fees.md).
 
@@ -44,16 +44,16 @@ flowchart LR
   R -- "claim payment (BRS)" --> PA[(MUTAV payments account)]
   PA -- "Pix (BRL)" --> A
   A -- "under the landlord's mandate" --> L[Landlord]
-  AD[Reserve admin] -. "caps, approvals above the per-call cap" .-> P
+  AD[Reserve admin] -. "caps (approvals above the per-call cap: planned)" .-> P
 ```
 
 ## What the program promises an agency
 
-- **Claim payments are never blocked by the solvency gate.** The gate protects the reserve from capital moving out. It never refuses a claim payment, and a pause does not stop claims either. Only the filed claim, the claim caps, liquid BRS or a frozen reserve can stop one.
+- **Claim payments are never blocked by the coverage gate.** The gate protects the reserve from capital moving out. It never refuses a claim payment, and a pause does not stop claims either. Only the filed claim, the claim caps, liquid BRS or a frozen reserve can stop one.
 - **Every claim is set aside the moment it is filed.** The filed amount becomes a provision. Filed claims are always held in full in the reserve's coverage requirement.
 - **The payment clock is public.** Every filing, payment and Pix settlement is an on-chain account or event with a timestamp.
-- **MUTAV can pay first.** MUTAV may pay the agency by Pix from its own bank account first, and the reserve then reimburses MUTAV's payments account. Agencies are paid on time even while a large claim waits for the admin's approval.
-- **A compromised operator key has a hard ceiling.** The most a misused operator key can cost is the admin-set claim caps, and those payments can only reach MUTAV's own payments account. Every other change it could make can be undone by another operator action.
+- **MUTAV can pay first.** MUTAV may pay the agency by Pix from its own bank account first, and the reserve then reimburses MUTAV's payments account. Agencies are paid on time even while a large claim waits for the admin's approval. Until the approval instruction ships, every claim above the per-call cap (R$15k in the pilot) is paid this way.
+- **A compromised operator key has a hard ceiling.** The most a misused operator key can cost is the admin-set claim caps, and those payments can only reach MUTAV's own payments account. Every other change it could make can be undone by another operator action (some of those corrections, such as `amend_claim` and `reinstate_guarantee`, ship as upgrades).
 
 ## What the agency can check
 
@@ -99,6 +99,7 @@ Anyone, with no wallet, can read the public `/reserve` page of the pilot app at 
 - [ADR 0005: Solvency gate scope: capital flows and new guarantees, never claim payments](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0009: Guarantee fees, MUTAV operation and MUTAV's reserve share are separate flows](../decisions/0009-separate-mutav-money-flows.md)
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md)
-- ADR 0019: v1 layout for the devnet release (per-agency cap removed)
+- [ADR 0019: v1 layout for the devnet release](../decisions/0019-v1-layout-for-the-devnet-release.md) (per-agency cap removed)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
 - [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md) (payout SLA removed from the program)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)

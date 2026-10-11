@@ -48,15 +48,15 @@ flowchart LR
 
 | Parameter | Value |
 |---|---|
-| `fee_take_bps` on devnet | 2,000 (20%) |
+| `fee_take_bps` on devnet and in the pilot | 2,000 (20%), [ADR 0028](../decisions/0028-pilot-parameters.md) |
 | Program maximum | 3,000 (30%) |
-| Real-pilot take | Not decided (spec §12 Q4, listed in the [open questions](../meta/open-questions.md#open-questions)) |
+| Real-pilot take | 2,000 (20%), set by [ADR 0028](../decisions/0028-pilot-parameters.md) (spec §12 Q4, marked resolved in the [open questions](../meta/open-questions.md#open-questions)). Any change is a time-locked admin action |
 
 ## Rules the program enforces
 
 - **Each bill counts once.** `contribute_fees` creates an `IncomeReceipt` account of kind `FEE`, keyed by `invoice_ref_hash` under its own `"fee"` seed prefix, so a bill reference can never collide with an issuer statement. A second call for the same bill fails, even if a payment notice arrives twice.
-- **Fees are never paused or gated.** Recording a fee is never paused and never solvency-gated, because fees only strengthen the reserve.
-- **Fees wait for the first deposit.** While the reserve has no shares outstanding, `contribute_fees` is refused, so no fee can be lost to share rounding. The operator records the bill once the first deposit is filled.
+- **Fees are never paused or gated.** Recording a fee is never paused and never coverage-gated, because fees only strengthen the reserve.
+- **Fees wait for the first deposit.** While the reserve has no shares outstanding, `contribute_fees` is refused with `NoSharesOutstanding`, so no fee can be lost to share rounding. The operator records the bill once the first deposit is filled.
 - **Fees never mint shares and never count as MUTAV capital.** MUTAV's own capital enters the reserve only through the ordinary deposit queue, like any other capital.
 - **Three separate MUTAV accounts.** The treasury (fee take), the payments account (claim payments) and MUTAV's capital wallet are distinct accounts.
 
@@ -67,6 +67,7 @@ flowchart LR
 | `gross` | Amount recorded |
 | `take` | MUTAV's take, sent to the treasury |
 | `net` | Amount sent to the reserve |
+| `period` | 0 for a fee (the statement month for issuer income) |
 | `slot` | When it was recorded |
 
 The event `FeesContributed { invoice_ref_hash, gross, take, net }` lets anyone check the split against `fee_take_bps`.
@@ -106,5 +107,7 @@ The reserve also receives issuer income: the BRS issuer's monthly partnership re
 - [ADR 0004: NAV computed on-chain with internal accounting, provisions at filing and bounded prices](../decisions/0004-onchain-nav-internal-accounting.md)
 - [ADR 0017: BRS income intake: an income inbox and `sweep_income`](../decisions/0017-brs-income-intake.md) (issuer income is kept apart from guarantee fees)
 - [ADR 0023: Capital flows and exit rights](../decisions/0023-capital-flows-and-exit-rights.md) (fees and income refused while no shares are outstanding)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md) (the fee take)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md) (`NoSharesOutstanding`)
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md) (income receipt kinds)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md) (`FeeReceipt` becomes an `IncomeReceipt` of kind `FEE`)

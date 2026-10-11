@@ -10,12 +10,12 @@ No wallet, account or permission is needed to read any of it.
 |---|---|---|
 | Reserve configuration | `VaultConfig` account | Roles (admin, operator, pauser, guardians), pending role handovers and their expiry, caps, coverage ratio, stress buffer, fee take, the treasury and payments accounts, the allowlist root. |
 | Reserve state | `VaultState` account | Tracked BRS balance, remaining cover, provisions, coverage required, shares outstanding, NAV, mode, pause and halt flags, queue heads, the claim window. |
-| Every guarantee | One `Guarantee` account per lease | Agency, rent, default and exit cover, amounts paid per leg, status, and hashes of the lease and instrument. |
-| Every claim | One `ClaimFiling` account per claim | Guarantee, leg, filed amount (the provision), any admin-approved amount, status (filed, paid, withdrawn, settled), timestamps. Every amendment emits `ClaimAmended`. |
+| Every guarantee | One `Guarantee` account per lease | Agency reference, default and exit cover, amounts paid and provisions per leg, status and close reason, and a hash of the lease and instrument. |
+| Every claim | One `ClaimFiling` account per claim | Guarantee, leg, filed amount (the provision), any admin-approved amount, status (filed, paid, withdrawn, settled), timestamps. Once `amend_claim` ships, every amendment will emit `ClaimAmended`. |
 | Every claim payment and its settlement | The same `ClaimFiling` account, `ClaimPaid` and `PayoutSettled` events | Amount paid, destination (MUTAV's payments account), and a hash of the Pix end-to-end ID once MUTAV pays the agency. |
 | Guarantee fees | One `IncomeReceipt` of kind `FEE` per agency bill, `FeesContributed` event | Gross amount, MUTAV's take, net amount into the reserve. |
-| Issuer income | One `IncomeReceipt` of kind `NORA_STATEMENT` per Nora statement, `IncomeSwept` event | Gross and net (MUTAV takes nothing from issuer income), and the inbox balance after the sweep. |
-| Unsolicited money and backstop | `IncomeReceipt` of kind `UNSOLICITED` or `BACKSTOP`, `UnsolicitedSkimmed` and the admin's booking and return events | Every untracked amount moved aside, booked into the reserve or returned to its source. |
+| Issuer income | One `IncomeReceipt` of kind `ISSUER_STATEMENT` per Nora statement, `IncomeSwept` event | Gross and net (MUTAV takes nothing from issuer income), and the inbox balance after the sweep. |
+| Unsolicited money and backstop | Planned: `IncomeReceipt` of kind `UNSOLICITED` or `BACKSTOP` (both kinds reserved), `UnsolicitedSkimmed` and the admin's booking and return events | Once the unsolicited-money instructions ship: every untracked amount moved aside, booked into the reserve or returned to its source. Until then a MUTAV backstop arrives through `contribute_fees` as a `FEE` receipt with its own reference. |
 | Capital movements | Deposit and redemption request accounts, fill events | Every request in queue order, the NAV of each fill, shares minted and burned. |
 | Token balances | The reserve's token accounts, owned by the program's vault authority | The actual BRS and share balances, which you can compare with the tracked totals. |
 | Configuration changes | `ConfigUpdated` (one per changed field), the role-handover events, `Paused` and related events | Every change to a parameter or role, with the old and new value. |
@@ -32,7 +32,7 @@ The published TypeScript client (`@mutav-finance/mutav-protocol-solana`) contain
 
 ### Why direct transfers don't move the numbers
 
-The program keeps **internal accounting**. It tracks the amounts it moved, not raw token balances. If someone sends BRS straight to a reserve account, the share value does not change. Anyone can run `skim` to move that untracked surplus into a separate account for unsolicited money. The reserve admin then returns it to the sender or books it into the reserve.
+The program keeps **internal accounting**. It tracks the amounts it moved, not raw token balances. If someone sends BRS straight to a reserve account, the share value does not change. A planned upgrade adds `skim`, which anyone can run to move that untracked surplus into a separate account for unsolicited money; the reserve admin then returns it to the sender or books it into the reserve. Until then the surplus stays in the account, outside NAV.
 
 So two figures are always public for each account: the tracked total and the actual token balance. A gap between them is unsolicited money waiting to be handled.
 
@@ -90,7 +90,7 @@ Some things stay off-chain by design. Knowing them tells you what the on-chain d
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md)
 - [ADR 0017: BRS income intake](../decisions/0017-brs-income-intake.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
-- ADR 0019: v1 layout for the devnet release (agency-cap removal)
+- [ADR 0019: v1 layout for the devnet release](../decisions/0019-v1-layout-for-the-devnet-release.md) (agency-cap removal)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md) (operator-activity feed)
 - [ADR 0021: Claims: approval, amendment and exact payment](../decisions/0021-claims-approval-amendment-exact-payment.md) (claim statuses on one account, payout SLA removal)
 - [ADR 0024: Unsolicited money and backstop contributions](../decisions/0024-unsolicited-money-and-backstop.md)

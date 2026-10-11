@@ -14,13 +14,13 @@ This page lists the documents, code and external references the MUTAV documentat
 | Document | Path | What it holds |
 |---|---|---|
 | Program specification | [`docs/spec.md`](../spec.md) | Source of truth for accounts, instructions, invariants, caps, events and errors. Key parts: [§1 Principles](../spec.md#1-principles), [§2 Roles and keys](../spec.md#2-roles-and-keys), [§4 Invariants and formulas](../spec.md#4-invariants-and-formulas), [§5 Instructions](../spec.md#5-instructions), [§8 Caps](../spec.md#8-caps), [§12 Open questions](../spec.md#12-open-questions), [§14 Upgrade readiness](../spec.md#14-upgrade-readiness), [§15 Glossary](../spec.md#15-glossary) |
-| Architecture decision records | [`docs/decisions/`](../decisions/) | ADRs 0001 to 0018; see [Decisions](decisions.md) |
+| Architecture decision records | [`docs/decisions/`](../decisions/) | ADRs 0001 to 0029 (0013 is not used); see [Decisions](decisions.md) |
 | Litepaper | [`docs/litepaper.md`](../litepaper.md) | The problem, the product, the reserve model, capital flows, risks and roadmap; appendix E lists its references |
 | Implementation plan | [`docs/plan.md`](../plan.md) | Build tasks and their history |
 | Development provenance | [`docs/provenance.md`](../provenance.md) | What was built during the hackathon, prior MUTAV work and third-party code |
 | Repository README | [`README.md`](../../README.md) | Layout, build, test, deploy steps and devnet addresses |
 | Pilot app specification | [`app/docs/spec.md`](../../app/docs/spec.md) | Routes and behaviour of the pilot web app |
-| Third-party notices | [`NOTICE`](../../NOTICE) | Attributions and licences of adapted code |
+| Licence and acknowledgements | [`README.md`, Licence and Acknowledgements](../../README.md#license), [`LICENSE`](../../LICENSE) | Code is MIT, Copyright (c) 2026 MUTAV; the MUTAV name and brand are not MIT-licensed. Third-party design references are acknowledged there and in [`docs/provenance.md`](../provenance.md) |
 
 ### Program code
 
@@ -29,7 +29,7 @@ This page lists the documents, code and external references the MUTAV documentat
 | Program entry point and instruction list | [`programs/mutav/src/lib.rs`](../../programs/mutav/src/lib.rs) |
 | Accounts | [`programs/mutav/src/state/`](../../programs/mutav/src/state/) |
 | Instructions by role | [`programs/mutav/src/instructions/`](../../programs/mutav/src/instructions/) (`admin/`, `operator/`, `capital/`, `public/`, `reserve/`) |
-| Solvency and coverage maths | [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), [`math.rs`](../../programs/mutav/src/math.rs) |
+| Coverage maths (required coverage, the coverage gate, underwater check) | [`programs/mutav/src/solvency.rs`](../../programs/mutav/src/solvency.rs), [`math.rs`](../../programs/mutav/src/math.rs) |
 | Pricing | [`programs/mutav/src/pricing.rs`](../../programs/mutav/src/pricing.rs) |
 | Mint and token-account guards | [`programs/mutav/src/token_guard.rs`](../../programs/mutav/src/token_guard.rs) |
 | Allowlist proofs | [`programs/mutav/src/allowlist.rs`](../../programs/mutav/src/allowlist.rs) |
@@ -78,7 +78,7 @@ These live in the separate `mutav` repository. They give the business, market an
 | Verifiable builds (`solana-verify`) | <https://github.com/otter-sec/solana-verifiable-build> |
 | LiteSVM (unit and integration tests) | <https://github.com/LiteSVM/litesvm> |
 | Codama (client generation from the IDL) | <https://github.com/codama-idl/codama> |
-| `solana-foundation/vault` (MIT; the async deposit and redemption core is adapted from it) | <https://github.com/solana-foundation/vault> |
+| `solana-foundation/vault` (MIT; a design reference for the async deposit and redemption core, no code included) | <https://github.com/solana-foundation/vault> |
 
 ## Squads v4
 
@@ -129,13 +129,13 @@ Only the provisions cited in the spec or the litepaper are listed. The program r
 
 ## Comparable programs studied for design patterns
 
-MUTAV studied other Solana programs for patterns only. No code from them is copied; adapted third-party code is listed in [`NOTICE`](../../NOTICE).
+MUTAV studied other Solana programs for patterns only. No third-party code is included; the design references are acknowledged in the [README](../../README.md#acknowledgements) and [`docs/provenance.md`](../provenance.md).
 
 | Program | What was studied | Where it shows up in MUTAV |
 |---|---|---|
 | OnRe (`onre-finance/onre-sol`, read at commit `c049083`). Documentation: <https://docs.onre.finance/>, including the token configuration and reference pages. Code: <https://github.com/onre-finance/onre-sol> | A Solana program that mints a token at NAV and redeems through asynchronous requests, with a Squads-held admin authority, supply caps, per-purpose token accounts and reserved-byte account layouts | Partial fills per request ([ADR 0010](../decisions/0010-partial-fills-at-queue-head.md)); the convex exit haircut and reserved layouts ([ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)); two-step role handover ([ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md)); computing fees and rounding once per request, keeping cancel and claim open under pause and refusing zero-output fills ([ADR 0023](../decisions/0023-capital-flows-and-exit-rights.md)) |
 | OnRe public audits | Public audit reports by Ackee Blockchain (November 2025), OtterSec (August 2026) and Quantstamp | Reviewed by issue class as an input to the devnet release design |
-| `solana-foundation/vault` (MIT) | Account and authority skeleton and the async deposit and redemption core | Adapted, with the unrestricted asset withdrawal removed ([`NOTICE`](../../NOTICE)) |
+| `solana-foundation/vault` (MIT) | Account and authority structure and the async deposit and redemption lifecycle | A design reference; no code is included, and MUTAV has no unrestricted asset withdrawal ([README acknowledgements](../../README.md#acknowledgements)) |
 | Request, cooldown and permissionless-exit patterns under timelocked governance (Ethena cooldowns, Marinade delayed-unstake tickets, the Maker governance security module) | How holders can always leave before a governance change takes effect | The exit fallback ([ADR 0025](../decisions/0025-exit-fallback-cooldown-exit.md)) |
 | Kamino kVault and klend, Jupiter JLP, Sanctum Infinity, Voltr, Meteora's keeper | Multi-asset reserves: one token account and one config record per asset, targets and bands, rate-limited moves, a pinned price calculator, disable-only emergency powers | The proposed adapter model, liquidity floor, bands and emergency path ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md), which lists every link) |
 | Solana incident write-ups (Drift 2026, Mango, Solend, Cashio, SPL token-lending forks) | Losses that came from a corrupted NAV input or from admin powers with no time lock | The asymmetric time lock and the bounded TESOURO price ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)) |
@@ -149,12 +149,12 @@ MUTAV studied other Solana programs for patterns only. No code from them is copi
 
 ## Sources
 
-- [`docs/provenance.md`](../provenance.md) and [`NOTICE`](../../NOTICE), for third-party code and design references.
+- [`docs/provenance.md`](../provenance.md) and the [README acknowledgements](../../README.md#acknowledgements), for third-party design references.
 - [`docs/litepaper.md`](../litepaper.md) appendix E, for external references.
 - [`docs/spec.md`](../spec.md) §2.2, §3.13, §12 and §15, for the legal provisions cited.
 - [`Anchor.toml`](../../Anchor.toml) and [`Cargo.toml`](../../Cargo.toml), for the toolchain versions.
 - The `mutav-finance/mutav` repository (`docs/`, `research/`), for business context.
-- The ADRs 0020 to 0027 in [`docs/decisions/`](../decisions/), which cite the comparable programs, audits and incident reports they draw on.
+- The ADRs 0020 to 0029 in [`docs/decisions/`](../decisions/), which cite the comparable programs, audits and incident reports they draw on.
 - The multi-asset research report `reports/Multi asset vaults on Solana.md` in the MUTAV workspace (not in this repository), summarized in [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md).
 
 ## Decisions

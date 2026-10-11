@@ -11,26 +11,26 @@ Each guarantee is the on-chain record of one **limited fiança** (CC 823). Its R
 | Default leg | Rent and charges in arrears while the lease runs | `default_cover` |
 | Exit leg | The tenant's debts at the end of occupation | `exit_cover` |
 
-Both covers are absolute R$ amounts set at registration. The rent multipliers behind them are stored for display only and never enter the program's math. No instruction changes the covers after registration. A change, such as a rent increase that should raise the cover, needs a signed addendum and an instruction that is not yet specified (spec §12 Q22, listed in the [open questions](../meta/open-questions.md#open-questions)).
+Both covers are absolute R$ amounts set at registration. The rent and the rent multipliers behind them stay in the MUTAV platform; the program stores only the covers. No instruction changes the covers after registration. A change, such as a rent increase that should raise the cover, needs a signed addendum and an instruction that is not yet specified (spec §12 Q22, listed in the [open questions](../meta/open-questions.md#open-questions)).
 
 ## From lease to registration
 
 1. **Off-chain.** The agency activates the lease in the MUTAV platform. MUTAV assesses it. The landlord signs the guarantee instrument with MUTAV, or the agency signs under a special power from the landlord. The tenant's fee contract is separate.
-2. **On-chain.** The operator calls `register_guarantee(id, agency_id, refs_hash, rent, default_multiplier_bps, exit_multiplier_bps, default_cover, exit_cover)`.
+2. **On-chain.** The operator calls `register_guarantee({ id, agency_id, refs_hash, default_cover, exit_cover })`.
 
 The program accepts the registration only if all of these hold:
 
 | Check | Refused with |
 |---|---|
 | The reserve is not paused | `Paused` |
-| The reserve's BRS account is not frozen by the issuer | `ReserveFrozen` |
-| Rent and cover are above 0 | `InvalidParameter` |
-| Total cover is within the per-guarantee cap (R$40,000 on devnet) | `GuaranteeCapExceeded` |
 | The reserve is not under-covered | `UnderCovered` |
+| The reserve's BRS account is not frozen by the issuer | `ReserveFrozen` |
+| Total cover is above 0 | `InvalidParameter` |
+| Total cover is within the per-guarantee cap (R$120,000 in the pilot, [ADR 0028](../decisions/0028-pilot-parameters.md)) | `GuaranteeCapExceeded` |
 | The reserve can back the new cover: the coverage it needs after the registration fits in the capital it holds | `InsufficientFreeCapital` |
 | The `id` is new | Account already in use |
 
-The last check is the **solvency gate**. When it refuses, the reserve cannot back more cover yet. New guarantees wait until capital comes in or existing guarantees close. Guarantees already registered are not affected.
+The capital check is the **coverage gate**. When it refuses, the reserve cannot back more cover yet. New guarantees wait until capital comes in or existing guarantees close. Guarantees already registered are not affected.
 
 There is no per-agency cap. The program limits cover per guarantee and in total through the reserve's coverage requirement. Per-agency figures are derived from the guarantee accounts, which carry the `agency_id`.
 
@@ -43,7 +43,7 @@ stateDiagram-v2
   [*] --> ACTIVE: register_guarantee
   ACTIVE --> CLOSED: close_guarantee(RELEASED)
   ACTIVE --> CLOSED: close_guarantee(VOID), nothing paid
-  CLOSED --> ACTIVE: reinstate_guarantee, within max_reinstate_age
+  CLOSED --> ACTIVE: reinstate_guarantee (planned upgrade)
 ```
 
 | State | Meaning | New claims | Cover counted in the reserve's requirement |
@@ -59,18 +59,20 @@ The operator closes a guarantee with `close_guarantee(id, reason)`. Two reasons 
 
 | Reason | When | Extra rule |
 |---|---|---|
-| `RELEASED` | The guarantee ended (for example, the lease ended) | No open claim |
-| `VOID` | The lease never took effect, or the registration was an error | No open claim, and nothing was ever paid on either leg |
+| `RELEASED` (1) | The guarantee ended (for example, the lease ended) | The guarantee is `ACTIVE` and has no open claim |
+| `VOID` (2) | The lease never took effect, or the registration was an error | The guarantee is `ACTIVE`, has no open claim, and nothing was ever paid on either leg (`GuaranteeHasPayments`) |
 
-Closing releases the remaining cover from the reserve's requirement. It is never solvency-gated, because it reduces liability. It runs while the reserve is paused. The event `GuaranteeClosed { id, released_cover, reason }` records it.
+Any other reason is refused with `InvalidParameter`; an open claim with `OpenClaims`. The reason is stored on the account as `close_reason`.
 
-A guarantee with an open claim cannot close. Every filed claim must be paid or withdrawn first (see [Claims](claims.md)).
+Closing releases the remaining cover from the reserve's requirement. It is never coverage-gated, because it reduces liability. It runs while the reserve is paused. The event `GuaranteeClosed { id, released_cover, reason }` records it.
 
-## Reinstating a guarantee
+A guarantee with an open claim cannot close. Every filed claim must be paid first, or withdrawn once `amend_claim` ships (see [Claims](claims.md)).
 
-`reinstate_guarantee` undoes a close. It moves a `CLOSED` guarantee back to `ACTIVE` and restores its remaining cover. It is an operator action, allowed only within `max_reinstate_age` of the close. That age is set by the reserve admin (30 days on devnet). It is not paused, not solvency-gated and not subject to the claim caps. The event `GuaranteeReinstated` shows it in the operator-activity feed.
+## Reinstating a guarantee (planned)
 
-Its main use is recovery. If an operator key were ever compromised, a new operator corrects the registry with ordinary operator actions: a false registration is closed as `VOID`, and a wrongful close is reinstated. Claim payments are the only operator action that cannot be undone, and the admin's claim caps bound them.
+`reinstate_guarantee` is a planned upgrade; it is not in the devnet binary, and a close is final until it ships. As designed in ADR 0020, it undoes a close. It moves a `CLOSED` guarantee back to `ACTIVE` and restores its remaining cover. It is an operator action, allowed only within `max_reinstate_age` of the close. That age is set by the reserve admin (30 days on devnet). It is not paused, not coverage-gated and not subject to the claim caps. The event `GuaranteeReinstated` shows it in the operator-activity feed.
+
+Its main use is recovery. If an operator key were ever compromised, a new operator corrects the registry with ordinary operator actions: a false registration is closed as `VOID`, and, once `reinstate_guarantee` ships, a wrongful close is reinstated. Claim payments are the only operator action that cannot be undone, and the admin's claim caps bound them.
 
 ## A guarantee and the monthly fee
 
@@ -87,18 +89,16 @@ Only amounts, timestamps and commitments (hashes) cross from the platform to the
 | `id` | The platform's reference for the guarantee. Its derivation, for example a keyed hash of the lease identity, stays off-chain |
 | `agency_id` | A reference for the agency issued by the platform |
 | `refs_hash` | A commitment to the lease and the signed instrument |
-| `rent` | Monthly rent at registration, for display and audit |
-| `default_multiplier_bps`, `exit_multiplier_bps` | Display only |
 | `default_cover`, `exit_cover` | The two sub-limits |
 | `default_paid`, `exit_paid` | Paid so far, per leg |
 | `provision_default`, `provision_exit` | Open claims, per leg |
 | `open_claims` | Filed claims not yet paid or withdrawn |
-| `status`, `registered_at`, `closed_at` | State and timestamps |
+| `status`, `close_reason`, `registered_at`, `closed_at` | State, close reason and timestamps |
 
 **Private, in the MUTAV platform:**
 
 - the tenant's and the landlord's identity, and the property address;
-- the lease and the signed instrument (only their hash is on-chain);
+- the lease and the signed instrument (only their hash is on-chain), the rent and the rent multipliers;
 - tenant assessment and pricing of the guarantee fee;
 - the agency's monthly bills and payment records;
 - payment-request evidence and the review record.
@@ -139,6 +139,7 @@ stateDiagram-v2
 - [ADR 0008: One capital flow for everyone; FIFO deposits; pause never blocks claims](../decisions/0008-uniform-capital-flow-and-pause-scope.md)
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md) (the lifecycle is planned; space is reserved now)
 - [ADR 0016: Coverage ratio below 1.0, with a 0.10 floor and a provisions term](../decisions/0016-coverage-ratio-below-one.md)
-- ADR 0019: v1 layout for the devnet release (padding for the ADR 0012 fields, per-agency cap and `AgencyExposure` removed)
+- [ADR 0019: v1 layout for the devnet release](../decisions/0019-v1-layout-for-the-devnet-release.md) (padding for the ADR 0012 fields, per-agency cap and `AgencyExposure` removed)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md) (`close_guarantee` reasons, `reinstate_guarantee`, `max_reinstate_age`, frozen-reserve check in registration)
 - [ADR 0022: Coverage: stress buffer and underwater reserve](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) (amends 0016; removes the per-agency cap from the devnet caps)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md) (the per-guarantee cap)
