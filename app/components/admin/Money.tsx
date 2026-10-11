@@ -12,11 +12,13 @@ import { Section } from "@/components/Section";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { RoleLine, RoleTag } from "@/components/RoleTag";
-import { Grid, TextField, useLive } from "@/components/demo/shared";
+import { Grid, Note, TextField, useLive } from "@/components/demo/shared";
 import { AdminAction, Cards, DataTable, ExternalTag, Facts, PLANNED, Sub, WhatThis, type Mode } from "@/components/admin/shared";
 import { ConfigCard, bpsField, brsField } from "@/components/admin/ConfigCard";
 import { capsError, MAX_FEE_TAKE_BPS } from "@/lib/admin";
-import { fmtBrs, fmtShares, fmtTime, parseBrs } from "@/lib/format";
+import { conversionNav, navBoundsAround } from "@mutav-finance/mutav-protocol-solana";
+import { fmtBrs, fmtNav, fmtShares, fmtTime, parseBrs } from "@/lib/format";
+import { depositHead, redeemHead, type HeadStatus } from "@/lib/queue";
 import { claimCap } from "@/lib/operator";
 import { incomeSummary } from "@/lib/reserve-assets";
 import type { Role } from "@/lib/roles";
@@ -38,6 +40,43 @@ function Context({ who, children, figure, href, linkLabel }: { who: Role | "exte
 
 const Contexts = ({ children }: { children: ReactNode }) => <div style={{ borderBottom: "1px solid var(--color-border)" }}>{children}</div>;
 
+/**
+ * The NAV range a fill proposal accepts (ADR 0023): the conversion NAV now ±
+ * the tolerance. A proposal that executes after a larger move (the time lock
+ * runs in between) is refused with NavOutOfBounds instead of filling at a
+ * price the approvers never saw.
+ */
+function useNavBounds(id: string) {
+  const { reserve } = useLive();
+  const [tol, setTol] = useState("100");
+  const bps = Number(tol);
+  const ok = Number.isInteger(bps) && bps >= 0 && bps <= 10_000;
+  const nav = conversionNav(reserve.state.sharesOutstanding, reserve.solvency.netAssets);
+  const bounds = ok ? navBoundsAround(nav, bps) : null;
+  const field = (
+    <TextField
+      id={id}
+      label="NAV tolerance (bps)"
+      value={tol}
+      onChange={setTol}
+      numeric
+      hint={bounds ? `fills only at NAV ${fmtNav(bounds.min)} – ${fmtNav(bounds.max)} (now ${fmtNav(nav)})` : "0–10000 bps"}
+    />
+  );
+  return { bounds, field };
+}
+
+/** Why the head of a queue would not fill now, or that it would (PREVIEW). */
+function HeadNote({ head }: { head: HeadStatus | null }) {
+  if (!head) return <Note>Queue empty.</Note>;
+  if (head.stuck.length === 0) return <Note tone="ok">Head seq {head.seq.toString()} would fill now (PREVIEW at NAV now; the program decides at execution).</Note>;
+  return (
+    <Note tone="warn">
+      Head seq {head.seq.toString()} would not fill now (PREVIEW): {head.stuck.join("; ")}. Fills are whole and FIFO, so every request behind it waits.
+    </Note>
+  );
+}
+
 // ── In ──────────────────────────────────────────────────────────────────────
 
 function Deposits({ mode }: { mode: Mode }) {
@@ -45,6 +84,8 @@ function Deposits({ mode }: { mode: Mode }) {
   const q = capitalQueue(reserve.state, ledger);
   const c = reserve.config;
   const [count, setCount] = useState("8");
+  const nb = useNavBounds("adm-dep-nav");
+  const head = depositHead(c, reserve.state, reserve.solvency, ledger, null);
   return (
     <Sub id="money-deposits" title="Capital deposits" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
@@ -53,13 +94,18 @@ function Deposits({ mode }: { mode: Mode }) {
         </Context>
       </Contexts>
       <Cards>
-        <AdminAction title="Fulfil deposits" label="fulfil_deposits" mode={mode} request={{ kind: "fulfil_deposits", count: Math.max(1, Number(count) || 1) }}>
+        <AdminAction title="Fulfil deposits" label="fulfil_deposits" mode={mode} request={nb.bounds ? { kind: "fulfil_deposits", count: Math.min(8, Math.max(1, Number(count) || 1)), navBounds: nb.bounds } : null}>
           <Facts
             now={m(`${q.deposits.length} waiting · head seq ${reserve.state.depositHead}`)}
             bound={m(`max reserve ${fmtBrs(c.caps.maxTvl, 0)} · up to 8 per call`)}
             does="Moves escrowed BRS into the reserve in FIFO order and mints shares at NAV. Allowed in under-coverage; refused while paused or while fulfilment is halted."
           />
-          <Grid><TextField id="adm-dep" label="Count" value={count} onChange={setCount} numeric /></Grid>
+          <Grid>
+            <TextField id="adm-dep" label="Count" value={count} onChange={setCount} numeric />
+            {nb.field}
+          </Grid>
+          <HeadNote head={head} />
+          <Note>The server fills only up to the first request whose owner is off the current allowlist, and refuses when that request is the head: cancel it first.</Note>
         </AdminAction>
         <ConfigCard
           title="Request sizes"
@@ -141,6 +187,9 @@ function Redemptions({ mode }: { mode: Mode }) {
   const q = capitalQueue(reserve.state, ledger);
   const [count, setCount] = useState("8");
   const [maxAssets, setMaxAssets] = useState("");
+  const nb = useNavBounds("adm-red-nav");
+  const max = parseBrs(maxAssets);
+  const head = redeemHead(reserve.config, reserve.state, reserve.solvency, ledger, max);
   return (
     <Sub id="money-redemptions" title="Redemptions" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
@@ -149,7 +198,7 @@ function Redemptions({ mode }: { mode: Mode }) {
         </Context>
       </Contexts>
       <Cards>
-        <AdminAction title="Fulfil redemptions" label="fulfil_redeems" mode={mode} request={{ kind: "fulfil_redeems", count: Math.max(1, Number(count) || 1), maxAssets: parseBrs(maxAssets) ?? (1n << 64n) - 1n }}>
+        <AdminAction title="Fulfil redemptions" label="fulfil_redeems" mode={mode} request={nb.bounds ? { kind: "fulfil_redeems", count: Math.min(8, Math.max(1, Number(count) || 1)), maxAssets: max ?? (1n << 64n) - 1n, navBounds: nb.bounds } : null}>
           <Facts
             now={m(`${q.redeems.length} waiting · free capital ${fmtBrs(reserve.solvency.freeCapital, 0)}`)}
             bound={m("each fill ≤ free capital · whole requests only · up to 8 per call")}
@@ -158,7 +207,9 @@ function Redemptions({ mode }: { mode: Mode }) {
           <Grid>
             <TextField id="adm-red" label="Count" value={count} onChange={setCount} numeric />
             <TextField id="adm-max" label="Max BRS (blank = no limit)" value={maxAssets} onChange={setMaxAssets} numeric />
+            {nb.field}
           </Grid>
+          <HeadNote head={head} />
         </AdminAction>
       </Cards>
     </Sub>

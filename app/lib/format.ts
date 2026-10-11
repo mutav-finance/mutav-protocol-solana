@@ -84,6 +84,13 @@ export function parseBrs(input: string, decimals = BRS_DECIMALS): bigint | null 
   return v > 0n ? v : null;
 }
 
+/** Base units as an exact input string (`"1234.5"`): no grouping, trailing zeros trimmed; parseBrs reads it back. */
+export function toInput(base: bigint, decimals = BRS_DECIMALS): string {
+  const scale = 10n ** BigInt(decimals);
+  const f = (base % scale).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return f ? `${base / scale}.${f}` : `${base / scale}`;
+}
+
 /** Ratio `a / b` as a percentage with one decimal; `—` when `b` is 0. */
 export function fmtRatio(a: bigint, b: bigint): string {
   if (b === 0n) return "—";

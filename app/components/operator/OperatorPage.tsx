@@ -330,6 +330,11 @@ export function OperatorPage() {
           </Section>
           <Section id="console" title="Console" kicker={locked ? "Read-only" : "Operator wallet connected"} roles={<RoleLine items={[{ role: "operator", prefix: "every action signed by" }]}>The program checks the signer; the wallet signs; the app holds no key.</RoleLine>}>
             {locked && <Note tone="warn">Read-only: connect the operator wallet to act. The forms stay visible so anyone can see what the operator can do.</Note>}
+            {d && address && address === d.reserve.config.pendingOperator && (
+              <Note tone="ok">
+                This wallet is the proposed operator key: take the role with accept_role on <Link href="/admin#general-handovers" className="ext-link">/admin → Pending handovers</Link> (ADR 0020).
+              </Note>
+            )}
             <Console locked={locked} />
             <Note>
               For the six-step story with the gate refusal, see the <Link href="/demo" className="ext-link">guided demo</Link>.

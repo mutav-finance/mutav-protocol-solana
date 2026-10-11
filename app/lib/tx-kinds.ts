@@ -24,14 +24,19 @@ export type OperatorTx =
 
 /** The allowlisted capital provider's instructions (spec §5.5); `seq` names the owner's request. */
 export type InvestorTx =
-  | { kind: "request_deposit"; assets: bigint }
+  /** `minSharesOut`: the owner's price limit (ADR 0023); 0 or absent = none. */
+  | { kind: "request_deposit"; assets: bigint; minSharesOut?: bigint }
   | { kind: "cancel_deposit"; seq: bigint }
   | { kind: "claim_shares"; seq: bigint }
-  | { kind: "request_redeem"; shares: bigint }
+  /** `minAssetsOut`: the owner's price limit (ADR 0023); 0 or absent = none. */
+  | { kind: "request_redeem"; shares: bigint; minAssetsOut?: bigint }
   | { kind: "cancel_redeem"; seq: bigint }
   | { kind: "claim_assets"; seq: bigint };
 
 export type PublicTx = { kind: "refresh" };
+
+/** The proposed operator or pauser key takes its role, signing itself (ADR 0020). 1 = operator, 2 = pauser. */
+export type RoleTx = { kind: "accept_role"; role: 1 | 2 };
 
 /** `PriceParams` fields the admin may change through `set_config` (spec §7). Addresses travel as base58. */
 export type PriceDraft = Partial<{
@@ -63,7 +68,10 @@ export type AdminTx =
       /** `caps.max_nav_move_bps`, the NAV-move guard (spec §7), 0–10_000. */
       maxNavMoveBps?: number;
     }
-  | { kind: "set_allowlist_root"; owners: string[] }
+  /** The root of the server's ALLOWLIST (A9); `owners`, when sent, must be that same list or the server refuses. */
+  | { kind: "set_allowlist_root"; owners?: string[] }
+  /** Clear a pending handover before it is accepted (1 operator, 2 pauser, 3 admin). */
+  | { kind: "cancel_pending"; role: 1 | 2 | 3 }
   /** Propose new operator and pauser keys (distinct from the admin and each other); each new key then signs `accept_role` (ADR 0020). */
   | { kind: "set_roles"; operator: string; pauser: string }
   /** Point claim payments at a new BRS token account (spec §2.1 checks run on-chain). */
@@ -71,7 +79,7 @@ export type AdminTx =
   /** Pauser key or admin, no time lock: clears the operator at once. */
   | { kind: "revoke_operator" };
 
-export type TxRequest = OperatorTx | InvestorTx | PublicTx | AdminTx;
+export type TxRequest = OperatorTx | InvestorTx | PublicTx | RoleTx | AdminTx;
 export type TxKind = TxRequest["kind"];
 
 export const ADMIN_KINDS: ReadonlySet<TxKind> = new Set([
@@ -83,6 +91,7 @@ export const ADMIN_KINDS: ReadonlySet<TxKind> = new Set([
   "set_allowlist_root",
   "set_roles",
   "set_payments_account",
+  "cancel_pending",
 ]);
 export const OPERATOR_KINDS: ReadonlySet<TxKind> = new Set([
   "register_guarantee",
@@ -95,7 +104,8 @@ export const OPERATOR_KINDS: ReadonlySet<TxKind> = new Set([
 ]);
 
 /** Which configured role the program checks as signer, for the UI warning. */
-export function expectedSigner(kind: TxKind): "operator" | "admin" | "pauser-or-admin" | "investor" | "anyone" {
+export function expectedSigner(kind: TxKind): "operator" | "admin" | "pauser-or-admin" | "investor" | "anyone" | "proposed key" {
+  if (kind === "accept_role") return "proposed key";
   if (OPERATOR_KINDS.has(kind)) return "operator";
   if (ADMIN_KINDS.has(kind)) return "admin";
   if (kind === "pause" || kind === "revoke_operator") return "pauser-or-admin";
