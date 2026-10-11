@@ -1,4 +1,5 @@
-//! `set_payments_account` (spec §5.1).
+//! `set_treasury_account` (spec §5.1; ADR 0026). The treasury receives the
+//! fee take of `contribute_fees` (ADR 0007).
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
@@ -7,14 +8,14 @@ use crate::constants::CONFIG_SEED;
 use crate::{
     constants::field,
     errors::MutavError,
-    events::{emit_config_changes, ConfigChanges, PaymentsAccountUpdated},
+    events::{emit_config_changes, ConfigChanges, TreasuryAccountUpdated},
     instructions::admin::{validate_money_accounts, vault_authority_key},
     state::VaultConfig,
 };
 
 #[event_cpi]
 #[derive(Accounts)]
-pub struct SetPaymentsAccount<'info> {
+pub struct SetTreasuryAccount<'info> {
     pub admin: Signer<'info>,
 
     #[account(
@@ -26,17 +27,17 @@ pub struct SetPaymentsAccount<'info> {
     )]
     pub config: Box<Account<'info, VaultConfig>>,
 
-    /// The new payments token account (BRS). Its owner is MUTAV's payments
+    /// The new treasury token account (BRS). Its owner is MUTAV's treasury
     /// wallet, an off-chain fact; the program records the account. It may
     /// not be owned by the operator (ADR 0020).
-    pub payments_account: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    /// The current treasury token account, to compare (spec §2.1).
-    #[account(address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
     pub treasury_account: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    /// The current payments token account, to compare (spec §2.1).
+    #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
+    pub payments_account: Box<InterfaceAccount<'info, TokenAccount>>,
 }
 
-pub fn handle_set_payments_account(ctx: Context<SetPaymentsAccount>) -> Result<()> {
+pub fn handle_set_treasury_account(ctx: Context<SetTreasuryAccount>) -> Result<()> {
     let vault_authority = vault_authority_key(
         &ctx.accounts.config.key(),
         ctx.accounts.config.authority_bump,
@@ -50,16 +51,16 @@ pub fn handle_set_payments_account(ctx: Context<SetPaymentsAccount>) -> Result<(
         &ctx.accounts.config.operator,
     )?;
 
-    let new = ctx.accounts.payments_account.key();
+    let new = ctx.accounts.treasury_account.key();
     let config = &mut ctx.accounts.config;
-    let old = config.payments_account;
+    let old = config.treasury_account;
     let mut ch = ConfigChanges::default();
-    ch.set(field::PAYMENTS_ACCOUNT, &mut config.payments_account, new);
+    ch.set(field::TREASURY_ACCOUNT, &mut config.treasury_account, new);
 
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(PaymentsAccountUpdated {
+    emit_cpi!(TreasuryAccountUpdated {
         config: config_key,
         ts,
         old,
