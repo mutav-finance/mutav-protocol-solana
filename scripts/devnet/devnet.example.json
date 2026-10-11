@@ -30,10 +30,10 @@
   "coverageRatioBps": 2500,
   "feeTakeBps": 2000,
   "caps": {
-    "_comment": "BRS base units (6 dp). The pilot parameters (ADR 0028, superseding the devnet caps of ADR 0016 / ADR 0022): c = 0.25, R$1M reserve (max_tvl), R$120k per guarantee, R$10k / R$20k claim payments per call / per 31 days (the bounded loss from a compromised operator, about 2% of max_tvl), stress buffer R$19k, requests R$1k–R$100k. maxNavMoveBps is 10000 (100%) on devnet on purpose: the guard nets out guarantee fees and swept income per share (ADR 0017), but a claim provision or payment against a small demo reserve is a real NAV move and would trip it and halt fulfilment. If it trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
+    "_comment": "BRS base units (6 dp). The pilot parameters (ADR 0028, superseding the devnet caps of ADR 0016 / ADR 0022): c = 0.25, R$1M reserve (max_tvl), R$120k per guarantee, R$15k / R$20k claim payments per call / per 31 days (a 6x-rent eviction fits the per-call cap; the bounded loss from a compromised operator is R$20k per 31 days, about 2% of max_tvl), stress buffer R$19k, requests R$1k–R$100k. maxNavMoveBps is 10000 (100%) on devnet on purpose: the guard nets out guarantee fees and swept income per share (ADR 0017), but a claim provision or payment against a small demo reserve is a real NAV move and would trip it and halt fulfilment. If it trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
     "maxTvl": 1000000000000,
     "maxCoverPerGuarantee": 120000000000,
-    "maxClaimPerCall": 10000000000,
+    "maxClaimPerCall": 15000000000,
     "maxClaimPerPeriod": 20000000000,
     "minRequest": 1000000000,
     "maxRequest": 100000000000,

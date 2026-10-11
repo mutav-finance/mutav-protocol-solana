@@ -178,7 +178,7 @@ describe("simulator on the pilot", () => {
     expect(PILOT).toMatchObject({
       perMonth: 10, months: 6, growthTarget: 60, feePct: 12, rent: 2200, defaultCover: 12, exitCover: 6,
       coverageRatio: 0.25, startCapital: 100_000, monthlyRaise: 100_000, raiseFrom: 1,
-      maxTvl: 1_000_000, maxCoverPerGuarantee: 120_000, maxClaimPerCall: 10_000, maxClaimPerPeriod: 20_000,
+      maxTvl: 1_000_000, maxCoverPerGuarantee: 120_000, maxClaimPerCall: 15_000, maxClaimPerPeriod: 20_000,
       maxTesouroSharePct: 0, withdraw: "buffer",
     });
   });

@@ -15,7 +15,7 @@ The devnet caps were sized for `c` = 0.10, the program floor: a R$300k reserve, 
 | `coverage_ratio_bps` (`c`) | 0.25 | `2_500` | `1_000` (0.10) |
 | `caps.max_tvl` | R$1,000,000 | `1_000_000_000_000` | R$300k |
 | `caps.max_cover_per_guarantee` | R$120,000 | `120_000_000_000` | R$40k |
-| `caps.max_claim_per_call` | R$10,000 | `10_000_000_000` | unchanged |
+| `caps.max_claim_per_call` | R$15,000 | `15_000_000_000` | R$10k |
 | `caps.max_claim_per_period` | R$20,000 per 31 days | `20_000_000_000` | unchanged |
 | `caps.stress_buffer` | R$19,000 | `19_000_000_000` | R$19k planned, now set and locked |
 | `caps.min_request` / `caps.max_request` | R$1,000 / R$100,000 | unchanged | unchanged (`max_request` ≤ `max_tvl`) |
@@ -39,7 +39,7 @@ Recomputed with the simulator's own model: every planned lease is admitted in bo
 
 - **Higher, safer coverage.** `c` = 0.25 holds a quarter of every lease's remaining cover, two and a half times the program floor. The first real book is small and its loss data is not ours yet, so the pilot keeps a margin well above the worst-case floor.
 - **A capital plan instead of a single deposit.** Capital arrives with the book: R$100k a month backs about 10 new leases a month at `c` = 0.25. `max_tvl` (R$1M) is the ceiling of that plan, not a target, and it stops a raise from taking the reserve past what the founders want at risk.
-- **Claim caps bound the operator.** The operator pays claims without the multisig up to R$10k per call and R$20k per 31 days. That is the most a compromised operator key can drain in a window: about 2% of `max_tvl`. Larger payments need an `approve_claim` approval of the exact amount (ADR 0021). One eviction at 6× rent (R$13,200) is above the per-call cap, so it always goes through an approval.
+- **Claim caps bound the operator.** The operator pays claims without the multisig up to R$15k per call and R$20k per 31 days. A 6×-rent eviction (R$13,200) fits the per-call cap, so the most common large claim is paid without waiting for the multisig. Claims above R$15k need an `approve_claim` approval of the exact amount (ADR 0021). The bounded loss from a compromised operator key stays R$20k per 31 days, about 2% of `max_tvl`.
 - **Per-guarantee cap with room.** R$120k fits the working product (R$39,600) and leaves room for higher rents or covers without a cap change.
 - **BRS only.** The pilot holds BRS only (ADR 0018); the adapter share stays 0% and the settlement floor 100% until an adapter exists. The 50% / 100% adapter cases stay in the simulator as what-ifs.
 

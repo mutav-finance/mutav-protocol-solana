@@ -73,7 +73,7 @@ export const DEVNET_LOCKED: LockedValue[] = [
   { field: 'fee_take_bps', onChain: (c) => v(c.feeTakeBps), value: 2_000n },
   { field: 'caps.max_tvl', onChain: (c) => v(c.caps.maxTvl), value: 1_000_000n * BRL },
   { field: 'caps.max_cover_per_guarantee', onChain: (c) => v(c.caps.maxCoverPerGuarantee), value: 120_000n * BRL },
-  { field: 'caps.max_claim_per_call', onChain: (c) => v(c.caps.maxClaimPerCall), value: 10_000n * BRL },
+  { field: 'caps.max_claim_per_call', onChain: (c) => v(c.caps.maxClaimPerCall), value: 15_000n * BRL },
   {
     field: 'caps.max_claim_per_period',
     onChain: (c) => v(c.caps.maxClaimPerPeriod),

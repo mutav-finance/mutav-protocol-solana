@@ -993,7 +993,7 @@ All caps live in `VaultConfig.caps` and are admin-adjustable (time-locked). The 
 |---|---|---|---|
 | `max_tvl` | `u64` | `fulfil_deposits` | R$1M |
 | `max_cover_per_guarantee` | `u64` | `register_guarantee` | R$120k |
-| `max_claim_per_call` | `u64` | `pay_claim`: above it, only with an `approve_claim` approval of the exact amount (ADR 0021) | R$10k |
+| `max_claim_per_call` | `u64` | `pay_claim`: above it, only with an `approve_claim` approval of the exact amount (ADR 0021) | R$15k |
 | `max_claim_per_period` | `u64` | `pay_claim`: the payments of the last **31 UTC days**, this one included (a sliding window of daily buckets, ADR 0019) | R$20k per 31 days |
 | `min_request`, `max_request` | `u64`, `u64` | `request_deposit`, `request_redeem` | R$1,000 / R$100,000 |
 | `max_nav_move_bps` | `u16` | `refresh` (NAV-move guard, §7). A change needs a `refresh` in the same slot | `10_000` on devnet on purpose (a claim against a small demo reserve is a real NAV move); lower for the real pilot |

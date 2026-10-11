@@ -79,7 +79,7 @@ describe('checkDevnetLocked', () => {
       fee_take_bps: 2_000n,
       'caps.max_tvl': 1_000_000n * BRL,
       'caps.max_cover_per_guarantee': 120_000n * BRL,
-      'caps.max_claim_per_call': 10_000n * BRL,
+      'caps.max_claim_per_call': 15_000n * BRL,
       'caps.max_claim_per_period': 20_000n * BRL,
       'caps.min_request': 1_000n * BRL,
       'caps.max_request': 100_000n * BRL,
