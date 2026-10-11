@@ -5,7 +5,6 @@
  * deposit or redemption request, then follow, cancel and claim it. Everyone
  * can read it; only a wallet on the on-chain allowlist can send requests.
  * Cancels and claims need only the request's owner (spec §5.5).
- * The pilot runs on MUTAV's own capital and is not open to public investment.
  *
  * Layout: centred header, one strip of three reserve figures, the request
  * card (centred and narrow like a swap form), then the wallet's requests.
@@ -17,7 +16,8 @@ import { ReadError } from "@/components/Section";
 import { LiveProvider } from "@/components/demo/shared";
 import { QueueEntries } from "./QueueEntries";
 import { useInvestor } from "./useInvestor";
-import { fmtBrs, fmtNav } from "@/lib/format";
+import { fmtNav } from "@/lib/format";
+import { useMoney, type Money } from "@/lib/client/use-money";
 import type { ReserveView } from "@/lib/view";
 import { RequestCard } from "./RequestCard";
 
@@ -49,7 +49,8 @@ const svg = (d: string) => (
   </svg>
 );
 
-function Stats({ r }: { r: ReserveView }) {
+function Stats({ r, money }: { r: ReserveView; money: Money }) {
+  const usd = money.rate ? ` Shown in dollars at ${money.rate}; BRS is valued at par to BRL.` : "";
   return (
     <div role="group" aria-label="Reserve figures" className="bg-(--color-surface) grid grid-cols-1 gap-x-6 gap-y-4 border px-5 py-4 sm:grid-cols-3">
       <Stat
@@ -61,14 +62,14 @@ function Stats({ r }: { r: ReserveView }) {
       <Stat
         icon={svg("M4 6h16v12H4zM4 10h16")}
         label="Stable assets"
-        tip="BRS in the reserve token account. Excludes pending deposits and assets owed to filled redemptions."
-        value={fmtBrs(r.solvency.stableAssets)}
+        tip={`BRS in the reserve token account. Excludes pending deposits and assets owed to filled redemptions.${usd}`}
+        value={money.fmt(r.solvency.stableAssets)}
       />
       <Stat
         icon={svg("M12 3v18M7 8h7a3 3 0 010 6H8a3 3 0 000 6h8")}
         label="Free capital"
-        tip="Stable assets − coverage required. Redemptions are filled from it; it gates new guarantees and redemptions, never a claim payment."
-        value={fmtBrs(r.solvency.freeCapital)}
+        tip={`Stable assets − coverage required. Redemptions are filled from it; it gates new guarantees and redemptions, never a claim payment.${usd}`}
+        value={money.fmt(r.solvency.freeCapital)}
       />
     </div>
   );
@@ -86,13 +87,14 @@ function Skeleton() {
 
 export function InvestmentPage() {
   const { connected, owner, poll, d, inv, invData, mine, refresh } = useInvestor();
+  const money = useMoney();
   const pad = { paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" };
   return (
     <main className="flex w-full flex-1 flex-col gap-6 py-8" style={pad}>
       <header className="flex flex-col items-center gap-2 text-center">
         <h1 className="font-display text-(--color-text) m-0 text-3xl font-bold tracking-tight">Investment</h1>
         <p className="font-body text-(--color-text-2) m-0 max-w-[60ch] text-sm text-balance">
-          Deposit BRS or redeem shares through the capital queue. The pilot runs on MUTAV&apos;s own capital and is not open to public investment.
+          Deposit BRS or redeem shares through the capital queue.
         </p>
       </header>
 
@@ -102,12 +104,12 @@ export function InvestmentPage() {
       {d && (
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh }}>
           <div className="mx-auto flex w-full max-w-[560px] flex-col gap-6">
-            <Stats r={d.reserve} />
+            <Stats r={d.reserve} money={money} />
             {inv.error && !inv.data && <ReadError error={inv.error} />}
-            <RequestCard inv={invData} connected={connected} />
+            <RequestCard inv={invData} connected={connected} money={money} />
           </div>
           <div className="mx-auto w-full max-w-[960px]">
-            <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} />
+            <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} money={money} />
           </div>
         </LiveProvider>
       )}

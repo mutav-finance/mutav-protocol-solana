@@ -11,6 +11,7 @@ import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { Action } from "@/components/demo/shared";
 import { fmtTime } from "@/lib/format";
+import type { Money } from "@/lib/client/use-money";
 import type { InvestorView } from "@/lib/server/investor";
 import type { InvestorRequest } from "@/lib/view";
 import { ACTION_LABEL, Block, StatusOf, claimOf, lineOf, sideName, waitingOf } from "./shared";
@@ -50,7 +51,7 @@ function Identity({ x }: { x: InvestorRequest }) {
   );
 }
 
-function Rows({ rows, connected }: { rows: InvestorRequest[]; connected: boolean }) {
+function Rows({ rows, connected, money }: { rows: InvestorRequest[]; connected: boolean; money: Money }) {
   return (
     <>
       {/* Phones: one card per request, so the actions stay visible. */}
@@ -66,8 +67,8 @@ function Rows({ rows, connected }: { rows: InvestorRequest[]; connected: boolean
               <dt className="text-(--color-text-3) text-right">Waiting</dt>
               <dt className="text-(--color-text-3) text-right">To claim</dt>
               <dd className="m-0">{lineOf(x)}</dd>
-              <dd className="m-0 text-right">{waitingOf(x)}</dd>
-              <dd className="m-0 text-right">{claimOf(x)}</dd>
+              <dd className="m-0 text-right">{waitingOf(x, money)}</dd>
+              <dd className="m-0 text-right">{claimOf(x, money)}</dd>
             </dl>
             {x.actions.length > 0 && <RowActions x={x} connected={connected} />}
           </li>
@@ -98,10 +99,10 @@ function Rows({ rows, connected }: { rows: InvestorRequest[]; connected: boolean
                   <Mono dim={x.position === null}>{lineOf(x)}</Mono>
                 </td>
                 <td className="num">
-                  <Mono>{waitingOf(x)}</Mono>
+                  <Mono>{waitingOf(x, money)}</Mono>
                 </td>
                 <td className="num">
-                  <Mono>{claimOf(x)}</Mono>
+                  <Mono>{claimOf(x, money)}</Mono>
                 </td>
                 <td style={{ whiteSpace: "normal" }}>
                   <RowActions x={x} connected={connected} />
@@ -144,7 +145,7 @@ function Verify({ inv }: { inv: InvestorView | null }) {
   );
 }
 
-export function QueueEntries({ rows, owner, connected, inv }: { rows: InvestorRequest[]; owner: string | null; connected: boolean; inv: InvestorView | null }) {
+export function QueueEntries({ rows, owner, connected, inv, money }: { rows: InvestorRequest[]; owner: string | null; connected: boolean; inv: InvestorView | null; money: Money }) {
   return (
     <Block
       id="queue-h"
@@ -162,7 +163,7 @@ export function QueueEntries({ rows, owner, connected, inv }: { rows: InvestorRe
       ) : rows.length === 0 ? (
         <p className="font-body text-(--color-text-3) m-0 px-6 py-6 text-sm">No open requests. New deposits and redemptions appear here.</p>
       ) : (
-        <Rows rows={sortRows(rows)} connected={connected} />
+        <Rows rows={sortRows(rows)} connected={connected} money={money} />
       )}
       <Verify inv={inv} />
     </Block>

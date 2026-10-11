@@ -3,8 +3,8 @@
 /**
  * The request card on /investment: one swap-style form for both sides of the
  * capital queue. "You pay" is what goes into escrow (BRS for a deposit, shares
- * for a redemption); "You receive" is a preview at today's NAV, labelled as
- * one: the Reserve Admin fills requests in queue order at the NAV of the fill.
+ * for a redemption); "You receive" is worked out at today's NAV: the Reserve
+ * Admin fills requests in queue order at the NAV of the fill.
  * The arrow between the fields switches sides. The server composes the
  * unsigned transaction (with the Merkle proof); the connected wallet signs.
  */
@@ -15,7 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Action, Note, useLive } from "@/components/demo/shared";
 import { LABEL, TRACKING } from "./shared";
-import { BRS_DECIMALS, SHARE_DECIMALS, fmtBrs, fmtShares, fmtUnits, parseBrs } from "@/lib/format";
+import { BRS_DECIMALS, SHARE_DECIMALS, fmtShares, fmtUnits, parseBrs } from "@/lib/format";
+import type { Money } from "@/lib/client/use-money";
 import type { InvestorView } from "@/lib/server/investor";
 
 type Side = "deposit" | "redeem";
@@ -45,7 +46,7 @@ function Field({ id, title, unit, value, onChange, foot, readOnly }: { id: strin
   );
 }
 
-export function RequestCard({ inv, connected }: { inv: InvestorView | null; connected: boolean }) {
+export function RequestCard({ inv, connected, money }: { inv: InvestorView | null; connected: boolean; money: Money }) {
   const { reserve } = useLive();
   const caps = reserve.config.caps;
   const { sharesOutstanding } = reserve.state;
@@ -97,7 +98,7 @@ export function RequestCard({ inv, connected }: { inv: InvestorView | null; conn
             foot={
               <>
                 <span>
-                  {deposit ? "Wallet" : "Held"} {balance === null ? "—" : deposit ? fmtBrs(balance) : fmtShares(balance)}
+                  {deposit ? "Wallet" : "Held"} {balance === null ? "—" : deposit ? `${fmtUnits(balance, BRS_DECIMALS)} BRS` : fmtShares(balance)}
                 </span>
                 {balance !== null && balance > 0n && (
                   <Button type="button" variant="ghost" size="sm" onClick={() => setInput(fmtUnits(balance, decimals, decimals).replace(/,/g, ""))} className="h-6 px-2 text-2xs">
@@ -128,12 +129,12 @@ export function RequestCard({ inv, connected }: { inv: InvestorView | null; conn
             unit={deposit ? "shares" : "BRS"}
             value={preview === null ? "" : deposit ? fmtShares(preview) : fmtUnits(preview, BRS_DECIMALS)}
             readOnly
-            foot={<span>PREVIEW · at NAV now; filled at the NAV of the fill</span>}
+            foot={<span>{value !== null && money.fx ? `≈ ${money.fmt(value)} · ` : ""}at NAV now; filled at the NAV of the fill</span>}
           />
         </div>
 
         <p className="font-mono text-(--color-text-3) m-0 text-2xs">
-          Limits {fmtBrs(caps.minRequest, 0)} – {fmtBrs(caps.maxRequest, 0)} per request{deposit ? "" : ", valued at NAV now"}
+          Limits {money.fmt(caps.minRequest, 0)} – {money.fmt(caps.maxRequest, 0)} per request{deposit ? "" : ", valued at NAV now"}
         </p>
         <div className="[&>div>button]:h-11 [&>div>button]:w-full">
           {deposit ? (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtBps, fmtBrs, fmtDuration, fmtNav, fmtPct, fmtRatio, fmtShares, fmtTime, fmtUnits, parseBrs, shortAddr } from "../format";
+import { brsToUsd, fmtBps, fmtBrs, fmtUsd, fmtDuration, fmtNav, fmtPct, fmtRatio, fmtShares, fmtTime, fmtUnits, parseBrs, shortAddr } from "../format";
 
 describe("format", () => {
   it("formats BRS with grouping and truncation", () => {
@@ -42,5 +42,13 @@ describe("format", () => {
 describe("fmtPct", () => {
   it("prints whole and fractional percentages without trailing zeros", () => {
     expect([fmtPct(10_000), fmtPct(5_000), fmtPct(2_550), fmtPct(0)]).toEqual(["100%", "50%", "25.5%", "0%"]);
+  });
+});
+
+describe("fmtUsd", () => {
+  it("converts BRS at the USD/BRL rate, truncating", () => {
+    expect(brsToUsd(5_400_000n, 5_400_000n)).toBe(1_000_000n);
+    expect(fmtUsd(58_700_000_000n, 5_400_000n)).toBe("$ 10,870.37");
+    expect(fmtUsd(1n, 5_400_000n)).toBe("$ 0.00");
   });
 });
