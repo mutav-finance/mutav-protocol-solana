@@ -36,7 +36,10 @@ export type GatePreview = {
   freeCapitalBefore: bigint;
   stableAssets: bigint;
   coverageRequiredBefore: bigint;
-  /** `max(ceil(c × (remaining_cover_total + new_cover) / 10_000), provisions)` (ADR 0016). */
+  /**
+   * `max(ceil(c × (remaining_cover_total + new_cover) / 10_000), provisions +
+   * min(stress_buffer, unprovisioned))` (ADR 0016, ADR 0022).
+   */
   coverageRequiredAfter: bigint;
   /** `coverage_required_after`; must be ≤ `stable_assets`. */
   needed: bigint;
@@ -50,7 +53,12 @@ type StateView = Pick<VaultState, "mode" | "brsBalance" | "remainingCoverTotal" 
 export function previewRegisterGuarantee(config: ConfigView, state: StateView, g: GateInput): GatePreview {
   const before = coverageFromAccounts(config, state);
   const newCover = g.defaultCover + g.exitCover;
-  const coverageRequiredAfter = coverageRequired(state.remainingCoverTotal + newCover, config.coverageRatioBps, state.provisions);
+  const coverageRequiredAfter = coverageRequired(
+    state.remainingCoverTotal + newCover,
+    config.coverageRatioBps,
+    state.provisions,
+    config.caps.stressBuffer,
+  );
   const needed = coverageRequiredAfter;
   const base = {
     newCover,
