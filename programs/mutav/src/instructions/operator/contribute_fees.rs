@@ -139,6 +139,9 @@ pub fn handle_contribute_fees(
         gross: amount,
         take,
         net,
+        fees_in_total: ctx.accounts.state.fees_in_total,
+        fee_take_total: ctx.accounts.state.fee_take_total,
+        brs_balance: ctx.accounts.state.brs_balance,
     });
     Ok(())
 }

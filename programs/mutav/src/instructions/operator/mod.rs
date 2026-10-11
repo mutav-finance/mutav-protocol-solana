@@ -1,6 +1,7 @@
 //! Operator instructions (spec §5.2–§5.4, §5.3a), signed by the mutav-app KMS key.
 //! Every one checks `VaultConfig::is_operator`, so a revoked operator
-//! (`revoke_operator`) is refused until `set_roles` appoints a new key.
+//! (`revoke_operator`) is refused until a new operator accepts its role
+//! (`propose_role` / `accept_role`, ADR 0020).
 
 pub mod close_guarantee;
 pub mod contribute_fees;
