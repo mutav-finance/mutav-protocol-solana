@@ -26,6 +26,8 @@ import { rolesError } from "@/lib/admin";
 import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
 import { useWallet } from "@/components/WalletProvider";
 import { ACCOUNT_ROLES } from "@/lib/roles";
+import { operatorDay } from "@/lib/operator";
+import { paymentsAlerts } from "@/lib/view";
 import { bytesToHex } from "@/lib/serde";
 
 const m = (x: ReactNode) => <Mono style={{ fontSize: 12 }}>{x}</Mono>;
@@ -79,6 +81,45 @@ function Emergency({ mode }: { mode: Mode }) {
         />
       </Cards>
     </div>
+  );
+}
+
+// ── Watch ───────────────────────────────────────────────────────────────────
+
+/**
+ * Early detection: what the operator key did in the last 24 hours, read from
+ * the accounts, and red flags on the payments account every claim payment
+ * lands in. The pauser key acts on either at once (pause, revoke_operator).
+ */
+function Watch() {
+  const { reserve, ledger } = useLive();
+  const day = operatorDay(ledger, reserve.now);
+  const alerts = paymentsAlerts(reserve.payments, reserve.config);
+  const p = reserve.payments;
+  return (
+    <Sub id="general-watch" title="Watch · last 24 hours">
+      <div className="grid-2">
+        <KV
+          rows={[
+            [<Meaning key="r" label="Guarantees registered">register_guarantee by the operator key</Meaning>, m(`${day.registered.count} · ${fmtBrs(day.registered.cover, 0)} cover`)],
+            [<Meaning key="c" label="Guarantees closed">close_guarantee</Meaning>, m(String(day.closed.count))],
+            [<Meaning key="f" label="Claims filed">file_claim (provisions)</Meaning>, m(`${day.filed.count} · ${fmtBrs(day.filed.amount, 0)}`)],
+            [<Meaning key="p" label="Claims paid">pay_claim, bounded by the claim caps</Meaning>, m(`${day.paid.count} · ${fmtBrs(day.paid.amount, 0)} of ${fmtBrs(reserve.config.caps.maxClaimPerPeriod, 0)} per 31 days`)],
+            [<Meaning key="g" label="Guarantee fees booked">contribute_fees</Meaning>, m(`${day.fees.count} · ${fmtBrs(day.fees.amount, 0)}`)],
+          ]}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <StatusBadge bordered color={alerts.length ? "var(--color-error)" : "var(--color-success)"} label={alerts.length ? "PAYMENTS ACCOUNT · CHECK" : "PAYMENTS ACCOUNT · OK"} />
+          {alerts.map((a) => <Note key={a} tone="error">The payments account: {a}.</Note>)}
+          {p?.exists && (
+            <Mono style={{ fontSize: 11, color: "var(--color-text-3)", wordBreak: "break-all" }}>
+              owner {p.owner}{p.expectedOwner ? " (checked against PAYMENTS_OWNER)" : " · set PAYMENTS_OWNER on the server to alert when it changes"}
+            </Mono>
+          )}
+          <Note>Read from the accounts&apos; own timestamps on every refresh. A burst of registrations or payments, or a red flag here, is the cue to pause or revoke the operator above.</Note>
+        </div>
+      </div>
+    </Sub>
   );
 }
 
@@ -286,6 +327,7 @@ export function General({ mode, sq, sqError, onSquadsDone }: { mode: Mode; sq: S
     <Section id="general" kicker="Governance" title="General controls" roles={<RoleLine items={[{ role: "admin", prefix: "written only by the" }]}>The pauser key can also pause and revoke the operator.</RoleLine>}>
       <WhatThis>The settings that cut across every flow: the stop switches, who holds each role, how much cover the reserve backs, and who may hold shares. Per-flow settings sit with their flow; asset settings sit under Allocation.</WhatThis>
       <Emergency mode={mode} />
+      <Watch />
       <Sub id="general-roles" title="Roles & multisig">
         <Note>
           Every admin change on this page is a Squads vault-transaction proposal: one member creates and approves it, the others approve from their own wallets, and anyone executes it once the threshold is met and the time lock has passed. Members reject a proposal while it is Active, or vote to cancel it once Approved; a live set_config blocks the next one until it runs or is rejected or cancelled. Execute refuses a set_config whose fields moved on-chain since it was proposed. This page holds no key.

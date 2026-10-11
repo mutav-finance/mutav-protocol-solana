@@ -86,7 +86,40 @@ export type ReserveView = {
    * never counts toward NAV.
    */
   incomeInbox: { address: string; exists: boolean; amount: bigint };
+  /** The payments token account's SPL facts, for the watcher alert (absent in older reads and tests). */
+  payments?: PaymentsFacts;
 };
+
+/** SPL facts of the payments token account (where pay_claim sends BRS). */
+export type PaymentsFacts = {
+  exists: boolean;
+  /** Token-account owner (the wallet that can move the BRS out). */
+  owner: string | null;
+  mint: string | null;
+  delegate: string | null;
+  closeAuthority: string | null;
+  frozen: boolean;
+  /** PAYMENTS_OWNER from the server env: the owner the admin expects, when set. */
+  expectedOwner: string | null;
+};
+
+/**
+ * Watcher alerts on the payments account (AV-3 follow-up): every claim
+ * payment lands there, so its owner changing, a delegate or close authority
+ * appearing, or the owner being the operator key, is worth a red flag.
+ */
+export function paymentsAlerts(p: PaymentsFacts | undefined, c: Pick<VaultConfig, "operator" | "reserveMint">): string[] {
+  if (!p) return [];
+  if (!p.exists) return ["the payments account does not exist"];
+  const out: string[] = [];
+  if (p.expectedOwner && p.owner !== p.expectedOwner) out.push(`its owner is ${p.owner}, not the expected ${p.expectedOwner} (PAYMENTS_OWNER): the owner changed`);
+  if (p.owner === c.operator) out.push("it is owned by the operator key: a compromised operator could pay claims to itself");
+  if (p.mint !== null && p.mint !== c.reserveMint) out.push("it is not a BRS account");
+  if (p.delegate) out.push(`it has a delegate (${p.delegate}) who can move its BRS`);
+  if (p.closeAuthority) out.push(`it has a close authority (${p.closeAuthority})`);
+  if (p.frozen) out.push("it is frozen: pay_claim into it fails");
+  return out;
+}
 
 /** `ClaimFiling.leg` ids (LEG_DEFAULT = 1, LEG_EXIT = 2; 0 names no leg). */
 export const LEG = { default: 1, exit: 2 } as const;
@@ -153,7 +186,6 @@ export type AgencyRow = {
  * Per-agency figures derived from the guarantee accounts: the program keeps
  * no per-agency account or cap (ADR 0019).
  */
-// TODO(PR 5): the agency view's final shape (no cap to compare against now).
 export function agencyRows(guarantees: Row<Guarantee>[]): AgencyRow[] {
   const by = new Map<string, AgencyRow>();
   for (const { data: g } of guarantees) {

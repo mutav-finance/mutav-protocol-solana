@@ -35,7 +35,7 @@ import {
   getRedeemsFulfilledEventDecoder,
 } from "@mutav-finance/mutav-protocol-solana";
 import { fetchEncodedAccount, getAddressDecoder } from "@solana/kit";
-import type { CapitalEvent, Ledger, ReserveView, Row, TokenFacts } from "../view";
+import type { CapitalEvent, Ledger, PaymentsFacts, ReserveView, Row, TokenFacts } from "../view";
 import { assertGenesis } from "../cluster";
 import { serverEnv, type ServerEnv } from "./env";
 
@@ -98,12 +98,13 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
   if (addresses.config !== env.configAddress) {
     throw new Error(`CONFIG_ADDRESS ${env.configAddress} is not the config PDA of its reserve mint under ${env.programId}`);
   }
-  const [state, clock, token, inbox] = await Promise.all([
+  const [state, clock, token, inbox, payments] = await Promise.all([
     fetchVaultState(rpc, addresses.state, READ),
     clusterNow(env),
     readTokenFacts(env, config.data.reserveMint, addresses.reserve),
     // ADR 0017: issuer income paid and not swept yet (never in NAV).
     fetchIncomeInbox(rpc, { vaultAuthority: addresses.vaultAuthority, config: config.data }),
+    readPaymentsFacts(env, config.data.paymentsAccount),
   ]);
   return {
     cluster: env.cluster,
@@ -117,6 +118,30 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
     slot: clock.slot,
     token,
     incomeInbox: { address: inbox.address, exists: inbox.exists, amount: inbox.amount },
+    payments,
+  };
+}
+
+/**
+ * The payments token account's SPL facts (account layout: mint [0..32),
+ * owner [32..64), delegate option [72..76) + key [76..108), state [108],
+ * close-authority option [129..133) + key [133..165)).
+ */
+async function readPaymentsFacts(env: ServerEnv, account: Address): Promise<PaymentsFacts> {
+  const a = await fetchEncodedAccount(rpcFor(env), account, READ);
+  const expectedOwner = env.paymentsOwner;
+  if (!a.exists || (a.data as Uint8Array).length < 165) return { exists: false, owner: null, mint: null, delegate: null, closeAuthority: null, frozen: false, expectedOwner };
+  const d = a.data as Uint8Array;
+  const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
+  const ad = getAddressDecoder();
+  return {
+    exists: true,
+    mint: ad.decode(d.subarray(0, 32)),
+    owner: ad.decode(d.subarray(32, 64)),
+    delegate: dv.getUint32(72, true) === 1 ? ad.decode(d.subarray(76, 108)) : null,
+    frozen: d[108] === 2,
+    closeAuthority: dv.getUint32(129, true) === 1 ? ad.decode(d.subarray(133, 165)) : null,
+    expectedOwner,
   };
 }
 

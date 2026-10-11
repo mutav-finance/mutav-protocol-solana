@@ -39,7 +39,7 @@ import {
 import { readReserve } from "../lib/server/chain";
 import { composeInstructions } from "../lib/server/compose";
 import { serverEnv } from "../lib/server/env";
-import { REF } from "../lib/refs";
+import { randomRef, REF } from "../lib/refs";
 import { fromHex } from "../lib/serde";
 import type { TxRequest } from "../lib/tx-kinds";
 import { assertLocal, defaultKeysDir, localKeys, protocolLib, signAndSend, type Role } from "./lib/local";
@@ -146,14 +146,17 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   await go("capital", { kind: "claim_shares", seq: 0n }, "claim_shares");
 
   console.log("\n== seed: three guarantees");
+  // Opaque random agency ids, held by the operator (here, this run).
+  const agencyIds = new Map<string, string>();
+  const agencyId = (agency: string) => agencyIds.get(agency) ?? (agencyIds.set(agency, randomRef()), agencyIds.get(agency)!);
   const lease = async (leaseLabel: string, agency: string, rent: bigint) =>
     go(
       "operator",
       {
         kind: "register_guarantee",
         id: await REF.guaranteeId(leaseLabel),
-        agencyId: await REF.agencyId(agency),
-        refsHash: await REF.refsHash(leaseLabel),
+        agencyId: agencyId(agency),
+        refsHash: await REF.refsHash(leaseLabel, randomRef()),
         defaultCover: 3n * rent * BRL,
         exitCover: rent * BRL,
       },
