@@ -36,6 +36,7 @@ import {
 } from "@mutav-finance/mutav-protocol-solana";
 import { fetchEncodedAccount, getAddressDecoder } from "@solana/kit";
 import type { CapitalEvent, Ledger, ReserveView, Row, TokenFacts } from "../view";
+import { assertGenesis } from "../cluster";
 import { serverEnv, type ServerEnv } from "./env";
 
 export class NotConfiguredError extends Error {
@@ -46,6 +47,26 @@ let cached: { url: string; rpc: ReturnType<typeof createSolanaRpc> } | null = nu
 export function rpcFor(env: ServerEnv) {
   if (!cached || cached.url !== env.rpcUrl) cached = { url: env.rpcUrl, rpc: createSolanaRpc(env.rpcUrl) };
   return cached.rpc;
+}
+
+/** One genesis check per RPC URL per server instance (A4); a failed check is retried on the next request. */
+const genesisChecked = new Map<string, Promise<void>>();
+
+export function assertClusterGenesis(env: ServerEnv, read = async () => String(await rpcFor(env).getGenesisHash().send())): Promise<void> {
+  let p = genesisChecked.get(env.rpcUrl);
+  if (!p) {
+    p = read().then((hash) => assertGenesis(hash, env.cluster, env.rpcUrl));
+    p.catch(() => genesisChecked.delete(env.rpcUrl));
+    genesisChecked.set(env.rpcUrl, p);
+  }
+  return p;
+}
+
+/** The server env, after the RPC's genesis hash matched the cluster. Every route starts here. */
+export async function guardedEnv(): Promise<ServerEnv> {
+  const env = serverEnv();
+  await assertClusterGenesis(env);
+  return env;
 }
 
 /** Reads see a transaction as soon as it confirms (the RPC default is finalized, ~13 s behind). */
