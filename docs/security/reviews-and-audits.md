@@ -8,8 +8,8 @@ This page lists the verification that exists for the mutav program, its client a
 
 | Suite | Tooling | What it covers | Where |
 |---|---|---|---|
-| Program integration tests | LiteSVM | Each instruction's happy path, its errors, and the gate and cap edge cases: initialize, config, roles and pause, guarantees, claims, fees, income, the capital queues, solvency gate, under-coverage, refresh, freeze detection, mint guard, rounding, events. | [`tests/tests/`](../../tests/tests/) |
-| Property tests | `proptest` inside LiteSVM | Randomised checks, among them that `pay_claim` is never refused for solvency or under-coverage, and rounding in the reserve's favour. | [`tests/tests/claims.rs`](../../tests/tests/claims.rs), [`tests/tests/rounding.rs`](../../tests/tests/rounding.rs) |
+| Program integration tests | LiteSVM | Each instruction's happy path, its errors, and the gate and cap edge cases: initialize, config, roles and pause, guarantees, claims, fees, income, the capital queues, the coverage gate, under-coverage, refresh, freeze detection, mint guard, rounding, events. | [`tests/tests/`](../../tests/tests/) |
+| Property tests | `proptest` inside LiteSVM | Randomised checks, among them that `pay_claim` is never refused by the coverage gate or under-coverage, and rounding in the reserve's favour. | [`tests/tests/claims.rs`](../../tests/tests/claims.rs), [`tests/tests/rounding.rs`](../../tests/tests/rounding.rs) |
 | Invariant checks | LiteSVM | The specification's invariants asserted after instructions. See [Invariants](invariants.md). | [`tests/tests/claim_invariants.rs`](../../tests/tests/claim_invariants.rs) and the suites above |
 | Layout tests | LiteSVM and Borsh | Golden v1 layouts, v1 to v2 carve decoding, padding preservation, padding zero at init, version guard. | [`tests/tests/layout/`](../../tests/tests/layout/), [`padding.rs`](../../tests/tests/padding.rs), [`version_guard.rs`](../../tests/tests/version_guard.rs) |
 | Compute units | LiteSVM | A full fill batch fits the default compute budget. A regression guard. | [`tests/tests/compute.rs`](../../tests/tests/compute.rs) |
@@ -25,7 +25,7 @@ Each change in the pre-devnet fix waves adds its tests first, including the oper
 Every program-owned account has a fixed layout with zeroed padding at the end. New fields are carved from the front of the padding and must read zero as the safe default.
 
 - Golden fixtures live in [`tests/fixtures/layout/v1/`](../../tests/fixtures/layout/v1/). The tests check sizes, field offsets, and that v1 bytes decode under the current structs.
-- The fixtures are regenerated one last time for the devnet release layout (ADR 0019: v1 layout for the devnet release). From the first devnet deploy, v1 is frozen. Every later change is a carve from padding or a new account, checked against the v1 fixtures.
+- The fixtures are regenerated one last time for the devnet release layout ([ADR 0019](../decisions/0019-v1-layout-for-the-devnet-release.md)). From the first devnet deploy, v1 is frozen. Every later change is a carve from padding or a new account, checked against the v1 fixtures.
 - At devnet and mainnet launch, live accounts are dumped into the fixtures and decoded in CI.
 
 See [specification §14.2](../spec.md#142-padding-and-version) and [§14.7](../spec.md#147-layout-stability-tests-pilot).
@@ -55,7 +55,7 @@ flowchart LR
     R1["Adversarial review<br/>5 parallel read-only reviews"] --> R2["Whole-protocol review<br/>against published audits<br/>of a comparable program"]
     R2 --> R3["OWASP Smart Contract<br/>Top 10 (2026) pass"]
     R3 --> S["Simplification review"]
-    S --> D["Decisions and ADRs 0020 to 0027"]
+    S --> D["Decisions and ADRs 0020 to 0029"]
     D --> W["Fix wave<br/>bounded PRs, tests first"]
     W --> A["Internal security audit<br/>(fresh session)"]
     A --> DP["Devnet deploy"]
@@ -80,13 +80,13 @@ The [OWASP Smart Contract Top 10](https://scs.owasp.org/sctop10/) is used as a c
 
 | ID | Category | How the design addresses it |
 |---|---|---|
-| SC01 | Access Control Vulnerabilities | Distinct roles checked with `has_one` and signer constraints. Two-step handover for every role and the admin. Pending keys expire and are cleared on revocation. Guardians can never be the default key or a role key. `initialize` is signed by the upgrade authority. See [Governance and keys](governance-and-keys.md). |
-| SC02 | Business Logic Vulnerabilities | Numbered invariants tested after instructions. Claim caps bound the operator's irreversible power. Every other registry action is reversible. Queue heads cannot stall on a 0-value request. See [Invariants](invariants.md). |
+| SC01 | Access Control Vulnerabilities | Distinct roles checked with `has_one` and signer constraints. Two-step handover for every role and the admin. Pending keys expire after 72 hours and can be cancelled (`cancel_pending`); `revoke_operator` and `revoke_pauser` clear the matching pending key. Guardians can never repeat each other or hold a role key; the default key marks an empty slot. `initialize` is signed by the upgrade authority. See [Governance and keys](governance-and-keys.md). |
+| SC02 | Business Logic Vulnerabilities | Numbered invariants tested after instructions. Claim caps bound the operator's irreversible power. Registry actions are reversible (fully once the Wave 2 claim instructions ship). A redemption head worth 0 BRS is never filled; the owner or the admin cancels it, so the queue cannot stall. Both fills stop while the reserve is underwater. See [Invariants](invariants.md). |
 | SC03 | Price Oracle Manipulation | v1 reads no oracle: BRS is valued at par and NAV comes from tracked balances. Fills carry admin `nav_bounds` and an inline NAV-move guard. A later priced asset uses a price MUTAV reads itself, bounded by a rate band, an accrual corridor, staleness limits and admin floors and caps ([spec §7](../spec.md#7-price-safety), [ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md), Proposed). |
 | SC04 | Flash Loan–Facilitated Attacks | NAV ignores raw balances, so a donation cannot move it. Deposits and redemptions are asynchronous and filled by the admin in FIFO order, never in the same transaction as the request. |
 | SC05 | Lack of Input Validation | Seeds and canonical bumps, owners, mints and token programs checked on every account. `set_config` bounds every parameter. The mint guard refuses unsafe Token-2022 extensions and requires 6 decimals. |
 | SC06 | Unchecked External Calls | CPIs only to the stored token program, with `transfer_checked`. `sweep_income` checks post-CPI balance deltas. Adapters, when added, run on a pinned program, with post-CPI reload and delta checks, and every adapter account required at every gate ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)). |
-| SC07 | Arithmetic Errors | u128 math with explicit rounding, always in the reserve's favour. Every deposit fill must mint more than 0 shares. No NAV-raising inflow while no shares exist. |
+| SC07 | Arithmetic Errors | u128 math with explicit rounding, always in the reserve's favour. Every deposit fill must mint more than 0 shares. No NAV-raising inflow while no shares exist (`NoSharesOutstanding`). |
 | SC08 | Reentrancy Attacks | v1 makes no CPI into an untrusted program. The vault authority is never passed into an adapter CPI. |
 | SC09 | Integer Overflow and Underflow | Checked math (`MathOverflow`); overflow checks on in release builds; saturating writes only on the claim path, where a failure would block a payment. |
 | SC10 | Proxy & Upgradeability Vulnerabilities | Upgrade authority on a separate multisig with a long time lock; verified builds; frozen layouts with append-only rules; `idl-compat` in CI; the exit fallback lets holders leave before an upgrade takes effect, once built. |
@@ -110,9 +110,10 @@ An independent security audit is planned before mainnet. The auditor, scope and 
 ## Decisions
 
 - [ADR 0001: Record architecture decisions](../decisions/0001-record-architecture-decisions.md)
-- [ADR 0011: Phase-2 instant exit, earmark-aware solvency and upgrade readiness](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md) (layout rules, feature flags, upgrade runbook)
-- ADR 0019: v1 layout for the devnet release
+- [ADR 0011: Phase-2 instant exit and upgrade readiness](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md) (layout rules, feature flags, upgrade runbook)
+- [ADR 0019: v1 layout for the devnet release](../decisions/0019-v1-layout-for-the-devnet-release.md)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
 - [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)

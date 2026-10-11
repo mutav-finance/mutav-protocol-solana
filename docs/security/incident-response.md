@@ -1,6 +1,6 @@
 # Incident response
 
-This page describes the tools the program gives MUTAV in an incident and the runbooks that use them. The aim is that no money gets stuck and that claims keep being paid.
+This page describes the tools the program gives MUTAV in an incident and the runbooks that use them. The aim is that no money gets stuck and that claims keep being paid. Instructions marked *later* are decided but not in the devnet binary.
 
 ## Pause
 
@@ -8,21 +8,21 @@ This page describes the tools the program gives MUTAV in an incident and the run
 
 | Stopped by pause | Always open |
 |---|---|
-| `request_deposit`, `request_redeem` (including holders who left the allowlist) | Every claim instruction: `file_claim`, `amend_claim` (an amendment to 0 withdraws), `refile_claim`, `approve_claim`, `pay_claim`, `settle_payout` |
-| `fulfil_deposits`, `fulfil_redeems` | `close_guarantee`, `reinstate_guarantee` |
+| `request_deposit`, `request_redeem` (including holders who left the allowlist) | Every claim instruction: `file_claim`, `pay_claim`, `settle_payout` (and, *later*, `amend_claim`, `refile_claim`, `approve_claim`) |
+| `fulfil_deposits`, `fulfil_redeems` | `close_guarantee` (and, *later*, `reinstate_guarantee`) |
 | `register_guarantee` | `contribute_fees`, `sweep_income` |
-| | `cancel_deposit` (owner or admin), `cancel_redeem`, `claim_shares`, `claim_assets` |
-| | `skim`, `classify_unsolicited`, `book_unsolicited` (both kinds, backstop included), `return_unsolicited` (every source) |
+| | `cancel_deposit` and `cancel_redeem` (owner or admin), `claim_shares`, `claim_assets` |
+| | *Later:* `skim`, `classify_unsolicited`, `book_unsolicited` (both kinds, backstop included), `return_unsolicited` (every source) |
 | | `refresh`, `advance_queue_head` |
-| | Admin configuration, `propose_role` / `accept_role`, `propose_admin` / `accept_admin`, `cancel_pending`, guardian appointment, `revoke_operator` |
+| | Admin configuration, `propose_role` / `accept_role`, `propose_admin` / `accept_admin`, `cancel_pending`, `set_guardians`, `revoke_operator`, `revoke_pauser`, `clear_fulfil_halt` |
 
 Pause never traps holders' money and never blocks a claim. After the first adapter upgrade, the same keys that can pause also have the risk-reducing adapter actions described in [Adapter emergency](#adapter-emergency).
 
 ### NAV halt
 
-The NAV-move guard is a second, narrower stop. It runs in `refresh` and inline in both fill instructions. When NAV per share (net of booked inflows) moves more than `max_nav_move_bps` from the baseline, `fulfil_halted` is set and both queues refuse fills. The halt is sticky. Only the admin's `clear_fulfil_halt` clears it and resets the baseline, and it refuses while the reserve is frozen.
+The NAV-move guard is a second, narrower stop. It runs in `refresh` and inline in both fill instructions. When NAV per share (net of booked inflows) moves more than `max_nav_move_bps` from the baseline, both fills refuse with `FulfilHalted`. The inline check runs at batch start and does not latch; `refresh` (anyone) latches `fulfil_halted`, and then both queues refuse fills until it is cleared. The halt is sticky. Only the admin's `clear_fulfil_halt(nav_bounds)` clears it and resets the baseline to the current NAV, which must lie within `nav_bounds`; it refuses while the reserve is frozen. On devnet `max_nav_move_bps` is 10,000, so the guard rarely trips there.
 
-Each fill also carries `nav_bounds (min, max)` chosen by the admin when the proposal is composed. A fill outside them is refused.
+Each fill also carries `nav_bounds (min, max)` chosen by the admin when the proposal is composed. A fill outside them is refused with `NavOutOfBounds`.
 
 ```mermaid
 stateDiagram-v2
@@ -37,14 +37,14 @@ stateDiagram-v2
 
 ## Operator compromise
 
-Only the operator knows the contracts, so every registry action is an operator action and is reversible by another operator action. The admin's role stays financial: it does not roll back the registry. There is no admin rollback instruction and no time-window argument.
+Only the operator knows the contracts, so every registry action is an operator action and is meant to be reversible by another operator action (fully so once the Wave 2 claim instructions and `reinstate_guarantee` ship). The admin's role stays financial: it does not roll back the registry. There is no admin rollback instruction and no time-window argument.
 
 | Step | Who | Action |
 |---|---|---|
-| 1. Freeze | Pauser (or admin) | `revoke_operator` at once. Operator instructions fail from the next slot, and the pending operator and pauser keys are cleared. `pause` as well if capital flows or new guarantees must stop. |
-| 2. Appoint | Admin, then the new key | `propose_role(OPERATOR, key)`; the new key signs `accept_role(OPERATOR)` within 72 hours. If the pauser key is also suspect, propose a new pauser in the same Squads proposal. |
+| 1. Freeze | Pauser (or admin) | `revoke_operator` at once. Operator instructions fail from the next slot, and the pending operator key is cleared (the pending pauser key is not). `pause` as well if capital flows or new guarantees must stop. If the pauser key is suspect, the admin runs `revoke_pauser`. |
+| 2. Appoint | Admin, then the new key | `propose_role(OPERATOR, key)`; the new key signs `accept_role(OPERATOR)` within 72 hours. If the pauser key is also suspect, propose a new pauser with `propose_role(PAUSER, key)` in the same Squads proposal. |
 | 3. Reconcile | New operator | Compare the MUTAV platform's contract registry and audit trail (kept where the operator key cannot write) with on-chain events and `refs_hash` values since the compromise. |
-| 4. Correct | New operator | Use ordinary operator actions. Fake registrations: `close_guarantee(VOID)`. Wrongful closes: `reinstate_guarantee`, within `max_reinstate_age`. Fake filings: `amend_claim(0)`, which sets the filing to `WITHDRAWN`. Wrong amounts: `amend_claim`. A withdrawn notice that turns out to be real: `refile_claim`, which starts it from scratch with no approval. |
+| 4. Correct | New operator | Use ordinary operator actions. Fake registrations: `close_guarantee(VOID)`. Until Wave 2 ships, a fake filing stays provisioned and is never paid. *Later:* wrongful closes, `reinstate_guarantee` within `max_reinstate_age`; fake filings, `amend_claim(0)`, which sets the filing to `WITHDRAWN`; wrong amounts, `amend_claim`; a withdrawn notice that turns out to be real, `refile_claim`, which starts it from scratch with no approval. |
 | 5. Accept the bounded loss | MUTAV | Claim payments made with the compromised key are irreversible. They are bounded by the claim caps and landed in MUTAV's own payments account. |
 | 6. Resume fills | Admin | The admin signs no redemption fill until reconciliation is done. |
 
@@ -53,7 +53,7 @@ flowchart LR
     D["Detect<br/>(operator-activity feed)"] --> F["Freeze<br/>revoke_operator, pause"]
     F --> A["Appoint<br/>propose_role / accept_role"]
     A --> R["Reconcile<br/>registry vs on-chain events"]
-    R --> C["Correct<br/>close VOID, reinstate,<br/>amend (0 withdraws)"]
+    R --> C["Correct<br/>close VOID; later reinstate,<br/>amend (0 withdraws)"]
     C --> S["Resume<br/>unpause, fills"]
 ```
 
@@ -65,7 +65,7 @@ flowchart LR
 
 The pauser can revoke the operator, which pauses operator actions, claim payments included, until the admin's time lock lets a new `propose_role` through and the new operator accepts. If the pauser key is ever lost to someone else, recovery follows the same path.
 
-- Replace the pauser in the same Squads proposal that proposes the new operator.
+- The admin removes the pauser at once with `revoke_pauser`, and proposes a new one with `propose_role(PAUSER, key)` in the same Squads proposal that proposes the new operator. `revoke_operator` leaves the pending pauser alone, so a doubtful pauser cannot cancel its own replacement.
 - Bank-first payment covers the gap: MUTAV pays the agency by Pix from its own bank account, and the reserve reimburses the payments account once `pay_claim` runs again.
 
 ## Admin key compromise
@@ -82,18 +82,18 @@ The BRS issuer can freeze any BRS account, the reserve's included.
 | `register_guarantee` | Counts it as 0 BRS; refuses with `ReserveFrozen`. |
 | `fulfil_deposits`, `fulfil_redeems` | Refuse with `ReserveFrozen`. |
 | `clear_fulfil_halt` | Refuses with `ReserveFrozen`. |
-| `skim` | Refuses when the source or `unsolicited` is frozen. |
+| `skim` (*later*) | Refuses when the source or `unsolicited` is frozen. |
 | `pay_claim` | Cannot transfer. MUTAV pays the agency by Pix from its own bank and the reserve reimburses the payments account after the freeze lifts. |
 
 The reserve's money is split across separate token accounts, so one freeze does not trap every balance. Owners can still cancel requests and claim from accounts that are not frozen.
 
 ## Underwater reserve
 
-When net assets reach 0 with shares outstanding, `fulfil_deposits` refuses with `ReserveUnderwater`, so new money never pays for old losses. Recovery is a MUTAV backstop: MUTAV sends BRS and the admin books it with `book_unsolicited` and receipt kind `BACKSTOP`. No shares are minted, so the money raises NAV for every holder. Claim payments continue within the caps throughout. Public copy says "reserve below target; MUTAV backstop active".
+The reserve is underwater when NAV per share is below the smallest published unit while shares are outstanding (`net_assets × NAV_SCALE < shares_outstanding`). Both `fulfil_deposits` and `fulfil_redeems` then refuse with `ReserveUnderwater`, so new money never pays for old losses. An empty reserve (no shares) is not underwater. `cancel_deposit` and `cancel_redeem` stay open. Recovery is a MUTAV backstop. Until `book_unsolicited` ships, the operator recapitalizes with `contribute_fees` under a fresh `invoice_ref_hash` recorded as a backstop; the fee take applies, so MUTAV sends `needed / (1 − take)`. Later the admin books backstop money with `book_unsolicited` and receipt kind `BACKSTOP`. No shares are minted, so the money raises NAV for every holder. Claim payments continue within the caps throughout. Public copy says "reserve below target; MUTAV backstop active".
 
 ## Unsolicited money
 
-Money that arrives outside a booking path does not move NAV. It is held apart and then returned or booked. Unsolicited money is the reserve admin's responsibility.
+Money that arrives outside a booking path does not move NAV. The instructions below are decided ([ADR 0024](../decisions/0024-unsolicited-money-and-backstop.md)) and arrive in a later upgrade; in the devnet binary only the `unsolicited` account exists, and such money simply sits outside NAV. Once built, it is held apart and then returned or booked. Unsolicited money is the reserve admin's responsibility.
 
 | Source | First step | Who |
 |---|---|---|

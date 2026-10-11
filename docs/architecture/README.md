@@ -2,7 +2,7 @@
 
 This section describes how MUTAV is built for the devnet release: the on-chain program, the systems around it, who signs what, where every account and every token lives, and how the program changes over time. It describes the decided design for that release, in the present tense.
 
-MUTAV is an institutional fiador for Brazilian rental leases. One Solana program, `mutav`, holds a BRL reserve in BRS and records every guarantee MUTAV gives, with its remaining cover. It gates every capital movement and every new guarantee on a solvency check. It never gates a claim payment. The reserve is operational infrastructure that keeps the guarantees healthy. It is not a yield product.
+MUTAV is an institutional fiador for Brazilian rental leases. One Solana program, `mutav`, holds a BRL reserve in BRS and records every guarantee MUTAV gives, with its remaining cover. It gates every capital movement and every new guarantee on a coverage check. It never gates a claim payment. The reserve is operational infrastructure that keeps the guarantees healthy. It is not a yield product.
 
 ## Pages in this section
 
@@ -52,11 +52,11 @@ flowchart LR
   CLIENT -.->|"Squads proposals"| ADM
   CLIENT -.->|"unsigned transactions"| INV
   OP -->|"guarantees, claims, fees, income"| PROG
-  ADM -->|"ceilings, fills, approvals, roles"| PROG
+  ADM -->|"ceilings, fills, roles"| PROG
   UPG -->|"program upgrades"| PROG
   PAU -->|"pause, revoke operator"| PROG
   INV -->|"deposit and redeem requests"| PROG
-  ANY -->|"refresh, advance heads, skim"| PROG
+  ANY -->|"refresh, advance queue heads"| PROG
   PROG -->|"moves BRS and shares"| TOK
   BRS -.->|"monthly income share to the income inbox"| TOK
   PROG -.->|"events, account reads"| PLAT
@@ -67,7 +67,7 @@ flowchart LR
 
 | System | Where it lives | What it does | Holds keys? |
 |---|---|---|---|
-| `mutav` program | [`programs/mutav/`](../../programs/mutav/) (Anchor) | Custody of the reserve, the share mint, on-chain NAV, the guarantee registry, the solvency gate, the deposit and redemption queues, roles, claim payments | Signs only through its own PDAs |
+| `mutav` program | [`programs/mutav/`](../../programs/mutav/) (Anchor) | Custody of the reserve, the share mint, on-chain NAV, the guarantee registry, the coverage gate, the deposit and redemption queues, roles, claim payments | Signs only through its own PDAs |
 | TypeScript client | [`clients/js/`](../../clients/js/), published as `@mutav-finance/mutav-protocol-solana` | Codama instruction builders and account decoders generated from the IDL, plus PDAs, reads, an exact math mirror and previews | No. It composes; wallets and multisigs sign |
 | Pilot web app | [`app/`](../../app/), live at [reserve.mutav.finance](https://reserve.mutav.finance) | Transparency page, operator console, investor view, admin proposal builder, guided demo, simulator | No. Connected wallets sign |
 | MUTAV platform | [`mutav-finance/mutav-app`](https://github.com/mutav-finance/mutav-app), a separate repo | Contracts, agencies, claim review and the payment service level, agency billing, the indexer. Later it sends operator instructions with a KMS-backed key | The operator key, once the operator moves off the hand-signed console |
@@ -114,7 +114,7 @@ On a real-money pilot, hardware-wallet keys replace the devnet stand-ins, and th
 1. **The business model is the fixed requirement.** The program implements it and decides nothing the platform should decide.
 2. **The reserve is verifiable on-chain.** The program tracks the amounts it moved, not raw token balances. Losses are recognised early: a filed claim is provisioned at once.
 3. **MUTAV operates every chain touchpoint.** The operator is the only writer of guarantees and claims.
-4. **The solvency gate protects the reserve and never stops a claim payment.**
+4. **The coverage gate protects the reserve and never stops a claim payment.**
 5. **No arbitrary outflows.** Money leaves only to a fixed set of destinations (see [Money flows](money-flows.md)).
 6. **Operator and admin are separate.** The most a compromised operator can cost is the admin-set claim caps. Every other operator change is reversible.
 7. **No migrations.** Every account carries reserved space, so later features are carved from padding or added as new accounts.
@@ -142,9 +142,11 @@ On a real-money pilot, hardware-wallet keys replace the devnet stand-ins, and th
 - [ADR 0002: One core program plus adapter programs with capped sub-authorities](../decisions/0002-core-program-and-capped-adapters.md)
 - [ADR 0003: Claim payments operated by MUTAV through a whitelisted payments account](../decisions/0003-payments-operated-by-mutav.md)
 - [ADR 0004: NAV computed on-chain with internal accounting](../decisions/0004-onchain-nav-internal-accounting.md)
-- [ADR 0005: Solvency gate scope](../decisions/0005-solvency-gate-scope.md)
+- [ADR 0005: Coverage gate scope](../decisions/0005-solvency-gate-scope.md)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed; who moves assets, the emergency path and the floor on `fulfil_redeems` are decided)
-- ADR 0019: v1 layout for the devnet release
+- [ADR 0019: v1 layout for the devnet release](../decisions/0019-v1-layout-for-the-devnet-release.md)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
+- [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)

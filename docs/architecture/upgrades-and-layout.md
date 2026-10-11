@@ -8,21 +8,21 @@ Authority is split across two Squads v4 multisigs with the same members.
 
 | Multisig | Holds | Time lock: devnet | Time lock: real-money pilot |
 |---|---|---|---|
-| **Admin multisig** | `VaultConfig.admin`: configuration, roles, fills, approvals, unsolicited money, unpause | 5 minutes | 24 hours |
+| **Admin multisig** | `VaultConfig.admin`: configuration, roles, guardians, fills, cancels, unpause. Later also claim approvals and unsolicited money | 5 minutes | 24 hours |
 | **Upgrade multisig** | The program upgrade authority, the IDL, `initialize` | 1 hour | 7 days |
 
 Why two:
 
-- Day-to-day admin work (filling queues, approving an above-cap claim amount) needs a short wait.
+- Day-to-day admin work (filling queues, and later approving an above-cap claim amount) needs a short wait.
 - Replacing the program needs a long wait, so holders and observers can react before it executes.
-- The exit fallback ties the two together: the upgrade time lock is kept at or above `max_queue_wait_secs`, so a holder can leave through the fallback before an upgrade lands (7 days and 7 days on a real-money pilot).
+- The exit fallback (future work; `max_queue_wait_secs` ships at 0) ties the two together: the upgrade time lock is kept at or above `max_queue_wait_secs`, so a holder can leave through the fallback before an upgrade lands (7 days and 7 days on a real-money pilot).
 
 Rules for both multisigs:
 
 - **No config authority.** `config_authority` is the default key, so members, threshold and time lock change only through the multisig's own time-locked proposals.
 - **The time lock counts from approval.**
 - **No multisig config change during an upgrade window,** because it makes in-flight proposals stale.
-- **Pause is not time-locked.** The pauser and guardians can pause capital flows and new guarantees at any time, including during a pending upgrade.
+- **Pause is not time-locked.** The pauser and guardians can pause capital flows and new guarantees at any time, including during a pending upgrade. The pauser's `revoke_operator` is not time-locked either.
 - On devnet both are 2-of-2 with two devnet wallets standing in for the founders. Hardware-wallet keys replace them before real money.
 
 The deploy scripts check each multisig before use: owner program is Squads v4, the exact member set, the exact threshold, and a time lock at or above the floor (300 seconds for admin and 3,600 seconds for upgrade on devnet).
@@ -68,11 +68,11 @@ The first devnet deploy freezes layout v1.
 
 **Before the freeze**, these edits land together and the golden fixtures (`tests/fixtures/layout/v1/`) are regenerated once more:
 
-- larger padding for `Guarantee` (192) and `ClaimFiling`, which also absorbs the former `Payout` record;
+- larger padding for `Guarantee` (203 after the removed display fields and `close_reason`) and `ClaimFiling` (192), which also absorbs the former `Payout` record;
 - removal of the payout SLA fields, of the per-agency cap with the `AgencyExposure` account, and of the state listed in [ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md) (`HolderState`, `FeeReceipt`, `Payout`, the phase-2 exit parameters and earmark, the global TESOURO price fields, the cached `stable_assets`, the income take, partial-fill fields, `pending_notices`, the inline adapter slots and `claim_period_secs`);
 - the carves listed in [Accounts](accounts.md#fields-carved-for-the-devnet-release);
 - account-list changes, such as the seeds-checked `reserve` in `register_guarantee` and `clear_fulfil_halt`;
-- the `reason` argument of `close_guarantee`, the `nav_bounds` arguments of both fill instructions, the `expected_amount` argument of `pay_claim`, the sparse `set_config(Vec<ConfigParam>)` and `advance_queue_head(queue, max)`;
+- the `reason` argument of `close_guarantee`, the `nav_bounds` arguments of both fill instructions and `clear_fulfil_halt`, the `Eligibility` argument of both request instructions, the `expected_amount` argument of `pay_claim`, the sparse `set_config(Vec<ConfigParam>)` and `advance_queue_head(queue, max)`;
 - the new instructions, events and errors, and the removal of dead errors, events and always-false fields, renumbered once before the freeze.
 
 **After the freeze**, every change is either a carve from padding or a new account, checked against the v1 fixtures. Existing instructions, events and errors keep their shape.
@@ -147,10 +147,11 @@ These arrive without migration, as carves or new accounts:
 |---|---|
 | Partial fills at the queue head | Carved from `RedeemRequest` padding, held by the padding test |
 | Cumulative baseline for the NAV-move guard | Carved from padding |
-| Requester price protection (`min_assets_out`) | Carved from request padding |
-| Exit fallback fill path | Uses `max_queue_wait_secs`, already carved |
+| Rest of the requester price protection | `min_shares_out` and `min_assets_out` are already carved; anything further comes from request padding |
+| Exit fallback fill path | Uses `max_queue_wait_secs`, already carved (0, off) |
 | Claim-notice gate | A counter carved from `VaultState` padding; `ClaimNotice` is a new account. Built with the exit fallback |
-| Fiança lifecycle fields | The grown `Guarantee` and `ClaimFiling` padding |
+| Fiança lifecycle fields, `reinstate_guarantee` and the Wave 2 claim instructions (`approve_claim`, `amend_claim`, `refile_claim`, withdrawal) | The grown `Guarantee` and `ClaimFiling` padding; `approved_amount` and `max_reinstate_age` are already carved |
+| Unsolicited money (`skim`, `classify_unsolicited`, `book_unsolicited`, `return_unsolicited`) | The `unsolicited` account exists; `INCOME_KIND_UNSOLICITED` and `INCOME_KIND_BACKSTOP` are reserved |
 | Adapters and a second reserve asset | `adapter_count` and `adapter_bitmap`, already carved at 0, and one `AdapterState` PDA per adapter ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)) |
 | Phase-2 instant exit | Exit parameters carved from `VaultConfig` and `InstantExitState` from `VaultState`; `SUPPORTED_FEATURES` stays 0 until then |
 | A take on issuer income | A carve, once a take is decided (spec §12 Q47) |
@@ -167,10 +168,11 @@ These arrive without migration, as carves or new accounts:
 ## Decisions
 
 - [ADR 0001: Record architecture decisions](../decisions/0001-record-architecture-decisions.md)
-- [ADR 0011: Phase-2 instant exit, earmark-aware solvency and upgrade readiness](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)
+- [ADR 0011: Phase-2 instant exit and upgrade readiness](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)
 - [ADR 0012: Guarantees aligned with a limited fiança onerosa](../decisions/0012-fianca-aligned-guarantee-lifecycle.md) (padding sized for its fields)
 - [ADR 0018: BRS-only pilot reserve](../decisions/0018-brs-only-pilot-reserve.md) (adapter slots and the settlement floor)
-- ADR 0019: v1 layout for the devnet release (padding, removals and carved fields)
+- [ADR 0019: v1 layout for the devnet release](../decisions/0019-v1-layout-for-the-devnet-release.md) (padding, removals and carved fields)
+- [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md) (time locks and values for devnet and the pilot)
 - [ADR 0020: Operator/admin separation and operator-compromise recovery](../decisions/0020-operator-admin-separation-and-recovery.md) (two multisigs, two-step handover, guardians)
 - [ADR 0025: Exit fallback: a cooldown exit after `max_queue_wait_secs`](../decisions/0025-exit-fallback-cooldown-exit.md)
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
