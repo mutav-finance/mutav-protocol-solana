@@ -1,6 +1,7 @@
 //! `register_guarantee` (spec §5.2): solvency-gated and capped.
 
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
     constants::*,
@@ -51,6 +52,11 @@ pub struct RegisterGuarantee<'info> {
     )]
     pub guarantee: Box<Account<'info, Guarantee>>,
 
+    /// Read for its freeze state (ADR 0020): a frozen reserve counts as 0
+    /// BRS, so no new cover is accepted against it.
+    #[account(seeds = [RESERVE_SEED, config.key().as_ref()], bump)]
+    pub reserve: Box<InterfaceAccount<'info, TokenAccount>>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -67,6 +73,8 @@ pub fn handle_register_guarantee(
     // Rule 1: not paused, normal mode (stored, and checked inline, spec §6).
     require!(!config.paused, MutavError::Paused);
     require!(state.mode == MODE_NORMAL, MutavError::UnderCovered);
+    // A frozen reserve counts as 0 BRS: refused before any solvency figure.
+    require!(!ctx.accounts.reserve.is_frozen(), MutavError::ReserveFrozen);
     let before = solvency_snapshot(config, state)?;
     require!(!before.under_covered(), MutavError::UnderCovered);
 
@@ -126,6 +134,9 @@ pub fn handle_register_guarantee(
         refs_hash: args.refs_hash,
         default_cover: args.default_cover,
         exit_cover: args.exit_cover,
+        remaining_cover_total: state.remaining_cover_total,
+        coverage_required: state.coverage_required,
+        active_guarantees: state.active_guarantees,
     });
     Ok(())
 }
