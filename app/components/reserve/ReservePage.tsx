@@ -29,7 +29,7 @@ export function ReservePage() {
       {d && (
         <>
           <WhoDoesWhat />
-          <Section id="health" title="Health" kicker="Solvency" info="Computed by the program's own formulas (spec §4) from VaultConfig and VaultState." roles={<RoleLine items={[{ role: "admin", prefix: "ratio and caps set by" }, { role: "anyone", prefix: "refresh by" }]} />} action={<RefreshButton onConfirmed={poll.refresh} />}>
+          <Section id="health" title="Health" kicker="Coverage" info="Computed by the program's own formulas (spec §4) from VaultConfig and VaultState." roles={<RoleLine items={[{ role: "admin", prefix: "ratio and caps set by" }, { role: "anyone", prefix: "refresh by" }]} />} action={<RefreshButton onConfirmed={poll.refresh} />}>
             <Health r={d.reserve} />
           </Section>
           <Section id="coverage" title="Coverage" kicker="Guarantees" roles={<RoleLine items={[{ role: "operator", prefix: "registered by" }, { role: "admin", prefix: "caps set by" }]} />} info="Each guarantee has a default (rent-arrears) leg and an exit (property-recovery) leg. Remaining cover is cover minus what was already paid.">
