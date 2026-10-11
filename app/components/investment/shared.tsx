@@ -12,7 +12,7 @@ import type { InvestorRequest } from "@/lib/view";
 /** Dev only: with the mock chain and no wallet, preview MUTAV's capital wallet. */
 export const MOCK = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_MOCK_CHAIN === "1";
 
-export const ACTION_LABEL = { cancel_deposit: "Cancel deposit", claim_shares: "Claim shares", cancel_redeem: "Cancel redemption", claim_assets: "Claim BRS" } as const;
+export const ACTION_LABEL = { cancel_deposit: "Cancel deposit", claim_shares: "Collect shares", cancel_redeem: "Cancel redemption", claim_assets: "Collect BRS" } as const;
 
 /** Inter Medium 12px caps label (STYLE.md card label). */
 export const LABEL = "font-body text-(--color-text-2) text-xs font-medium uppercase";
@@ -21,12 +21,36 @@ export const TRACKING = { letterSpacing: "0.01em" };
 export const sideName = (x: InvestorRequest) => (x.side === "deposit" ? "Deposit" : "Redemption");
 export const waitingOf = (x: InvestorRequest, m: Money) => (x.waiting === 0n ? "—" : x.side === "deposit" ? m.fmt(x.waiting) : `${fmtShares(x.waiting)} sh`);
 export const claimOf = (x: InvestorRequest, m: Money) => (x.claimable === 0n ? "—" : x.side === "deposit" ? `${fmtShares(x.claimable)} sh` : m.fmt(x.claimable));
-export const lineOf = (x: InvestorRequest) => (x.position === null ? "—" : `#${x.position}`);
+export const lineOf = (x: InvestorRequest) => (x.position === null ? "—" : ordinal(x.position));
+
+/** 1 → "1st", 2 → "2nd", 11 → "11th", 23 → "23rd". */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+
+/** The on-chain status in UI words: pending is "Waiting", fulfilled is "Filled". */
+export function statusName(x: InvestorRequest): string {
+  switch (x.status) {
+    case "pending":
+      return "Waiting";
+    case "partially filled":
+      return "Partly filled";
+    case "fulfilled":
+    case "filled":
+      return "Filled";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return x.status;
+  }
+}
 
 /** Status as a brand badge: 6px square + mono label. */
 export function StatusOf({ x }: { x: InvestorRequest }) {
-  if (x.claimable > 0n) return <StatusBadge color="var(--color-success)" label="READY TO CLAIM" />;
-  return <StatusBadge color="var(--color-text-3)" label={x.status.toUpperCase()} />;
+  if (x.claimable > 0n) return <StatusBadge color="var(--color-success)" label="READY TO COLLECT" />;
+  return <StatusBadge color="var(--color-text-3)" label={statusName(x).toUpperCase()} />;
 }
 
 /** A bordered surface block with a one-line header (title, optional definition, optional aside). */

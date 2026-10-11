@@ -1,12 +1,12 @@
 "use client";
 
 /**
- * The request card on /investment: one swap-style form for both sides of the
- * capital queue. "You pay" is what goes into escrow (BRS for a deposit, shares
- * for a redemption); "You receive" is worked out at today's NAV: the Reserve
- * Admin fills requests in queue order at the NAV of the fill.
- * The arrow between the fields switches sides. The server composes the
- * unsigned transaction (with the Merkle proof); the connected wallet signs.
+ * The request card on /investment: one form for both sides of the capital
+ * queue, switched by the Deposit / Redeem tabs. The first field is what waits
+ * in line (BRS for a deposit, shares for a redemption); "You receive" is
+ * worked out at today's share price: the Reserve Admin fills requests in order
+ * at the share price of the fill. The server composes the unsigned
+ * transaction (with the Merkle proof); the connected wallet signs.
  */
 import { useState, type ReactNode } from "react";
 import { assetsFor, sharesFor } from "@mutav-finance/mutav-protocol-solana";
@@ -21,7 +21,7 @@ import type { InvestorView } from "@/lib/server/investor";
 
 type Side = "deposit" | "redeem";
 
-/** One field of the swap: label, a large amount, the unit, and a balance line. */
+/** One field of the form: label, a large amount, the unit, and a balance line. */
 function Field({ id, title, unit, value, onChange, foot, readOnly }: { id: string; title: string; unit: string; value: string; onChange?: (v: string) => void; foot: ReactNode; readOnly?: boolean }) {
   return (
     <div className="bg-(--color-canvas) flex flex-col gap-2 border p-4">
@@ -70,13 +70,11 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
     setSide(s);
     setInput("");
   };
+  const blocked = paused ? null : !connected ? "Connect an approved wallet to request." : state === null ? "Checking access…" : canRequest ? null : "This wallet isn't approved. Access is by allowlist (KYC off-chain).";
 
   return (
-    <section aria-labelledby="request-h" className="bg-(--color-surface) flex w-full flex-col border">
+    <section aria-label={deposit ? "Deposit request" : "Redemption request"} className="bg-(--color-surface) flex w-full flex-col border">
       <div className="flex flex-col gap-4 px-6 py-5">
-        <h2 id="request-h" className="font-display text-(--color-text) m-0 text-center text-xl font-bold">
-          {deposit ? "Deposit" : "Redeem"}
-        </h2>
         <Tabs value={side} onValueChange={(v) => switchTo(v as Side)}>
           <TabsList className="w-full">
             <TabsTrigger value="deposit" className="flex-1">
@@ -88,17 +86,17 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
           </TabsList>
         </Tabs>
 
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-2">
           <Field
             id="inv-pay"
-            title="You pay"
+            title={deposit ? "You deposit" : "You redeem"}
             unit={deposit ? "BRS" : "shares"}
             value={input}
             onChange={setInput}
             foot={
               <>
                 <span>
-                  {deposit ? "Wallet" : "Held"} {balance === null ? "—" : deposit ? `${fmtUnits(balance, BRS_DECIMALS)} BRS` : fmtShares(balance)}
+                  Balance {balance === null ? "—" : deposit ? `${fmtUnits(balance, BRS_DECIMALS)} BRS` : fmtShares(balance)}
                 </span>
                 {balance !== null && balance > 0n && (
                   <Button type="button" variant="ghost" size="sm" onClick={() => setInput(fmtUnits(balance, decimals, decimals).replace(/,/g, ""))} className="h-6 px-2 text-2xs">
@@ -108,34 +106,20 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
               </>
             }
           />
-          <div className="relative z-10 -my-3 flex justify-center">
-            <Button
-              type="button"
-              variant="secondary"
-              size="icon"
-              aria-label={deposit ? "Switch to redeem" : "Switch to deposit"}
-              title={deposit ? "Switch to redeem" : "Switch to deposit"}
-              onClick={() => switchTo(deposit ? "redeem" : "deposit")}
-              className="bg-(--color-surface-2) text-(--color-text-2) hover:text-(--color-text) size-8 border [border-color:var(--color-border)]"
-            >
-              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
-            </Button>
-          </div>
           <Field
             id="inv-receive"
             title="You receive"
             unit={deposit ? "shares" : "BRS"}
             value={preview === null ? "" : deposit ? fmtShares(preview) : fmtUnits(preview, BRS_DECIMALS)}
             readOnly
-            foot={<span>{value !== null && money.fx ? `≈ ${money.fmt(value)} · ` : ""}at NAV now; filled at the NAV of the fill</span>}
+            foot={<span>{value !== null && money.fx ? `≈ ${money.fmt(value)} · ` : ""}At today&apos;s share price. The fill price sets the final amount.</span>}
           />
         </div>
 
         <p className="font-mono text-(--color-text-3) m-0 text-2xs">
-          Limits {money.fmt(caps.minRequest, 0)} – {money.fmt(caps.maxRequest, 0)} per request{deposit ? "" : ", valued at NAV now"}
+          Min {money.fmt(caps.minRequest, 0)} · max {money.fmt(caps.maxRequest, 0)} per request
         </p>
+        {blocked && <p className="font-body text-(--color-text-2) m-0 text-center text-xs">{blocked}</p>}
         <div className="[&>div>button]:h-11 [&>div>button]:w-full [&>div>button:disabled]:bg-(--color-surface-3) [&>div>button:disabled]:text-(--color-text-3) [&>div>button:disabled]:opacity-100">
           {deposit ? (
             <Action label="Request deposit" disabled={!canRequest} request={amount ? { kind: "request_deposit", assets: amount } : null} />
@@ -143,16 +127,20 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
             <Action label="Request redemption" disabled={!canRequest} request={amount ? { kind: "request_redeem", shares: amount } : null} />
           )}
         </div>
-        {!paused && !canRequest && (
-          <p className="font-mono text-(--color-text-3) m-0 text-center text-2xs">
-            {!connected ? "Connect the allowlisted wallet to send requests." : state === null ? "Checking the allowlist…" : "This wallet is not on the allowlist."}
-          </p>
-        )}
-        {paused && <Note tone="warn">Requests are paused by the Reserve Admin. Cancels and claims below stay open.</Note>}
+        {paused && <Note tone="warn">Requests are paused by the Reserve Admin. Cancel and collect stay open.</Note>}
         {outside && <Note tone="warn">Outside the per-request limits: the program will refuse it.</Note>}
       </div>
       <HowItWorks />
     </section>
+  );
+}
+
+/** A helper line with a bold lead phrase and the rest in the secondary tone. */
+function Lead({ lead, children }: { lead: string; children: ReactNode }) {
+  return (
+    <li>
+      <span className="text-(--color-text) font-semibold">{lead}</span> {children}
+    </li>
   );
 }
 
@@ -162,18 +150,9 @@ function HowItWorks() {
     <details className="group border-t px-6 py-4">
       <summary className="font-body text-(--color-text-2) hover:text-(--color-text) cursor-pointer text-sm select-none">How requests work</summary>
       <ul className="font-body text-(--color-text-2) m-0 mt-3 flex list-none flex-col gap-2 p-0 text-xs leading-relaxed">
-        <li>
-          <span className="text-(--color-text) font-medium">Deposit.</span> BRS waits in escrow, in queue order. The Reserve Admin fulfils it at the NAV of that moment;
-          then you claim the shares below.
-        </li>
-        <li>
-          <span className="text-(--color-text) font-medium">Redemption.</span> Shares wait in escrow, in queue order. They are filled from free capital, never while the
-          reserve is under-covered; then you claim the BRS below.
-        </li>
-        <li>
-          <span className="text-(--color-text) font-medium">Cancel and claim</span> need only the request&apos;s owner and are never paused. Your wallet signs every
-          request; the server holds no key.
-        </li>
+        <Lead lead="Deposit.">Your BRS waits in line. When filled, collect your shares here.</Lead>
+        <Lead lead="Redemption.">Your shares wait in line and fill from free capital. Then collect your BRS.</Lead>
+        <Lead lead="Cancel or collect anytime.">Your wallet signs every request.</Lead>
       </ul>
     </details>
   );

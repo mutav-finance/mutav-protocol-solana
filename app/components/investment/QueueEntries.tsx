@@ -4,19 +4,35 @@
  * "Your requests": the wallet's queue entries as a compact list beside the
  * request card, in the style of the reserve's Recent activity. Ready rows
  * first; one line each (side, status and place in line, amount, age). Cancel
- * and claim show under a row only with a connected wallet.
+ * and collect show under a row only with a connected wallet.
  */
 import Link from "next/link";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { Action } from "@/components/demo/shared";
-import { fmtDuration } from "@/lib/format";
 import type { Money } from "@/lib/client/use-money";
 import type { InvestorView } from "@/lib/server/investor";
 import type { InvestorRequest } from "@/lib/view";
-import { ACTION_LABEL, claimOf, lineOf, sideName, waitingOf } from "./shared";
+import { ACTION_LABEL, claimOf, lineOf, sideName, statusName, waitingOf } from "./shared";
 
 const NUM = { fontVariantNumeric: "tabular-nums" } as const;
+
+/** Seconds as a readable age: "just now", "5 minutes ago", "3 hours ago", "5 days ago". */
+function ago(secs: bigint): string {
+  const s = Number(secs < 0n ? 0n : secs);
+  const units: [number, string][] = [
+    [86_400 * 365, "year"],
+    [86_400 * 30, "month"],
+    [86_400, "day"],
+    [3_600, "hour"],
+    [60, "minute"],
+  ];
+  for (const [size, name] of units) {
+    const n = Math.floor(s / size);
+    if (n >= 1) return `${n} ${name}${n === 1 ? "" : "s"} ago`;
+  }
+  return "just now";
+}
 
 /** Ready first, then waiting in line (front of the line first), then the rest, newest first. */
 function sortRows(rows: InvestorRequest[]): InvestorRequest[] {
@@ -43,7 +59,7 @@ function RowActions({ x }: { x: InvestorRequest }) {
 function Row({ x, now, connected, money, last }: { x: InvestorRequest; now: bigint; connected: boolean; money: Money; last: boolean }) {
   const ready = x.claimable > 0n;
   const amount = ready ? claimOf(x, money) : waitingOf(x, money);
-  const sub = ready ? "ready to claim" : x.position !== null ? `${x.status.toLowerCase()} · ${lineOf(x)} in line` : x.status.toLowerCase();
+  const sub = ready ? "Ready to collect" : x.position !== null ? `${statusName(x)} · ${lineOf(x)} in line` : statusName(x);
   return (
     <li
       title={`seq ${x.seq.toString()}`}
@@ -59,19 +75,21 @@ function Row({ x, now, connected, money, last }: { x: InvestorRequest; now: bigi
       </span>
       <span className="flex flex-col items-end gap-0.5">
         <Mono style={{ ...NUM, fontSize: 13, color: ready ? "var(--color-success)" : "var(--color-text)" }}>{amount}</Mono>
-        <Explorer value={x.address} label={x.requestedAt > 0n ? `${fmtDuration(now - x.requestedAt)} ago` : "account"} />
+        <Explorer value={x.address} label={x.requestedAt > 0n ? ago(now - x.requestedAt) : "account"} />
       </span>
       {connected && x.actions.length > 0 && <RowActions x={x} />}
     </li>
   );
 }
 
-/** Verify footer: the allowlist root and the wallet's holder account, on one quiet line. */
+/** Verify footer, collapsed: the allowlist root and the wallet's holder account. */
 function Verify({ inv }: { inv: InvestorView | null }) {
   if (!inv) return null;
   const root = inv.allowlist.root;
   return (
-    <p className="font-body text-(--color-text-3) m-0 flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-3 text-2xs">
+    <details className="border-t pt-3">
+      <summary className="font-body text-(--color-text-2) hover:text-(--color-text) cursor-pointer text-xs select-none">Check your access on-chain</summary>
+      <p className="font-body text-(--color-text-3) m-0 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs">
       <span title={root}>
         Allowlist root{" "}
         <Mono dim>
@@ -86,7 +104,8 @@ function Verify({ inv }: { inv: InvestorView | null }) {
           </span>
         </>
       )}
-    </p>
+      </p>
+    </details>
   );
 }
 
@@ -102,7 +121,7 @@ export function QueueEntries({ rows, owner, connected, inv, money, now }: { rows
           </h2>
           {owner && (
             <Mono style={{ ...NUM, fontSize: 11, color: "var(--color-text-3)" }}>
-              {rows.length} open{ready > 0 ? ` · ${ready} ready to claim` : ""}
+              {rows.length} open{ready > 0 ? ` · ${ready} ready to collect` : ""}
             </Mono>
           )}
         </span>
