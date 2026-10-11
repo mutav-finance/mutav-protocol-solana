@@ -187,6 +187,36 @@ const seqRange = (next: bigint) => {
   return Array.from({ length: Number(next - from) }, (_, i) => from + BigInt(i));
 };
 
+/** Accounts per getMultipleAccounts call (the RPC limit is 100). */
+const ACCOUNT_BATCH = 100;
+
+/** The deposit seqs still in the queue, head first: [depositHead, nextDepositSeq), at most min(max, MAX_SEQS). */
+export function depositQueueSeqs(state: Pick<ReserveView["state"], "depositHead" | "nextDepositSeq">, max = Number(MAX_SEQS)): bigint[] {
+  const { depositHead: head, nextDepositSeq: next } = state;
+  const cap = BigInt(Math.max(0, Math.min(Math.floor(max), Number(MAX_SEQS))));
+  const end = next - head > cap ? head + cap : next;
+  const out: bigint[] = [];
+  for (let s = head; s < end; s++) out.push(s);
+  return out;
+}
+
+/**
+ * The pending deposit requests a fill may include, and nothing else: only the
+ * DepositRequest PDAs from the head to the next seq (no program-account scans,
+ * no capital events), at most `count` (the fill's), for `fulfil_deposits`.
+ */
+export async function readDepositQueue(env: ServerEnv, reserve: ReserveView, count = Number(MAX_SEQS)): Promise<Ledger["deposits"]> {
+  const config = reserve.addresses.config as Address;
+  const o = { programAddress: env.programId };
+  const addrs = await Promise.all(depositQueueSeqs(reserve.state, count).map(async (seq) => (await findDepositRequestPda({ config, seq }, o))[0]));
+  const out: Ledger["deposits"] = [];
+  for (let k = 0; k < addrs.length; k += ACCOUNT_BATCH) {
+    const accs = await fetchAllMaybeDepositRequest(rpcFor(env), addrs.slice(k, k + ACCOUNT_BATCH), READ);
+    for (const a of accs) if (a.exists) out.push({ address: a.address, data: a.data });
+  }
+  return out;
+}
+
 export async function readLedger(env = serverEnv(), reserve?: ReserveView): Promise<Ledger> {
   const r = reserve ?? (await readReserve(env));
   const rpc = rpcFor(env);

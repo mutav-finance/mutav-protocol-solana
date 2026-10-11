@@ -16,7 +16,7 @@ export async function GET(req: Request) {
         const reserve = await readReserve(env);
         if (!env.squadsMultisig) return { configured: false, admin: reserve.config.admin, cluster: env.cluster };
         const vault = vaultAddress(env.squadsMultisig);
-        const ms = await readMultisig(env, reserve.now, reserve.config);
+        const ms = await readMultisig(env, reserve.now, reserve);
         return { configured: true, adminIsVault: reserve.config.admin === vault, multisig: ms, now: reserve.now };
       }, { fresh: isFresh(req) }),
     );
