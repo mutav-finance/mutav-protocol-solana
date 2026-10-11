@@ -8,12 +8,12 @@ Authority is split across two Squads v4 multisigs with the same members.
 
 | Multisig | Holds | Time lock: devnet | Time lock: real-money pilot |
 |---|---|---|---|
-| **Admin multisig** | `VaultConfig.admin`: configuration, roles, guardians, fills, cancels, unpause. Later also claim approvals and unsolicited money | 5 minutes | 24 hours |
+| **Admin multisig** | `VaultConfig.admin`: configuration, roles, guardians, fills, parking requests, claim approvals, unpause. Later also unsolicited money | 5 minutes | 24 hours |
 | **Upgrade multisig** | The program upgrade authority, the IDL, `initialize` | 1 hour | 7 days |
 
 Why two:
 
-- Day-to-day admin work (filling queues, and later approving an above-cap claim amount) needs a short wait.
+- Day-to-day admin work (filling queues, approving an above-cap claim amount) needs a short wait.
 - Replacing the program needs a long wait, so holders and observers can react before it executes.
 - The exit fallback (future work; `max_queue_wait_secs` ships at 0) ties the two together: the upgrade time lock is kept at or above `max_queue_wait_secs`, so a holder can leave through the fallback before an upgrade lands (7 days and 7 days on a real-money pilot).
 
@@ -150,7 +150,7 @@ These arrive without migration, as carves or new accounts:
 | Rest of the requester price protection | `min_shares_out` and `min_assets_out` are already carved; anything further comes from request padding |
 | Exit fallback fill path | Uses `max_queue_wait_secs`, already carved (0, off) |
 | Claim-notice gate | A counter carved from `VaultState` padding; `ClaimNotice` is a new account. Built with the exit fallback |
-| Fiança lifecycle fields, `reinstate_guarantee` and the Wave 2 claim instructions (`approve_claim`, `amend_claim`, `refile_claim`, withdrawal) | The grown `Guarantee` and `ClaimFiling` padding; `approved_amount` and `max_reinstate_age` are already carved |
+| Fiança lifecycle fields, `reinstate_guarantee` and the remaining Wave 2 claim instructions (`amend_claim`, `refile_claim`, withdrawal) | The grown `Guarantee` and `ClaimFiling` padding; `max_reinstate_age` is already carved, and `approved_amount` and `revision` are in use by `approve_claim` |
 | Unsolicited money (`skim`, `classify_unsolicited`, `book_unsolicited`, `return_unsolicited`) | The `unsolicited` account exists; `INCOME_KIND_UNSOLICITED` and `INCOME_KIND_BACKSTOP` are reserved |
 | Adapters and a second reserve asset | `adapter_count` and `adapter_bitmap`, already carved at 0, and one `AdapterState` PDA per adapter ([ADR 0027](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md)) |
 | Phase-2 instant exit | Exit parameters carved from `VaultConfig` and `InstantExitState` from `VaultState`; `SUPPORTED_FEATURES` stays 0 until then |

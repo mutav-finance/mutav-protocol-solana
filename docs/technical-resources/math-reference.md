@@ -97,7 +97,7 @@ A new guarantee of R$39,600 cover (12× + 6× a R$2,200 rent) would raise the ra
 |---|---|
 | `register_guarantee` | Mode normal, `stable_assets ≥ coverage_required` before, and `coverage_required` computed with the new cover `≤ stable_assets`. A frozen reserve counts as 0 BRS. |
 | `fulfil_redeems` | Mode normal, `stable_assets ≥ coverage_required` at batch start, not underwater, and each fill `≤ min(max_assets − paid, free_capital, liquid_budget)`, recomputed before every fill. |
-| Every other instruction | Not gated. In particular `file_claim`, `pay_claim`, `settle_payout`, `contribute_fees`, `sweep_income`, `close_guarantee`, cancels and claims, and the cranks. The later `approve_claim`, `amend_claim`, `refile_claim` and `reinstate_guarantee` are not gated either. |
+| Every other instruction | Not gated. In particular `file_claim`, `approve_claim`, `pay_claim`, `settle_payout`, `contribute_fees`, `sweep_income`, `close_guarantee`, cancels and claims, and the cranks. The later `amend_claim`, `refile_claim` and `reinstate_guarantee` are not gated either. |
 
 `fulfil_deposits` is not gated by coverage, because it brings capital in. It is refused while the reserve is underwater (`ReserveUnderwater`), so new money never buys the holders' losses at a near-zero price, and by `stable_assets + Σ assets ≤ max_tvl`.
 
@@ -117,7 +117,7 @@ published_nav      = 0                                              if shares_ou
 - `shares_outstanding` = minted share supply + shares owed on filled, unclaimed deposits.
 - Every fill is priced at the NAV of that fill and rounds in the reserve's favour, so a fill never lowers NAV per share.
 - A deposit that would mint 0 shares is not filled: the batch stops at it (`RequestTooSmall` when nothing was filled).
-- A redemption head worth 0 BRS at fill time is never filled: `fulfil_redeems` stops with the head untouched (`RequestTooSmall` when nothing was filled), and the owner or the admin cancels it.
+- A redemption head worth 0 BRS at fill time is never filled: `fulfil_redeems` stops with the head untouched (`RequestTooSmall` when nothing was filled), and the owner cancels it, or the admin parks it.
 - A head whose price limit is not met (`shares < min_shares_out`, `assets < min_assets_out`) stops the batch with `PriceLimitNotMet` and stays pending.
 
 ### Inflows with no shares outstanding
@@ -204,7 +204,7 @@ The rule is exact: the payments of the last 31 days plus this one stay within `m
 
 Devnet and pilot: R$15,000 per call, R$20,000 per sliding 31-day window ([ADR 0028](../decisions/0028-pilot-parameters.md)).
 
-A claim payment above `max_claim_per_call` needs `approve_claim`, a later upgrade; until it ships, `pay_claim` refuses it and MUTAV pays the agency bank-first. Once it ships, if the payment would not fit in the window, the admin raises `max_claim_per_period` in the same proposal and lowers it back later.
+A claim payment above `max_claim_per_call` needs the admin's `approve_claim` of the exact amount; until it executes, `pay_claim` refuses it and MUTAV may pay the agency bank-first. If the payment would not fit in the window, the admin raises `max_claim_per_period` in the same proposal and lowers it back later.
 
 ## Caps
 
@@ -212,7 +212,7 @@ A claim payment above `max_claim_per_call` needs `approve_claim`, a later upgrad
 |---|---|---|
 | `max_tvl` | `fulfil_deposits` | `stable_assets + Σ assets ≤ max_tvl` |
 | `max_cover_per_guarantee` | `register_guarantee` | `default_cover + exit_cover ≤ cap` |
-| `max_claim_per_call` | `pay_claim` | `> 0`. Exceeded only with an exact `approved_amount`, written by the later `approve_claim` |
+| `max_claim_per_call` | `pay_claim` | `> 0`. Exceeded only with an exact `approved_amount`, written by `approve_claim` |
 | `max_claim_per_period` | `pay_claim` | Sliding 31-day window, strict, approved payments included. `≥ max_claim_per_call`. |
 | `min_request`, `max_request` | `request_deposit`, `request_redeem` | `min ≤ value ≤ max`. A redemption below `min_request` is accepted only as an exit of the balance from the owner's canonical share account, leaving a remainder worth less than `min_request`, and worth at least `max(1, min_request / 10)` ([ADR 0029](../decisions/0029-claims-and-capital-rules-in-the-program.md)). A value of 0 is always refused. |
 | `stress_buffer` | `register_guarantee`, `fulfil_redeems`, through `coverage_required` | `≤ max_tvl`; see above |

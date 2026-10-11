@@ -49,7 +49,7 @@ Fees, income and backstop money raise the value of every share pro rata. MUTAV b
 | Role | Key | What it does for capital |
 |---|---|---|
 | Capital provider (owner) | Own wallet | Requests deposits and redemptions; cancels; claims shares and BRS. |
-| Reserve admin | Squads v4 multisig, time-locked | Fills the deposit and redemption queues in FIFO order, inside `nav_bounds` it fixes when proposing; sets caps; can cancel a pending deposit or redemption back to its owner; clears a NAV halt. In Wave 2 also books unsolicited money and backstops. |
+| Reserve admin | Squads v4 multisig, time-locked | Fills the deposit and redemption queues in FIFO order, inside `nav_bounds` it fixes when proposing; sets caps; can park a pending deposit or redemption so the queue moves on, for the owner to collect; clears a NAV halt. In Wave 2 also books unsolicited money and backstops. |
 | Operator | Separate key | Books guarantee fees and issuer income; files and pays claims. Cannot fill queues, mint shares or send reserve BRS anywhere but MUTAV's payments account. The most a misused operator key can cost the reserve is the admin-set claim caps. |
 | Pauser and guardians | Separate keys | Pause (the pauser can also revoke the operator). A pause stops new requests, fills and new guarantees, never cancels, claims or claim payments. Up to three guardians, one on devnet. |
 | Anyone | Any signer | `refresh` (recomputes NAV and records a NAV-move halt), `advance_queue_head`. |

@@ -18,8 +18,8 @@ sequenceDiagram
   Pl->>Pl: Review, information requests, approval
   Op->>Pr: file_claim(leg, amount, notice_ref_hash)
   Note over Pr: Provision booked at once
-  opt Amount above max_claim_per_call (approve_claim: planned upgrade)
-    Ad->>Pr: approve_claim(notice_ref_hash, amount), time-locked
+  opt Amount above max_claim_per_call
+    Ad->>Pr: approve_claim(notice_ref_hash, amount, expected_revision), time-locked
   end
   Op->>Pr: pay_claim(notice_ref_hash, expected_amount): exactly the provision
   Pr->>PA: BRS
@@ -57,11 +57,11 @@ The program limits how much the operator key can pay:
 | `max_claim_per_call` | R$15,000 | The most one claim payment may be without approval. A 6×-rent eviction (R$13,200 at a R$2,200 rent) fits |
 | `max_claim_per_period` | R$20,000 per sliding 31-day window | The payments of the last 31 days plus this one may not exceed it, approved payments included, so no 30-day span exceeds it |
 
-A claim above the per-call cap needs an admin-approved amount: the program refuses its payment with `ClaimCallCapExceeded` unless the provision equals the filing's `approved_amount`. That amount is set by the reserve admin's `approve_claim(notice_ref_hash, amount)`, a planned upgrade (Wave 2) that is not in the devnet binary. Once it ships, the admin multisig signs it through its time lock (devnet 5 minutes; real pilot 24 hours). The approval records an exact `approved_amount` on the filing. The admin approves how much may leave the reserve, not whether the claim is valid. That judgment stays with the operator.
+A claim above the per-call cap needs an admin-approved amount: the program refuses its payment with `ClaimCallCapExceeded` unless the provision equals the filing's `approved_amount`. That amount is set by the reserve admin's `approve_claim(notice_ref_hash, amount, expected_revision)`, which the admin multisig signs through its time lock (devnet 5 minutes; real pilot 24 hours). The approval records an exact `approved_amount`, equal to the provision, on the filing at its current revision, and emits `ClaimApproved`. It moves no funds and runs while the reserve is paused or the operator is revoked. The admin approves how much may leave the reserve, not whether the claim is valid. That judgment stays with the operator.
 
 If the payment would not fit in the window cap, the admin's proposal also raises `max_claim_per_period` in the same step, and a later configuration change lowers it back.
 
-These caps bound what a misused operator key could move. They do not limit what MUTAV owes the landlord under the guarantee. Large claims go through the approval, and MUTAV's bank-first payment (below) keeps the agency paid while the approval waits. Until `approve_claim` ships, every claim above the per-call cap is filed in full and paid bank-first; the reserve reimburses MUTAV once the approval exists.
+These caps bound what a misused operator key could move. They do not limit what MUTAV owes the landlord under the guarantee. Large claims go through the approval, and MUTAV's bank-first payment (below) keeps the agency paid while the approval waits. A claim above the per-call cap is filed in full; MUTAV may pay it bank-first while the approval waits, and the reserve reimburses MUTAV once the approval exists.
 
 ## 4. Payment: exactly the filed amount
 
@@ -125,7 +125,7 @@ To settle a claim for less than was filed, the operator amends it down, then pay
 
 `refile_claim` accepts only a `WITHDRAWN` filing and resets the approval, the provision and the filing time, so an old approval is never reused.
 
-The diagram shows the full design. In the devnet binary only `file_claim`, `pay_claim` and `settle_payout` exist; the `approve_claim`, `amend_claim` and `refile_claim` transitions arrive with the upgrade.
+The diagram shows the full design. In the devnet binary only `file_claim`, `approve_claim`, `pay_claim` and `settle_payout` exist; the `amend_claim` and `refile_claim` transitions arrive with the upgrade.
 
 ```mermaid
 stateDiagram-v2
@@ -157,7 +157,7 @@ Every claim action except payment is designed to be undone by another operator a
 
 ## Planned
 
-- **Approval, amendment and re-filing.** `approve_claim`, `amend_claim` and `refile_claim` ([ADR 0021](../decisions/0021-claims-approval-amendment-exact-payment.md)) ship as an upgrade; their fields are already carved in `ClaimFiling`.
+- **Amendment and re-filing.** `amend_claim` and `refile_claim` ([ADR 0021](../decisions/0021-claims-approval-amendment-exact-payment.md)) ship as an upgrade; their fields are already carved in `ClaimFiling`. `approve_claim` is already in the program.
 - **Claim categories and richer records.** With the ADR 0012 lifecycle, each claim names the guaranteed debt (rent arrears, charges, damage, court costs owed by the tenant, abandonment costs, other listed debts), and the records gain the time the request became complete, a commitment to the debt calculation, the landlord's receipt (*quitação*) and the mandate in force. Space is already reserved in the `ClaimFiling` account.
 - **Settlement attestation.** It becomes required once the operator and the reserve admin are separate companies.
 - **Claim notices.** A notice raised at the first missed rent, which holds capital fills while a known loss is not yet filed, is built before any outside capital, together with the exit fallback of ADR 0025.
@@ -167,7 +167,7 @@ Every claim action except payment is designed to be undone by another operator a
 - [Specification §3.6 `ClaimFiling`](../spec.md#36-claimfiling-derived), [§5.4 Claims and payouts](../spec.md#54-claims-and-payouts-operator) and [§8 Caps](../spec.md#8-caps)
 - [Specification §2.2 MUTAV as fiador: off-chain duties](../spec.md#22-mutav-as-fiador-off-chain-duties-adr-0012) and [§12 Open questions](../spec.md#12-open-questions) (Q14, Q36)
 - [Litepaper §7 Guarantee lifecycle](../litepaper.md#7-guarantee-lifecycle)
-- Code: [`programs/mutav/src/state/claim.rs`](../../programs/mutav/src/state/claim.rs), [`programs/mutav/src/instructions/operator/file_claim.rs`](../../programs/mutav/src/instructions/operator/file_claim.rs), [`programs/mutav/src/instructions/operator/pay_claim.rs`](../../programs/mutav/src/instructions/operator/pay_claim.rs), [`programs/mutav/src/instructions/operator/settle_payout.rs`](../../programs/mutav/src/instructions/operator/settle_payout.rs)
+- Code: [`programs/mutav/src/state/claim.rs`](../../programs/mutav/src/state/claim.rs), [`programs/mutav/src/instructions/operator/file_claim.rs`](../../programs/mutav/src/instructions/operator/file_claim.rs), [`programs/mutav/src/instructions/operator/pay_claim.rs`](../../programs/mutav/src/instructions/operator/pay_claim.rs), [`programs/mutav/src/instructions/admin/approve_claim.rs`](../../programs/mutav/src/instructions/admin/approve_claim.rs), [`programs/mutav/src/instructions/operator/settle_payout.rs`](../../programs/mutav/src/instructions/operator/settle_payout.rs)
 - Technical reference, devnet release design of 2026-10-10, §5.3, §7.2 and §9 (branch `docs/protocol-reference`, `docs/technical-reference.html`)
 
 ## Decisions

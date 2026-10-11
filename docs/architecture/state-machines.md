@@ -27,7 +27,7 @@ The fuller fiança lifecycle (exoneration notice, keys returned, claims tail, ex
 
 ## Claim filing
 
-A `ClaimFiling` is keyed by guarantee and `notice_ref_hash`. Each filing is one event, such as one month's rent. The filing also holds its payment and settlement record (`approved_amount`, zero until Wave 2, `payments_account`, `paid_at`, `paid_amount`, `pix_e2e_hash`, `settled_at`); there is no separate payout account.
+A `ClaimFiling` is keyed by guarantee and `notice_ref_hash`. Each filing is one event, such as one month's rent. The filing also holds its payment and settlement record (`approved_amount`, zero until the admin's `approve_claim`, `payments_account`, `paid_at`, `paid_amount`, `pix_e2e_hash`, `settled_at`); there is no separate payout account.
 
 | Value | Status | Meaning |
 |---|---|---|
@@ -42,7 +42,7 @@ Status values are append-only.
 stateDiagram-v2
   [*] --> FILED: file_claim (operator)
   FILED --> FILED: later, amend_claim to a new amount above 0 (operator), resets approval
-  FILED --> FILED: later, approve_claim (admin), above the per-call cap
+  FILED --> FILED: approve_claim (admin), above the per-call cap
   FILED --> PAID: pay_claim (operator), exactly the provision
   FILED --> WITHDRAWN: later, amend_claim to 0 (operator)
   WITHDRAWN --> FILED: later, refile_claim (operator)
@@ -55,12 +55,12 @@ stateDiagram-v2
 | File | Operator | `file_claim(leg, amount, notice_ref_hash)`, leg `DEFAULT` (1) or `EXIT` (2). Guarantee `ACTIVE`. Amount above 0 and within the leg's unprovisioned cover (`leg_cover − leg_paid − leg_provision`). No cap on the filed amount. Never paused, never coverage-gated | `FILED`. Provision booked on the leg and in `provisions`. `open_claims` rises. NAV falls at once |
 | Amend (*later*) | Operator | `FILED`. A higher amount stays within the leg's unprovisioned cover. Refused on `PAID` and `SETTLED`. Not pause-gated | Lower: the difference is released. Higher: more is booked. `approved_amount` reset to 0. Emits `ClaimAmended { old, new }` |
 | Withdraw, amend to 0 (*later*) | Operator | `FILED`. Not pause-gated, never coverage-gated | `WITHDRAWN`. Whole provision released, `open_claims` falls, coverage recomputed. Emits `ClaimWithdrawn` |
-| Approve (*later*, Wave 2) | Admin | `FILED`. Needed only when the provision is above `max_claim_per_call`. Not pause-gated | Records `approved_amount`, binding that exact amount. The admin approves the amount leaving the reserve, not the claim's validity |
-| Pay | Operator | `pay_claim(notice_ref_hash, expected_amount)`. `FILED`, leg matches, `expected_amount` equals the provision. At or below `max_claim_per_call`, or `approved_amount` equals the provision (possible only once `approve_claim` ships). Payments of the last 31 days plus this one within `max_claim_per_period`. Destination is the payments account. Reserve not frozen and enough liquid BRS. No coverage, mode, pause or NAV-guard check | `PAID`. Leg paid rises, provision released, BRS to the payments account. `paid_at`, `paid_amount` and `payments_account` recorded on the filing |
+| Approve | Admin | `approve_claim(notice_ref_hash, amount, expected_revision)`. `FILED`; `amount` above 0 and equal to the provision; `expected_revision` equals the filing's revision (`ClaimRevisionMismatch`). Needed only when the provision is above `max_claim_per_call`; no cap is read. Not pause-gated, never coverage-gated, works with the operator revoked | Records `approved_amount`, binding that exact amount. Moves no funds. Emits `ClaimApproved`. The admin approves the amount leaving the reserve, not the claim's validity |
+| Pay | Operator | `pay_claim(notice_ref_hash, expected_amount)`. `FILED`, leg matches, `expected_amount` equals the provision. At or below `max_claim_per_call`, or `approved_amount` equals the provision. Payments of the last 31 days plus this one within `max_claim_per_period`. Destination is the payments account. Reserve not frozen and enough liquid BRS. No coverage, mode, pause or NAV-guard check | `PAID`. Leg paid rises, provision released, BRS to the payments account. `paid_at`, `paid_amount` and `payments_account` recorded on the filing |
 | Re-file (*later*) | Operator | `refile_claim`, same arguments as `file_claim`. `WITHDRAWN` only | `FILED` again with a fresh `provision`, `filed_at` and `approved_amount = 0`. An old approval is never reused |
 | Settle | Operator | `PAID` | `SETTLED`. `pix_e2e_hash` and `settled_at` recorded |
 
-To settle a claim for less than filed, the operator will amend it down, then pay (Wave 2). Until `approve_claim` ships, a claim above `max_claim_per_call` is paid by MUTAV from its bank first, and the reserve reimburses the payments account once the approval exists.
+To settle a claim for less than filed, the operator will amend it down, then pay (Wave 2). A claim above `max_claim_per_call` is paid once the admin's approval clears the time lock; MUTAV may pay it from its bank first meanwhile, and the reserve then reimburses the payments account.
 
 `settle_payout` records the hash of the Pix end-to-end ID after MUTAV pays the agency. It is a settlement record only. The program has no payout deadline; the payment service level (contractual term plus a 48-hour target) lives in the MUTAV platform. A settlement receipt hash (`quitacao_hash`) arrives later as a new instruction version.
 
@@ -122,7 +122,7 @@ The devnet release fills whole requests only, so a head larger than the budget w
 - Each request is its own PDA at a monotonically increasing `seq`. A `seq` is never reused. Two requests sent at once may race for the same `seq`; the client retries with the next one.
 - `advance_queue_head(queue, max)` (anyone) moves one queue's head over closed or empty requests and stops at the first live one. It moves no money.
 - Cancels and claims never pause, so holders' money is never trapped by a pause.
-- The owner's associated token account is created idempotently by `cancel_deposit`, `cancel_redeem`, `claim_shares` and `claim_assets`; the caller pays the rent.
+- The owner's associated token account is created idempotently by the owner's `cancel_deposit` and `cancel_redeem`, `claim_shares` and `claim_assets`; the caller pays the rent. The admin's cancel creates nothing.
 
 ### Exit fallback
 

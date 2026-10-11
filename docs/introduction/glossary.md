@@ -24,10 +24,10 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 
 | Term | Meaning |
 |---|---|
-| Bank-first payment | MUTAV pays the agency by Pix from its own bank account first, and the reserve then reimburses MUTAV's payments account through `pay_claim`. Keeps payments on time while an approval waits or a reserve account is frozen. Until `approve_claim` ships, every claim above `max_claim_per_call` is paid this way. |
+| Bank-first payment | MUTAV pays the agency by Pix from its own bank account first, and the reserve then reimburses MUTAV's payments account through `pay_claim`. Keeps payments on time while an approval waits or a reserve account is frozen. An option, not the only path above `max_claim_per_call`. |
 | Claim | A payment request booked on-chain by the operator with `file_claim` (a `ClaimFiling` account). Each claim is one event, such as one month's rent or one exit payment. The same account records its payment and settlement. Status: `FILED`, `PAID`, `WITHDRAWN` or `SETTLED`. |
 | Claim amendment | Planned upgrade, not in the devnet binary. The operator changes a filed claim's amount with `amend_claim`. Lowering it releases the difference; raising it books more, up to the leg's unprovisioned cover. Amending to 0 withdraws the claim. Any approval resets. |
-| Claim approval | `approve_claim`, a reserve-admin action and a planned upgrade (Wave 2). The program already refuses a payment above `max_claim_per_call` (R$15k in the pilot) without an approved amount; until `approve_claim` ships, such claims are paid bank-first. It binds the exact amount that may leave the reserve. It does not judge whether the claim is valid. |
+| Claim approval | `approve_claim`, a reserve-admin action through the admin time lock. The program refuses a payment above `max_claim_per_call` (R$15k in the pilot) without an approved amount. It binds the exact amount that may leave the reserve: the filing's provision, at the filing's current revision. It moves no funds. It does not judge whether the claim is valid. |
 | Claim payment | `pay_claim`: BRS sent from the reserve to MUTAV's payments account. It pays exactly the filed provision (`expected_amount` must equal it). Within `max_claim_per_call` and the sliding claim window. Never refused by the coverage gate or a pause. |
 | Claim withdrawal | Planned upgrade. The operator releases a filed claim's whole provision with `amend_claim` to 0. The claim becomes `WITHDRAWN`. |
 | Re-file (`refile_claim`) | Planned upgrade. The operator files a `WITHDRAWN` claim again on the same notice. It starts from scratch: provision, filing time and any approval are reset. |
@@ -80,7 +80,7 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 | Deposit / redemption queue | First-in, first-out queues of capital requests. Each request is its own account. The reserve admin fills them in order. |
 | Exit fallback | Planned. After a maximum queue wait (`max_queue_wait_secs`), anyone can fill the head redemption under the same rules. The parameter is reserved and off for devnet; it is built before outside capital. |
 | Open exit | Any wallet that already holds shares can redeem, even after removal from the allowlist. |
-| Cancel deposit / redeem (`cancel_deposit`, `cancel_redeem`) | The owner, or the admin, cancels a pending request. The BRS or shares go back to the owner's own token account, and the queue moves on. Never paused. A redemption head worth 0 BRS is never filled and leaves the queue this way. |
+| Cancel deposit / redeem (`cancel_deposit`, `cancel_redeem`) | The owner cancels a pending request: the BRS or shares go back to the owner's own token account, and the queue moves on. The admin's cancel only parks a pending request (`CANCELLED`): nothing moves, the queue moves past it, and the owner collects it later with the same instruction ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)). Never paused. A redemption head worth 0 BRS is never filled and leaves the queue this way. |
 | Reserve share | An SPL token for a pro-rata share of net assets. Minted on deposit fills, burned on redemption fills. |
 | Sub-minimum exit | A redemption worth less than `min_request` (valued in BRS at current NAV). Allowed only as an exit of the balance: from the owner's canonical share account, leaving a remainder worth less than `min_request`, and worth at least the sub-minimum exit floor, `max(1, min_request / 10)` (R$100 at the pilot minimum of R$1,000). A smaller balance waits; it stays transferable and valued at NAV. |
 | Whole fills | The pilot fills each request in full or not at all. Partial fills at the queue head are planned. |
@@ -149,3 +149,4 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (proposed; guardian emergency actions decided)
 - [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
 - [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)
+- [ADR 0030: The admin's cancel parks the request](../decisions/0030-admin-cancel-parks-the-request.md)

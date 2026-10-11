@@ -33,7 +33,7 @@ flowchart LR
 
   INV -->|"request_deposit"| PD
   PD -->|"fulfil_deposits (admin)"| R
-  PD -->|"cancel_deposit (owner or admin)"| INV
+  PD -->|"cancel_deposit (owner)"| INV
   R -->|"fulfil_redeems (admin)"| CL
   CL -->|"claim_assets (owner)"| INV
   OPA -->|"contribute_fees: net"| R
@@ -68,11 +68,11 @@ Shares move separately: `claim_shares` mints shares to the owner, `request_redee
 
 | Flow | Instruction | Signer | From | To | Bound |
 |---|---|---|---|---|---|
-| Claim payment | `pay_claim` | Operator | `reserve` | MUTAV payments account | Exactly the filing's provision. Per-call cap (approval above it is Wave 2). Rolling 31-day window cap. Liquid BRS. Never coverage-gated |
+| Claim payment | `pay_claim` | Operator | `reserve` | MUTAV payments account | Exactly the filing's provision. Per-call cap (admin approval above it). Rolling 31-day window cap. Liquid BRS. Never coverage-gated |
 | Redemption | `fulfil_redeems`, then `claim_assets` | Admin, then owner | `reserve` | `claims`, then the owner | Free capital and liquid budget. Strict FIFO. Inside the admin's `nav_bounds` |
 | Fee take | `contribute_fees` | Operator | Operator's BRS account | Treasury | `fee_take_bps` (at most 30%) |
-| Deposit cancel | `cancel_deposit` | Owner or admin | `pending_deposits` | The owner's own BRS associated token account | The escrowed amount |
-| Redemption cancel (shares) | `cancel_redeem` | Owner or admin | `pending_redemptions` | The owner's share account | The escrowed shares |
+| Deposit cancel | `cancel_deposit` | Owner (the admin's cancel parks the request and moves nothing) | `pending_deposits` | The owner's own BRS associated token account | The escrowed amount |
+| Redemption cancel (shares) | `cancel_redeem` | Owner (the admin's cancel parks the request and moves nothing) | `pending_redemptions` | The owner's share account | The escrowed shares |
 | Return to sender (*later*) | `return_unsolicited(source, amount, destination, ref_hash)` | Admin | `unsolicited` (BRS), surplus in `pending_redemptions` (shares), a foreign token account, or lamports above rent-exempt | The source of the original transfer | Screened; within the runbook window. Never from the income inbox or `reserve`. Foreign tokens: classic SPL Token mints only, never BRS, the share mint or an adapter mint |
 
 ## Capital: deposits and redemptions
@@ -102,9 +102,9 @@ sequenceDiagram
 - **Gates.** Redemption fills need normal mode and fit within free capital and liquid BRS. Deposit fills are allowed in under-coverage (they recapitalise the reserve) and stop at `max_tvl`. Both fills are refused with `ReserveUnderwater` while the reserve is underwater: NAV per share below the smallest published unit while shares are outstanding (`net_assets × NAV_SCALE < shares_outstanding`). New money never pays for old losses. An empty reserve (no shares) is not underwater.
 - **Fills carry `nav_bounds`**, a NAV range composed by `/admin` with the proposal. A fill outside it is refused with `NavOutOfBounds`. The NAV-move guard also runs inline at the start of both fills and refuses with `FulfilHalted`. The inline refusal does not latch; the next `refresh` (anyone) latches `fulfil_halted`.
 - **Small exits.** A redemption worth from `min_request` to `max_request` at the current NAV is normal; 0 or above `max_request` is refused. Below `min_request` only an exit of the balance is accepted: it debits the owner's canonical share associated token account, leaves a remainder worth less than `min_request`, and is worth at least `max(1, min_request / 10)` (R$100 at the R$1,000 minimum). A smaller balance waits; it stays transferable and valued at NAV.
-- **Zero-value heads.** A head redemption worth 0 BRS at fill time is never filled. `fulfil_redeems` stops with the head untouched (`RequestTooSmall` if nothing was filled), and the owner or the admin cancels it.
+- **Zero-value heads.** A head redemption worth 0 BRS at fill time is never filled. `fulfil_redeems` stops with the head untouched (`RequestTooSmall` if nothing was filled); the owner cancels it, or the admin parks it.
 - **Baseline.** The deposit fill that mints the first shares seeds the NAV-move guard's baseline; the redemption fill that burns the last shares clears it.
-- **Admin cancels.** A pending deposit from a wallet removed from the allowlist, an unreachable owner, or a stuck redemption head is returned by the admin with `cancel_deposit` or `cancel_redeem`, to the owner's own account, which unblocks the queue.
+- **Admin parks, owner collects.** The admin can take a pending deposit from a wallet removed from the allowlist, an unreachable owner, or a stuck redemption head out of the queue with `cancel_deposit` or `cancel_redeem`. The admin's cancel parks the request (`CANCELLED`) and moves nothing: the escrow stays in `pending_deposits` or `pending_redemptions` and in the tracked totals, fills and `advance_queue_head` move past it, and only the owner collects it later with the same instruction. The owner cannot make the park fail, and a parked request has no expiry ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)).
 
 MUTAV's own capital uses the same queues and gets no special treatment.
 
@@ -148,8 +148,8 @@ sequenceDiagram
   Platform->>Op: approved after review
   Op->>Program: file_claim(leg, amount, notice_ref_hash)
   Note over Program: provision booked, NAV falls at once
-  opt amount above max_claim_per_call (Wave 2)
-    Admin->>Program: approve_claim(notice_ref_hash, amount)
+  opt amount above max_claim_per_call
+    Admin->>Program: approve_claim(notice_ref_hash, amount, expected_revision)
   end
   Op->>Program: pay_claim(notice_ref_hash, expected_amount)
   Note over Program: exactly the provision to the payments account, filing PAID
@@ -160,9 +160,9 @@ sequenceDiagram
 
 - **Destination.** Claim payments go only to MUTAV's payments account. MUTAV pays the agency by Pix, and the agency pays the landlord.
 - **Exact payment.** `pay_claim` pays exactly the filing's provision and refuses unless `expected_amount` equals it. To settle for less, the operator will first lower the filing with `amend_claim` (Wave 2), then pay.
-- **Caps.** Up to `max_claim_per_call` (R$15k on devnet and the pilot) the operator pays alone. Above it, the admin will approve the exact amount with `approve_claim` (Wave 2). Every payment counts toward `max_claim_per_period` over a rolling window of 31 UTC-day buckets (R$20k on devnet and the pilot), so no 31-day span exceeds the cap. For an unusually large claim, the admin raises the period cap in the same proposal and lowers it again later.
+- **Caps.** Up to `max_claim_per_call` (R$15k on devnet and the pilot) the operator pays alone. Above it, the admin approves the exact amount with `approve_claim`, and `pay_claim` then pays it. Every payment, approved ones included, counts toward `max_claim_per_period` over a rolling window of 31 UTC-day buckets (R$20k on devnet and the pilot), so no 31-day span exceeds the cap. For an unusually large claim, the admin raises the period cap in the same proposal and lowers it again later.
 - **Never coverage-gated.** Only the filing checks, the cover bound, the caps, liquid BRS or a frozen reserve can stop a payment. Pause does not.
-- **Bank-first.** MUTAV may pay the agency from its own bank account first. The reserve then reimburses the payments account through `pay_claim`. This keeps payments on time while an approval waits on the time lock, or while a frozen reserve blocks the payment. Until `approve_claim` ships, every claim above `max_claim_per_call` is paid this way.
+- **Bank-first.** MUTAV may pay the agency from its own bank account first. The reserve then reimburses the payments account through `pay_claim`. This keeps payments on time while an approval waits on the time lock, or while a frozen reserve blocks the payment.
 - **No service level in the program.** Payment deadlines live in the MUTAV platform. `settle_payout` only records the Pix settlement hash on the filing.
 
 ## Unsolicited money and backstop
@@ -223,3 +223,4 @@ Every fee, income and booking inflow is also counted in `inflow_nav`, so the NAV
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
 - [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
 - [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)
+- [ADR 0030: The admin's cancel parks the request](../decisions/0030-admin-cancel-parks-the-request.md)

@@ -8,10 +8,10 @@ This page describes the tools the program gives MUTAV in an incident and the run
 
 | Stopped by pause | Always open |
 |---|---|
-| `request_deposit`, `request_redeem` (including holders who left the allowlist) | Every claim instruction: `file_claim`, `pay_claim`, `settle_payout` (and, *later*, `amend_claim`, `refile_claim`, `approve_claim`) |
+| `request_deposit`, `request_redeem` (including holders who left the allowlist) | Every claim instruction: `file_claim`, `approve_claim`, `pay_claim`, `settle_payout` (and, *later*, `amend_claim`, `refile_claim`) |
 | `fulfil_deposits`, `fulfil_redeems` | `close_guarantee` (and, *later*, `reinstate_guarantee`) |
 | `register_guarantee` | `contribute_fees`, `sweep_income` |
-| | `cancel_deposit` and `cancel_redeem` (owner or admin), `claim_shares`, `claim_assets` |
+| | `cancel_deposit` and `cancel_redeem` (the owner collects; the admin parks, [ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)), `claim_shares`, `claim_assets` |
 | | *Later:* `skim`, `classify_unsolicited`, `book_unsolicited` (both kinds, backstop included), `return_unsolicited` (every source) |
 | | `refresh`, `advance_queue_head` |
 | | Admin configuration, `propose_role` / `accept_role`, `propose_admin` / `accept_admin`, `cancel_pending`, `set_guardians`, `revoke_operator`, `revoke_pauser`, `clear_fulfil_halt` |

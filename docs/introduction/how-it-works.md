@@ -104,7 +104,7 @@ sequenceDiagram
   Op->>Op: Review off-chain
   Op->>Pr: file_claim (amount booked as a provision)
   Note over Pr: NAV drops at once. Coverage required includes the provision.
-  opt Amount above the per-call cap (approve_claim ships as an upgrade)
+  opt Amount above the per-call cap
     Ad->>Pr: approve_claim (binds the exact amount, time-locked)
   end
   Op->>Pr: pay_claim (pays exactly the provision)
@@ -117,14 +117,14 @@ sequenceDiagram
 The claim rules:
 
 - **File.** The operator files a claim with `file_claim`. The program sets the amount aside as a provision immediately. Each claim is one event, such as one month's rent.
-- **Approve, only for large claims.** A claim above the per-call cap (`max_claim_per_call`) needs the reserve admin's `approve_claim`, which binds an exact amount. The admin approves the amount leaving the reserve, not the validity of the claim. The program already refuses a payment above the per-call cap without that approval; `approve_claim` itself ships as an upgrade (see bank-first payment below).
+- **Approve, only for large claims.** A claim above the per-call cap (`max_claim_per_call`) needs the reserve admin's `approve_claim`, which binds an exact amount. The admin approves the amount leaving the reserve, not the validity of the claim. The program refuses a payment above the per-call cap without that approval. The approval waits on the admin's time lock (see bank-first payment below).
 - **Pay.** `pay_claim` pays exactly the filed provision to MUTAV's payments account. Every payment, approved or not, counts toward a strict cap per sliding 31-day window (`max_claim_per_period`), so no 30-day span pays out more than the cap. For an unusually large claim the admin raises that cap in the same proposal as the approval.
 - **Amend or withdraw (planned upgrade).** The operator will be able to change the amount with `amend_claim`. Amending to 0 withdraws the claim and releases its provision. Any amendment resets an approval. A withdrawn claim can be filed again with `refile_claim`, which starts from scratch and never reuses an old approval. Neither instruction is in the devnet binary.
 - **Settle.** After MUTAV pays the agency by Pix, the operator records the payment with `settle_payout`.
 
 What can stop a claim payment: the filing checks, the cover bound, the caps, the liquid BRS in the reserve, or a frozen reserve account. The coverage gate never stops one, and neither does a pause.
 
-**Bank-first payment.** MUTAV may pay the agency by Pix from its own bank account first. The reserve then reimburses MUTAV's payments account through `pay_claim`. This keeps payments on time while a large approval waits for the time lock, or while a reserve account is frozen. Until `approve_claim` ships, every claim above the per-call cap is paid this way and reimbursed once the approval exists.
+**Bank-first payment.** MUTAV may pay the agency by Pix from its own bank account first. The reserve then reimburses MUTAV's payments account through `pay_claim`. This keeps payments on time while a large approval waits for the time lock, or while a reserve account is frozen.
 
 The contractual payment deadline and its tracking live in the MUTAV platform. The program records when each claim was filed, paid and settled, all on the claim's own account.
 
@@ -159,7 +159,7 @@ flowchart LR
 - **Exit is open.** Any wallet that already holds shares can redeem, even if it was later removed from the allowlist. Below the minimum request size, a holder may still exit the rest of a small balance, down to a floor of a tenth of the minimum (R$100 in the pilot); a smaller balance waits and stays transferable.
 - **Redemptions are paid only from surplus** over what the guarantees need. This is the coverage gate again. If the head request is larger than the free capital, the queue waits. The pilot fills whole requests only.
 - Owners can cancel a request or claim what is owed to them at any time, including while paused.
-- A pending request can be cancelled by its owner or by the admin, with `cancel_deposit` or `cancel_redeem`. Either way the BRS or the shares go back to the owner's own account.
+- A pending request can be cancelled by its owner with `cancel_deposit` or `cancel_redeem`: the BRS or the shares go back to the owner's own account. The admin's cancel only parks the request so the queue moves on; nothing moves, and the owner collects it later ([ADR 0030](../decisions/0030-admin-cancel-parks-the-request.md)).
 - MUTAV's own capital uses the same queues with no special treatment.
 
 During the pilot the only capital provider is MUTAV. The reserve is not open to public investment.
@@ -228,3 +228,4 @@ Every value below is set by the reserve admin and changes only through the time-
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
 - [ADR 0028: Pilot parameters](../decisions/0028-pilot-parameters.md)
 - [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)
+- [ADR 0030: The admin's cancel parks the request](../decisions/0030-admin-cancel-parks-the-request.md)
