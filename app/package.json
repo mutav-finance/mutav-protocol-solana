@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
+    "demo:capture": "bun e2e/demo/run.ts",
+    "demo:wallets": "bun e2e/demo/wallets.ts",
     "localnet:up": "bun scripts/localnet.ts up",
     "localnet:down": "bun scripts/localnet.ts down",
     "seed": "bun scripts/seed.ts",

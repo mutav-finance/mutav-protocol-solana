@@ -49,3 +49,9 @@ scripts/idl-compat.ts Bun\.file\(
 # The program keypair path handed to the Solana CLI; never opened.
 scripts/devnet/deploy.ts -keypair\.json
 scripts/devnet/lib/cli.ts -keypair\.json
+
+# Demo-video capture harness (test-only, e2e/demo/): an injected test wallet
+# signs with disposable role keys kept outside the repo (~/.config/solana/
+# mutav/demo/), and refuses unless the RPC genesis is devnet or a local
+# validator. Nothing in app/, components/ or lib/ imports it.
+app/e2e/demo/*
