@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as multisig from "@sqds/multisig";
 import { PublicKey, TransactionInstruction, TransactionMessage } from "@solana/web3.js";
-import { createMemoIn, findCreateMemo, signaturesOldestFirst, StaleCarryError, type CompiledTxLike, type CreateMatch } from "../server/squads";
+import { createMemoIn, findCreateMemo, rawInstructions, signaturesOldestFirst, StaleCarryError, type CompiledTxLike, type CreateMatch } from "../server/squads";
 
 // Unique public keys (no key pairs).
 const key = () => PublicKey.unique();
@@ -92,5 +92,19 @@ describe("A3 signature paging", () => {
   });
   it("fails closed past the page bound", async () => {
     await expect(signaturesOldestFirst(async () => rows(5000, 1000), 3)).rejects.toBeInstanceOf(StaleCarryError);
+  });
+});
+
+describe("A3 vault transaction instructions", () => {
+  it("resolves static accounts and marks lookup-table ones unresolvable", () => {
+    const vt = {
+      message: {
+        accountKeys: [MS, CREATOR],
+        instructions: [{ programIdIndex: 0, accountIndexes: new Uint8Array([1, 5]), data: new Uint8Array([9]) }, { programIdIndex: 7, accountIndexes: new Uint8Array([]), data: new Uint8Array() }],
+      },
+    } as unknown as Parameters<typeof rawInstructions>[0];
+    const [a, b] = rawInstructions(vt);
+    expect(a).toEqual({ programId: MS.toBase58(), accounts: [CREATOR.toBase58(), null], data: new Uint8Array([9]) });
+    expect(b!.programId).toBeNull();
   });
 });

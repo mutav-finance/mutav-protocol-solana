@@ -18,7 +18,7 @@ import { Note } from "@/components/demo/shared";
 import { postJson } from "@/lib/client/api";
 import { useTx } from "@/lib/client/use-tx";
 import { fmtDuration, fmtTime } from "@/lib/format";
-import type { ConfigChange } from "@/lib/config-diff";
+import type { DecodedInstruction } from "@/lib/proposal-decode";
 
 export type ProposalView = {
   index: bigint;
@@ -33,8 +33,10 @@ export type ProposalView = {
   executable: boolean;
   executableAt: bigint | null;
   instructions: string[];
-  /** For a set_config inside: the fields it changes against on-chain config now. */
-  changes?: ConfigChange[];
+  /** Every instruction decoded: arguments, checks against the chain now, red flags. */
+  decoded: DecodedInstruction[];
+  /** Program ids of foreign (non-MUTAV, non-Compute Budget) instructions. */
+  foreign: string[];
 };
 export type SquadsResp =
   | { configured: false; admin: string; cluster: string }
@@ -57,6 +59,36 @@ function useNow(serverNow: bigint | null) {
 
 type Act = "approve" | "reject" | "cancel" | "execute";
 
+/** What the vault transaction will do: each instruction, its decoded arguments and red flags (A3). */
+function ProposalInstructions({ p }: { p: ProposalView }) {
+  if (p.decoded.length === 0) return <Mono style={{ fontSize: 12 }}>{p.instructions.join(", ") || "—"}</Mono>;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {p.foreign.length > 0 && <StatusBadge bordered color="var(--color-error)" label="FOREIGN INSTRUCTION" />}
+      <ol aria-label={`instructions in proposal ${p.index}`} style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+        {p.decoded.map((d, k) => (
+          <li key={k}>
+            {d.program === "foreign" ? (
+              <Mono style={{ fontSize: 12, color: "var(--color-error)" }}>foreign instruction · program {d.programId}</Mono>
+            ) : (
+              <Mono style={{ fontSize: 12 }}>{d.name}</Mono>
+            )}
+            {d.program !== "foreign" && d.details.length > 0 && (
+              <ul className="font-mono" style={{ margin: "2px 0 0", paddingLeft: 14, fontSize: 11, color: "var(--color-text-2)", listStyle: "square", overflowWrap: "anywhere" }}>
+                {d.details.map((x, j) => (
+                  <li key={j} style={x.warn ? { color: "var(--color-error)" } : undefined}>
+                    {x.label}: {x.value}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold: number; now: bigint; onDone: () => void }) {
   const { address } = useWallet();
   const tx = useTx(onDone);
@@ -77,12 +109,7 @@ function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold
     <tr>
       <td className="num"><Mono>#{p.index.toString()}</Mono></td>
       <td style={{ whiteSpace: "normal" }}>
-        <Mono style={{ fontSize: 12 }}>{p.instructions.join(", ") || "—"}</Mono>
-        {p.changes && (
-          <ul aria-label={`set_config changes in proposal ${p.index}`} className="font-mono" style={{ margin: "4px 0 0", paddingLeft: 14, fontSize: 11, color: "var(--color-text-2)", listStyle: "square" }}>
-            {p.changes.length === 0 ? <li>no field differs from on-chain now</li> : p.changes.map((c) => <li key={c.field}>{c.field}: {c.from} → {c.to}</li>)}
-          </ul>
-        )}
+        <ProposalInstructions p={p} />
       </td>
       <td><Mono style={{ color: status === "Executed" ? "var(--color-success)" : status === "Executable" ? "var(--color-accent)" : "var(--color-text-2)" }}>{status}</Mono></td>
       <td className="num">
@@ -92,6 +119,14 @@ function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold
       </td>
       <td><Mono dim>{left === null ? "—" : left > 0n ? `${fmtDuration(left)} left` : `since ${fmtTime(p.executableAt!)}`}</Mono></td>
       <td style={{ whiteSpace: "normal" }}>
+        {(canVote || canExecute) && p.foreign.length > 0 && (
+          <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>
+            Foreign instruction ({p.foreign.join(", ")}): the vault would sign it. Approve only if you know what it does.
+          </Mono>
+        )}
+        {(canVote || canExecute) && p.foreign.length === 0 && p.decoded.some((d) => d.details.some((x) => x.warn)) && (
+          <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>Red flags above: read them before approving.</Mono>
+        )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("approve")}>Approve</Button>}
           {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("reject")}>Reject</Button>}
