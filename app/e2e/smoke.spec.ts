@@ -36,7 +36,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   test("/reserve — overview: hero, where the capital sits, promises, persistent tabs", async ({ page }) => {
     await page.goto("/reserve");
     const views = page.getByRole("navigation", { name: "Transparency views" });
-    for (const tab of ["Overview", "Coverage", "Claims", "Capital", "Risks", "Verify"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
+    for (const tab of ["Overview", "Coverage", "Claims", "Money", "Risks", "Verify"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
     await expect(views.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();
     await expect(page.getByText("R$ 28,300.00").first()).toBeVisible();
@@ -137,12 +137,11 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
       await expect(page).toHaveURL(/\/investment$/);
     }
     await expect(page.getByRole("heading", { name: "Investment", level: 1 })).toBeVisible();
-    await expect(page.getByText("Connect the allowlisted wallet to send requests.")).toBeVisible();
-    await expect(page.getByRole("group", { name: "Reserve figures" })).toContainText("NAV per share");
+    await expect(page.getByText("Connect an approved wallet to request.")).toBeVisible();
+    await expect(page.getByRole("group", { name: "Reserve figures" })).toContainText("Share price");
     // Without a wallet the page stays read-only.
     await expect(page.getByRole("button", { name: "Request deposit" })).toBeDisabled();
-    await page.getByRole("button", { name: "Switch to redeem" }).focus();
-    await page.keyboard.press("Enter");
+    await page.getByRole("tab", { name: "Redeem" }).click();
     await expect(page.getByRole("button", { name: "Request redemption" })).toBeDisabled();
     await expect(page.getByRole("heading", { name: "Your requests" })).toBeVisible();
     const seeded = await (await request.get("/api/reserve")).json();

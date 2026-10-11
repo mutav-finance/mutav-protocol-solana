@@ -18,6 +18,7 @@ import { Explorer } from "@/components/Explorer";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { useReserve } from "@/components/reserve/ReserveShell";
 import { HistoryChart } from "@/components/reserve/HistoryChart";
+import { FlowDiagram } from "@/components/reserve/FlowDiagram";
 import { HeroAmount, Lead, fmtAgo } from "@/components/reserve/sections/shared";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
 import { fmtBps, fmtNav, fmtPct, fmtRatio } from "@/lib/format";
@@ -81,6 +82,12 @@ export function Overview() {
         <div className="flex min-w-0 flex-col gap-14">
           <Hero r={r} l={d.ledger} />
           <WhereCapitalSits r={r} l={d.ledger} />
+          <section aria-labelledby="flow-h" className="flex flex-col gap-4">
+            <h3 id="flow-h" className="font-display text-(--color-text) m-0 text-base font-bold">
+              How money moves
+            </h3>
+            <FlowDiagram />
+          </section>
           <Promises />
         </div>
         <aside className="flex min-w-0 flex-col gap-10">
