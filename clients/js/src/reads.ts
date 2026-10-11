@@ -174,13 +174,31 @@ async function position<T>(
   return { seq, head, isHead: open && requestsAhead === 0, requestsAhead, amountAhead, open };
 }
 
+/** `DepositRequest.status` (spec §3.8). */
+export const DEPOSIT_PENDING = 0;
+export const DEPOSIT_FULFILLED = 1;
+/** Parked by the admin's `cancel_deposit` (ADR 0030): the BRS is still owed; only the owner collects it with `cancel_deposit`. */
+export const DEPOSIT_CANCELLED = 2;
+
+/** `RedeemRequest.status` (spec §3.8). */
+export const REDEEM_PENDING = 0;
+export const REDEEM_FILLED = 1;
+/** Parked by the admin's `cancel_redeem` (ADR 0030): the shares are still owed; only the owner collects them with `cancel_redeem`. */
+export const REDEEM_CANCELLED = 2;
+
+/** The request waits in its queue (only `PENDING` does; parked and filled requests are dead for the queue). */
+export const isQueued = (r: { status: number }) => r.status === 0;
+
+/** The admin parked the request (ADR 0030): its owner can collect the escrow with `cancel_deposit` / `cancel_redeem`. */
+export const isParked = (r: { status: number }) => r.status === 2;
+
 /** Where redeem request `seq` stands in the FIFO queue (dead seqs skipped). */
 export async function getRedeemQueuePosition(rpc: ReadRpc, config: Address, seq: bigint, o: ProgramOpt = {}) {
   const state = (await fetchVaultState(rpc, await stateOf(config, o))).data;
   return position(state.redeemHead, state.nextRedeemSeq, seq, async (seqs) => {
     const addrs = await Promise.all(seqs.map(async (s) => (await findRedeemRequestPda({ config, seq: s }, o))[0]));
     return fetchAllMaybeRedeemRequest(rpc, addrs);
-  }, (r) => (r.status === 0 ? r.shares : 0n));
+  }, (r) => (isQueued(r) ? r.shares : 0n));
 }
 
 /** Where deposit request `seq` stands in the FIFO queue. */
@@ -189,7 +207,7 @@ export async function getDepositQueuePosition(rpc: ReadRpc, config: Address, seq
   return position(state.depositHead, state.nextDepositSeq, seq, async (seqs) => {
     const addrs = await Promise.all(seqs.map(async (s) => (await findDepositRequestPda({ config, seq: s }, o))[0]));
     return fetchAllMaybeDepositRequest(rpc, addrs);
-  }, (r) => (r.status === 0 ? r.assets : 0n));
+  }, (r) => (isQueued(r) ? r.assets : 0n));
 }
 
 const stateOf = async (config: Address, o: ProgramOpt) => (await findStatePda({ config }, o))[0];

@@ -138,7 +138,8 @@ export type AcceptRoleInput<
   /**
    * The money accounts, to check a new operator owns neither (ADR 0020).
    * Required for `ROLE_OPERATOR`; omitted for `ROLE_PAUSER`, so a pauser
-   * handover never depends on the money accounts' state.
+   * handover never depends on the money accounts' state. Read leniently
+   * in the handler (`load_money_account`): a closed account is skipped.
    */
   treasuryAccount?: TAccountTreasuryAccount;
   paymentsAccount?: TAccountPaymentsAccount;
@@ -285,7 +286,8 @@ export type ParsedAcceptRoleInstruction<
     /**
      * The money accounts, to check a new operator owns neither (ADR 0020).
      * Required for `ROLE_OPERATOR`; omitted for `ROLE_PAUSER`, so a pauser
-     * handover never depends on the money accounts' state.
+     * handover never depends on the money accounts' state. Read leniently
+     * in the handler (`load_money_account`): a closed account is skipped.
      */
     treasuryAccount?: TAccountMetas[2] | undefined;
     paymentsAccount?: TAccountMetas[3] | undefined;

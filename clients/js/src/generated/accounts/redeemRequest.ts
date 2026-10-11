@@ -67,7 +67,7 @@ export type RedeemRequest = {
   requestedAt: bigint;
   /** `0` until filled. */
   filledAt: bigint;
-  /** `REDEEM_PENDING` / `REDEEM_FILLED`. */
+  /** `REDEEM_PENDING` / `REDEEM_FILLED` / `REDEEM_CANCELLED` (ADR 0030). */
   status: number;
   /**
    * Shares burned by fills: `0` while pending, `shares` after the whole
@@ -103,7 +103,7 @@ export type RedeemRequestArgs = {
   requestedAt: number | bigint;
   /** `0` until filled. */
   filledAt: number | bigint;
-  /** `REDEEM_PENDING` / `REDEEM_FILLED`. */
+  /** `REDEEM_PENDING` / `REDEEM_FILLED` / `REDEEM_CANCELLED` (ADR 0030). */
   status: number;
   /**
    * Shares burned by fills: `0` while pending, `shares` after the whole

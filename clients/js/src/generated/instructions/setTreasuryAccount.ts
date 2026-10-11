@@ -137,7 +137,11 @@ export type SetTreasuryAccountInput<
    * not be owned by the operator (ADR 0020).
    */
   treasuryAccount: TAccountTreasuryAccount;
-  /** The current payments token account, to compare (spec §2.1). */
+  /**
+   * The current payments token account, to compare (spec §2.1). Read
+   * leniently in the handler (`load_money_account`): a closed account is
+   * skipped, so it never blocks replacing the treasury.
+   */
   paymentsAccount: TAccountPaymentsAccount;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
@@ -278,7 +282,11 @@ export type ParsedSetTreasuryAccountInstruction<
      * not be owned by the operator (ADR 0020).
      */
     treasuryAccount: TAccountMetas[2];
-    /** The current payments token account, to compare (spec §2.1). */
+    /**
+     * The current payments token account, to compare (spec §2.1). Read
+     * leniently in the handler (`load_money_account`): a closed account is
+     * skipped, so it never blocks replacing the treasury.
+     */
     paymentsAccount: TAccountMetas[3];
     eventAuthority: TAccountMetas[4];
     program: TAccountMetas[5];

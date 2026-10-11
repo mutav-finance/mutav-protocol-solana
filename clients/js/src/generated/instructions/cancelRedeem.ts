@@ -179,8 +179,9 @@ export type CancelRedeemAsyncInput<
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   /**
-   * The request's owner or the admin. Pays the rent of the owner's share
-   * token account if it has to be created.
+   * The request's owner or the admin. The owner pays the rent of its
+   * share token account if it has to be created; the admin only parks
+   * (ADR 0030).
    */
   signer: TAccountSigner;
   /**
@@ -193,7 +194,8 @@ export type CancelRedeemAsyncInput<
   redeemRequest: TAccountRedeemRequest;
   /**
    * The owner's associated token account for the share mint; created
-   * idempotently in the handler, the signer paying its rent (ADR 0023).
+   * idempotently in the handler on the owner's path (ADR 0023). Not
+   * touched by the admin's.
    */
   ownerShares: TAccountOwnerShares;
   pendingRedemptions?: TAccountPendingRedemptions;
@@ -520,8 +522,9 @@ export type CancelRedeemInput<
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   /**
-   * The request's owner or the admin. Pays the rent of the owner's share
-   * token account if it has to be created.
+   * The request's owner or the admin. The owner pays the rent of its
+   * share token account if it has to be created; the admin only parks
+   * (ADR 0030).
    */
   signer: TAccountSigner;
   /**
@@ -534,7 +537,8 @@ export type CancelRedeemInput<
   redeemRequest: TAccountRedeemRequest;
   /**
    * The owner's associated token account for the share mint; created
-   * idempotently in the handler, the signer paying its rent (ADR 0023).
+   * idempotently in the handler on the owner's path (ADR 0023). Not
+   * touched by the admin's.
    */
   ownerShares: TAccountOwnerShares;
   pendingRedemptions: TAccountPendingRedemptions;
@@ -809,8 +813,9 @@ export type ParsedCancelRedeemInstruction<
   programAddress: Address<TProgram>;
   accounts: {
     /**
-     * The request's owner or the admin. Pays the rent of the owner's share
-     * token account if it has to be created.
+     * The request's owner or the admin. The owner pays the rent of its
+     * share token account if it has to be created; the admin only parks
+     * (ADR 0030).
      */
     signer: TAccountMetas[0];
     /**
@@ -823,7 +828,8 @@ export type ParsedCancelRedeemInstruction<
     redeemRequest: TAccountMetas[4];
     /**
      * The owner's associated token account for the share mint; created
-     * idempotently in the handler, the signer paying its rent (ADR 0023).
+     * idempotently in the handler on the owner's path (ADR 0023). Not
+     * touched by the admin's.
      */
     ownerShares: TAccountMetas[5];
     pendingRedemptions: TAccountMetas[6];
