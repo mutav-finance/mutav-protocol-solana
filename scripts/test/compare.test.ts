@@ -75,22 +75,23 @@ describe('checkDevnetLocked', () => {
   test('the locked values (spec decisions)', () => {
     const v = Object.fromEntries(DEVNET_LOCKED.map((l) => [l.field, l.value]));
     expect(v).toEqual({
-      coverage_ratio_bps: 1_000n,
+      coverage_ratio_bps: 2_500n,
       fee_take_bps: 2_000n,
-      'caps.max_tvl': 300_000n * BRL,
-      'caps.max_cover_per_guarantee': 40_000n * BRL,
+      'caps.max_tvl': 1_000_000n * BRL,
+      'caps.max_cover_per_guarantee': 120_000n * BRL,
       'caps.max_claim_per_call': 10_000n * BRL,
       'caps.max_claim_per_period': 20_000n * BRL,
       'caps.min_request': 1_000n * BRL,
       'caps.max_request': 100_000n * BRL,
       'caps.max_nav_move_bps': 10_000n,
+      'caps.stress_buffer': 19_000n * BRL,
       reserve_decimals: 6n,
     });
   });
 
   test('a drifted value fails, naming the field', () => {
     const c = onChainFrom(devnetCfg());
-    c.caps.maxTvl = 500_000n * BRL;
+    c.caps.maxTvl = 1_500_000n * BRL;
     c.caps.maxNavMoveBps = 1;
     const f = checkDevnetLocked(c);
     expect(f).toHaveLength(2);

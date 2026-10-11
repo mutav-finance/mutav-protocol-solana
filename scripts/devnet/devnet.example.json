@@ -1,5 +1,5 @@
 {
-  "_comment": "Devnet deploy config. Copy to a path outside the repo (it names real wallets), fill every <FILL: ...>, and pass it with --config. Never put a key in it: addresses only. Two Squads v4 multisigs (spec §12 Q15): `squads` is the admin multisig (its vault is VaultConfig.admin, time lock >= 5 min) and `upgradeSquads` holds the program upgrade authority (time lock >= 1 h). The scripts derive each vault from multisig + vaultIndex and require it to equal `admin` / `upgradeAuthority`; deploy.ts and verify.ts require each multisig to be owned by the Squads v4 program, autonomous, with exactly these members (each able to vote), exactly this threshold and a time lock at or above the floor. Values without <FILL> are the locked devnet values (c = 0.10, ADR 0016; fee take 2000); verify.ts checks them on-chain.",
+  "_comment": "Devnet deploy config. Copy to a path outside the repo (it names real wallets), fill every <FILL: ...>, and pass it with --config. Never put a key in it: addresses only. Two Squads v4 multisigs (spec §12 Q15): `squads` is the admin multisig (its vault is VaultConfig.admin, time lock >= 5 min) and `upgradeSquads` holds the program upgrade authority (time lock >= 1 h). The scripts derive each vault from multisig + vaultIndex and require it to equal `admin` / `upgradeAuthority`; deploy.ts and verify.ts require each multisig to be owned by the Squads v4 program, autonomous, with exactly these members (each able to vote), exactly this threshold and a time lock at or above the floor. Values without <FILL> are the locked devnet values (c = 0.25 and the caps of ADR 0028; fee take 2000); verify.ts checks them on-chain.",
   "cluster": "devnet",
   "programId": "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9",
   "reserveMint": "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4",
@@ -27,17 +27,18 @@
   "mutavCapitalWallet": "<FILL: MUTAV capital wallet (owns neither money account)>",
   "treasuryAccount": "<FILL: BRS token account receiving MUTAV's fee take>",
   "paymentsAccount": "<FILL: BRS token account receiving claim payments>",
-  "coverageRatioBps": 1000,
+  "coverageRatioBps": 2500,
   "feeTakeBps": 2000,
   "caps": {
-    "_comment": "BRS base units (6 dp). Sized for c = 0.10 (ADR 0016): R$300k reserve, R$40k per guarantee, R$10k / R$20k claim payments per call / per 31 days (ADR 0019), requests R$1k–R$100k. maxNavMoveBps is 10000 (100%) on devnet on purpose: the guard nets out guarantee fees and swept income per share (ADR 0017), but a claim provision or payment against a small demo reserve is a real NAV move and would trip it and halt fulfilment. If it trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
-    "maxTvl": 300000000000,
-    "maxCoverPerGuarantee": 40000000000,
+    "_comment": "BRS base units (6 dp). The pilot parameters (ADR 0028, superseding the devnet caps of ADR 0016 / ADR 0022): c = 0.25, R$1M reserve (max_tvl), R$120k per guarantee, R$10k / R$20k claim payments per call / per 31 days (the bounded loss from a compromised operator, about 2% of max_tvl), stress buffer R$19k, requests R$1k–R$100k. maxNavMoveBps is 10000 (100%) on devnet on purpose: the guard nets out guarantee fees and swept income per share (ADR 0017), but a claim provision or payment against a small demo reserve is a real NAV move and would trip it and halt fulfilment. If it trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
+    "maxTvl": 1000000000000,
+    "maxCoverPerGuarantee": 120000000000,
     "maxClaimPerCall": 10000000000,
     "maxClaimPerPeriod": 20000000000,
     "minRequest": 1000000000,
     "maxRequest": 100000000000,
-    "maxNavMoveBps": 10000
+    "maxNavMoveBps": 10000,
+    "stressBuffer": 19000000000
   },
   "allowlist": [
     "<FILL: MUTAV capital wallet, plus any devnet investor wallets>"
