@@ -17,7 +17,6 @@ import { fmtDuration } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { type ReserveView } from "@/lib/view";
 
-import { ImageSlot } from "@/components/ImageSlot";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -159,19 +158,15 @@ function ClaimLimits({ r }: { r: ReserveView }) {
 function CapitalTerms() {
   return (
     <section aria-labelledby="risk-capital-h" className="flex flex-col gap-4">
-      <ImageSlot slot="reserve-risks" aspect="8:1" opacity={0.12} className="h-14">
-        <div className="flex h-full items-end px-6 pb-3">
-          <h3 id="risk-capital-h" className="font-display text-(--color-text) m-0 text-base font-bold">
-            Who provides capital, and what comes later
-          </h3>
-        </div>
-      </ImageSlot>
+      <div className="bg-(--color-surface) border-l-(--color-text-3) border border-l-2 px-6 py-3">
+        <h3 id="risk-capital-h" className="font-display text-(--color-text) m-0 text-base font-bold">
+          Who provides capital, and what comes later
+        </h3>
+      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <article className="bg-(--color-surface) relative flex flex-col gap-3 overflow-hidden border p-6">
-          {/* Decorative image slot; this tile carries no numbers. */}
-          <ImageSlot slot="reserve-disclosures" aspect="tile" opacity={0.1} fill />
-          <h4 className="font-display text-(--color-text) relative m-0 text-lg leading-snug font-bold">Approved wallets only</h4>
-          <p className="font-body text-(--color-text-2) relative m-0 text-sm leading-relaxed">
+        <article className="bg-(--color-surface) flex flex-col gap-3 border p-6">
+          <h4 className="font-display text-(--color-text) m-0 text-lg leading-snug font-bold">Approved wallets only</h4>
+          <p className="font-body text-(--color-text-2) m-0 text-sm leading-relaxed">
             An on-chain allowlist gates deposits and redemptions (KYC off-chain). Every approved wallet waits in the same FIFO queue.
           </p>
         </article>

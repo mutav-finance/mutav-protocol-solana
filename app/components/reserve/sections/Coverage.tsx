@@ -21,7 +21,6 @@ import { activeRemainingCover, agencyRows, coverageRows, type AgencyRow, type Co
 import { C } from "@/components/charts/Charts";
 
 import { Empty, Num, Table, short } from "@/components/reserve/sections/shared";
-import { ImageSlot } from "@/components/ImageSlot";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -263,12 +262,10 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <ImageSlot slot="reserve-coverage" aspect="8:1" opacity={0.12} className="h-14">
-          <div className="flex h-full items-end justify-between gap-4 px-6 pb-3">
-            <h3 className="font-display text-(--color-text) m-0 text-base font-bold">By guarantee</h3>
-            <LegLegend />
-          </div>
-        </ImageSlot>
+        <div className="bg-(--color-surface) border-l-(--color-text-3) flex items-center justify-between gap-4 border border-l-2 px-6 py-3">
+          <h3 className="font-display text-(--color-text) m-0 text-base font-bold">By guarantee</h3>
+          <LegLegend />
+        </div>
         <p className="font-body text-(--color-text-2) m-0 text-sm">Largest remaining cover first. Open a row for rent, claims and the account.</p>
         {rows.length === 0 ? (
           <Empty>No guarantees registered yet. Each one appears here once the Operator registers it.</Empty>

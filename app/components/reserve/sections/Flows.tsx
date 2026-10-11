@@ -13,7 +13,6 @@
 import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
-import { ImageSlot, type ImageSlotName } from "@/components/ImageSlot";
 import { C, Legend, Row, RowLabel, Swatch, Track } from "@/components/charts/Charts";
 import { frac } from "@/lib/charts";
 import { fmtBps, fmtTime } from "@/lib/format";
@@ -72,9 +71,6 @@ export function PeriodPicker({ value, onChange, label }: { value: Period; onChan
 // ── Building blocks ─────────────────────────────────────────────────────────
 
 const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit", redemption: "Redemption" } as const;
-
-/** Decorative slot beside the hero. */
-const FLOWS_SLOT: ImageSlotName = "flows-capital";
 
 /** Ledger rows shown before "Show all". */
 const LEDGER_ROWS = 10;
@@ -203,11 +199,9 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
           <Mono style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{signed(earned, fmtBrs)}</Mono>
           <span className="font-body text-(--color-text-2) text-sm">Guarantee fees + issuer income − claim payments</span>
         </div>
-        <ImageSlot slot={FLOWS_SLOT} aspect="8:1" opacity={0.12} className="h-14 border-t">
-          <div className="flex h-full items-center px-6">
-            <p className="font-body text-(--color-text) m-0 text-sm font-medium">A deposit is not income.</p>
-          </div>
-        </ImageSlot>
+        <div className="border-l-(--color-text-3) border-t border-l-2 px-6 py-3">
+          <p className="font-body text-(--color-text) m-0 text-sm font-medium">A deposit is not income.</p>
+        </div>
       </div>
 
       {/* [C+D] Both sides of the money in one bordered strip, as diverging bars. */}

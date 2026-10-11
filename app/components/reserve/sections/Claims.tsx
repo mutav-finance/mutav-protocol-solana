@@ -17,7 +17,6 @@ import { claimSpeed, frac } from "@/lib/charts";
 import { C, ChartFrame, Legend, Row, RowLabel, Swatch, Track, type Seg } from "@/components/charts/Charts";
 
 import { Empty, short } from "@/components/reserve/sections/shared";
-import { ImageSlot } from "@/components/ImageSlot";
 import { PeriodPicker, inPeriod, type Period } from "@/components/reserve/sections/Flows";
 import { Section } from "@/components/Section";
 import { ClaimsTable } from "@/components/reserve/claims/ClaimsTable";
@@ -36,14 +35,12 @@ const PERIOD_NAME: Record<Period, string> = { "7D": "last 7 days", "30D": "last 
 /** Slowest of the recorded durations (worst case is the honest proof of speed). */
 const slowest = (xs: (bigint | null)[]): bigint | null => xs.reduce<bigint | null>((m, x) => (x === null ? m : m === null || x > m ? x : m), null);
 
-/** The spec promise as a wide image band (section divider, no numbers on it). */
+/** The spec promise as a callout (section divider, no numbers on it). */
 function GuardBand() {
   return (
-    <ImageSlot slot="reserve-claims" aspect="8:1" opacity={0.12} className="h-14 w-full">
-      <div className="flex h-full items-center px-6">
-        <p className="font-body text-(--color-text) m-0 text-sm font-medium">Claim payments are never blocked by solvency or by a pause.</p>
-      </div>
-    </ImageSlot>
+    <div className="bg-(--color-surface) border-l-(--color-text-3) w-full border border-l-2 px-6 py-3">
+      <p className="font-body text-(--color-text) m-0 text-sm font-medium">Claim payments are never blocked by solvency or by a pause.</p>
+    </div>
   );
 }
 

@@ -12,7 +12,6 @@ import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { ImageSlot } from "@/components/ImageSlot";
 import { fmtShares, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, type Ledger, type QueueRow, type ReserveView } from "@/lib/view";
@@ -130,11 +129,9 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
     <div className="flex flex-col gap-6">
       <Summary deposits={q.deposits} redeems={q.redeems} capital={capital} />
 
-      <ImageSlot slot="queue-line" aspect="8:1" opacity={0.12} className="h-14">
-        <div className="flex h-full items-center px-6">
-          <p className="font-body text-(--color-text) m-0 text-sm font-medium">One line, oldest first. No request skips it.</p>
-        </div>
-      </ImageSlot>
+      <div className="bg-(--color-surface) border-l-(--color-text-3) border border-l-2 px-6 py-3">
+        <p className="font-body text-(--color-text) m-0 text-sm font-medium">One line, oldest first. No request skips it.</p>
+      </div>
 
       <div className="flex flex-col gap-6">
         <Line title="Deposits" empty="No deposits waiting. New requests join the end of the line." rows={q.deposits} unitHead="Amount" unit={fmtBrs} capital={capital} />
