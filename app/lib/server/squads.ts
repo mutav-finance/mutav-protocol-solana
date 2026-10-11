@@ -17,7 +17,7 @@ import {
 import { AccountRole, type Address, type Instruction } from "@solana/kit";
 import { identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, type VaultConfig } from "@mutav-finance/mutav-protocol-solana";
 import type { ServerEnv } from "./env";
-import { setConfigChanges, type ConfigChange } from "../config-diff";
+import { isLiveProposal, parseBaselineMemo, setConfigChanges, staleCarry, staleCarryText, type ConfigChange } from "../config-diff";
 
 export type ProposalStatus = "None" | "Draft" | "Active" | "Rejected" | "Approved" | "Executing" | "Executed" | "Cancelled";
 
@@ -30,6 +30,10 @@ export type ProposalView = {
   statusAt: bigint | null;
   approvals: string[];
   rejections: string[];
+  /** Members who voted to cancel an Approved proposal. */
+  cancellations: string[];
+  /** At or below the multisig's stale index: Draft/Active can no longer be voted on. */
+  stale: boolean;
   /** Approved and time lock elapsed at `now`. */
   executable: boolean;
   /** When the time lock ends (Approved only). */
@@ -96,18 +100,46 @@ function instructionNames(tx: multisig.generated.VaultTransaction, programId: st
 const statusAt = (s: multisig.generated.ProposalStatus): bigint | null =>
   "timestamp" in s && s.timestamp !== undefined ? BigInt(s.timestamp.toString()) : null;
 
-export async function readMultisig(env: ServerEnv, now: bigint, depth = 10, config?: VaultConfig): Promise<MultisigView> {
+/** Most proposal indices read back from the newest; the pilot multisig makes a handful a week. */
+export const MAX_PROPOSAL_SCAN = 256;
+/** Finished proposals shown besides every live one. */
+const RECENT_FINISHED = 10;
+/** Accounts per getMultipleAccountsInfo call (the RPC limit is 100). */
+const BATCH = 100;
+
+/** Indices to scan, newest first: every index back to the first, at most MAX_PROPOSAL_SCAN. */
+export function scanIndices(txIndex: bigint, max = MAX_PROPOSAL_SCAN): bigint[] {
+  const from = txIndex > BigInt(max) ? txIndex - BigInt(max) + 1n : 1n;
+  const out: bigint[] = [];
+  for (let i = txIndex; i >= from; i--) out.push(i);
+  return out;
+}
+
+/**
+ * The multisig and its proposals (A3): EVERY proposal that can still execute
+ * or be voted on (scanned back MAX_PROPOSAL_SCAN indices, so an old Approved
+ * set_config waiting on the time lock is never missed), plus the last few
+ * finished ones for context.
+ */
+export async function readMultisig(env: ServerEnv, now: bigint, config?: VaultConfig): Promise<MultisigView> {
   if (!env.squadsMultisig) throw new Error("SQUADS_MULTISIG is not set");
   const c = conn(env);
   const msPda = pk(env.squadsMultisig);
   const ms = await multisig.accounts.Multisig.fromAccountAddress(c, msPda);
   const txIndex = BigInt(ms.transactionIndex.toString());
-  const from = txIndex > BigInt(depth) ? txIndex - BigInt(depth) + 1n : 1n;
-  const proposals: ProposalView[] = [];
-  for (let i = txIndex; i >= from; i--) {
-    const [txPda] = multisig.getTransactionPda({ multisigPda: msPda, index: i });
-    const [propPda] = multisig.getProposalPda({ multisigPda: msPda, transactionIndex: i });
-    const [txInfo, propInfo] = await c.getMultipleAccountsInfo([txPda, propPda]);
+  const staleIndex = BigInt(ms.staleTransactionIndex.toString());
+  const indices = scanIndices(txIndex);
+  const pdas = indices.flatMap((i) => [
+    multisig.getTransactionPda({ multisigPda: msPda, index: i })[0],
+    multisig.getProposalPda({ multisigPda: msPda, transactionIndex: i })[0],
+  ]);
+  const infos: Awaited<ReturnType<Connection["getMultipleAccountsInfo"]>> = [];
+  for (let k = 0; k < pdas.length; k += BATCH) infos.push(...(await c.getMultipleAccountsInfo(pdas.slice(k, k + BATCH))));
+  const all: ProposalView[] = indices.map((i, n) => {
+    const txPda = pdas[2 * n]!;
+    const propPda = pdas[2 * n + 1]!;
+    const txInfo = infos[2 * n] ?? null;
+    const propInfo = infos[2 * n + 1] ?? null;
     let names: string[] = [];
     let changes: ConfigChange[] | undefined;
     if (txInfo) {
@@ -119,11 +151,12 @@ export async function readMultisig(env: ServerEnv, now: bigint, depth = 10, conf
         names = ["(not a vault transaction)"];
       }
     }
-    let view: Omit<ProposalView, "instructions" | "index" | "transaction" | "proposal"> = {
+    let view: Omit<ProposalView, "instructions" | "index" | "transaction" | "proposal" | "stale"> = {
       status: "None",
       statusAt: null,
       approvals: [],
       rejections: [],
+      cancellations: [],
       executable: false,
       executableAt: null,
     };
@@ -136,12 +169,16 @@ export async function readMultisig(env: ServerEnv, now: bigint, depth = 10, conf
         statusAt: at,
         approvals: p.approved.map((k) => k.toBase58()),
         rejections: p.rejected.map((k) => k.toBase58()),
+        cancellations: p.cancelled.map((k) => k.toBase58()),
         executable: executableAt !== null && now >= executableAt,
         executableAt,
       };
     }
-    proposals.push({ index: i, transaction: txPda.toBase58(), proposal: propPda.toBase58(), instructions: names, ...(changes ? { changes } : {}), ...view });
-  }
+    return { index: i, transaction: txPda.toBase58(), proposal: propPda.toBase58(), instructions: names, stale: i <= staleIndex, ...(changes ? { changes } : {}), ...view };
+  });
+  const live = all.filter((p) => isLiveProposal(p));
+  const finished = all.filter((p) => !isLiveProposal(p) && p.status !== "None").slice(0, RECENT_FINISHED);
+  const proposals = [...live, ...finished].sort((a, b) => (a.index < b.index ? 1 : a.index > b.index ? -1 : 0));
   return {
     address: env.squadsMultisig,
     vault: vaultAddress(env.squadsMultisig),
@@ -149,7 +186,7 @@ export async function readMultisig(env: ServerEnv, now: bigint, depth = 10, conf
     timeLock: ms.timeLock,
     members: ms.members.map((m) => ({ key: m.key.toBase58(), permissions: m.permissions.mask })),
     transactionIndex: txIndex,
-    staleTransactionIndex: BigInt(ms.staleTransactionIndex.toString()),
+    staleTransactionIndex: staleIndex,
     proposals,
   };
 }
@@ -210,22 +247,75 @@ export async function composeProposalCreate(env: ServerEnv, member: string, inne
   return { tx: await unsigned(env, member, ixs), index };
 }
 
-export async function composeProposalApprove(env: ServerEnv, member: string, index: bigint): Promise<string> {
+export type ProposalAction = "approve" | "reject" | "cancel" | "execute";
+
+/** Compose an unsigned vote (approve, reject, cancel) or execute for a member's wallet. */
+export async function composeProposalAction(env: ServerEnv, member: string, index: bigint, action: ProposalAction, config?: VaultConfig): Promise<string> {
   if (!env.squadsMultisig) throw new Error("SQUADS_MULTISIG is not set");
-  return unsigned(env, member, [
-    multisig.instructions.proposalApprove({ multisigPda: pk(env.squadsMultisig), transactionIndex: index, member: pk(member) }),
-  ]);
+  const args = { multisigPda: pk(env.squadsMultisig), transactionIndex: index, member: pk(member) };
+  switch (action) {
+    case "approve":
+      return unsigned(env, member, [multisig.instructions.proposalApprove(args)]);
+    case "reject":
+      // Active proposals: enough rejections (members − threshold + 1) make it Rejected.
+      return unsigned(env, member, [multisig.instructions.proposalReject(args)]);
+    case "cancel":
+      // Approved proposals: `threshold` cancel votes make it Cancelled (V2 reallocates the vote list).
+      return unsigned(env, member, [multisig.instructions.proposalCancelV2(args)]);
+    case "execute": {
+      if (config) await assertNoStaleCarry(env, index, config);
+      const { instruction } = await multisig.instructions.vaultTransactionExecute({ connection: conn(env), ...args });
+      return unsigned(env, member, [instruction]);
+    }
+  }
 }
 
-export async function composeProposalExecute(env: ServerEnv, member: string, index: bigint): Promise<string> {
-  if (!env.squadsMultisig) throw new Error("SQUADS_MULTISIG is not set");
-  const { instruction } = await multisig.instructions.vaultTransactionExecute({
-    connection: conn(env),
-    multisigPda: pk(env.squadsMultisig),
-    transactionIndex: index,
-    member: pk(member),
-  });
-  return unsigned(env, member, [instruction]);
+/**
+ * The memo the proposal was created with, read from its creation transaction
+ * (Squads keeps the memo in the instruction, not in the account). Null when
+ * the RPC has no history for it.
+ */
+export async function readCreateMemo(env: ServerEnv, index: bigint): Promise<string | null> {
+  if (!env.squadsMultisig) return null;
+  const c = conn(env);
+  const [txPda] = multisig.getTransactionPda({ multisigPda: pk(env.squadsMultisig), index });
+  const sigs = await c.getSignaturesForAddress(txPda, { limit: 1000 }, "confirmed");
+  const first = sigs.filter((x) => !x.err).at(-1);
+  if (!first) return null;
+  const tx = await c.getTransaction(first.signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
+  if (!tx) return null;
+  const keys = tx.transaction.message.staticAccountKeys.map((k) => k.toBase58());
+  const disc = Buffer.from(multisig.generated.vaultTransactionCreateInstructionDiscriminator);
+  for (const ix of tx.transaction.message.compiledInstructions) {
+    if (keys[ix.programIdIndex] !== SQUADS_PROGRAM) continue;
+    const data = Buffer.from(ix.data);
+    if (!data.subarray(0, 8).equals(disc)) continue;
+    const [decoded] = multisig.generated.vaultTransactionCreateStruct.deserialize(data);
+    return decoded.args.memo ?? null;
+  }
+  return null;
+}
+
+/**
+ * Stale-carry check before executing a set_config proposal (A3): every field
+ * it writes must still hold the value it had when the proposal was made.
+ */
+async function assertNoStaleCarry(env: ServerEnv, index: bigint, config: VaultConfig) {
+  const [txPda] = multisig.getTransactionPda({ multisigPda: pk(env.squadsMultisig!), index });
+  const info = await conn(env).getAccountInfo(txPda, "confirmed");
+  if (!info) return;
+  const [vt] = multisig.accounts.VaultTransaction.fromAccountInfo(info);
+  if (!instructionNames(vt, env.programId).includes("SetConfig")) return;
+  const baseline = parseBaselineMemo(await readCreateMemo(env, index));
+  if (!baseline) {
+    throw new StaleCarryError(`proposal #${index} writes set_config but records no baseline the app can check (made outside this app, or its creation is not in this RPC's history): reject or cancel it and propose again`);
+  }
+  const moved = staleCarry(baseline, config);
+  if (moved.length > 0) throw new StaleCarryError(staleCarryText(index, moved));
+}
+
+export class StaleCarryError extends Error {
+  override name = "StaleCarryError";
 }
 
 /** Program ids a relayed transaction may touch (the relay refuses anything else). */

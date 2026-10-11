@@ -1,8 +1,10 @@
 "use client";
 
 /**
- * The Squads v4 multisig behind the Reserve Admin: its status, time lock and
- * recent proposals, with approve and execute from the member's own wallet.
+ * The Squads v4 multisig behind the Reserve Admin: its status, time lock,
+ * every live proposal and the last finished ones, with approve, reject,
+ * cancel and execute from the member's own wallet (A3). Execute refuses a
+ * set_config built against values that have moved since (stale carry).
  */
 import { useEffect, useState } from "react";
 import { ReadError } from "@/components/Section";
@@ -26,6 +28,8 @@ export type ProposalView = {
   statusAt: bigint | null;
   approvals: string[];
   rejections: string[];
+  cancellations: string[];
+  stale: boolean;
   executable: boolean;
   executableAt: bigint | null;
   instructions: string[];
@@ -51,14 +55,24 @@ function useNow(serverNow: bigint | null) {
   return now;
 }
 
+type Act = "approve" | "reject" | "cancel" | "execute";
+
 function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold: number; now: bigint; onDone: () => void }) {
   const { address } = useWallet();
-  const approve = useTx(onDone);
-  const execute = useTx(onDone);
+  const tx = useTx(onDone);
+  const [last, setLast] = useState<Act | null>(null);
   const left = p.executableAt !== null ? p.executableAt - now : null;
-  const status = p.status === "Approved" ? (left !== null && left <= 0n ? "Executable" : "Approved · time lock") : p.status;
-  const send = (action: "approve" | "execute", t: ReturnType<typeof useTx>) =>
-    t.runWith(() => postJson<{ tx: string }>("/api/squads", { action, index: p.index, member: address }));
+  const voted = !!address && (p.approvals.includes(address) || p.rejections.includes(address));
+  const status =
+    p.status === "Approved" ? (left !== null && left <= 0n ? "Executable" : "Approved · time lock") : p.stale && (p.status === "Active" || p.status === "Draft") ? `${p.status} · stale` : p.status;
+  const send = (action: Act) => {
+    setLast(action);
+    return tx.runWith(() => postJson<{ tx: string }>("/api/squads", { action, index: p.index, member: address }));
+  };
+  const busy = !["idle", "confirmed", "failed"].includes(tx.state.phase);
+  const canVote = p.status === "Active" && !p.stale && !!address && !voted;
+  const canCancel = p.status === "Approved" && !!address && !p.cancellations.includes(address);
+  const canExecute = p.status === "Approved" && left !== null && left <= 0n && !!address;
   return (
     <tr>
       <td className="num"><Mono>#{p.index.toString()}</Mono></td>
@@ -71,19 +85,20 @@ function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold
         )}
       </td>
       <td><Mono style={{ color: status === "Executed" ? "var(--color-success)" : status === "Executable" ? "var(--color-accent)" : "var(--color-text-2)" }}>{status}</Mono></td>
-      <td className="num"><Mono>{p.approvals.length}/{threshold}</Mono></td>
+      <td className="num">
+        <Mono>{p.approvals.length}/{threshold}</Mono>
+        {p.rejections.length > 0 && <Mono dim> · {p.rejections.length} rejected</Mono>}
+        {p.cancellations.length > 0 && <Mono dim> · {p.cancellations.length} to cancel</Mono>}
+      </td>
       <td><Mono dim>{left === null ? "—" : left > 0n ? `${fmtDuration(left)} left` : `since ${fmtTime(p.executableAt!)}`}</Mono></td>
       <td style={{ whiteSpace: "normal" }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          {p.status === "Active" && address && !p.approvals.includes(address) && (
-            <Button size="sm" variant="outline" onClick={() => send("approve", approve)}>Approve</Button>
-          )}
-          {p.status === "Approved" && left !== null && left <= 0n && address && (
-            <Button size="sm" onClick={() => send("execute", execute)}>Execute</Button>
-          )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("approve")}>Approve</Button>}
+          {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("reject")}>Reject</Button>}
+          {canExecute && <Button size="sm" disabled={busy} onClick={() => send("execute")}>Execute</Button>}
+          {canCancel && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("cancel")} title="Approved proposals: threshold cancel votes make it Cancelled">Cancel</Button>}
         </div>
-        <TxStatus state={approve.state} showAccounts={false} />
-        <TxStatus state={execute.state} showAccounts={false} />
+        {last && <TxStatus state={tx.state} showAccounts={false} />}
       </td>
       <td><Explorer value={p.proposal} /></td>
     </tr>
@@ -115,7 +130,7 @@ export function SquadsPanel({ sq, error, onDone }: { sq: SquadsResp | null; erro
         </Mono>
       </div>
       {ms.proposals.length === 0 ? (
-        <Note>No proposals yet.</Note>
+        <Note>No live proposal, and none finished recently.</Note>
       ) : (
         <div className="table-wrap">
           <table className="data-table" aria-label="Squads proposals">

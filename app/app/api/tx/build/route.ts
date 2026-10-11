@@ -5,6 +5,8 @@ import { errorResponse } from "@/lib/server/respond";
 import { composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 import type { TxRequest } from "@/lib/tx-kinds";
+import { baselineMemo, setConfigFields } from "@/lib/config-diff";
+import { identifyMutavInstruction, MutavInstruction } from "@mutav-finance/mutav-protocol-solana";
 
 export type BuildBody = {
   request: TxRequest;
@@ -33,7 +35,10 @@ export async function POST(req: Request) {
       if (reserve.config.admin !== vault) throw new ComposeError(`VaultConfig.admin ${reserve.config.admin} is not the Squads vault ${vault}`);
       if (body.request.kind === "set_config") refuseOverlappingSetConfig((await readMultisig(env, reserve.now)).proposals);
       const inner = await composeInstructions(body.request, vault, ctx);
-      const { tx, index } = await composeProposalCreate(env, signer, inner, `mutav ${body.request.kind}`);
+      // A set_config proposal records the values it was built against (A3 stale-carry check at execute).
+      const setConfig = inner.find((ix) => ix.data && ix.data.length >= 8 && identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig);
+      const memo = setConfig ? baselineMemo(setConfigFields(new Uint8Array(setConfig.data!)), reserve.config) : `mutav ${body.request.kind}`;
+      const { tx, index } = await composeProposalCreate(env, signer, inner, memo);
       return jsonResponse({ tx, proposalIndex: index, instructions: describeInstructions(inner, reserve.config), via: "squads" });
     }
     if (isAdminKind(body.request) && env.cluster !== "localnet") {
