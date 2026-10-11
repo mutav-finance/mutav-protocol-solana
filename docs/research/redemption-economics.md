@@ -6,7 +6,7 @@ This note was written as input to an ADR and to the [specification](../spec.md) 
 
 **Sources read:** the specification (§3 accounts, §4 invariants, §5.5 capital, §6 under-coverage, §7 price safety, §8 caps), [ADR 0008](../decisions/0008-uniform-capital-flow-and-pause-scope.md), MUTAV's internal project document, the [OnRe comparable](onre-comparable.md), and OnRe's code ([`onre-finance/onre-sol`](https://github.com/onre-finance/onre-sol), MIT): `instructions/redemption/fulfill_redemption_request.rs` (partial fills via `fulfilled_amount`) and `docs/PROP_AMM_PRICING_MODEL.md` (dynamic-wall haircut).
 
-> **Since this research:** most of this design was accepted on 2026-10-02 as [ADR 0010](../decisions/0010-partial-fills-at-queue-head.md) (partial fills) and [ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md) (earmark-aware solvency and a phase-2 instant exit, designed but shipped disabled). On 2026-10-10 the program was simplified for the v1 freeze: the pilot keeps whole fills ([ADR 0023](../decisions/0023-capital-flows-and-exit-rights.md)), and the partial-fill fields, the exit parameters, the buffer earmark, the claim-notice counter and the per-holder account were removed from v1 and return later as carves or new accounts ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md), ADR 0019). A cooldown exit after `max_queue_wait_secs` was added as the holder's guaranteed exit path ([ADR 0025](../decisions/0025-exit-fallback-cooldown-exit.md)). The notes below mark each point.
+> **Since this research:** most of this design was accepted on 2026-10-02 as [ADR 0010](../decisions/0010-partial-fills-at-queue-head.md) (partial fills) and [ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md) (an earmark-aware coverage gate and a phase-2 instant exit, designed but shipped disabled). On 2026-10-10 the program was simplified for the v1 freeze: the pilot keeps whole fills ([ADR 0023](../decisions/0023-capital-flows-and-exit-rights.md)), and the partial-fill fields, the exit parameters, the buffer earmark, the claim-notice counter and the per-holder account were removed from v1 and return later as carves or new accounts ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md), ADR 0019). A cooldown exit after `max_queue_wait_secs` was added as the holder's guaranteed exit path ([ADR 0025](../decisions/0025-exit-fallback-cooldown-exit.md)). The notes below mark each point.
 
 ---
 
@@ -16,14 +16,14 @@ This note was written as input to an ADR and to the [specification](../spec.md) 
 |---|---|
 | Partial fills | `fulfil_redeems` fills greedily from the head. Whole requests while they fit; then **one partial fill of the head**, which stops the batch. At most one partially filled request exists at any time, and it is always the head. Each fill is priced at the NAV at that fill. Filled assets accrue on the request and can be claimed between fills. `cancel_redeem` returns the unfilled shares and pays out anything accrued. |
 | Dust | A partial fill must be ≥ `min_fill_assets` (R$500), and it must leave a remainder worth ≥ `min_request` (R$1,000). Otherwise it is trimmed, or skipped. |
-| Solvency formula | `surplus = stable_assets − coverage_required`; `free_capital = max(0, surplus − earmark_eff)`; `earmark_eff ≤ surplus` always. In the pilot, `earmark_eff = 0`, so `free_capital = surplus` exactly as before. |
+| Free-capital formula | `surplus = stable_assets − coverage_required`; `free_capital = max(0, surplus − earmark_eff)`; `earmark_eff ≤ surplus` always. In the pilot, `earmark_eff = 0`, so `free_capital = surplus` exactly as before. |
 | Earmark when surplus shrinks | **Hybrid with a headroom (option C).** Free capital above a headroom absorbs the loss first. Then the earmark goes to zero **before** the last headroom slice of free capital. Instant exit is therefore off whenever `surplus < headroom`, well before under-coverage. The stored earmark only ratchets down; recovered surplus goes to free capital (the queue) first. |
 | Queue vs buffer | **The FIFO queue has priority.** The buffer refills only when the redemption queue is empty. A buffer that sits idle while the head waits longer than `buffer_release_after_secs` (14 days) is released to free capital. Instant exits never change `free_capital`, so they never take capacity from the queue. |
 | Instant-exit price | `out = raw − haircut`, with `raw` = shares at NAV. The haircut is the **integral of a convex marginal rate** over the buffer's utilization state `x = max(recent exit volume, target − earmark_eff)`. This makes it **split-proof inside a window**; OnRe's per-order endpoint formula is not. Pilot parameters: 50 bps floor, +600 bps at full use of the target, quadratic, 10% marginal cap. |
 | Haircut proceeds | Stay in `reserve`. NAV rises for every remaining holder, including queued shares. `free_capital` is unchanged. |
 | Gates | Off when: flag disabled, paused, `mode == UnderCovered`, `fulfil_halted`, stale price, `pending_notices > 0`, `surplus < headroom`, wallet barred (MUTAV capital wallet and affiliates), within the minimum holding period, or a per-period cap is reached. |
 
-> **Since this research:** ADR 0011 kept the queue-first rule and the split-proof integral haircut, but dropped the headroom term from the solvency gates (a term that falls with surplus would let the queue drain the earmark step by step). Instant exit instead requires surplus to stay above the headroom after the exit. The instruction is named `instant_redeem`, and the stored earmark falls by `raw`, so the retained haircut becomes free capital ([ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)). None of this is in the v1 binary ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)).
+> **Since this research:** ADR 0011 kept the queue-first rule and the split-proof integral haircut, but dropped the headroom term from the coverage gates (a term that falls with surplus would let the queue drain the earmark step by step). Instant exit instead requires surplus to stay above the headroom after the exit. The instruction is named `instant_redeem`, and the stored earmark falls by `raw`, so the retained haircut becomes free capital ([ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md)). None of this is in the v1 binary ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)).
 
 ---
 
@@ -192,7 +192,7 @@ The account closes (rent to the owner) when `shares_remaining == 0 && assets_cla
 
 ## 3. The buffer earmark (phase 2)
 
-> **Since this research:** the earmark-aware solvency formula was accepted in [ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md) and then removed from v1 together with the exit parameters; it returns as a carve when instant exit is built ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)). This whole section describes a later design.
+> **Since this research:** the earmark-aware free-capital formula was accepted in [ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md) and then removed from v1 together with the exit parameters; it returns as a carve when instant exit is built ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)). This whole section describes a later design.
 
 ### 3.1 What the earmark is
 
@@ -207,7 +207,7 @@ The account closes (rent to the owner) when `shares_remaining == 0 && assets_cla
   - `buffer_headroom_bps` (of `coverage_required`);
   - `buffer_release_after_secs`.
 
-### 3.2 The effective earmark (computed inline by every instruction that reads solvency)
+### 3.2 The effective earmark (computed inline by every instruction that reads the coverage figures)
 
 ```text
 headroom      = ceil(coverage_required × buffer_headroom_bps / 10_000)
@@ -392,7 +392,7 @@ V_window = V_prev × max(0, 1 − (now − epoch_start)/epoch) + V_curr   // two
 | Whole buffer drained by several wallets in one window | 0 | R$5,000 | R$125.00 | 2.50% | R$4,875.00 | 6.50% |
 | A burst past the target (after a refill inside the same window) | 5,000 | R$2,500 | R$226.54 | 9.06% | R$2,273.46 | 10.00% (cap) |
 
-**NAV and solvency effects of Dan's R$2,500 exit:**
+**NAV and coverage effects of Dan's R$2,500 exit:**
 - 2,500 shares are burned and R$2,475 is paid out. The R$25 haircut stays in `reserve`, so NAV goes from R$1.000000 to **R$1.000256** for the 97,500 remaining shares, queued shares included.
 - `surplus` falls by R$2,475 and `buffer_earmark` falls by R$2,475, so **`free_capital` is unchanged**. Instant exits never take capacity from the queue.
 - Utilization after the exit is `x = max(V_window = 2,500, E − earmark = 2,475) = 2,500`.
@@ -477,7 +477,7 @@ That is about 60 bytes, which fits.
 
 **Sizing note.** `ExitParams` is about 90 bytes and the barred list is 128 bytes. Together they exceed a 128-byte `VaultConfig._reserved`. They should be **real fields from day one**, not padding, which is what the brief decided. The `_reserved` arrays stay available for whatever phase 2 discovers.
 
-**The pilot formula already reads `earmark_eff`.** With `buffer_earmark = 0`, it returns 0 at every step. The phase-2 upgrade then changes no solvency maths, only adds instructions.
+**The pilot formula already reads `earmark_eff`.** With `buffer_earmark = 0`, it returns 0 at every step. The phase-2 upgrade then changes no coverage maths, only adds instructions.
 
 > **Since this research:** ADR 0011 first took this route (real fields from the pilot, padding of 512 bytes on `VaultConfig` and 256 on `VaultState`). For the v1 freeze the founders chose the opposite trade-off: `ExitParams`, the buffer earmark, `min_fill_assets`, `pending_notices` and `HolderState` were removed, and the padding test reserves the bytes they need (275 + 88) so each returns as a carve without a migration. `feature_flags` stays and fails closed ([ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md), ADR 0019). See also [Upgrade readiness](upgrade-readiness.md).
 

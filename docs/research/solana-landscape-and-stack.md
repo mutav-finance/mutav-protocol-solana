@@ -212,7 +212,7 @@ The protocols note recommended one PDA per request seeded by a vault ticket coun
 
 - **solana-foundation/vault:** a physically separate `pending_vault` token account; deposits move into the reserve only at approval, redemptions move out at approval and to the user at claim. [V]
 - **SVS-10:** accounting-only separation through `total_pending_deposits`; filled redemptions go to per-user `claimable_tokens` PDAs. [V: [request_deposit.rs](https://github.com/solanabr/solana-vault-standard/blob/main/programs/svs-10/src/instructions/request_deposit.rs)]
-- The recommendation was physical separation, so `stable_assets` for the solvency check can never include pending deposits or approved-but-unclaimed redemptions, which count as liabilities. [I] MUTAV's design follows this with separate `pending_deposits`, `pending_redemptions` and `reserve` token accounts (see [Accounts](../architecture/accounts.md)).
+- The recommendation was physical separation, so `stable_assets` for the coverage check can never include pending deposits or approved-but-unclaimed redemptions, which count as liabilities. [I] MUTAV's design follows this with separate `pending_deposits`, `pending_redemptions` and `reserve` token accounts (see [Accounts](../architecture/accounts.md)).
 
 **ERC-7540 ports.** solana-foundation/vault is "inspired by ERC-7540", with TLV extensions (fees, minimums, pausable flows, FIFO queues); partial fills, an asset cap, lock-ups and deposit/redeem netting are specified but not built, and it **explicitly rejects slippage parameters** for async NAV flows. [V: [DESIGN_DECISIONS.md](https://github.com/solana-foundation/vault/blob/main/DESIGN_DECISIONS.md)] SVS-10 is "ERC-7540 equivalent with synchronous cancellation (ERC-7887)"; SVS-11 adds manager approval, KYC and compliance. Neither is a ratified SIMD or sRFC standard; solana-foundation/vault references sRFC-37 (Token ACL) for KYC'd share tokens. [V/I]
 
@@ -310,7 +310,7 @@ Solana forbids A→B→A reentrancy, so a reserve program cannot be called back 
 
 | | One core program (reserve, registry, coverage, queue as modules) | Separate programs |
 |---|---|---|
-| Solvency check | A plain function call with an atomic post-state assertion `stable_assets ≥ coverage_required` | The reserve must read coverage state as an owner-checked passed account and can never be called back |
+| Coverage check | A plain function call with an atomic post-state assertion `stable_assets ≥ coverage_required` | The reserve must read coverage state as an owner-checked passed account and can never be called back |
 | CPI budget | Reserve, adapter, venue, token: depth 4 of 5 | Coverage, reserve, adapter, venue, token: **5 of 5**, so a venue that CPIs further breaks |
 | Audit surface | One IDL, one upgrade authority, one set of PDAs | N programs, N upgrade authorities, cross-program trust |
 | Precedent | OnRe (66 instructions, 1 program), Kamino klend, Drift | SVS (one program per variant), Voltr (vault plus adaptor programs) |

@@ -278,7 +278,7 @@ All of this section is *(inference)* unless a source is linked.
 
 ### What does not map
 
-- **Solvency gating.** OnRe has no on-chain solvency check on exit; redemption is limited only by vault balance, the haircut curve and the worker. MUTAV fills redemptions only out of free capital, after the coverage the guarantees need ([ADR 0005](../decisions/0005-solvency-gate-scope.md), [ADR 0008](../decisions/0008-uniform-capital-flow-and-pause-scope.md)).
+- **Coverage gating.** OnRe has no on-chain coverage check on exit; redemption is limited only by vault balance, the haircut curve and the worker. MUTAV fills redemptions only out of free capital, after the coverage the guarantees need ([ADR 0005](../decisions/0005-solvency-gate-scope.md), [ADR 0008](../decisions/0008-uniform-capital-flow-and-pause-scope.md)).
 - **Queue order.** OnRe's queue is worker-discretionary and keyed by UUID. MUTAV's queue is strict FIFO with an on-chain sequence ([ADR 0008](../decisions/0008-uniform-capital-flow-and-pause-scope.md)).
 - **Exposure shape.** OnRe's exposure is contractually capped and short-tail (ILWs with binary triggers). MUTAV's claims are frequent, small and correlated with the Brazilian macro cycle, so required coverage should be modelled from default rates and loss given default rather than a fixed bps target.
 - **Access.** OnRe splits permissionless secondary holding from a KYC'd primary market; that pattern was considered for a hackathon demo.
@@ -333,7 +333,7 @@ What must change: the instant exit pays only from the earmark and the queue only
 
 OnRe changed live accounts without a migration three times: it carved `fulfilled_amount` (8 bytes) from `RedemptionRequest.reserved` (127 to 119); carved `vault_target_bps`, `disabled` and `fee_basis_points_prop_amm_sell` (5 bytes) from `RedemptionOffer.reserved` (109 to 104); and replaced a `u64` request ID with `String(32)` inside the same 216-byte allocation (119 to 91), renaming the retired counter to `gap: u64` so later offsets do not shift. [tests/layout_compatibility.rs](https://github.com/onre-finance/onre-sol/blob/c0490831f438074562ebf51e437ca5f8e027596b/programs/onreapp/tests/layout_compatibility.rs) serializes a `Legacy*` struct, deserializes it as the new one and asserts `8 + INIT_SPACE == N`.
 
-The recommendations for MUTAV were: copy the layout-compatibility test for every account from day one; size padding for phase 2 explicitly; retire fields with a `gap`, never by deletion; put outgrown phase-2 state in a new PDA; and ship the solvency formula with the earmark already subtracted, held at 0.
+The recommendations for MUTAV were: copy the layout-compatibility test for every account from day one; size padding for phase 2 explicitly; retire fields with a `gap`, never by deletion; put outgrown phase-2 state in a new PDA; and ship the free-capital formula with the earmark already subtracted, held at 0.
 
 > **Since this research:** padding is sized so the guarantee, claim and payout lifecycles and the phase-2 carves fit without a migration, and later fields read zero as "off" (ADR 0019, [ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md)). Upgrade readiness is set out in [ADR 0011](../decisions/0011-phase2-instant-exit-and-upgrade-readiness.md).
 

@@ -80,7 +80,7 @@ No reference has a guarantee or claim registry; OnRe settles claims off-chain, a
 
 | Instruction | Reference pattern applied | MUTAV design |
 |---|---|---|
-| `register_guarantee` | OnRe per-call caps | Pause, mode and solvency gates; `max_cover_per_guarantee`; event with post-state |
+| `register_guarantee` | OnRe per-call caps | Pause, mode and coverage gates; `max_cover_per_guarantee`; event with post-state |
 | `close_guarantee(id, reason)` | No meaningful zero | Reason `RELEASED` or `VOID`, numbered from 1 and stored on the account |
 | `reinstate_guarantee` | Age measured from a stored timestamp | Within `max_reinstate_age` of `closed_at`; resets the close fields |
 | `file_claim`, `amend_claim`, `refile_claim` | SF request versioning | A `revision` counter grows with each amendment |
