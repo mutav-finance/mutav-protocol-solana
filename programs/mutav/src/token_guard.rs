@@ -1,9 +1,8 @@
 //! Token safety checks. Every check fails closed.
 //!
-//! The mint guard is adapted from `solana-foundation/vault`
-//! (`programs/async_vault/src/utils.rs`, `validate_asset_mint_extensions_from_acct_info`,
-//! commit c359962), MIT License, Copyright (c) 2026 Solana Foundation. See `NOTICE`.
-//! Changes: rejects every extension listed in spec §5.1 (PC-19, ADR 0017), and
+//! The mint guard's structure follows `validate_asset_mint_extensions_from_acct_info`
+//! in `solana-foundation/vault` (MIT), extended and rewritten for MUTAV (see
+//! docs/provenance.md). Design notes: rejects every extension listed in spec §5.1 (PC-19, ADR 0017), and
 //! a transfer fee in either the older or the newer epoch configuration.
 
 use anchor_lang::prelude::*;

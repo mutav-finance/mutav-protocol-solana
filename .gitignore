@@ -21,3 +21,6 @@ dist/
 
 # Cargo.lock and bun.lock are intentionally tracked.
 .claude/worktrees/
+
+# Copied from the repo root by clients/js prepack
+clients/js/LICENSE

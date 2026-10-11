@@ -18,7 +18,7 @@ MUTAV is an institutional *fiador*. It gives Brazilian tenants a paid rental gua
 | Impact | §1: 17.8M rented households; 5 of 7 agencies interviewed front the landlord's rent |
 | Novelty | §8: per-guarantee liabilities on-chain gate every capital exit, and claim payments are never solvency-gated |
 | UX | §7: agencies keep their workflow (one monthly bill by boleto, PIX or BRS, a transparency page) and never call the program |
-| Open source | Apache-2.0, verified builds (§6, §11) |
+| Open source | MIT, verified builds (§6, §11) |
 | Business plan | §2.1 and Figure 1b; open decisions in §13 |
 
 ---
@@ -204,7 +204,7 @@ Callout near the client: "TS client composes transactions; holds no keys".
 Alt text adds: a licensed payment provider for boleto and PIX collection, and an authorized BRS minter and offramp.
 ```
 
-**Stack and provenance.** Anchor 1.2.0, Solana CLI 4.1.2, LiteSVM, Mollusk, Surfpool, Squads v4 and `solana-verify`. The async core is forked from solana-foundation/vault (MIT) with its unrestricted withdrawal removed; no OnRe code was copied. Apache-2.0 ([provenance](provenance.md)).
+**Stack and provenance.** Anchor 1.2.0, Solana CLI 4.1.2, LiteSVM, Mollusk, Surfpool, Squads v4 and `solana-verify`. The async request lifecycle follows solana-foundation/vault's design (MIT); no code from it or from OnRe is copied. MIT ([provenance](provenance.md)).
 
 ---
 
@@ -711,7 +711,7 @@ Phase 2 only, not deployed:
 - Solana fees and CPI: <https://solana.com/docs/core/fees>, <https://solana.com/docs/core/cpi>
 - Nora BRS: <https://www.nora.finance/docs/integrate/core-concepts/brs-token>
 - Etherfuse stablebonds and price feeds: <https://etherfuse.com/products/stablebonds>, <https://docs.etherfuse.com/price-feeds.md>
-- Internal: [spec](spec.md), [ADRs](decisions/), [implementation plan](plan.md), [provenance](provenance.md), [NOTICE](../NOTICE).
+- Internal: [spec](spec.md), [ADRs](decisions/), [implementation plan](plan.md), [provenance](provenance.md), [acknowledgements](../README.md#acknowledgements).
 
 ### F. Accounts (PDAs)
 
@@ -736,7 +736,7 @@ Phase 2 only, not deployed:
 | Denomination | BRL | USD | USDC on-chain; BRL off-chain | USDC | USDC | ETH and stables |
 | Liabilities on-chain? | Yes, one account per guarantee | Aggregate NAV only | Deal state only | Pool state only | Loan state (Ethereum) | Yes, active covers |
 | Exit gated on on-chain solvency? | Yes: exits only from surplus over `c` × remaining cover (`c` governed) | No | No | Tranche-ratio gate | No | Partly: MCR% > 100% |
-| Audited / open source | **Unaudited**; Apache-2.0 | Audited; open | Closed source¹ | Audited; Solana programs private¹ | Audited; open (Ethereum) | Audited; open |
+| Audited / open source | **Unaudited**; MIT | Audited; open | Closed source¹ | Audited; Solana programs private¹ | Audited; open (Ethereum) | Audited; open |
 
 ¹ Where programs are closed source, the entries are inferred from public documentation.
 

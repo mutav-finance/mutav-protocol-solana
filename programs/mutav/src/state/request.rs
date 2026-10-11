@@ -1,9 +1,7 @@
 //! `DepositRequest` and `RedeemRequest` (spec §3.8).
 //!
-//! Async request skeleton adapted from `solana-foundation/vault`
-//! (`programs/async_vault/src/state/`, commit c359962), MIT License,
-//! Copyright (c) 2026 Solana Foundation. See `NOTICE`.
-//! Changes: one PDA per FIFO `seq` (not per owner), `u8` statuses and
+//! Design reference: the request accounts of `solana-foundation/vault`; no
+//! code is copied (see docs/provenance.md). Design notes: one PDA per FIFO `seq` (not per owner), `u8` statuses and
 //! `_reserved` padding.
 
 use anchor_lang::prelude::*;

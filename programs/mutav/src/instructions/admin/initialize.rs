@@ -1,9 +1,7 @@
 //! `initialize` (spec §5.1).
 //!
-//! Account and authority skeleton adapted from `solana-foundation/vault`
-//! (`programs/async_vault/src/instructions/create_vault.rs`, commit c359962),
-//! MIT License, Copyright (c) 2026 Solana Foundation. See `NOTICE`.
-//! Changes: only the program's upgrade authority may initialize; a data-less
+//! Design reference: `solana-foundation/vault` (`create_vault`); no code is
+//! copied (see docs/provenance.md). Design notes: only the program's upgrade authority may initialize; a data-less
 //! vault-authority PDA (not the config account) owns four per-purpose token
 //! accounts and the program-created share mint; roles, caps and price bounds
 //! are validated. The upstream unrestricted asset withdrawal (`withdraw_assets`)
