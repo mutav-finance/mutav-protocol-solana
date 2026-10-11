@@ -270,30 +270,111 @@ export async function composeProposalAction(env: ServerEnv, member: string, inde
   }
 }
 
+// ── The memo a proposal was created with (A3 stale-carry baseline) ─────────
+//
+// Squads keeps the memo in the create instruction, not in the account, so it
+// is read back from history. Anyone can touch the transaction PDA (before or
+// after it exists) with a transaction of their own, so the lookup accepts
+// only a successful, top-level Squads `vaultTransactionCreate` for exactly
+// this multisig and transaction PDA, whose creator is the one recorded
+// on-chain, and takes the memo from that same instruction. Anything else is
+// ignored; no match fails closed.
+
+/** Signatures per getSignaturesForAddress page (the RPC maximum). */
+const SIGNATURE_PAGE = 1000;
+/** Pages read back before giving up (fail closed): 20,000 signatures. */
+export const MAX_SIGNATURE_PAGES = 20;
+/** Transactions fetched looking for the create before giving up (fail closed). */
+export const MAX_CREATE_TX_READS = 100;
+
+type SignatureRow = { signature: string; err: unknown };
+
 /**
- * The memo the proposal was created with, read from its creation transaction
- * (Squads keeps the memo in the instruction, not in the account). Null when
- * the RPC has no history for it.
+ * Every successful signature on an address, oldest first: pages back with
+ * `before` until the history is exhausted. Throws past MAX_SIGNATURE_PAGES.
  */
-export async function readCreateMemo(env: ServerEnv, index: bigint): Promise<string | null> {
+export async function signaturesOldestFirst(page: (before: string | undefined) => Promise<SignatureRow[]>, maxPages = MAX_SIGNATURE_PAGES): Promise<string[]> {
+  const out: string[] = [];
+  let before: string | undefined;
+  for (let n = 0; ; n++) {
+    if (n >= maxPages) throw new StaleCarryError(`the proposal's transaction account has more than ${maxPages * SIGNATURE_PAGE} signatures: its creation cannot be located, so execute is refused (reject or cancel it and propose again)`);
+    const rows = await page(before);
+    for (const r of rows) if (!r.err) out.push(r.signature);
+    if (rows.length < SIGNATURE_PAGE) break;
+    before = rows.at(-1)!.signature;
+  }
+  return out.reverse();
+}
+
+/** A transaction's top-level instructions over its full account list (static keys, then loaded ones). */
+export type CompiledTxLike = { keys: string[]; instructions: { programIdIndex: number; accountKeyIndexes: number[]; data: Uint8Array }[] };
+/** The create instruction the memo may come from. */
+export type CreateMatch = { multisig: string; transaction: string; creator: string };
+
+const CREATE_DISC = Buffer.from(multisig.generated.vaultTransactionCreateInstructionDiscriminator);
+
+/**
+ * The memo of the top-level `vaultTransactionCreate` in `tx` whose accounts
+ * are [multisig, transaction, creator, …] as wanted; null when none is.
+ */
+export function createMemoIn(tx: CompiledTxLike, want: CreateMatch): { memo: string | null } | null {
+  for (const ix of tx.instructions) {
+    if (tx.keys[ix.programIdIndex] !== SQUADS_PROGRAM) continue;
+    const data = Buffer.from(ix.data);
+    if (data.length < 8 || !data.subarray(0, 8).equals(CREATE_DISC)) continue;
+    const acc = ix.accountKeyIndexes.map((i) => tx.keys[i]);
+    if (acc[0] !== want.multisig || acc[1] !== want.transaction || acc[2] !== want.creator) continue;
+    try {
+      const [decoded] = multisig.generated.vaultTransactionCreateStruct.deserialize(data);
+      return { memo: decoded.args.memo ?? null };
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
+ * The memo from the oldest successful transaction holding a matching create,
+ * reading at most MAX_CREATE_TX_READS transactions (fail closed past it).
+ * Null when none matches.
+ */
+export async function findCreateMemo(
+  signatures: string[],
+  fetchTx: (signature: string) => Promise<CompiledTxLike | null>,
+  want: CreateMatch,
+  maxReads = MAX_CREATE_TX_READS,
+): Promise<string | null> {
+  for (const [n, sig] of signatures.entries()) {
+    if (n >= maxReads) throw new StaleCarryError(`more than ${maxReads} transactions touched the proposal's transaction account before a matching create: execute is refused (reject or cancel it and propose again)`);
+    const tx = await fetchTx(sig);
+    if (!tx) continue;
+    const hit = createMemoIn(tx, want);
+    if (hit) return hit.memo;
+  }
+  return null;
+}
+
+/**
+ * The memo proposal `index` was created with, by the on-chain `creator` of its
+ * vault transaction. Null when no matching create is in the RPC's history.
+ */
+export async function readCreateMemo(env: ServerEnv, index: bigint, creator: string): Promise<string | null> {
   if (!env.squadsMultisig) return null;
   const c = conn(env);
   const [txPda] = multisig.getTransactionPda({ multisigPda: pk(env.squadsMultisig), index });
-  const sigs = await c.getSignaturesForAddress(txPda, { limit: 1000 }, "confirmed");
-  const first = sigs.filter((x) => !x.err).at(-1);
-  if (!first) return null;
-  const tx = await c.getTransaction(first.signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
-  if (!tx) return null;
-  const keys = tx.transaction.message.staticAccountKeys.map((k) => k.toBase58());
-  const disc = Buffer.from(multisig.generated.vaultTransactionCreateInstructionDiscriminator);
-  for (const ix of tx.transaction.message.compiledInstructions) {
-    if (keys[ix.programIdIndex] !== SQUADS_PROGRAM) continue;
-    const data = Buffer.from(ix.data);
-    if (!data.subarray(0, 8).equals(disc)) continue;
-    const [decoded] = multisig.generated.vaultTransactionCreateStruct.deserialize(data);
-    return decoded.args.memo ?? null;
-  }
-  return null;
+  const sigs = await signaturesOldestFirst((before) => c.getSignaturesForAddress(txPda, { limit: SIGNATURE_PAGE, before }, "confirmed"));
+  return findCreateMemo(
+    sigs,
+    async (sig) => {
+      const tx = await c.getTransaction(sig, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
+      if (!tx || tx.meta?.err) return null;
+      const msg = tx.transaction.message;
+      const keys = msg.getAccountKeys({ accountKeysFromLookups: tx.meta?.loadedAddresses ?? undefined }).keySegments().flat().map((k) => k.toBase58());
+      return { keys, instructions: msg.compiledInstructions.map((ix) => ({ programIdIndex: ix.programIdIndex, accountKeyIndexes: ix.accountKeyIndexes, data: ix.data })) };
+    },
+    { multisig: env.squadsMultisig, transaction: txPda.toBase58(), creator },
+  );
 }
 
 /**
@@ -307,7 +388,7 @@ async function assertNoStaleCarry(env: ServerEnv, index: bigint, config: VaultCo
   const [vt] = multisig.accounts.VaultTransaction.fromAccountInfo(info);
   const fields = setConfigFieldsOf(vt, env.programId);
   if (fields === null) return;
-  const baseline = parseBaselineMemo(await readCreateMemo(env, index));
+  const baseline = parseBaselineMemo(await readCreateMemo(env, index, vt.creator.toBase58()));
   if (!baseline || !baselineCovers(baseline, fields)) {
     throw new StaleCarryError(`proposal #${index} writes set_config but its memo does not record the values of exactly the fields it writes (made outside this app, or its creation is not in this RPC's history): reject or cancel it and propose again`);
   }
