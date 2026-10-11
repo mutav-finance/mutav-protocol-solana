@@ -45,6 +45,18 @@ describe('solvencyFromAccounts', () => {
     expect(low.freeCapital).toBe(4_000n * BRL);
   });
 
+  test("the config's stress buffer enters coverage required (ADR 0022)", () => {
+    const { config, state } = reserve({
+      brsBalance: 30_000n * BRL,
+      remainingCoverTotal: 100_000n * BRL,
+      provisions: 4_000n * BRL,
+    });
+    const c = { ...config, coverageRatioBps: 1_000, caps: { ...config.caps, stressBuffer: 19_000n * BRL } };
+    const s = solvencyFromAccounts(c, state);
+    expect(s.coverageRequired).toBe(23_000n * BRL);
+    expect(s.freeCapital).toBe(7_000n * BRL);
+  });
+
 });
 
 describe('previewDepositFulfil', () => {
@@ -97,10 +109,22 @@ describe('previewRedeemFulfil (whole fills only)', () => {
     expect(r.stoppedBy).toBe('InsufficientFreeCapital');
   });
 
-  test('a request worth nothing stops the batch', () => {
+  test('a request worth nothing fills as 0 assets and the queue moves on (ADR 0023)', () => {
     const { config, state } = reserve({ brsBalance: 1n, sharesOutstanding: 1_000_000n });
-    const r = previewRedeemFulfil(config, state, [{ seq: 0n, shares: 1n }]);
-    expect(r.stoppedBy).toBe('RequestTooSmall');
+    const r = previewRedeemFulfil(config, state, [
+      { seq: 0n, shares: 1n },
+      { seq: 1n, shares: 999_999n },
+    ]);
+    expect(r.fills.map((f) => [f.seq, f.assets])).toEqual([
+      [0n, 0n],
+      [1n, 1n],
+    ]);
+    expect(r.stoppedBy).toBeNull();
+  });
+
+  test('an underwater reserve refuses (ADR 0022)', () => {
+    const { config, state } = reserve({ brsBalance: 5n, provisions: 5n, remainingCoverTotal: 5n, sharesOutstanding: 10n });
+    expect(previewRedeemFulfil(config, state, [{ seq: 0n, shares: 1n }]).stoppedBy).toBe('ReserveUnderwater');
   });
 
   test('stops at count', () => {

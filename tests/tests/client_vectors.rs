@@ -185,6 +185,7 @@ fn solvency_case(i: &SolvencyInputs) -> Value {
             "remainingCoverTotal": s(i.remaining_cover_total),
             "coverageRatioBps": i.coverage_ratio_bps,
             "provisions": s(i.provisions),
+            "stressBuffer": s(i.stress_buffer),
         },
         "output": out,
     })
@@ -196,6 +197,7 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
         remaining_cover_total: 80_000,
         coverage_ratio_bps: 10_000,
         provisions: 2_000,
+        stress_buffer: 0,
     };
     let mut cases = vec![
         base,
@@ -232,14 +234,51 @@ fn solvency_vectors(rng: &mut Rng) -> Value {
             remaining_cover_total: MAX,
             ..base
         },
+        // The stress buffer (ADR 0022): it binds over the ratio term, is
+        // limited by the unprovisioned cover, and saturates.
+        SolvencyInputs {
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            provisions: 4_000,
+            stress_buffer: 19_000,
+            ..base
+        },
+        SolvencyInputs {
+            remaining_cover_total: 10_000,
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            provisions: 4_000,
+            stress_buffer: 19_000,
+            ..base
+        },
+        SolvencyInputs {
+            remaining_cover_total: MAX,
+            provisions: MAX - 1,
+            stress_buffer: MAX,
+            ..base
+        },
+        SolvencyInputs {
+            remaining_cover_total: 5,
+            provisions: 9,
+            stress_buffer: MAX,
+            ..base
+        },
         SolvencyInputs::default(),
     ];
-    for _ in 0..300 {
+    for k in 0..300u64 {
+        let (brs, cover, c, prov) = (rng.amount(), rng.amount(), rng.bps(), rng.amount());
+        // Derived without drawing from `rng`, so the vectors after these
+        // stay where they were.
+        let stress = match k % 4 {
+            0 => 0,
+            1 => cover / 7,
+            2 => brs ^ prov,
+            _ => MAX,
+        };
         cases.push(SolvencyInputs {
-            brs_balance: rng.amount(),
-            remaining_cover_total: rng.amount(),
-            coverage_ratio_bps: rng.bps(),
-            provisions: rng.amount(),
+            brs_balance: brs,
+            remaining_cover_total: cover,
+            coverage_ratio_bps: c,
+            provisions: prov,
+            stress_buffer: stress,
         });
     }
     Value::Array(cases.iter().map(solvency_case).collect())

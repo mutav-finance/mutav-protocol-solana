@@ -10,7 +10,12 @@ import type { VaultConfig } from './generated/accounts/vaultConfig';
 import type { VaultState } from './generated/accounts/vaultState';
 import { assetsFor, computeSolvency, conversionNav, sharesFor, U64_MAX, type Solvency } from './math';
 
-type ConfigView = Pick<VaultConfig, 'coverageRatioBps'>;
+/**
+ * The config fields the previews read. `caps.stressBuffer` enters
+ * `coverage_required` (ADR 0022); pass the decoded `VaultConfig` and it is
+ * read from there.
+ */
+type ConfigView = Pick<VaultConfig, 'coverageRatioBps'> & { caps?: Pick<VaultConfig['caps'], 'stressBuffer'> };
 type StateView = Pick<
   VaultState,
   'brsBalance' | 'remainingCoverTotal' | 'provisions' | 'sharesOutstanding' | 'fulfilHalted' | 'mode'
@@ -27,6 +32,7 @@ export function solvencyFromAccounts(
     remainingCoverTotal: state.remainingCoverTotal,
     coverageRatioBps: config.coverageRatioBps,
     provisions: state.provisions,
+    stressBuffer: config.caps?.stressBuffer ?? 0n,
   });
 }
 
@@ -57,6 +63,7 @@ export type RedeemStop =
   | 'UnderCovered'
   | 'FulfilHalted'
   | 'RequestTooSmall'
+  | 'ReserveUnderwater'
   | 'InsufficientFreeCapital'
   | 'InsufficientLiquidBalance';
 
@@ -79,7 +86,10 @@ export function previewRedeemFulfil(
   if (config.paused) return refuse('Paused');
   if (state.mode !== 0) return refuse('UnderCovered');
   if (state.fulfilHalted) return refuse('FulfilHalted');
-  if (solvencyFromAccounts(config, state).underCovered) return refuse('UnderCovered');
+  const start = solvencyFromAccounts(config, state);
+  if (start.underCovered) return refuse('UnderCovered');
+  // Net assets 0 with shares outstanding (ADR 0022).
+  if (state.sharesOutstanding > 0n && start.netAssets === 0n) return refuse('ReserveUnderwater');
 
   let brs = state.brsBalance;
   let shares = state.sharesOutstanding;
@@ -91,8 +101,9 @@ export function previewRedeemFulfil(
     const sol = solvencyFromAccounts(config, state, { brsBalance: brs });
     const adminLeft = maxAssets - paid;
     const budget = [adminLeft, sol.freeCapital, sol.liquidBudget].reduce((m, x) => (x < m ? x : m));
+    // A head worth 0 BRS fills as a 0-asset fill: its shares are burned
+    // (ADR 0023, NEW-B).
     const value = assetsFor(r.shares, shares, sol.netAssets);
-    if (value === 0n) return { fills, stoppedBy: 'RequestTooSmall' };
     if (value > budget) {
       const liquidBinds = sol.liquidBudget < sol.freeCapital && sol.liquidBudget < adminLeft;
       return { fills, stoppedBy: liquidBinds ? 'InsufficientLiquidBalance' : 'InsufficientFreeCapital' };

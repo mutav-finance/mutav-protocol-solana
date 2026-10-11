@@ -16,6 +16,8 @@ import {
   isValidIncomePeriod,
   takeSplit,
   claimWindowPaid,
+  stressTerm,
+  U64_MAX,
   type SolvencyInputs,
 } from '../src';
 import { outcome, vectors } from './vectors';
@@ -39,6 +41,16 @@ describe('coverageRequired (ADR 0016)', () => {
     // At c ≥ 1 provisions ≤ cover never bind.
     expect(coverageRequired(100_000n, 10_000, 100_000n)).toBe(100_000n);
     expect(coverageRequired(100_000n, 15_000, 100_000n)).toBe(150_000n);
+  });
+
+  test('the stress buffer covers the next claims, up to the unprovisioned cover (ADR 0022)', () => {
+    expect(coverageRequired(100_000n, 1_000, 4_000n, 19_000n)).toBe(23_000n);
+    expect(coverageRequired(10_000n, 1_000, 4_000n, 19_000n)).toBe(10_000n);
+    expect(coverageRequired(1_000_000n, 1_000, 4_000n, 19_000n)).toBe(100_000n);
+    expect(coverageRequired(0n, 1_000, 0n, 19_000n)).toBe(0n);
+    // Saturates instead of exceeding u64.
+    expect(stressTerm(U64_MAX, U64_MAX - 1n, U64_MAX)).toBe(U64_MAX);
+    expect(stressTerm(5n, 9n, U64_MAX)).toBe(9n);
   });
 });
 
@@ -68,6 +80,7 @@ describe('solvency parity (free_capital, liquid_budget, …)', () => {
       remainingCoverTotal: BigInt(i.remainingCoverTotal),
       coverageRatioBps: i.coverageRatioBps,
       provisions: BigInt(i.provisions),
+      stressBuffer: BigInt(i.stressBuffer),
     };
     if (v.output === 'error') {
       expect(() => computeSolvency(input)).toThrow(MathOverflowError);
