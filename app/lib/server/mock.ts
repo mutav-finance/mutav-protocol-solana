@@ -50,7 +50,7 @@ type Keys = Record<"mint" | "admin" | "operator" | "pauser" | "capital" | "treas
 
 let built: Promise<{ reserve: ReserveView; ledger: Ledger; keys: Keys }> | null = null;
 
-/** The fictional reserve: R$50k from MUTAV's capital wallet, four leases at two agencies, fees, income and one paid claim. */
+/** The fictional reserve: R$60k from MUTAV's capital wallet in two fills, four leases at two agencies, fees, income and one paid claim. */
 async function build() {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const keys = Object.fromEntries(
@@ -103,6 +103,12 @@ async function build() {
         ["INV-2026-0001", 4_000n, 40n],
         ["INV-2026-0002", 5_000n, 25n],
         ["INV-2026-0003", 3_500n, 5n],
+        // More dated fees across ~90 days, so the Overview history has a shape.
+        ["INV-2026-0004", 2_800n, 82n],
+        ["INV-2026-0005", 3_000n, 67n],
+        ["INV-2026-0006", 4_500n, 52n],
+        ["INV-2026-0007", 2_200n, 33n],
+        ["INV-2026-0008", 3_800n, 14n],
       ] as const
     ).map(async ([inv, gross, ago], i) => ({
       address: await addressOf(`fee:${i}`),
@@ -115,6 +121,11 @@ async function build() {
       address: await addressOf("income:0"),
       blockTime: now - 8n * DAY,
       data: { discriminator: disc, version: 1, bump: 255, incomeRefHash: await bytes(REF.income("NORA-202609-01")), period: 202_609, gross: 1_200n * BRL, take: 0n, net: 1_200n * BRL, slot: 400_010_000n, reserved: zeros(32) },
+    },
+    {
+      address: await addressOf("income:1"),
+      blockTime: now - 38n * DAY,
+      data: { discriminator: disc, version: 1, bump: 255, incomeRefHash: await bytes(REF.income("NORA-202608-01")), period: 202_608, gross: 900n * BRL, take: 0n, net: 900n * BRL, slot: 400_005_000n, reserved: zeros(32) },
     },
   ];
   const notice1 = await bytes(REF.notice("NOTICE-0001"));
@@ -146,10 +157,12 @@ async function build() {
   );
 
   const deposited = 50_000n * BRL;
+  /** An earlier, smaller fill that opened the reserve before the main one. */
+  const seedFill = 10_000n * BRL;
   const feesNet = fees.reduce((s, f) => s + f.data.net, 0n);
   const incomeNet = income.reduce((s, r) => s + r.data.net, 0n);
   const claimsPaid = payouts.reduce((s, p) => s + p.data.amount, 0n);
-  const sharesOutstanding = deposited;
+  const sharesOutstanding = deposited + seedFill;
 
   const deposits = [
     {
@@ -218,7 +231,7 @@ async function build() {
     version: 1,
     bump: 255,
     mode: 0,
-    brsBalance: deposited + feesNet + incomeNet - claimsPaid,
+    brsBalance: deposited + seedFill + feesNet + incomeNet - claimsPaid,
     tesouroUnits: 0n,
     tesouroPrice: 1_000_000_000n,
     tesouroPriceTs: now - DAY,
@@ -276,6 +289,7 @@ async function build() {
   const ledger: Ledger = {
     capitalEvents: [
       { side: "deposit", signature: await signatureOf("fill:0"), ts: now - 59n * DAY, fromSeq: 0n, toSeq: 0n, assets: deposited, shares: deposited, nav: NAV_SCALE },
+      { side: "deposit", signature: await signatureOf("fill:seed"), ts: now - 88n * DAY, fromSeq: 0n, toSeq: 0n, assets: seedFill, shares: seedFill, nav: NAV_SCALE },
     ],
     guarantees: g.map((data, i) => ({ address: gAddr[i]!, data: data as never })),
     filings: filings as never,

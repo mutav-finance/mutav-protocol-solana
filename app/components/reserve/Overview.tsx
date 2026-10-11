@@ -2,13 +2,15 @@
 
 /**
  * /reserve Overview answers one question: "Can the reserve cover every open
- * guarantee?" Main column, top to bottom:
+ * guarantee?" Above both columns: the accounts that prove it, on Explorer.
+ * Main column, top to bottom:
  *   1. Hero: stable assets, their share of what is required, four figures
  *      that open their tab, and the program state.
  *   2. Where the capital sits: stable assets split by what they back.
  *   3. What never changes: the two spec promises.
  *   4. Verify it yourself: one link to the Verify tab.
- * Side column (sticky from 1120px): the latest movements of the ledger.
+ * Side column: the latest movements of the ledger, then stable assets over
+ * time rebuilt from those movements.
  * Renders on-chain values from /api/ledger; nothing beyond sums and shares.
  */
 import type { ReactNode } from "react";
@@ -17,8 +19,9 @@ import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { useReserve } from "@/components/reserve/ReserveShell";
+import { HistoryChart } from "@/components/reserve/HistoryChart";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
-import { fmtBps, fmtDuration, fmtNav, fmtRatio, fmtShares } from "@/lib/format";
+import { fmtBps, fmtDuration, fmtNav, fmtRatio } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, claimsTimeline, coverageRows, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
 
@@ -65,18 +68,68 @@ const Dot = ({ color, size = 6 }: { color: string; size?: number }) => <span ari
 export function Overview() {
   const { d } = useReserve();
   const r = d.reserve;
+  const flows = moneyFlows(r.state, d.ledger).rows;
   return (
-    <div className="grid grid-cols-1 items-start gap-10 min-[1120px]:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="flex min-w-0 flex-col gap-14">
-        <Hero r={r} l={d.ledger} />
-        <WhereCapitalSits r={r} l={d.ledger} />
-        <Promises />
-        <VerifyCta />
+    <div className="flex flex-col gap-10">
+      <ProofCards r={r} />
+      <div className="grid grid-cols-1 items-start gap-10 min-[1120px]:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="flex min-w-0 flex-col gap-14">
+          <Hero r={r} l={d.ledger} />
+          <WhereCapitalSits r={r} l={d.ledger} />
+          <Promises />
+          <VerifyCta />
+        </div>
+        <aside className="flex min-w-0 flex-col gap-10">
+          <RecentActivity r={r} rows={flows} />
+          <HistoryChart rows={flows} stableAssets={r.solvency.stableAssets} now={r.now} />
+        </aside>
       </div>
-      <aside className="flex min-w-0 flex-col gap-6 min-[1120px]:sticky min-[1120px]:top-32">
-        <RecentActivity r={r} l={d.ledger} />
-      </aside>
     </div>
+  );
+}
+
+// ── 0 · Proof cards ─────────────────────────────────────────────────────────
+
+/** The accounts a reader checks first, each on Explorer with one plain-English line. */
+function ProofCards({ r }: { r: ReserveView }) {
+  const card = (key: string, title: string, address: string, what: string, extra?: { label: string; value: ReactNode; note?: string }) => (
+    <li key={key} className="bg-(--color-surface) flex min-w-0 list-none flex-col gap-3 border p-6">
+      <Label>{title}</Label>
+      <span className="min-w-0 text-sm">
+        <Explorer value={address} rpc={r.explorerRpc} />
+      </span>
+      <span className="font-body text-(--color-text-2) text-[13px] leading-relaxed text-pretty">{what}</span>
+      {extra && (
+        <span className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t pt-3">
+          <span className="font-body text-(--color-text-3) text-xs">{extra.label}</span>
+          <span className="text-sm">{extra.value}</span>
+          {extra.note && <span className="font-body text-(--color-text-3) text-xs">{extra.note}</span>}
+        </span>
+      )}
+    </li>
+  );
+  return (
+    <section aria-labelledby="proof-h" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <H3 id="proof-h">On-chain, by design</H3>
+        <Link href="/reserve/verify" className="ext-link font-body text-xs">
+          Every account →
+        </Link>
+      </div>
+      <ul className="m-0 grid gap-4 p-0" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))" }}>
+        {card("program", "Program", r.programId, "The code that enforces the reserve's rules. Every deposit, fee and claim payment runs through it.", {
+          label: "Upgrade authority",
+          value: <Explorer value={r.config.admin} rpc={r.explorerRpc} />,
+          note: "Squads multisig",
+        })}
+        {card("reserve", "Reserve token account", r.addresses.reserve, "Where the stable assets sit. Only the program can move them, and only by its rules.")}
+        {card("mint", "BRS mint", r.token.mint, "The token the reserve holds: BRS, a stablecoin pegged to the Brazilian real.", {
+          label: "Freeze authority",
+          value: r.token.freezeAuthority ? <Explorer value={r.token.freezeAuthority} rpc={r.explorerRpc} /> : <Mono style={{ fontSize: 12 }}>none</Mono>,
+          note: r.token.freezeAuthority ? "can freeze any BRS account, the reserve's included" : undefined,
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -100,23 +153,16 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
   const agencies = new Set(active.map((g) => g.agencyId)).size;
   const awaiting = claimsTimeline(l, r.config.payoutSlaSecs, r.now).filter((c) => c.stage === "filed").length;
 
-  const kpis: { label: string; tip: string; value: string; sub: string; href?: string }[] = [
-    { label: "Coverage ratio", tip: "Stable assets ÷ coverage required. Above 100%, the reserve holds more than it must.", value: ratio, sub: "stable assets ÷ required" },
-    {
-      label: "NAV per share",
-      tip: "Net assets (stable assets − open provisions) ÷ shares outstanding. Published on-chain at each refresh.",
-      value: fmtNav(s.navPerShare),
-      sub: `${fmtShares(s.sharesOutstanding)} shares outstanding`,
-      href: "/reserve/capital",
-    },
+  const kpis: { label: string; value: string; def: string; href?: string }[] = [
+    { label: "Coverage ratio", value: ratio, def: "Stable assets held against the cover the reserve must hold." },
+    { label: "NAV per share", value: fmtNav(s.navPerShare), def: "What each share is worth, after open claims are set aside.", href: "/reserve/capital" },
     {
       label: "Remaining cover",
-      tip: "Both legs of every active guarantee, minus what was already paid.",
       value: fmtBrs(s.remainingCoverTotal),
-      sub: `${plural(active.length, "active guarantee")} · ${plural(agencies, "agency", "agencies")}`,
+      def: `Still guaranteed on ${plural(active.length, "active guarantee")} at ${plural(agencies, "agency", "agencies")}.`,
       href: "/reserve/coverage",
     },
-    { label: "Open provisions", tip: "Booked when a claim is filed, until it is paid. Already out of NAV.", value: fmtBrs(s.provisions), sub: `${plural(awaiting, "claim")} awaiting payment`, href: "/reserve/claims" },
+    { label: "Open provisions", value: fmtBrs(s.provisions), def: `Set aside for ${plural(awaiting, "claim")} filed and not yet paid.`, href: "/reserve/claims" },
   ];
 
   const ok = "var(--color-success)";
@@ -150,11 +196,11 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
           const body = (
             <>
               <span className="flex justify-between gap-2">
-                <Label tip={k.tip}>{k.label}</Label>
+                <Label>{k.label}</Label>
                 {k.href && <Mono style={{ fontSize: 12, color: "var(--color-text-3)" }}>→</Mono>}
               </span>
-              <Mono style={{ ...NUM, fontSize: 22, fontWeight: 700, whiteSpace: "nowrap", color: "var(--color-text)" }}>{k.value}</Mono>
-              <Mono style={{ ...NUM, fontSize: 11, color: "var(--color-text-3)" }}>{k.sub}</Mono>
+              <Mono style={{ ...NUM, fontSize: 24, fontWeight: 700, whiteSpace: "nowrap", color: "var(--color-text)" }}>{k.value}</Mono>
+              <span className="font-body text-(--color-text-2) text-[13px] leading-snug text-pretty">{k.def}</span>
             </>
           );
           const cls = "bg-(--color-surface) flex min-w-0 flex-col gap-2.5 border px-6 py-5 no-underline";
@@ -350,8 +396,7 @@ function VerifyCta() {
 
 // ── Side · Recent activity ──────────────────────────────────────────────────
 
-function RecentActivity({ r, l }: { r: ReserveView; l: Ledger }) {
-  const rows = moneyFlows(r.state, l).rows;
+function RecentActivity({ r, rows }: { r: ReserveView; rows: FlowRow[] }) {
   const since = r.now - ACTIVITY_DAYS * 86_400n;
   const recent = rows.filter((x) => x.at !== null && x.at >= since).length;
   const shown = rows.slice(0, ACTIVITY_ROWS);
