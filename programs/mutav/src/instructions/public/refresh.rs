@@ -8,7 +8,7 @@ use anchor_spl::token_interface::TokenAccount;
 use crate::{
     constants::*,
     errors::MutavError,
-    events::{ModeChanged, ReserveFrozenDetected, StateRefreshed},
+    events::{FulfilHaltRaised, ModeChanged, ReserveFrozenDetected, StateRefreshed},
     pricing::{guard_nav, nav_move_exceeds, published_nav},
     solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
@@ -51,6 +51,8 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
     // 1. Frozen reserve token accounts: reported, and a frozen `reserve`
     // does not count in `stable_assets` (fail closed). The tracked
     // `brs_balance` is unchanged.
+    // No adapter in this binary: a reserve with adapters fails closed.
+    crate::instructions::capital::split_adapter_accounts(config, ctx.remaining_accounts)?;
     let a = &ctx.accounts;
     let mut reserve_frozen = false;
     for (account, counts) in [
@@ -89,8 +91,11 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
     // count in between. A frozen reserve counted as 0 is a measured move, and
     // so is the thaw. Only the admin's `clear_fulfil_halt` clears the flag
     // (ADR 0015).
-    let moved_nav = guard_nav(nav, state.inflow_nav);
-    if nav_move_exceeds(state.nav_per_share, moved_nav, max_nav_move_bps) {
+    let (prev_nav, inflow) = (state.nav_per_share, state.inflow_nav);
+    let moved_nav = guard_nav(nav, inflow);
+    let exceeded = nav_move_exceeds(prev_nav, moved_nav, max_nav_move_bps);
+    let raised = exceeded && !state.fulfil_halted;
+    if exceeded {
         state.fulfil_halted = true;
     }
     // The published NAV below includes the inflows: they start the next
@@ -105,7 +110,22 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
     state.mode = to;
     state.last_refresh_ts = now;
     state.last_refresh_slot = clock.slot;
-    let provisions = state.provisions;
+    let (provisions, shares_outstanding, fulfil_halted) = (
+        state.provisions,
+        state.shares_outstanding,
+        state.fulfil_halted,
+    );
+    if raised {
+        emit_cpi!(FulfilHaltRaised {
+            config: config_key,
+            ts: now,
+            prev_nav_per_share: prev_nav,
+            guard_nav: moved_nav,
+            inflow_nav: inflow,
+            max_nav_move_bps,
+            source: HALT_SOURCE_REFRESH,
+        });
+    }
 
     if from != to {
         emit_cpi!(ModeChanged {
@@ -125,6 +145,12 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
         provisions,
         nav_per_share: nav,
         mode: to,
+        prev_nav_per_share: prev_nav,
+        inflow_nav: inflow,
+        guard_nav: moved_nav,
+        shares_outstanding,
+        net_assets: sol.net_assets,
+        fulfil_halted,
     });
     Ok(())
 }
