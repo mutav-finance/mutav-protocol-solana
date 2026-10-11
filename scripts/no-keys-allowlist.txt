@@ -7,7 +7,9 @@
 # refuses non-local URLs (CLAUDE.md: only app/scripts/ may sign).
 app/scripts/*
 scripts/devnet/dry-run.ts
-scripts/devnet/lib/local.ts
+# Signs with in-memory test signers; logs the validator to a file. The CLI
+# runner lives in lib/exec.ts, which is scanned.
+scripts/devnet/lib/local.ts signTransactionMessageWithSigners|Bun\.file\(this\.logPath
 
 # The fixture test of this checker holds one hit per pattern on purpose.
 scripts/test/check-no-keys.test.ts

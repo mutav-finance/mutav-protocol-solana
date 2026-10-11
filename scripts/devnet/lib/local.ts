@@ -1,7 +1,7 @@
 /**
  * Local-only harness for the dry run and the Surfpool fork test: start and
- * stop a local cluster, run the Solana CLIs, and send transactions signed by
- * throwaway in-memory keys. Every function refuses a non-local URL; nothing
+ * stop a local cluster and send transactions signed by throwaway in-memory
+ * keys (the CLI runner is in exec.ts). Every function refuses a non-local URL; nothing
  * here reads a key file (the deployer keypair is created by `solana-keygen`
  * in a temp dir and only its *path* is handed to the Solana CLI).
  */
@@ -27,6 +27,9 @@ import {
 } from '@solana/kit';
 import { isLocalUrl } from './cluster';
 
+/** Re-exported for the fork test and app/scripts, which load this module. */
+export { run } from './exec';
+
 /** Local clusters serve the test-cluster API (airdrops included). */
 export type LocalRpc = Rpc<SolanaRpcApi>;
 
@@ -37,15 +40,6 @@ function assertLocal(url: string) {
 export function tempDir(prefix: string) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   return { dir, remove: () => rmSync(dir, { recursive: true, force: true }) };
-}
-
-/** Run a CLI to completion; throw with its output on failure. */
-export function run(cmd: string[], opts: { quiet?: boolean } = {}): string {
-  const p = Bun.spawnSync(cmd, { stdout: 'pipe', stderr: 'pipe' });
-  const out = p.stdout.toString() + p.stderr.toString();
-  if (p.exitCode !== 0) throw new Error(`${cmd.slice(0, 3).join(' ')} … failed (${p.exitCode}):\n${out}`);
-  if (!opts.quiet) process.stdout.write(out);
-  return p.stdout.toString();
 }
 
 /** A local cluster process (solana-test-validator or surfpool) with guaranteed cleanup. */

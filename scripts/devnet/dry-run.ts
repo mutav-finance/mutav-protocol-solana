@@ -51,7 +51,8 @@ import {
   TOKEN_PROGRAM,
 } from './lib/compose';
 import { postDeployChecks } from './lib/checks';
-import { airdrop, assertNoProcess, LocalCluster, run, send, tempDir } from './lib/local';
+import { run } from './lib/exec';
+import { airdrop, assertNoProcess, LocalCluster, send, tempDir } from './lib/local';
 import { accountData } from './lib/rpc';
 import { deploy } from './deploy';
 

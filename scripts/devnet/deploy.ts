@@ -42,7 +42,7 @@ import { assertConfigCluster, guardCluster, rpcGenesis, type GenesisSource } fro
 import { programDataUpgradeAuthority } from './lib/checks';
 import { programDataAddress } from './lib/compose';
 import { loadConfig, type DeployConfig } from './lib/config';
-import { run } from './lib/local';
+import { run } from './lib/exec';
 import { accountInfo, rpcFor, type ReadOptions } from './lib/rpc';
 import { checkSquadsAccount, squadsVaultAddress } from './lib/squads';
 
