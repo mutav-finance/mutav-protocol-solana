@@ -123,6 +123,17 @@ describe("investor requests", () => {
     expect(by.R1).toMatchObject({ status: "filled", position: null, claimable: 4n, actions: ["claim_assets"] });
   });
 
+  it("offers the owner's cancel on a request the admin parked (ADR 0030)", () => {
+    const rows = investorRequests(
+      "ME",
+      { depositHead: 1n, redeemHead: 1n } as never,
+      { deposits: [dep("D0", "ME", 0n, 2)], redeems: [red("R0", "ME", 0n, { status: 2 })] },
+    );
+    const by = Object.fromEntries(rows.map((r) => [r.address, r]));
+    expect(by.D0).toMatchObject({ status: "parked", position: null, waiting: 5_000n * BRL, claimable: 0n, actions: ["cancel_deposit"] });
+    expect(by.R0).toMatchObject({ status: "parked", position: null, waiting: 3n, claimable: 0n, actions: ["cancel_redeem"] });
+  });
+
   it("is empty without a wallet", () => {
     expect(investorRequests(null, { depositHead: 0n, redeemHead: 0n } as never, { deposits: [], redeems: [] })).toEqual([]);
   });
