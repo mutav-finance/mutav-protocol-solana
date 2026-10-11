@@ -2,7 +2,7 @@
 
 Companion to the storyboard (`storyboard.html`); the two match.
 
-- **Runtime:** 2:45. **Voiceover:** 231 words, verbatim below; three spoken amounts in reais.
+- **Runtime:** 2:45. **Voiceover:** 235 words, verbatim below; three spoken amounts in reais.
 - **Recorded**, not live: silent clips per beat (injected test wallet, no pop-ups), a rough cut with overlays, then the VO recorded to the cut.
 - **Numbers:** ADR 0028 (c = 0.25), Plan B with 6× + 6× cover. Ana, agency names and lease references are fictional.
 - **Overlays (edit):** devnet badge always; coverage meter; corner mini-map with the active component (legend once, F3); "Signed by …" chips; "Coverage gate · refused" chip; at most one honesty label per shot.
@@ -11,8 +11,8 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 | Time | Beat | Frames |
 |---|---|---|
-| 0:00 (12 s) | The stakes | F1 |
-| 0:12 (6 s) | Agency side | F2 |
+| 0:00 (11 s) | The stakes | F1 |
+| 0:11 (7 s) | Agency side | F2 |
 | 0:18 (30 s) | Ana's lease on-chain | F3–F5 |
 | 0:48 (24 s) | The refusal | F6–F7 |
 | 1:12 (38 s) | Rent goes unpaid | F8–F10 |
@@ -23,7 +23,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 > **0:00** Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and every real it promises is backed on Solana.
 >
-> **0:12** Her agency works in MUTAV's platform and never touches a wallet.
+> **0:11** Her agency works in MUTAV's platform. Every lease it signs becomes an account on Solana.
 >
 > **0:18** Our operator puts the lease on-chain: eighteen thousand reais of cover, one account per lease, with an opaque ID. No name, no CPF.
 >
@@ -42,7 +42,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 ## 3. Shot list
 
-**F1 · 0:00 – 0:12 · /reserve (Overview)**: The stakes: Ana needs a guarantor
+**F1 · 0:00 – 0:11 · /reserve (Overview)**: The stakes: Ana needs a guarantor
 - **On screen:** Open on the public reserve page, already loaded: Overview, devnet badge, coverage meter (required R$36,000 / held R$44,000). No wallet. The mini-map sits in the corner with "BRS reserve" active.
 - **VO:** "Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and every real it promises is backed on Solana."
 - **Caption:** Built during the hackathon: Solana program + reserve app
@@ -51,9 +51,9 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Edit:** Product on screen from frame 1; the stakes are in the voice. Slow push-in ≤ 1.3× (motion).
 - **Retake:** Read-only: repeat freely.
 
-**F2 · 0:12 – 0:18 · app.mutav.finance (agency view)**: The agency never touches a wallet
+**F2 · 0:11 – 0:18 · app.mutav.finance (agency view)**: The agency side
 - **On screen:** The agency's view in MUTAV's platform (mutav-app) with Ana's fictional lease. Mini-map: "Agency platform" active.
-- **VO:** "Her agency works in MUTAV's platform and never touches a wallet."
+- **VO:** "Her agency works in MUTAV's platform. Every lease it signs becomes an account on Solana."
 - **Caption:** Agency platform · pre-hackathon · not yet on-chain
 - **Honesty label:** Agency platform · pre-hackathon · not yet on-chain
 - **Proof:** None: off-chain, labelled as such.
