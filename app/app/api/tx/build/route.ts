@@ -26,7 +26,8 @@ export async function POST(req: Request) {
     const env = await guardedEnv();
     const signer = address(body.signer);
     const reserve = await readReserve(env);
-    const ledger = body.request.kind === "refresh" ? await readLedger(env, reserve) : undefined;
+    const needsLedger = body.request.kind === "refresh" || body.request.kind === "fulfil_deposits";
+    const ledger = needsLedger ? await readLedger(env, reserve) : undefined;
     const ctx = { reserve, ledger, allowlist: env.allowlist, env };
 
     if (isAdminKind(body.request) && (body.via ?? "squads") === "squads") {

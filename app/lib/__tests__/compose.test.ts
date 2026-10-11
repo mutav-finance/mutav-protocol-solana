@@ -230,4 +230,68 @@ describe("compose", () => {
     expect(() => assertRelayable(tx, policy)).toThrow(/not fully signed/);
     expect(() => assertRelayable(tx, { ...policy, mutav: WALLET })).toThrow(RelayRefusedError);
   });
+
+  it("request_deposit and request_redeem carry the owner's price limits (0 = none)", async () => {
+    const r = await reserve();
+    const { buildAllowlist, getRequestDepositInstructionDataDecoder, getRequestRedeemInstructionDataDecoder } = await import("@mutav-finance/mutav-protocol-solana");
+    r.config = { ...r.config, investorAllowlistRoot: (await buildAllowlist([WALLET])).root };
+    r.state = { ...r.state, nextRedeemSeq: 4n };
+    const ctx = { reserve: r, allowlist: [WALLET] };
+    const [dep] = await composeInstructions({ kind: "request_deposit", assets: 5n, minSharesOut: 4n }, WALLET, ctx);
+    expect(getRequestDepositInstructionDataDecoder().decode(dep!.data!).minSharesOut).toBe(4n);
+    const [dep0] = await composeInstructions({ kind: "request_deposit", assets: 5n }, WALLET, ctx);
+    expect(getRequestDepositInstructionDataDecoder().decode(dep0!.data!).minSharesOut).toBe(0n);
+    const [red] = await composeInstructions({ kind: "request_redeem", shares: 5n, minAssetsOut: 3n }, WALLET, ctx);
+    expect(getRequestRedeemInstructionDataDecoder().decode(red!.data!).minAssetsOut).toBe(3n);
+    await expect(composeInstructions({ kind: "request_redeem", shares: 5n, minAssetsOut: -1n }, WALLET, ctx)).rejects.toThrow(/price limit/);
+  });
+
+  it("accept_role is signed by the proposed key itself, before it expires", async () => {
+    const r = await reserve();
+    const { getAcceptRoleInstructionDataDecoder } = await import("@mutav-finance/mutav-protocol-solana");
+    r.now = 100n;
+    r.config = { ...r.config, pendingOperator: WALLET, pendingOperatorExpiresAt: 200n, pendingPauser: address("11111111111111111111111111111111"), pendingPauserExpiresAt: 0n } as never;
+    const [ix] = await composeInstructions({ kind: "accept_role", role: 1 }, WALLET, { reserve: r });
+    expect(getAcceptRoleInstructionDataDecoder().decode(ix!.data!).role).toBe(1);
+    const d = describeInstructions([ix!])[0]!;
+    expect(d.accounts.filter((a) => a.signer).map((a) => a.address)).toEqual([WALLET]);
+    // The operator acceptance carries both money accounts for the ownership check.
+    expect(d.accounts.map((a) => a.address)).toEqual(expect.arrayContaining([TREASURY, PAYMENTS]));
+    await expect(composeInstructions({ kind: "accept_role", role: 1 }, PAYMENTS, { reserve: r })).rejects.toThrow(/not the proposed operator/);
+    await expect(composeInstructions({ kind: "accept_role", role: 2 }, WALLET, { reserve: r })).rejects.toThrow(/no pauser handover/);
+    r.now = 201n;
+    await expect(composeInstructions({ kind: "accept_role", role: 1 }, WALLET, { reserve: r })).rejects.toThrow(/expired/);
+  });
+
+  it("cancel_pending is an admin instruction", async () => {
+    const r = await reserve();
+    const [ix] = await composeInstructions({ kind: "cancel_pending", role: 3 }, WALLET, { reserve: r });
+    expect(identifyMutavInstruction(ix!.data!)).toBe(MutavInstruction.CancelPending);
+  });
+
+  it("A9: set_allowlist_root composes the server's ALLOWLIST and refuses a different list", async () => {
+    const r = await reserve();
+    const { buildAllowlist, getSetAllowlistRootInstructionDataDecoder } = await import("@mutav-finance/mutav-protocol-solana");
+    const [ix] = await composeInstructions({ kind: "set_allowlist_root" }, WALLET, { reserve: r, allowlist: [WALLET, TREASURY] });
+    expect(Array.from(getSetAllowlistRootInstructionDataDecoder().decode(ix!.data!).root)).toEqual(Array.from((await buildAllowlist([WALLET, TREASURY])).root));
+    await expect(composeInstructions({ kind: "set_allowlist_root", owners: [TREASURY, WALLET] }, WALLET, { reserve: r, allowlist: [WALLET, TREASURY] })).resolves.toHaveLength(1);
+    await expect(composeInstructions({ kind: "set_allowlist_root", owners: [WALLET] }, WALLET, { reserve: r, allowlist: [WALLET, TREASURY] })).rejects.toThrow(/differ from the server's ALLOWLIST/);
+    await expect(composeInstructions({ kind: "set_allowlist_root" }, WALLET, { reserve: r, allowlist: [] })).rejects.toThrow(/ALLOWLIST is empty/);
+  });
+
+  it("fulfil_deposits stops before a head owner who is off the current allowlist", async () => {
+    const r = await reserve();
+    const { buildAllowlist } = await import("@mutav-finance/mutav-protocol-solana");
+    r.config = { ...r.config, investorAllowlistRoot: (await buildAllowlist([WALLET])).root };
+    const dep = (seq: bigint, owner: string) => ({ address: `D${seq}`, data: { status: 0, seq, owner, assets: 1n, minSharesOut: 0n } });
+    const ledger = (owners: string[]) => ({ guarantees: [], deposits: owners.map((o, i) => dep(2n + BigInt(i), o)) }) as never;
+    // Seqs 2, 3 listed; 4 de-listed: fill 2, with the PDAs of seqs 2 and 3 only.
+    const [ix] = await composeInstructions({ kind: "fulfil_deposits", count: 8 }, WALLET, { reserve: r, allowlist: [WALLET], ledger: ledger([WALLET, WALLET, TREASURY]) });
+    expect(getFulfilDepositsInstructionDataDecoder().decode(ix!.data!).count).toBe(2);
+    expect(describeInstructions([ix!])[0]!.accounts.filter((a) => a.writable && !a.signer).length).toBeGreaterThanOrEqual(2);
+    const all = await composeInstructions({ kind: "fulfil_deposits", count: 8 }, WALLET, { reserve: r, allowlist: [WALLET], ledger: ledger([WALLET, WALLET, WALLET]) });
+    expect(getFulfilDepositsInstructionDataDecoder().decode(all[0]!.data!).count).toBe(8);
+    await expect(composeInstructions({ kind: "fulfil_deposits", count: 8 }, WALLET, { reserve: r, allowlist: [WALLET], ledger: ledger([TREASURY]) })).rejects.toThrow(/seq 2 at the head .* not on the current allowlist/);
+    await expect(composeInstructions({ kind: "fulfil_deposits", count: 8 }, WALLET, { reserve: r, allowlist: [TREASURY], ledger: ledger([WALLET]) })).rejects.toThrow(/does not hash/);
+  });
 });
