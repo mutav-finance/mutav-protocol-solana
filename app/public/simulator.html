@@ -709,7 +709,7 @@ function mutavCompute(p) {
     /* the book: cohorts inside the lease term with cover left */
     var existing = 0, remBefore = 0;
     for (var k = Math.max(1, m - term + 1); k < m; k++) if (cohorts[k] && remPer[k] > 0) { existing += cohorts[k]; remBefore += cohorts[k] * remPer[k]; }
-    /* register_guarantee, in the program's order: per-guarantee cap, per-agency cap (one agency), solvency */
+    /* register_guarantee, in the program's order: per-guarantee cap, per-agency cap (one agency), required coverage */
     var allowed = planned, refusal = null;
     if (planned > 0) {
       var openU = mutavUnits(opening), remU = mutavUnits(remBefore);
@@ -924,7 +924,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     ]},
     { id: 'contracts', t: 'Guarantee contracts', s: 'Contracts', sm: 'the leases you write', f: [
       { sub: 'Book' },
-      { k: 'perMonth', l: 'New leases per month', u: 'leases', step: 1, min: 0, src: 'canonical', i: 'Planned new guarantees each month. 02: ~28 a month toward 170; pilot plan 10. The solvency gate may admit fewer.' },
+      { k: 'perMonth', l: 'New leases per month', u: 'leases', step: 1, min: 0, src: 'canonical', i: 'Planned new guarantees each month. 02: ~28 a month toward 170; pilot plan 10. The coverage gate may admit fewer.' },
       { k: 'months', l: 'Months simulated', u: 'mo', step: 1, min: 1, max: 120, src: 'canonical', i: 'Simulation horizon. 02: ~6-month pilot.' },
       { k: 'leaseTerm', l: 'Lease term', u: 'mo', step: 1, min: 1, src: 'research', i: 'A lease leaves the book after this many months. Typical lease 30 months (06, PY:109).' },
       { sub: 'Price' },
