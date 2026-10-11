@@ -23,6 +23,8 @@ import {
   getI64Encoder,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
   type Address,
@@ -49,6 +51,10 @@ export type GuaranteeRegisteredEvent = {
   refsHash: ReadonlyUint8Array;
   defaultCover: bigint;
   exitCover: bigint;
+  /** Running totals after the registration. */
+  remainingCoverTotal: bigint;
+  coverageRequired: bigint;
+  activeGuarantees: number;
 };
 
 export type GuaranteeRegisteredEventArgs = {
@@ -59,6 +65,10 @@ export type GuaranteeRegisteredEventArgs = {
   refsHash: ReadonlyUint8Array;
   defaultCover: number | bigint;
   exitCover: number | bigint;
+  /** Running totals after the registration. */
+  remainingCoverTotal: number | bigint;
+  coverageRequired: number | bigint;
+  activeGuarantees: number;
 };
 
 /** Gets the encoder for {@link GuaranteeRegisteredEventArgs} event data. */
@@ -72,6 +82,9 @@ export function getGuaranteeRegisteredEventEncoder(): FixedSizeEncoder<Guarantee
       ["refsHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["defaultCover", getU64Encoder()],
       ["exitCover", getU64Encoder()],
+      ["remainingCoverTotal", getU64Encoder()],
+      ["coverageRequired", getU64Encoder()],
+      ["activeGuarantees", getU32Encoder()],
     ]),
     [getConstantEncoder(GUARANTEE_REGISTERED_EVENT_DISCRIMINATOR)],
   );
@@ -88,6 +101,9 @@ export function getGuaranteeRegisteredEventDecoder(): FixedSizeDecoder<Guarantee
       ["refsHash", fixDecoderSize(getBytesDecoder(), 32)],
       ["defaultCover", getU64Decoder()],
       ["exitCover", getU64Decoder()],
+      ["remainingCoverTotal", getU64Decoder()],
+      ["coverageRequired", getU64Decoder()],
+      ["activeGuarantees", getU32Decoder()],
     ]),
     [getConstantDecoder(GUARANTEE_REGISTERED_EVENT_DISCRIMINATOR)],
   );

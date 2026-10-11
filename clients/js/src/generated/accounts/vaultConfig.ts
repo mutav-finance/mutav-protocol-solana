@@ -29,6 +29,8 @@ import {
   getStructEncoder,
   getU16Decoder,
   getU16Encoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
   getU8Decoder,
@@ -133,6 +135,20 @@ export type VaultConfig = {
   /** Pause-only guardian keys. `Pubkey::default()` = empty slot. */
   guardians: Array<Address>;
   /**
+   * Bitmask of capital-flow directions stopped one by one (for example
+   * deposits but not redemptions), separate from the global `paused`.
+   * `0` = none. Read by no instruction of this binary.
+   */
+  disabledOps: number;
+  /** The key whose attestations the reserve accepts. */
+  kycAttester: Address;
+  /** The program that holds the attestations. */
+  attestationProgram: Address;
+  /** The attestation type (schema id) an investor must hold. */
+  requiredAttestationType: ReadonlyUint8Array;
+  /** Bumped to invalidate every attestation issued before. */
+  attesterEpoch: number;
+  /**
    * Zeroed. Never read or written by logic. Holds the planned carves
    * (phase-2 exit parameters, the ADR 0012 config fields) without a
    * migration (spec §14.2, ADR 0019).
@@ -209,6 +225,20 @@ export type VaultConfigArgs = {
   /** Pause-only guardian keys. `Pubkey::default()` = empty slot. */
   guardians: Array<Address>;
   /**
+   * Bitmask of capital-flow directions stopped one by one (for example
+   * deposits but not redemptions), separate from the global `paused`.
+   * `0` = none. Read by no instruction of this binary.
+   */
+  disabledOps: number;
+  /** The key whose attestations the reserve accepts. */
+  kycAttester: Address;
+  /** The program that holds the attestations. */
+  attestationProgram: Address;
+  /** The attestation type (schema id) an investor must hold. */
+  requiredAttestationType: ReadonlyUint8Array;
+  /** Bumped to invalidate every attestation issued before. */
+  attesterEpoch: number;
+  /**
    * Zeroed. Never read or written by logic. Holds the planned carves
    * (phase-2 exit parameters, the ADR 0012 config fields) without a
    * migration (spec §14.2, ADR 0019).
@@ -249,7 +279,12 @@ export function getVaultConfigEncoder(): FixedSizeEncoder<VaultConfigArgs> {
       ["pendingPauser", getAddressEncoder()],
       ["pendingPauserExpiresAt", getI64Encoder()],
       ["guardians", getArrayEncoder(getAddressEncoder(), { size: 3 })],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 512)],
+      ["disabledOps", getU8Encoder()],
+      ["kycAttester", getAddressEncoder()],
+      ["attestationProgram", getAddressEncoder()],
+      ["requiredAttestationType", fixEncoderSize(getBytesEncoder(), 32)],
+      ["attesterEpoch", getU32Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 411)],
     ]),
     (value) => ({ ...value, discriminator: VAULT_CONFIG_DISCRIMINATOR }),
   );
@@ -287,7 +322,12 @@ export function getVaultConfigDecoder(): FixedSizeDecoder<VaultConfig> {
     ["pendingPauser", getAddressDecoder()],
     ["pendingPauserExpiresAt", getI64Decoder()],
     ["guardians", getArrayDecoder(getAddressDecoder(), { size: 3 })],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 512)],
+    ["disabledOps", getU8Decoder()],
+    ["kycAttester", getAddressDecoder()],
+    ["attestationProgram", getAddressDecoder()],
+    ["requiredAttestationType", fixDecoderSize(getBytesDecoder(), 32)],
+    ["attesterEpoch", getU32Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 411)],
   ]);
 }
 

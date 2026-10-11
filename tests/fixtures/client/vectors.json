@@ -1950,9 +1950,12 @@
             "maxClaimPerPeriod": "20000000000",
             "maxCoverPerGuarantee": "30000000000",
             "maxNavMoveBps": 10000,
+            "maxQueueWaitSecs": "0",
+            "maxReinstateAge": "2592000",
             "maxRequest": "30000000000",
             "maxTvl": "100000000000",
-            "minRequest": "1000000000"
+            "minRequest": "1000000000",
+            "stressBuffer": "19000000000"
           },
           "coverageRatioBps": 10000,
           "feeTakeBps": 2000,
@@ -1961,16 +1964,103 @@
           "pauser": "9ZdTNFBzTn3qqAKNwLtxC3zxTnJWXFTXM9FXftpvUua6"
         }
       },
-      "data": "afaf6d1f0d989bed484e285b1cd56c942bab87309ed5c5733ed01b847fe371d85ca1ff2589fa87f3b2484a2b8d203abfe53e21aa0d48a53f61c89bcdde1e2fb439d24c13ec6bb05f7f394cf6aae87b8b55da6900d4918fa2cbde4a69b56949d7dfd8908dcfe21977c2217488eea34559c2f576b8c090a3c2bc03406be1ddbf54296b7ff8b0c93fa51027d00700e876481700000000ac23fc0600000000e40b540200000000c817a80400000000ca9a3b0000000000ac23fc060000001027",
+      "data": "afaf6d1f0d989bed484e285b1cd56c942bab87309ed5c5733ed01b847fe371d85ca1ff2589fa87f3b2484a2b8d203abfe53e21aa0d48a53f61c89bcdde1e2fb439d24c13ec6bb05f7f394cf6aae87b8b55da6900d4918fa2cbde4a69b56949d7dfd8908dcfe21977c2217488eea34559c2f576b8c090a3c2bc03406be1ddbf54296b7ff8b0c93fa51027d00700e876481700000000ac23fc0600000000e40b540200000000c817a80400000000ca9a3b0000000000ac23fc06000000102700fe7c6c040000000000000000000000008d270000000000",
       "name": "initialize"
     },
     {
       "args": {
-        "operator": "CzwWD7uMkd8mBYgYZFVwCQvLkuDRra34c8BQZAASvN8W",
-        "pauser": "9ZdTNFBzTn3qqAKNwLtxC3zxTnJWXFTXM9FXftpvUua6"
+        "params": [
+          {
+            "__kind": "CoverageRatioBps",
+            "fields": [
+              1000
+            ]
+          },
+          {
+            "__kind": "MaxTvl",
+            "fields": [
+              "300000000000"
+            ]
+          },
+          {
+            "__kind": "MutavCapitalWallet",
+            "fields": [
+              "CzwWD7uMkd8mBYgYZFVwCQvLkuDRra34c8BQZAASvN8W"
+            ]
+          },
+          {
+            "__kind": "MaxReinstateAge",
+            "fields": [
+              "-1"
+            ]
+          }
+        ]
       },
-      "data": "775681a13717fa0cb2484a2b8d203abfe53e21aa0d48a53f61c89bcdde1e2fb439d24c13ec6bb05f7f394cf6aae87b8b55da6900d4918fa2cbde4a69b56949d7dfd8908dcfe21977",
-      "name": "setRoles"
+      "data": "6c9e9aafd46234420400000000e8030400b864d94500000003b2484a2b8d203abfe53e21aa0d48a53f61c89bcdde1e2fb439d24c13ec6bb05f0dffffffffffffffff",
+      "name": "setConfig"
+    },
+    {
+      "args": {
+        "key": "9ZdTNFBzTn3qqAKNwLtxC3zxTnJWXFTXM9FXftpvUua6",
+        "role": 2
+      },
+      "data": "4f05a05a157fc305027f394cf6aae87b8b55da6900d4918fa2cbde4a69b56949d7dfd8908dcfe21977",
+      "name": "proposeRole"
+    },
+    {
+      "args": {
+        "role": 1
+      },
+      "data": "341907e7c4eb77fd01",
+      "name": "acceptRole"
+    },
+    {
+      "args": {
+        "key": "CzwWD7uMkd8mBYgYZFVwCQvLkuDRra34c8BQZAASvN8W"
+      },
+      "data": "79d6c7d4572775eab2484a2b8d203abfe53e21aa0d48a53f61c89bcdde1e2fb439d24c13ec6bb05f",
+      "name": "proposeAdmin"
+    },
+    {
+      "args": {},
+      "data": "702a2d5a74b50daa",
+      "name": "acceptAdmin"
+    },
+    {
+      "args": {
+        "role": 3
+      },
+      "data": "4a576df240c0974703",
+      "name": "cancelPending"
+    },
+    {
+      "args": {
+        "guardians": [
+          "EWydCHh9yPGgGE5WvLTyAhaQ4CGbjzT3qpkF8Rto4GJy",
+          "11111111111111111111111111111111",
+          "45mL3Di3rLJ3WwPdDFekQNHXv3prMRHKupk4E2zG14dL"
+        ]
+      },
+      "data": "a6458cb79da9fd28c8d5cc6ba7d69ba47a8f9360752baa2fa21d6920288766ab106aba02f94a46e600000000000000000000000000000000000000000000000000000000000000002dcb819142bad85c7ee558c161893316dc284f287c69f13038745dd98bb7cff7",
+      "name": "setGuardians"
+    },
+    {
+      "args": {},
+      "data": "661fdc1114904f4e",
+      "name": "revokePauser"
+    },
+    {
+      "args": {},
+      "data": "9ebb73cd3661bdd7",
+      "name": "setTreasuryAccount"
+    },
+    {
+      "args": {
+        "id": "c32ec64948451a9b5cf9ff735f99b4b5fdfe565a09a95494c54afff651d4bd1a",
+        "reason": 2
+      },
+      "data": "d733368a2bf14fe7c32ec64948451a9b5cf9ff735f99b4b5fdfe565a09a95494c54afff651d4bd1a02",
+      "name": "closeGuarantee"
     },
     {
       "args": {
@@ -2011,11 +2101,10 @@
     },
     {
       "args": {
-        "amount": "18446744073709551615",
-        "leg": 1,
+        "expectedAmount": "18446744073709551615",
         "noticeRefHash": "a95b0c47f0524784efb870fe7070d9965b309f63a57cdb79270e0171c1d55dae"
       },
-      "data": "497fb06e4308ddaa01ffffffffffffffffa95b0c47f0524784efb870fe7070d9965b309f63a57cdb79270e0171c1d55dae",
+      "data": "497fb06e4308ddaaa95b0c47f0524784efb870fe7070d9965b309f63a57cdb79270e0171c1d55daeffffffffffffffff",
       "name": "payClaim"
     },
     {
@@ -2029,43 +2118,60 @@
     {
       "args": {
         "assets": "5000000000",
-        "proof": [
-          "e82314743f58ecc67141522c453e34a92408db2825e891e05440a8c9ee05ae74",
-          "64a7878ddd08f909026f9cbd24060fd4957ab4d826fd5efd87760f861fe02ec1"
-        ]
+        "eligibility": {
+          "__kind": "Merkle",
+          "proof": [
+            "e82314743f58ecc67141522c453e34a92408db2825e891e05440a8c9ee05ae74",
+            "64a7878ddd08f909026f9cbd24060fd4957ab4d826fd5efd87760f861fe02ec1"
+          ]
+        },
+        "minSharesOut": "4950000000"
       },
-      "data": "f3cac5d78761d56d00f2052a0100000002000000e82314743f58ecc67141522c453e34a92408db2825e891e05440a8c9ee05ae7464a7878ddd08f909026f9cbd24060fd4957ab4d826fd5efd87760f861fe02ec1",
+      "data": "f3cac5d78761d56d00f2052a0100000080010b27010000000002000000e82314743f58ecc67141522c453e34a92408db2825e891e05440a8c9ee05ae7464a7878ddd08f909026f9cbd24060fd4957ab4d826fd5efd87760f861fe02ec1",
       "name": "requestDeposit"
     },
     {
       "args": {
-        "proof": [],
+        "eligibility": {
+          "__kind": "Merkle",
+          "proof": []
+        },
+        "minAssetsOut": "0",
         "shares": "1"
       },
-      "data": "69312c26cff121ad010000000000000000000000",
+      "data": "69312c26cff121ad010000000000000000000000000000000000000000",
       "name": "requestRedeem"
     },
     {
       "args": {
-        "count": 8
+        "count": 8,
+        "navBounds": {
+          "max": "1010000000",
+          "min": "990000000"
+        }
       },
-      "data": "3b6800a2b8d5b8db08",
+      "data": "3b6800a2b8d5b8db088033023b000000008060333c00000000",
       "name": "fulfilDeposits"
     },
     {
       "args": {
         "count": 3,
-        "maxAssets": "18446744073709551615"
+        "maxAssets": "18446744073709551615",
+        "navBounds": {
+          "max": "1010000000",
+          "min": "990000000"
+        }
       },
-      "data": "fb2d01fd4199bccb03ffffffffffffffff",
+      "data": "fb2d01fd4199bccb03ffffffffffffffff8033023b000000008060333c00000000",
       "name": "fulfilRedeems"
     },
     {
       "args": {
-        "max": 255
+        "max": 255,
+        "queue": 2
       },
-      "data": "6fb58db179c85c14ff",
-      "name": "advanceQueueHeads"
+      "data": "fdfd08f0acda65b402ff",
+      "name": "advanceQueueHead"
     },
     {
       "args": {},
@@ -2078,8 +2184,13 @@
       "name": "pause"
     },
     {
-      "args": {},
-      "data": "485c000564d6bb27",
+      "args": {
+        "navBounds": {
+          "max": "1010000000",
+          "min": "990000000"
+        }
+      },
+      "data": "485c000564d6bb278033023b000000008060333c00000000",
       "name": "clearFulfilHalt"
     },
     {
@@ -3574,6 +3685,7 @@
       "reserve": "GwxWFRSgG5N2j1dgXAJuhLtKmbQ4rvkffBwDnf3jmfZe",
       "shareMint": "8YjrZLUC7M52gXoFvmh8WRXmcexQRj4qX5Fi6PUo9cSf",
       "state": "CuVJUrrXYzaXJr4P97yxjAN6gNGofQo8wS5NGNFXchn7",
+      "unsolicited": "6FcBfz3y7yYztoWvzofAu2pyEE7rnDUKGQW3gBeTXdL7",
       "vaultAuthority": "BSPjvvD6wmmCA7QXSthACnjAJVz1BmhqDsf4CKzQRoSk"
     },
     "inputs": {

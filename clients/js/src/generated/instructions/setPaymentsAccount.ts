@@ -133,7 +133,8 @@ export type SetPaymentsAccountInput<
   config: TAccountConfig;
   /**
    * The new payments token account (BRS). Its owner is MUTAV's payments
-   * wallet, an off-chain fact; the program records the account.
+   * wallet, an off-chain fact; the program records the account. It may
+   * not be owned by the operator (ADR 0020).
    */
   paymentsAccount: TAccountPaymentsAccount;
   /** The current treasury token account, to compare (spec §2.1). */
@@ -273,7 +274,8 @@ export type ParsedSetPaymentsAccountInstruction<
     config: TAccountMetas[1];
     /**
      * The new payments token account (BRS). Its owner is MUTAV's payments
-     * wallet, an off-chain fact; the program records the account.
+     * wallet, an off-chain fact; the program records the account. It may
+     * not be owned by the operator (ADR 0020).
      */
     paymentsAccount: TAccountMetas[2];
     /** The current treasury token account, to compare (spec §2.1). */

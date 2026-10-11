@@ -10,25 +10,21 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressDecoder,
-  getAddressEncoder,
+  getArrayDecoder,
+  getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
-  getU16Decoder,
-  getU16Encoder,
-  getU64Decoder,
-  getU64Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
   SolanaError,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
   type Address,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+  type Codec,
+  type Decoder,
+  type Encoder,
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
@@ -49,10 +45,10 @@ import {
 import { findStatePda } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 import {
-  getCapsInputDecoder,
-  getCapsInputEncoder,
-  type CapsInput,
-  type CapsInputArgs,
+  getConfigParamDecoder,
+  getConfigParamEncoder,
+  type ConfigParam,
+  type ConfigParamArgs,
 } from "../types";
 
 export const SET_CONFIG_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
@@ -105,47 +101,29 @@ export type SetConfigInstruction<
 
 export type SetConfigInstructionData = {
   discriminator: ReadonlyUint8Array;
-  coverageRatioBps: number;
-  feeTakeBps: number;
-  featureFlags: bigint;
-  mutavCapitalWallet: Address;
-  caps: CapsInput;
+  params: Array<ConfigParam>;
 };
 
-export type SetConfigInstructionDataArgs = {
-  coverageRatioBps: number;
-  feeTakeBps: number;
-  featureFlags: number | bigint;
-  mutavCapitalWallet: Address;
-  caps: CapsInputArgs;
-};
+export type SetConfigInstructionDataArgs = { params: Array<ConfigParamArgs> };
 
-export function getSetConfigInstructionDataEncoder(): FixedSizeEncoder<SetConfigInstructionDataArgs> {
+export function getSetConfigInstructionDataEncoder(): Encoder<SetConfigInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
-      ["coverageRatioBps", getU16Encoder()],
-      ["feeTakeBps", getU16Encoder()],
-      ["featureFlags", getU64Encoder()],
-      ["mutavCapitalWallet", getAddressEncoder()],
-      ["caps", getCapsInputEncoder()],
+      ["params", getArrayEncoder(getConfigParamEncoder())],
     ]),
     (value) => ({ ...value, discriminator: SET_CONFIG_DISCRIMINATOR }),
   );
 }
 
-export function getSetConfigInstructionDataDecoder(): FixedSizeDecoder<SetConfigInstructionData> {
+export function getSetConfigInstructionDataDecoder(): Decoder<SetConfigInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
-    ["coverageRatioBps", getU16Decoder()],
-    ["feeTakeBps", getU16Decoder()],
-    ["featureFlags", getU64Decoder()],
-    ["mutavCapitalWallet", getAddressDecoder()],
-    ["caps", getCapsInputDecoder()],
+    ["params", getArrayDecoder(getConfigParamDecoder())],
   ]);
 }
 
-export function getSetConfigInstructionDataCodec(): FixedSizeCodec<
+export function getSetConfigInstructionDataCodec(): Codec<
   SetConfigInstructionDataArgs,
   SetConfigInstructionData
 > {
@@ -172,19 +150,15 @@ export type SetConfigAsyncInput<
   /** Its cached `coverage_required` follows a change of `c`. */
   state?: TAccountState;
   /**
-   * The treasury token account after this update (the current one, or a
-   * new one).
+   * The current treasury token account, to check the money flows of the
+   * resulting config (spec §2.1).
    */
   treasuryAccount: TAccountTreasuryAccount;
-  /** The current payments token account, to compare owners (spec §2.1). */
+  /** The current payments token account, likewise. */
   paymentsAccount: TAccountPaymentsAccount;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
-  coverageRatioBps: SetConfigInstructionDataArgs["coverageRatioBps"];
-  feeTakeBps: SetConfigInstructionDataArgs["feeTakeBps"];
-  featureFlags: SetConfigInstructionDataArgs["featureFlags"];
-  mutavCapitalWallet: SetConfigInstructionDataArgs["mutavCapitalWallet"];
-  caps: SetConfigInstructionDataArgs["caps"];
+  params: SetConfigInstructionDataArgs["params"];
 };
 
 export async function getSetConfigInstructionAsync<
@@ -357,19 +331,15 @@ export type SetConfigInput<
   /** Its cached `coverage_required` follows a change of `c`. */
   state: TAccountState;
   /**
-   * The treasury token account after this update (the current one, or a
-   * new one).
+   * The current treasury token account, to check the money flows of the
+   * resulting config (spec §2.1).
    */
   treasuryAccount: TAccountTreasuryAccount;
-  /** The current payments token account, to compare owners (spec §2.1). */
+  /** The current payments token account, likewise. */
   paymentsAccount: TAccountPaymentsAccount;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
-  coverageRatioBps: SetConfigInstructionDataArgs["coverageRatioBps"];
-  feeTakeBps: SetConfigInstructionDataArgs["feeTakeBps"];
-  featureFlags: SetConfigInstructionDataArgs["featureFlags"];
-  mutavCapitalWallet: SetConfigInstructionDataArgs["mutavCapitalWallet"];
-  caps: SetConfigInstructionDataArgs["caps"];
+  params: SetConfigInstructionDataArgs["params"];
 };
 
 export function getSetConfigInstruction<
@@ -521,11 +491,11 @@ export type ParsedSetConfigInstruction<
     /** Its cached `coverage_required` follows a change of `c`. */
     state: TAccountMetas[2];
     /**
-     * The treasury token account after this update (the current one, or a
-     * new one).
+     * The current treasury token account, to check the money flows of the
+     * resulting config (spec §2.1).
      */
     treasuryAccount: TAccountMetas[3];
-    /** The current payments token account, to compare owners (spec §2.1). */
+    /** The current payments token account, likewise. */
     paymentsAccount: TAccountMetas[4];
     eventAuthority: TAccountMetas[5];
     program: TAccountMetas[6];

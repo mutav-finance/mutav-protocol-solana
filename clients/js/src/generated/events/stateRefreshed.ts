@@ -12,6 +12,8 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
+  getBooleanDecoder,
+  getBooleanEncoder,
   getBytesEncoder,
   getConstantDecoder,
   getConstantEncoder,
@@ -50,6 +52,17 @@ export type StateRefreshedEvent = {
   provisions: bigint;
   navPerShare: bigint;
   mode: number;
+  /**
+   * The NAV-move guard's inputs (spec §7): the previous published NAV,
+   * the NAV per share verified inflows added since, and the NAV the guard
+   * compared (net of those inflows).
+   */
+  prevNavPerShare: bigint;
+  inflowNav: bigint;
+  guardNav: bigint;
+  sharesOutstanding: bigint;
+  netAssets: bigint;
+  fulfilHalted: boolean;
 };
 
 export type StateRefreshedEventArgs = {
@@ -61,6 +74,17 @@ export type StateRefreshedEventArgs = {
   provisions: number | bigint;
   navPerShare: number | bigint;
   mode: number;
+  /**
+   * The NAV-move guard's inputs (spec §7): the previous published NAV,
+   * the NAV per share verified inflows added since, and the NAV the guard
+   * compared (net of those inflows).
+   */
+  prevNavPerShare: number | bigint;
+  inflowNav: number | bigint;
+  guardNav: number | bigint;
+  sharesOutstanding: number | bigint;
+  netAssets: number | bigint;
+  fulfilHalted: boolean;
 };
 
 /** Gets the encoder for {@link StateRefreshedEventArgs} event data. */
@@ -75,6 +99,12 @@ export function getStateRefreshedEventEncoder(): FixedSizeEncoder<StateRefreshed
       ["provisions", getU64Encoder()],
       ["navPerShare", getU64Encoder()],
       ["mode", getU8Encoder()],
+      ["prevNavPerShare", getU64Encoder()],
+      ["inflowNav", getU64Encoder()],
+      ["guardNav", getU64Encoder()],
+      ["sharesOutstanding", getU64Encoder()],
+      ["netAssets", getU64Encoder()],
+      ["fulfilHalted", getBooleanEncoder()],
     ]),
     [getConstantEncoder(STATE_REFRESHED_EVENT_DISCRIMINATOR)],
   );
@@ -92,6 +122,12 @@ export function getStateRefreshedEventDecoder(): FixedSizeDecoder<StateRefreshed
       ["provisions", getU64Decoder()],
       ["navPerShare", getU64Decoder()],
       ["mode", getU8Decoder()],
+      ["prevNavPerShare", getU64Decoder()],
+      ["inflowNav", getU64Decoder()],
+      ["guardNav", getU64Decoder()],
+      ["sharesOutstanding", getU64Decoder()],
+      ["netAssets", getU64Decoder()],
+      ["fulfilHalted", getBooleanDecoder()],
     ]),
     [getConstantDecoder(STATE_REFRESHED_EVENT_DISCRIMINATOR)],
   );

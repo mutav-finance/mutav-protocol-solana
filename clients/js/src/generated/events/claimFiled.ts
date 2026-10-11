@@ -50,6 +50,12 @@ export type ClaimFiledEvent = {
   leg: number;
   amount: bigint;
   noticeRefHash: ReadonlyUint8Array;
+  /**
+   * `VaultState.provisions` and the cached `coverage_required` after the
+   * filing.
+   */
+  provisionsAfter: bigint;
+  coverageRequiredAfter: bigint;
 };
 
 export type ClaimFiledEventArgs = {
@@ -59,6 +65,12 @@ export type ClaimFiledEventArgs = {
   leg: number;
   amount: number | bigint;
   noticeRefHash: ReadonlyUint8Array;
+  /**
+   * `VaultState.provisions` and the cached `coverage_required` after the
+   * filing.
+   */
+  provisionsAfter: number | bigint;
+  coverageRequiredAfter: number | bigint;
 };
 
 /** Gets the encoder for {@link ClaimFiledEventArgs} event data. */
@@ -71,6 +83,8 @@ export function getClaimFiledEventEncoder(): FixedSizeEncoder<ClaimFiledEventArg
       ["leg", getU8Encoder()],
       ["amount", getU64Encoder()],
       ["noticeRefHash", fixEncoderSize(getBytesEncoder(), 32)],
+      ["provisionsAfter", getU64Encoder()],
+      ["coverageRequiredAfter", getU64Encoder()],
     ]),
     [getConstantEncoder(CLAIM_FILED_EVENT_DISCRIMINATOR)],
   );
@@ -86,6 +100,8 @@ export function getClaimFiledEventDecoder(): FixedSizeDecoder<ClaimFiledEvent> {
       ["leg", getU8Decoder()],
       ["amount", getU64Decoder()],
       ["noticeRefHash", fixDecoderSize(getBytesDecoder(), 32)],
+      ["provisionsAfter", getU64Decoder()],
+      ["coverageRequiredAfter", getU64Decoder()],
     ]),
     [getConstantDecoder(CLAIM_FILED_EVENT_DISCRIMINATOR)],
   );

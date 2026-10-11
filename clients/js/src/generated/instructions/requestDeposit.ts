@@ -10,8 +10,6 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getArrayDecoder,
-  getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getStructDecoder,
@@ -46,6 +44,12 @@ import {
 } from "@solana/kit/program-client-core";
 import { findPendingDepositsPda, findStatePda } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
+import {
+  getEligibilityDecoder,
+  getEligibilityEncoder,
+  type Eligibility,
+  type EligibilityArgs,
+} from "../types";
 
 export const REQUEST_DEPOSIT_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array(
   [243, 202, 197, 215, 135, 97, 213, 109],
@@ -118,12 +122,14 @@ export type RequestDepositInstruction<
 export type RequestDepositInstructionData = {
   discriminator: ReadonlyUint8Array;
   assets: bigint;
-  proof: Array<ReadonlyUint8Array>;
+  minSharesOut: bigint;
+  eligibility: Eligibility;
 };
 
 export type RequestDepositInstructionDataArgs = {
   assets: number | bigint;
-  proof: Array<ReadonlyUint8Array>;
+  minSharesOut: number | bigint;
+  eligibility: EligibilityArgs;
 };
 
 export function getRequestDepositInstructionDataEncoder(): Encoder<RequestDepositInstructionDataArgs> {
@@ -131,7 +137,8 @@ export function getRequestDepositInstructionDataEncoder(): Encoder<RequestDeposi
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["assets", getU64Encoder()],
-      ["proof", getArrayEncoder(fixEncoderSize(getBytesEncoder(), 32))],
+      ["minSharesOut", getU64Encoder()],
+      ["eligibility", getEligibilityEncoder()],
     ]),
     (value) => ({ ...value, discriminator: REQUEST_DEPOSIT_DISCRIMINATOR }),
   );
@@ -141,7 +148,8 @@ export function getRequestDepositInstructionDataDecoder(): Decoder<RequestDeposi
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["assets", getU64Decoder()],
-    ["proof", getArrayDecoder(fixDecoderSize(getBytesDecoder(), 32))],
+    ["minSharesOut", getU64Decoder()],
+    ["eligibility", getEligibilityDecoder()],
   ]);
 }
 
@@ -187,7 +195,8 @@ export type RequestDepositAsyncInput<
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   assets: RequestDepositInstructionDataArgs["assets"];
-  proof: RequestDepositInstructionDataArgs["proof"];
+  minSharesOut: RequestDepositInstructionDataArgs["minSharesOut"];
+  eligibility: RequestDepositInstructionDataArgs["eligibility"];
 };
 
 export async function getRequestDepositInstructionAsync<
@@ -454,7 +463,8 @@ export type RequestDepositInput<
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   assets: RequestDepositInstructionDataArgs["assets"];
-  proof: RequestDepositInstructionDataArgs["proof"];
+  minSharesOut: RequestDepositInstructionDataArgs["minSharesOut"];
+  eligibility: RequestDepositInstructionDataArgs["eligibility"];
 };
 
 export function getRequestDepositInstruction<

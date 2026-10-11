@@ -72,7 +72,6 @@ export type SweepIncomeInstruction<
   TAccountIncomeReceipt extends string | AccountMeta<string> = string,
   TAccountIncomeInbox extends string | AccountMeta<string> = string,
   TAccountReserve extends string | AccountMeta<string> = string,
-  TAccountTreasuryAccount extends string | AccountMeta<string> = string,
   TAccountVaultAuthority extends string | AccountMeta<string> = string,
   TAccountReserveMint extends string | AccountMeta<string> = string,
   TAccountTokenProgram extends string | AccountMeta<string> =
@@ -106,9 +105,6 @@ export type SweepIncomeInstruction<
       TAccountReserve extends string
         ? WritableAccount<TAccountReserve>
         : TAccountReserve,
-      TAccountTreasuryAccount extends string
-        ? WritableAccount<TAccountTreasuryAccount>
-        : TAccountTreasuryAccount,
       TAccountVaultAuthority extends string
         ? ReadonlyAccount<TAccountVaultAuthority>
         : TAccountVaultAuthority,
@@ -187,8 +183,6 @@ export type SweepIncomeAsyncInput<
     InstructionAccountInput,
   TAccountIncomeInbox extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
-  TAccountTreasuryAccount extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountVaultAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput = InstructionAccountInput,
@@ -217,12 +211,6 @@ export type SweepIncomeAsyncInput<
   incomeInbox: TAccountIncomeInbox;
   reserve?: TAccountReserve;
   /**
-   * The whitelisted MUTAV treasury. Receives nothing: there is no take on
-   * issuer income (ADR 0019). Kept in the account list until the
-   * interface change that drops it.
-   */
-  treasuryAccount: TAccountTreasuryAccount;
-  /**
    * The vault authority: owns the inbox and `reserve` and signs the
    * transfers.
    */
@@ -245,7 +233,6 @@ export async function getSweepIncomeInstructionAsync<
   TAccountIncomeReceipt extends InstructionAccountInput,
   TAccountIncomeInbox extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
-  TAccountTreasuryAccount extends InstructionAccountInput,
   TAccountVaultAuthority extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput,
@@ -262,7 +249,6 @@ export async function getSweepIncomeInstructionAsync<
     TAccountIncomeReceipt,
     TAccountIncomeInbox,
     TAccountReserve,
-    TAccountTreasuryAccount,
     TAccountVaultAuthority,
     TAccountReserveMint,
     TAccountTokenProgram,
@@ -298,10 +284,6 @@ export async function getSweepIncomeInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountReserve,
       InstructionAccountInputAddress<TAccountReserve>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountTreasuryAccount,
-      InstructionAccountInputAddress<TAccountTreasuryAccount>
     >,
     ResolvedInstructionAccountMeta<
       TAccountVaultAuthority,
@@ -360,11 +342,6 @@ export async function getSweepIncomeInstructionAsync<
     },
     reserve: {
       value: input.reserve ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
-    treasuryAccount: {
-      value: input.treasuryAccount ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -474,7 +451,6 @@ export async function getSweepIncomeInstructionAsync<
       getAccountMeta("incomeReceipt", accounts.incomeReceipt),
       getAccountMeta("incomeInbox", accounts.incomeInbox),
       getAccountMeta("reserve", accounts.reserve),
-      getAccountMeta("treasuryAccount", accounts.treasuryAccount),
       getAccountMeta("vaultAuthority", accounts.vaultAuthority),
       getAccountMeta("reserveMint", accounts.reserveMint),
       getAccountMeta("tokenProgram", accounts.tokenProgram),
@@ -512,10 +488,6 @@ export async function getSweepIncomeInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountReserve,
       InstructionAccountInputAddress<TAccountReserve>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountTreasuryAccount,
-      InstructionAccountInputAddress<TAccountTreasuryAccount>
     >,
     ResolvedInstructionAccountMeta<
       TAccountVaultAuthority,
@@ -556,8 +528,6 @@ export type SweepIncomeInput<
     InstructionAccountInput,
   TAccountIncomeInbox extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
-  TAccountTreasuryAccount extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountVaultAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput = InstructionAccountInput,
@@ -586,12 +556,6 @@ export type SweepIncomeInput<
   incomeInbox: TAccountIncomeInbox;
   reserve: TAccountReserve;
   /**
-   * The whitelisted MUTAV treasury. Receives nothing: there is no take on
-   * issuer income (ADR 0019). Kept in the account list until the
-   * interface change that drops it.
-   */
-  treasuryAccount: TAccountTreasuryAccount;
-  /**
    * The vault authority: owns the inbox and `reserve` and signs the
    * transfers.
    */
@@ -614,7 +578,6 @@ export function getSweepIncomeInstruction<
   TAccountIncomeReceipt extends InstructionAccountInput,
   TAccountIncomeInbox extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
-  TAccountTreasuryAccount extends InstructionAccountInput,
   TAccountVaultAuthority extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput,
@@ -631,7 +594,6 @@ export function getSweepIncomeInstruction<
     TAccountIncomeReceipt,
     TAccountIncomeInbox,
     TAccountReserve,
-    TAccountTreasuryAccount,
     TAccountVaultAuthority,
     TAccountReserveMint,
     TAccountTokenProgram,
@@ -666,10 +628,6 @@ export function getSweepIncomeInstruction<
   ResolvedInstructionAccountMeta<
     TAccountReserve,
     InstructionAccountInputAddress<TAccountReserve>
-  >,
-  ResolvedInstructionAccountMeta<
-    TAccountTreasuryAccount,
-    InstructionAccountInputAddress<TAccountTreasuryAccount>
   >,
   ResolvedInstructionAccountMeta<
     TAccountVaultAuthority,
@@ -727,11 +685,6 @@ export function getSweepIncomeInstruction<
     },
     reserve: {
       value: input.reserve ?? null,
-      isSigner: false,
-      isWritable: true,
-    },
-    treasuryAccount: {
-      value: input.treasuryAccount ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -793,7 +746,6 @@ export function getSweepIncomeInstruction<
       getAccountMeta("incomeReceipt", accounts.incomeReceipt),
       getAccountMeta("incomeInbox", accounts.incomeInbox),
       getAccountMeta("reserve", accounts.reserve),
-      getAccountMeta("treasuryAccount", accounts.treasuryAccount),
       getAccountMeta("vaultAuthority", accounts.vaultAuthority),
       getAccountMeta("reserveMint", accounts.reserveMint),
       getAccountMeta("tokenProgram", accounts.tokenProgram),
@@ -831,10 +783,6 @@ export function getSweepIncomeInstruction<
     ResolvedInstructionAccountMeta<
       TAccountReserve,
       InstructionAccountInputAddress<TAccountReserve>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountTreasuryAccount,
-      InstructionAccountInputAddress<TAccountTreasuryAccount>
     >,
     ResolvedInstructionAccountMeta<
       TAccountVaultAuthority,
@@ -889,22 +837,16 @@ export type ParsedSweepIncomeInstruction<
     incomeInbox: TAccountMetas[4];
     reserve: TAccountMetas[5];
     /**
-     * The whitelisted MUTAV treasury. Receives nothing: there is no take on
-     * issuer income (ADR 0019). Kept in the account list until the
-     * interface change that drops it.
-     */
-    treasuryAccount: TAccountMetas[6];
-    /**
      * The vault authority: owns the inbox and `reserve` and signs the
      * transfers.
      */
-    vaultAuthority: TAccountMetas[7];
-    reserveMint: TAccountMetas[8];
-    tokenProgram: TAccountMetas[9];
-    payer: TAccountMetas[10];
-    systemProgram: TAccountMetas[11];
-    eventAuthority: TAccountMetas[12];
-    program: TAccountMetas[13];
+    vaultAuthority: TAccountMetas[6];
+    reserveMint: TAccountMetas[7];
+    tokenProgram: TAccountMetas[8];
+    payer: TAccountMetas[9];
+    systemProgram: TAccountMetas[10];
+    eventAuthority: TAccountMetas[11];
+    program: TAccountMetas[12];
   };
   data: SweepIncomeInstructionData;
 };
@@ -917,12 +859,12 @@ export function parseSweepIncomeInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedSweepIncomeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 14) {
+  if (instruction.accounts.length < 13) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 14,
+        expectedAccountMetas: 13,
       },
     );
   }
@@ -941,7 +883,6 @@ export function parseSweepIncomeInstruction<
       incomeReceipt: getNextAccount(),
       incomeInbox: getNextAccount(),
       reserve: getNextAccount(),
-      treasuryAccount: getNextAccount(),
       vaultAuthority: getNextAccount(),
       reserveMint: getNextAccount(),
       tokenProgram: getNextAccount(),

@@ -54,6 +54,7 @@ import {
   findReservePda,
   findShareMintPda,
   findStatePda,
+  findUnsolicitedPda,
   findVaultAuthorityPda,
 } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
@@ -86,6 +87,7 @@ export type InitializeInstruction<
   TAccountPendingDeposits extends string | AccountMeta<string> = string,
   TAccountPendingRedemptions extends string | AccountMeta<string> = string,
   TAccountClaims extends string | AccountMeta<string> = string,
+  TAccountUnsolicited extends string | AccountMeta<string> = string,
   TAccountIncomeInbox extends string | AccountMeta<string> = string,
   TAccountTreasuryAccount extends string | AccountMeta<string> = string,
   TAccountPaymentsAccount extends string | AccountMeta<string> = string,
@@ -141,6 +143,9 @@ export type InitializeInstruction<
       TAccountClaims extends string
         ? WritableAccount<TAccountClaims>
         : TAccountClaims,
+      TAccountUnsolicited extends string
+        ? WritableAccount<TAccountUnsolicited>
+        : TAccountUnsolicited,
       TAccountIncomeInbox extends string
         ? WritableAccount<TAccountIncomeInbox>
         : TAccountIncomeInbox,
@@ -251,6 +256,7 @@ export type InitializeAsyncInput<
   TAccountPendingRedemptions extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountClaims extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUnsolicited extends InstructionAccountInput = InstructionAccountInput,
   TAccountIncomeInbox extends InstructionAccountInput = InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput =
     InstructionAccountInput,
@@ -284,6 +290,8 @@ export type InitializeAsyncInput<
   pendingDeposits?: TAccountPendingDeposits;
   pendingRedemptions?: TAccountPendingRedemptions;
   claims?: TAccountClaims;
+  /** Money sent to the reserve unasked (ADR 0024): `["unsolicited", config]`. */
+  unsolicited?: TAccountUnsolicited;
   /**
    * The income inbox (ADR 0017): the vault authority's associated token
    * account for `reserve_mint`, created here idempotently.
@@ -322,6 +330,7 @@ export async function getInitializeInstructionAsync<
   TAccountPendingDeposits extends InstructionAccountInput,
   TAccountPendingRedemptions extends InstructionAccountInput,
   TAccountClaims extends InstructionAccountInput,
+  TAccountUnsolicited extends InstructionAccountInput,
   TAccountIncomeInbox extends InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput,
@@ -346,6 +355,7 @@ export async function getInitializeInstructionAsync<
     TAccountPendingDeposits,
     TAccountPendingRedemptions,
     TAccountClaims,
+    TAccountUnsolicited,
     TAccountIncomeInbox,
     TAccountTreasuryAccount,
     TAccountPaymentsAccount,
@@ -407,6 +417,10 @@ export async function getInitializeInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountClaims,
       InstructionAccountInputAddress<TAccountClaims>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUnsolicited,
+      InstructionAccountInputAddress<TAccountUnsolicited>
     >,
     ResolvedInstructionAccountMeta<
       TAccountIncomeInbox,
@@ -498,6 +512,11 @@ export async function getInitializeInstructionAsync<
       isWritable: true,
     },
     claims: { value: input.claims ?? null, isSigner: false, isWritable: true },
+    unsolicited: {
+      value: input.unsolicited ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     incomeInbox: {
       value: input.incomeInbox ?? null,
       isSigner: false,
@@ -656,6 +675,17 @@ export async function getInitializeInstructionAsync<
       { programAddress },
     );
   }
+  if (!accounts.unsolicited.value) {
+    accounts.unsolicited.value = await findUnsolicitedPda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
   if (!accounts.shareTokenProgram.value) {
     accounts.shareTokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
@@ -683,6 +713,7 @@ export async function getInitializeInstructionAsync<
       getAccountMeta("pendingDeposits", accounts.pendingDeposits),
       getAccountMeta("pendingRedemptions", accounts.pendingRedemptions),
       getAccountMeta("claims", accounts.claims),
+      getAccountMeta("unsolicited", accounts.unsolicited),
       getAccountMeta("incomeInbox", accounts.incomeInbox),
       getAccountMeta("treasuryAccount", accounts.treasuryAccount),
       getAccountMeta("paymentsAccount", accounts.paymentsAccount),
@@ -748,6 +779,10 @@ export async function getInitializeInstructionAsync<
       InstructionAccountInputAddress<TAccountClaims>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountUnsolicited,
+      InstructionAccountInputAddress<TAccountUnsolicited>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountIncomeInbox,
       InstructionAccountInputAddress<TAccountIncomeInbox>
     >,
@@ -803,6 +838,7 @@ export type InitializeInput<
   TAccountPendingRedemptions extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountClaims extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUnsolicited extends InstructionAccountInput = InstructionAccountInput,
   TAccountIncomeInbox extends InstructionAccountInput = InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput =
     InstructionAccountInput,
@@ -836,6 +872,8 @@ export type InitializeInput<
   pendingDeposits: TAccountPendingDeposits;
   pendingRedemptions: TAccountPendingRedemptions;
   claims: TAccountClaims;
+  /** Money sent to the reserve unasked (ADR 0024): `["unsolicited", config]`. */
+  unsolicited: TAccountUnsolicited;
   /**
    * The income inbox (ADR 0017): the vault authority's associated token
    * account for `reserve_mint`, created here idempotently.
@@ -874,6 +912,7 @@ export function getInitializeInstruction<
   TAccountPendingDeposits extends InstructionAccountInput,
   TAccountPendingRedemptions extends InstructionAccountInput,
   TAccountClaims extends InstructionAccountInput,
+  TAccountUnsolicited extends InstructionAccountInput,
   TAccountIncomeInbox extends InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput,
   TAccountPaymentsAccount extends InstructionAccountInput,
@@ -898,6 +937,7 @@ export function getInitializeInstruction<
     TAccountPendingDeposits,
     TAccountPendingRedemptions,
     TAccountClaims,
+    TAccountUnsolicited,
     TAccountIncomeInbox,
     TAccountTreasuryAccount,
     TAccountPaymentsAccount,
@@ -958,6 +998,10 @@ export function getInitializeInstruction<
   ResolvedInstructionAccountMeta<
     TAccountClaims,
     InstructionAccountInputAddress<TAccountClaims>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUnsolicited,
+    InstructionAccountInputAddress<TAccountUnsolicited>
   >,
   ResolvedInstructionAccountMeta<
     TAccountIncomeInbox,
@@ -1048,6 +1092,11 @@ export function getInitializeInstruction<
       isWritable: true,
     },
     claims: { value: input.claims ?? null, isSigner: false, isWritable: true },
+    unsolicited: {
+      value: input.unsolicited ?? null,
+      isSigner: false,
+      isWritable: true,
+    },
     incomeInbox: {
       value: input.incomeInbox ?? null,
       isSigner: false,
@@ -1130,6 +1179,7 @@ export function getInitializeInstruction<
       getAccountMeta("pendingDeposits", accounts.pendingDeposits),
       getAccountMeta("pendingRedemptions", accounts.pendingRedemptions),
       getAccountMeta("claims", accounts.claims),
+      getAccountMeta("unsolicited", accounts.unsolicited),
       getAccountMeta("incomeInbox", accounts.incomeInbox),
       getAccountMeta("treasuryAccount", accounts.treasuryAccount),
       getAccountMeta("paymentsAccount", accounts.paymentsAccount),
@@ -1195,6 +1245,10 @@ export function getInitializeInstruction<
       InstructionAccountInputAddress<TAccountClaims>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountUnsolicited,
+      InstructionAccountInputAddress<TAccountUnsolicited>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountIncomeInbox,
       InstructionAccountInputAddress<TAccountIncomeInbox>
     >,
@@ -1255,22 +1309,24 @@ export type ParsedInitializeInstruction<
     pendingDeposits: TAccountMetas[9];
     pendingRedemptions: TAccountMetas[10];
     claims: TAccountMetas[11];
+    /** Money sent to the reserve unasked (ADR 0024): `["unsolicited", config]`. */
+    unsolicited: TAccountMetas[12];
     /**
      * The income inbox (ADR 0017): the vault authority's associated token
      * account for `reserve_mint`, created here idempotently.
      */
-    incomeInbox: TAccountMetas[12];
+    incomeInbox: TAccountMetas[13];
     /** MUTAV treasury token account (BRS); receives the fee take. */
-    treasuryAccount: TAccountMetas[13];
+    treasuryAccount: TAccountMetas[14];
     /** MUTAV payments token account (BRS); receives claim payments. */
-    paymentsAccount: TAccountMetas[14];
-    reserveTokenProgram: TAccountMetas[15];
+    paymentsAccount: TAccountMetas[15];
+    reserveTokenProgram: TAccountMetas[16];
     /** The share mint is a classic SPL Token mint. */
-    shareTokenProgram: TAccountMetas[16];
-    systemProgram: TAccountMetas[17];
-    associatedTokenProgram: TAccountMetas[18];
-    eventAuthority: TAccountMetas[19];
-    program: TAccountMetas[20];
+    shareTokenProgram: TAccountMetas[17];
+    systemProgram: TAccountMetas[18];
+    associatedTokenProgram: TAccountMetas[19];
+    eventAuthority: TAccountMetas[20];
+    program: TAccountMetas[21];
   };
   data: InitializeInstructionData;
 };
@@ -1283,12 +1339,12 @@ export function parseInitializeInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedInitializeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 21) {
+  if (instruction.accounts.length < 22) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 21,
+        expectedAccountMetas: 22,
       },
     );
   }
@@ -1313,6 +1369,7 @@ export function parseInitializeInstruction<
       pendingDeposits: getNextAccount(),
       pendingRedemptions: getNextAccount(),
       claims: getNextAccount(),
+      unsolicited: getNextAccount(),
       incomeInbox: getNextAccount(),
       treasuryAccount: getNextAccount(),
       paymentsAccount: getNextAccount(),
