@@ -10,7 +10,7 @@ import { instructionsBy, PAUSER_OR_ADMIN, ROLE_META, type Role } from "@/lib/rol
 const NOTE: Partial<Record<Role, string>> = {
   admin: "Every change goes through a time-locked Squads proposal. Only pause is instant, and a separate pauser key can also send it.",
   operator: "The only writer for guarantees, guarantee fees and claims. It cannot change config or fulfil the queue. Today MUTAV's team signs by hand; later mutav-app's backend sends these with a KMS-held key.",
-  investor: "The pilot runs on MUTAV's own capital and is not open to public investment. Requests are gated by an allowlist (KYC off-chain, Merkle proof on-chain); in the pilot the allowlisted capital provider is MUTAV's capital wallet.",
+  investor: "Requests are gated by an allowlist (KYC off-chain, Merkle proof on-chain).",
 };
 
 const PAGE: Partial<Record<Role, [string, string]>> = {

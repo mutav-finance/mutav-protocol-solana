@@ -47,7 +47,7 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
     {
       title: "Check it yourself.",
       body: "Every figure links to its account on Solana Explorer. Open the Verify tab for the program, the keys that sign and every account.",
-      evidence: "Governed by a Squads multisig · unaudited pilot",
+      evidence: "Governed by a Squads multisig",
     },
   ];
   const s = steps[step];

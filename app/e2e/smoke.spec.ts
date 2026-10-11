@@ -43,7 +43,6 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByRole("heading", { name: "Where the capital sits" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
     await expect(page.getByText("Claim payments are never blocked by solvency.")).toBeVisible();
-    await expect(page.getByText("The pilot runs on MUTAV's own capital and is not open to public investment")).toBeVisible();
     await noBannedWords(page);
   });
 

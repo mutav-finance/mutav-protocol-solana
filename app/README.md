@@ -2,7 +2,7 @@
 
 A small web app that shows the MUTAV reserve program working on Solana. Built for the Colosseum Crypto World's Fair (Sep 14 – Oct 12, 2026). Spec: [`docs/spec.md`](docs/spec.md). App rules: [`CLAUDE.md`](CLAUDE.md) (plus the repo-root [`CLAUDE.md`](../CLAUDE.md)). It lives in `app/` of `mutav-protocol-solana`, next to the program and the client it reads through.
 
-MUTAV is an institutional rental guarantor in Brazil. Every guarantee (a *fiança*) is backed by a reserve anyone can verify on Solana. The pilot runs on MUTAV's own capital and is not open to public investment; capital actions are gated by an on-chain allowlist (KYC off-chain).
+MUTAV is an institutional rental guarantor in Brazil. Every guarantee (a *fiança*) is backed by a reserve anyone can verify on Solana. Capital actions are gated by an on-chain allowlist (KYC off-chain).
 
 Live: [reserve.mutav.finance](https://reserve.mutav.finance).
 

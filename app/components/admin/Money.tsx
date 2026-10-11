@@ -50,7 +50,7 @@ function Deposits({ mode }: { mode: Mode }) {
     <Sub id="money-deposits" title="Capital deposits" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
         <Context who="investor" figure={m(`${q.deposits.length} waiting · ${fmtBrs(reserve.state.pendingDepositsTotal, 0)}`)} href="/investment">
-          request_deposit escrows BRS in the FIFO queue (allowlisted wallets; in the pilot, MUTAV&apos;s capital wallet).
+          request_deposit escrows BRS in the FIFO queue (allowlisted wallets).
         </Context>
       </Contexts>
       <Cards>

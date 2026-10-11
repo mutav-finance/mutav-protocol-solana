@@ -24,7 +24,7 @@ import { capitalQueue, claimsTimeline, coverageRows, moneyFlows, type FlowRow, t
 /** The two promises the spec makes, each linked to the view that shows them. */
 const PROMISES: [string, string, string, string][] = [
   ["Claim payments are never blocked by solvency.", "The gate stops new guarantees and redemptions only.", "/reserve/claims", "See claims"],
-  ["Pilot on MUTAV's own capital. Not open to public investment.", "Only MUTAV's capital wallet is on the on-chain allowlist.", "/reserve/risks", "Read the risks"],
+  ["Capital requests need an approved wallet.", "Deposits and redemptions are gated by an on-chain allowlist (KYC off-chain).", "/reserve/risks", "Read the risks"],
 ];
 
 const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" } as const;

@@ -5,8 +5,7 @@ export function SiteFooter() {
     <footer className="bg-(--color-surface) mt-auto border-t" style={{ padding: "28px var(--section-pad-x)" }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 24, justifyContent: "space-between", alignItems: "flex-start" }}>
         <p className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)", margin: 0, maxWidth: 640, lineHeight: 1.6 }}>
-          The pilot runs on MUTAV&apos;s own capital and is not open to public investment. Capital requests are gated by an allowlist (KYC off-chain), and nothing here is an offer to invest. The program is unaudited
-          and runs on Solana devnet for the Colosseum Crypto World&apos;s Fair.
+          Capital requests are gated by an allowlist (KYC off-chain).
         </p>
         <nav aria-label="Footer" style={{ display: "flex", gap: 18 }}>
           {[

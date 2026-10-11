@@ -85,7 +85,7 @@ const NODES: Node<BoxData>[] = [
   n("escrows", 820, 186, { title: "ESCROWS", sub: "pending deposits\npending redemptions\nclaims (filled redemptions)", w: 220, h: 98 }),
   n("nora", 0, 200, { title: "NORA · BRS", sub: "issues the BRL stablecoin\nholds its freeze authority", w: 200, h: 70 }),
   n("treasury", 120, 390, { title: "TREASURY", sub: "MUTAV's fee take\n(operating revenue)", w: 190, h: 64 }),
-  n("investor", 840, 390, { title: "INVESTOR", sub: "allowlisted capital wallet\n(pilot: MUTAV's own)", w: 200, h: 64, role: "investor" }),
+  n("investor", 840, 390, { title: "INVESTOR", sub: "allowlisted capital wallet\n(KYC off-chain)", w: 200, h: 64, role: "investor" }),
   n("payments", 560, 390, { title: "PAYMENTS ACCOUNT", sub: "claim payments out\n→ PIX to the agency", w: 220, h: 64 }),
 ];
 

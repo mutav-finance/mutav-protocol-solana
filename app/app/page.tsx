@@ -94,8 +94,7 @@ export default function Landing() {
             Check it yourself
           </h2>
           <p className="font-body" style={{ fontSize: 14, color: "var(--color-text-2)", margin: "0 0 24px", maxWidth: 720, lineHeight: 1.6 }}>
-            The pilot runs on MUTAV&apos;s own capital and is not open to public investment. Capital requests are gated by an on-chain allowlist (KYC off-chain); in the pilot the only allowlisted capital provider is MUTAV&apos;s capital
-            wallet. What is open to everyone is the evidence: every account, every claim and every payment, on Solana.
+            Capital requests are gated by an on-chain allowlist (KYC off-chain). What is open to everyone is the evidence: every account, every claim and every payment, on Solana.
           </p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Link href="/reserve" className="font-body cta-fill" style={{ background: "var(--color-accent)", color: "var(--color-canvas)", fontSize: 15, fontWeight: 600, padding: "12px 20px", textDecoration: "none" }}>

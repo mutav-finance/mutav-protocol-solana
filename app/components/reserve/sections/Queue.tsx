@@ -129,7 +129,7 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
 
       <ImageSlot slot="queue-line" aspect="8:1" opacity={0.12} className="h-14">
         <div className="flex h-full items-center px-6">
-          <p className="font-body text-(--color-text) m-0 text-sm font-medium">One line, oldest first. MUTAV&apos;s own capital waits in it too.</p>
+          <p className="font-body text-(--color-text) m-0 text-sm font-medium">One line, oldest first. No request skips it.</p>
         </div>
       </ImageSlot>
 
@@ -146,7 +146,6 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
           <li>The Reserve Admin fills requests oldest first. No request skips the line.</li>
           <li>The investor then collects their shares or BRS.</li>
         </ol>
-        <p className="font-body text-(--color-text-3) m-0 mt-4 text-xs">The pilot runs on MUTAV&apos;s own capital and is not open to public investment.</p>
       </details>
     </div>
   );

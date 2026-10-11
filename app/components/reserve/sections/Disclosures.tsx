@@ -5,7 +5,7 @@
  * reserve, and what limits each risk?" Four blocks, top to bottom:
  *   1. Hero: the one risk with a live on-chain state (Nora's freeze).
  *   2. Claim payments: never gated by solvency, bounded by the two caps.
- *   3. The pilot's terms: own capital (not investable) and what is built later.
+ *   3. Who provides capital (the allowlist) and what is built later.
  *   4. Verify it yourself (shared with the Overview).
  * Renders on-chain values from /api/ledger; nothing is computed here.
  */
@@ -13,7 +13,6 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
-import { StatusBadge } from "@/components/StatusBadge";
 import { fmtBrs, fmtDuration } from "@/lib/format";
 import { type ReserveView } from "@/lib/view";
 
@@ -29,16 +28,6 @@ function Label({ children }: { children: ReactNode }) {
   return (
     <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={LABEL}>
       {children}
-    </span>
-  );
-}
-
-/** Brand badge (STYLE.md §3.5): 6px square in the status color + mono label in text-2. */
-function Badge({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span aria-hidden="true" className="inline-block size-1.5 shrink-0" style={{ background: color }} />
-      <Mono style={{ fontSize: 11, letterSpacing: "0.06em", color: "var(--color-text-2)" }}>{label}</Mono>
     </span>
   );
 }
@@ -88,7 +77,7 @@ export function VerifyStrip({ r, accountsLink = true }: { r: ReserveView; accoun
           </Link>
         )}
       </div>
-      <div className="grid grid-cols-1 gap-px border sm:grid-cols-2 lg:grid-cols-4" style={{ background: "var(--color-border)" }}>
+      <div className="grid grid-cols-1 gap-px border sm:grid-cols-3" style={{ background: "var(--color-border)" }}>
         {cell("Program", <Explorer value={r.programId} />)}
         {cell(
           "Governed by",
@@ -98,7 +87,6 @@ export function VerifyStrip({ r, accountsLink = true }: { r: ReserveView; accoun
           </span>,
         )}
         {cell("Cluster", <Mono style={{ fontSize: 12, color: "var(--color-text)" }}>{r.cluster.toUpperCase()}</Mono>)}
-        {cell("Audit", <Badge color="var(--color-accent)" label="UNAUDITED PILOT" />)}
       </div>
     </section>
   );
@@ -165,14 +153,14 @@ function ClaimLimits({ r }: { r: ReserveView }) {
   );
 }
 
-/** Block 3 · the pilot's terms: whose capital it is, and what is not built yet. Text only, no figures. */
+/** Block 3 · who provides capital, and what is not built yet. Text only, no figures. */
 function PilotTerms() {
   return (
     <section aria-labelledby="risk-pilot-h" className="flex flex-col gap-4">
       <ImageSlot slot="reserve-risks" aspect="8:1" opacity={0.12} className="h-14">
         <div className="flex h-full items-end px-6 pb-3">
           <h3 id="risk-pilot-h" className="font-display text-(--color-text) m-0 text-base font-bold">
-            What this pilot is, and is not
+            Who provides capital, and what comes later
           </h3>
         </div>
       </ImageSlot>
@@ -180,12 +168,10 @@ function PilotTerms() {
         <article className="bg-(--color-surface) relative flex flex-col gap-3 overflow-hidden border p-6">
           {/* Decorative image slot; this tile carries no numbers. */}
           <ImageSlot slot="reserve-disclosures" aspect="tile" opacity={0.1} fill />
-          <h4 className="font-display text-(--color-text) relative m-0 text-lg leading-snug font-bold">MUTAV&apos;s own capital, not open to public investment</h4>
+          <h4 className="font-display text-(--color-text) relative m-0 text-lg leading-snug font-bold">Approved wallets only</h4>
           <p className="font-body text-(--color-text-2) relative m-0 text-sm leading-relaxed">
-            An on-chain allowlist gates deposits and redemptions (KYC off-chain). Only MUTAV&apos;s capital wallet is on it, and it waits in the same FIFO queue as
-            anyone.
+            An on-chain allowlist gates deposits and redemptions (KYC off-chain). Every approved wallet waits in the same FIFO queue.
           </p>
-          <p className="font-body text-(--color-text) relative m-0 mt-auto text-sm font-medium">Nothing on this page is an offer to invest.</p>
         </article>
         <article className="bg-(--color-surface) flex flex-col gap-3 border p-6">
           <div className="flex flex-col gap-1">
@@ -224,7 +210,6 @@ export function DisclosuresSection({ d }: { d: Data }) {
       id="disclosures"
       title="Risks"
       subtitle="What could stop this reserve, and what limits each risk?"
-      action={<StatusBadge color="var(--color-accent)" label="UNAUDITED PILOT" />}
     >
       <Disclosures r={d.reserve} />
     </Section>

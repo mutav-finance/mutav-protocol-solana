@@ -53,7 +53,7 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   },
   investor: {
     label: "Investor",
-    holder: "An allowlisted capital wallet; in the pilot, MUTAV's own",
+    holder: "An allowlisted capital wallet",
     duty: "Requests deposits and redemptions, then claims its shares or assets.",
     color: "var(--color-role-investor)",
     marker: "triangle",
