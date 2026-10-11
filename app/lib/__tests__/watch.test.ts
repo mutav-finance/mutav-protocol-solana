@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { operatorDay } from "../operator";
 import { paymentsAlerts, type PaymentsFacts } from "../view";
-import { parseHundredths, toInput } from "../format";
+import { parseHundredths, parseUnitsOrZero, toInput } from "../format";
 import { randomRef, REF } from "../refs";
 
 const NOW = 1_000_000n;
@@ -48,6 +48,13 @@ describe("A8 and data minimization", () => {
     expect(parseHundredths("0")).toBe(0n);
     expect(parseHundredths("1.155")).toBeNull();
     expect(parseHundredths("-1")).toBeNull();
+  });
+  it("accepts 0 as a price limit (none), and real amounts", () => {
+    expect(parseUnitsOrZero("0")).toBe(0n);
+    expect(parseUnitsOrZero("0.00")).toBe(0n);
+    expect(parseUnitsOrZero("1.5")).toBe(1_500_000n);
+    expect(parseUnitsOrZero("abc")).toBeNull();
+    expect(parseUnitsOrZero("")).toBeNull();
   });
   it("writes base units back as exact input", () => {
     expect(toInput(1_500_000n)).toBe("1.5");

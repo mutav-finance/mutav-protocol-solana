@@ -102,6 +102,13 @@ export function toInput(base: bigint, decimals = BRS_DECIMALS): string {
   return f ? `${base / scale}.${f}` : `${base / scale}`;
 }
 
+/** Like parseBrs, but "0" is a valid amount (price limits: 0 = none). */
+export function parseUnitsOrZero(input: string, decimals = BRS_DECIMALS): bigint | null {
+  const t = input.trim().replace(/,/g, "");
+  if (/^0*\.?0*$/.test(t) && t !== "" && t !== ".") return 0n;
+  return parseBrs(input, decimals);
+}
+
 /** Ratio `a / b` as a percentage with one decimal; `—` when `b` is 0. */
 export function fmtRatio(a: bigint, b: bigint): string {
   if (b === 0n) return "—";

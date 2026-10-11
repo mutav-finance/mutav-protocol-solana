@@ -23,7 +23,7 @@ import { useWallet } from "@/components/WalletProvider";
 import { Action, Grid, LiveProvider, Note, TextField, useLive } from "@/components/demo/shared";
 import { ALLOWLIST_TEXT, type AllowlistState } from "@/lib/allowlist";
 import { usePoll } from "@/lib/client/use-poll";
-import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, SHARE_DECIMALS, toInput } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, parseUnitsOrZero, SHARE_DECIMALS, toInput } from "@/lib/format";
 import type { InvestorView } from "@/lib/server/investor";
 import { investorRequests, type Ledger, type ReserveView } from "@/lib/view";
 
@@ -164,8 +164,8 @@ function RequestForms({ allowed, inv }: { allowed: boolean; inv: InvestorView | 
   const redOut = redValue !== null && (redValue < caps.minRequest || redValue > caps.maxRequest);
   const overBalance = shares !== null && balance !== null && shares > balance;
   // Blank = no limit (0 on-chain); otherwise the least the owner accepts.
-  const minSharesOut = minShares.trim() ? parseBrs(minShares, SHARE_DECIMALS) : 0n;
-  const minAssetsOut = minBrs.trim() ? parseBrs(minBrs) : 0n;
+  const minSharesOut = minShares.trim() ? parseUnitsOrZero(minShares, SHARE_DECIMALS) : 0n;
+  const minAssetsOut = minBrs.trim() ? parseUnitsOrZero(minBrs) : 0n;
   return (
     <div className="grid-2">
       <article style={{ border: "1px solid var(--color-border)", padding: "16px 18px" }}>

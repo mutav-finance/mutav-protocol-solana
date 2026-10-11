@@ -21,7 +21,9 @@ export const readResponse = (value: unknown) => jsonResponse(value, { headers: {
 export function errorResponse(e: unknown): Response {
   const message = redactUrls(e instanceof Error ? e.message : String(e));
   const rawLogs = (e as { context?: { logs?: string[] } })?.context?.logs ?? (e as { logs?: string[] })?.logs;
-  const logs = Array.isArray(rawLogs) ? rawLogs.map((l) => redactUrls(String(l))) : rawLogs;
+  // Logs of any shape: an array of lines, one string, or anything else (stringified).
+  const logs =
+    rawLogs == null ? null : Array.isArray(rawLogs) ? rawLogs.map((l) => redactUrls(String(l))) : [redactUrls(typeof rawLogs === "string" ? rawLogs : JSON.stringify(rawLogs))];
   if (e instanceof NotConfiguredError) return jsonResponse({ error: message, notConfigured: true }, { status: 503 });
   if (e instanceof MainnetRefusedError || e instanceof RelayRefusedError) return jsonResponse({ error: message }, { status: 403 });
   if (e instanceof ComposeError) return jsonResponse({ error: message }, { status: 400 });
