@@ -2,13 +2,11 @@
 
 /**
  * /reserve Overview answers one question: "Can the reserve cover every open
- * guarantee?" Above both columns: the accounts that prove it, on Explorer.
- * Main column, top to bottom:
+ * guarantee?" Main column, top to bottom:
  *   1. Hero: stable assets, their share of what is required, four figures
  *      that open their tab, and the program state.
  *   2. Where the capital sits: stable assets split by what they back.
  *   3. What never changes: the two spec promises.
- *   4. Verify it yourself: one link to the Verify tab.
  * Side column: the latest movements of the ledger, then stable assets over
  * time rebuilt from those movements.
  * Renders on-chain values from /api/ledger; nothing beyond sums and shares.
@@ -71,7 +69,6 @@ export function Overview() {
   const flows = moneyFlows(r.state, d.ledger).rows;
   return (
     <div className="flex flex-col gap-10">
-      <ProofCards r={r} />
       <div className="grid grid-cols-1 items-start gap-10 min-[1120px]:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-14">
           <Hero r={r} l={d.ledger} />
@@ -84,51 +81,6 @@ export function Overview() {
         </aside>
       </div>
     </div>
-  );
-}
-
-// ── 0 · Proof cards ─────────────────────────────────────────────────────────
-
-/** The accounts a reader checks first, each on Explorer with one plain-English line. */
-function ProofCards({ r }: { r: ReserveView }) {
-  const card = (key: string, title: string, address: string, what: string, extra?: { label: string; value: ReactNode; note?: string }) => (
-    <li key={key} className="bg-(--color-surface) flex min-w-0 list-none flex-col gap-3 border p-6">
-      <Label>{title}</Label>
-      <span className="min-w-0 text-sm">
-        <Explorer value={address} rpc={r.explorerRpc} />
-      </span>
-      <span className="font-body text-(--color-text-2) text-[13px] leading-relaxed text-pretty">{what}</span>
-      {extra && (
-        <span className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t pt-3">
-          <span className="font-body text-(--color-text-3) text-xs">{extra.label}</span>
-          <span className="text-sm">{extra.value}</span>
-          {extra.note && <span className="font-body text-(--color-text-3) text-xs">{extra.note}</span>}
-        </span>
-      )}
-    </li>
-  );
-  return (
-    <section aria-labelledby="proof-h" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <H3 id="proof-h">On-chain, by design</H3>
-        <Link href="/reserve/verify" className="ext-link font-body text-xs">
-          Every account →
-        </Link>
-      </div>
-      <ul className="m-0 grid gap-4 p-0" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))" }}>
-        {card("program", "Program", r.programId, "The code that enforces the reserve's rules. Every deposit, fee and claim payment runs through it.", {
-          label: "Upgrade authority",
-          value: <Explorer value={r.config.admin} rpc={r.explorerRpc} />,
-          note: "Squads multisig",
-        })}
-        {card("reserve", "Reserve token account", r.addresses.reserve, "Where the stable assets sit. Only the program can move them, and only by its rules.")}
-        {card("mint", "BRS mint", r.token.mint, "The token the reserve holds: BRS, a stablecoin pegged to the Brazilian real.", {
-          label: "Freeze authority",
-          value: r.token.freezeAuthority ? <Explorer value={r.token.freezeAuthority} rpc={r.explorerRpc} /> : <Mono style={{ fontSize: 12 }}>none</Mono>,
-          note: r.token.freezeAuthority ? "can freeze any BRS account, the reserve's included" : undefined,
-        })}
-      </ul>
-    </section>
   );
 }
 

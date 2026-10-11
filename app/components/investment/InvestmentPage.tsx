@@ -6,8 +6,8 @@
  * can read it; only a wallet on the on-chain allowlist can send requests.
  * Cancels and claims need only the request's owner (spec §5.5).
  *
- * Layout: centred header, one strip of three reserve figures, the request
- * card (centred and narrow like a swap form), then the wallet's requests.
+ * Layout: centred header, one strip of three reserve figures, then the
+ * request card on the left as the lead and the wallet's requests beside it.
  */
 import type { ReactNode } from "react";
 import { InfoTooltip } from "@/components/InfoTooltip";
@@ -52,7 +52,7 @@ const svg = (d: string) => (
 function Stats({ r, money }: { r: ReserveView; money: Money }) {
   const usd = money.rate ? ` Shown in dollars at ${money.rate}; BRS is valued at par to BRL.` : "";
   return (
-    <div role="group" aria-label="Reserve figures" className="bg-(--color-surface) grid grid-cols-1 gap-x-6 gap-y-4 border px-5 py-4 sm:grid-cols-3">
+    <div role="group" aria-label="Reserve figures" className="bg-(--color-surface-2) grid grid-cols-1 gap-x-6 gap-y-4 border px-5 py-4 sm:grid-cols-3">
       <Stat
         icon={svg("M3 17l6-6 4 4 8-8M15 7h6v6")}
         label="NAV per share"
@@ -66,7 +66,7 @@ function Stats({ r, money }: { r: ReserveView; money: Money }) {
         value={money.fmt(r.solvency.stableAssets)}
       />
       <Stat
-        icon={svg("M12 3v18M7 8h7a3 3 0 010 6H8a3 3 0 000 6h8")}
+        icon={svg("M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6")}
         label="Free capital"
         tip={`Stable assets − coverage required. Redemptions are filled from it; it gates new guarantees and redemptions, never a claim payment.${usd}`}
         value={money.fmt(r.solvency.freeCapital)}
@@ -77,10 +77,13 @@ function Stats({ r, money }: { r: ReserveView; money: Money }) {
 
 function Skeleton() {
   return (
-    <div aria-busy="true" aria-label="Reading the chain" className="mx-auto flex w-full max-w-[560px] flex-col gap-6">
+    <div aria-busy="true" aria-label="Reading the chain" className="mx-auto flex w-full max-w-[1040px] flex-col gap-6">
       <span className="sr-only">Reading the chain…</span>
       <div className="bg-(--color-surface) h-[72px] border" />
-      <div className="bg-(--color-surface) h-[480px] border" />
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="bg-(--color-surface) h-[480px] border" />
+        <div className="bg-(--color-surface) h-[240px] border" />
+      </div>
     </div>
   );
 }
@@ -103,13 +106,13 @@ export function InvestmentPage() {
 
       {d && (
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh }}>
-          <div className="mx-auto flex w-full max-w-[560px] flex-col gap-6">
+          <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6">
             <Stats r={d.reserve} money={money} />
             {inv.error && !inv.data && <ReadError error={inv.error} />}
-            <RequestCard inv={invData} connected={connected} money={money} />
-          </div>
-          <div className="mx-auto w-full max-w-[960px]">
-            <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} money={money} />
+            <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <RequestCard inv={invData} connected={connected} money={money} />
+              <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} money={money} now={d.reserve.now} />
+            </div>
           </div>
         </LiveProvider>
       )}

@@ -2,7 +2,8 @@
 
 /**
  * /reserve · Accounts. Answers "who can act on the reserve, and where do I
- * check it?". Lead: the four keys that sign. Then the program and every
+ * check it?". Lead: the three accounts a reader checks first (ProofCards),
+ * then the four keys that sign. Then the program and every
  * account it uses, grouped by job, each with copy and Explorer. Addresses come
  * from /api/ledger; nothing is hardcoded.
  */
@@ -10,6 +11,7 @@ import { RoleTag } from "@/components/RoleTag";
 import { type ReserveView } from "@/lib/view";
 import { ACCOUNT_ROLES, type AccountRole } from "@/lib/roles";
 import { Section } from "@/components/Section";
+import { ProofCards } from "@/components/reserve/ProofCards";
 import { AddressLine } from "@/components/reserve/accounts/AddressLine";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -179,7 +181,10 @@ export function Accounts({ r }: { r: ReserveView }) {
 export function AccountsSection({ d }: { d: Data }) {
   return (
     <Section id="accounts" title="Accounts" kicker="Verify it yourself" subtitle="Who can act on the reserve, and every address to check.">
-      <Accounts r={d.reserve} />
+      <div className="flex flex-col gap-10">
+        <ProofCards r={d.reserve} />
+        <Accounts r={d.reserve} />
+      </div>
     </Section>
   );
 }

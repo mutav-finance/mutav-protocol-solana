@@ -79,7 +79,17 @@ export function ReserveShell({ children }: { children: ReactNode }) {
             <h1 className="font-display text-(--color-text) m-0 text-[28px] leading-tight font-bold" style={{ letterSpacing: "-0.025em" }}>
               Transparency
             </h1>
-            <p className="font-body text-(--color-text-2) m-0 max-w-[640px] text-sm text-pretty">Every figure is read from the MUTAV program&apos;s on-chain accounts.</p>
+            <p className="font-body text-(--color-text-2) m-0 max-w-[640px] text-sm text-pretty">
+              Every figure is read from the MUTAV program&apos;s on-chain accounts.
+              {!pathname.startsWith("/reserve/verify") && (
+                <>
+                  {" "}
+                  <Link href="/reserve/verify" className="ext-link">
+                    Verify →
+                  </Link>
+                </>
+              )}
+            </p>
           </div>
           <div className="font-mono text-(--color-text-3) flex items-center gap-3 text-xs">
             {d && (
