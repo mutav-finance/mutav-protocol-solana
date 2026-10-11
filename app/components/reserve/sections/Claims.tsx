@@ -16,7 +16,7 @@ import { claimsTimeline, type ClaimRow, type Ledger, type ReserveView } from "@/
 import { claimSpeed, frac } from "@/lib/charts";
 import { C, ChartFrame, Legend, Row, RowLabel, Swatch, Track, type Seg } from "@/components/charts/Charts";
 
-import { Empty, short } from "@/components/reserve/sections/shared";
+import { Empty, MotionStyle, fmtSpan, short } from "@/components/reserve/sections/shared";
 import { PeriodPicker, inPeriod, type Period } from "@/components/reserve/sections/Flows";
 import { Section } from "@/components/Section";
 import { ClaimsTable } from "@/components/reserve/claims/ClaimsTable";
@@ -35,10 +35,10 @@ const PERIOD_NAME: Record<Period, string> = { "7D": "last 7 days", "30D": "last 
 /** Slowest of the recorded durations (worst case is the honest proof of speed). */
 const slowest = (xs: (bigint | null)[]): bigint | null => xs.reduce<bigint | null>((m, x) => (x === null ? m : m === null || x > m ? x : m), null);
 
-/** The spec promise as a callout (section divider, no numbers on it). */
+/** The spec promise as a callout: the page's promise, so its 1px left border is the amber line. */
 function GuardBand() {
   return (
-    <div className="bg-(--color-surface) border-l-(--color-text-3) w-full border border-l-2 px-6 py-3">
+    <div className="bg-(--color-surface) border-l-(--color-accent) w-full border px-6 py-3">
       <p className="font-body text-(--color-text) m-0 text-sm font-medium">Claim payments are never blocked by solvency or by a pause.</p>
     </div>
   );
@@ -72,7 +72,7 @@ function Summary({ rows, total, slaSecs, period, onPeriod }: { rows: ClaimRow[];
           <Label>Claims paid · {PERIOD_NAME[period]}</Label>
           <Mono style={{ fontSize: "clamp(36px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{fmtBrs(paidSum)}</Mono>
           <span className="font-body text-(--color-text-2) text-sm">
-            {paidRows.length} of {rows.length} filed paid · {settled} settled by PIX
+            {paidRows.length} of {rows.length} {rows.length === 1 ? "claim" : "claims"} paid · {settled} received by landlord (PIX)
             {rows.length !== total && <span className="text-(--color-text-3)"> · {total} on record</span>}
           </span>
         </div>
@@ -80,12 +80,12 @@ function Summary({ rows, total, slaSecs, period, onPeriod }: { rows: ClaimRow[];
       </div>
       <div className="grid grid-cols-1 border-t sm:grid-cols-3">
         <Cell first label="Slowest filed → paid" value={pay === null ? "—" : fmtDuration(pay)} sub={pay === null ? "None paid yet" : undefined} />
-        <Cell label="Slowest paid → settled" value={settle === null ? "—" : fmtDuration(settle)} sub={`Payout SLA ${fmtDuration(slaSecs)}`} />
+        <Cell label="Slowest paid → settled" value={settle === null ? "—" : fmtDuration(settle)} sub={`Deadline to reach landlord: ${fmtSpan(slaSecs)}`} />
         <Cell
-          label="Late"
+          label="Paid late"
           value={String(late)}
           color={late > 0 ? "var(--color-error)" : undefined}
-          sub={overdue > 0 ? `${overdue} past SLA, not yet recorded` : "Recorded on-chain"}
+          sub={overdue > 0 ? `${overdue} past the deadline, not yet recorded` : "Recorded on-chain"}
         />
       </div>
     </div>
@@ -118,21 +118,22 @@ function SpeedChart({ rows, slaSecs, now }: { rows: ClaimRow[]; slaSecs: bigint;
         <Legend>
           <Swatch color={C.ink} label="done" />
           <Swatch color={C.ink} label="pending" outline />
-          <Swatch color={C.bad} label="late" />
+          <Swatch color={C.bad} label="paid late" />
         </Legend>
       }
-      caption="Oldest filing first. The vertical line is the payout SLA."
+      caption="Oldest filing first. The vertical line is the deadline to reach the landlord."
     >
-      <div className="grid-2">
+      <div className="grid-2 mv-grow-bars">
+        <MotionStyle />
         {panel("Filed → paid", payAxis, (c) => ({ seg: c.fileToPay === null ? null : { f: frac(c.fileToPay, payAxis), color: C.ink }, text: c.fileToPay === null ? "not paid" : fmtDuration(c.fileToPay) }))}
         {panel(
           "Paid → settled",
           settleAxis,
           (c) => ({
             seg: c.payToSettle === null ? null : { f: frac(c.payToSettle, settleAxis), color: c.late ? C.bad : C.ink, outline: c.pending && !c.late },
-            text: c.payToSettle === null ? "—" : `${fmtDuration(c.payToSettle)}${c.pending ? " so far" : ""}${c.late ? " · late" : ""}`,
+            text: c.payToSettle === null ? "—" : `${fmtDuration(c.payToSettle)}${c.pending ? " so far" : ""}${c.late ? " · paid late" : ""}`,
           }),
-          { f: frac(slaSecs, settleAxis), label: `SLA ${fmtDuration(slaSecs)}` },
+          { f: frac(slaSecs, settleAxis), label: `Deadline ${fmtSpan(slaSecs)}` },
         )}
       </div>
     </ChartFrame>
@@ -182,8 +183,8 @@ export function ClaimsSection({ d }: { d: Data }) {
     <Section
       id="claims"
       title="Claims"
-      subtitle="Are claims paid on time? Every timestamp is read on-chain."
-      info="Filed: the claim is booked, and NAV already reflects it before any money leaves the reserve. Paid: the claim payment leaves the reserve. Settled: the landlord receives it by PIX. The payout SLA is set by the Reserve Admin."
+      subtitle="Are claims paid on time?"
+      info="Filed: the claim is booked and its amount set aside for claims, so the share price reflects it before any money leaves the reserve. Paid: the claim payment leaves the reserve. Settled: the landlord receives it by PIX. The Reserve Admin sets the deadline to reach the landlord."
     >
       <Claims r={d.reserve} l={d.ledger} />
     </Section>

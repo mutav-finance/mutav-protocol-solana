@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * Stable assets over time, as a step line: the balance only moves when a
+ * The reserve balance over time, as a step line: the balance only moves when a
  * dated ledger movement lands. Rebuilt by `lib/history` from the same ledger
  * rows the activity list shows, walked back from the current read.
- * Precision Brutalism: hairline grid, 2px line, square markers, no animation.
+ * Precision Brutalism: no grid, a neutral 2px line, square markers, only the
+ * final value labelled, no animation.
  * Hover or arrow keys move a crosshair; a hidden table is the text alternative.
  */
 import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
@@ -75,7 +76,7 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <p id="history-h" className="font-body text-(--color-text-2) m-0 text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>
-            Stable assets over time
+            Reserve balance over time
           </p>
           <Mono style={{ ...NUM, fontSize: 12, color: "var(--color-text-2)" }}>
             {changeText} · {moves} {moves === 1 ? "movement" : "movements"}
@@ -88,7 +89,7 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
       </div>
 
       <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2">
-        {/* y-axis labels, aligned to the gridlines */}
+        {/* y-axis labels, mono text-3, aligned to the ticks (no gridlines) */}
         <div className="relative" style={{ height: H }} aria-hidden="true">
           {ticks.map((t) => (
             <Mono key={t.toString()} style={{ ...NUM, position: "absolute", right: 0, top: pctY(t), transform: "translateY(-50%)", fontSize: 10, color: "var(--color-text-3)", whiteSpace: "nowrap" }}>
@@ -103,7 +104,7 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
           ref={plot}
           role="img"
           tabIndex={0}
-          aria-label={`Stable assets from ${day(w.start)} to today: ${fmtBrs(first)} to ${fmtBrs(stableAssets)}. Arrow keys step through the movements.`}
+          aria-label={`Reserve balance from ${day(w.start)} to today: ${fmtBrs(first)} to ${fmtBrs(stableAssets)}. Arrow keys step through the movements.`}
           className="relative cursor-crosshair touch-none outline-offset-4"
           style={{ height: H }}
           onPointerMove={onMove}
@@ -112,15 +113,22 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
           onKeyDown={onKey}
           onBlur={() => setActive(null)}
         >
-          {ticks.map((t) => (
-            <div key={t.toString()} aria-hidden="true" className="absolute inset-x-0" style={{ top: pctY(t), borderTop: `1px solid ${t === 0n ? "var(--color-border-input)" : "var(--color-border)"}` }} />
-          ))}
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 block size-full overflow-visible" aria-hidden="true">
             <path d={area} fill={LINE} fillOpacity={0.06} stroke="none" />
             <path d={line} fill="none" stroke={LINE} strokeWidth={2} vectorEffect="non-scaling-stroke" strokeLinejoin="miter" />
           </svg>
           {/* the current balance, always marked */}
           <span aria-hidden="true" className="absolute size-2" style={{ left: "100%", top: pctY(stableAssets), transform: "translate(-50%, -50%)", background: LINE, outline: "2px solid var(--color-surface)" }} />
+          {/* The only value label on the plot: today's balance, in bold, above the end marker. */}
+          {!a && (
+            <span
+              aria-hidden="true"
+              className="font-mono pointer-events-none absolute right-0"
+              style={{ ...NUM, top: pctY(stableAssets), transform: fy(stableAssets) < 28 ? "translateY(10px)" : "translateY(calc(-100% - 10px))", fontSize: 12, fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap" }}
+            >
+              {fmtBrs(stableAssets)}
+            </span>
+          )}
           {a && (
             <>
               <div aria-hidden="true" className="absolute inset-y-0" style={{ left: pctX(a.at), borderLeft: "1px solid var(--color-text-3)" }} />
@@ -151,18 +159,18 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
       </div>
 
       <figcaption className="font-body text-(--color-text-3) text-2xs leading-relaxed">
-        Rebuilt from the ledger: today&apos;s stable assets, walked back through every dated guarantee fee, issuer income, claim payment and queue fill.
+        Rebuilt from the ledger: today&apos;s reserve balance, walked back through every dated guarantee fee, issuer income, claim payment and queue fill.
       </figcaption>
 
       {/* sr-only on a <div>: a table sizes to its content and would widen the page. */}
       <div className="sr-only">
         <table>
-          <caption>Stable assets after each movement</caption>
+          <caption>Reserve balance after each movement</caption>
           <thead>
             <tr>
               <th scope="col">Date (UTC)</th>
               <th scope="col">Movement</th>
-              <th scope="col">Stable assets</th>
+              <th scope="col">Reserve balance</th>
             </tr>
           </thead>
           <tbody>

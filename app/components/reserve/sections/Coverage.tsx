@@ -7,14 +7,16 @@
  * account fields.
  *
  * Layout (shared visual reference): [B+C] one hero tile (remaining cover, the
- * leg split bar and a 3-cell strip) beside the image slot, [E] the guarantee
- * table with per-row detail on expand, [E] the agency table with cap meters.
+ * split bar between unpaid rent and move-out debts, and a 2-cell strip), [E]
+ * the guarantee table with per-row detail on expand, [E] the agency table with
+ * cap meters, [F] the totals that close the sums. What is set aside for filed
+ * claims lives on the Claims tab.
  */
 import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
-import { fmtBps, fmtTime } from "@/lib/format";
+import { fmtBps, fmtPct, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { frac } from "@/lib/charts";
 import { activeRemainingCover, agencyRows, coverageRows, type AgencyRow, type CoverageRow, type Ledger, type ReserveView } from "@/lib/view";
@@ -22,7 +24,7 @@ import { C } from "@/components/charts/Charts";
 import { coverageRequired } from "@mutav-finance/mutav-protocol-solana";
 import { TotalsStrip, type TotalsTerm } from "@/components/reserve/sections/Flows";
 
-import { Empty, Num, Table, short } from "@/components/reserve/sections/shared";
+import { BlockHead, Empty, HeroAmount, MotionStyle, Num, PlusMark, Table, short } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -31,7 +33,7 @@ import type { Data } from "@/components/reserve/sections/shared";
 const LABEL = "font-body text-(--color-text-2) m-0 text-xs font-medium uppercase";
 const LABEL_STYLE = { letterSpacing: "0.01em" };
 
-/** Leg colours: one meaning everywhere on the page (hero bar, strip swatches, row bars). */
+/** Leg colours: one meaning everywhere on the page (hero bar, strip swatches, row bars). The default leg reads as "Unpaid rent", the exit leg as "Move-out debts". */
 const LEG = { default: C.ink, exit: C.mid };
 
 /** Cap use, one format and one rounding everywhere on the page. */
@@ -47,30 +49,16 @@ function byRemaining(rows: CoverageRow[]): CoverageRow[] {
   );
 }
 
-const GUARANTEE_HEAD: (string | [string, "num"])[] = ["Guarantee", "Agency", ["Remaining", "num"], ["Default leg left", "num"], ["Exit leg left", "num"], ["Provision", "num"]];
+const GUARANTEE_HEAD: (string | [string, "num"])[] = ["Guarantee", "Agency", ["Remaining", "num"], ["Unpaid rent left", "num"], ["Move-out debts left", "num"]];
 const COVER_TIPS = {
-  Remaining: "Default leg left plus exit leg left. Bars scale to the largest active guarantee.",
-  "Default leg left": "Sub-limit for rent and charges in arrears while the lease runs, minus what was already paid on it.",
-  "Exit leg left": "Sub-limit for the tenant's debts up to and at the end of occupation, minus what was already paid on it.",
-  Provision: "Booked when a claim is filed and not yet paid; already out of NAV.",
+  Remaining: "Unpaid rent left plus move-out debts left. Bars scale to the largest active guarantee.",
+  "Unpaid rent left": "The default leg: limit for rent and charges in arrears while the lease runs, minus what was already paid on it.",
+  "Move-out debts left": "The exit leg: limit for the tenant's debts up to and at the end of occupation, minus what was already paid on it.",
 };
 const AGENCY_TIPS = {
-  "Cap used": "Outstanding cover of the agency ÷ the per-agency cap set by the Reserve Admin.",
-  Guarantees: "Active guarantees of all those registered for the agency.",
+  "Share of agency cap": "Remaining cover of the agency ÷ the per-agency cap set by the Reserve Admin.",
+  "Active / total": "Active guarantees of all those registered for the agency.",
 };
-
-/** A block heading with an optional one-line note. */
-function BlockHead({ title, note, aside }: { title: string; note?: ReactNode; aside?: ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-      <div className="flex flex-col gap-1">
-        <h3 className="font-display text-(--color-text) m-0 text-lg font-bold">{title}</h3>
-        {note && <p className="font-body text-(--color-text-2) m-0 text-sm">{note}</p>}
-      </div>
-      {aside}
-    </div>
-  );
-}
 
 /** 8px square legend swatch. */
 const Swatch = ({ color }: { color: string }) => <span aria-hidden="true" className="inline-block h-2 w-2 shrink-0" style={{ background: color }} />;
@@ -80,10 +68,10 @@ function LegLegend() {
   return (
     <span className="font-mono text-(--color-text-3) inline-flex items-center gap-4 text-xs">
       <span className="inline-flex items-center gap-2">
-        <Swatch color={LEG.default} /> Default leg
+        <Swatch color={LEG.default} /> Unpaid rent
       </span>
       <span className="inline-flex items-center gap-2">
-        <Swatch color={LEG.exit} /> Exit leg
+        <Swatch color={LEG.exit} /> Move-out debts
       </span>
     </span>
   );
@@ -92,10 +80,12 @@ function LegLegend() {
 /** A small in-row bar: segments laid left to right on a track, scaled by the caller. */
 function MiniBar({ segs }: { segs: { f: number; color: string }[] }) {
   return (
-    <span aria-hidden="true" className="inline-flex h-1.5 w-24 shrink-0 gap-px" style={{ background: "var(--color-chart-track)" }}>
-      {segs.filter((s) => s.f > 0).map((s, i) => (
-        <span key={i} className="block h-full" style={{ width: `${Math.max(s.f * 100, 1)}%`, background: s.color }} />
-      ))}
+    <span aria-hidden="true" className="inline-flex h-1.5 w-24 shrink-0" style={{ background: "var(--color-chart-track)" }}>
+      <span className="mv-grow flex h-full w-full gap-px">
+        {segs.filter((s) => s.f > 0).map((s, i) => (
+          <span key={i} className="block h-full" style={{ width: `${Math.max(s.f * 100, 1)}%`, background: s.color }} />
+        ))}
+      </span>
     </span>
   );
 }
@@ -105,7 +95,7 @@ function CapMeter({ a }: { a: AgencyRow }) {
   const over = a.capUsedBps > 10_000n;
   return (
     <span aria-hidden="true" className="relative inline-block h-2 w-24 shrink-0 border" style={{ background: "var(--color-chart-track)" }}>
-      <span className="absolute inset-y-0 left-0 block" style={{ width: `${frac(a.capUsedBps, 10_000n) * 100}%`, background: over ? C.bad : C.ink }} />
+      <span className="mv-grow absolute inset-y-0 left-0 block" style={{ width: `${frac(a.capUsedBps, 10_000n) * 100}%`, background: over ? C.bad : C.ink }} />
       <span className="absolute -inset-y-px right-0 block w-[2px]" style={{ background: "var(--color-text)" }} />
     </span>
   );
@@ -145,7 +135,7 @@ function GuaranteeRow({ g, axis, agency }: { g: CoverageRow; axis: bigint; agenc
               onClick={() => setOpen((v) => !v)}
               className="text-(--color-text-3) hover:text-(--color-text) h-6 w-6 px-0 font-mono"
             >
-              {open ? "−" : "+"}
+              <PlusMark open={open} />
             </Button>
             <Mono>{short(g.id)}</Mono>
           </span>
@@ -163,7 +153,6 @@ function GuaranteeRow({ g, axis, agency }: { g: CoverageRow; axis: bigint; agenc
         </td>
         <Num>{fmtBrs(g.defaultRemaining)}</Num>
         <Num>{fmtBrs(g.exitRemaining)}</Num>
-        <Num color={g.provision > 0n ? "var(--color-copper)" : undefined}>{fmtBrs(g.provision)}</Num>
       </tr>
       {open && (
         <tr id={detailId} className="bg-(--color-surface-2)">
@@ -210,8 +199,6 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   const closed = rows.filter((g) => !g.active);
   const defaultLeft = active.reduce((s, g) => s + g.defaultRemaining, 0n);
   const exitLeft = active.reduce((s, g) => s + g.exitRemaining, 0n);
-  const provision = active.reduce((s, g) => s + g.provision, 0n);
-  const openClaims = active.reduce((s, g) => s + g.openClaims, 0);
   const coverAxis = active.reduce((m, g) => (g.remaining > m ? g.remaining : m), 0n);
   // Agencies have no name on-chain: number them in table order; the hash stays beside.
   const agencyName = new Map(agencies.map((a, i) => [a.agencyId, `Agency ${i + 1}`]));
@@ -231,62 +218,61 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   const byRatio = coverageRequired(r.state.remainingCoverTotal, r.config.coverageRatioBps, 0n);
   const totals: TotalsTerm[][] = [
     [
-      { label: "Default leg", value: fmtBrs(defaultLeft) },
-      { op: "+", label: "Exit leg", value: fmtBrs(exitLeft) },
+      { label: "Unpaid rent", value: fmtBrs(defaultLeft) },
+      { op: "+", label: "Move-out debts", value: fmtBrs(exitLeft) },
       { op: "=", label: "Remaining cover", value: fmtBrs(sum), result: true },
     ],
     [
-      { label: `${fmtBps(r.config.coverageRatioBps)} × remaining cover`, value: fmtBrs(byRatio) },
-      { op: "or", label: "Open provisions", value: fmtBrs(r.state.provisions) },
-      { op: "=", label: "Coverage required, the larger", value: fmtBrs(s.coverageRequired), result: true },
+      { label: `${fmtPct(r.config.coverageRatioBps)} × remaining cover`, value: fmtBrs(byRatio) },
+      { op: "or", label: "Set aside for claims", value: fmtBrs(r.state.provisions) },
+      { op: "=", label: "Coverage required (higher of the two)", value: fmtBrs(s.coverageRequired), result: true },
     ],
   ];
+  // The third sum only when it closes exactly (no buffer earmark held back, not under-covered).
+  if (s.stableAssets >= s.coverageRequired && s.stableAssets - s.coverageRequired === s.freeCapital)
+    totals.push([
+      { label: "Reserve balance", value: fmtBrs(s.stableAssets) },
+      { op: "−", label: "Coverage required", value: fmtBrs(s.coverageRequired) },
+      { op: "=", label: "Free capital", value: fmtBrs(s.freeCapital), result: true },
+    ]);
+  const agenciesActive = new Set(active.map((g) => g.agencyId)).size;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
   return (
     <div className="flex flex-col gap-8">
+      <MotionStyle />
       <div className="bg-(--color-surface) flex flex-col gap-6 border p-6">
-          <div className="flex flex-col gap-2">
-            <p className={LABEL} style={LABEL_STYLE}>Remaining cover</p>
-            <Mono style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{fmtBrs(sum)}</Mono>
-            <span className="font-body text-(--color-text-2) text-sm">
-              What the reserve still guarantees: the cover of <Mono style={{ color: "var(--color-text)" }}>{r.state.activeGuarantees}</Mono> active guarantees across{" "}
-              <Mono style={{ color: "var(--color-text)" }}>{agencies.length}</Mono> agencies, minus claim payments already made.
-            </span>
-          </div>
-          {/* [D] One composition bar: how the remaining cover splits between the two legs. */}
-          <div
-              role="img"
-              aria-label={`Remaining cover by leg: default ${fmtBrs(defaultLeft)} (${share(defaultLeft, sum)}), exit ${fmtBrs(exitLeft)} (${share(exitLeft, sum)}).`}
-              className="flex h-2 w-full gap-px"
-              style={{ background: "var(--color-chart-track)" }}
-            >
-              {[
-                { v: defaultLeft, color: LEG.default },
-                { v: exitLeft, color: LEG.exit },
-              ]
-                .filter((s) => s.v > 0n)
-                .map((s, i) => (
-                  <span key={i} className="block h-full" style={{ width: `${frac(s.v, sum) * 100}%`, background: s.color }} />
-                ))}
-          </div>
-          <div className="-mx-px grid grid-cols-1 gap-px border sm:grid-cols-3" style={{ background: "var(--color-border)" }}>
-            <StripCell label="Default leg" swatch={LEG.default} value={fmtBrs(defaultLeft)} sub={`Rent and charges in arrears while leases run; ${share(defaultLeft, sum)} of remaining.`} />
-            <StripCell label="Exit leg" swatch={LEG.exit} value={fmtBrs(exitLeft)} sub={`Tenant debts up to and at the end of occupation; ${share(exitLeft, sum)} of remaining.`} />
-            <StripCell
-              label="Provision"
-              value={fmtBrs(provision)}
-              sub={`Set aside for ${openClaims} open ${openClaims === 1 ? "claim" : "claims"} filed and not yet paid.`}
-              color={provision > 0n ? "var(--color-copper)" : undefined}
-            />
-          </div>
+        <HeroAmount phrase="Remaining cover" value={fmtBrs(sum)}>
+          <span className="font-body text-(--color-text-2)">
+            {`Left on ${plural(active.length, "active guarantee", "active guarantees")} at ${plural(agenciesActive, "agency", "agencies")}, after claims paid.`}
+          </span>
+        </HeroAmount>
+        {/* [D] One composition bar: how the remaining cover splits between unpaid rent and move-out debts. */}
+        <div
+          role="img"
+          aria-label={`Remaining cover by part: unpaid rent ${fmtBrs(defaultLeft)} (${share(defaultLeft, sum)}), move-out debts ${fmtBrs(exitLeft)} (${share(exitLeft, sum)}).`}
+          className="flex h-2 w-full"
+          style={{ background: "var(--color-chart-track)" }}
+        >
+          <span className="mv-grow flex h-full w-full gap-px">
+            {[
+              { v: defaultLeft, color: LEG.default },
+              { v: exitLeft, color: LEG.exit },
+            ]
+              .filter((x) => x.v > 0n)
+              .map((x, i) => (
+                <span key={i} className="block h-full" style={{ width: `${frac(x.v, sum) * 100}%`, background: x.color }} />
+              ))}
+          </span>
+        </div>
+        <div className="-mx-px grid grid-cols-1 gap-px border sm:grid-cols-2" style={{ background: "var(--color-border)" }}>
+          <StripCell label="Unpaid rent" swatch={LEG.default} value={fmtBrs(defaultLeft)} sub={`Rent and charges in arrears while leases run (the default leg); ${share(defaultLeft, sum)} of remaining.`} />
+          <StripCell label="Move-out debts" swatch={LEG.exit} value={fmtBrs(exitLeft)} sub={`Tenant debts up to and at the end of occupation (the exit leg); ${share(exitLeft, sum)} of remaining.`} />
+        </div>
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="bg-(--color-surface) border-l-(--color-text-3) flex items-center justify-between gap-4 border border-l-2 px-6 py-3">
-          <h3 className="font-display text-(--color-text) m-0 text-base font-bold">By guarantee</h3>
-          <LegLegend />
-        </div>
-        <p className="font-body text-(--color-text-2) m-0 text-sm">Largest remaining cover first. Open a row for rent, claims and the account.</p>
+        <BlockHead title="By guarantee" note="Largest remaining cover first. Open a row for rent, claims and the account." aside={<LegLegend />} />
         {rows.length === 0 ? (
           <Empty>No guarantees registered yet. Each one appears here once the Operator registers it.</Empty>
         ) : (
@@ -301,8 +287,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
             {closed.length > 0 && (
               <details className="group">
                 <summary className="font-body text-(--color-text-2) hover:text-(--color-text) flex cursor-pointer list-none items-center gap-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
-                  <span aria-hidden="true" className="font-mono text-(--color-text-3) inline-block w-3 group-open:hidden">+</span>
-                  <span aria-hidden="true" className="font-mono text-(--color-text-3) hidden w-3 group-open:inline-block">−</span>
+                  <PlusMark />
                   Closed guarantees <Mono dim>({closed.length})</Mono>
                 </summary>
                 <Table label="Closed guarantees" head={GUARANTEE_HEAD} tips={COVER_TIPS}>
@@ -315,7 +300,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       </div>
 
       {/* [E] Per agency: concentration against the cap, read as a meter. */}
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         <BlockHead
           title="By agency"
           note={
@@ -327,7 +312,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
         {agencies.length === 0 ? (
           <Empty>No agency exposure yet.</Empty>
         ) : (
-          <Table label="Per-agency exposure" head={["Agency", ["Outstanding cover", "num"], ["Cap used", "num"], ["Guarantees", "num"], ["Claims paid", "num"]]} tips={AGENCY_TIPS}>
+          <Table label="Per-agency exposure" head={["Agency", ["Remaining cover", "num"], ["Share of agency cap", "num"], ["Active / total", "num"], ["Claims paid", "num"]]} tips={AGENCY_TIPS}>
             {agencies.map((a) => (
               <tr key={a.address}>
                 <td><AgencyCell id={a.agencyId} /></td>
@@ -340,7 +325,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
                 </td>
                 <td className="num">
                   <Mono>{a.activeGuarantees}</Mono>
-                  <Mono dim> of {registered.get(a.agencyId) ?? 0}</Mono>
+                  <Mono dim> / {registered.get(a.agencyId) ?? 0}</Mono>
                 </td>
                 <Num>{fmtBrs(a.claimsPaidTotal)}</Num>
               </tr>
@@ -352,7 +337,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       <TotalsStrip
         title="Totals · cover against the reserve"
         groups={totals}
-        note="Coverage required is the larger of the coverage ratio times remaining cover (rounded up) and open provisions. The Overview sets it against stable assets."
+        note="Coverage required is the higher of the coverage ratio times remaining cover (rounded up) and what is set aside for claims."
       />
     </div>
   );
@@ -365,8 +350,8 @@ export function CoverageSection({ d }: { d: Data }) {
       id="coverage"
       title="Coverage"
       kicker="Guarantees"
-      subtitle="How much the reserve still guarantees, and where it sits."
-      info="Each guarantee is a fiança with a default leg and an exit leg. Remaining cover is cover minus what was already paid. The Operator registers guarantees; the Reserve Admin sets the caps. IDs are hashes; names stay off-chain."
+      subtitle="What the reserve guarantees today, by lease and by agency."
+      info="Each guarantee is a fiança in two parts: unpaid rent (the default leg) and move-out debts (the exit leg). Remaining cover is cover minus what was already paid. The Operator registers guarantees; the Reserve Admin sets the caps. IDs are hashes; names stay off-chain."
     >
       <Coverage r={d.reserve} l={d.ledger} />
     </Section>

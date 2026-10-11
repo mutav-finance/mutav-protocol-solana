@@ -5,9 +5,10 @@
  * visit to /reserve and again from the ? beside the live line. Each step pairs
  * one sentence with one piece of evidence read from the chain.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useFmt } from "@/components/MoneyProvider";
+import { Explorer } from "@/components/Explorer";
 import type { ReserveView } from "@/lib/view";
 
 /** localStorage key: set once the reader finishes or skips the steps. */
@@ -34,7 +35,7 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
   const [step, setStep] = useState(0);
   const next = useRef<HTMLButtonElement>(null);
   const covered = r.solvency.stableAssets >= r.solvency.coverageRequired;
-  const steps = [
+  const steps: { title: string; body: string; evidence: ReactNode }[] = [
     {
       title: "Every number on this page is read from Solana.",
       body: "The page reads the MUTAV program's accounts every 10 seconds. Nothing is typed in by hand, and no wallet is needed to look.",
@@ -42,13 +43,18 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
     },
     {
       title: "One question: can the reserve cover every guarantee?",
-      body: "Stable assets must stay above coverage required. If they fall below it, the program stops new guarantees and redemptions, never claim payments.",
+      body: "The reserve balance must stay above coverage required. If it falls below, the program stops new guarantees and redemptions, never claim payments.",
       evidence: `${fmtBrs(r.solvency.stableAssets)} held ${covered ? "≥" : "<"} ${fmtBrs(r.solvency.coverageRequired)} required`,
     },
     {
       title: "Check it yourself.",
       body: "Every figure links to its account on Solana Explorer. Open the Verify tab for the program, the keys that sign and every account.",
-      evidence: "Governed by a Squads multisig",
+      evidence: (
+        <span className="flex flex-col gap-1.5">
+          <span className="font-body text-(--color-text-2)">Reserve Admin (Squads multisig)</span>
+          <Explorer value={r.config.admin} rpc={r.explorerRpc} full />
+        </span>
+      ),
     },
   ];
   const s = steps[step];
@@ -89,7 +95,7 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
               Skip
             </Button>
             <Button ref={next} className="h-10 px-5 font-semibold" onClick={() => (last ? close() : setStep(step + 1))}>
-              {last ? "Open the reserve" : "Next →"}
+              {last ? "Start reading" : "Next →"}
             </Button>
           </span>
         </div>

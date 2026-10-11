@@ -15,12 +15,12 @@ import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { C, Legend, Row, RowLabel, Swatch, Track } from "@/components/charts/Charts";
 import { frac } from "@/lib/charts";
-import { fmtBps, fmtTime } from "@/lib/format";
+import { fmtPct, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { moneyFlows, type FlowRow, type Ledger, type ReserveView } from "@/lib/view";
 import { Button } from "@/components/ui/button";
 
-import { Empty, Num, Table } from "@/components/reserve/sections/shared";
+import { BlockHead, Empty, MotionStyle, Num, PlusMark, Table } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -85,14 +85,6 @@ const Label = ({ children }: { children: ReactNode }) => (
   </span>
 );
 
-/** Block heading inside the tab: label left, an optional control right. */
-const BlockHead = ({ children, action }: { children: ReactNode; action?: ReactNode }) => (
-  <div className="flex flex-wrap items-center justify-between gap-3">
-    <Label>{children}</Label>
-    {action}
-  </div>
-);
-
 // ── Totals strip (also used by Coverage and Queue) ──────────────────────────
 
 /** How a term joins the one before it. "or" reads as "the larger of". */
@@ -139,7 +131,7 @@ export function TotalsStrip({ title, groups, note }: { title: string; groups: To
   );
 }
 
-type Bar = { label: string; sub: string; amount: bigint; dir: "in" | "out" };
+type Bar = { label: string; sub?: string; amount: bigint; dir: "in" | "out" };
 
 /** One side of the money (earnings or capital): its net in the head, then diverging bars on the group's own axis. */
 function FlowGroup({ title, note, net, bars }: { title: string; note: string; net: bigint; bars: Bar[] }) {
@@ -157,7 +149,7 @@ function FlowGroup({ title, note, net, bars }: { title: string; note: string; ne
           <Mono style={{ fontSize: 20, fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{signed(net, fmtBrs)}</Mono>
         </div>
       </div>
-      <div className="flex flex-col gap-4">
+      <div className="mv-grow-bars flex flex-col gap-4">
         {bars.map((b) => {
           const f = frac(b.amount, axis);
           const sign = b.dir === "in" ? "+" : "−";
@@ -165,9 +157,9 @@ function FlowGroup({ title, note, net, bars }: { title: string; note: string; ne
             <Row
               key={b.label}
               labelWidth={170}
-              label={<RowLabel sub={<span className="font-body text-(--color-text-3) text-2xs">{b.sub}</span>}>{b.label}</RowLabel>}
+              label={<RowLabel sub={b.sub ? <span className="font-body text-(--color-text-3) text-2xs">{b.sub}</span> : undefined}>{b.label}</RowLabel>}
               value={`${sign}${fmtBrs(b.amount, 0)}`}
-              summary={`${b.label}: ${sign}${fmtBrs(b.amount)} ${b.dir === "in" ? "into" : "out of"} the reserve. ${b.sub}.`}
+              summary={`${b.label}: ${sign}${fmtBrs(b.amount)} ${b.dir === "in" ? "into" : "out of"} the reserve.${b.sub ? ` ${b.sub}.` : ""}`}
             >
               {/* Zero axis in the middle: out grows left, in grows right. */}
               <div className="grid min-w-0 grid-cols-2">
@@ -223,58 +215,57 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
   };
 
   const earnings: Bar[] = [
-    { label: "Guarantee fees", sub: `net · ${fmtBrs(totals.feeTakeToTreasury, 0)} take to treasury (${fmtBps(r.config.feeTakeBps)})`, amount: totals.feesNetToReserve, dir: "in" },
+    { label: "Guarantee fees", sub: `after ${fmtBrs(totals.feeTakeToTreasury, 0)} MUTAV fee (${fmtPct(r.config.feeTakeBps)})`, amount: totals.feesNetToReserve, dir: "in" },
     {
       label: "Issuer income",
-      sub: totals.incomeTakeToTreasury > 0n ? `net · ${fmtBrs(totals.incomeTakeToTreasury, 0)} take to treasury (${fmtBps(r.config.incomeTakeBps)})` : "net · swept per statement",
+      sub: totals.incomeTakeToTreasury > 0n ? `from the BRS issuer, monthly · after ${fmtBrs(totals.incomeTakeToTreasury, 0)} MUTAV fee (${fmtPct(r.config.incomeTakeBps)})` : "from the BRS issuer, monthly",
       amount: totals.incomeNetToReserve,
       dir: "in",
     },
-    { label: "Claim payments", sub: "to the payments account", amount: totals.claimsPaid, dir: "out" },
+    { label: "Claim payments", sub: "paid to landlords", amount: totals.claimsPaid, dir: "out" },
   ];
   const capitalBars: Bar[] = [
-    { label: "Deposits", sub: "filled", amount: totals.depositsIn, dir: "in" },
-    { label: "Redemptions", sub: "filled", amount: totals.redemptionsOut, dir: "out" },
+    { label: "Deposits", amount: totals.depositsIn, dir: "in" },
+    { label: "Redemptions", amount: totals.redemptionsOut, dir: "out" },
   ];
 
   return (
     <div className="flex flex-col gap-8">
+      <MotionStyle />
       {/* [C+D] Both sides of the money in one bordered strip, as diverging bars. */}
       <div className="flex flex-col gap-4">
         <BlockHead
-          action={
+          title="In and out · since launch"
+          aside={
             <Legend>
               <Swatch color={C.ink} label="into the reserve" />
               <Swatch color={C.mid} label="out of the reserve" />
             </Legend>
           }
-        >
-          In and out · since launch
-        </BlockHead>
+        />
         <div className="grid grid-cols-1 gap-px border lg:grid-cols-2" style={{ background: "var(--color-border)" }}>
           <FlowGroup title="Earnings" note="What the reserve earned from its guarantees, after the claim payments it made." net={earned} bars={earnings} />
           <FlowGroup title="Capital" note="Investor money filled in and out of the reserve. Not earnings." net={capital} bars={capitalBars} />
-        </div>
-        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-          <span className="font-body text-(--color-text-2) text-sm">
-            Net change since launch <Mono style={{ color: "var(--color-text)", fontWeight: 700 }}>{signed(earned + capital, fmtBrs)}</Mono>: earnings plus capital. A deposit is not income.
-          </span>
-          <span className="font-body text-(--color-text-3) text-2xs">Each side has its own scale. Capital sums the fills in the last 100 transactions of each escrow.</span>
         </div>
       </div>
 
       {/* [E] The dated ledger; the period filter applies here only. */}
       <div id="ledger" className="flex scroll-mt-32 flex-col gap-4">
-        <BlockHead action={<PeriodPicker value={period} onChange={pick} label="Ledger period" />}>
-          Ledger{all.length > 0 && <Mono dim> · {rows.length}</Mono>}
-        </BlockHead>
+        <BlockHead
+          title={
+            <>
+              Ledger{all.length > 0 && <Mono dim> · {rows.length}</Mono>}
+            </>
+          }
+          aside={<PeriodPicker value={period} onChange={pick} label="Ledger period" />}
+        />
         {all.length === 0 ? (
           <Empty>No money has moved yet. Fees, claim payments and capital fills appear here.</Empty>
         ) : rows.length === 0 ? (
           <Empty>No flows in this period.</Empty>
         ) : (
           <>
-            <Table label="Money flows" head={["Flow", "When", ["Reserve", "num"], ["Treasury", "num"], "Account / tx"]}>
+            <Table label="Money flows" head={["Flow", "When", ["Reserve", "num"], ["MUTAV fee", "num"], "Explorer"]}>
               {shown.map((f) => (
                 <LedgerRow key={`${f.kind}-${f.account}`} f={f} />
               ))}
@@ -293,15 +284,14 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
       {/* [F] Definitions, collapsed: data first, explanation one click away. */}
       <details className="bg-(--color-surface) group border px-6 py-4">
         <summary className="font-body text-(--color-text-2) hover:text-(--color-text) flex cursor-pointer list-none items-center gap-3 text-sm [&::-webkit-details-marker]:hidden">
-          <span aria-hidden="true" className="font-mono text-(--color-text-3) inline-block w-3 group-open:hidden">+</span>
-          <span aria-hidden="true" className="font-mono text-(--color-text-3) hidden w-3 group-open:inline-block">−</span>
+          <PlusMark />
           How these figures are counted
         </summary>
         <ul className="font-body text-(--color-text-2) m-0 mt-4 flex flex-col gap-2 pl-6 text-sm leading-relaxed">
-          <li>Earned net = guarantee fees net + issuer income net − claim payments. Capital net = deposits − redemptions.</li>
-          <li>Guarantee fees, issuer income, the take and claim payments are lifetime totals from the reserve&apos;s state account.</li>
-          <li>Deposits and redemptions sum the fills in the last 100 transactions of each escrow.</li>
-          <li>Totals are since launch. The period filter applies to the ledger only.</li>
+          <li>Earned net = guarantee fees net + issuer income net − claim payments. Capital net = deposits − redemptions. A deposit is not income.</li>
+          <li>Guarantee fees, issuer income, the MUTAV fee and claim payments are lifetime totals from the reserve&apos;s state account.</li>
+          <li>Capital sums the fills in the last 100 transactions of each queue account (deposits waiting in line, redemptions waiting in line).</li>
+          <li>Each side has its own scale. Totals are since launch; the period filter applies to the ledger only.</li>
         </ul>
       </details>
     </div>
