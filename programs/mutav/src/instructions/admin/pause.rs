@@ -1,10 +1,12 @@
-//! `pause` / `unpause` (spec §5.1). While paused, capital flows, new
-//! guarantees and allocation are rejected; fees, claims, settlement, claim
-//! notices, `refresh`, `advance_queue_heads`, `cancel_*` and `claim_*` stay
-//! open (ADRs 0008, 0009, 0011). Each gated instruction checks `config.paused`.
+//! `pause` / `unpause` (spec §5.1; ADR 0020). While paused, capital flows
+//! (`request_*`, `fulfil_*`) and new guarantees are rejected; fees, income,
+//! claims, settlement, closes, `refresh`, `advance_queue_head`, `cancel_*`,
+//! `claim_*` and every role instruction stay open (ADRs 0008, 0009, 0020).
+//! Each gated instruction checks `config.paused`.
 
 use anchor_lang::prelude::*;
 
+use crate::constants::CONFIG_SEED;
 use crate::{
     constants::field,
     errors::MutavError,
@@ -15,13 +17,15 @@ use crate::{
 #[event_cpi]
 #[derive(Accounts)]
 pub struct Pause<'info> {
-    /// The pauser or the admin. No time lock.
+    /// The pauser, the admin or a guardian (ADR 0020). No time lock.
     pub signer: Signer<'info>,
 
     #[account(
         mut,
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
         constraint = config.is_supported() @ MutavError::UnsupportedVersion,
-        constraint = config.is_pauser_or_admin(&signer.key()) @ MutavError::Unauthorized,
+        constraint = config.can_pause(&signer.key()) @ MutavError::Unauthorized,
     )]
     pub config: Box<Account<'info, VaultConfig>>,
 }
@@ -33,6 +37,8 @@ pub struct Unpause<'info> {
 
     #[account(
         mut,
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
         constraint = config.is_supported() @ MutavError::UnsupportedVersion,
         constraint = config.admin == admin.key() @ MutavError::Unauthorized,
     )]
