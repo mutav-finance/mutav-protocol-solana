@@ -63,13 +63,6 @@ pub struct SweepIncome<'info> {
     #[account(mut, seeds = [RESERVE_SEED, config.key().as_ref()], bump)]
     pub reserve: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// The whitelisted MUTAV treasury. Receives nothing: there is no take on
-    /// issuer income (ADR 0019). Kept in the account list until the
-    /// interface change that drops it.
-    /// CHECK: address-checked; never written.
-    #[account(mut, address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
-    pub treasury_account: UncheckedAccount<'info>,
-
     /// The vault authority: owns the inbox and `reserve` and signs the
     /// transfers.
     /// CHECK: data-less PDA, seeds-checked.
@@ -174,6 +167,8 @@ pub fn handle_sweep_income(
         period,
         amount,
         inbox_after,
+        income_total: ctx.accounts.state.income_total,
+        brs_balance: ctx.accounts.state.brs_balance,
     });
     Ok(())
 }

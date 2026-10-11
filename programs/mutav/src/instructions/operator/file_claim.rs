@@ -112,6 +112,8 @@ pub fn handle_file_claim(
         leg,
         amount,
         notice_ref_hash,
+        provisions_after: ctx.accounts.state.provisions,
+        coverage_required_after: ctx.accounts.state.coverage_required,
     });
     Ok(())
 }

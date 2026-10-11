@@ -16,8 +16,6 @@ import {
   getStructEncoder,
   getU64Decoder,
   getU64Encoder,
-  getU8Decoder,
-  getU8Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
   SolanaError,
   transformEncoder,
@@ -124,24 +122,21 @@ export type PayClaimInstruction<
 
 export type PayClaimInstructionData = {
   discriminator: ReadonlyUint8Array;
-  leg: number;
-  amount: bigint;
   noticeRefHash: ReadonlyUint8Array;
+  expectedAmount: bigint;
 };
 
 export type PayClaimInstructionDataArgs = {
-  leg: number;
-  amount: number | bigint;
   noticeRefHash: ReadonlyUint8Array;
+  expectedAmount: number | bigint;
 };
 
 export function getPayClaimInstructionDataEncoder(): FixedSizeEncoder<PayClaimInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
-      ["leg", getU8Encoder()],
-      ["amount", getU64Encoder()],
       ["noticeRefHash", fixEncoderSize(getBytesEncoder(), 32)],
+      ["expectedAmount", getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: PAY_CLAIM_DISCRIMINATOR }),
   );
@@ -150,9 +145,8 @@ export function getPayClaimInstructionDataEncoder(): FixedSizeEncoder<PayClaimIn
 export function getPayClaimInstructionDataDecoder(): FixedSizeDecoder<PayClaimInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
-    ["leg", getU8Decoder()],
-    ["amount", getU64Decoder()],
     ["noticeRefHash", fixDecoderSize(getBytesDecoder(), 32)],
+    ["expectedAmount", getU64Decoder()],
   ]);
 }
 
@@ -201,9 +195,8 @@ export type PayClaimAsyncInput<
   tokenProgram?: TAccountTokenProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
-  leg: PayClaimInstructionDataArgs["leg"];
-  amount: PayClaimInstructionDataArgs["amount"];
   noticeRefHash: PayClaimInstructionDataArgs["noticeRefHash"];
+  expectedAmount: PayClaimInstructionDataArgs["expectedAmount"];
 };
 
 export async function getPayClaimInstructionAsync<
@@ -519,9 +512,8 @@ export type PayClaimInput<
   tokenProgram?: TAccountTokenProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
-  leg: PayClaimInstructionDataArgs["leg"];
-  amount: PayClaimInstructionDataArgs["amount"];
   noticeRefHash: PayClaimInstructionDataArgs["noticeRefHash"];
+  expectedAmount: PayClaimInstructionDataArgs["expectedAmount"];
 };
 
 export function getPayClaimInstruction<

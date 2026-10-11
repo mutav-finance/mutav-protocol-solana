@@ -42,7 +42,7 @@ describe("claims timeline", () => {
   const filing = (address: string, hash: number, filedAt: bigint, over: Partial<ClaimFiling> = {}): Row<ClaimFiling> => ({
     address,
     data: {
-      guarantee: "G1", leg: 0, noticeRefHash: b32(hash), provision: 1_000n * BRL, filedAt, status: 0,
+      guarantee: "G1", leg: 1, noticeRefHash: b32(hash), provision: 1_000n * BRL, filedAt, status: 0,
       paidAmount: 0n, paidAt: 0n, pixE2eHash: b32(0), settledAt: 0n, ...over,
     } as unknown as ClaimFiling,
   });

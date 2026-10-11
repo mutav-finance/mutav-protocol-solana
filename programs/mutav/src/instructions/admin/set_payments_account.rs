@@ -3,11 +3,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
 
+use crate::constants::CONFIG_SEED;
 use crate::{
     constants::field,
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges, PaymentsAccountUpdated},
-    instructions::admin::{validate_money_accounts, vault_authority_key},
+    instructions::admin::{validate_money_accounts, vault_authority_key, Installing},
     state::VaultConfig,
 };
 
@@ -18,13 +19,16 @@ pub struct SetPaymentsAccount<'info> {
 
     #[account(
         mut,
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
         constraint = config.is_supported() @ MutavError::UnsupportedVersion,
         constraint = config.admin == admin.key() @ MutavError::Unauthorized,
     )]
     pub config: Box<Account<'info, VaultConfig>>,
 
     /// The new payments token account (BRS). Its owner is MUTAV's payments
-    /// wallet, an off-chain fact; the program records the account.
+    /// wallet, an off-chain fact; the program records the account. It may
+    /// not be owned by the operator (ADR 0020).
     pub payments_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// The current treasury token account, to compare (spec §2.1).
@@ -43,6 +47,8 @@ pub fn handle_set_payments_account(ctx: Context<SetPaymentsAccount>) -> Result<(
         &ctx.accounts.payments_account,
         &ctx.accounts.config.mutav_capital_wallet,
         &vault_authority,
+        &ctx.accounts.config.operator,
+        Installing::Payments,
     )?;
 
     let new = ctx.accounts.payments_account.key();

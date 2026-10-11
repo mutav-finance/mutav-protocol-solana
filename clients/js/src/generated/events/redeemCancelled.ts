@@ -45,6 +45,8 @@ export type RedeemCancelledEvent = {
   owner: Address;
   seq: bigint;
   sharesReturned: bigint;
+  /** The signer: the owner, or the admin removing the request (ADR 0023). */
+  by: Address;
 };
 
 export type RedeemCancelledEventArgs = {
@@ -53,6 +55,8 @@ export type RedeemCancelledEventArgs = {
   owner: Address;
   seq: number | bigint;
   sharesReturned: number | bigint;
+  /** The signer: the owner, or the admin removing the request (ADR 0023). */
+  by: Address;
 };
 
 /** Gets the encoder for {@link RedeemCancelledEventArgs} event data. */
@@ -64,6 +68,7 @@ export function getRedeemCancelledEventEncoder(): FixedSizeEncoder<RedeemCancell
       ["owner", getAddressEncoder()],
       ["seq", getU64Encoder()],
       ["sharesReturned", getU64Encoder()],
+      ["by", getAddressEncoder()],
     ]),
     [getConstantEncoder(REDEEM_CANCELLED_EVENT_DISCRIMINATOR)],
   );
@@ -78,6 +83,7 @@ export function getRedeemCancelledEventDecoder(): FixedSizeDecoder<RedeemCancell
       ["owner", getAddressDecoder()],
       ["seq", getU64Decoder()],
       ["sharesReturned", getU64Decoder()],
+      ["by", getAddressDecoder()],
     ]),
     [getConstantDecoder(REDEEM_CANCELLED_EVENT_DISCRIMINATOR)],
   );

@@ -109,12 +109,10 @@ fn a_freeze_and_the_thaw_both_trip_the_nav_move_guard() {
     assert!(s.fulfil_halted, "the freeze trips the guard");
     assert_eq!(s.nav_per_share, 1);
 
-    // Clearing while still frozen re-opens nothing for long: the baseline is
-    // the tracked NAV, and the next refresh, still frozen, trips again.
-    f.clear_fulfil_halt().expect("admin clears");
-    assert_eq!(f.state().nav_per_share, NAV_SCALE);
-    f.refresh().unwrap();
-    assert!(f.state().fulfil_halted, "still frozen: halted again");
+    // The halt cannot be cleared while the reserve is frozen (ADR 0020):
+    // the new baseline would come from BRS that cannot move.
+    assert_mutav_err(f.clear_fulfil_halt(), MutavError::ReserveFrozen);
+    assert!(f.state().fulfil_halted);
 
     // With the collapsed baseline kept, the thaw is a measured move too.
     let mut s = f.state();

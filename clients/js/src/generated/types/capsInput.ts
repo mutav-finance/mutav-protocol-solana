@@ -8,6 +8,8 @@
 
 import {
   combineCodec,
+  getI64Decoder,
+  getI64Encoder,
   getStructDecoder,
   getStructEncoder,
   getU16Decoder,
@@ -27,6 +29,9 @@ export type CapsInput = {
   minRequest: bigint;
   maxRequest: bigint;
   maxNavMoveBps: number;
+  stressBuffer: bigint;
+  maxQueueWaitSecs: bigint;
+  maxReinstateAge: bigint;
 };
 
 export type CapsInputArgs = {
@@ -37,6 +42,9 @@ export type CapsInputArgs = {
   minRequest: number | bigint;
   maxRequest: number | bigint;
   maxNavMoveBps: number;
+  stressBuffer: number | bigint;
+  maxQueueWaitSecs: number | bigint;
+  maxReinstateAge: number | bigint;
 };
 
 export function getCapsInputEncoder(): FixedSizeEncoder<CapsInputArgs> {
@@ -48,6 +56,9 @@ export function getCapsInputEncoder(): FixedSizeEncoder<CapsInputArgs> {
     ["minRequest", getU64Encoder()],
     ["maxRequest", getU64Encoder()],
     ["maxNavMoveBps", getU16Encoder()],
+    ["stressBuffer", getU64Encoder()],
+    ["maxQueueWaitSecs", getI64Encoder()],
+    ["maxReinstateAge", getI64Encoder()],
   ]);
 }
 
@@ -60,6 +71,9 @@ export function getCapsInputDecoder(): FixedSizeDecoder<CapsInput> {
     ["minRequest", getU64Decoder()],
     ["maxRequest", getU64Decoder()],
     ["maxNavMoveBps", getU16Decoder()],
+    ["stressBuffer", getU64Decoder()],
+    ["maxQueueWaitSecs", getI64Decoder()],
+    ["maxReinstateAge", getI64Decoder()],
   ]);
 }
 

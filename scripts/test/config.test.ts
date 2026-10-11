@@ -72,6 +72,22 @@ describe('parseConfig bounds mirror the program', () => {
     c.coverageRatioBps = 1_000;
     expect(parseConfig(c).coverageRatioBps).toBe(1_000);
   });
+  test('coverage ceiling', () => bad((c) => (c.coverageRatioBps = 10_001), 'coverageRatioBps'));
+  test('coverage ceiling accepts 1.0', () => {
+    const c = filled();
+    c.coverageRatioBps = 10_000;
+    expect(parseConfig(c).coverageRatioBps).toBe(10_000);
+  });
+  test('a missing carve is left unset (keep the chain value), a present one parsed', () => {
+    const c = filled();
+    delete c.caps.stressBuffer;
+    delete c.caps.maxQueueWaitSecs;
+    delete c.caps.maxReinstateAge;
+    const p = parseConfig(c).caps;
+    expect([p.stressBuffer, p.maxQueueWaitSecs, p.maxReinstateAge]).toEqual([undefined, undefined, undefined]);
+    c.caps.stressBuffer = '5';
+    expect(parseConfig(c).caps.stressBuffer).toBe(5n);
+  });
   test('bps fields', () => bad((c) => (c.caps.maxNavMoveBps = 10_001), 'caps.maxNavMoveBps'));
   test('request bounds', () => bad((c) => (c.caps.minRequest = '999999999999999'), 'minRequest'));
   test('distinct roles', () => bad((c) => (c.pauser = c.operator), 'distinct'));

@@ -69,9 +69,10 @@ fn fulfil_deposits_works_in_under_coverage() {
     f.register(guarantee_args(unique_hash(), 30_000 * BRL, 0))
         .unwrap();
     // The admin raises `c` to 1.5: coverage 45,000 > 30,000 of stable assets.
-    let mut args = set_config_args(&f.config());
-    args.coverage_ratio_bps = 15_000;
-    f.set_config(args).unwrap();
+    // (Injected: `set_config` refuses c above 1.0 since ADR 0022.)
+    let mut c = f.config();
+    c.coverage_ratio_bps = 15_000;
+    f.write_config(&c);
     // `refresh` (Task 10) would record the mode; the gates also check inline.
     let mut s = f.state();
     s.mode = MODE_UNDER_COVERED;

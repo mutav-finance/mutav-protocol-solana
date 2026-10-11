@@ -89,7 +89,7 @@ fn request_deposit_escrows_and_queues() {
     assert_ne!(r.bump, 0);
     assert_eq!((r.shares_out, r.nav_at_fulfil, r.fulfilled_at), (0, 0, 0));
     assert_eq!(r.requested_at, T0);
-    assert_eq!(r._reserved, [0; 64]);
+    assert_eq!(r._reserved, [0; 56]);
 
     let s = f.state();
     assert_eq!(s.next_deposit_seq, 1);
@@ -106,8 +106,14 @@ fn request_deposit_escrows_and_queues() {
     let ev = events::<DepositRequested>(&meta);
     assert_eq!(ev.len(), 1);
     assert_eq!(
-        (ev[0].config, ev[0].owner, ev[0].seq, ev[0].assets),
-        (f.pdas.config, a.pubkey(), 0, 5_000 * BRL)
+        (
+            ev[0].config,
+            ev[0].owner,
+            ev[0].seq,
+            ev[0].assets,
+            ev[0].min_shares_out
+        ),
+        (f.pdas.config, a.pubkey(), 0, 5_000 * BRL, 0)
     );
 
     // A second request takes the next seq.
@@ -232,18 +238,92 @@ fn cancel_deposit_refunds_and_closes_while_paused() {
 }
 
 #[test]
-fn cancel_deposit_is_owner_only_and_pending_only() {
+fn cancel_deposit_is_owner_or_admin_and_pending_only() {
     let (mut f, list, inv) = setup(2, 10_000 * BRL);
     let (a, b) = (&inv[0], &inv[1]);
     let (res, seq) = f.request_deposit(a, &list, 2_000 * BRL);
     res.unwrap();
-    let ix = f.cancel_deposit_ix(&b.pubkey(), seq, &b.brs);
+    // Another investor, the operator or the pauser cannot cancel.
+    let ix = f.cancel_deposit_ix(&b.pubkey(), &a.pubkey(), seq, &a.brs);
     assert_mutav_err(f.send_as(ix, &b.key), MutavError::Unauthorized);
-    // Refund to someone else's account.
-    let ix = f.cancel_deposit_ix(&a.pubkey(), seq, &b.brs);
+    for k in [f.operator.insecure_clone(), f.pauser.insecure_clone()] {
+        let ix = f.cancel_deposit_ix(&k.pubkey(), &a.pubkey(), seq, &a.brs);
+        assert_mutav_err(f.send(ix, &k), MutavError::Unauthorized);
+    }
+    // The refund goes to the owner's ATA only, and the rent to the owner.
+    let ix = f.cancel_deposit_ix(&a.pubkey(), &a.pubkey(), seq, &b.brs);
+    assert_mutav_err(f.send_as(ix, &a.key), MutavError::Unauthorized);
+    let other = f.token_account(&a.pubkey());
+    let ix = f.cancel_deposit_ix(&a.pubkey(), &a.pubkey(), seq, &other);
+    assert_mutav_err(f.send_as(ix, &a.key), MutavError::Unauthorized);
+    let ix = f.cancel_deposit_ix(&a.pubkey(), &b.pubkey(), seq, &b.brs);
     assert_mutav_err(f.send_as(ix, &a.key), MutavError::Unauthorized);
     f.fulfil_deposits(1, &[seq]).unwrap();
     assert_mutav_err(f.cancel_deposit(a, seq), MutavError::InvalidRequestStatus);
+    assert_mutav_err(
+        f.admin_cancel_deposit(a, seq),
+        MutavError::InvalidRequestStatus,
+    );
+}
+
+#[test]
+fn the_admin_cancels_a_deposit_back_to_its_owner() {
+    let (mut f, list, inv) = setup(2, 10_000 * BRL);
+    let (a, b) = (&inv[0], &inv[1]);
+    let (res, seq) = f.request_deposit(a, &list, 2_000 * BRL);
+    res.unwrap();
+    let (res, seq_b) = f.request_deposit(b, &list, 1_000 * BRL);
+    res.unwrap();
+    // The investor is de-listed and its BRS account closed: the admin's
+    // cancel recreates the owner's ATA (the admin pays) and returns
+    // everything to the owner, never to the signer. Paused: still allowed.
+    let close = anchor_spl::token::spl_token::instruction::close_account(
+        &TOKEN_PROGRAM,
+        &a.brs,
+        &a.pubkey(),
+        &a.pubkey(),
+        &[],
+    )
+    .unwrap();
+    let bal = f.balance(&a.brs);
+    let burn = anchor_spl::token::spl_token::instruction::burn(
+        &TOKEN_PROGRAM,
+        &a.brs,
+        &f.reserve_mint,
+        &a.pubkey(),
+        &[],
+        bal,
+    )
+    .unwrap();
+    send_ixs(&mut f.svm, &[burn, close], &[&a.key]).expect("close the owner's ATA");
+    assert!(f.svm.get_account(&a.brs).is_none_or(|x| x.data.is_empty()));
+    f.allowlist(&[b.pubkey()]);
+    let admin = f.admin.insecure_clone();
+    f.send(f.pause_ix(&admin.pubkey()), &admin).unwrap();
+
+    let owner_lamports = f.svm.get_account(&a.pubkey()).unwrap().lamports;
+    let meta = f.admin_cancel_deposit(a, seq).expect("admin cancel");
+    assert_eq!(f.balance(&a.brs), 2_000 * BRL, "refund in the owner's ATA");
+    assert!(f.deposit_request(seq).is_none(), "request closed");
+    assert!(
+        f.svm.get_account(&a.pubkey()).unwrap().lamports > owner_lamports,
+        "the request's rent goes to the owner"
+    );
+    let ev = events::<DepositCancelled>(&meta);
+    assert_eq!(
+        (ev[0].owner, ev[0].seq, ev[0].assets, ev[0].by),
+        (a.pubkey(), seq, 2_000 * BRL, admin.pubkey())
+    );
+    // The head can now move past it to the next live request.
+    f.advance_queue_head(QUEUE_DEPOSIT, 2, &[seq, seq_b])
+        .unwrap();
+    assert_eq!(f.state().deposit_head, seq_b);
+    f.assert_capital_invariants("after the admin cancel");
+
+    // The owner's own cancel, while paused, names the owner as `by`.
+    let meta = f.cancel_deposit(b, seq_b).expect("owner cancel");
+    assert_eq!(events::<DepositCancelled>(&meta)[0].by, b.pubkey());
+    let _ = list;
 }
 
 // ===========================================================================
@@ -453,7 +533,7 @@ fn request_redeem_escrows_shares() {
     assert_eq!((r.shares_filled, r.shares_remaining()), (0, 4_000 * BRL));
     assert_eq!((r.assets_out, r.nav_at_fill, r.filled_at), (0, 0, 0));
     assert_eq!(r.requested_at, T0 + 10);
-    assert_eq!(r._reserved, [0; 56]);
+    assert_eq!(r._reserved, [0; 48]);
     let s = f.state();
     assert_eq!((s.next_redeem_seq, s.redeem_head), (1, 0));
     assert_eq!(s.pending_redeem_shares, 4_000 * BRL);
@@ -463,8 +543,8 @@ fn request_redeem_escrows_shares() {
     assert_eq!(f.balance(&a.shares), 6_000 * BRL);
     let ev = events::<RedeemRequested>(&meta);
     assert_eq!(
-        (ev[0].owner, ev[0].seq, ev[0].shares),
-        (a.pubkey(), 0, 4_000 * BRL)
+        (ev[0].owner, ev[0].seq, ev[0].shares, ev[0].min_assets_out),
+        (a.pubkey(), 0, 4_000 * BRL, 0)
     );
     f.assert_capital_invariants("after request_redeem");
 }
@@ -533,9 +613,12 @@ fn cancel_redeem_returns_the_shares_closes_and_keeps_the_head() {
     let (r, seq) = f.request_redeem(a, &list, 3_000 * BRL);
     r.unwrap();
     f.request_redeem(b, &list, 2_000 * BRL).0.unwrap();
-    // Not the owner.
-    let ix = f.cancel_redeem_ix(&b.pubkey(), seq, &b.shares);
+    // Not the owner nor the admin.
+    let ix = f.cancel_redeem_ix(&b.pubkey(), &a.pubkey(), seq, &a.shares);
     assert_mutav_err(f.send_as(ix, &b.key), MutavError::Unauthorized);
+    // The owner account must be the request's owner.
+    let ix = f.cancel_redeem_ix(&a.pubkey(), &b.pubkey(), seq, &b.shares);
+    assert_mutav_err(f.send_as(ix, &a.key), MutavError::Unauthorized);
     pause(&mut f);
     let rent = lamports(&f, &redeem_pda(&f.pdas.config, seq));
     let sol = lamports(&f, &a.pubkey());
@@ -548,10 +631,92 @@ fn cancel_redeem_returns_the_shares_closes_and_keeps_the_head() {
     assert_eq!(s.redeem_head, 0, "cancel_redeem never moves the head");
     let ev = events::<RedeemCancelled>(&meta);
     assert_eq!(
-        (ev[0].owner, ev[0].seq, ev[0].shares_returned),
-        (a.pubkey(), seq, 3_000 * BRL)
+        (ev[0].owner, ev[0].seq, ev[0].shares_returned, ev[0].by),
+        (a.pubkey(), seq, 3_000 * BRL, a.pubkey())
     );
     f.assert_capital_invariants("after cancel_redeem");
+}
+
+#[test]
+fn the_admin_cancels_a_redeem_head_that_cannot_fill() {
+    // A head whose price limit no fill can meet blocks the queue. The admin
+    // removes it: the shares and the rent go back to the owner, and the next
+    // request fills.
+    let (mut f, list, inv) = holders(2, 10_000 * BRL);
+    let (a, b) = (&inv[0], &inv[1]);
+    let seq = f.state().next_redeem_seq;
+    let ix = f.request_redeem_limit_ix(
+        &a.pubkey(),
+        &a.shares,
+        3_000 * BRL,
+        u64::MAX,
+        list.proof(&a.pubkey()),
+    );
+    let meta = f.send_as(ix, &a.key).unwrap();
+    let ev = events::<RedeemRequested>(&meta);
+    assert_eq!(
+        (ev[0].shares, ev[0].min_assets_out),
+        (3_000 * BRL, u64::MAX)
+    );
+    let (r, seq_b) = f.request_redeem(b, &list, 2_000 * BRL);
+    r.unwrap();
+    assert_mutav_err(
+        f.fulfil_redeems(2, u64::MAX, &[seq, seq_b]),
+        MutavError::PriceLimitNotMet,
+    );
+
+    // Paused: the admin path is not gated either.
+    pause(&mut f);
+    let owner_sol = lamports(&f, &a.pubkey());
+    let rent = lamports(&f, &redeem_pda(&f.pdas.config, seq));
+    let admin = f.admin.pubkey();
+    let meta = f.admin_cancel_redeem(a, seq).expect("admin cancel");
+    assert!(f.redeem_request(seq).is_none());
+    assert_eq!(
+        f.balance(&a.shares),
+        10_000 * BRL,
+        "shares back to the owner"
+    );
+    assert_eq!(
+        lamports(&f, &a.pubkey()),
+        owner_sol + rent,
+        "rent to the owner"
+    );
+    let ev = events::<RedeemCancelled>(&meta);
+    assert_eq!(
+        (ev[0].owner, ev[0].seq, ev[0].shares_returned, ev[0].by),
+        (a.pubkey(), seq, 3_000 * BRL, admin)
+    );
+    f.assert_capital_invariants("after the admin cancel");
+
+    let admin = f.admin.insecure_clone();
+    f.send(f.unpause_ix(&admin.pubkey()), &admin).unwrap();
+    f.fulfil_redeems(1, u64::MAX, &[seq, seq_b])
+        .expect("the next request fills");
+    assert_eq!(f.redeem_request(seq_b).unwrap().status, REDEEM_FILLED);
+    assert_eq!(f.state().redeem_head, seq_b + 1);
+}
+
+#[test]
+fn the_admin_cancel_recreates_the_owners_share_account() {
+    // The owner closed its (empty) share account: the admin pays to recreate
+    // it, and the shares land there, never with the signer.
+    let (mut f, list, inv) = holders(1, 10_000 * BRL);
+    let a = &inv[0];
+    let (r, seq) = f.request_redeem(a, &list, 10_000 * BRL);
+    r.unwrap();
+    assert_eq!(f.balance(&a.shares), 0);
+    let close = anchor_spl::token::spl_token::instruction::close_account(
+        &TOKEN_PROGRAM,
+        &a.shares,
+        &a.pubkey(),
+        &a.pubkey(),
+        &[],
+    )
+    .unwrap();
+    f.send_as(close, &a.key).unwrap();
+    f.admin_cancel_redeem(a, seq).expect("admin cancel");
+    assert_eq!(f.balance(&a.shares), 10_000 * BRL);
 }
 
 // ===========================================================================
@@ -863,7 +1028,7 @@ fn the_head_crank_clears_request_cancel_cycles() {
     pause(&mut f);
     let stranger = Keypair::new();
     f.svm.airdrop(&stranger.pubkey(), 1_000_000_000).unwrap();
-    let ix = f.advance_queue_heads_ix(10, &(0..10).collect::<Vec<_>>(), &[]);
+    let ix = f.advance_queue_head_ix(QUEUE_REDEEM, 10, &(0..10).collect::<Vec<_>>());
     let meta = send_ix(&mut f.svm, ix, &[&stranger]).expect("crank 1");
     assert_eq!(f.state().redeem_head, 10);
     let ev = events::<QueueHeadsAdvanced>(&meta);
@@ -889,39 +1054,58 @@ fn the_head_crank_rules() {
     let (mut f, list, inv) = queue_book();
     let a = &inv[0];
     f.mint_brs(&a.brs, 10_000 * BRL);
+    let d0 = f.state().deposit_head;
+    // Unknown queues fail; zero is never a queue.
+    for q in [0u8, 3, u8::MAX] {
+        assert_mutav_err(
+            f.advance_queue_head(q, 4, &[0]),
+            MutavError::InvalidParameter,
+        );
+    }
     // Never past the tail: the next seq's PDA is empty but is not a dead
     // request, so it is not matched.
-    f.advance_queue_heads(4, &[0], &[3]).unwrap();
-    assert_eq!((f.state().redeem_head, f.state().deposit_head), (0, 3));
-    // An account that is not the next seq of either queue is ignored: the
-    // crank moves no funds, so a wrong list only wastes the caller's fee.
-    f.advance_queue_heads(4, &[5], &[0]).unwrap();
-    assert_eq!((f.state().redeem_head, f.state().deposit_head), (0, 3));
+    f.advance_queue_head(QUEUE_REDEEM, 4, &[0]).unwrap();
+    f.advance_queue_head(QUEUE_DEPOSIT, 4, &[d0]).unwrap();
+    assert_eq!((f.state().redeem_head, f.state().deposit_head), (0, d0));
+    // An account that is not the queue's next seq is ignored: the crank
+    // moves no funds, so a wrong list only wastes the caller's fee. A
+    // deposit PDA in the redeem queue's list is such an account.
+    f.advance_queue_head(QUEUE_REDEEM, 4, &[5]).unwrap();
+    let config = f.pdas.config;
+    let mut ix = f.advance_queue_head_ix(QUEUE_REDEEM, 4, &[]);
+    ix.accounts
+        .push(anchor_lang::prelude::AccountMeta::new_readonly(
+            deposit_pda(&config, 0),
+            false,
+        ));
+    let payer = f.payer.insecure_clone();
+    f.send(ix, &payer).unwrap();
+    assert_eq!((f.state().redeem_head, f.state().deposit_head), (0, d0));
     // A filled-but-unclaimed redeem request (nothing remaining) is dead.
     let (_, s0) = f.request_redeem(a, &list, 2_000 * BRL);
     let (_, s1) = f.request_redeem(a, &list, 2_000 * BRL);
     f.fulfil_redeems(1, u64::MAX, &[s0]).unwrap();
     // Rewind the head as if an older binary had left it behind.
     inject(&mut f, |s| s.redeem_head = s0);
-    // Interleaved queues, with a stale account after the live head.
+    // One queue per call; the other head never moves.
     let (_, d) = f.request_deposit(a, &list, 1_000 * BRL);
     f.cancel_deposit(a, d).unwrap();
-    let config = f.pdas.config;
-    let mut ix = f.advance_queue_heads_ix(8, &[s0, s1, s1 + 1], &[]);
-    ix.accounts.insert(
-        6,
-        anchor_lang::prelude::AccountMeta::new_readonly(deposit_pda(&config, d), false),
-    );
-    let payer = f.payer.insecure_clone();
-    f.send(ix, &payer).unwrap();
+    let meta = f
+        .advance_queue_head(QUEUE_REDEEM, 8, &[s0, s1, s1 + 1])
+        .unwrap();
     assert_eq!(f.state().redeem_head, s1, "stops at the live request");
+    assert_eq!(f.state().deposit_head, d0, "the deposit head is untouched");
+    let ev = events::<QueueHeadsAdvanced>(&meta);
+    assert_eq!((ev[0].redeem_head, ev[0].deposit_head), (s1, d0));
+    f.advance_queue_head(QUEUE_DEPOSIT, 8, &[d]).unwrap();
     assert_eq!(f.state().deposit_head, d + 1);
+    assert_eq!(f.state().redeem_head, s1);
     // `max` bounds the accounts read.
     let (_, d2) = f.request_deposit(a, &list, 1_000 * BRL);
     f.cancel_deposit(a, d2).unwrap();
-    f.advance_queue_heads(0, &[], &[d2]).unwrap();
+    f.advance_queue_head(QUEUE_DEPOSIT, 0, &[d2]).unwrap();
     assert_eq!(f.state().deposit_head, d2, "max = 0 reads nothing");
-    f.advance_queue_heads(1, &[], &[d2]).unwrap();
+    f.advance_queue_head(QUEUE_DEPOSIT, 1, &[d2]).unwrap();
     assert_eq!(f.state().deposit_head, d2 + 1);
 }
 
@@ -1059,4 +1243,58 @@ fn queue_invariants_hold_over_random_sequences() {
             }
         }
     }
+}
+
+#[test]
+fn a_deposit_that_would_mint_zero_shares_is_not_filled() {
+    // Net assets with no shares outstanding make 1,000 BRL worth 0 shares:
+    // the batch stops at that request, which keeps its BRS in escrow.
+    let (mut f, list, inv) = setup(1, 10_000 * BRL);
+    let a = &inv[0];
+    let ix =
+        f.request_deposit_limit_ix(&a.pubkey(), &a.brs, 1_000 * BRL, 7, list.proof(&a.pubkey()));
+    let seq = f.state().next_deposit_seq;
+    let meta = f.send_as(ix, &a.key).unwrap();
+    assert_eq!(events::<DepositRequested>(&meta)[0].min_shares_out, 7);
+    let ix =
+        f.request_deposit_limit_ix(&a.pubkey(), &a.brs, 1_000 * BRL, 0, list.proof(&a.pubkey()));
+    f.send_as(ix, &a.key).unwrap();
+    inject(&mut f, |s| s.brs_balance += 2_000 * BRL);
+    let escrow = f.balance(&f.pdas.pending_deposits);
+    let before = f.state();
+    assert_mutav_err(
+        f.fulfil_deposits(2, &[seq, seq + 1]),
+        MutavError::RequestTooSmall,
+    );
+    let r = f.deposit_request(seq).unwrap();
+    assert_eq!((r.status, r.shares_out), (DEPOSIT_PENDING, 0));
+    assert_eq!(f.balance(&f.pdas.pending_deposits), escrow, "BRS not taken");
+    let s = f.state();
+    assert_eq!(
+        (
+            s.deposit_head,
+            s.pending_deposits_total,
+            s.shares_outstanding
+        ),
+        (
+            before.deposit_head,
+            before.pending_deposits_total,
+            before.shares_outstanding
+        )
+    );
+}
+
+#[test]
+fn fulfil_deposits_count_is_bounded() {
+    let (mut f, list, inv) = setup(1, 10_000 * BRL);
+    let (r, seq) = f.request_deposit(&inv[0], &list, 1_000 * BRL);
+    r.unwrap();
+    for count in [0, MAX_FULFIL_BATCH + 1] {
+        assert_mutav_err(
+            f.fulfil_deposits(count, &[seq]),
+            MutavError::InvalidParameter,
+        );
+    }
+    f.fulfil_deposits(MAX_FULFIL_BATCH, &[seq])
+        .expect("count at the bound");
 }

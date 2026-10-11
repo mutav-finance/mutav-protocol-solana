@@ -14,6 +14,8 @@ import {
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU8Decoder,
+  getU8Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
   SolanaError,
   transformEncoder,
@@ -93,15 +95,20 @@ export type CloseGuaranteeInstruction<
 export type CloseGuaranteeInstructionData = {
   discriminator: ReadonlyUint8Array;
   id: ReadonlyUint8Array;
+  reason: number;
 };
 
-export type CloseGuaranteeInstructionDataArgs = { id: ReadonlyUint8Array };
+export type CloseGuaranteeInstructionDataArgs = {
+  id: ReadonlyUint8Array;
+  reason: number;
+};
 
 export function getCloseGuaranteeInstructionDataEncoder(): FixedSizeEncoder<CloseGuaranteeInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["id", fixEncoderSize(getBytesEncoder(), 32)],
+      ["reason", getU8Encoder()],
     ]),
     (value) => ({ ...value, discriminator: CLOSE_GUARANTEE_DISCRIMINATOR }),
   );
@@ -111,6 +118,7 @@ export function getCloseGuaranteeInstructionDataDecoder(): FixedSizeDecoder<Clos
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["id", fixDecoderSize(getBytesDecoder(), 32)],
+    ["reason", getU8Decoder()],
   ]);
 }
 
@@ -140,6 +148,7 @@ export type CloseGuaranteeAsyncInput<
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   id: CloseGuaranteeInstructionDataArgs["id"];
+  reason: CloseGuaranteeInstructionDataArgs["reason"];
 };
 
 export async function getCloseGuaranteeInstructionAsync<
@@ -311,6 +320,7 @@ export type CloseGuaranteeInput<
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   id: CloseGuaranteeInstructionDataArgs["id"];
+  reason: CloseGuaranteeInstructionDataArgs["reason"];
 };
 
 export function getCloseGuaranteeInstruction<

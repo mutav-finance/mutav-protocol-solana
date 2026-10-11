@@ -76,6 +76,12 @@ export type RedeemRequest = {
    */
   sharesFilled: bigint;
   /**
+   * The owner's price limit: the least BRS this request accepts
+   * (ADR 0023). `0` = no limit. A fill that would pay less stops the
+   * batch at this request.
+   */
+  minAssetsOut: bigint;
+  /**
    * Zeroed. Never read or written by logic. Holds the rest of the ADR 0010
    * partial-fill fields without a migration (ADR 0019).
    */
@@ -106,6 +112,12 @@ export type RedeemRequestArgs = {
    */
   sharesFilled: number | bigint;
   /**
+   * The owner's price limit: the least BRS this request accepts
+   * (ADR 0023). `0` = no limit. A fill that would pay less stops the
+   * batch at this request.
+   */
+  minAssetsOut: number | bigint;
+  /**
    * Zeroed. Never read or written by logic. Holds the rest of the ADR 0010
    * partial-fill fields without a migration (ADR 0019).
    */
@@ -128,7 +140,8 @@ export function getRedeemRequestEncoder(): FixedSizeEncoder<RedeemRequestArgs> {
       ["filledAt", getI64Encoder()],
       ["status", getU8Encoder()],
       ["sharesFilled", getU64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 56)],
+      ["minAssetsOut", getU64Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 48)],
     ]),
     (value) => ({ ...value, discriminator: REDEEM_REQUEST_DISCRIMINATOR }),
   );
@@ -149,7 +162,8 @@ export function getRedeemRequestDecoder(): FixedSizeDecoder<RedeemRequest> {
     ["filledAt", getI64Decoder()],
     ["status", getU8Decoder()],
     ["sharesFilled", getU64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 56)],
+    ["minAssetsOut", getU64Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 48)],
   ]);
 }
 

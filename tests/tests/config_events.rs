@@ -4,12 +4,13 @@
 
 use anchor_lang::{prelude::Pubkey, AccountDeserialize, AnchorSerialize, Discriminator};
 use mutav::{
-    constants::{field, CONFIG_FIELDS, INSTANT_EXIT},
+    constants::{field, CONFIG_FIELDS, INSTANT_EXIT, ROLE_OPERATOR, ROLE_PAUSER},
     events::{ConfigUpdated, FieldBytes},
     state::VaultConfig,
-    SetConfigArgs,
+    ConfigParam,
 };
 use mutav_tests::helpers::*;
+use solana_keypair::Keypair;
 use solana_signer::Signer;
 
 /// The value of field `id` in `c`, encoded as `ConfigUpdated` encodes it.
@@ -39,28 +40,41 @@ fn value_bytes(c: &VaultConfig, id: u16) -> [u8; 32] {
         CAPS_MIN_REQUEST => c.caps.min_request.field_bytes(),
         CAPS_MAX_REQUEST => c.caps.max_request.field_bytes(),
         MAX_NAV_MOVE_BPS => c.caps.max_nav_move_bps.field_bytes(),
+        PENDING_ADMIN => c.pending_admin.field_bytes(),
+        PENDING_OPERATOR => c.pending_operator.field_bytes(),
+        PENDING_PAUSER => c.pending_pauser.field_bytes(),
+        GUARDIAN_0 => c.guardians[0].field_bytes(),
+        GUARDIAN_1 => c.guardians[1].field_bytes(),
+        GUARDIAN_2 => c.guardians[2].field_bytes(),
+        CAPS_STRESS_BUFFER => c.caps.stress_buffer.field_bytes(),
+        CAPS_MAX_QUEUE_WAIT_SECS => c.caps.max_queue_wait_secs.field_bytes(),
+        CAPS_MAX_REINSTATE_AGE => c.caps.max_reinstate_age.field_bytes(),
         other => panic!("field id {other} has no value mapping in this test"),
     }
 }
 
-/// Changes only field `id` in `set_config` args. Returns `false` if the field
+/// A `set_config` param that changes only field `id`, or `None` if the field
 /// is not a `set_config` field.
-fn change_in_set_config(a: &mut SetConfigArgs, id: u16) -> bool {
+fn change_in_set_config(c: &VaultConfig, id: u16) -> Option<ConfigParam> {
     use field::*;
-    match id {
-        COVERAGE_RATIO_BPS => a.coverage_ratio_bps += 1,
-        FEE_TAKE_BPS => a.fee_take_bps += 1,
-        MUTAV_CAPITAL_WALLET => a.mutav_capital_wallet = Pubkey::new_unique(),
-        CAPS_MAX_TVL => a.caps.max_tvl += 1,
-        CAPS_MAX_COVER_PER_GUARANTEE => a.caps.max_cover_per_guarantee += 1,
-        CAPS_MAX_CLAIM_PER_CALL => a.caps.max_claim_per_call += 1,
-        CAPS_MAX_CLAIM_PER_PERIOD => a.caps.max_claim_per_period += 1,
-        CAPS_MIN_REQUEST => a.caps.min_request += 1,
-        CAPS_MAX_REQUEST => a.caps.max_request += 1,
-        MAX_NAV_MOVE_BPS => a.caps.max_nav_move_bps += 1,
-        _ => return false,
-    }
-    true
+    use ConfigParam::*;
+    let k = &c.caps;
+    Some(match id {
+        COVERAGE_RATIO_BPS => CoverageRatioBps(c.coverage_ratio_bps - 1),
+        FEE_TAKE_BPS => FeeTakeBps(c.fee_take_bps + 1),
+        MUTAV_CAPITAL_WALLET => MutavCapitalWallet(Pubkey::new_unique()),
+        CAPS_MAX_TVL => MaxTvl(k.max_tvl + 1),
+        CAPS_MAX_COVER_PER_GUARANTEE => MaxCoverPerGuarantee(k.max_cover_per_guarantee + 1),
+        CAPS_MAX_CLAIM_PER_CALL => MaxClaimPerCall(k.max_claim_per_call + 1),
+        CAPS_MAX_CLAIM_PER_PERIOD => MaxClaimPerPeriod(k.max_claim_per_period + 1),
+        CAPS_MIN_REQUEST => MinRequest(k.min_request + 1),
+        CAPS_MAX_REQUEST => MaxRequest(k.max_request + 1),
+        MAX_NAV_MOVE_BPS => MaxNavMoveBps(k.max_nav_move_bps + 1),
+        CAPS_STRESS_BUFFER => StressBuffer(k.stress_buffer + 1),
+        CAPS_MAX_QUEUE_WAIT_SECS => MaxQueueWaitSecs(k.max_queue_wait_secs + 1),
+        CAPS_MAX_REINSTATE_AGE => MaxReinstateAge(k.max_reinstate_age + 1),
+        _ => return None,
+    })
 }
 
 /// Writes `feature_flags` directly into the account, as a newer binary could.
@@ -86,15 +100,50 @@ fn inject_feature_flags(f: &mut Fixture, flags: u64) {
 fn change_field(f: &mut Fixture, id: u16) -> litesvm::types::TransactionMetadata {
     let admin = f.admin.insecure_clone();
     let a = admin.pubkey();
-    let pauser = f.config().pauser;
-    let operator = f.config().operator;
+    let fresh = |f: &mut Fixture| {
+        let k = Keypair::new();
+        f.svm.airdrop(&k.pubkey(), 1_000_000_000).unwrap();
+        k
+    };
     match id {
-        field::OPERATOR => {
-            let ix = f.set_roles_ix(&a, Pubkey::new_unique(), pauser);
+        // An acceptance changes the role and clears the pending key; a
+        // proposal changes the pending key only.
+        field::OPERATOR | field::PAUSER => {
+            let role = if id == field::OPERATOR {
+                ROLE_OPERATOR
+            } else {
+                ROLE_PAUSER
+            };
+            let k = fresh(f);
+            let ix = f.propose_role_ix(&a, role, k.pubkey());
+            f.send(ix, &admin).unwrap();
+            let ix = f.accept_role_ix(&k.pubkey(), role);
+            f.send(ix, &k)
+        }
+        field::PENDING_OPERATOR => {
+            let ix = f.propose_role_ix(&a, ROLE_OPERATOR, Pubkey::new_unique());
             f.send(ix, &admin)
         }
-        field::PAUSER => {
-            let ix = f.set_roles_ix(&a, operator, Pubkey::new_unique());
+        field::PENDING_PAUSER => {
+            let ix = f.propose_role_ix(&a, ROLE_PAUSER, Pubkey::new_unique());
+            f.send(ix, &admin)
+        }
+        field::PENDING_ADMIN => {
+            let ix = f.propose_admin_ix(&a, Pubkey::new_unique());
+            f.send(ix, &admin)
+        }
+        field::ADMIN => {
+            let k = fresh(f);
+            let ix = f.propose_admin_ix(&a, k.pubkey());
+            f.send(ix, &admin).unwrap();
+            let res = f.send(f.accept_admin_ix(&k.pubkey()), &k);
+            f.admin = k;
+            res
+        }
+        field::GUARDIAN_0 | field::GUARDIAN_1 | field::GUARDIAN_2 => {
+            let mut g = f.config().guardians;
+            g[(id - field::GUARDIAN_0) as usize] = Pubkey::new_unique();
+            let ix = f.set_guardians_ix(&a, g);
             f.send(ix, &admin)
         }
         field::PAYMENTS_ACCOUNT => {
@@ -105,8 +154,7 @@ fn change_field(f: &mut Fixture, id: u16) -> litesvm::types::TransactionMetadata
         }
         field::TREASURY_ACCOUNT => {
             let new = f.token_account(&Pubkey::new_unique());
-            let args = set_config_args(&f.config());
-            let ix = f.set_config_ix(&a, args, &new);
+            let ix = f.set_treasury_account_ix(&a, &new);
             f.send(ix, &admin)
         }
         field::INVESTOR_ALLOWLIST_ROOT => {
@@ -118,21 +166,13 @@ fn change_field(f: &mut Fixture, id: u16) -> litesvm::types::TransactionMetadata
             f.send(ix, &admin)
         }
         // The pilot cannot set a feature bit, but clearing one is always
-        // allowed: inject `INSTANT_EXIT` as a newer binary would have, then
-        // clear it.
-        // (The caller injects the bit before taking its snapshot.)
-        field::FEATURE_FLAGS => {
-            let mut args = set_config_args(&f.config());
-            args.feature_flags = 0;
-            f.set_config(args)
-        }
+        // allowed: the caller injects `INSTANT_EXIT` as a newer binary would
+        // have, then this clears it.
+        field::FEATURE_FLAGS => f.set_config(vec![ConfigParam::FeatureFlags(0)]),
         id => {
-            let mut args = set_config_args(&f.config());
-            assert!(
-                change_in_set_config(&mut args, id),
-                "mutable field {id} has no event path"
-            );
-            f.set_config(args)
+            let p = change_in_set_config(&f.config(), id)
+                .unwrap_or_else(|| panic!("mutable field {id} has no event path"));
+            f.set_config(vec![p])
         }
     }
     .unwrap_or_else(|e| {
@@ -160,14 +200,13 @@ fn every_mutable_config_field_emits_config_updated() {
         }
         let meta = change_field(&mut f, row.id);
         let after = f.config();
-        let ev = events::<ConfigUpdated>(&meta);
-        assert_eq!(
-            ev.len(),
-            1,
-            "{}: expected one ConfigUpdated, got {:?}",
-            row.name,
-            ev.iter().map(|e| e.field).collect::<Vec<_>>()
-        );
+        // An acceptance also clears its pending key; every other path changes
+        // one field. Either way the field appears exactly once.
+        let ev: Vec<ConfigUpdated> = events::<ConfigUpdated>(&meta)
+            .into_iter()
+            .filter(|e| e.field == row.id)
+            .collect();
+        assert_eq!(ev.len(), 1, "{}: expected one ConfigUpdated", row.name);
         let e = &ev[0];
         assert_eq!(e.field, row.id, "{}", row.name);
         assert_eq!(e.config, f.pdas.config);
@@ -193,15 +232,14 @@ fn fixed_fields_have_no_path() {
     assert_eq!(
         fixed,
         vec![
-            "admin",
             "reserve_mint",
             "reserve_token_program",
             "reserve_decimals",
             "share_mint"
         ]
     );
-    // `set_config` args carry none of them (compile-time: `SetConfigArgs` has
-    // no such fields); `reserve_mint_and_token_program_never_change` in
+    // `set_config` args carry none of them (compile-time: `ConfigParam` has
+    // no such variants); `reserve_mint_and_token_program_never_change` in
     // `set_config.rs` checks the values survive every update.
 }
 
@@ -209,33 +247,21 @@ fn fixed_fields_have_no_path() {
 fn many_fields_in_one_set_config() {
     let mut f = Fixture::new();
     let before = f.config();
-    let mut args = set_config_args(&before);
-    let ids: Vec<u16> = CONFIG_FIELDS
+    let params: Vec<ConfigParam> = CONFIG_FIELDS
         .iter()
-        .map(|r| r.id)
-        .filter(|&id| {
-            let mut probe = args.clone();
-            change_in_set_config(&mut probe, id)
-        })
+        .filter_map(|r| change_in_set_config(&before, r.id))
         .collect();
-    for &id in &ids {
-        change_in_set_config(&mut args, id);
-    }
+    let ids: Vec<u16> = params.iter().map(|p| p.field()).collect();
     let admin = f.admin.insecure_clone();
-    let treasury = before.treasury_account;
-    let ix = f.set_config_ix(&admin.pubkey(), args, &treasury);
-    let cu_ix = anchor_lang::solana_program::instruction::Instruction::new_with_bytes(
-        Pubkey::from_str_const("ComputeBudget111111111111111111111111111111"),
-        &[&[2u8][..], &1_400_000u32.to_le_bytes()].concat(),
-        vec![],
-    );
+    let ix = f.set_config_ix(&admin.pubkey(), params);
     let payer = f.payer.insecure_clone();
-    let meta = send_ixs(&mut f.svm, &[cu_ix, ix], &[&payer, &admin]).expect("bulk set_config");
+    let refresh = f.refresh_ix();
+    let meta = send_ixs(&mut f.svm, &[refresh, ix], &[&payer, &admin]).expect("bulk set_config");
     let got: Vec<u16> = events::<ConfigUpdated>(&meta)
         .iter()
         .map(|e| e.field)
         .collect();
-    assert_eq!(got, ids, "one event per changed field, in table order");
+    assert_eq!(got, ids, "one event per changed field, in param order");
     println!(
         "set_config changing {} fields: {} CU",
         ids.len(),

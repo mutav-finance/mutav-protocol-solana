@@ -135,6 +135,17 @@ export function navPerShare(netAssets: bigint, sharesOutstanding: bigint): bigin
   return mulDiv(netAssets, NAV_SCALE, sharesOutstanding, 'down');
 }
 
+/**
+ * The NAV `refresh` publishes and `clear_fulfil_halt` checks against its
+ * `nav_bounds` (`pricing::published_nav`): `0` with no shares outstanding,
+ * otherwise `navPerShare` floored at `1`. Fills check `conversionNav` instead.
+ */
+export function publishedNav(netAssets: bigint, sharesOutstanding: bigint): bigint {
+  if (u64(sharesOutstanding) === 0n) return 0n;
+  const nav = navPerShare(netAssets, sharesOutstanding);
+  return nav > 1n ? nav : 1n;
+}
+
 export type SolvencyInputs = {
   brsBalance: bigint;
   remainingCoverTotal: bigint;

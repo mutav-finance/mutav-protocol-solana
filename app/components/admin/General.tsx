@@ -63,7 +63,7 @@ function Emergency({ mode }: { mode: Mode }) {
           <Action label="pause" request={{ kind: "pause" }} variant="destructive" disabled={paused} />
         </PauserAction>
         <AdminAction title="Unpause" label="unpause" mode={mode} request={paused ? { kind: "unpause" } : null} note={paused ? "Reopens what pause stopped." : "The reserve is not paused."} />
-        <PauserAction title="Revoke operator" note={revoked ? "The operator role is already revoked: appoint a new key with set_roles below." : "Clears the operator key if it is compromised: every operator instruction fails until the admin appoints a new one with set_roles."}>
+        <PauserAction title="Revoke operator" note={revoked ? "The operator role is already revoked: propose a new key below; it accepts with accept_role." : "Clears the operator key if it is compromised: every operator instruction fails until a key the admin proposes accepts the role."}>
           <Action label="revoke_operator" request={{ kind: "revoke_operator" }} variant="destructive" disabled={revoked} />
         </PauserAction>
         <AdminAction title="Clear fulfil halt" label="clear_fulfil_halt" mode={mode} request={halted ? { kind: "clear_fulfil_halt" } : null} note={halted ? "The NAV-move guard halted both queues. Clearing resets the NAV baseline (ADR 0015)." : "Fulfilment is not halted."} />
@@ -107,7 +107,7 @@ function CoverageControl({ mode }: { mode: Mode }) {
       title="Coverage ratio and reserve limits"
       mode={mode}
       fields={[
-        bpsField("coverageRatioBps", "Coverage ratio c (bps)", c.coverageRatioBps, 65_535, MIN_COVERAGE_RATIO_BPS),
+        bpsField("coverageRatioBps", "Coverage ratio c (bps)", c.coverageRatioBps, 10_000, MIN_COVERAGE_RATIO_BPS),
         brsField("maxTvl", "Max reserve (BRS)", c.caps.maxTvl),
         brsField("maxCoverPerGuarantee", "Max cover per guarantee (BRS)", c.caps.maxCoverPerGuarantee),
       ]}
@@ -162,8 +162,8 @@ function RolesControl({ mode }: { mode: Mode }) {
   const req = { kind: "set_roles" as const, operator: operator.trim(), pauser: pauser.trim() };
   const bad = rolesError(req, reserve.config.admin);
   return (
-    <AdminAction title="Operator and pauser keys" label="set_roles" mode={mode} request={bad ? null : req}>
-      <Facts now={<><Explorer value={reserve.config.operator} /> · <Explorer value={reserve.config.pauser} /></>} bound={m("set, distinct from the admin and from each other")} does="Appoints a new operator key (for example after revoke_operator) or a new pauser key." />
+    <AdminAction title="Operator and pauser keys" label="propose_role" mode={mode} request={bad ? null : req}>
+      <Facts now={<><Explorer value={reserve.config.operator} /> · <Explorer value={reserve.config.pauser} /></>} bound={m("set, distinct from the admin and from each other")} does="Proposes a new operator key (for example after revoke_operator) or a new pauser key; each new key signs accept_role within 72 hours (ADR 0020)." />
       <Grid>
         <TextField id="adm-operator" label="Operator" value={operator} onChange={setOperator} />
         <TextField id="adm-pauser" label="Pauser" value={pauser} onChange={setPauser} />

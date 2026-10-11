@@ -49,6 +49,12 @@ import {
   findVaultAuthorityPda,
 } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
+import {
+  getNavBoundsDecoder,
+  getNavBoundsEncoder,
+  type NavBounds,
+  type NavBoundsArgs,
+} from "../types";
 
 export const FULFIL_DEPOSITS_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array(
   [59, 104, 0, 162, 184, 213, 184, 219],
@@ -116,15 +122,20 @@ export type FulfilDepositsInstruction<
 export type FulfilDepositsInstructionData = {
   discriminator: ReadonlyUint8Array;
   count: number;
+  navBounds: NavBounds;
 };
 
-export type FulfilDepositsInstructionDataArgs = { count: number };
+export type FulfilDepositsInstructionDataArgs = {
+  count: number;
+  navBounds: NavBoundsArgs;
+};
 
 export function getFulfilDepositsInstructionDataEncoder(): FixedSizeEncoder<FulfilDepositsInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["count", getU8Encoder()],
+      ["navBounds", getNavBoundsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: FULFIL_DEPOSITS_DISCRIMINATOR }),
   );
@@ -134,6 +145,7 @@ export function getFulfilDepositsInstructionDataDecoder(): FixedSizeDecoder<Fulf
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["count", getU8Decoder()],
+    ["navBounds", getNavBoundsDecoder()],
   ]);
 }
 
@@ -174,6 +186,7 @@ export type FulfilDepositsAsyncInput<
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   count: FulfilDepositsInstructionDataArgs["count"];
+  navBounds: FulfilDepositsInstructionDataArgs["navBounds"];
 };
 
 export async function getFulfilDepositsInstructionAsync<
@@ -441,6 +454,7 @@ export type FulfilDepositsInput<
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   count: FulfilDepositsInstructionDataArgs["count"];
+  navBounds: FulfilDepositsInstructionDataArgs["navBounds"];
 };
 
 export function getFulfilDepositsInstruction<

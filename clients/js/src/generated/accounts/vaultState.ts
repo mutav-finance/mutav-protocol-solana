@@ -103,6 +103,14 @@ export type VaultState = {
   claimDayBuckets: Array<bigint>;
   /** The day (`unix_ts / 86_400`) the ring was last rolled to. `0` = never. */
   claimDayAnchor: bigint;
+  /** BRS moved into `reserve` by deposit fills. */
+  depositedAssetsTotal: bigint;
+  /** Shares created by deposit fills. */
+  mintedSharesTotal: bigint;
+  /** Shares burned by redemption fills. */
+  redeemedSharesTotal: bigint;
+  /** BRS moved to `claims` by redemption fills. */
+  redeemedAssetsTotal: bigint;
   /**
    * Zeroed. Holds the planned carves (phase-2 `InstantExitState` 88 bytes
    * and the buffer earmark, the claim-notice counter, the ADR 0012
@@ -160,6 +168,14 @@ export type VaultStateArgs = {
   claimDayBuckets: Array<number | bigint>;
   /** The day (`unix_ts / 86_400`) the ring was last rolled to. `0` = never. */
   claimDayAnchor: number | bigint;
+  /** BRS moved into `reserve` by deposit fills. */
+  depositedAssetsTotal: number | bigint;
+  /** Shares created by deposit fills. */
+  mintedSharesTotal: number | bigint;
+  /** Shares burned by redemption fills. */
+  redeemedSharesTotal: number | bigint;
+  /** BRS moved to `claims` by redemption fills. */
+  redeemedAssetsTotal: number | bigint;
   /**
    * Zeroed. Holds the planned carves (phase-2 `InstantExitState` 88 bytes
    * and the buffer earmark, the claim-notice counter, the ADR 0012
@@ -200,7 +216,11 @@ export function getVaultStateEncoder(): FixedSizeEncoder<VaultStateArgs> {
       ["inflowNav", getU64Encoder()],
       ["claimDayBuckets", getArrayEncoder(getU64Encoder(), { size: 31 })],
       ["claimDayAnchor", getI64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 256)],
+      ["depositedAssetsTotal", getU64Encoder()],
+      ["mintedSharesTotal", getU64Encoder()],
+      ["redeemedSharesTotal", getU64Encoder()],
+      ["redeemedAssetsTotal", getU64Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 224)],
     ]),
     (value) => ({ ...value, discriminator: VAULT_STATE_DISCRIMINATOR }),
   );
@@ -237,7 +257,11 @@ export function getVaultStateDecoder(): FixedSizeDecoder<VaultState> {
     ["inflowNav", getU64Decoder()],
     ["claimDayBuckets", getArrayDecoder(getU64Decoder(), { size: 31 })],
     ["claimDayAnchor", getI64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 256)],
+    ["depositedAssetsTotal", getU64Decoder()],
+    ["mintedSharesTotal", getU64Decoder()],
+    ["redeemedSharesTotal", getU64Decoder()],
+    ["redeemedAssetsTotal", getU64Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 224)],
   ]);
 }
 

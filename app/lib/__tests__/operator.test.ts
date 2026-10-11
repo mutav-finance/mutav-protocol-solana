@@ -54,3 +54,14 @@ describe("duties and activity", () => {
     expect(instructionName(new Uint8Array([7]), table)).toBe("unknown");
   });
 });
+
+describe("operator history counts operator acceptances only", async () => {
+  const { isOperatorAccept } = await import("../server/operator");
+  const { ACCEPT_ROLE_DISCRIMINATOR, PROPOSE_ROLE_DISCRIMINATOR } = await import("@mutav-finance/mutav-protocol-solana");
+  const ix = (disc: ArrayLike<number>, role: number) => Uint8Array.from([...Array.from(disc), role]);
+  it("accept_role(1) is an operator change; accept_role(2) and others are not", () => {
+    expect(isOperatorAccept(ix(ACCEPT_ROLE_DISCRIMINATOR, 1))).toBe(true);
+    expect(isOperatorAccept(ix(ACCEPT_ROLE_DISCRIMINATOR, 2))).toBe(false);
+    expect(isOperatorAccept(ix(PROPOSE_ROLE_DISCRIMINATOR, 1))).toBe(false);
+  });
+});

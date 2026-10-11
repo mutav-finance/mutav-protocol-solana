@@ -86,11 +86,17 @@ export type Guarantee = {
   /** `0` while active. */
   closedAt: bigint;
   /**
-   * Zeroed. Never read or written by logic. The 192-byte pilot budget
-   * (spec §14.2) holds the ADR 0012 lifecycle fields (88 bytes) without a
-   * migration; it was grown from 64 before the layout freeze, and the 12
-   * bytes of the removed display fields (`rent`, `default_multiplier_bps`,
-   * `exit_multiplier_bps`) returned to it (ADR 0019).
+   * `CLOSE_RELEASED` or `CLOSE_VOID`, written by `close_guarantee`
+   * (ADR 0020). `0` while active.
+   */
+  closeReason: number;
+  /**
+   * Zeroed. Never read or written by logic. The pilot budget (spec §14.2)
+   * holds the ADR 0012 lifecycle fields (88 bytes) without a migration; it
+   * was grown from 64 before the layout freeze, the 12 bytes of the
+   * removed display fields (`rent`, `default_multiplier_bps`,
+   * `exit_multiplier_bps`) returned to it, and `close_reason` took one
+   * (ADR 0019).
    */
   reserved: ReadonlyUint8Array;
 };
@@ -131,11 +137,17 @@ export type GuaranteeArgs = {
   /** `0` while active. */
   closedAt: number | bigint;
   /**
-   * Zeroed. Never read or written by logic. The 192-byte pilot budget
-   * (spec §14.2) holds the ADR 0012 lifecycle fields (88 bytes) without a
-   * migration; it was grown from 64 before the layout freeze, and the 12
-   * bytes of the removed display fields (`rent`, `default_multiplier_bps`,
-   * `exit_multiplier_bps`) returned to it (ADR 0019).
+   * `CLOSE_RELEASED` or `CLOSE_VOID`, written by `close_guarantee`
+   * (ADR 0020). `0` while active.
+   */
+  closeReason: number;
+  /**
+   * Zeroed. Never read or written by logic. The pilot budget (spec §14.2)
+   * holds the ADR 0012 lifecycle fields (88 bytes) without a migration; it
+   * was grown from 64 before the layout freeze, the 12 bytes of the
+   * removed display fields (`rent`, `default_multiplier_bps`,
+   * `exit_multiplier_bps`) returned to it, and `close_reason` took one
+   * (ADR 0019).
    */
   reserved: ReadonlyUint8Array;
 };
@@ -160,7 +172,8 @@ export function getGuaranteeEncoder(): FixedSizeEncoder<GuaranteeArgs> {
       ["status", getU8Encoder()],
       ["registeredAt", getI64Encoder()],
       ["closedAt", getI64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 204)],
+      ["closeReason", getU8Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 203)],
     ]),
     (value) => ({ ...value, discriminator: GUARANTEE_DISCRIMINATOR }),
   );
@@ -185,7 +198,8 @@ export function getGuaranteeDecoder(): FixedSizeDecoder<Guarantee> {
     ["status", getU8Decoder()],
     ["registeredAt", getI64Decoder()],
     ["closedAt", getI64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 204)],
+    ["closeReason", getU8Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 203)],
   ]);
 }
 

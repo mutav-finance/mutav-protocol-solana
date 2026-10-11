@@ -48,6 +48,9 @@ export type RedeemsFulfilledEvent = {
   assets: bigint;
   nav: bigint;
   idleFreeCapital: bigint;
+  /** Lifetime counters after the batch. */
+  redeemedSharesTotal: bigint;
+  redeemedAssetsTotal: bigint;
 };
 
 export type RedeemsFulfilledEventArgs = {
@@ -59,6 +62,9 @@ export type RedeemsFulfilledEventArgs = {
   assets: number | bigint;
   nav: number | bigint;
   idleFreeCapital: number | bigint;
+  /** Lifetime counters after the batch. */
+  redeemedSharesTotal: number | bigint;
+  redeemedAssetsTotal: number | bigint;
 };
 
 /** Gets the encoder for {@link RedeemsFulfilledEventArgs} event data. */
@@ -73,6 +79,8 @@ export function getRedeemsFulfilledEventEncoder(): FixedSizeEncoder<RedeemsFulfi
       ["assets", getU64Encoder()],
       ["nav", getU64Encoder()],
       ["idleFreeCapital", getU64Encoder()],
+      ["redeemedSharesTotal", getU64Encoder()],
+      ["redeemedAssetsTotal", getU64Encoder()],
     ]),
     [getConstantEncoder(REDEEMS_FULFILLED_EVENT_DISCRIMINATOR)],
   );
@@ -90,6 +98,8 @@ export function getRedeemsFulfilledEventDecoder(): FixedSizeDecoder<RedeemsFulfi
       ["assets", getU64Decoder()],
       ["nav", getU64Decoder()],
       ["idleFreeCapital", getU64Decoder()],
+      ["redeemedSharesTotal", getU64Decoder()],
+      ["redeemedAssetsTotal", getU64Decoder()],
     ]),
     [getConstantDecoder(REDEEMS_FULFILLED_EVENT_DISCRIMINATOR)],
   );

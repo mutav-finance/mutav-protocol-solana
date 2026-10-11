@@ -63,6 +63,10 @@ export type ClaimSharesInstruction<
   TAccountVaultAuthority extends string | AccountMeta<string> = string,
   TAccountShareTokenProgram extends string | AccountMeta<string> =
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -92,6 +96,12 @@ export type ClaimSharesInstruction<
       TAccountShareTokenProgram extends string
         ? ReadonlyAccount<TAccountShareTokenProgram>
         : TAccountShareTokenProgram,
+      TAccountAssociatedTokenProgram extends string
+        ? ReadonlyAccount<TAccountAssociatedTokenProgram>
+        : TAccountAssociatedTokenProgram,
+      TAccountSystemProgram extends string
+        ? ReadonlyAccount<TAccountSystemProgram>
+        : TAccountSystemProgram,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -140,6 +150,10 @@ export type ClaimSharesAsyncInput<
     InstructionAccountInput,
   TAccountShareTokenProgram extends InstructionAccountInput =
     InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -149,10 +163,15 @@ export type ClaimSharesAsyncInput<
   config: TAccountConfig;
   depositRequest: TAccountDepositRequest;
   shareMint: TAccountShareMint;
-  /** The owner's share token account. */
+  /**
+   * The owner's associated token account for the share mint; created
+   * idempotently in the handler, the owner paying its rent (ADR 0023).
+   */
   ownerShares: TAccountOwnerShares;
   vaultAuthority?: TAccountVaultAuthority;
   shareTokenProgram?: TAccountShareTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
 };
@@ -165,6 +184,8 @@ export async function getClaimSharesInstructionAsync<
   TAccountOwnerShares extends InstructionAccountInput,
   TAccountVaultAuthority extends InstructionAccountInput,
   TAccountShareTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -177,6 +198,8 @@ export async function getClaimSharesInstructionAsync<
     TAccountOwnerShares,
     TAccountVaultAuthority,
     TAccountShareTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountSystemProgram,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -211,6 +234,14 @@ export async function getClaimSharesInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountShareTokenProgram,
       InstructionAccountInputAddress<TAccountShareTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -257,6 +288,16 @@ export async function getClaimSharesInstructionAsync<
       isSigner: false,
       isWritable: false,
     },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -289,6 +330,14 @@ export async function getClaimSharesInstructionAsync<
     accounts.shareTokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
+  }
 
   return Object.freeze({
     accounts: [
@@ -299,6 +348,8 @@ export async function getClaimSharesInstructionAsync<
       getAccountMeta("ownerShares", accounts.ownerShares),
       getAccountMeta("vaultAuthority", accounts.vaultAuthority),
       getAccountMeta("shareTokenProgram", accounts.shareTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -335,6 +386,14 @@ export async function getClaimSharesInstructionAsync<
       InstructionAccountInputAddress<TAccountShareTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -356,6 +415,10 @@ export type ClaimSharesInput<
     InstructionAccountInput,
   TAccountShareTokenProgram extends InstructionAccountInput =
     InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -365,10 +428,15 @@ export type ClaimSharesInput<
   config: TAccountConfig;
   depositRequest: TAccountDepositRequest;
   shareMint: TAccountShareMint;
-  /** The owner's share token account. */
+  /**
+   * The owner's associated token account for the share mint; created
+   * idempotently in the handler, the owner paying its rent (ADR 0023).
+   */
   ownerShares: TAccountOwnerShares;
   vaultAuthority: TAccountVaultAuthority;
   shareTokenProgram?: TAccountShareTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
 };
@@ -381,6 +449,8 @@ export function getClaimSharesInstruction<
   TAccountOwnerShares extends InstructionAccountInput,
   TAccountVaultAuthority extends InstructionAccountInput,
   TAccountShareTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -393,6 +463,8 @@ export function getClaimSharesInstruction<
     TAccountOwnerShares,
     TAccountVaultAuthority,
     TAccountShareTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountSystemProgram,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -426,6 +498,14 @@ export function getClaimSharesInstruction<
   ResolvedInstructionAccountMeta<
     TAccountShareTokenProgram,
     InstructionAccountInputAddress<TAccountShareTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -471,6 +551,16 @@ export function getClaimSharesInstruction<
       isSigner: false,
       isWritable: false,
     },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -492,6 +582,14 @@ export function getClaimSharesInstruction<
     accounts.shareTokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
+  }
 
   return Object.freeze({
     accounts: [
@@ -502,6 +600,8 @@ export function getClaimSharesInstruction<
       getAccountMeta("ownerShares", accounts.ownerShares),
       getAccountMeta("vaultAuthority", accounts.vaultAuthority),
       getAccountMeta("shareTokenProgram", accounts.shareTokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -538,6 +638,14 @@ export function getClaimSharesInstruction<
       InstructionAccountInputAddress<TAccountShareTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -559,12 +667,17 @@ export type ParsedClaimSharesInstruction<
     config: TAccountMetas[1];
     depositRequest: TAccountMetas[2];
     shareMint: TAccountMetas[3];
-    /** The owner's share token account. */
+    /**
+     * The owner's associated token account for the share mint; created
+     * idempotently in the handler, the owner paying its rent (ADR 0023).
+     */
     ownerShares: TAccountMetas[4];
     vaultAuthority: TAccountMetas[5];
     shareTokenProgram: TAccountMetas[6];
-    eventAuthority: TAccountMetas[7];
-    program: TAccountMetas[8];
+    associatedTokenProgram: TAccountMetas[7];
+    systemProgram: TAccountMetas[8];
+    eventAuthority: TAccountMetas[9];
+    program: TAccountMetas[10];
   };
   data: ClaimSharesInstructionData;
 };
@@ -577,12 +690,12 @@ export function parseClaimSharesInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedClaimSharesInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 9) {
+  if (instruction.accounts.length < 11) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 9,
+        expectedAccountMetas: 11,
       },
     );
   }
@@ -602,6 +715,8 @@ export function parseClaimSharesInstruction<
       ownerShares: getNextAccount(),
       vaultAuthority: getNextAccount(),
       shareTokenProgram: getNextAccount(),
+      associatedTokenProgram: getNextAccount(),
+      systemProgram: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

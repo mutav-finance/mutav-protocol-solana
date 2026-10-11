@@ -8,6 +8,7 @@ import {
   MathOverflowError,
   mulDiv,
   navPerShare,
+  publishedNav,
   NAV_SCALE,
   sharesFor,
   VIRTUAL_OFFSET,
@@ -134,5 +135,14 @@ describe('issuer income (ADR 0017)', () => {
   test('periods are YYYYMM months, as the program checks', () => {
     for (const p of [202_610, 202_601, 202_612]) expect(isValidIncomePeriod(p)).toBe(true);
     for (const p of [0, 202_600, 202_613, 2_026, 199_912, 1_000_001, 202_610.5]) expect(isValidIncomePeriod(p)).toBe(false);
+  });
+});
+
+describe('publishedNav', () => {
+  test('mirrors pricing::published_nav', () => {
+    expect(publishedNav(1_000n, 0n)).toBe(0n);
+    expect(publishedNav(0n, 0n)).toBe(0n);
+    expect(publishedNav(0n, 1_000n)).toBe(1n);
+    expect(publishedNav(1_000n, 1_000n)).toBe(1_000_000_000n);
   });
 });

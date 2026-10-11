@@ -58,7 +58,7 @@ During the launch and the hackathon MUTAV's team operates the reserve by hand fr
 - **Limits now:** the claim-payment cap window (the last 31 days of `claim_day_buckets` vs `max_claim_per_period`, `max_claim_per_call`; ADR 0019), free capital for new guarantees.
 - **Console:** a form per operator instruction (shared with `/demo`), each with its on-chain bound shown before signing and the gate preview where it applies. `sweep_income` (ADR 0017) shows the income-inbox balance and previews the split; it sweeps exactly the amount on a Nora statement.
 - **Responsibilities:** each instruction, what is done by hand today and what will trigger it in the backend; undocumented triggers say "triggered by the MUTAV platform".
-- **Recent activity:** the operator key's last MUTAV transactions, and the last `set_roles` in VaultConfig's recent history, when the RPC keeps history.
+- **Recent activity:** the operator key's last MUTAV transactions, and the last operator `accept_role` (role = 1) in VaultConfig's recent history, when the RPC keeps history.
 - **Safety:** what bounds a compromised operator key (caps, fixed payments account, `revoke_operator`, admin-only config).
 
 ### `/investor` Investor view
@@ -88,9 +88,9 @@ Also usable outside the script: a free-form operator panel for each operator ins
 For Squads members. A sticky in-page nav (General controls · Money in & out · Allocation) over three sections; every parameter lives with the thing it governs, and each control lives in exactly one place. Every admin change is a **Squads vault-transaction proposal** that members approve and execute from their wallets; `set_config` controls write only their own fields and carry the rest over from on-chain. If the configured admin is not a Squads vault (localnet only), direct signing is allowed, clearly labelled.
 
 - **General controls** (`#general`), the cross-cutting settings:
-  - **Emergency** strip: paused, fulfil halted, operator active or revoked; `pause` and `revoke_operator` (pauser key or admin, signed directly, no time lock), `unpause` and `clear_fulfil_halt` (Reserve Admin, through Squads).
-  - **Roles & multisig:** the Squads status, time lock and proposal list, with the create → approve → execute flow explained once; the roles; `set_roles`.
-  - **Coverage & reserve limits:** coverage ratio c, `max_tvl`, `max_cover_per_guarantee`; one `set_config` (no per-agency cap, ADR 0019).
+  - **Emergency** strip: paused, fulfil halted, operator active or revoked; `pause` and `revoke_operator` (pauser key or admin, signed directly, no time lock), `unpause` and `clear_fulfil_halt` (Reserve Admin, through Squads). `clear_fulfil_halt`'s default NAV bounds centre on the published NAV (`navPerShare` floored at 1, 0 with no shares), which it checks; fills centre on the conversion NAV.
+  - **Roles & multisig:** the Squads status, time lock and proposal list, with the create → approve → execute flow explained once; the roles; a role change is a `propose_role` proposal (an unexpired handover to another key is cancelled first with `cancel_pending`, in the same proposal), then the new key signs `accept_role` itself (ADR 0020).
+  - **Coverage & reserve limits:** coverage ratio c, `max_tvl`, `max_cover_per_guarantee`; one `set_config` (no per-agency cap, ADR 0019). A change to c, `max_nav_move_bps` or `stress_buffer` is proposed as `refresh` → `set_config` → `refresh`, so the mode reflects the new values when it executes.
   - **Allowlist & accounts:** allowlist root, treasury, payments, mints; `set_allowlist_root` (client Merkle builder), `set_payments_account`.
 - **Money in & out** (`#money`): each flow with its settings. Operator and Investor steps are one-line context rows (role tag, live total, link to `/operator`, `/investor` or `/reserve`); charts stay on `/reserve`.
   - In: **deposits** (`fulfil_deposits`; `min_request`, `max_request`), **guarantee fees** (`fee_take_bps`), **BRS issuer income** (Nora → inbox → `sweep_income`; inbox balance, swept total, last statements; `income_take_bps`, fail-closed cap 0 until spec §12 Q47).

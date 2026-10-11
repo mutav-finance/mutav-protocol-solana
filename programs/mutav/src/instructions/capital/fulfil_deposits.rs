@@ -1,4 +1,4 @@
-//! `fulfil_deposits(count)` (spec §5.5). Admin. Strict FIFO from
+//! `fulfil_deposits(count, nav_bounds)` (spec §5.5; ADR 0023). Admin. Strict FIFO from
 //! `deposit_head`, priced at the NAV at fulfil. Allowed in under-coverage: it
 //! is the recapitalization path (ADR 0008).
 
@@ -10,8 +10,10 @@ use anchor_spl::token_interface::{
 use crate::{
     constants::*,
     errors::MutavError,
-    events::DepositsFulfilled,
-    instructions::capital::{deposit_request_address, load_slot, store, Slot},
+    events::{DepositFilled, DepositsFulfilled},
+    instructions::capital::{
+        deposit_request_address, load_slot, split_adapter_accounts, store, NavBounds, Slot,
+    },
     instructions::operator::solvency_snapshot,
     math::{conversion_nav, shares_for},
     state::{DepositRequest, VaultConfig, VaultState},
@@ -25,6 +27,8 @@ pub struct FulfilDeposits<'info> {
     pub admin: Signer<'info>,
 
     #[account(
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
         constraint = config.is_supported() @ MutavError::UnsupportedVersion,
         constraint = admin.key() == config.admin @ MutavError::Unauthorized,
     )]
@@ -55,9 +59,18 @@ pub struct FulfilDeposits<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 }
 
-pub fn handle_fulfil_deposits(ctx: Context<FulfilDeposits>, count: u8) -> Result<()> {
+pub fn handle_fulfil_deposits(
+    ctx: Context<FulfilDeposits>,
+    count: u8,
+    nav_bounds: NavBounds,
+) -> Result<()> {
     let config = &ctx.accounts.config;
     let state = &ctx.accounts.state;
+    nav_bounds.validate()?;
+    require!(
+        count > 0 && count <= MAX_FULFIL_BATCH,
+        MutavError::InvalidParameter
+    );
 
     // Rules, in the spec's order. Under-coverage is allowed (ADR 0008).
     require!(!config.paused, MutavError::Paused);
@@ -73,7 +86,10 @@ pub fn handle_fulfil_deposits(ctx: Context<FulfilDeposits>, count: u8) -> Result
     let (mut fills, mut total_assets, mut total_shares) = (0u8, 0u64, 0u64);
     let (mut from_seq, mut to_seq, mut batch_nav) = (0u64, 0u64, 0u64);
 
-    for info in ctx.remaining_accounts.iter() {
+    let requests = split_adapter_accounts(config, ctx.remaining_accounts)?;
+    let mut filled: Vec<DepositFilled> = Vec::with_capacity(count as usize);
+    let mut blocked: Option<MutavError> = None;
+    for info in requests.iter() {
         if seq >= next_seq || fills >= count {
             break;
         }
@@ -84,7 +100,20 @@ pub fn handle_fulfil_deposits(ctx: Context<FulfilDeposits>, count: u8) -> Result
             if r.status == DEPOSIT_PENDING {
                 // Priced at the NAV at fulfil, after the earlier fills.
                 let nav = conversion_nav(shares_outstanding, net_assets)?;
+                nav_bounds.check(nav)?;
                 let shares = shares_for(r.assets, shares_outstanding, net_assets)?;
+                if shares == 0 {
+                    // Would mint nothing at this NAV: no fill, the BRS stays
+                    // pending. The batch stops at this request.
+                    blocked = Some(MutavError::RequestTooSmall);
+                    break;
+                }
+                // The owner's price limit: the batch stops at this request,
+                // which stays pending (no fill, no skip).
+                if shares < r.min_shares_out {
+                    blocked = Some(MutavError::PriceLimitNotMet);
+                    break;
+                }
                 r.shares_out = shares;
                 r.nav_at_fulfil = nav;
                 r.fulfilled_at = now;
@@ -109,11 +138,31 @@ pub fn handle_fulfil_deposits(ctx: Context<FulfilDeposits>, count: u8) -> Result
                 shares_outstanding = shares_outstanding
                     .checked_add(shares)
                     .ok_or(MutavError::MathOverflow)?;
+                filled.push(DepositFilled {
+                    config: config_key,
+                    ts: now,
+                    owner: r.owner,
+                    seq,
+                    assets: r.assets,
+                    shares,
+                    nav,
+                    shares_outstanding_after: shares_outstanding,
+                    net_assets_after: net_assets,
+                });
             }
             // A fulfilled (unclaimed) request is dead for the queue.
         }
         // A closed seq passes the skip proof.
         seq += 1;
+    }
+
+    // A batch that stops at a request (price limit, or zero shares) before
+    // any fill fails, so the admin sees why; after some fills it succeeds up
+    // to that request.
+    if fills == 0 {
+        if let Some(e) = blocked {
+            return Err(e.into());
+        }
     }
 
     // TVL cap on the whole batch.
@@ -160,7 +209,20 @@ pub fn handle_fulfil_deposits(ctx: Context<FulfilDeposits>, count: u8) -> Result
         .ok_or(MutavError::MathOverflow)?;
     state.shares_outstanding = shares_outstanding;
     state.deposit_head = seq;
+    state.deposited_assets_total = state
+        .deposited_assets_total
+        .checked_add(total_assets)
+        .ok_or(MutavError::MathOverflow)?;
+    state.minted_shares_total = state
+        .minted_shares_total
+        .checked_add(total_shares)
+        .ok_or(MutavError::MathOverflow)?;
+    let (deposited_assets_total, minted_shares_total) =
+        (state.deposited_assets_total, state.minted_shares_total);
 
+    for e in filled {
+        emit_cpi!(e);
+    }
     if fills > 0 {
         emit_cpi!(DepositsFulfilled {
             config: config_key,
@@ -170,6 +232,8 @@ pub fn handle_fulfil_deposits(ctx: Context<FulfilDeposits>, count: u8) -> Result
             assets: total_assets,
             shares: total_shares,
             nav: batch_nav,
+            deposited_assets_total,
+            minted_shares_total,
         });
     }
     Ok(())

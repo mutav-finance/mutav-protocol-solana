@@ -13,14 +13,23 @@ import {
   type TransactionSigner,
 } from '@solana/kit';
 import {
+  configParamsDiff,
+  configParamsNeedRefresh,
   findIncomeInboxAddress,
   findReserveAddresses,
+  getAcceptRoleInstruction,
+  getCancelPendingInstruction,
   getInitializeInstruction,
+  getProposeRoleInstruction,
+  getRefreshInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
-  getSetRolesInstruction,
   type VaultConfig,
 } from '../../../clients/js/src';
+
+/** Role ids of `propose_role` / `accept_role` (ADR 0020). */
+export const ROLE_OPERATOR = 1;
+export const ROLE_PAUSER = 2;
 import type { DeployConfig } from './config';
 
 export const BPF_LOADER_UPGRADEABLE = address('BPFLoaderUpgradeab1e11111111111111111111111');
@@ -69,6 +78,7 @@ export async function composeInitialize(
       pendingDeposits: a.pendingDeposits,
       pendingRedemptions: a.pendingRedemptions,
       claims: a.claims,
+      unsolicited: a.unsolicited,
       // ADR 0017: the income inbox Nora pays, created idempotently.
       incomeInbox: await findIncomeInboxAddress({
         vaultAuthority: a.vaultAuthority,
@@ -88,40 +98,102 @@ export async function composeInitialize(
       mutavCapitalWallet: cfg.mutavCapitalWallet,
       coverageRatioBps: cfg.coverageRatioBps,
       feeTakeBps: cfg.feeTakeBps,
-      caps: cfg.caps,
+      // ADR 0019 carves left out of the file start off (0).
+      caps: {
+        ...cfg.caps,
+        stressBuffer: cfg.caps.stressBuffer ?? 0n,
+        maxQueueWaitSecs: cfg.caps.maxQueueWaitSecs ?? 0n,
+        maxReinstateAge: cfg.caps.maxReinstateAge ?? 0n,
+      },
     },
     opts(cfg),
   );
 }
 
-/** `set_roles(operator, pauser)` from the config. Admin. */
-export async function composeSetRoles(cfg: DeployConfig, admin: TransactionSigner): Promise<Instruction> {
+const DEFAULT_ADDRESS = address('11111111111111111111111111111111');
+
+/**
+ * `propose_role` for each role whose key differs from the file, as one
+ * proposal (ADR 0020). A handover already pending for the requested key is
+ * refused ("awaiting accept_role": the key signs `accept_role`, nothing to
+ * propose). Another unexpired pending key gets `cancel_pending(role)` first,
+ * in the same proposal, since `propose_role` refuses while one waits.
+ */
+export async function composeProposeRoles(
+  cfg: DeployConfig,
+  current: VaultConfig,
+  admin: TransactionSigner,
+  nowSecs: bigint = BigInt(Math.floor(Date.now() / 1000)),
+): Promise<Instruction[]> {
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
-  return getSetRolesInstruction(
+  const base = { admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId };
+  const out: Instruction[] = [];
+  for (const [role, name, key, now, pending, expiresAt] of [
+    [ROLE_OPERATOR, 'operator', cfg.operator, current.operator, current.pendingOperator, current.pendingOperatorExpiresAt],
+    [ROLE_PAUSER, 'pauser', cfg.pauser, current.pauser, current.pendingPauser, current.pendingPauserExpiresAt],
+  ] as const) {
+    if (key === now) continue;
+    const live = pending !== DEFAULT_ADDRESS && nowSecs <= expiresAt;
+    if (live && pending === key) {
+      throw new Error(`${name} ${key} is already proposed, awaiting accept_role (expires at ${expiresAt})`);
+    }
+    if (live) out.push(getCancelPendingInstruction({ ...base, role }, opts(cfg)));
+    out.push(getProposeRoleInstruction({ ...base, role, key }, opts(cfg)));
+  }
+  return out;
+}
+
+/** `accept_role(role)`, signed by the proposed key. */
+export async function composeAcceptRole(
+  cfg: DeployConfig,
+  current: VaultConfig,
+  role: number,
+  newKey: TransactionSigner,
+): Promise<Instruction> {
+  const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
+  return getAcceptRoleInstruction(
     {
-      admin,
+      newKey,
       config: a.config,
+      // The money accounts are checked for the operator only (ADR 0020).
+      treasuryAccount: role === ROLE_OPERATOR ? current.treasuryAccount : undefined,
+      paymentsAccount: role === ROLE_OPERATOR ? current.paymentsAccount : undefined,
       eventAuthority: a.eventAuthority,
       program: cfg.programId,
-      operator: cfg.operator,
-      pauser: cfg.pauser,
+      role,
     },
     opts(cfg),
   );
 }
 
 /**
- * `set_config` writing the file's caps, coverage ratio and take rate, and
- * keeping every other field as it is on-chain (`current`). `feature_flags`
- * and the capital wallet are carried over unchanged, never set here.
+ * `set_config` with only the fields where the file's caps, coverage ratio
+ * and take rate differ from the chain (`current`), sparse (ADR 0026), with
+ * `refresh` first when a change needs it. `feature_flags` and the capital
+ * wallet are never set here; a stress buffer, queue wait or reinstate age
+ * missing from the file keeps the chain's value. Empty when nothing differs.
  */
 export async function composeSetCaps(
   cfg: DeployConfig,
   current: VaultConfig,
   admin: TransactionSigner,
-): Promise<Instruction> {
+): Promise<Instruction[]> {
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
-  return getSetConfigInstruction(
+  const params = configParamsDiff(current, {
+    coverageRatioBps: cfg.coverageRatioBps,
+    feeTakeBps: cfg.feeTakeBps,
+    featureFlags: current.featureFlags,
+    mutavCapitalWallet: current.mutavCapitalWallet,
+    // A carve left out of the file keeps the chain's value (no reset).
+    caps: {
+      ...cfg.caps,
+      stressBuffer: cfg.caps.stressBuffer ?? current.caps.stressBuffer,
+      maxQueueWaitSecs: cfg.caps.maxQueueWaitSecs ?? current.caps.maxQueueWaitSecs,
+      maxReinstateAge: cfg.caps.maxReinstateAge ?? current.caps.maxReinstateAge,
+    },
+  });
+  if (params.length === 0) return [];
+  const setConfig = getSetConfigInstruction(
     {
       admin,
       config: a.config,
@@ -130,14 +202,25 @@ export async function composeSetCaps(
       paymentsAccount: current.paymentsAccount,
       eventAuthority: a.eventAuthority,
       program: cfg.programId,
-      coverageRatioBps: cfg.coverageRatioBps,
-      feeTakeBps: cfg.feeTakeBps,
-      featureFlags: current.featureFlags,
-      mutavCapitalWallet: current.mutavCapitalWallet,
-      caps: cfg.caps,
+      params,
     },
     opts(cfg),
   );
+  if (!configParamsNeedRefresh(params)) return [setConfig];
+  const refresh = getRefreshInstruction(
+    {
+      config: a.config,
+      state: a.state,
+      reserve: a.reserve,
+      pendingDeposits: a.pendingDeposits,
+      pendingRedemptions: a.pendingRedemptions,
+      claims: a.claims,
+      eventAuthority: a.eventAuthority,
+      program: cfg.programId,
+    },
+    opts(cfg),
+  );
+  return [refresh, setConfig];
 }
 
 /** `set_allowlist_root(root)`. Admin. */

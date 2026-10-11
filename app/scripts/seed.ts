@@ -32,7 +32,7 @@ import {
   findGuaranteePda,
   findIncomeInboxAddress,
   findReserveAddresses,
-  getSetRolesInstruction,
+  getProposeRoleInstruction,
   MUTAV_PROGRAM_ADDRESS,
   TOKEN_PROGRAM_ADDRESS,
 } from "@mutav-finance/mutav-protocol-solana";
@@ -145,7 +145,7 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   await go("admin", { kind: "fulfil_deposits", count: 1 }, "fulfil_deposits (admin)");
   await go("capital", { kind: "claim_shares", seq: 0n }, "claim_shares");
 
-  console.log("\n== seed: two guarantees");
+  console.log("\n== seed: three guarantees");
   const lease = async (leaseLabel: string, agency: string, rent: bigint) =>
     go(
       "operator",
@@ -161,6 +161,9 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     );
   await lease("lease-sp-001", "Imobiliária Paulista", 2_500n);
   await lease("lease-rj-001", "Rio Imóveis", 3_000n);
+  // Enough cover (R$38,000 in all) that the under-covered scenario (c = 1.0)
+  // puts coverage required above the stable assets (about R$29,500).
+  await lease("lease-mg-001", "Minas Lar", 4_000n);
 
   console.log("\n== seed: one guarantee fee");
   await go("operator", { kind: "contribute_fees", invoiceRefHash: await REF.invoice("INV-2026-0001"), amount: 1_000n * BRL }, "contribute_fees R$1,000 (20% take to the treasury)");
@@ -177,22 +180,23 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   console.log("\n== seed: one settled claim (timeline history)");
   const [guarantee] = await findGuaranteePda({ config, id: fromHex(await REF.guaranteeId("lease-sp-001")) });
   const notice = await REF.notice("notice-sp-001-2026-09");
-  await go("operator", { kind: "file_claim", guarantee, leg: 0, amount: 2_500n * BRL, noticeRefHash: notice }, "file_claim R$2,500 (default leg)");
-  await go("operator", { kind: "pay_claim", guarantee, leg: 0, amount: 2_500n * BRL, noticeRefHash: notice }, "pay_claim R$2,500");
+  await go("operator", { kind: "file_claim", guarantee, leg: 1, amount: 2_500n * BRL, noticeRefHash: notice }, "file_claim R$2,500 (default leg)");
+  await go("operator", { kind: "pay_claim", guarantee, leg: 1, amount: 2_500n * BRL, noticeRefHash: notice }, "pay_claim R$2,500");
   await go("operator", { kind: "settle_payout", guarantee, noticeRefHash: notice, pixE2eHash: await REF.pixE2e("E1234567820261006120000demo0001") }, "settle_payout (PIX E2E hash)");
 
-  let operator = s("operator").address as string;
+  const operator = s("operator").address as string;
   if (opts.operator) {
     console.log("\n== seed: hand the operator role to your wallet");
     const op = address(opts.operator);
     await p.airdrop(rpc, op, 10);
     spl(["mint", mint, "10000", await ata(op)]);
     const a = await findReserveAddresses(mint);
+    // Two-step handover (ADR 0020): the admin proposes; the wallet accepts
+    // with `accept_role(1)` within 72 hours (it holds its own key).
     await signAndSend(rpc, s("admin").address, [s("admin")], [
-      getSetRolesInstruction({ admin: s("admin"), config, eventAuthority: a.eventAuthority, program: MUTAV_PROGRAM_ADDRESS, operator: op, pauser: s("pauser").address }),
+      getProposeRoleInstruction({ admin: s("admin"), config, eventAuthority: a.eventAuthority, program: MUTAV_PROGRAM_ADDRESS, role: 1, key: op }),
     ]);
-    operator = op;
-    log(`set_roles: operator = ${op} (funded with 10 SOL and R$10,000 BRS)`);
+    log(`propose_role: operator = ${op} (funded with 10 SOL and R$10,000 BRS); sign accept_role(1) from that wallet to take the role`);
   }
 
   await go("pauser", { kind: "refresh" }, "refresh (publish NAV, coverage and mode)");
@@ -201,13 +205,17 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   return { url, programId: MUTAV_PROGRAM_ADDRESS, config, reserveMint: mint, allowlist, keysDir, keys, operator };
 }
 
-/** Demo step 5: raise the coverage ratio so the reserve is under-covered (or restore it), then refresh. */
+/**
+ * Demo step 5: raise the coverage ratio to c = 1.0 (the program maximum) so
+ * the reserve is under-covered: the seeded remaining cover (about R$35,500)
+ * exceeds the stable assets (about R$29,500). Or restore it. Then refresh.
+ */
 export async function setScenario(url: string, keysDir: string, scenario: "under-covered" | "normal", config: string) {
   assertLocal(url);
   const p = await protocolLib();
   const k = await localKeys(keysDir, p.run);
   // Restores the seeded c = 0.10 (ADR 0016).
-  const ratio = scenario === "under-covered" ? 15_000 : 1_000;
+  const ratio = scenario === "under-covered" ? 10_000 : 1_000;
   await act(url, config, [], k.admin.signer, { kind: "set_config", coverageRatioBps: ratio }, `set_config coverage_ratio_bps = ${ratio}`);
   await act(url, config, [], k.pauser.signer, { kind: "refresh" }, "refresh");
 }

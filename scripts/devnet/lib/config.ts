@@ -45,7 +45,7 @@ export type DeployConfig = {
   paymentsAccount: Address;
   coverageRatioBps: number;
   feeTakeBps: number;
-  caps: CapsInputArgs & {
+  caps: Omit<CapsInputArgs, 'stressBuffer' | 'maxQueueWaitSecs' | 'maxReinstateAge'> & {
     maxTvl: bigint;
     maxCoverPerGuarantee: bigint;
     maxClaimPerCall: bigint;
@@ -54,6 +54,10 @@ export type DeployConfig = {
     minRequest: bigint;
     maxRequest: bigint;
     maxNavMoveBps: number;
+    /** ADR 0019 carves. Absent: `initialize` writes 0 (off) and `caps.ts` keeps the chain's value. */
+    stressBuffer?: bigint;
+    maxQueueWaitSecs?: bigint;
+    maxReinstateAge?: bigint;
   };
   /** Owners allowlisted for `request_deposit` / `request_redeem`. */
   allowlist: Address[];
@@ -74,6 +78,7 @@ const big = (v: unknown, path: string) => {
   if (typeof v === 'string' && /^-?\d+$/.test(v)) return BigInt(v);
   throw new Error(`${path} must be an integer (use a string above 2^53)`);
 };
+const optBig = (v: unknown, path: string) => (v === undefined || v === null ? undefined : big(v, path));
 const int = (v: unknown, path: string, max: number) => {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > max) {
     throw new Error(`${path} must be an integer in [0, ${max}]`);
@@ -137,13 +142,19 @@ export function parseConfig(raw: any): DeployConfig {
       minRequest: big(raw.caps?.minRequest, 'caps.minRequest'),
       maxRequest: big(raw.caps?.maxRequest, 'caps.maxRequest'),
       maxNavMoveBps: bps(raw.caps?.maxNavMoveBps, 'caps.maxNavMoveBps'),
+      // ADR 0019 carves; absent means "not set by this file" (see the type).
+      stressBuffer: optBig(raw.caps?.stressBuffer, 'caps.stressBuffer'),
+      maxQueueWaitSecs: optBig(raw.caps?.maxQueueWaitSecs, 'caps.maxQueueWaitSecs'),
+      maxReinstateAge: optBig(raw.caps?.maxReinstateAge, 'caps.maxReinstateAge'),
     },
     allowlist: (raw.allowlist ?? []).map((a: unknown, i: number) => addr(a, `allowlist[${i}]`)),
   };
 
   // Program bounds (validate_params, validate_roles).
   if (c.feeTakeBps > 3_000) throw new Error('feeTakeBps must be <= 3000 (program maximum, 30%)');
-  if (c.coverageRatioBps < 1_000) throw new Error('coverageRatioBps must be >= 1000 (program minimum, c = 0.10; ADR 0016)');
+  if (c.coverageRatioBps < 1_000 || c.coverageRatioBps > 10_000) {
+    throw new Error('coverageRatioBps must be in [1000, 10000] (program bounds, 0.10 <= c <= 1.0; ADR 0016, ADR 0022)');
+  }
   if (c.caps.minRequest > c.caps.maxRequest) throw new Error('caps.minRequest must be <= caps.maxRequest');
   const roles = [c.admin, c.operator, c.pauser];
   if (new Set(roles).size !== 3) throw new Error('admin, operator and pauser must be distinct');
