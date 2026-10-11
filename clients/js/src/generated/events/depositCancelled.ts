@@ -45,6 +45,7 @@ export type DepositCancelledEvent = {
   owner: Address;
   seq: bigint;
   assets: bigint;
+  by: Address;
 };
 
 export type DepositCancelledEventArgs = {
@@ -53,6 +54,7 @@ export type DepositCancelledEventArgs = {
   owner: Address;
   seq: number | bigint;
   assets: number | bigint;
+  by: Address;
 };
 
 /** Gets the encoder for {@link DepositCancelledEventArgs} event data. */
@@ -64,6 +66,7 @@ export function getDepositCancelledEventEncoder(): FixedSizeEncoder<DepositCance
       ["owner", getAddressEncoder()],
       ["seq", getU64Encoder()],
       ["assets", getU64Encoder()],
+      ["by", getAddressEncoder()],
     ]),
     [getConstantEncoder(DEPOSIT_CANCELLED_EVENT_DISCRIMINATOR)],
   );
@@ -78,6 +81,7 @@ export function getDepositCancelledEventDecoder(): FixedSizeDecoder<DepositCance
       ["owner", getAddressDecoder()],
       ["seq", getU64Decoder()],
       ["assets", getU64Decoder()],
+      ["by", getAddressDecoder()],
     ]),
     [getConstantDecoder(DEPOSIT_CANCELLED_EVENT_DISCRIMINATOR)],
   );

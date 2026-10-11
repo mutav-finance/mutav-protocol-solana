@@ -42,16 +42,16 @@ import {
 import { findStatePda } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 
-export const ADVANCE_QUEUE_HEADS_DISCRIMINATOR: ReadonlyUint8Array =
-  new Uint8Array([111, 181, 141, 177, 121, 200, 92, 20]);
+export const ADVANCE_QUEUE_HEAD_DISCRIMINATOR: ReadonlyUint8Array =
+  new Uint8Array([253, 253, 8, 240, 172, 218, 101, 180]);
 
-export function getAdvanceQueueHeadsDiscriminatorBytes(): ReadonlyUint8Array {
+export function getAdvanceQueueHeadDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    ADVANCE_QUEUE_HEADS_DISCRIMINATOR,
+    ADVANCE_QUEUE_HEAD_DISCRIMINATOR,
   );
 }
 
-export type AdvanceQueueHeadsInstruction<
+export type AdvanceQueueHeadInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
@@ -78,41 +78,47 @@ export type AdvanceQueueHeadsInstruction<
     ]
   >;
 
-export type AdvanceQueueHeadsInstructionData = {
+export type AdvanceQueueHeadInstructionData = {
   discriminator: ReadonlyUint8Array;
+  queue: number;
   max: number;
 };
 
-export type AdvanceQueueHeadsInstructionDataArgs = { max: number };
+export type AdvanceQueueHeadInstructionDataArgs = {
+  queue: number;
+  max: number;
+};
 
-export function getAdvanceQueueHeadsInstructionDataEncoder(): FixedSizeEncoder<AdvanceQueueHeadsInstructionDataArgs> {
+export function getAdvanceQueueHeadInstructionDataEncoder(): FixedSizeEncoder<AdvanceQueueHeadInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["queue", getU8Encoder()],
       ["max", getU8Encoder()],
     ]),
-    (value) => ({ ...value, discriminator: ADVANCE_QUEUE_HEADS_DISCRIMINATOR }),
+    (value) => ({ ...value, discriminator: ADVANCE_QUEUE_HEAD_DISCRIMINATOR }),
   );
 }
 
-export function getAdvanceQueueHeadsInstructionDataDecoder(): FixedSizeDecoder<AdvanceQueueHeadsInstructionData> {
+export function getAdvanceQueueHeadInstructionDataDecoder(): FixedSizeDecoder<AdvanceQueueHeadInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["queue", getU8Decoder()],
     ["max", getU8Decoder()],
   ]);
 }
 
-export function getAdvanceQueueHeadsInstructionDataCodec(): FixedSizeCodec<
-  AdvanceQueueHeadsInstructionDataArgs,
-  AdvanceQueueHeadsInstructionData
+export function getAdvanceQueueHeadInstructionDataCodec(): FixedSizeCodec<
+  AdvanceQueueHeadInstructionDataArgs,
+  AdvanceQueueHeadInstructionData
 > {
   return combineCodec(
-    getAdvanceQueueHeadsInstructionDataEncoder(),
-    getAdvanceQueueHeadsInstructionDataDecoder(),
+    getAdvanceQueueHeadInstructionDataEncoder(),
+    getAdvanceQueueHeadInstructionDataDecoder(),
   );
 }
 
-export type AdvanceQueueHeadsAsyncInput<
+export type AdvanceQueueHeadAsyncInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
@@ -123,17 +129,18 @@ export type AdvanceQueueHeadsAsyncInput<
   state?: TAccountState;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
-  max: AdvanceQueueHeadsInstructionDataArgs["max"];
+  queue: AdvanceQueueHeadInstructionDataArgs["queue"];
+  max: AdvanceQueueHeadInstructionDataArgs["max"];
 };
 
-export async function getAdvanceQueueHeadsInstructionAsync<
+export async function getAdvanceQueueHeadInstructionAsync<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
-  input: AdvanceQueueHeadsAsyncInput<
+  input: AdvanceQueueHeadAsyncInput<
     TAccountConfig,
     TAccountState,
     TAccountEventAuthority,
@@ -141,7 +148,7 @@ export async function getAdvanceQueueHeadsInstructionAsync<
   >,
   config?: { programAddress?: TProgramAddress },
 ): Promise<
-  AdvanceQueueHeadsInstruction<
+  AdvanceQueueHeadInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
       TAccountConfig,
@@ -210,11 +217,11 @@ export async function getAdvanceQueueHeadsInstructionAsync<
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
-    data: getAdvanceQueueHeadsInstructionDataEncoder().encode(
-      args as AdvanceQueueHeadsInstructionDataArgs,
+    data: getAdvanceQueueHeadInstructionDataEncoder().encode(
+      args as AdvanceQueueHeadInstructionDataArgs,
     ),
     programAddress,
-  } as AdvanceQueueHeadsInstruction<
+  } as AdvanceQueueHeadInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
       TAccountConfig,
@@ -235,7 +242,7 @@ export async function getAdvanceQueueHeadsInstructionAsync<
   >);
 }
 
-export type AdvanceQueueHeadsInput<
+export type AdvanceQueueHeadInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
@@ -246,24 +253,25 @@ export type AdvanceQueueHeadsInput<
   state: TAccountState;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
-  max: AdvanceQueueHeadsInstructionDataArgs["max"];
+  queue: AdvanceQueueHeadInstructionDataArgs["queue"];
+  max: AdvanceQueueHeadInstructionDataArgs["max"];
 };
 
-export function getAdvanceQueueHeadsInstruction<
+export function getAdvanceQueueHeadInstruction<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
-  input: AdvanceQueueHeadsInput<
+  input: AdvanceQueueHeadInput<
     TAccountConfig,
     TAccountState,
     TAccountEventAuthority,
     TAccountProgram
   >,
   config?: { programAddress?: TProgramAddress },
-): AdvanceQueueHeadsInstruction<
+): AdvanceQueueHeadInstruction<
   TProgramAddress,
   ResolvedInstructionAccountMeta<
     TAccountConfig,
@@ -318,11 +326,11 @@ export function getAdvanceQueueHeadsInstruction<
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
-    data: getAdvanceQueueHeadsInstructionDataEncoder().encode(
-      args as AdvanceQueueHeadsInstructionDataArgs,
+    data: getAdvanceQueueHeadInstructionDataEncoder().encode(
+      args as AdvanceQueueHeadInstructionDataArgs,
     ),
     programAddress,
-  } as AdvanceQueueHeadsInstruction<
+  } as AdvanceQueueHeadInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
       TAccountConfig,
@@ -343,7 +351,7 @@ export function getAdvanceQueueHeadsInstruction<
   >);
 }
 
-export type ParsedAdvanceQueueHeadsInstruction<
+export type ParsedAdvanceQueueHeadInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
@@ -354,17 +362,17 @@ export type ParsedAdvanceQueueHeadsInstruction<
     eventAuthority: TAccountMetas[2];
     program: TAccountMetas[3];
   };
-  data: AdvanceQueueHeadsInstructionData;
+  data: AdvanceQueueHeadInstructionData;
 };
 
-export function parseAdvanceQueueHeadsInstruction<
+export function parseAdvanceQueueHeadInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedAdvanceQueueHeadsInstruction<TProgram, TAccountMetas> {
+): ParsedAdvanceQueueHeadInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
@@ -388,6 +396,6 @@ export function parseAdvanceQueueHeadsInstruction<
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },
-    data: getAdvanceQueueHeadsInstructionDataDecoder().decode(instruction.data),
+    data: getAdvanceQueueHeadInstructionDataDecoder().decode(instruction.data),
   };
 }

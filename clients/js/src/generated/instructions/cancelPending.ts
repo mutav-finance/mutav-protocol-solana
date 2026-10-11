@@ -14,6 +14,8 @@ import {
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU8Decoder,
+  getU8Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
   SolanaError,
   transformEncoder,
@@ -41,21 +43,20 @@ import {
 } from "@solana/kit/program-client-core";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 
-export const SET_PAYMENTS_ACCOUNT_DISCRIMINATOR: ReadonlyUint8Array =
-  new Uint8Array([0, 150, 170, 5, 132, 244, 20, 241]);
+export const CANCEL_PENDING_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
+  74, 87, 109, 242, 64, 192, 151, 71,
+]);
 
-export function getSetPaymentsAccountDiscriminatorBytes(): ReadonlyUint8Array {
+export function getCancelPendingDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    SET_PAYMENTS_ACCOUNT_DISCRIMINATOR,
+    CANCEL_PENDING_DISCRIMINATOR,
   );
 }
 
-export type SetPaymentsAccountInstruction<
+export type CancelPendingInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
   TAccountAdmin extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
-  TAccountPaymentsAccount extends string | AccountMeta<string> = string,
-  TAccountTreasuryAccount extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -70,12 +71,6 @@ export type SetPaymentsAccountInstruction<
       TAccountConfig extends string
         ? WritableAccount<TAccountConfig>
         : TAccountConfig,
-      TAccountPaymentsAccount extends string
-        ? ReadonlyAccount<TAccountPaymentsAccount>
-        : TAccountPaymentsAccount,
-      TAccountTreasuryAccount extends string
-        ? ReadonlyAccount<TAccountTreasuryAccount>
-        : TAccountTreasuryAccount,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -86,82 +81,69 @@ export type SetPaymentsAccountInstruction<
     ]
   >;
 
-export type SetPaymentsAccountInstructionData = {
+export type CancelPendingInstructionData = {
   discriminator: ReadonlyUint8Array;
+  role: number;
 };
 
-export type SetPaymentsAccountInstructionDataArgs = {};
+export type CancelPendingInstructionDataArgs = { role: number };
 
-export function getSetPaymentsAccountInstructionDataEncoder(): FixedSizeEncoder<SetPaymentsAccountInstructionDataArgs> {
+export function getCancelPendingInstructionDataEncoder(): FixedSizeEncoder<CancelPendingInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
-    (value) => ({
-      ...value,
-      discriminator: SET_PAYMENTS_ACCOUNT_DISCRIMINATOR,
-    }),
+    getStructEncoder([
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["role", getU8Encoder()],
+    ]),
+    (value) => ({ ...value, discriminator: CANCEL_PENDING_DISCRIMINATOR }),
   );
 }
 
-export function getSetPaymentsAccountInstructionDataDecoder(): FixedSizeDecoder<SetPaymentsAccountInstructionData> {
+export function getCancelPendingInstructionDataDecoder(): FixedSizeDecoder<CancelPendingInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["role", getU8Decoder()],
   ]);
 }
 
-export function getSetPaymentsAccountInstructionDataCodec(): FixedSizeCodec<
-  SetPaymentsAccountInstructionDataArgs,
-  SetPaymentsAccountInstructionData
+export function getCancelPendingInstructionDataCodec(): FixedSizeCodec<
+  CancelPendingInstructionDataArgs,
+  CancelPendingInstructionData
 > {
   return combineCodec(
-    getSetPaymentsAccountInstructionDataEncoder(),
-    getSetPaymentsAccountInstructionDataDecoder(),
+    getCancelPendingInstructionDataEncoder(),
+    getCancelPendingInstructionDataDecoder(),
   );
 }
 
-export type SetPaymentsAccountInput<
+export type CancelPendingInput<
   TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
-  TAccountPaymentsAccount extends InstructionAccountInput =
-    InstructionAccountInput,
-  TAccountTreasuryAccount extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   admin: TAccountAdmin;
   config: TAccountConfig;
-  /**
-   * The new payments token account (BRS). Its owner is MUTAV's payments
-   * wallet, an off-chain fact; the program records the account. It may
-   * not be owned by the operator (ADR 0020).
-   */
-  paymentsAccount: TAccountPaymentsAccount;
-  /** The current treasury token account, to compare (spec §2.1). */
-  treasuryAccount: TAccountTreasuryAccount;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
+  role: CancelPendingInstructionDataArgs["role"];
 };
 
-export function getSetPaymentsAccountInstruction<
+export function getCancelPendingInstruction<
   TAccountAdmin extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
-  TAccountPaymentsAccount extends InstructionAccountInput,
-  TAccountTreasuryAccount extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
-  input: SetPaymentsAccountInput<
+  input: CancelPendingInput<
     TAccountAdmin,
     TAccountConfig,
-    TAccountPaymentsAccount,
-    TAccountTreasuryAccount,
     TAccountEventAuthority,
     TAccountProgram
   >,
   config?: { programAddress?: TProgramAddress },
-): SetPaymentsAccountInstruction<
+): CancelPendingInstruction<
   TProgramAddress,
   ResolvedInstructionAccountMeta<
     TAccountAdmin,
@@ -170,14 +152,6 @@ export function getSetPaymentsAccountInstruction<
   ResolvedInstructionAccountMeta<
     TAccountConfig,
     InstructionAccountInputAddress<TAccountConfig>
-  >,
-  ResolvedInstructionAccountMeta<
-    TAccountPaymentsAccount,
-    InstructionAccountInputAddress<TAccountPaymentsAccount>
-  >,
-  ResolvedInstructionAccountMeta<
-    TAccountTreasuryAccount,
-    InstructionAccountInputAddress<TAccountTreasuryAccount>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -198,16 +172,6 @@ export function getSetPaymentsAccountInstruction<
   const originalAccounts = {
     admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
     config: { value: input.config ?? null, isSigner: false, isWritable: true },
-    paymentsAccount: {
-      value: input.paymentsAccount ?? null,
-      isSigner: false,
-      isWritable: false,
-    },
-    treasuryAccount: {
-      value: input.treasuryAccount ?? null,
-      isSigner: false,
-      isWritable: false,
-    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -224,18 +188,21 @@ export function getSetPaymentsAccountInstruction<
     ResolvedInstructionAccount
   >;
 
+  // Original args.
+  const args = { ...input };
+
   return Object.freeze({
     accounts: [
       getAccountMeta("admin", accounts.admin),
       getAccountMeta("config", accounts.config),
-      getAccountMeta("paymentsAccount", accounts.paymentsAccount),
-      getAccountMeta("treasuryAccount", accounts.treasuryAccount),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
-    data: getSetPaymentsAccountInstructionDataEncoder().encode({}),
+    data: getCancelPendingInstructionDataEncoder().encode(
+      args as CancelPendingInstructionDataArgs,
+    ),
     programAddress,
-  } as SetPaymentsAccountInstruction<
+  } as CancelPendingInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
       TAccountAdmin,
@@ -244,14 +211,6 @@ export function getSetPaymentsAccountInstruction<
     ResolvedInstructionAccountMeta<
       TAccountConfig,
       InstructionAccountInputAddress<TAccountConfig>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountPaymentsAccount,
-      InstructionAccountInputAddress<TAccountPaymentsAccount>
-    >,
-    ResolvedInstructionAccountMeta<
-      TAccountTreasuryAccount,
-      InstructionAccountInputAddress<TAccountTreasuryAccount>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -264,7 +223,7 @@ export function getSetPaymentsAccountInstruction<
   >);
 }
 
-export type ParsedSetPaymentsAccountInstruction<
+export type ParsedCancelPendingInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
@@ -272,34 +231,26 @@ export type ParsedSetPaymentsAccountInstruction<
   accounts: {
     admin: TAccountMetas[0];
     config: TAccountMetas[1];
-    /**
-     * The new payments token account (BRS). Its owner is MUTAV's payments
-     * wallet, an off-chain fact; the program records the account. It may
-     * not be owned by the operator (ADR 0020).
-     */
-    paymentsAccount: TAccountMetas[2];
-    /** The current treasury token account, to compare (spec §2.1). */
-    treasuryAccount: TAccountMetas[3];
-    eventAuthority: TAccountMetas[4];
-    program: TAccountMetas[5];
+    eventAuthority: TAccountMetas[2];
+    program: TAccountMetas[3];
   };
-  data: SetPaymentsAccountInstructionData;
+  data: CancelPendingInstructionData;
 };
 
-export function parseSetPaymentsAccountInstruction<
+export function parseCancelPendingInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedSetPaymentsAccountInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+): ParsedCancelPendingInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 4) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 6,
+        expectedAccountMetas: 4,
       },
     );
   }
@@ -314,13 +265,9 @@ export function parseSetPaymentsAccountInstruction<
     accounts: {
       admin: getNextAccount(),
       config: getNextAccount(),
-      paymentsAccount: getNextAccount(),
-      treasuryAccount: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },
-    data: getSetPaymentsAccountInstructionDataDecoder().decode(
-      instruction.data,
-    ),
+    data: getCancelPendingInstructionDataDecoder().decode(instruction.data),
   };
 }

@@ -14,6 +14,8 @@ import {
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU8Decoder,
+  getU8Encoder,
   SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
   SolanaError,
   transformEncoder,
@@ -41,21 +43,20 @@ import {
 } from "@solana/kit/program-client-core";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 
-export const SET_PAYMENTS_ACCOUNT_DISCRIMINATOR: ReadonlyUint8Array =
-  new Uint8Array([0, 150, 170, 5, 132, 244, 20, 241]);
+export const ACCEPT_ROLE_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
+  52, 25, 7, 231, 196, 235, 119, 253,
+]);
 
-export function getSetPaymentsAccountDiscriminatorBytes(): ReadonlyUint8Array {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(
-    SET_PAYMENTS_ACCOUNT_DISCRIMINATOR,
-  );
+export function getAcceptRoleDiscriminatorBytes(): ReadonlyUint8Array {
+  return fixEncoderSize(getBytesEncoder(), 8).encode(ACCEPT_ROLE_DISCRIMINATOR);
 }
 
-export type SetPaymentsAccountInstruction<
+export type AcceptRoleInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
-  TAccountAdmin extends string | AccountMeta<string> = string,
+  TAccountNewKey extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
-  TAccountPaymentsAccount extends string | AccountMeta<string> = string,
   TAccountTreasuryAccount extends string | AccountMeta<string> = string,
+  TAccountPaymentsAccount extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -63,19 +64,19 @@ export type SetPaymentsAccountInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountAdmin extends string
-        ? ReadonlySignerAccount<TAccountAdmin> &
-            AccountSignerMeta<TAccountAdmin>
-        : TAccountAdmin,
+      TAccountNewKey extends string
+        ? ReadonlySignerAccount<TAccountNewKey> &
+            AccountSignerMeta<TAccountNewKey>
+        : TAccountNewKey,
       TAccountConfig extends string
         ? WritableAccount<TAccountConfig>
         : TAccountConfig,
-      TAccountPaymentsAccount extends string
-        ? ReadonlyAccount<TAccountPaymentsAccount>
-        : TAccountPaymentsAccount,
       TAccountTreasuryAccount extends string
         ? ReadonlyAccount<TAccountTreasuryAccount>
         : TAccountTreasuryAccount,
+      TAccountPaymentsAccount extends string
+        ? ReadonlyAccount<TAccountPaymentsAccount>
+        : TAccountPaymentsAccount,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -86,98 +87,97 @@ export type SetPaymentsAccountInstruction<
     ]
   >;
 
-export type SetPaymentsAccountInstructionData = {
+export type AcceptRoleInstructionData = {
   discriminator: ReadonlyUint8Array;
+  role: number;
 };
 
-export type SetPaymentsAccountInstructionDataArgs = {};
+export type AcceptRoleInstructionDataArgs = { role: number };
 
-export function getSetPaymentsAccountInstructionDataEncoder(): FixedSizeEncoder<SetPaymentsAccountInstructionDataArgs> {
+export function getAcceptRoleInstructionDataEncoder(): FixedSizeEncoder<AcceptRoleInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
-    (value) => ({
-      ...value,
-      discriminator: SET_PAYMENTS_ACCOUNT_DISCRIMINATOR,
-    }),
+    getStructEncoder([
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["role", getU8Encoder()],
+    ]),
+    (value) => ({ ...value, discriminator: ACCEPT_ROLE_DISCRIMINATOR }),
   );
 }
 
-export function getSetPaymentsAccountInstructionDataDecoder(): FixedSizeDecoder<SetPaymentsAccountInstructionData> {
+export function getAcceptRoleInstructionDataDecoder(): FixedSizeDecoder<AcceptRoleInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["role", getU8Decoder()],
   ]);
 }
 
-export function getSetPaymentsAccountInstructionDataCodec(): FixedSizeCodec<
-  SetPaymentsAccountInstructionDataArgs,
-  SetPaymentsAccountInstructionData
+export function getAcceptRoleInstructionDataCodec(): FixedSizeCodec<
+  AcceptRoleInstructionDataArgs,
+  AcceptRoleInstructionData
 > {
   return combineCodec(
-    getSetPaymentsAccountInstructionDataEncoder(),
-    getSetPaymentsAccountInstructionDataDecoder(),
+    getAcceptRoleInstructionDataEncoder(),
+    getAcceptRoleInstructionDataDecoder(),
   );
 }
 
-export type SetPaymentsAccountInput<
-  TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+export type AcceptRoleInput<
+  TAccountNewKey extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
-  TAccountPaymentsAccount extends InstructionAccountInput =
-    InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountPaymentsAccount extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  admin: TAccountAdmin;
+  /** The proposed key. */
+  newKey: TAccountNewKey;
   config: TAccountConfig;
-  /**
-   * The new payments token account (BRS). Its owner is MUTAV's payments
-   * wallet, an off-chain fact; the program records the account. It may
-   * not be owned by the operator (ADR 0020).
-   */
-  paymentsAccount: TAccountPaymentsAccount;
-  /** The current treasury token account, to compare (spec §2.1). */
+  /** The money accounts, to check a new operator owns neither (ADR 0020). */
   treasuryAccount: TAccountTreasuryAccount;
+  paymentsAccount: TAccountPaymentsAccount;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
+  role: AcceptRoleInstructionDataArgs["role"];
 };
 
-export function getSetPaymentsAccountInstruction<
-  TAccountAdmin extends InstructionSignerInput,
+export function getAcceptRoleInstruction<
+  TAccountNewKey extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
-  TAccountPaymentsAccount extends InstructionAccountInput,
   TAccountTreasuryAccount extends InstructionAccountInput,
+  TAccountPaymentsAccount extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
-  input: SetPaymentsAccountInput<
-    TAccountAdmin,
+  input: AcceptRoleInput<
+    TAccountNewKey,
     TAccountConfig,
-    TAccountPaymentsAccount,
     TAccountTreasuryAccount,
+    TAccountPaymentsAccount,
     TAccountEventAuthority,
     TAccountProgram
   >,
   config?: { programAddress?: TProgramAddress },
-): SetPaymentsAccountInstruction<
+): AcceptRoleInstruction<
   TProgramAddress,
   ResolvedInstructionAccountMeta<
-    TAccountAdmin,
-    InstructionAccountInputAddress<TAccountAdmin>
+    TAccountNewKey,
+    InstructionAccountInputAddress<TAccountNewKey>
   >,
   ResolvedInstructionAccountMeta<
     TAccountConfig,
     InstructionAccountInputAddress<TAccountConfig>
   >,
   ResolvedInstructionAccountMeta<
-    TAccountPaymentsAccount,
-    InstructionAccountInputAddress<TAccountPaymentsAccount>
-  >,
-  ResolvedInstructionAccountMeta<
     TAccountTreasuryAccount,
     InstructionAccountInputAddress<TAccountTreasuryAccount>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPaymentsAccount,
+    InstructionAccountInputAddress<TAccountPaymentsAccount>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -196,15 +196,15 @@ export function getSetPaymentsAccountInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
+    newKey: { value: input.newKey ?? null, isSigner: true, isWritable: false },
     config: { value: input.config ?? null, isSigner: false, isWritable: true },
-    paymentsAccount: {
-      value: input.paymentsAccount ?? null,
+    treasuryAccount: {
+      value: input.treasuryAccount ?? null,
       isSigner: false,
       isWritable: false,
     },
-    treasuryAccount: {
-      value: input.treasuryAccount ?? null,
+    paymentsAccount: {
+      value: input.paymentsAccount ?? null,
       isSigner: false,
       isWritable: false,
     },
@@ -224,34 +224,39 @@ export function getSetPaymentsAccountInstruction<
     ResolvedInstructionAccount
   >;
 
+  // Original args.
+  const args = { ...input };
+
   return Object.freeze({
     accounts: [
-      getAccountMeta("admin", accounts.admin),
+      getAccountMeta("newKey", accounts.newKey),
       getAccountMeta("config", accounts.config),
-      getAccountMeta("paymentsAccount", accounts.paymentsAccount),
       getAccountMeta("treasuryAccount", accounts.treasuryAccount),
+      getAccountMeta("paymentsAccount", accounts.paymentsAccount),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
-    data: getSetPaymentsAccountInstructionDataEncoder().encode({}),
+    data: getAcceptRoleInstructionDataEncoder().encode(
+      args as AcceptRoleInstructionDataArgs,
+    ),
     programAddress,
-  } as SetPaymentsAccountInstruction<
+  } as AcceptRoleInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountAdmin,
-      InstructionAccountInputAddress<TAccountAdmin>
+      TAccountNewKey,
+      InstructionAccountInputAddress<TAccountNewKey>
     >,
     ResolvedInstructionAccountMeta<
       TAccountConfig,
       InstructionAccountInputAddress<TAccountConfig>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountPaymentsAccount,
-      InstructionAccountInputAddress<TAccountPaymentsAccount>
-    >,
-    ResolvedInstructionAccountMeta<
       TAccountTreasuryAccount,
       InstructionAccountInputAddress<TAccountTreasuryAccount>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPaymentsAccount,
+      InstructionAccountInputAddress<TAccountPaymentsAccount>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -264,36 +269,32 @@ export function getSetPaymentsAccountInstruction<
   >);
 }
 
-export type ParsedSetPaymentsAccountInstruction<
+export type ParsedAcceptRoleInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    admin: TAccountMetas[0];
+    /** The proposed key. */
+    newKey: TAccountMetas[0];
     config: TAccountMetas[1];
-    /**
-     * The new payments token account (BRS). Its owner is MUTAV's payments
-     * wallet, an off-chain fact; the program records the account. It may
-     * not be owned by the operator (ADR 0020).
-     */
-    paymentsAccount: TAccountMetas[2];
-    /** The current treasury token account, to compare (spec §2.1). */
-    treasuryAccount: TAccountMetas[3];
+    /** The money accounts, to check a new operator owns neither (ADR 0020). */
+    treasuryAccount: TAccountMetas[2];
+    paymentsAccount: TAccountMetas[3];
     eventAuthority: TAccountMetas[4];
     program: TAccountMetas[5];
   };
-  data: SetPaymentsAccountInstructionData;
+  data: AcceptRoleInstructionData;
 };
 
-export function parseSetPaymentsAccountInstruction<
+export function parseAcceptRoleInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedSetPaymentsAccountInstruction<TProgram, TAccountMetas> {
+): ParsedAcceptRoleInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 6) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
@@ -312,15 +313,13 @@ export function parseSetPaymentsAccountInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      admin: getNextAccount(),
+      newKey: getNextAccount(),
       config: getNextAccount(),
-      paymentsAccount: getNextAccount(),
       treasuryAccount: getNextAccount(),
+      paymentsAccount: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },
-    data: getSetPaymentsAccountInstructionDataDecoder().decode(
-      instruction.data,
-    ),
+    data: getAcceptRoleInstructionDataDecoder().decode(instruction.data),
   };
 }

@@ -41,6 +41,7 @@ import {
   type ResolvedInstructionAccountMeta,
 } from "@solana/kit/program-client-core";
 import {
+  findConfigPda,
   findPendingDepositsPda,
   findStatePda,
   findVaultAuthorityPda,
@@ -59,6 +60,7 @@ export function getCancelDepositDiscriminatorBytes(): ReadonlyUint8Array {
 
 export type CancelDepositInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
+  TAccountSigner extends string | AccountMeta<string> = string,
   TAccountOwner extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
@@ -69,6 +71,10 @@ export type CancelDepositInstruction<
   TAccountReserveMint extends string | AccountMeta<string> = string,
   TAccountTokenProgram extends string | AccountMeta<string> =
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  TAccountAssociatedTokenProgram extends string | AccountMeta<string> =
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  TAccountSystemProgram extends string | AccountMeta<string> =
+    "11111111111111111111111111111111",
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -76,9 +82,12 @@ export type CancelDepositInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
+      TAccountSigner extends string
+        ? WritableSignerAccount<TAccountSigner> &
+            AccountSignerMeta<TAccountSigner>
+        : TAccountSigner,
       TAccountOwner extends string
-        ? WritableSignerAccount<TAccountOwner> &
-            AccountSignerMeta<TAccountOwner>
+        ? WritableAccount<TAccountOwner>
         : TAccountOwner,
       TAccountConfig extends string
         ? ReadonlyAccount<TAccountConfig>
@@ -104,6 +113,12 @@ export type CancelDepositInstruction<
       TAccountTokenProgram extends string
         ? ReadonlyAccount<TAccountTokenProgram>
         : TAccountTokenProgram,
+      TAccountAssociatedTokenProgram extends string
+        ? ReadonlyAccount<TAccountAssociatedTokenProgram>
+        : TAccountAssociatedTokenProgram,
+      TAccountSystemProgram extends string
+        ? ReadonlyAccount<TAccountSystemProgram>
+        : TAccountSystemProgram,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -144,7 +159,8 @@ export function getCancelDepositInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CancelDepositAsyncInput<
-  TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+  TAccountSigner extends InstructionSignerInput = InstructionSignerInput,
+  TAccountOwner extends InstructionAccountInput = InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountDepositRequest extends InstructionAccountInput =
@@ -157,27 +173,45 @@ export type CancelDepositAsyncInput<
   TAccountReserveMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput =
     InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** The request's owner; receives the refund and the rent. */
+  /**
+   * The request's owner or the admin. Pays the rent of the owner's token
+   * account if it has to be created.
+   */
+  signer: TAccountSigner;
+  /**
+   * The request's owner; receives the request's rent.
+   * only.
+   */
   owner: TAccountOwner;
-  config: TAccountConfig;
+  config?: TAccountConfig;
   state?: TAccountState;
   depositRequest: TAccountDepositRequest;
-  /** The owner's BRS account for the refund. */
+  /**
+   * The owner's associated token account for the reserve mint; created
+   * idempotently in the handler.
+   */
   destination: TAccountDestination;
   pendingDeposits?: TAccountPendingDeposits;
   vaultAuthority?: TAccountVaultAuthority;
   reserveMint: TAccountReserveMint;
   tokenProgram?: TAccountTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
 };
 
 export async function getCancelDepositInstructionAsync<
-  TAccountOwner extends InstructionSignerInput,
+  TAccountSigner extends InstructionSignerInput,
+  TAccountOwner extends InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountDepositRequest extends InstructionAccountInput,
@@ -186,11 +220,14 @@ export async function getCancelDepositInstructionAsync<
   TAccountVaultAuthority extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
   input: CancelDepositAsyncInput<
+    TAccountSigner,
     TAccountOwner,
     TAccountConfig,
     TAccountState,
@@ -200,6 +237,8 @@ export async function getCancelDepositInstructionAsync<
     TAccountVaultAuthority,
     TAccountReserveMint,
     TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountSystemProgram,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -207,6 +246,10 @@ export async function getCancelDepositInstructionAsync<
 ): Promise<
   CancelDepositInstruction<
     TProgramAddress,
+    ResolvedInstructionAccountMeta<
+      TAccountSigner,
+      InstructionAccountInputAddress<TAccountSigner>
+    >,
     ResolvedInstructionAccountMeta<
       TAccountOwner,
       InstructionAccountInputAddress<TAccountOwner>
@@ -244,6 +287,14 @@ export async function getCancelDepositInstructionAsync<
       InstructionAccountInputAddress<TAccountTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -261,7 +312,8 @@ export async function getCancelDepositInstructionAsync<
 
   // Original accounts.
   const originalAccounts = {
-    owner: { value: input.owner ?? null, isSigner: true, isWritable: true },
+    signer: { value: input.signer ?? null, isSigner: true, isWritable: true },
+    owner: { value: input.owner ?? null, isSigner: false, isWritable: true },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
     depositRequest: {
@@ -294,6 +346,16 @@ export async function getCancelDepositInstructionAsync<
       isSigner: false,
       isWritable: false,
     },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -311,6 +373,17 @@ export async function getCancelDepositInstructionAsync<
   >;
 
   // Resolve default values.
+  if (!accounts.config.value) {
+    accounts.config.value = await findConfigPda(
+      {
+        reserveMint: getAddressFromResolvedInstructionAccount(
+          "reserveMint",
+          accounts.reserveMint.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
   if (!accounts.state.value) {
     accounts.state.value = await findStatePda(
       {
@@ -348,9 +421,18 @@ export async function getCancelDepositInstructionAsync<
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
+  }
 
   return Object.freeze({
     accounts: [
+      getAccountMeta("signer", accounts.signer),
       getAccountMeta("owner", accounts.owner),
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
@@ -360,6 +442,8 @@ export async function getCancelDepositInstructionAsync<
       getAccountMeta("vaultAuthority", accounts.vaultAuthority),
       getAccountMeta("reserveMint", accounts.reserveMint),
       getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -367,6 +451,10 @@ export async function getCancelDepositInstructionAsync<
     programAddress,
   } as CancelDepositInstruction<
     TProgramAddress,
+    ResolvedInstructionAccountMeta<
+      TAccountSigner,
+      InstructionAccountInputAddress<TAccountSigner>
+    >,
     ResolvedInstructionAccountMeta<
       TAccountOwner,
       InstructionAccountInputAddress<TAccountOwner>
@@ -404,6 +492,14 @@ export async function getCancelDepositInstructionAsync<
       InstructionAccountInputAddress<TAccountTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -415,7 +511,8 @@ export async function getCancelDepositInstructionAsync<
 }
 
 export type CancelDepositInput<
-  TAccountOwner extends InstructionSignerInput = InstructionSignerInput,
+  TAccountSigner extends InstructionSignerInput = InstructionSignerInput,
+  TAccountOwner extends InstructionAccountInput = InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountDepositRequest extends InstructionAccountInput =
@@ -428,27 +525,45 @@ export type CancelDepositInput<
   TAccountReserveMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput =
     InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput =
+    InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** The request's owner; receives the refund and the rent. */
+  /**
+   * The request's owner or the admin. Pays the rent of the owner's token
+   * account if it has to be created.
+   */
+  signer: TAccountSigner;
+  /**
+   * The request's owner; receives the request's rent.
+   * only.
+   */
   owner: TAccountOwner;
   config: TAccountConfig;
   state: TAccountState;
   depositRequest: TAccountDepositRequest;
-  /** The owner's BRS account for the refund. */
+  /**
+   * The owner's associated token account for the reserve mint; created
+   * idempotently in the handler.
+   */
   destination: TAccountDestination;
   pendingDeposits: TAccountPendingDeposits;
   vaultAuthority: TAccountVaultAuthority;
   reserveMint: TAccountReserveMint;
   tokenProgram?: TAccountTokenProgram;
+  associatedTokenProgram?: TAccountAssociatedTokenProgram;
+  systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
 };
 
 export function getCancelDepositInstruction<
-  TAccountOwner extends InstructionSignerInput,
+  TAccountSigner extends InstructionSignerInput,
+  TAccountOwner extends InstructionAccountInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountDepositRequest extends InstructionAccountInput,
@@ -457,11 +572,14 @@ export function getCancelDepositInstruction<
   TAccountVaultAuthority extends InstructionAccountInput,
   TAccountReserveMint extends InstructionAccountInput,
   TAccountTokenProgram extends InstructionAccountInput,
+  TAccountAssociatedTokenProgram extends InstructionAccountInput,
+  TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
   input: CancelDepositInput<
+    TAccountSigner,
     TAccountOwner,
     TAccountConfig,
     TAccountState,
@@ -471,12 +589,18 @@ export function getCancelDepositInstruction<
     TAccountVaultAuthority,
     TAccountReserveMint,
     TAccountTokenProgram,
+    TAccountAssociatedTokenProgram,
+    TAccountSystemProgram,
     TAccountEventAuthority,
     TAccountProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): CancelDepositInstruction<
   TProgramAddress,
+  ResolvedInstructionAccountMeta<
+    TAccountSigner,
+    InstructionAccountInputAddress<TAccountSigner>
+  >,
   ResolvedInstructionAccountMeta<
     TAccountOwner,
     InstructionAccountInputAddress<TAccountOwner>
@@ -514,6 +638,14 @@ export function getCancelDepositInstruction<
     InstructionAccountInputAddress<TAccountTokenProgram>
   >,
   ResolvedInstructionAccountMeta<
+    TAccountAssociatedTokenProgram,
+    InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountSystemProgram,
+    InstructionAccountInputAddress<TAccountSystemProgram>
+  >,
+  ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
     InstructionAccountInputAddress<TAccountEventAuthority>
   >,
@@ -530,7 +662,8 @@ export function getCancelDepositInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    owner: { value: input.owner ?? null, isSigner: true, isWritable: true },
+    signer: { value: input.signer ?? null, isSigner: true, isWritable: true },
+    owner: { value: input.owner ?? null, isSigner: false, isWritable: true },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
     depositRequest: {
@@ -563,6 +696,16 @@ export function getCancelDepositInstruction<
       isSigner: false,
       isWritable: false,
     },
+    associatedTokenProgram: {
+      value: input.associatedTokenProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
+    systemProgram: {
+      value: input.systemProgram ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -584,9 +727,18 @@ export function getCancelDepositInstruction<
     accounts.tokenProgram.value =
       "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" as Address<"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA">;
   }
+  if (!accounts.associatedTokenProgram.value) {
+    accounts.associatedTokenProgram.value =
+      "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" as Address<"ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL">;
+  }
+  if (!accounts.systemProgram.value) {
+    accounts.systemProgram.value =
+      "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
+  }
 
   return Object.freeze({
     accounts: [
+      getAccountMeta("signer", accounts.signer),
       getAccountMeta("owner", accounts.owner),
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
@@ -596,6 +748,8 @@ export function getCancelDepositInstruction<
       getAccountMeta("vaultAuthority", accounts.vaultAuthority),
       getAccountMeta("reserveMint", accounts.reserveMint),
       getAccountMeta("tokenProgram", accounts.tokenProgram),
+      getAccountMeta("associatedTokenProgram", accounts.associatedTokenProgram),
+      getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
@@ -603,6 +757,10 @@ export function getCancelDepositInstruction<
     programAddress,
   } as CancelDepositInstruction<
     TProgramAddress,
+    ResolvedInstructionAccountMeta<
+      TAccountSigner,
+      InstructionAccountInputAddress<TAccountSigner>
+    >,
     ResolvedInstructionAccountMeta<
       TAccountOwner,
       InstructionAccountInputAddress<TAccountOwner>
@@ -640,6 +798,14 @@ export function getCancelDepositInstruction<
       InstructionAccountInputAddress<TAccountTokenProgram>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountAssociatedTokenProgram,
+      InstructionAccountInputAddress<TAccountAssociatedTokenProgram>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountSystemProgram,
+      InstructionAccountInputAddress<TAccountSystemProgram>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -656,19 +822,32 @@ export type ParsedCancelDepositInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** The request's owner; receives the refund and the rent. */
-    owner: TAccountMetas[0];
-    config: TAccountMetas[1];
-    state: TAccountMetas[2];
-    depositRequest: TAccountMetas[3];
-    /** The owner's BRS account for the refund. */
-    destination: TAccountMetas[4];
-    pendingDeposits: TAccountMetas[5];
-    vaultAuthority: TAccountMetas[6];
-    reserveMint: TAccountMetas[7];
-    tokenProgram: TAccountMetas[8];
-    eventAuthority: TAccountMetas[9];
-    program: TAccountMetas[10];
+    /**
+     * The request's owner or the admin. Pays the rent of the owner's token
+     * account if it has to be created.
+     */
+    signer: TAccountMetas[0];
+    /**
+     * The request's owner; receives the request's rent.
+     * only.
+     */
+    owner: TAccountMetas[1];
+    config: TAccountMetas[2];
+    state: TAccountMetas[3];
+    depositRequest: TAccountMetas[4];
+    /**
+     * The owner's associated token account for the reserve mint; created
+     * idempotently in the handler.
+     */
+    destination: TAccountMetas[5];
+    pendingDeposits: TAccountMetas[6];
+    vaultAuthority: TAccountMetas[7];
+    reserveMint: TAccountMetas[8];
+    tokenProgram: TAccountMetas[9];
+    associatedTokenProgram: TAccountMetas[10];
+    systemProgram: TAccountMetas[11];
+    eventAuthority: TAccountMetas[12];
+    program: TAccountMetas[13];
   };
   data: CancelDepositInstructionData;
 };
@@ -681,12 +860,12 @@ export function parseCancelDepositInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCancelDepositInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 11) {
+  if (instruction.accounts.length < 14) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 11,
+        expectedAccountMetas: 14,
       },
     );
   }
@@ -699,6 +878,7 @@ export function parseCancelDepositInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
+      signer: getNextAccount(),
       owner: getNextAccount(),
       config: getNextAccount(),
       state: getNextAccount(),
@@ -708,6 +888,8 @@ export function parseCancelDepositInstruction<
       vaultAuthority: getNextAccount(),
       reserveMint: getNextAccount(),
       tokenProgram: getNextAccount(),
+      associatedTokenProgram: getNextAccount(),
+      systemProgram: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

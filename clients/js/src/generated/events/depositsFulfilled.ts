@@ -47,6 +47,9 @@ export type DepositsFulfilledEvent = {
   assets: bigint;
   shares: bigint;
   nav: bigint;
+  /** Lifetime counters after the batch. */
+  depositedAssetsTotal: bigint;
+  mintedSharesTotal: bigint;
 };
 
 export type DepositsFulfilledEventArgs = {
@@ -57,6 +60,9 @@ export type DepositsFulfilledEventArgs = {
   assets: number | bigint;
   shares: number | bigint;
   nav: number | bigint;
+  /** Lifetime counters after the batch. */
+  depositedAssetsTotal: number | bigint;
+  mintedSharesTotal: number | bigint;
 };
 
 /** Gets the encoder for {@link DepositsFulfilledEventArgs} event data. */
@@ -70,6 +76,8 @@ export function getDepositsFulfilledEventEncoder(): FixedSizeEncoder<DepositsFul
       ["assets", getU64Encoder()],
       ["shares", getU64Encoder()],
       ["nav", getU64Encoder()],
+      ["depositedAssetsTotal", getU64Encoder()],
+      ["mintedSharesTotal", getU64Encoder()],
     ]),
     [getConstantEncoder(DEPOSITS_FULFILLED_EVENT_DISCRIMINATOR)],
   );
@@ -86,6 +94,8 @@ export function getDepositsFulfilledEventDecoder(): FixedSizeDecoder<DepositsFul
       ["assets", getU64Decoder()],
       ["shares", getU64Decoder()],
       ["nav", getU64Decoder()],
+      ["depositedAssetsTotal", getU64Decoder()],
+      ["mintedSharesTotal", getU64Decoder()],
     ]),
     [getConstantDecoder(DEPOSITS_FULFILLED_EVENT_DISCRIMINATOR)],
   );

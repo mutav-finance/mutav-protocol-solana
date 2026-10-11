@@ -23,8 +23,12 @@ import {
   getI64Encoder,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
+  getU8Decoder,
+  getU8Encoder,
   type Address,
   type FixedSizeCodec,
   type FixedSizeDecoder,
@@ -45,14 +49,24 @@ export type GuaranteeClosedEvent = {
   config: Address;
   ts: bigint;
   id: ReadonlyUint8Array;
+  reason: number;
   releasedCover: bigint;
+  /** Running totals after the close. */
+  remainingCoverTotal: bigint;
+  coverageRequired: bigint;
+  activeGuarantees: number;
 };
 
 export type GuaranteeClosedEventArgs = {
   config: Address;
   ts: number | bigint;
   id: ReadonlyUint8Array;
+  reason: number;
   releasedCover: number | bigint;
+  /** Running totals after the close. */
+  remainingCoverTotal: number | bigint;
+  coverageRequired: number | bigint;
+  activeGuarantees: number;
 };
 
 /** Gets the encoder for {@link GuaranteeClosedEventArgs} event data. */
@@ -62,7 +76,11 @@ export function getGuaranteeClosedEventEncoder(): FixedSizeEncoder<GuaranteeClos
       ["config", getAddressEncoder()],
       ["ts", getI64Encoder()],
       ["id", fixEncoderSize(getBytesEncoder(), 32)],
+      ["reason", getU8Encoder()],
       ["releasedCover", getU64Encoder()],
+      ["remainingCoverTotal", getU64Encoder()],
+      ["coverageRequired", getU64Encoder()],
+      ["activeGuarantees", getU32Encoder()],
     ]),
     [getConstantEncoder(GUARANTEE_CLOSED_EVENT_DISCRIMINATOR)],
   );
@@ -75,7 +93,11 @@ export function getGuaranteeClosedEventDecoder(): FixedSizeDecoder<GuaranteeClos
       ["config", getAddressDecoder()],
       ["ts", getI64Decoder()],
       ["id", fixDecoderSize(getBytesDecoder(), 32)],
+      ["reason", getU8Decoder()],
       ["releasedCover", getU64Decoder()],
+      ["remainingCoverTotal", getU64Decoder()],
+      ["coverageRequired", getU64Decoder()],
+      ["activeGuarantees", getU32Decoder()],
     ]),
     [getConstantDecoder(GUARANTEE_CLOSED_EVENT_DISCRIMINATOR)],
   );

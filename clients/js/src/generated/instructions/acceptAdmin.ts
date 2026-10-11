@@ -10,8 +10,6 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressDecoder,
-  getAddressEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getStructDecoder,
@@ -43,17 +41,19 @@ import {
 } from "@solana/kit/program-client-core";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 
-export const SET_ROLES_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
-  119, 86, 129, 161, 55, 23, 250, 12,
+export const ACCEPT_ADMIN_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
+  112, 42, 45, 90, 116, 181, 13, 170,
 ]);
 
-export function getSetRolesDiscriminatorBytes(): ReadonlyUint8Array {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(SET_ROLES_DISCRIMINATOR);
+export function getAcceptAdminDiscriminatorBytes(): ReadonlyUint8Array {
+  return fixEncoderSize(getBytesEncoder(), 8).encode(
+    ACCEPT_ADMIN_DISCRIMINATOR,
+  );
 }
 
-export type SetRolesInstruction<
+export type AcceptAdminInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
-  TAccountAdmin extends string | AccountMeta<string> = string,
+  TAccountNewAdmin extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
@@ -62,10 +62,10 @@ export type SetRolesInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountAdmin extends string
-        ? ReadonlySignerAccount<TAccountAdmin> &
-            AccountSignerMeta<TAccountAdmin>
-        : TAccountAdmin,
+      TAccountNewAdmin extends string
+        ? ReadonlySignerAccount<TAccountNewAdmin> &
+            AccountSignerMeta<TAccountNewAdmin>
+        : TAccountNewAdmin,
       TAccountConfig extends string
         ? WritableAccount<TAccountConfig>
         : TAccountConfig,
@@ -79,80 +79,66 @@ export type SetRolesInstruction<
     ]
   >;
 
-export type SetRolesInstructionData = {
-  discriminator: ReadonlyUint8Array;
-  operator: Address;
-  pauser: Address;
-};
+export type AcceptAdminInstructionData = { discriminator: ReadonlyUint8Array };
 
-export type SetRolesInstructionDataArgs = {
-  operator: Address;
-  pauser: Address;
-};
+export type AcceptAdminInstructionDataArgs = {};
 
-export function getSetRolesInstructionDataEncoder(): FixedSizeEncoder<SetRolesInstructionDataArgs> {
+export function getAcceptAdminInstructionDataEncoder(): FixedSizeEncoder<AcceptAdminInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([
-      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
-      ["operator", getAddressEncoder()],
-      ["pauser", getAddressEncoder()],
-    ]),
-    (value) => ({ ...value, discriminator: SET_ROLES_DISCRIMINATOR }),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
+    (value) => ({ ...value, discriminator: ACCEPT_ADMIN_DISCRIMINATOR }),
   );
 }
 
-export function getSetRolesInstructionDataDecoder(): FixedSizeDecoder<SetRolesInstructionData> {
+export function getAcceptAdminInstructionDataDecoder(): FixedSizeDecoder<AcceptAdminInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
-    ["operator", getAddressDecoder()],
-    ["pauser", getAddressDecoder()],
   ]);
 }
 
-export function getSetRolesInstructionDataCodec(): FixedSizeCodec<
-  SetRolesInstructionDataArgs,
-  SetRolesInstructionData
+export function getAcceptAdminInstructionDataCodec(): FixedSizeCodec<
+  AcceptAdminInstructionDataArgs,
+  AcceptAdminInstructionData
 > {
   return combineCodec(
-    getSetRolesInstructionDataEncoder(),
-    getSetRolesInstructionDataDecoder(),
+    getAcceptAdminInstructionDataEncoder(),
+    getAcceptAdminInstructionDataDecoder(),
   );
 }
 
-export type SetRolesInput<
-  TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
+export type AcceptAdminInput<
+  TAccountNewAdmin extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  admin: TAccountAdmin;
+  /** The proposed admin. */
+  newAdmin: TAccountNewAdmin;
   config: TAccountConfig;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
-  operator: SetRolesInstructionDataArgs["operator"];
-  pauser: SetRolesInstructionDataArgs["pauser"];
 };
 
-export function getSetRolesInstruction<
-  TAccountAdmin extends InstructionSignerInput,
+export function getAcceptAdminInstruction<
+  TAccountNewAdmin extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
 >(
-  input: SetRolesInput<
-    TAccountAdmin,
+  input: AcceptAdminInput<
+    TAccountNewAdmin,
     TAccountConfig,
     TAccountEventAuthority,
     TAccountProgram
   >,
   config?: { programAddress?: TProgramAddress },
-): SetRolesInstruction<
+): AcceptAdminInstruction<
   TProgramAddress,
   ResolvedInstructionAccountMeta<
-    TAccountAdmin,
-    InstructionAccountInputAddress<TAccountAdmin>
+    TAccountNewAdmin,
+    InstructionAccountInputAddress<TAccountNewAdmin>
   >,
   ResolvedInstructionAccountMeta<
     TAccountConfig,
@@ -175,7 +161,11 @@ export function getSetRolesInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
+    newAdmin: {
+      value: input.newAdmin ?? null,
+      isSigner: true,
+      isWritable: false,
+    },
     config: { value: input.config ?? null, isSigner: false, isWritable: true },
     eventAuthority: {
       value: input.eventAuthority ?? null,
@@ -193,25 +183,20 @@ export function getSetRolesInstruction<
     ResolvedInstructionAccount
   >;
 
-  // Original args.
-  const args = { ...input };
-
   return Object.freeze({
     accounts: [
-      getAccountMeta("admin", accounts.admin),
+      getAccountMeta("newAdmin", accounts.newAdmin),
       getAccountMeta("config", accounts.config),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
-    data: getSetRolesInstructionDataEncoder().encode(
-      args as SetRolesInstructionDataArgs,
-    ),
+    data: getAcceptAdminInstructionDataEncoder().encode({}),
     programAddress,
-  } as SetRolesInstruction<
+  } as AcceptAdminInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountAdmin,
-      InstructionAccountInputAddress<TAccountAdmin>
+      TAccountNewAdmin,
+      InstructionAccountInputAddress<TAccountNewAdmin>
     >,
     ResolvedInstructionAccountMeta<
       TAccountConfig,
@@ -228,28 +213,29 @@ export function getSetRolesInstruction<
   >);
 }
 
-export type ParsedSetRolesInstruction<
+export type ParsedAcceptAdminInstruction<
   TProgram extends string = typeof MUTAV_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    admin: TAccountMetas[0];
+    /** The proposed admin. */
+    newAdmin: TAccountMetas[0];
     config: TAccountMetas[1];
     eventAuthority: TAccountMetas[2];
     program: TAccountMetas[3];
   };
-  data: SetRolesInstructionData;
+  data: AcceptAdminInstructionData;
 };
 
-export function parseSetRolesInstruction<
+export function parseAcceptAdminInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedSetRolesInstruction<TProgram, TAccountMetas> {
+): ParsedAcceptAdminInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
@@ -268,11 +254,11 @@ export function parseSetRolesInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      admin: getNextAccount(),
+      newAdmin: getNextAccount(),
       config: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },
-    data: getSetRolesInstructionDataDecoder().decode(instruction.data),
+    data: getAcceptAdminInstructionDataDecoder().decode(instruction.data),
   };
 }

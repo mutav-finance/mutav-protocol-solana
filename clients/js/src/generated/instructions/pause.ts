@@ -111,7 +111,7 @@ export type PauseInput<
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  /** The pauser or the admin. No time lock. */
+  /** The pauser, the admin or a guardian (ADR 0020). No time lock. */
   signer: TAccountSigner;
   config: TAccountConfig;
   eventAuthority: TAccountEventAuthority;
@@ -213,7 +213,7 @@ export type ParsedPauseInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    /** The pauser or the admin. No time lock. */
+    /** The pauser, the admin or a guardian (ADR 0020). No time lock. */
     signer: TAccountMetas[0];
     config: TAccountMetas[1];
     eventAuthority: TAccountMetas[2];

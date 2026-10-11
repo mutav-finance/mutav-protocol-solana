@@ -43,7 +43,7 @@ import {
   type ResolvedInstructionAccount,
   type ResolvedInstructionAccountMeta,
 } from "@solana/kit/program-client-core";
-import { findStatePda } from "../pdas";
+import { findReservePda, findStatePda } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
 
 export const REGISTER_GUARANTEE_DISCRIMINATOR: ReadonlyUint8Array =
@@ -61,6 +61,7 @@ export type RegisterGuaranteeInstruction<
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
   TAccountGuarantee extends string | AccountMeta<string> = string,
+  TAccountReserve extends string | AccountMeta<string> = string,
   TAccountPayer extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
@@ -84,6 +85,9 @@ export type RegisterGuaranteeInstruction<
       TAccountGuarantee extends string
         ? WritableAccount<TAccountGuarantee>
         : TAccountGuarantee,
+      TAccountReserve extends string
+        ? ReadonlyAccount<TAccountReserve>
+        : TAccountReserve,
       TAccountPayer extends string
         ? WritableSignerAccount<TAccountPayer> &
             AccountSignerMeta<TAccountPayer>
@@ -158,6 +162,7 @@ export type RegisterGuaranteeAsyncInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
   TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
@@ -169,6 +174,11 @@ export type RegisterGuaranteeAsyncInput<
   config: TAccountConfig;
   state?: TAccountState;
   guarantee: TAccountGuarantee;
+  /**
+   * Read for its freeze state (ADR 0020): a frozen reserve counts as 0
+   * BRS, so no new cover is accepted against it.
+   */
+  reserve?: TAccountReserve;
   payer: TAccountPayer;
   systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
@@ -185,6 +195,7 @@ export async function getRegisterGuaranteeInstructionAsync<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput,
   TAccountPayer extends InstructionSignerInput,
   TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
@@ -196,6 +207,7 @@ export async function getRegisterGuaranteeInstructionAsync<
     TAccountConfig,
     TAccountState,
     TAccountGuarantee,
+    TAccountReserve,
     TAccountPayer,
     TAccountSystemProgram,
     TAccountEventAuthority,
@@ -220,6 +232,10 @@ export async function getRegisterGuaranteeInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountGuarantee,
       InstructionAccountInputAddress<TAccountGuarantee>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
       TAccountPayer,
@@ -258,6 +274,11 @@ export async function getRegisterGuaranteeInstructionAsync<
       value: input.guarantee ?? null,
       isSigner: false,
       isWritable: true,
+    },
+    reserve: {
+      value: input.reserve ?? null,
+      isSigner: false,
+      isWritable: false,
     },
     payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
     systemProgram: {
@@ -296,6 +317,17 @@ export async function getRegisterGuaranteeInstructionAsync<
       { programAddress },
     );
   }
+  if (!accounts.reserve.value) {
+    accounts.reserve.value = await findReservePda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -307,6 +339,7 @@ export async function getRegisterGuaranteeInstructionAsync<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("guarantee", accounts.guarantee),
+      getAccountMeta("reserve", accounts.reserve),
       getAccountMeta("payer", accounts.payer),
       getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
@@ -335,6 +368,10 @@ export async function getRegisterGuaranteeInstructionAsync<
       InstructionAccountInputAddress<TAccountGuarantee>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountPayer,
       InstructionAccountInputAddress<TAccountPayer>
     >,
@@ -358,6 +395,7 @@ export type RegisterGuaranteeInput<
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput = InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
   TAccountPayer extends InstructionSignerInput = InstructionSignerInput,
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
@@ -369,6 +407,11 @@ export type RegisterGuaranteeInput<
   config: TAccountConfig;
   state: TAccountState;
   guarantee: TAccountGuarantee;
+  /**
+   * Read for its freeze state (ADR 0020): a frozen reserve counts as 0
+   * BRS, so no new cover is accepted against it.
+   */
+  reserve: TAccountReserve;
   payer: TAccountPayer;
   systemProgram?: TAccountSystemProgram;
   eventAuthority: TAccountEventAuthority;
@@ -385,6 +428,7 @@ export function getRegisterGuaranteeInstruction<
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
   TAccountGuarantee extends InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput,
   TAccountPayer extends InstructionSignerInput,
   TAccountSystemProgram extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
@@ -396,6 +440,7 @@ export function getRegisterGuaranteeInstruction<
     TAccountConfig,
     TAccountState,
     TAccountGuarantee,
+    TAccountReserve,
     TAccountPayer,
     TAccountSystemProgram,
     TAccountEventAuthority,
@@ -419,6 +464,10 @@ export function getRegisterGuaranteeInstruction<
   ResolvedInstructionAccountMeta<
     TAccountGuarantee,
     InstructionAccountInputAddress<TAccountGuarantee>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountReserve,
+    InstructionAccountInputAddress<TAccountReserve>
   >,
   ResolvedInstructionAccountMeta<
     TAccountPayer,
@@ -457,6 +506,11 @@ export function getRegisterGuaranteeInstruction<
       isSigner: false,
       isWritable: true,
     },
+    reserve: {
+      value: input.reserve ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     payer: { value: input.payer ?? null, isSigner: true, isWritable: true },
     systemProgram: {
       value: input.systemProgram ?? null,
@@ -494,6 +548,7 @@ export function getRegisterGuaranteeInstruction<
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
       getAccountMeta("guarantee", accounts.guarantee),
+      getAccountMeta("reserve", accounts.reserve),
       getAccountMeta("payer", accounts.payer),
       getAccountMeta("systemProgram", accounts.systemProgram),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
@@ -520,6 +575,10 @@ export function getRegisterGuaranteeInstruction<
     ResolvedInstructionAccountMeta<
       TAccountGuarantee,
       InstructionAccountInputAddress<TAccountGuarantee>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
       TAccountPayer,
@@ -550,10 +609,15 @@ export type ParsedRegisterGuaranteeInstruction<
     config: TAccountMetas[1];
     state: TAccountMetas[2];
     guarantee: TAccountMetas[3];
-    payer: TAccountMetas[4];
-    systemProgram: TAccountMetas[5];
-    eventAuthority: TAccountMetas[6];
-    program: TAccountMetas[7];
+    /**
+     * Read for its freeze state (ADR 0020): a frozen reserve counts as 0
+     * BRS, so no new cover is accepted against it.
+     */
+    reserve: TAccountMetas[4];
+    payer: TAccountMetas[5];
+    systemProgram: TAccountMetas[6];
+    eventAuthority: TAccountMetas[7];
+    program: TAccountMetas[8];
   };
   data: RegisterGuaranteeInstructionData;
 };
@@ -566,12 +630,12 @@ export function parseRegisterGuaranteeInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedRegisterGuaranteeInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 8) {
+  if (instruction.accounts.length < 9) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 8,
+        expectedAccountMetas: 9,
       },
     );
   }
@@ -588,6 +652,7 @@ export function parseRegisterGuaranteeInstruction<
       config: getNextAccount(),
       state: getNextAccount(),
       guarantee: getNextAccount(),
+      reserve: getNextAccount(),
       payer: getNextAccount(),
       systemProgram: getNextAccount(),
       eventAuthority: getNextAccount(),

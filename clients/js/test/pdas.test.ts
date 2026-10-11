@@ -32,6 +32,7 @@ describe('PDA derivation matches the program', () => {
       pendingDeposits: expected.pendingDeposits,
       pendingRedemptions: expected.pendingRedemptions,
       claims: expected.claims,
+      unsolicited: expected.unsolicited,
       eventAuthority: expected.eventAuthority,
     });
   });

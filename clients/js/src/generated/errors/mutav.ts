@@ -48,55 +48,76 @@ export const MUTAV_ERROR__OPEN_CLAIMS = 0x177e; // 6014
 export const MUTAV_ERROR__EXCEEDS_REMAINING_COVER = 0x177f; // 6015
 /** ClaimNotFiled: Claim has not been filed */
 export const MUTAV_ERROR__CLAIM_NOT_FILED = 0x1780; // 6016
-/** LegMismatch: Leg does not match the claim filing */
-export const MUTAV_ERROR__LEG_MISMATCH = 0x1781; // 6017
-/** ClaimCallCapExceeded: Per-call claim payment cap exceeded */
-export const MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED = 0x1782; // 6018
+/** ClaimCallCapExceeded: Above the per-call claim cap without a matching approval */
+export const MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED = 0x1781; // 6017
 /** ClaimPeriodCapExceeded: Per-period claim payment cap exceeded */
-export const MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED = 0x1783; // 6019
+export const MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED = 0x1782; // 6018
 /** InvalidPaymentsAccount: Invalid payments account */
-export const MUTAV_ERROR__INVALID_PAYMENTS_ACCOUNT = 0x1784; // 6020
+export const MUTAV_ERROR__INVALID_PAYMENTS_ACCOUNT = 0x1783; // 6019
 /** PayoutAlreadySettled: Payout already settled */
-export const MUTAV_ERROR__PAYOUT_ALREADY_SETTLED = 0x1785; // 6021
+export const MUTAV_ERROR__PAYOUT_ALREADY_SETTLED = 0x1784; // 6020
 /** NotAllowlisted: Wallet is not allowlisted */
-export const MUTAV_ERROR__NOT_ALLOWLISTED = 0x1786; // 6022
+export const MUTAV_ERROR__NOT_ALLOWLISTED = 0x1785; // 6021
 /** RequestTooSmall: Request is below the minimum */
-export const MUTAV_ERROR__REQUEST_TOO_SMALL = 0x1787; // 6023
+export const MUTAV_ERROR__REQUEST_TOO_SMALL = 0x1786; // 6022
 /** RequestTooLarge: Request is above the maximum */
-export const MUTAV_ERROR__REQUEST_TOO_LARGE = 0x1788; // 6024
+export const MUTAV_ERROR__REQUEST_TOO_LARGE = 0x1787; // 6023
 /** InvalidRequestStatus: Invalid request status */
-export const MUTAV_ERROR__INVALID_REQUEST_STATUS = 0x1789; // 6025
+export const MUTAV_ERROR__INVALID_REQUEST_STATUS = 0x1788; // 6024
 /** QueueOrderViolation: Queue order violation */
-export const MUTAV_ERROR__QUEUE_ORDER_VIOLATION = 0x178a; // 6026
+export const MUTAV_ERROR__QUEUE_ORDER_VIOLATION = 0x1789; // 6025
 /** PostCpiCheckFailed: Post-CPI check failed */
-export const MUTAV_ERROR__POST_CPI_CHECK_FAILED = 0x178b; // 6027
+export const MUTAV_ERROR__POST_CPI_CHECK_FAILED = 0x178a; // 6026
 /** MathOverflow: Math overflow */
-export const MUTAV_ERROR__MATH_OVERFLOW = 0x178c; // 6028
+export const MUTAV_ERROR__MATH_OVERFLOW = 0x178b; // 6027
 /** FeatureNotSupported: Feature not supported by this program version */
-export const MUTAV_ERROR__FEATURE_NOT_SUPPORTED = 0x178d; // 6029
+export const MUTAV_ERROR__FEATURE_NOT_SUPPORTED = 0x178c; // 6028
 /** InvalidTreasuryAccount: Invalid treasury account */
-export const MUTAV_ERROR__INVALID_TREASURY_ACCOUNT = 0x178e; // 6030
+export const MUTAV_ERROR__INVALID_TREASURY_ACCOUNT = 0x178d; // 6029
 /** UnsupportedVersion: Unsupported account version or status */
-export const MUTAV_ERROR__UNSUPPORTED_VERSION = 0x178f; // 6031
+export const MUTAV_ERROR__UNSUPPORTED_VERSION = 0x178e; // 6030
 /** InvalidIncomeSource: Income source is not the reserve's income inbox */
-export const MUTAV_ERROR__INVALID_INCOME_SOURCE = 0x1790; // 6032
+export const MUTAV_ERROR__INVALID_INCOME_SOURCE = 0x178f; // 6031
 /** IncomeExceedsInbox: Amount exceeds the income inbox balance */
-export const MUTAV_ERROR__INCOME_EXCEEDS_INBOX = 0x1791; // 6033
+export const MUTAV_ERROR__INCOME_EXCEEDS_INBOX = 0x1790; // 6032
 /** InvalidTokenProgram: Token program is not the reserve's token program */
-export const MUTAV_ERROR__INVALID_TOKEN_PROGRAM = 0x1792; // 6034
+export const MUTAV_ERROR__INVALID_TOKEN_PROGRAM = 0x1791; // 6033
 /** ClaimNotPaid: Claim has not been paid */
-export const MUTAV_ERROR__CLAIM_NOT_PAID = 0x1793; // 6035
+export const MUTAV_ERROR__CLAIM_NOT_PAID = 0x1792; // 6034
+/** DuplicateParam: A config parameter appears more than once */
+export const MUTAV_ERROR__DUPLICATE_PARAM = 0x1793; // 6035
+/** ExpectedAmountMismatch: Expected amount does not match the claim's provision */
+export const MUTAV_ERROR__EXPECTED_AMOUNT_MISMATCH = 0x1794; // 6036
+/** NavOutOfBounds: NAV per share is outside the given bounds */
+export const MUTAV_ERROR__NAV_OUT_OF_BOUNDS = 0x1795; // 6037
+/** NoPendingHandover: No handover is pending for this role */
+export const MUTAV_ERROR__NO_PENDING_HANDOVER = 0x1796; // 6038
+/** HandoverExpired: The pending handover has expired */
+export const MUTAV_ERROR__HANDOVER_EXPIRED = 0x1797; // 6039
+/** GuaranteeHasPayments: Guarantee has claim payments */
+export const MUTAV_ERROR__GUARANTEE_HAS_PAYMENTS = 0x1798; // 6040
+/** HandoverPending: A handover is already pending for this role */
+export const MUTAV_ERROR__HANDOVER_PENDING = 0x1799; // 6041
+/** RefreshRequired: Refresh the reserve in the same slot first */
+export const MUTAV_ERROR__REFRESH_REQUIRED = 0x179a; // 6042
+/** PriceLimitNotMet: The head request's price limit is not met */
+export const MUTAV_ERROR__PRICE_LIMIT_NOT_MET = 0x179b; // 6043
 
 export type MutavError =
   | typeof MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED
   | typeof MUTAV_ERROR__CLAIM_NOT_FILED
   | typeof MUTAV_ERROR__CLAIM_NOT_PAID
   | typeof MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__DUPLICATE_PARAM
   | typeof MUTAV_ERROR__EXCEEDS_REMAINING_COVER
+  | typeof MUTAV_ERROR__EXPECTED_AMOUNT_MISMATCH
   | typeof MUTAV_ERROR__FEATURE_NOT_SUPPORTED
   | typeof MUTAV_ERROR__FULFIL_HALTED
   | typeof MUTAV_ERROR__GUARANTEE_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__GUARANTEE_HAS_PAYMENTS
   | typeof MUTAV_ERROR__GUARANTEE_NOT_ACTIVE
+  | typeof MUTAV_ERROR__HANDOVER_EXPIRED
+  | typeof MUTAV_ERROR__HANDOVER_PENDING
   | typeof MUTAV_ERROR__INCOME_EXCEEDS_INBOX
   | typeof MUTAV_ERROR__INSUFFICIENT_FREE_CAPITAL
   | typeof MUTAV_ERROR__INSUFFICIENT_LIQUID_BALANCE
@@ -107,14 +128,17 @@ export type MutavError =
   | typeof MUTAV_ERROR__INVALID_REQUEST_STATUS
   | typeof MUTAV_ERROR__INVALID_TOKEN_PROGRAM
   | typeof MUTAV_ERROR__INVALID_TREASURY_ACCOUNT
-  | typeof MUTAV_ERROR__LEG_MISMATCH
   | typeof MUTAV_ERROR__MATH_OVERFLOW
+  | typeof MUTAV_ERROR__NAV_OUT_OF_BOUNDS
+  | typeof MUTAV_ERROR__NO_PENDING_HANDOVER
   | typeof MUTAV_ERROR__NOT_ALLOWLISTED
   | typeof MUTAV_ERROR__OPEN_CLAIMS
   | typeof MUTAV_ERROR__PAUSED
   | typeof MUTAV_ERROR__PAYOUT_ALREADY_SETTLED
   | typeof MUTAV_ERROR__POST_CPI_CHECK_FAILED
+  | typeof MUTAV_ERROR__PRICE_LIMIT_NOT_MET
   | typeof MUTAV_ERROR__QUEUE_ORDER_VIOLATION
+  | typeof MUTAV_ERROR__REFRESH_REQUIRED
   | typeof MUTAV_ERROR__REQUEST_TOO_LARGE
   | typeof MUTAV_ERROR__REQUEST_TOO_SMALL
   | typeof MUTAV_ERROR__RESERVE_FROZEN
@@ -128,15 +152,20 @@ export type MutavError =
 let mutavErrorMessages: Record<MutavError, string> | undefined;
 if (process.env["NODE_ENV"] !== "production") {
   mutavErrorMessages = {
-    [MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED]: `Per-call claim payment cap exceeded`,
+    [MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED]: `Above the per-call claim cap without a matching approval`,
     [MUTAV_ERROR__CLAIM_NOT_FILED]: `Claim has not been filed`,
     [MUTAV_ERROR__CLAIM_NOT_PAID]: `Claim has not been paid`,
     [MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED]: `Per-period claim payment cap exceeded`,
+    [MUTAV_ERROR__DUPLICATE_PARAM]: `A config parameter appears more than once`,
     [MUTAV_ERROR__EXCEEDS_REMAINING_COVER]: `Amount exceeds the remaining cover`,
+    [MUTAV_ERROR__EXPECTED_AMOUNT_MISMATCH]: `Expected amount does not match the claim's provision`,
     [MUTAV_ERROR__FEATURE_NOT_SUPPORTED]: `Feature not supported by this program version`,
     [MUTAV_ERROR__FULFIL_HALTED]: `Fulfilment is halted by the NAV-move guard`,
     [MUTAV_ERROR__GUARANTEE_CAP_EXCEEDED]: `Per-guarantee cap exceeded`,
+    [MUTAV_ERROR__GUARANTEE_HAS_PAYMENTS]: `Guarantee has claim payments`,
     [MUTAV_ERROR__GUARANTEE_NOT_ACTIVE]: `Guarantee is not active`,
+    [MUTAV_ERROR__HANDOVER_EXPIRED]: `The pending handover has expired`,
+    [MUTAV_ERROR__HANDOVER_PENDING]: `A handover is already pending for this role`,
     [MUTAV_ERROR__INCOME_EXCEEDS_INBOX]: `Amount exceeds the income inbox balance`,
     [MUTAV_ERROR__INSUFFICIENT_FREE_CAPITAL]: `Insufficient free capital`,
     [MUTAV_ERROR__INSUFFICIENT_LIQUID_BALANCE]: `Insufficient liquid balance`,
@@ -147,14 +176,17 @@ if (process.env["NODE_ENV"] !== "production") {
     [MUTAV_ERROR__INVALID_REQUEST_STATUS]: `Invalid request status`,
     [MUTAV_ERROR__INVALID_TOKEN_PROGRAM]: `Token program is not the reserve's token program`,
     [MUTAV_ERROR__INVALID_TREASURY_ACCOUNT]: `Invalid treasury account`,
-    [MUTAV_ERROR__LEG_MISMATCH]: `Leg does not match the claim filing`,
     [MUTAV_ERROR__MATH_OVERFLOW]: `Math overflow`,
+    [MUTAV_ERROR__NAV_OUT_OF_BOUNDS]: `NAV per share is outside the given bounds`,
+    [MUTAV_ERROR__NO_PENDING_HANDOVER]: `No handover is pending for this role`,
     [MUTAV_ERROR__NOT_ALLOWLISTED]: `Wallet is not allowlisted`,
     [MUTAV_ERROR__OPEN_CLAIMS]: `Guarantee has open claims`,
     [MUTAV_ERROR__PAUSED]: `The reserve is paused`,
     [MUTAV_ERROR__PAYOUT_ALREADY_SETTLED]: `Payout already settled`,
     [MUTAV_ERROR__POST_CPI_CHECK_FAILED]: `Post-CPI check failed`,
+    [MUTAV_ERROR__PRICE_LIMIT_NOT_MET]: `The head request's price limit is not met`,
     [MUTAV_ERROR__QUEUE_ORDER_VIOLATION]: `Queue order violation`,
+    [MUTAV_ERROR__REFRESH_REQUIRED]: `Refresh the reserve in the same slot first`,
     [MUTAV_ERROR__REQUEST_TOO_LARGE]: `Request is above the maximum`,
     [MUTAV_ERROR__REQUEST_TOO_SMALL]: `Request is below the minimum`,
     [MUTAV_ERROR__RESERVE_FROZEN]: `A reserve token account is frozen`,
