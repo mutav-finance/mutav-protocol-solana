@@ -19,6 +19,8 @@ import { useFmt } from "@/components/MoneyProvider";
 import { frac } from "@/lib/charts";
 import { activeRemainingCover, agencyRows, coverageRows, type AgencyRow, type CoverageRow, type Ledger, type ReserveView } from "@/lib/view";
 import { C } from "@/components/charts/Charts";
+import { coverageRequired } from "@mutav-finance/mutav-protocol-solana";
+import { TotalsStrip, type TotalsTerm } from "@/components/reserve/sections/Flows";
 
 import { Empty, Num, Table, short } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
@@ -109,8 +111,8 @@ function CapMeter({ a }: { a: AgencyRow }) {
   );
 }
 
-/** One label/value pair in the hero strip. */
-function StripCell({ label, swatch, value, sub, color }: { label: string; swatch?: string; value: string; sub: string; color?: string }) {
+/** One label/value pair in the hero strip; `sub` is a one-line plain-English definition. */
+function StripCell({ label, swatch, value, sub, color }: { label: string; swatch?: string; value: string; sub: ReactNode; color?: string }) {
   return (
     <div className="bg-(--color-surface) flex min-w-0 flex-col gap-2 px-4 py-3">
       <p className={`${LABEL} inline-flex items-center gap-2`} style={LABEL_STYLE}>
@@ -118,7 +120,7 @@ function StripCell({ label, swatch, value, sub, color }: { label: string; swatch
         {label}
       </p>
       <Mono style={{ fontSize: 20, fontWeight: 700, color: color ?? "var(--color-text)", whiteSpace: "nowrap" }}>{value}</Mono>
-      <span className="font-mono text-(--color-text-3) truncate text-xs">{sub}</span>
+      <span className="font-body text-(--color-text-2) text-xs leading-snug">{sub}</span>
     </div>
   );
 }
@@ -223,6 +225,31 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   );
   const row = (g: CoverageRow) => <GuaranteeRow key={g.address} g={g} axis={coverAxis} agency={<AgencyCell id={g.agencyId} />} />;
 
+  // [F] Totals that close the sums. Coverage required is max(ceil(c × remaining cover), provisions)
+  // (spec §4, ADR 0016); the ratio leg comes from the client's math mirror with provisions at 0.
+  const s = r.solvency;
+  const byRatio = coverageRequired(r.state.remainingCoverTotal, r.config.coverageRatioBps, 0n);
+  const totals: TotalsTerm[][] = [
+    [
+      { label: "Default leg", value: fmtBrs(defaultLeft) },
+      { op: "+", label: "Exit leg", value: fmtBrs(exitLeft) },
+      { op: "=", label: "Remaining cover", value: fmtBrs(sum), result: true },
+    ],
+    [
+      { label: `${fmtBps(r.config.coverageRatioBps)} × remaining cover`, value: fmtBrs(byRatio) },
+      { op: "or", label: "Open provisions", value: fmtBrs(r.state.provisions) },
+      { op: "=", label: "Coverage required, the larger", value: fmtBrs(s.coverageRequired), result: true },
+    ],
+    [
+      { label: "Stable assets", value: fmtBrs(s.stableAssets) },
+      { op: "−", label: "Coverage required", value: fmtBrs(s.coverageRequired) },
+      ...(s.earmarkEff > 0n ? [{ op: "−" as const, label: "Exit earmark", value: fmtBrs(s.earmarkEff) }] : []),
+      s.underCovered
+        ? { op: "=" as const, label: "Shortfall", value: `−${fmtBrs(s.deficit)}`, result: true, color: "var(--color-error)" }
+        : { op: "=" as const, label: "Free capital", value: fmtBrs(s.freeCapital), result: true },
+    ],
+  ];
+
   return (
     <div className="flex flex-col gap-8">
       <div className="bg-(--color-surface) flex flex-col gap-6 border p-6">
@@ -230,7 +257,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
             <p className={LABEL} style={LABEL_STYLE}>Remaining cover</p>
             <Mono style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{fmtBrs(sum)}</Mono>
             <span className="font-body text-(--color-text-2) text-sm">
-              <Mono style={{ color: "var(--color-text)" }}>{r.state.activeGuarantees}</Mono> active guarantees · <Mono style={{ color: "var(--color-text)" }}>{agencies.length}</Mono> agencies
+              What the reserve still guarantees: the cover of <Mono style={{ color: "var(--color-text)" }}>{r.state.activeGuarantees}</Mono> active guarantees across{" "}
+              <Mono style={{ color: "var(--color-text)" }}>{agencies.length}</Mono> agencies, minus claim payments already made.
             </span>
           </div>
           {/* [D] One composition bar: how the remaining cover splits between the two legs. */}
@@ -250,12 +278,12 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
                 ))}
           </div>
           <div className="-mx-px grid grid-cols-1 gap-px border sm:grid-cols-3" style={{ background: "var(--color-border)" }}>
-            <StripCell label="Default leg" swatch={LEG.default} value={fmtBrs(defaultLeft)} sub={`${share(defaultLeft, sum)} of remaining`} />
-            <StripCell label="Exit leg" swatch={LEG.exit} value={fmtBrs(exitLeft)} sub={`${share(exitLeft, sum)} of remaining`} />
+            <StripCell label="Default leg" swatch={LEG.default} value={fmtBrs(defaultLeft)} sub={`Rent and charges in arrears while leases run; ${share(defaultLeft, sum)} of remaining.`} />
+            <StripCell label="Exit leg" swatch={LEG.exit} value={fmtBrs(exitLeft)} sub={`Tenant debts up to and at the end of occupation; ${share(exitLeft, sum)} of remaining.`} />
             <StripCell
               label="Provision"
               value={fmtBrs(provision)}
-              sub={`${openClaims} open ${openClaims === 1 ? "claim" : "claims"}`}
+              sub={`Set aside for ${openClaims} open ${openClaims === 1 ? "claim" : "claims"} filed and not yet paid.`}
               color={provision > 0n ? "var(--color-copper)" : undefined}
             />
           </div>
@@ -328,6 +356,12 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
           </Table>
         )}
       </div>
+
+      <TotalsStrip
+        title="Totals · cover against the reserve"
+        groups={totals}
+        note="Coverage required is the larger of the coverage ratio times remaining cover (rounded up) and open provisions. Free capital is what stable assets hold beyond it: room for new guarantees."
+      />
     </div>
   );
 }

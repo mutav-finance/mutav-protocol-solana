@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { fmtShares, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, type Ledger, type QueueRow, type ReserveView } from "@/lib/view";
+import { TotalsStrip } from "@/components/reserve/sections/Flows";
 
 import { Empty, Num, Table } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
@@ -34,13 +35,16 @@ const Label = ({ children }: { children: ReactNode }) => (
 
 const Sub = ({ children }: { children: ReactNode }) => <span className="font-mono text-(--color-text-3) text-xs">{children}</span>;
 
-/** One support cell: label, one value, one sub-line. */
+/** One plain-English definition line under a headline figure (body font). */
+const Def = ({ children }: { children: ReactNode }) => <span className="font-body text-(--color-text-2) text-xs leading-snug">{children}</span>;
+
+/** One support cell: label, one value, one definition line. */
 function Cell({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="bg-(--color-surface) flex min-w-0 flex-col gap-2 p-6">
       <Label>{label}</Label>
       <Mono style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, color: "var(--color-text)", overflowWrap: "anywhere" }}>{value}</Mono>
-      <Sub>{sub}</Sub>
+      <Def>{sub}</Def>
     </div>
   );
 }
@@ -56,12 +60,12 @@ function Summary({ deposits, redeems, capital }: { deposits: QueueRow[]; redeems
       <div className="bg-(--color-surface) flex min-w-0 flex-col justify-center gap-2 p-6 lg:col-span-5">
         <Label>Waiting to deposit</Label>
         <Mono style={{ fontSize: "clamp(36px, 5vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)", overflowWrap: "anywhere" }}>{fmtBrs(sum(deposits))}</Mono>
-        <span className="font-body text-(--color-text-2) text-sm">{deposits.length === 0 ? "No deposit is waiting." : `${plural(deposits.length, "request", "requests")}, filled oldest first`}</span>
+        <span className="font-body text-(--color-text-2) text-sm">{deposits.length === 0 ? "No deposit is waiting." : `BRS held in escrow until the Reserve Admin fills it into the reserve: ${plural(deposits.length, "request", "requests")}, oldest first.`}</span>
       </div>
       <div className="grid grid-cols-1 gap-px sm:grid-cols-3 lg:col-span-7">
-        <Cell label="Shares to redeem" value={fmtShares(sum(redeems))} sub={plural(redeems.length, "request", "requests")} />
-        <Cell label="Oldest request" value={oldest ? fmtTime(oldest.requestedAt) : "none"} sub={oldest ? (oldest.side === "deposit" ? "deposit, next to fill" : "redemption, next to fill") : "queue is empty"} />
-        <Cell label="MUTAV capital" value={`${ours} of ${all.length}`} sub="requests, same line, no priority" />
+        <Cell label="Shares to redeem" value={fmtShares(sum(redeems))} sub={`Shares investors asked to turn back into BRS, in ${plural(redeems.length, "request", "requests")}.`} />
+        <Cell label="Oldest request" value={oldest ? fmtTime(oldest.requestedAt) : "none"} sub={oldest ? `The ${oldest.side === "deposit" ? "deposit" : "redemption"} waiting longest; it fills next on its side.` : "Nothing is waiting in either line."} />
+        <Cell label="MUTAV capital" value={`${ours} of ${all.length}`} sub="Requests from the MUTAV capital wallet. They wait in the same line, with no priority." />
       </div>
     </div>
   );
@@ -137,6 +141,18 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
         <Line title="Deposits" empty="No deposits waiting. New requests join the end of the line." rows={q.deposits} unitHead="Amount" unit={fmtBrs} capital={capital} />
         <Line title="Redemptions" empty="No redemptions waiting. New requests join the end of the line." rows={q.redeems} unitHead="Shares" unit={fmtShares} capital={capital} />
       </div>
+
+      <TotalsStrip
+        title="Totals · held outside stable assets"
+        groups={[
+          [
+            { label: "Deposits in escrow", value: fmtBrs(r.state.pendingDepositsTotal) },
+            { op: "+", label: "Owed to filled redemptions", value: fmtBrs(r.state.claimableAssetsTotal) },
+            { op: "=", label: "Held outside stable assets", value: fmtBrs(r.state.pendingDepositsTotal + r.state.claimableAssetsTotal), result: true },
+          ],
+        ]}
+        note="A deposit joins stable assets when it is filled. A filled redemption leaves them at the fill and waits in the claims account until the investor collects it. Neither counts toward coverage."
+      />
 
       {/* [F] Explanation below the data, collapsed. */}
       <details className="group border-t pt-4">
