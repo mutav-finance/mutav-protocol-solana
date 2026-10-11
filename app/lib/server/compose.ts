@@ -24,6 +24,13 @@ import {
 import {
   buildAllowlist,
   capsInputFromConfig,
+  configParamsDiff,
+  configParamsNeedRefresh,
+  conversionNav,
+  getProposeRoleInstruction,
+  navBoundsAround,
+  solvencyFromAccounts,
+  type NavBounds,
   fetchGuarantee,
   getCancelDepositInstruction,
   getCancelRedeemInstruction,
@@ -50,11 +57,9 @@ import {
   getRegisterGuaranteeInstruction,
   getRequestDepositInstruction,
   getSetAllowlistRootInstruction,
-  getSetRolesInstruction,
   getSetPaymentsAccountInstruction,
   getRevokeOperatorInstruction,
   getSetConfigInstruction,
-  parseSetConfigInstruction,
   getSettlePayoutInstruction,
   getSweepIncomeInstruction,
   getUnpauseInstruction,
@@ -75,6 +80,13 @@ import { serverEnv, type ServerEnv } from "./env";
 export const SYSTEM_PROGRAM = address("11111111111111111111111111111111");
 export const TOKEN_PROGRAM = address("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 export const ASSOCIATED_TOKEN_PROGRAM = address("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+
+/** `close_guarantee` reason RELEASED and the role ids of `propose_role` (ADR 0020). */
+const CLOSE_RELEASED = 1;
+const ROLE_OPERATOR = 1;
+const ROLE_PAUSER = 2;
+/** Default NAV tolerance of a fill or halt-clear proposal: ±1%. */
+export const DEFAULT_NAV_TOLERANCE_BPS = 100;
 
 export async function associatedTokenAddress(owner: Address, mint: Address, tokenProgram: Address = TOKEN_PROGRAM) {
   const e = getAddressEncoder();
@@ -149,16 +161,27 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
   const tokenProgram = r.config.reserveTokenProgram;
   const signer = createNoopSigner(signerAddress);
   const common = { config, eventAuthority: a.eventAuthority, program: programAddress };
+  const refreshIx = () =>
+    getRefreshInstruction(
+      { ...common, state: a.state, reserve: a.reserve, pendingDeposits: a.pendingDeposits, pendingRedemptions: a.pendingRedemptions, claims: a.claims },
+      o,
+    );
+  // The NAV the admin sees now, ± a tolerance (ADR 0023): a proposal that
+  // executes after a larger move is refused with `NavOutOfBounds`.
+  const navBounds = (draft?: { min: bigint; max: bigint }): NavBounds => {
+    if (draft) {
+      if (draft.min > draft.max) throw new ComposeError("NAV bounds: min must be ≤ max");
+      return draft;
+    }
+    const sol = solvencyFromAccounts(r.config, r.state);
+    return navBoundsAround(conversionNav(r.state.sharesOutstanding, sol.netAssets), DEFAULT_NAV_TOLERANCE_BPS);
+  };
 
   switch (req.kind) {
     // ── public ──────────────────────────────────────────────────────────────
     case "refresh": {
-      const ix = getRefreshInstruction(
-        { ...common, state: a.state, reserve: a.reserve, pendingDeposits: a.pendingDeposits, pendingRedemptions: a.pendingRedemptions, claims: a.claims },
-        o,
-      );
       // `refresh` takes no remaining accounts (no payout SLA, ADR 0019).
-      return [ix];
+      return [refreshIx()];
     }
 
     // ── operator ────────────────────────────────────────────────────────────
@@ -173,6 +196,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             operator: signer,
             state: a.state,
             guarantee,
+            reserve: a.reserve,
             payer: signer,
             systemProgram: SYSTEM_PROGRAM,
             id,
@@ -187,7 +211,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     }
     case "close_guarantee": {
       const g = await guaranteeAccount(ctx, req.guarantee);
-      return [getCloseGuaranteeInstruction({ ...common, operator: signer, state: a.state, guarantee: g.address, id: g.data.id }, o)];
+      return [getCloseGuaranteeInstruction({ ...common, operator: signer, state: a.state, guarantee: g.address, id: g.data.id, reason: req.reason ?? CLOSE_RELEASED }, o)];
     }
     case "contribute_fees": {
       const invoiceRefHash = bytes32(req.invoiceRefHash, "invoiceRefHash");
@@ -228,7 +252,6 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             incomeReceipt,
             incomeInbox: await findIncomeInboxAddress({ vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram }),
             reserve: a.reserve,
-            treasuryAccount: r.config.treasuryAccount,
             vaultAuthority: a.vaultAuthority,
             reserveMint: mint,
             tokenProgram,
@@ -270,9 +293,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             vaultAuthority: a.vaultAuthority,
             reserveMint: mint,
             tokenProgram,
-            leg: req.leg,
-            amount: req.amount,
             noticeRefHash,
+            expectedAmount: req.amount,
           },
           o,
         ),
@@ -307,7 +329,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             tokenProgram,
             systemProgram: SYSTEM_PROGRAM,
             assets: req.assets,
-            proof,
+            minSharesOut: 0n,
+            eligibility: { __kind: "Merkle", proof },
           },
           o,
         ),
@@ -318,7 +341,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
         getCancelDepositInstruction(
           {
             ...common,
-            owner: signer,
+            signer,
+            owner: signerAddress,
             state: a.state,
             depositRequest: (await findDepositRequestPda({ config, seq: req.seq }, o))[0],
             destination: await associatedTokenAddress(signerAddress, mint, tokenProgram),
@@ -347,7 +371,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             shareTokenProgram: TOKEN_PROGRAM,
             systemProgram: SYSTEM_PROGRAM,
             shares: req.shares,
-            proof,
+            minAssetsOut: 0n,
+            eligibility: { __kind: "Merkle", proof },
           },
           o,
         ),
@@ -372,8 +397,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       ];
     }
     case "claim_assets": {
+      // The program creates the owner's token account if needed (ADR 0023).
       return [
-        await createAtaIdempotent(signerAddress, signerAddress, mint, tokenProgram),
         getClaimAssetsInstruction(
           {
             ...common,
@@ -392,7 +417,6 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     }
     case "claim_shares": {
       return [
-        await createAtaIdempotent(signerAddress, signerAddress, a.shareMint),
         getClaimSharesInstruction(
           {
             ...common,
@@ -412,7 +436,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "fulfil_deposits": {
       const seqs = queueSeqs(r.state.depositHead, r.state.nextDepositSeq, req.count);
       const ix = getFulfilDepositsInstruction(
-        { ...common, admin: signer, state: a.state, pendingDeposits: a.pendingDeposits, reserve: a.reserve, vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram, count: req.count },
+        { ...common, admin: signer, state: a.state, pendingDeposits: a.pendingDeposits, reserve: a.reserve, vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram, count: req.count, navBounds: navBounds(req.navBounds) },
         o,
       );
       const pdas = await Promise.all(seqs.map(async (seq) => (await findDepositRequestPda({ config, seq }, o))[0]));
@@ -435,6 +459,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
           shareTokenProgram: TOKEN_PROGRAM,
           count: req.count,
           maxAssets: req.maxAssets,
+          navBounds: navBounds(req.navBounds),
         },
         o,
       );
@@ -448,7 +473,17 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "set_roles": {
       const bad = rolesError(req, r.config.admin);
       if (bad) throw new ComposeError(bad);
-      return [getSetRolesInstruction({ ...common, admin: signer, operator: address(req.operator), pauser: address(req.pauser) }, o)];
+      // Two-step handover (ADR 0020): propose each changed key; the new key
+      // signs `accept_role` itself.
+      const out: Instruction[] = [];
+      for (const [role, key, now] of [
+        [ROLE_OPERATOR, req.operator, r.config.operator],
+        [ROLE_PAUSER, req.pauser, r.config.pauser],
+      ] as const) {
+        if (key !== now) out.push(getProposeRoleInstruction({ ...common, admin: signer, role, key: address(key) }, o));
+      }
+      if (out.length === 0) throw new ComposeError("operator and pauser already hold these keys");
+      return out;
     }
     case "set_payments_account": {
       if (!isAddress(req.paymentsAccount)) throw new ComposeError("payments account is not an address");
@@ -458,30 +493,28 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "unpause":
       return [getUnpauseInstruction({ ...common, admin: signer }, o)];
     case "clear_fulfil_halt":
-      return [getClearFulfilHaltInstruction({ ...common, admin: signer, state: a.state }, o)];
+      return [getClearFulfilHaltInstruction({ ...common, admin: signer, state: a.state, reserve: a.reserve, navBounds: navBounds(req.navBounds) }, o)];
     case "set_config": {
       // Write only what changed; carry every other field over as it is on-chain.
       const c = r.config;
       const caps = capsInputFromConfig(c.caps);
       const bad = generalConfigError(req) ?? capsError({ ...caps, ...(req.caps ?? {}) });
       if (bad) throw new ComposeError(bad);
-      return [
-        getSetConfigInstruction(
-          {
-            ...common,
-            admin: signer,
-            state: a.state,
-            treasuryAccount: c.treasuryAccount,
-            paymentsAccount: c.paymentsAccount,
-            coverageRatioBps: req.coverageRatioBps ?? c.coverageRatioBps,
-            feeTakeBps: req.feeTakeBps ?? c.feeTakeBps,
-            featureFlags: c.featureFlags,
-            mutavCapitalWallet: c.mutavCapitalWallet,
-            caps: { ...caps, ...(req.caps ?? {}), ...(req.maxNavMoveBps !== undefined ? { maxNavMoveBps: req.maxNavMoveBps } : {}) },
-          },
-          o,
-        ),
-      ];
+      // Sparse (ADR 0026): one param per field that differs from on-chain.
+      const params = configParamsDiff(c, {
+        coverageRatioBps: req.coverageRatioBps ?? c.coverageRatioBps,
+        feeTakeBps: req.feeTakeBps ?? c.feeTakeBps,
+        featureFlags: c.featureFlags,
+        mutavCapitalWallet: c.mutavCapitalWallet,
+        caps: { ...caps, ...(req.caps ?? {}), ...(req.maxNavMoveBps !== undefined ? { maxNavMoveBps: req.maxNavMoveBps } : {}) },
+      });
+      if (params.length === 0) throw new ComposeError("nothing to change: every field already has this value");
+      const setConfig = getSetConfigInstruction(
+        { ...common, admin: signer, state: a.state, treasuryAccount: c.treasuryAccount, paymentsAccount: c.paymentsAccount, params },
+        o,
+      );
+      // c, the NAV-move bound and the stress buffer need a refresh in the same slot.
+      return configParamsNeedRefresh(params) ? [refreshIx(), setConfig] : [setConfig];
     }
     case "set_allowlist_root": {
       const tree = await buildAllowlist(req.owners.map((x) => address(x)));
@@ -543,7 +576,7 @@ export function describeInstructions(ixs: Instruction[], config?: VaultConfig) {
     // Callers pass only MUTAV instructions with a config (the build route's composed set).
     if (config && ix.data && ix.data.length >= 8) {
       try {
-        if (identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig) changes = setConfigChanges(new Uint8Array(ix.data), config, parseSetConfigInstruction(ix as never).accounts.treasuryAccount.address);
+        if (identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig) changes = setConfigChanges(new Uint8Array(ix.data), config);
       } catch {
         changes = undefined;
       }

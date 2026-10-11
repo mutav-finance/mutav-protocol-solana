@@ -32,7 +32,7 @@ import {
   findGuaranteePda,
   findIncomeInboxAddress,
   findReserveAddresses,
-  getSetRolesInstruction,
+  getProposeRoleInstruction,
   MUTAV_PROGRAM_ADDRESS,
   TOKEN_PROGRAM_ADDRESS,
 } from "@mutav-finance/mutav-protocol-solana";
@@ -181,18 +181,19 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   await go("operator", { kind: "pay_claim", guarantee, leg: 0, amount: 2_500n * BRL, noticeRefHash: notice }, "pay_claim R$2,500");
   await go("operator", { kind: "settle_payout", guarantee, noticeRefHash: notice, pixE2eHash: await REF.pixE2e("E1234567820261006120000demo0001") }, "settle_payout (PIX E2E hash)");
 
-  let operator = s("operator").address as string;
+  const operator = s("operator").address as string;
   if (opts.operator) {
     console.log("\n== seed: hand the operator role to your wallet");
     const op = address(opts.operator);
     await p.airdrop(rpc, op, 10);
     spl(["mint", mint, "10000", await ata(op)]);
     const a = await findReserveAddresses(mint);
+    // Two-step handover (ADR 0020): the admin proposes; the wallet accepts
+    // with `accept_role(1)` within 72 hours (it holds its own key).
     await signAndSend(rpc, s("admin").address, [s("admin")], [
-      getSetRolesInstruction({ admin: s("admin"), config, eventAuthority: a.eventAuthority, program: MUTAV_PROGRAM_ADDRESS, operator: op, pauser: s("pauser").address }),
+      getProposeRoleInstruction({ admin: s("admin"), config, eventAuthority: a.eventAuthority, program: MUTAV_PROGRAM_ADDRESS, role: 1, key: op }),
     ]);
-    operator = op;
-    log(`set_roles: operator = ${op} (funded with 10 SOL and R$10,000 BRS)`);
+    log(`propose_role: operator = ${op} (funded with 10 SOL and R$10,000 BRS); sign accept_role(1) from that wallet to take the role`);
   }
 
   await go("pauser", { kind: "refresh" }, "refresh (publish NAV, coverage and mode)");

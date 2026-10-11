@@ -1,10 +1,9 @@
 /**
- * What a `set_config` changes. `set_config` writes every field (the composer
- * carries the unnamed ones over), so two proposals built from the same
- * on-chain state undo each other when both execute. These helpers let the
- * server refuse an overlapping proposal and let approvers see the diff.
+ * What a `set_config` changes. `set_config` is sparse (ADR 0026), but two
+ * live proposals can still set the same field, and the later one wins; the
+ * server refuses an overlapping proposal and approvers see the diff.
  */
-import { getSetConfigInstructionDataDecoder, type VaultConfig } from "@mutav-finance/mutav-protocol-solana";
+import { getSetConfigInstructionDataDecoder, type ConfigParam, type VaultConfig } from "@mutav-finance/mutav-protocol-solana";
 import { bytesToHex } from "./serde";
 
 export type ConfigChange = { field: string; from: string; to: string };
@@ -29,20 +28,37 @@ function leaves(o: Record<string, unknown>, prefix = ""): [string, unknown][] {
   return out;
 }
 
+const FIELD: Record<ConfigParam["__kind"], string> = {
+  CoverageRatioBps: "coverage_ratio_bps",
+  FeeTakeBps: "fee_take_bps",
+  FeatureFlags: "feature_flags",
+  MutavCapitalWallet: "mutav_capital_wallet",
+  MaxTvl: "caps.max_tvl",
+  MaxCoverPerGuarantee: "caps.max_cover_per_guarantee",
+  MaxClaimPerCall: "caps.max_claim_per_call",
+  MaxClaimPerPeriod: "caps.max_claim_per_period",
+  MinRequest: "caps.min_request",
+  MaxRequest: "caps.max_request",
+  MaxNavMoveBps: "caps.max_nav_move_bps",
+  StressBuffer: "caps.stress_buffer",
+  MaxQueueWaitSecs: "caps.max_queue_wait_secs",
+  MaxReinstateAge: "caps.max_reinstate_age",
+};
+
 /**
- * The fields a `set_config` instruction's data would change against `config`,
- * in program field names (`caps.max_tvl`). `treasury` is the treasury account
- * passed to the instruction, when known.
+ * The fields a sparse `set_config` instruction's params would change against
+ * `config`, in program field names (`caps.max_tvl`). A param equal to the
+ * on-chain value changes nothing and is left out.
  */
-export function setConfigChanges(data: Uint8Array, config: VaultConfig, treasury?: string): ConfigChange[] {
-  const next = getSetConfigInstructionDataDecoder().decode(data) as unknown as Record<string, unknown>;
+export function setConfigChanges(data: Uint8Array, config: VaultConfig): ConfigChange[] {
+  const { params } = getSetConfigInstructionDataDecoder().decode(data);
   const now: Record<string, string> = Object.fromEntries(leaves(config as unknown as Record<string, unknown>).map(([k, v]) => [k, show(v)]));
   const changes: ConfigChange[] = [];
-  for (const [k, v] of leaves(next)) {
-    const to = show(v);
-    if (now[k] !== to) changes.push({ field: k, from: now[k] ?? "—", to });
+  for (const p of params) {
+    const field = FIELD[p.__kind];
+    const to = show(p.fields[0]);
+    if (now[field] !== to) changes.push({ field, from: now[field] ?? "—", to });
   }
-  if (treasury && treasury !== config.treasuryAccount) changes.push({ field: "treasury_account", from: config.treasuryAccount, to: treasury });
   return changes;
 }
 

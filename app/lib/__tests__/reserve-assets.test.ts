@@ -83,9 +83,9 @@ function specRole(role: string): string[] {
 const binary = () => [...readFileSync(join(REPO, "programs/mutav/src/lib.rs"), "utf8").matchAll(/pub fn (\w+)\s*\(\s*ctx: Context</g)].map((x) => x[1]!);
 
 describe("planned reserve-allocation instructions", () => {
-  it("are the spec's admin instructions that lib.rs does not have (besides pay_claim_admin)", () => {
+  it("are the spec's admin instructions that lib.rs does not have (besides approve_claim, Wave 2)", () => {
     const missing = specRole("Admin").filter((ix) => !binary().includes(ix));
-    expect(missing.sort()).toEqual([...PLANNED_RESERVE_INSTRUCTIONS.map((p) => p.ix), "pay_claim_admin"].sort());
+    expect(missing.sort()).toEqual([...PLANNED_RESERVE_INSTRUCTIONS.map((p) => p.ix), "approve_claim"].sort());
   });
 
   it("are signed by the admin and none is offered as an action", () => {

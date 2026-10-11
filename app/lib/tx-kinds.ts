@@ -12,11 +12,13 @@ export type OperatorTx =
       defaultCover: bigint;
       exitCover: bigint;
     }
-  | { kind: "close_guarantee"; guarantee: string }
+  /** `reason`: 1 RELEASED (default), 2 VOID: nothing paid (ADR 0020). */
+  | { kind: "close_guarantee"; guarantee: string; reason?: 1 | 2 }
   | { kind: "contribute_fees"; invoiceRefHash: string; amount: bigint }
   /** ADR 0017: sweep one issuer income statement from the income inbox into the reserve. `period` is YYYYMM. */
   | { kind: "sweep_income"; incomeRefHash: string; period: number; amount: bigint }
   | { kind: "file_claim"; guarantee: string; leg: 0 | 1; amount: bigint; noticeRefHash: string }
+  /** Pays exactly the filing's provision: `amount` is sent as `expected_amount` (ADR 0021); `leg` is read from the filing. */
   | { kind: "pay_claim"; guarantee: string; leg: 0 | 1; amount: bigint; noticeRefHash: string }
   | { kind: "settle_payout"; guarantee: string; noticeRefHash: string; pixE2eHash: string };
 
@@ -42,12 +44,16 @@ export type PriceDraft = Partial<{
   maxNavMoveBps: number;
 }>;
 
+/** NAV per share range (`NAV_SCALE`) a fill or halt clear may run at (ADR 0023). */
+export type NavBoundsDraft = { min: bigint; max: bigint };
+
 export type AdminTx =
-  | { kind: "fulfil_deposits"; count: number }
-  | { kind: "fulfil_redeems"; count: number; maxAssets: bigint }
+  /** `navBounds` defaults to the current NAV ± `DEFAULT_NAV_TOLERANCE_BPS`. */
+  | { kind: "fulfil_deposits"; count: number; navBounds?: NavBoundsDraft }
+  | { kind: "fulfil_redeems"; count: number; maxAssets: bigint; navBounds?: NavBoundsDraft }
   | { kind: "pause" }
   | { kind: "unpause" }
-  | { kind: "clear_fulfil_halt" }
+  | { kind: "clear_fulfil_halt"; navBounds?: NavBoundsDraft }
   | {
       kind: "set_config";
       coverageRatioBps?: number;
@@ -58,7 +64,7 @@ export type AdminTx =
       maxNavMoveBps?: number;
     }
   | { kind: "set_allowlist_root"; owners: string[] }
-  /** Replace the operator and pauser keys (distinct from the admin and each other). */
+  /** Propose new operator and pauser keys (distinct from the admin and each other); each new key then signs `accept_role` (ADR 0020). */
   | { kind: "set_roles"; operator: string; pauser: string }
   /** Point claim payments at a new BRS token account (spec §2.1 checks run on-chain). */
   | { kind: "set_payments_account"; paymentsAccount: string }

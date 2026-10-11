@@ -63,12 +63,12 @@ function Who({ r, history }: { r: ReserveView; history: OperatorHistory | null }
         operator key <Explorer value={r.config.operator} />
         {" · "}
         {history === null
-          ? "reading set_roles history…"
+          ? "reading role-handover history…"
           : history.rolesChanged
-            ? <>last set_roles <Explorer value={history.rolesChanged.signature} kind="tx" label={history.rolesChanged.blockTime !== null ? fmtTime(history.rolesChanged.blockTime) : "tx"} /></>
+            ? <>last accept_role <Explorer value={history.rolesChanged.signature} kind="tx" label={history.rolesChanged.blockTime !== null ? fmtTime(history.rolesChanged.blockTime) : "tx"} /></>
             : history.rolesScanned === 0
-              ? "this RPC keeps no VaultConfig history, so the last set_roles cannot be read"
-              : `no set_roles in VaultConfig's last ${history.rolesScanned} transactions`}
+              ? "this RPC keeps no VaultConfig history, so the last accept_role cannot be read"
+              : `no accept_role in VaultConfig's last ${history.rolesScanned} transactions`}
       </Mono>
     </div>
   );
