@@ -1,8 +1,15 @@
 //! `request_redeem(shares, min_assets_out, eligibility)` (spec §5.5;
 //! ADR 0023). Owner, never a delegate. `min_assets_out` is the owner's price
-//! limit (`0` = none). Holders still pass eligibility until the exit-open
-//! rule (ADR 0023, a later change) lets a holder redeem with an empty
-//! Merkle proof.
+//! limit (`0` = none).
+//!
+//! **Exit is open to holders** (ADR 0023, AV-6): a wallet that holds shares
+//! is not checked against the allowlist, so a de-listed holder can always
+//! leave; `eligibility` is read only from a wallet with no shares (which then
+//! has nothing to redeem). **A full exit skips `min_request`** (Q-1, NEW-B):
+//! redeeming the whole balance of the owner's canonical share associated
+//! token account may be worth less than the minimum, but never 0 BRS at
+//! request time. Partial exits keep both size limits; a full exit keeps
+//! `max_request`.
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -14,7 +21,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::RedeemRequested,
-    instructions::capital::{require_eligible, require_request_size, Eligibility},
+    instructions::capital::{owner_ata, require_eligible, require_request_size, Eligibility},
     instructions::operator::solvency_snapshot,
     math::assets_for,
     state::{RedeemRequest, VaultConfig, VaultState},
@@ -79,8 +86,12 @@ pub fn handle_request_redeem(
     let config = &ctx.accounts.config;
     let owner = ctx.accounts.owner.key();
     require!(!config.paused, MutavError::Paused);
-    require_eligible(config, &owner, &eligibility)?;
-    // The share account's owner is the signer (account constraint).
+    // The share account's owner is the signer (account constraint). Entry is
+    // gated, exit is not: a holder skips the allowlist (ADR 0023).
+    let owner_shares = &ctx.accounts.owner_shares;
+    if owner_shares.amount == 0 {
+        require_eligible(config, &owner, &eligibility)?;
+    }
     require!(shares > 0, MutavError::InvalidParameter);
     // Size in BRS at the current NAV; later NAV drift is ignored.
     let sol = solvency_snapshot(config, &ctx.accounts.state)?;
@@ -89,7 +100,24 @@ pub fn handle_request_redeem(
         ctx.accounts.state.shares_outstanding,
         sol.net_assets,
     )?;
-    require_request_size(config, value)?;
+    // A full exit from the canonical share account skips `min_request`
+    // (ADR 0023): only that account, so a balance cannot be split across
+    // token accounts into many sub-minimum requests (NEW-B).
+    let canonical = owner_ata(
+        &owner,
+        &config.share_mint,
+        &ctx.accounts.share_token_program.key(),
+    );
+    let full_exit = owner_shares.key() == canonical && shares == owner_shares.amount;
+    if full_exit {
+        require!(value > 0, MutavError::RequestTooSmall);
+        require!(
+            value <= config.caps.max_request,
+            MutavError::RequestTooLarge
+        );
+    } else {
+        require_request_size(config, value)?;
+    }
 
     // Escrow with the owner as authority, never a delegate.
     transfer_checked(

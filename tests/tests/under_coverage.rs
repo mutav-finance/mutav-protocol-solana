@@ -82,6 +82,10 @@ fn a_shortfall_switches_mode_and_freezes_the_gated_instructions() {
         redeem,
         ..
     } = book();
+    // The filing below moves NAV by 10%; this test is about the mode, so the
+    // NAV-move guard takes the devnet value before it.
+    f.set_config(vec![mutav::ConfigParam::MaxNavMoveBps(10_000)])
+        .unwrap();
     let c = Claim::on(&g, 3_000 * BRL);
     f.file_claim(c).unwrap();
     // c = 1.6: coverage 32,000 > 30,000.
@@ -570,11 +574,11 @@ fn a_real_shock_after_an_inflow_and_a_fill_still_halts() {
 }
 
 #[test]
-fn an_inflow_with_no_shares_outstanding_adds_nothing_and_fails_closed() {
-    // Every share redeemed, then a fee: there is no NAV per share to net out,
-    // so the counter stays 0. The next depositor receives the fee (few share
-    // units at a high NAV), and the next refresh measures that NAV in full
-    // against the 1.0 baseline: it halts.
+fn an_inflow_with_no_shares_outstanding_is_refused_and_the_next_supply_starts_clean() {
+    // Every share redeemed: the guard's baseline is cleared with the supply,
+    // a fee is refused until shares exist again (ADR 0023), and the next
+    // first deposit seeds a fresh baseline instead of being measured against
+    // the old holders' NAV.
     let mut f = Fixture::new();
     set_time(&mut f.svm, 1_760_000_000);
     let a = f.investor(1_000 * BRL);
@@ -586,10 +590,18 @@ fn an_inflow_with_no_shares_outstanding_adds_nothing_and_fails_closed() {
     let (r, redeem) = f.request_redeem(&a, &list, 1_000 * BRL);
     r.unwrap();
     f.fulfil_redeems(1, u64::MAX, &[redeem]).expect("fill");
-    assert_eq!(f.state().shares_outstanding, 0);
-    f.contribute(500 * BRL).0.unwrap();
-    assert_eq!(f.state().inflow_nav, 0);
+    let s = f.state();
+    assert_eq!(
+        (s.shares_outstanding, s.nav_per_share, s.inflow_nav),
+        (0, 0, 0)
+    );
+    assert_mutav_err(f.contribute(500 * BRL).0, MutavError::NoSharesOutstanding);
     f.deposit(&b, &list, 1_000 * BRL);
+    assert_eq!(
+        f.state().nav_per_share,
+        NAV_SCALE,
+        "seeded by the new supply"
+    );
     f.refresh().unwrap();
-    assert!(f.state().fulfil_halted, "fails closed");
+    assert!(!f.state().fulfil_halted);
 }

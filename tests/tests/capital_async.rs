@@ -851,9 +851,11 @@ fn whole_fills_stop_at_a_head_that_does_not_fit() {
 }
 
 #[test]
-fn a_head_worth_zero_assets_is_not_filled() {
-    // A head whose shares are worth 0 at the NAV of the fill stops the batch
-    // untouched (spec §3.8).
+fn an_underwater_reserve_fills_no_redemption() {
+    // Net assets 0 with shares outstanding: every head is worth 0, and the
+    // reserve is underwater (ADR 0022), so the batch is refused untouched
+    // rather than burning shares for nothing (a head worth 0 in a reserve
+    // that is not underwater fills as 0 assets, `capital_rules.rs`).
     let (mut f, list, inv) = queue_book();
     let (_, seq) = f.request_redeem(&inv[0], &list, 20_000 * BRL);
     // Net assets 0 with shares outstanding (provisions = stable assets).
@@ -862,7 +864,7 @@ fn a_head_worth_zero_assets_is_not_filled() {
     let before = f.state();
     assert_mutav_err(
         f.fulfil_redeems(1, u64::MAX, &[seq]),
-        MutavError::RequestTooSmall,
+        MutavError::ReserveUnderwater,
     );
     let r = f.redeem_request(seq).unwrap();
     assert_eq!(

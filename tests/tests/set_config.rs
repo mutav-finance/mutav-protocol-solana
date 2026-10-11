@@ -329,6 +329,8 @@ fn set_payments_account_rules() {
 #[test]
 fn set_treasury_account_rules() {
     let mut f = Fixture::new();
+    // Fees need shares outstanding (ADR 0023).
+    f.inject_shares(1_000 * BRL);
     let admin = f.admin.insecure_clone();
     let a = admin.pubkey();
     let payments = f.payments;

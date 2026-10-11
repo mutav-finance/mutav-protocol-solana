@@ -555,6 +555,8 @@ fn admin_handover_in_two_steps() {
 #[test]
 fn revoke_operator_until_a_new_operator_accepts() {
     let mut f = Fixture::new();
+    // Fees need shares outstanding (ADR 0023).
+    f.inject_shares(1_000 * BRL);
     let pauser = f.pauser.insecure_clone();
     let admin = f.admin.insecure_clone();
     let old_operator = f.operator.pubkey();

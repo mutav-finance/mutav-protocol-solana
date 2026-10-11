@@ -97,4 +97,8 @@ pub enum MutavError {
     RefreshRequired,
     #[msg("The head request's price limit is not met")]
     PriceLimitNotMet,
+    #[msg("Net assets are zero while shares are outstanding")]
+    ReserveUnderwater,
+    #[msg("No shares are outstanding")]
+    NoSharesOutstanding,
 }
