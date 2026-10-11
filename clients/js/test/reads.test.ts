@@ -68,14 +68,14 @@ async function setup() {
 }
 
 describe('fetchReserve', () => {
-  test('decodes config and state and derives the solvency snapshot', async () => {
+  test('decodes config and state and derives the coverage snapshot', async () => {
     const { rpc, a } = await setup();
     const r = await fetchReserve(rpc as never, MINT);
     expect(r.addresses.config).toBe(a.config);
     expect(r.config.data.reserveMint).toBe(MINT);
     expect(r.state.data.brsBalance).toBe(10_000n);
-    expect(r.solvency.surplus).toBe(6_000n);
-    expect(r.solvency.freeCapital).toBe(6_000n);
+    expect(r.coverage.surplus).toBe(6_000n);
+    expect(r.coverage.freeCapital).toBe(6_000n);
   });
 
   test('throws when the reserve is not initialized', async () => {

@@ -37,7 +37,7 @@ import { findFeeReceiptPda } from './generated/pdas/feeReceipt';
 import { findIncomeReceiptPda } from './generated/pdas/incomeReceipt';
 import { findStatePda } from './generated/pdas/state';
 import { MUTAV_PROGRAM_ADDRESS } from './generated/programs/mutav';
-import type { Solvency } from './math';
+import type { Coverage } from './math';
 import {
   findDepositRequestPda,
   findIncomeInboxAddress,
@@ -45,7 +45,7 @@ import {
   findReserveAddresses,
   type ReserveAddresses,
 } from './pdas';
-import { solvencyFromAccounts } from './preview';
+import { coverageFromAccounts } from './preview';
 
 export type ReadRpc = Rpc<GetAccountInfoApi & GetMultipleAccountsApi>;
 export type ScanRpc = Rpc<GetProgramAccountsApi>;
@@ -59,7 +59,9 @@ export type ReserveSnapshot = {
   addresses: ReserveAddresses;
   config: Account<VaultConfig>;
   state: Account<VaultState>;
-  solvency: Solvency;
+  coverage: Coverage;
+  /** @deprecated Renamed to `coverage` (the same object); kept for existing consumers. */
+  solvency: Coverage;
 };
 
 export async function fetchReserve(rpc: ReadRpc, reserveMint: Address, o: ProgramOpt = {}): Promise<ReserveSnapshot> {
@@ -68,7 +70,8 @@ export async function fetchReserve(rpc: ReadRpc, reserveMint: Address, o: Progra
     fetchVaultConfig(rpc, addresses.config),
     fetchVaultState(rpc, addresses.state),
   ]);
-  return { addresses, config, state, solvency: solvencyFromAccounts(config.data, state.data) };
+  const coverage = coverageFromAccounts(config.data, state.data);
+  return { addresses, config, state, coverage, solvency: coverage };
 }
 
 /** Program accounts of one type, optionally matching `bytes` at `offset` after the discriminator. */

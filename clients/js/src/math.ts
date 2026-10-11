@@ -1,6 +1,6 @@
 /**
- * TypeScript mirror of the program's math and solvency modules
- * (`programs/mutav/src/{math,solvency}.rs`, spec §4), for previews.
+ * TypeScript mirror of the program's math and coverage modules
+ * (`programs/mutav/src/{math,coverage}.rs`, spec §4), for previews.
  *
  * Every value is a `bigint` in base units. Each function rounds exactly as the
  * program does, in the reserve's favour, and throws `MathOverflowError` where
@@ -106,7 +106,7 @@ export function conversionNav(sharesOutstanding: bigint, netAssets: bigint): big
 
 /**
  * `provisions + min(stress_buffer, max(0, remaining_cover_total − provisions))`,
- * saturating at `u64::MAX` (`solvency::stress_term`, ADR 0022).
+ * saturating at `u64::MAX` (`coverage::stress_term`, ADR 0022).
  */
 export function stressTerm(remainingCoverTotal: bigint, provisions: bigint, stressBuffer: bigint): bigint {
   const p = u64(provisions, 'provisions');
@@ -163,7 +163,7 @@ export function publishedNav(netAssets: bigint, sharesOutstanding: bigint): bigi
   return nav > 1n ? nav : 1n;
 }
 
-export type SolvencyInputs = {
+export type CoverageInputs = {
   brsBalance: bigint;
   remainingCoverTotal: bigint;
   coverageRatioBps: number;
@@ -172,7 +172,7 @@ export type SolvencyInputs = {
   stressBuffer?: bigint;
 };
 
-export type Solvency = {
+export type Coverage = {
   /** The tracked BRS balance: the pilot reserve holds BRS only (ADR 0019). */
   stableAssets: bigint;
   coverageRequired: bigint;
@@ -188,8 +188,8 @@ export type Solvency = {
   deficit: bigint;
 };
 
-/** Every spec §4 quantity for one snapshot (the program's `Solvency::compute`). */
-export function computeSolvency(i: SolvencyInputs): Solvency {
+/** Every spec §4 quantity for one snapshot (the program's `Coverage::compute`). */
+export function computeCoverage(i: CoverageInputs): Coverage {
   const stable = u64(i.brsBalance);
   const required = coverageRequired(i.remainingCoverTotal, i.coverageRatioBps, i.provisions, i.stressBuffer ?? 0n);
   const sur = surplus(stable, required);
@@ -207,8 +207,15 @@ export function computeSolvency(i: SolvencyInputs): Solvency {
   };
 }
 
+/** @deprecated Renamed to {@link CoverageInputs}; kept for existing consumers. */
+export type SolvencyInputs = CoverageInputs;
+/** @deprecated Renamed to {@link Coverage}; kept for existing consumers. */
+export type Solvency = Coverage;
+/** @deprecated Renamed to {@link computeCoverage}; kept for existing consumers. */
+export const computeSolvency = computeCoverage;
+
 /**
- * An underwater reserve (`solvency::is_underwater`, ADR 0022, ADR 0029):
+ * An underwater reserve (`coverage::is_underwater`, ADR 0022, ADR 0029):
  * shares outstanding and `net_assets × NAV_SCALE < shares_outstanding`
  * (NAV per share below the smallest published unit). Both fills refuse
  * with `ReserveUnderwater`.
