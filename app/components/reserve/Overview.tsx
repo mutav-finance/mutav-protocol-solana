@@ -21,7 +21,7 @@ import { HistoryChart } from "@/components/reserve/HistoryChart";
 import { FlowDiagram } from "@/components/reserve/FlowDiagram";
 import { HeroAmount, Lead, fmtAgo } from "@/components/reserve/sections/shared";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
-import { fmtBps, fmtNav, fmtPct, fmtRatio } from "@/lib/format";
+import { fmtBps, fmtPct, fmtRatio, fmtSharePrice } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, claimsTimeline, coverageRows, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
 
@@ -156,7 +156,7 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
 
   const kpis: { label: string; value: string; def: string; href?: string }[] = [
     { label: "Free capital", value: fmtBrs(sol.freeCapital), def: "Free for new guarantees and redemptions." },
-    { label: "Share price", value: fmtNav(s.navPerShare), def: "What each share is worth, after claims are set aside." },
+    { label: "Share price", value: fmtSharePrice(s.navPerShare), def: "What each share is worth, after claims are set aside." },
     {
       label: "Remaining cover",
       value: fmtBrs(s.remainingCoverTotal),

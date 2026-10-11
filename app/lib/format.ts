@@ -43,6 +43,12 @@ export function fmtNav(nav: bigint): string {
   return fmtUnits(nav, Number(NAV_SCALE.toString().length - 1), 6);
 }
 
+/** Share price for investor screens: NAV per share with 4 places and its unit, `1.3240 BRS`. `0` (no shares) shows as an em dash. */
+export function fmtSharePrice(nav: bigint): string {
+  if (nav === 0n) return "—";
+  return `${fmtUnits(nav, Number(NAV_SCALE.toString().length - 1), 4)} BRS`;
+}
+
 /** Basis points as a percentage: `2000` → `20.00%`. */
 export function fmtBps(bps: number | bigint, places = 2): string {
   const b = BigInt(bps);
