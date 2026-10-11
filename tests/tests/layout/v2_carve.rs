@@ -77,13 +77,17 @@ pub struct VaultStateV2 {
     pub inflow_nav: u64,
     pub claim_day_buckets: [u64; 31],
     pub claim_day_anchor: i64,
+    pub deposited_assets_total: u64,
+    pub minted_shares_total: u64,
+    pub redeemed_shares_total: u64,
+    pub redeemed_assets_total: u64,
     // -- carved from `_reserved` --
     pub instant_exit: InstantExitState,
     pub _reserved: [u8; V2_PAD],
 }
 
 /// `_reserved` of v1, and what is left after the 88-byte carve.
-const V1_PAD: usize = 256;
+const V1_PAD: usize = 224;
 const V2_PAD: usize = V1_PAD - 88;
 
 /// Decodes v2 from account bytes (discriminator skipped).
@@ -220,11 +224,12 @@ pub struct RedeemRequestV2 {
     pub filled_at: i64,
     pub status: u8,
     pub shares_filled: u64,
+    pub min_assets_out: u64,
     // -- carved from `_reserved` --
     pub assets_claimed: u64,
     pub fill_count: u16,
     pub last_fill_at: i64,
-    pub _reserved: [u8; 56 - 18],
+    pub _reserved: [u8; 48 - 18],
 }
 
 impl RedeemRequestV2 {
@@ -236,7 +241,7 @@ impl RedeemRequestV2 {
 #[test]
 fn redeem_carve_starts_where_v1_padding_starts() {
     let (_, at, len) = *REDEEM_REQUEST_V1.last().unwrap();
-    assert_eq!(len, 56);
+    assert_eq!(len, 48);
     assert_eq!(
         8 + ser(&zeroed::<RedeemRequestV2>()).len(),
         mutav::constants::REDEEM_REQUEST_SIZE
@@ -273,7 +278,7 @@ fn v1_requests_read_as_v2_with_the_remainder_derived() {
         (v2.assets_claimed, v2.fill_count, v2.last_fill_at),
         (0, 0, 0)
     );
-    assert_eq!(v2._reserved, [0; 38]);
+    assert_eq!(v2._reserved, [0; 30]);
     // After the whole fill: shares_filled == shares, nothing remaining.
     f.fulfil_redeems(1, u64::MAX, &[seq]).unwrap();
     let v2 = read(&f);

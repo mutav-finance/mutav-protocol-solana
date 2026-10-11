@@ -52,6 +52,12 @@ import {
   findVaultAuthorityPda,
 } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
+import {
+  getNavBoundsDecoder,
+  getNavBoundsEncoder,
+  type NavBounds,
+  type NavBoundsArgs,
+} from "../types";
 
 export const FULFIL_REDEEMS_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   251, 45, 1, 253, 65, 153, 188, 203,
@@ -133,11 +139,13 @@ export type FulfilRedeemsInstructionData = {
   discriminator: ReadonlyUint8Array;
   count: number;
   maxAssets: bigint;
+  navBounds: NavBounds;
 };
 
 export type FulfilRedeemsInstructionDataArgs = {
   count: number;
   maxAssets: number | bigint;
+  navBounds: NavBoundsArgs;
 };
 
 export function getFulfilRedeemsInstructionDataEncoder(): FixedSizeEncoder<FulfilRedeemsInstructionDataArgs> {
@@ -146,6 +154,7 @@ export function getFulfilRedeemsInstructionDataEncoder(): FixedSizeEncoder<Fulfi
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["count", getU8Encoder()],
       ["maxAssets", getU64Encoder()],
+      ["navBounds", getNavBoundsEncoder()],
     ]),
     (value) => ({ ...value, discriminator: FULFIL_REDEEMS_DISCRIMINATOR }),
   );
@@ -156,6 +165,7 @@ export function getFulfilRedeemsInstructionDataDecoder(): FixedSizeDecoder<Fulfi
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["count", getU8Decoder()],
     ["maxAssets", getU64Decoder()],
+    ["navBounds", getNavBoundsDecoder()],
   ]);
 }
 
@@ -204,6 +214,7 @@ export type FulfilRedeemsAsyncInput<
   program: TAccountProgram;
   count: FulfilRedeemsInstructionDataArgs["count"];
   maxAssets: FulfilRedeemsInstructionDataArgs["maxAssets"];
+  navBounds: FulfilRedeemsInstructionDataArgs["navBounds"];
 };
 
 export async function getFulfilRedeemsInstructionAsync<
@@ -538,6 +549,7 @@ export type FulfilRedeemsInput<
   program: TAccountProgram;
   count: FulfilRedeemsInstructionDataArgs["count"];
   maxAssets: FulfilRedeemsInstructionDataArgs["maxAssets"];
+  navBounds: FulfilRedeemsInstructionDataArgs["navBounds"];
 };
 
 export function getFulfilRedeemsInstruction<

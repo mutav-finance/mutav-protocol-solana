@@ -1,4 +1,8 @@
-//! `request_redeem(shares, proof)` (spec §5.5). Owner, never a delegate.
+//! `request_redeem(shares, min_assets_out, eligibility)` (spec §5.5;
+//! ADR 0023). Owner, never a delegate. `min_assets_out` is the owner's price
+//! limit (`0` = none). Holders still pass eligibility until the exit-open
+//! rule (ADR 0023, a later change) lets a holder redeem with an empty
+//! Merkle proof.
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -10,7 +14,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::RedeemRequested,
-    instructions::capital::{require_allowlisted, require_request_size},
+    instructions::capital::{require_eligible, require_request_size, Eligibility},
     instructions::operator::solvency_snapshot,
     math::assets_for,
     state::{RedeemRequest, VaultConfig, VaultState},
@@ -65,12 +69,13 @@ pub struct RequestRedeem<'info> {
 pub fn handle_request_redeem(
     ctx: Context<RequestRedeem>,
     shares: u64,
-    proof: Vec<[u8; 32]>,
+    min_assets_out: u64,
+    eligibility: Eligibility,
 ) -> Result<()> {
     let config = &ctx.accounts.config;
     let owner = ctx.accounts.owner.key();
     require!(!config.paused, MutavError::Paused);
-    require_allowlisted(config, &owner, &proof)?;
+    require_eligible(config, &owner, &eligibility)?;
     // The share account's owner is the signer (account constraint).
     require!(shares > 0, MutavError::InvalidParameter);
     // Size in BRS at the current NAV; later NAV drift is ignored.
@@ -113,6 +118,7 @@ pub fn handle_request_redeem(
     r.seq = seq;
     r.shares = shares;
     r.requested_at = now;
+    r.min_assets_out = min_assets_out;
     r.status = REDEEM_PENDING;
 
     emit_cpi!(RedeemRequested {

@@ -68,6 +68,13 @@ export type DepositRequest = {
   fulfilledAt: bigint;
   /** `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED`. */
   status: number;
+  /**
+   * The owner's price limit: the fewest shares this request accepts
+   * (ADR 0023). `0` = no limit. A fill that would mint fewer stops the
+   * batch at this request; the request stays pending until the owner (or
+   * the admin) cancels it or the price recovers.
+   */
+  minSharesOut: bigint;
   /** Zeroed. Never read or written by logic. */
   reserved: ReadonlyUint8Array;
 };
@@ -88,6 +95,13 @@ export type DepositRequestArgs = {
   fulfilledAt: number | bigint;
   /** `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED`. */
   status: number;
+  /**
+   * The owner's price limit: the fewest shares this request accepts
+   * (ADR 0023). `0` = no limit. A fill that would mint fewer stops the
+   * batch at this request; the request stays pending until the owner (or
+   * the admin) cancels it or the price recovers.
+   */
+  minSharesOut: number | bigint;
   /** Zeroed. Never read or written by logic. */
   reserved: ReadonlyUint8Array;
 };
@@ -107,7 +121,8 @@ export function getDepositRequestEncoder(): FixedSizeEncoder<DepositRequestArgs>
       ["requestedAt", getI64Encoder()],
       ["fulfilledAt", getI64Encoder()],
       ["status", getU8Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 64)],
+      ["minSharesOut", getU64Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 56)],
     ]),
     (value) => ({ ...value, discriminator: DEPOSIT_REQUEST_DISCRIMINATOR }),
   );
@@ -127,7 +142,8 @@ export function getDepositRequestDecoder(): FixedSizeDecoder<DepositRequest> {
     ["requestedAt", getI64Decoder()],
     ["fulfilledAt", getI64Decoder()],
     ["status", getU8Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 64)],
+    ["minSharesOut", getU64Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 56)],
   ]);
 }
 

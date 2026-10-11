@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { address } from "@solana/kit";
-import { findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getSetConfigInstructionDataDecoder, MUTAV_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
+import { findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getSetConfigInstructionDataDecoder, identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
 import { fromHex } from "../serde";
 import { composeInstructions, describeInstructions, queueSeqs, refuseOverlappingSetConfig, unsignedTransaction } from "../server/compose";
 import { assertRelayable, invokedPrograms, isFullySigned, RelayRefusedError } from "../server/relay";
@@ -63,22 +63,23 @@ describe("compose", () => {
     expect(d.accounts.filter((a) => a.signer).map((a) => a.address)).toEqual([WALLET]);
   });
 
-  it("set_config writes only the requested change and carries the rest", async () => {
+  it("set_config is sparse: one param per changed field, refresh first when c changes", async () => {
     const r = await reserve();
-    const [ix] = await composeInstructions({ kind: "set_config", coverageRatioBps: 15_000 }, WALLET, { reserve: r });
-    expect(ix!.programAddress).toBe(MUTAV_PROGRAM_ADDRESS);
-    expect(ix!.data!.length).toBeGreaterThan(8);
+    const ixs = await composeInstructions({ kind: "set_config", coverageRatioBps: 5_000 }, WALLET, { reserve: r });
+    expect(ixs.length).toBe(2);
+    expect(identifyMutavInstruction(ixs[0]!.data!)).toBe(MutavInstruction.Refresh);
+    const d = getSetConfigInstructionDataDecoder().decode(ixs[1]!.data!);
+    expect(d.params).toEqual([{ __kind: "CoverageRatioBps", fields: [5_000] }]);
   });
 
-  it("set_config writes the NAV-move bound into caps and carries every other field", async () => {
+  it("set_config writes the NAV-move bound, after a refresh", async () => {
     const r = await reserve();
-    const [ix] = await composeInstructions({ kind: "set_config", maxNavMoveBps: 500 }, WALLET, { reserve: r });
-    const d = getSetConfigInstructionDataDecoder().decode(ix!.data!);
-    expect(d.caps.maxNavMoveBps).toBe(500);
+    const ixs = await composeInstructions({ kind: "set_config", maxNavMoveBps: 500 }, WALLET, { reserve: r });
+    const ix = ixs[ixs.length - 1]!;
+    const d = getSetConfigInstructionDataDecoder().decode(ix.data!);
+    expect(d.params).toEqual([{ __kind: "MaxNavMoveBps", fields: [500] }]);
     // set_config takes the state account, for the cached coverage_required (#29).
-    expect(ix!.accounts![2]!.address).toBe((await findReserveAddresses(MINT)).state);
-    expect(d.caps.maxTvl).toBe(r.config.caps.maxTvl);
-    expect(d.coverageRatioBps).toBe(r.config.coverageRatioBps);
+    expect(ix.accounts![2]!.address).toBe((await findReserveAddresses(MINT)).state);
     await expect(composeInstructions({ kind: "set_config", maxNavMoveBps: 10_001 }, WALLET, { reserve: r })).rejects.toThrow(/max_nav_move_bps/);
   });
 
@@ -103,7 +104,10 @@ describe("compose", () => {
     const r = await reserve();
     const [ix] = await composeInstructions({ kind: "set_config", feeTakeBps: 1_500, caps: { maxClaimPerPeriod: 30_000_000_000n } }, WALLET, { reserve: r });
     const d = getSetConfigInstructionDataDecoder().decode(ix!.data!);
-    expect([d.feeTakeBps, d.caps.maxClaimPerPeriod, d.caps.maxClaimPerCall]).toEqual([1_500, 30_000_000_000n, r.config.caps.maxClaimPerCall]);
+    expect(d.params).toEqual([
+      { __kind: "FeeTakeBps", fields: [1_500] },
+      { __kind: "MaxClaimPerPeriod", fields: [30_000_000_000n] },
+    ]);
     await expect(composeInstructions({ kind: "set_config", feeTakeBps: 3_001 }, WALLET, { reserve: r })).rejects.toThrow(/fee_take_bps/);
     await expect(composeInstructions({ kind: "set_config", caps: { minRequest: r.config.caps.maxRequest + 1n } }, WALLET, { reserve: r })).rejects.toThrow(/min_request/);
   });
@@ -113,8 +117,8 @@ describe("compose", () => {
     const ixs = await composeInstructions({ kind: "set_config", caps: { maxTvl: r.config.caps.maxTvl + 1n } }, WALLET, { reserve: r });
     const [d] = describeInstructions(ixs, r.config);
     expect(d!.changes).toEqual([{ field: "caps.max_tvl", from: String(r.config.caps.maxTvl), to: String(r.config.caps.maxTvl + 1n) }]);
-    const [same] = describeInstructions(await composeInstructions({ kind: "set_config" }, WALLET, { reserve: r }), r.config);
-    expect(same!.changes).toEqual([]);
+    // Nothing to change: refused, so no empty proposal is made.
+    await expect(composeInstructions({ kind: "set_config" }, WALLET, { reserve: r })).rejects.toThrow(/nothing to change/);
     // Other instructions carry no diff.
     expect(describeInstructions(await composeInstructions({ kind: "unpause" }, WALLET, { reserve: r }), r.config)[0]!.changes).toBeUndefined();
   });

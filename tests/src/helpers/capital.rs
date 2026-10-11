@@ -16,7 +16,19 @@ use mutav::{
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
-use super::{create_token_account, Fixture, TOKEN_PROGRAM};
+use super::{Fixture, ANY_NAV, TOKEN_PROGRAM};
+
+const ATA_PROGRAM: Pubkey = anchor_spl::associated_token::ID;
+const SYSTEM_PROGRAM: Pubkey = anchor_lang::solana_program::system_program::ID;
+
+/// The associated token account of `owner` for `mint` under `token_program`.
+pub fn ata(owner: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> Pubkey {
+    anchor_spl::associated_token::get_associated_token_address_with_program_id(
+        owner,
+        mint,
+        token_program,
+    )
+}
 
 fn pda(seeds: &[&[u8]]) -> Pubkey {
     Pubkey::find_program_address(seeds, &mutav::ID).0
@@ -84,7 +96,7 @@ impl Allowlist {
     }
 }
 
-/// An investor wallet with a BRS token account and a share token account.
+/// An investor wallet with its BRS and share associated token accounts.
 pub struct Investor {
     pub key: Keypair,
     pub brs: Pubkey,
@@ -113,19 +125,12 @@ impl Fixture {
         self.svm
             .airdrop(&key.pubkey(), 10_000_000_000)
             .expect("airdrop");
-        let brs_acc = self.token_account(&key.pubkey());
+        let (mint, tp, share_mint) = (self.reserve_mint, self.token_program, self.pdas.share_mint);
+        let brs_acc = self.create_ata(&key.pubkey(), &mint, &tp);
         if brs > 0 {
             self.mint_brs(&brs_acc, brs);
         }
-        let payer = self.payer.insecure_clone();
-        let share_mint = self.pdas.share_mint;
-        let shares = create_token_account(
-            &mut self.svm,
-            &payer,
-            &share_mint,
-            &key.pubkey(),
-            &TOKEN_PROGRAM,
-        );
+        let shares = self.create_ata(&key.pubkey(), &share_mint, &TOKEN_PROGRAM);
         Investor {
             key,
             brs: brs_acc,
@@ -137,6 +142,16 @@ impl Fixture {
         self.investor_with(Keypair::new(), brs)
     }
 
+    /// Creates the associated token account of `owner` for `mint`.
+    pub fn create_ata(&mut self, owner: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> Pubkey {
+        use anchor_spl::associated_token::spl_associated_token_account::instruction::create_associated_token_account_idempotent;
+        let payer = self.payer.insecure_clone();
+        let ix =
+            create_associated_token_account_idempotent(&payer.pubkey(), owner, mint, token_program);
+        self.send(ix, &payer).expect("create ATA");
+        ata(owner, mint, token_program)
+    }
+
     /// Sends `ix` signed (and paid) by the investor alone.
     pub fn send_as(&mut self, ix: Instruction, signer: &Keypair) -> TransactionResult {
         super::send_ix(&mut self.svm, ix, &[signer])
@@ -146,6 +161,7 @@ impl Fixture {
         Instruction::new_with_bytes(mutav::ID, &data, metas)
     }
 
+    /// `request_deposit` with no price limit and a Merkle proof.
     pub fn request_deposit_ix(
         &self,
         owner: &Pubkey,
@@ -153,10 +169,26 @@ impl Fixture {
         assets: u64,
         proof: Vec<[u8; 32]>,
     ) -> Instruction {
+        self.request_deposit_limit_ix(owner, source, assets, 0, proof)
+    }
+
+    pub fn request_deposit_limit_ix(
+        &self,
+        owner: &Pubkey,
+        source: &Pubkey,
+        assets: u64,
+        min_shares_out: u64,
+        proof: Vec<[u8; 32]>,
+    ) -> Instruction {
         let config = self.pdas.config;
         let seq = self.state().next_deposit_seq;
         self.capital_ix(
-            mutav::instruction::RequestDeposit { assets, proof }.data(),
+            mutav::instruction::RequestDeposit {
+                assets,
+                min_shares_out,
+                eligibility: mutav::Eligibility::Merkle { proof },
+            }
+            .data(),
             mutav::accounts::RequestDeposit {
                 owner: *owner,
                 config,
@@ -174,11 +206,20 @@ impl Fixture {
         )
     }
 
-    pub fn cancel_deposit_ix(&self, owner: &Pubkey, seq: u64, destination: &Pubkey) -> Instruction {
+    /// `cancel_deposit` signed by `signer` (the owner or the admin), refunding
+    /// `owner` into `destination` (normally the owner's BRS ATA).
+    pub fn cancel_deposit_ix(
+        &self,
+        signer: &Pubkey,
+        owner: &Pubkey,
+        seq: u64,
+        destination: &Pubkey,
+    ) -> Instruction {
         let config = self.pdas.config;
         self.capital_ix(
             mutav::instruction::CancelDeposit {}.data(),
             mutav::accounts::CancelDeposit {
+                signer: *signer,
                 owner: *owner,
                 config,
                 state: self.pdas.state,
@@ -188,6 +229,8 @@ impl Fixture {
                 vault_authority: self.pdas.authority,
                 reserve_mint: self.reserve_mint,
                 token_program: self.token_program,
+                associated_token_program: ATA_PROGRAM,
+                system_program: SYSTEM_PROGRAM,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -195,9 +238,29 @@ impl Fixture {
         )
     }
 
-    /// `fulfil_deposits` with the request PDAs of `seqs` as remaining
-    /// accounts.
+    /// `owner`'s BRS associated token account.
+    pub fn brs_ata(&self, owner: &Pubkey) -> Pubkey {
+        ata(owner, &self.reserve_mint, &self.token_program)
+    }
+
+    /// `owner`'s share associated token account.
+    pub fn share_ata(&self, owner: &Pubkey) -> Pubkey {
+        ata(owner, &self.pdas.share_mint, &TOKEN_PROGRAM)
+    }
+
+    /// `fulfil_deposits` with any NAV accepted, and the request PDAs of
+    /// `seqs` as remaining accounts.
     pub fn fulfil_deposits_ix(&self, signer: &Pubkey, count: u8, seqs: &[u64]) -> Instruction {
+        self.fulfil_deposits_bounded_ix(signer, count, ANY_NAV, seqs)
+    }
+
+    pub fn fulfil_deposits_bounded_ix(
+        &self,
+        signer: &Pubkey,
+        count: u8,
+        nav_bounds: mutav::NavBounds,
+        seqs: &[u64],
+    ) -> Instruction {
         let config = self.pdas.config;
         let mut metas = mutav::accounts::FulfilDeposits {
             admin: *signer,
@@ -216,7 +279,10 @@ impl Fixture {
             seqs.iter()
                 .map(|s| AccountMeta::new(deposit_pda(&config, *s), false)),
         );
-        self.capital_ix(mutav::instruction::FulfilDeposits { count }.data(), metas)
+        self.capital_ix(
+            mutav::instruction::FulfilDeposits { count, nav_bounds }.data(),
+            metas,
+        )
     }
 
     pub fn claim_shares_ix(&self, owner: &Pubkey, seq: u64, owner_shares: &Pubkey) -> Instruction {
@@ -231,6 +297,8 @@ impl Fixture {
                 owner_shares: *owner_shares,
                 vault_authority: self.pdas.authority,
                 share_token_program: TOKEN_PROGRAM,
+                associated_token_program: ATA_PROGRAM,
+                system_program: SYSTEM_PROGRAM,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -238,6 +306,7 @@ impl Fixture {
         )
     }
 
+    /// `request_redeem` with no price limit and a Merkle proof.
     pub fn request_redeem_ix(
         &self,
         owner: &Pubkey,
@@ -245,10 +314,26 @@ impl Fixture {
         shares: u64,
         proof: Vec<[u8; 32]>,
     ) -> Instruction {
+        self.request_redeem_limit_ix(owner, owner_shares, shares, 0, proof)
+    }
+
+    pub fn request_redeem_limit_ix(
+        &self,
+        owner: &Pubkey,
+        owner_shares: &Pubkey,
+        shares: u64,
+        min_assets_out: u64,
+        proof: Vec<[u8; 32]>,
+    ) -> Instruction {
         let config = self.pdas.config;
         let seq = self.state().next_redeem_seq;
         self.capital_ix(
-            mutav::instruction::RequestRedeem { shares, proof }.data(),
+            mutav::instruction::RequestRedeem {
+                shares,
+                min_assets_out,
+                eligibility: mutav::Eligibility::Merkle { proof },
+            }
+            .data(),
             mutav::accounts::RequestRedeem {
                 owner: *owner,
                 config,
@@ -280,6 +365,8 @@ impl Fixture {
                 vault_authority: self.pdas.authority,
                 share_mint: self.pdas.share_mint,
                 share_token_program: TOKEN_PROGRAM,
+                associated_token_program: ATA_PROGRAM,
+                system_program: SYSTEM_PROGRAM,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -287,12 +374,24 @@ impl Fixture {
         )
     }
 
-    /// `fulfil_redeems` with the request PDAs of `seqs` as remaining accounts.
+    /// `fulfil_redeems` with any NAV accepted, and the request PDAs of `seqs`
+    /// as remaining accounts.
     pub fn fulfil_redeems_ix(
         &self,
         signer: &Pubkey,
         count: u8,
         max_assets: u64,
+        seqs: &[u64],
+    ) -> Instruction {
+        self.fulfil_redeems_bounded_ix(signer, count, max_assets, ANY_NAV, seqs)
+    }
+
+    pub fn fulfil_redeems_bounded_ix(
+        &self,
+        signer: &Pubkey,
+        count: u8,
+        max_assets: u64,
+        nav_bounds: mutav::NavBounds,
         seqs: &[u64],
     ) -> Instruction {
         let config = self.pdas.config;
@@ -317,7 +416,12 @@ impl Fixture {
                 .map(|s| AccountMeta::new(redeem_pda(&config, *s), false)),
         );
         self.capital_ix(
-            mutav::instruction::FulfilRedeems { count, max_assets }.data(),
+            mutav::instruction::FulfilRedeems {
+                count,
+                max_assets,
+                nav_bounds,
+            }
+            .data(),
             metas,
         )
     }
@@ -336,6 +440,8 @@ impl Fixture {
                 vault_authority: self.pdas.authority,
                 reserve_mint: self.reserve_mint,
                 token_program: self.token_program,
+                associated_token_program: ATA_PROGRAM,
+                system_program: SYSTEM_PROGRAM,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -343,33 +449,48 @@ impl Fixture {
         )
     }
 
-    /// `advance_queue_heads(max)` with the redeem PDAs of `redeem_seqs`, then
-    /// the deposit PDAs of `deposit_seqs`, as remaining accounts.
-    pub fn advance_queue_heads_ix(
-        &self,
-        max: u8,
-        redeem_seqs: &[u64],
-        deposit_seqs: &[u64],
-    ) -> Instruction {
+    /// `advance_queue_head(queue, max)` with the PDAs of `seqs` of that
+    /// queue as remaining accounts.
+    pub fn advance_queue_head_ix(&self, queue: u8, max: u8, seqs: &[u64]) -> Instruction {
         let config = self.pdas.config;
-        let mut metas = mutav::accounts::AdvanceQueueHeads {
+        let mut metas = mutav::accounts::AdvanceQueueHead {
             config,
             state: self.pdas.state,
             event_authority: self.pdas.event_authority,
             program: mutav::ID,
         }
         .to_account_metas(None);
-        metas.extend(
-            redeem_seqs
-                .iter()
-                .map(|s| AccountMeta::new_readonly(redeem_pda(&config, *s), false)),
-        );
-        metas.extend(
-            deposit_seqs
-                .iter()
-                .map(|s| AccountMeta::new_readonly(deposit_pda(&config, *s), false)),
-        );
-        self.capital_ix(mutav::instruction::AdvanceQueueHeads { max }.data(), metas)
+        metas.extend(seqs.iter().map(|s| {
+            let pda = if queue == QUEUE_DEPOSIT {
+                deposit_pda(&config, *s)
+            } else {
+                redeem_pda(&config, *s)
+            };
+            AccountMeta::new_readonly(pda, false)
+        }));
+        self.capital_ix(
+            mutav::instruction::AdvanceQueueHead { queue, max }.data(),
+            metas,
+        )
+    }
+
+    /// One transaction that advances the redeem queue over `redeem_seqs` and
+    /// the deposit queue over `deposit_seqs`, each with `max`; a queue with
+    /// no seqs is left out.
+    pub fn advance_queue_heads_ixs(
+        &self,
+        max: u8,
+        redeem_seqs: &[u64],
+        deposit_seqs: &[u64],
+    ) -> Vec<Instruction> {
+        let mut out = vec![];
+        if !redeem_seqs.is_empty() {
+            out.push(self.advance_queue_head_ix(QUEUE_REDEEM, max, redeem_seqs));
+        }
+        if !deposit_seqs.is_empty() {
+            out.push(self.advance_queue_head_ix(QUEUE_DEPOSIT, max, deposit_seqs));
+        }
+        out
     }
 
     // -- one-call flows ------------------------------------------------------
@@ -400,8 +521,15 @@ impl Fixture {
     }
 
     pub fn cancel_deposit(&mut self, inv: &Investor, seq: u64) -> TransactionResult {
-        let ix = self.cancel_deposit_ix(&inv.pubkey(), seq, &inv.brs);
+        let ix = self.cancel_deposit_ix(&inv.pubkey(), &inv.pubkey(), seq, &inv.brs);
         self.send_as(ix, &inv.key)
+    }
+
+    /// `cancel_deposit` of `inv`'s request, signed by the admin.
+    pub fn admin_cancel_deposit(&mut self, inv: &Investor, seq: u64) -> TransactionResult {
+        let admin = self.admin.insecure_clone();
+        let ix = self.cancel_deposit_ix(&admin.pubkey(), &inv.pubkey(), seq, &inv.brs);
+        self.send(ix, &admin)
     }
 
     /// Request, fulfil and claim a deposit of `assets`. Returns the shares.
@@ -456,13 +584,22 @@ impl Fixture {
         self.send_as(ix, &inv.key)
     }
 
+    /// Advances both queues in one transaction (see
+    /// `advance_queue_heads_ixs`).
     pub fn advance_queue_heads(
         &mut self,
         max: u8,
         redeem_seqs: &[u64],
         deposit_seqs: &[u64],
     ) -> TransactionResult {
-        let ix = self.advance_queue_heads_ix(max, redeem_seqs, deposit_seqs);
+        let ixs = self.advance_queue_heads_ixs(max, redeem_seqs, deposit_seqs);
+        let payer = self.payer.insecure_clone();
+        super::send_ixs(&mut self.svm, &ixs, &[&payer])
+    }
+
+    /// `advance_queue_head(queue, max)` sent by the payer.
+    pub fn advance_queue_head(&mut self, queue: u8, max: u8, seqs: &[u64]) -> TransactionResult {
+        let ix = self.advance_queue_head_ix(queue, max, seqs);
         let payer = self.payer.insecure_clone();
         self.send(ix, &payer)
     }
@@ -602,7 +739,10 @@ impl Fixture {
         deposit2.accounts[3].pubkey = deposit_pda(&config, d1);
         deposit2.data = mutav::instruction::RequestDeposit {
             assets: 1_000 * super::BRL,
-            proof: proof.clone(),
+            min_shares_out: 0,
+            eligibility: mutav::Eligibility::Merkle {
+                proof: proof.clone(),
+            },
         }
         .data();
         let mut redeem = self.request_redeem_ix(&owner, &inv.shares, 1_100 * super::BRL, proof);
@@ -615,7 +755,7 @@ impl Fixture {
             ("request_deposit", deposit2, k()),
             (
                 "cancel_deposit",
-                self.cancel_deposit_ix(&owner, d1, &inv.brs),
+                self.cancel_deposit_ix(&owner, &owner, d1, &inv.brs),
                 k(),
             ),
             (
@@ -646,8 +786,13 @@ impl Fixture {
                 k(),
             ),
             (
-                "advance_queue_heads",
-                self.advance_queue_heads_ix(4, &[r0, r1], &[d0, d1]),
+                "advance_queue_head",
+                self.advance_queue_head_ix(QUEUE_REDEEM, 4, &[r0, r1]),
+                self.payer.insecure_clone(),
+            ),
+            (
+                "advance_queue_head",
+                self.advance_queue_head_ix(QUEUE_DEPOSIT, 4, &[d0, d1]),
                 self.payer.insecure_clone(),
             ),
             ("refresh", self.refresh_ix(), self.payer.insecure_clone()),
@@ -672,15 +817,25 @@ impl Fixture {
         Instruction::new_with_bytes(mutav::ID, &mutav::instruction::Refresh {}.data(), metas)
     }
 
-    /// `clear_fulfil_halt` (spec §5.1; ADR 0015) signed by `signer`.
+    /// `clear_fulfil_halt` (spec §5.1; ADR 0015) signed by `signer`, any NAV
+    /// accepted.
     pub fn clear_fulfil_halt_ix(&self, signer: &Pubkey) -> Instruction {
+        self.clear_fulfil_halt_bounded_ix(signer, ANY_NAV)
+    }
+
+    pub fn clear_fulfil_halt_bounded_ix(
+        &self,
+        signer: &Pubkey,
+        nav_bounds: mutav::NavBounds,
+    ) -> Instruction {
         Instruction::new_with_bytes(
             mutav::ID,
-            &mutav::instruction::ClearFulfilHalt {}.data(),
+            &mutav::instruction::ClearFulfilHalt { nav_bounds }.data(),
             mutav::accounts::ClearFulfilHalt {
                 admin: *signer,
                 config: self.pdas.config,
                 state: self.pdas.state,
+                reserve: self.pdas.reserve,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }

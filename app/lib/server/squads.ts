@@ -71,9 +71,8 @@ function setConfigDiff(tx: multisig.generated.VaultTransaction, programId: strin
     const data = new Uint8Array(ix.data);
     try {
       if (identifyMutavInstruction(data) !== MutavInstruction.SetConfig) continue;
-      // SetConfig accounts: admin, config, treasury_account, payments_account, …
-      const treasuryIdx = ix.accountIndexes[2];
-      return setConfigChanges(data, config, treasuryIdx === undefined ? undefined : keys[treasuryIdx]);
+      // Sparse params (ADR 0026); the treasury moves with `set_treasury_account`.
+      return setConfigChanges(data, config);
     } catch {
       return undefined;
     }

@@ -9,9 +9,8 @@ use solana_keypair::Keypair;
 use solana_signer::Signer;
 
 fn set_take(f: &mut Fixture, bps: u16) {
-    let mut args = set_config_args(&f.config());
-    args.fee_take_bps = bps;
-    f.set_config(args).unwrap();
+    f.set_config(vec![mutav::ConfigParam::FeeTakeBps(bps)])
+        .unwrap();
 }
 
 #[test]

@@ -48,6 +48,10 @@ export type FeesContributedEvent = {
   gross: bigint;
   take: bigint;
   net: bigint;
+  /** Running totals after the contribution. */
+  feesInTotal: bigint;
+  feeTakeTotal: bigint;
+  brsBalance: bigint;
 };
 
 export type FeesContributedEventArgs = {
@@ -57,6 +61,10 @@ export type FeesContributedEventArgs = {
   gross: number | bigint;
   take: number | bigint;
   net: number | bigint;
+  /** Running totals after the contribution. */
+  feesInTotal: number | bigint;
+  feeTakeTotal: number | bigint;
+  brsBalance: number | bigint;
 };
 
 /** Gets the encoder for {@link FeesContributedEventArgs} event data. */
@@ -69,6 +77,9 @@ export function getFeesContributedEventEncoder(): FixedSizeEncoder<FeesContribut
       ["gross", getU64Encoder()],
       ["take", getU64Encoder()],
       ["net", getU64Encoder()],
+      ["feesInTotal", getU64Encoder()],
+      ["feeTakeTotal", getU64Encoder()],
+      ["brsBalance", getU64Encoder()],
     ]),
     [getConstantEncoder(FEES_CONTRIBUTED_EVENT_DISCRIMINATOR)],
   );
@@ -84,6 +95,9 @@ export function getFeesContributedEventDecoder(): FixedSizeDecoder<FeesContribut
       ["gross", getU64Decoder()],
       ["take", getU64Decoder()],
       ["net", getU64Decoder()],
+      ["feesInTotal", getU64Decoder()],
+      ["feeTakeTotal", getU64Decoder()],
+      ["brsBalance", getU64Decoder()],
     ]),
     [getConstantDecoder(FEES_CONTRIBUTED_EVENT_DISCRIMINATOR)],
   );

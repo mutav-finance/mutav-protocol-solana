@@ -87,8 +87,19 @@ fn accepts_plain_token_2022_mint() {
 }
 
 #[test]
-fn accepts_zero_transfer_fee() {
-    assert_accepted(&[Ext::TransferFee(0)]);
+fn accepts_a_zero_transfer_fee_that_can_never_change() {
+    assert_accepted(&[Ext::FixedTransferFee(0)]);
+}
+
+#[test]
+fn rejects_a_zero_transfer_fee_with_a_config_authority() {
+    // A fee authority could raise the fee after `initialize` (ADR 0020).
+    assert_rejected(&[Ext::TransferFee(0)]);
+}
+
+#[test]
+fn rejects_a_non_zero_fixed_transfer_fee() {
+    assert_rejected(&[Ext::FixedTransferFee(1)]);
 }
 
 #[test]

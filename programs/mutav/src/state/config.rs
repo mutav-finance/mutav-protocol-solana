@@ -79,10 +79,25 @@ pub struct VaultConfig {
     pub pending_pauser_expires_at: i64,
     /// Pause-only guardian keys. `Pubkey::default()` = empty slot.
     pub guardians: [Pubkey; 3],
+    /// Bitmask of capital-flow directions stopped one by one (for example
+    /// deposits but not redemptions), separate from the global `paused`.
+    /// `0` = none. Read by no instruction of this binary.
+    pub disabled_ops: u8,
+    // -- Attestation block, reserved for KYC attestations of investors
+    // (a later upgrade). All zero = off. Read by no instruction of this
+    // binary. --
+    /// The key whose attestations the reserve accepts.
+    pub kyc_attester: Pubkey,
+    /// The program that holds the attestations.
+    pub attestation_program: Pubkey,
+    /// The attestation type (schema id) an investor must hold.
+    pub required_attestation_type: [u8; 32],
+    /// Bumped to invalidate every attestation issued before.
+    pub attester_epoch: u32,
     /// Zeroed. Never read or written by logic. Holds the planned carves
     /// (phase-2 exit parameters, the ADR 0012 config fields) without a
     /// migration (spec §14.2, ADR 0019).
-    pub _reserved: [u8; 512],
+    pub _reserved: [u8; 411],
 }
 
 const _: () = assert!(8 + VaultConfig::INIT_SPACE == VAULT_CONFIG_SIZE);
@@ -101,6 +116,17 @@ impl VaultConfig {
     /// `true` for the pauser or the admin.
     pub fn is_pauser_or_admin(&self, key: &Pubkey) -> bool {
         *key == self.pauser || *key == self.admin
+    }
+
+    /// `true` for a set guardian slot holding `key` (ADR 0020). The default
+    /// key, which marks an empty slot, is never a guardian.
+    pub fn is_guardian(&self, key: &Pubkey) -> bool {
+        *key != Pubkey::default() && self.guardians.contains(key)
+    }
+
+    /// Who may `pause`: the pauser, the admin or a guardian (ADR 0020).
+    pub fn can_pause(&self, key: &Pubkey) -> bool {
+        self.is_pauser_or_admin(key) || self.is_guardian(key)
     }
 
     /// Writes `caps` in place, field by field, recording changes.
@@ -129,6 +155,21 @@ impl VaultConfig {
             &mut c.max_nav_move_bps,
             a.max_nav_move_bps,
         );
+        ch.set(
+            field::CAPS_STRESS_BUFFER,
+            &mut c.stress_buffer,
+            a.stress_buffer,
+        );
+        ch.set(
+            field::CAPS_MAX_QUEUE_WAIT_SECS,
+            &mut c.max_queue_wait_secs,
+            a.max_queue_wait_secs,
+        );
+        ch.set(
+            field::CAPS_MAX_REINSTATE_AGE,
+            &mut c.max_reinstate_age,
+            a.max_reinstate_age,
+        );
     }
 }
 
@@ -146,9 +187,9 @@ pub struct Caps {
     /// The NAV-move guard (spec §7): a NAV-per-share move of more than this,
     /// in bps, between two `refresh`es halts fulfilment.
     pub max_nav_move_bps: u16,
-    // -- ADR 0019 carves: written zero, read by no instruction of this
-    // binary; `set_config` and the rules that read them come later. Zero is
-    // the pilot behaviour. --
+    // -- ADR 0019 carves, set by `initialize` and `set_config` (ADR 0026).
+    // No instruction of this binary reads them yet; the rules that use them
+    // come later. Zero is the pilot behaviour. --
     /// R$ amount of claims that could be filed next, for the stress term of
     /// `coverage_required`. `0` = no stress term.
     pub stress_buffer: u64,
@@ -175,6 +216,9 @@ pub struct CapsInput {
     pub min_request: u64,
     pub max_request: u64,
     pub max_nav_move_bps: u16,
+    pub stress_buffer: u64,
+    pub max_queue_wait_secs: i64,
+    pub max_reinstate_age: i64,
 }
 
 #[cfg(test)]
@@ -216,18 +260,11 @@ mod tests {
     fn apply_never_touches_padding() {
         let mut c = zeroed();
         c.caps._reserved = [7; 32];
-        c._reserved = [9; 512];
-        // The ADR 0019 carves are not `set_config` fields yet.
-        c.caps.stress_buffer = 11;
-        c.caps.max_reinstate_age = 12;
+        c._reserved = [9; 411];
+        // Role carves are not caps.
         c.pending_admin = Pubkey::new_unique();
         c.guardians[2] = Pubkey::new_unique();
-        let carved = (
-            c.caps.stress_buffer,
-            c.caps.max_reinstate_age,
-            c.pending_admin,
-            c.guardians,
-        );
+        let carved = (c.pending_admin, c.guardians);
         let mut ch = ConfigChanges::default();
         c.apply_caps(
             &CapsInput {
@@ -238,16 +275,25 @@ mod tests {
             &mut ch,
         );
         assert_eq!(c.caps._reserved, [7; 32]);
-        assert_eq!(c._reserved, [9; 512]);
-        assert_eq!(
-            (
-                c.caps.stress_buffer,
-                c.caps.max_reinstate_age,
-                c.pending_admin,
-                c.guardians
-            ),
-            carved
-        );
+        assert_eq!(c._reserved, [9; 411]);
+        assert_eq!((c.pending_admin, c.guardians), carved);
         assert_eq!(ch.0.len(), 2);
+    }
+
+    #[test]
+    fn guardians_never_include_the_default_key() {
+        let mut c = zeroed();
+        c.admin = Pubkey::new_unique();
+        c.pauser = Pubkey::new_unique();
+        let g = Pubkey::new_unique();
+        // Every slot empty: the default key is not a guardian.
+        assert!(!c.is_guardian(&Pubkey::default()));
+        assert!(!c.can_pause(&Pubkey::default()));
+        c.guardians[1] = g;
+        assert!(c.is_guardian(&g));
+        assert!(c.can_pause(&g));
+        assert!(!c.is_guardian(&Pubkey::default()), "empty slots stay empty");
+        assert!(c.can_pause(&c.admin.clone()) && c.can_pause(&c.pauser.clone()));
+        assert!(!c.can_pause(&Pubkey::new_unique()));
     }
 }

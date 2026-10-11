@@ -51,6 +51,16 @@ export type ClaimPaidEvent = {
   amount: bigint;
   noticeRefHash: ReadonlyUint8Array;
   paymentsAccount: Address;
+  /**
+   * After the payment: provisions, the cached `coverage_required`, the
+   * claim payments of the 31-day window (this one included), the tracked
+   * BRS in `reserve`, and lifetime claim payments.
+   */
+  provisionsAfter: bigint;
+  coverageRequiredAfter: bigint;
+  windowPaid: bigint;
+  brsBalanceAfter: bigint;
+  claimsPaidTotal: bigint;
 };
 
 export type ClaimPaidEventArgs = {
@@ -61,6 +71,16 @@ export type ClaimPaidEventArgs = {
   amount: number | bigint;
   noticeRefHash: ReadonlyUint8Array;
   paymentsAccount: Address;
+  /**
+   * After the payment: provisions, the cached `coverage_required`, the
+   * claim payments of the 31-day window (this one included), the tracked
+   * BRS in `reserve`, and lifetime claim payments.
+   */
+  provisionsAfter: number | bigint;
+  coverageRequiredAfter: number | bigint;
+  windowPaid: number | bigint;
+  brsBalanceAfter: number | bigint;
+  claimsPaidTotal: number | bigint;
 };
 
 /** Gets the encoder for {@link ClaimPaidEventArgs} event data. */
@@ -74,6 +94,11 @@ export function getClaimPaidEventEncoder(): FixedSizeEncoder<ClaimPaidEventArgs>
       ["amount", getU64Encoder()],
       ["noticeRefHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["paymentsAccount", getAddressEncoder()],
+      ["provisionsAfter", getU64Encoder()],
+      ["coverageRequiredAfter", getU64Encoder()],
+      ["windowPaid", getU64Encoder()],
+      ["brsBalanceAfter", getU64Encoder()],
+      ["claimsPaidTotal", getU64Encoder()],
     ]),
     [getConstantEncoder(CLAIM_PAID_EVENT_DISCRIMINATOR)],
   );
@@ -90,6 +115,11 @@ export function getClaimPaidEventDecoder(): FixedSizeDecoder<ClaimPaidEvent> {
       ["amount", getU64Decoder()],
       ["noticeRefHash", fixDecoderSize(getBytesDecoder(), 32)],
       ["paymentsAccount", getAddressDecoder()],
+      ["provisionsAfter", getU64Decoder()],
+      ["coverageRequiredAfter", getU64Decoder()],
+      ["windowPaid", getU64Decoder()],
+      ["brsBalanceAfter", getU64Decoder()],
+      ["claimsPaidTotal", getU64Decoder()],
     ]),
     [getConstantDecoder(CLAIM_PAID_EVENT_DISCRIMINATOR)],
   );

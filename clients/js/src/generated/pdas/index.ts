@@ -17,4 +17,5 @@ export * from "./pendingRedemptions";
 export * from "./reserve";
 export * from "./shareMint";
 export * from "./state";
+export * from "./unsolicited";
 export * from "./vaultAuthority";

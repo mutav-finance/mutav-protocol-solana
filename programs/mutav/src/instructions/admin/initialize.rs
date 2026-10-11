@@ -10,7 +10,14 @@
 //!
 //! `initialize` also creates the income inbox (ADR 0017): the vault
 //! authority's associated token account for the reserve mint, created
-//! idempotently so it succeeds even if someone created it first.
+//! idempotently so it succeeds even if someone created it first; and the
+//! `unsolicited` token account (ADR 0019, ADR 0024), which holds money sent
+//! to the reserve unasked until the reserve admin books or returns it.
+//!
+//! The reserve mint must have 6 decimals (BRS), so every cap means what it
+//! says in R$; a Token-2022 mint must pass the mint guard
+//! (`token_guard::check_reserve_mint`), which also refuses a transfer-fee
+//! config authority (ADR 0020).
 
 use anchor_lang::{prelude::*, solana_program::bpf_loader_upgradeable};
 use anchor_spl::{
@@ -23,7 +30,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::{ConfigChanges, VaultInitialized},
-    instructions::admin::{validate_money_accounts, validate_params, validate_roles},
+    instructions::admin::{validate_config, validate_money_accounts, validate_roles},
     state::{CapsInput, VaultConfig, VaultState},
     token_guard,
 };
@@ -59,7 +66,10 @@ pub struct Initialize<'info> {
     )]
     pub program_data: Box<Account<'info, ProgramData>>,
 
-    #[account(mint::token_program = reserve_token_program)]
+    #[account(
+        mint::token_program = reserve_token_program,
+        constraint = reserve_mint.decimals == RESERVE_DECIMALS @ MutavError::InvalidMint,
+    )]
     pub reserve_mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
@@ -140,6 +150,18 @@ pub struct Initialize<'info> {
     )]
     pub claims: Box<InterfaceAccount<'info, TokenAccount>>,
 
+    /// Money sent to the reserve unasked (ADR 0024): `["unsolicited", config]`.
+    #[account(
+        init,
+        payer = payer,
+        seeds = [UNSOLICITED_SEED, config.key().as_ref()],
+        bump,
+        token::mint = reserve_mint,
+        token::authority = vault_authority,
+        token::token_program = reserve_token_program,
+    )]
+    pub unsolicited: Box<InterfaceAccount<'info, TokenAccount>>,
+
     /// The income inbox (ADR 0017): the vault authority's associated token
     /// account for `reserve_mint`, created here idempotently.
     /// CHECK: address checked in the handler; the ATA program creates it.
@@ -161,7 +183,6 @@ pub struct Initialize<'info> {
 
 pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Result<()> {
     token_guard::check_reserve_mint(&ctx.accounts.reserve_mint.to_account_info())?;
-    validate_params(args.coverage_ratio_bps, args.fee_take_bps, &args.caps)?;
     validate_roles(&args.admin, &args.operator, &args.pauser)?;
     validate_money_accounts(
         &ctx.accounts.reserve_mint.key(),
@@ -169,6 +190,7 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
         &ctx.accounts.payments_account,
         &args.mutav_capital_wallet,
         &ctx.accounts.vault_authority.key(),
+        &args.operator,
     )?;
     create_income_inbox(&ctx)?;
     // No seed deposit (spec §12 Q20, decided 2026-10-06): the reserve starts
@@ -198,8 +220,10 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
     // Initial values are announced by `VaultInitialized`, not `ConfigUpdated`.
     let mut ignored = ConfigChanges::default();
     config.apply_caps(&args.caps, &mut ignored);
-    // `feature_flags`, `investor_allowlist_root`, `paused` and every
-    // `_reserved` stay zero.
+    // `feature_flags`, `investor_allowlist_root`, `paused`, the pending
+    // handovers, the guardians and every `_reserved` stay zero.
+    // The same bounds as every `set_config` (ADR 0026).
+    validate_config(config)?;
 
     let state = &mut ctx.accounts.state;
     state.version = PROGRAM_LAYOUT_VERSION;

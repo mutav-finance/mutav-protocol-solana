@@ -43,9 +43,7 @@ pub enum MutavError {
     ExceedsRemainingCover,
     #[msg("Claim has not been filed")]
     ClaimNotFiled,
-    #[msg("Leg does not match the claim filing")]
-    LegMismatch,
-    #[msg("Per-call claim payment cap exceeded")]
+    #[msg("Above the per-call claim cap without a matching approval")]
     ClaimCallCapExceeded,
     #[msg("Per-period claim payment cap exceeded")]
     ClaimPeriodCapExceeded,
@@ -81,4 +79,22 @@ pub enum MutavError {
     InvalidTokenProgram,
     #[msg("Claim has not been paid")]
     ClaimNotPaid,
+    #[msg("A config parameter appears more than once")]
+    DuplicateParam,
+    #[msg("Expected amount does not match the claim's provision")]
+    ExpectedAmountMismatch,
+    #[msg("NAV per share is outside the given bounds")]
+    NavOutOfBounds,
+    #[msg("No handover is pending for this role")]
+    NoPendingHandover,
+    #[msg("The pending handover has expired")]
+    HandoverExpired,
+    #[msg("Guarantee has claim payments")]
+    GuaranteeHasPayments,
+    #[msg("A handover is already pending for this role")]
+    HandoverPending,
+    #[msg("Refresh the reserve in the same slot first")]
+    RefreshRequired,
+    #[msg("The head request's price limit is not met")]
+    PriceLimitNotMet,
 }

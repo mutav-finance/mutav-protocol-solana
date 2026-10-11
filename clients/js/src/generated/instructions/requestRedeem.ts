@@ -10,8 +10,6 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getArrayDecoder,
-  getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getStructDecoder,
@@ -46,6 +44,12 @@ import {
 } from "@solana/kit/program-client-core";
 import { findPendingRedemptionsPda, findStatePda } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
+import {
+  getEligibilityDecoder,
+  getEligibilityEncoder,
+  type Eligibility,
+  type EligibilityArgs,
+} from "../types";
 
 export const REQUEST_REDEEM_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   105, 49, 44, 38, 207, 241, 33, 173,
@@ -118,12 +122,14 @@ export type RequestRedeemInstruction<
 export type RequestRedeemInstructionData = {
   discriminator: ReadonlyUint8Array;
   shares: bigint;
-  proof: Array<ReadonlyUint8Array>;
+  minAssetsOut: bigint;
+  eligibility: Eligibility;
 };
 
 export type RequestRedeemInstructionDataArgs = {
   shares: number | bigint;
-  proof: Array<ReadonlyUint8Array>;
+  minAssetsOut: number | bigint;
+  eligibility: EligibilityArgs;
 };
 
 export function getRequestRedeemInstructionDataEncoder(): Encoder<RequestRedeemInstructionDataArgs> {
@@ -131,7 +137,8 @@ export function getRequestRedeemInstructionDataEncoder(): Encoder<RequestRedeemI
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["shares", getU64Encoder()],
-      ["proof", getArrayEncoder(fixEncoderSize(getBytesEncoder(), 32))],
+      ["minAssetsOut", getU64Encoder()],
+      ["eligibility", getEligibilityEncoder()],
     ]),
     (value) => ({ ...value, discriminator: REQUEST_REDEEM_DISCRIMINATOR }),
   );
@@ -141,7 +148,8 @@ export function getRequestRedeemInstructionDataDecoder(): Decoder<RequestRedeemI
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["shares", getU64Decoder()],
-    ["proof", getArrayDecoder(fixDecoderSize(getBytesDecoder(), 32))],
+    ["minAssetsOut", getU64Decoder()],
+    ["eligibility", getEligibilityDecoder()],
   ]);
 }
 
@@ -190,7 +198,8 @@ export type RequestRedeemAsyncInput<
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   shares: RequestRedeemInstructionDataArgs["shares"];
-  proof: RequestRedeemInstructionDataArgs["proof"];
+  minAssetsOut: RequestRedeemInstructionDataArgs["minAssetsOut"];
+  eligibility: RequestRedeemInstructionDataArgs["eligibility"];
 };
 
 export async function getRequestRedeemInstructionAsync<
@@ -464,7 +473,8 @@ export type RequestRedeemInput<
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
   shares: RequestRedeemInstructionDataArgs["shares"];
-  proof: RequestRedeemInstructionDataArgs["proof"];
+  minAssetsOut: RequestRedeemInstructionDataArgs["minAssetsOut"];
+  eligibility: RequestRedeemInstructionDataArgs["eligibility"];
 };
 
 export function getRequestRedeemInstruction<

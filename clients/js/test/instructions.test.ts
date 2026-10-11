@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { AccountRole, address, createNoopSigner } from '@solana/kit';
 import * as client from '../src';
-import { findReserveAddresses, getSetRolesInstruction, MUTAV_PROGRAM_ADDRESS } from '../src';
+import { findReserveAddresses, getProposeRoleInstruction, MUTAV_PROGRAM_ADDRESS } from '../src';
 import { hex, unhex, vectors } from './vectors';
 
 /** Decoded instruction data in the vectors' JSON form. */
@@ -46,18 +46,18 @@ describe('instruction data matches the program encoding', () => {
 });
 
 describe('instruction builders compose without signing', () => {
-  test('setRoles: admin is a signer, accounts resolved, data encoded', async () => {
+  test('proposeRole: admin is a signer, accounts resolved, data encoded', async () => {
     const mint = address(vectors.pdas.inputs.reserveMint);
     const { config, eventAuthority } = await findReserveAddresses(mint);
     const admin = createNoopSigner(address('11111111111111111111111111111112'));
-    const v = vectors.instructions.find((x: any) => x.name === 'setRoles');
-    const ix = getSetRolesInstruction({
+    const v = vectors.instructions.find((x: any) => x.name === 'proposeRole');
+    const ix = getProposeRoleInstruction({
       admin,
       config,
       eventAuthority,
       program: MUTAV_PROGRAM_ADDRESS,
-      operator: address(v.args.operator),
-      pauser: address(v.args.pauser),
+      role: v.args.role,
+      key: address(v.args.key),
     });
     expect(ix.programAddress).toBe(MUTAV_PROGRAM_ADDRESS);
     expect(hex(ix.data)).toBe(v.data);

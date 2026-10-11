@@ -55,9 +55,8 @@ fn one_agency_is_bounded_only_by_free_capital() {
 fn caps_follow_set_config() {
     let mut f = Fixture::new();
     f.fund_reserve(200_000 * BRL);
-    let mut args = set_config_args(&f.config());
-    args.caps.max_cover_per_guarantee = 5_000 * BRL;
-    f.set_config(args).unwrap();
+    f.set_config(vec![mutav::ConfigParam::MaxCoverPerGuarantee(5_000 * BRL)])
+        .unwrap();
     let ag = unique_hash();
     assert_mutav_err(
         f.register(guarantee_args(ag, 5_000 * BRL + 1, 0)),

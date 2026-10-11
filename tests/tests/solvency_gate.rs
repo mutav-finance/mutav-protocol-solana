@@ -73,9 +73,11 @@ fn coverage_after_rounds_up_with_c_above_one() {
     // c = 1.5: R$30k of capital backs R$20k of cover. One more base unit
     // needs ceil(1.5 × 1) = 2 base units more coverage.
     let mut f = Fixture::new();
-    let mut args = set_config_args(&f.config());
-    args.coverage_ratio_bps = 15_000;
-    f.set_config(args).unwrap();
+    // c above 1.0 is refused by `set_config` since ADR 0022; a stored one
+    // (from an older binary) is still honoured by the gate.
+    let mut c = f.config();
+    c.coverage_ratio_bps = 15_000;
+    f.write_config(&c);
     f.fund_reserve(30_000 * BRL);
     assert_mutav_err(
         f.register(guarantee_args(unique_hash(), 20_000 * BRL + 1, 0)),
@@ -106,9 +108,10 @@ fn provisions_do_not_shrink_registration_capacity() {
 #[test]
 fn registration_at_the_coverage_floor() {
     let mut f = Fixture::new();
-    let mut args = set_config_args(&f.config());
-    args.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS;
-    f.set_config(args).unwrap();
+    f.set_config(vec![mutav::ConfigParam::CoverageRatioBps(
+        MIN_COVERAGE_RATIO_BPS,
+    )])
+    .unwrap();
     f.fund_reserve(10_000 * BRL);
     for _ in 0..3 {
         f.register(guarantee_args(unique_hash(), 30_000 * BRL, 0))
@@ -135,9 +138,10 @@ fn registration_at_the_coverage_floor() {
 #[test]
 fn provisions_bind_coverage_below_one_and_block_registration() {
     let mut f = Fixture::new();
-    let mut args = set_config_args(&f.config());
-    args.coverage_ratio_bps = MIN_COVERAGE_RATIO_BPS;
-    f.set_config(args).unwrap();
+    f.set_config(vec![mutav::ConfigParam::CoverageRatioBps(
+        MIN_COVERAGE_RATIO_BPS,
+    )])
+    .unwrap();
     f.fund_reserve(10_000 * BRL);
     let g1 = guarantee_args(unique_hash(), 30_000 * BRL, 0);
     let g2 = guarantee_args(unique_hash(), 30_000 * BRL, 0);

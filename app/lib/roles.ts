@@ -72,14 +72,23 @@ export const INSTRUCTION_ROLE = {
   // Admin (`config.admin == signer`), spec §5.1 / §5.6. `initialize` is signed by the upgrade authority.
   initialize: "admin",
   set_config: "admin",
-  set_roles: "admin",
+  // Role handover (ADR 0020): the admin proposes, cancels and sets
+  // guardians; the proposed key accepts (counted on the admin side).
+  propose_role: "admin",
+  accept_role: "admin",
+  propose_admin: "admin",
+  accept_admin: "admin",
+  cancel_pending: "admin",
+  set_guardians: "admin",
+  revoke_pauser: "admin",
   set_payments_account: "admin",
+  set_treasury_account: "admin",
   set_allowlist_root: "admin",
   clear_fulfil_halt: "admin",
   unpause: "admin",
   fulfil_deposits: "admin",
   fulfil_redeems: "admin",
-  // Pauser or admin (`is_pauser_or_admin`): the admin side, no time lock.
+  // Pauser, admin (or, for `pause`, a guardian): the admin side, no time lock.
   pause: "admin",
   revoke_operator: "admin",
   // Operator (`is_operator`), spec §5.2–5.4.
@@ -99,7 +108,7 @@ export const INSTRUCTION_ROLE = {
   claim_assets: "investor",
   // Permissionless, spec §5.8.
   refresh: "anyone",
-  advance_queue_heads: "anyone",
+  advance_queue_head: "anyone",
 } as const satisfies Record<string, Role>;
 
 export type Instruction = keyof typeof INSTRUCTION_ROLE;
@@ -107,7 +116,8 @@ export type Instruction = keyof typeof INSTRUCTION_ROLE;
 /** Instructions signed only by the pauser key or the admin (no time lock). */
 export const PAUSER_OR_ADMIN: ReadonlySet<Instruction> = new Set(["pause", "revoke_operator"]);
 
-export const roleOf = (ix: Instruction | TxKind): Role => INSTRUCTION_ROLE[ix as Instruction];
+/** `set_roles` composes `propose_role` for each changed key (ADR 0020). */
+export const roleOf = (ix: Instruction | TxKind): Role => (ix === "set_roles" ? "admin" : INSTRUCTION_ROLE[ix as Instruction]);
 
 /** The instructions each role may sign, in the order above. */
 export function instructionsBy(role: Role): Instruction[] {

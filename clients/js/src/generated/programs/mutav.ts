@@ -58,8 +58,11 @@ import {
   type VaultStateArgs,
 } from "../accounts";
 import {
-  getAdvanceQueueHeadsInstructionAsync,
+  getAcceptAdminInstruction,
+  getAcceptRoleInstruction,
+  getAdvanceQueueHeadInstructionAsync,
   getCancelDepositInstructionAsync,
+  getCancelPendingInstruction,
   getCancelRedeemInstructionAsync,
   getClaimAssetsInstructionAsync,
   getClaimSharesInstructionAsync,
@@ -72,20 +75,27 @@ import {
   getInitializeInstructionAsync,
   getPauseInstruction,
   getPayClaimInstructionAsync,
+  getProposeAdminInstruction,
+  getProposeRoleInstruction,
   getRefreshInstructionAsync,
   getRegisterGuaranteeInstructionAsync,
   getRequestDepositInstructionAsync,
   getRequestRedeemInstructionAsync,
   getRevokeOperatorInstruction,
+  getRevokePauserInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstructionAsync,
+  getSetGuardiansInstruction,
   getSetPaymentsAccountInstruction,
-  getSetRolesInstruction,
   getSettlePayoutInstructionAsync,
+  getSetTreasuryAccountInstruction,
   getSweepIncomeInstructionAsync,
   getUnpauseInstruction,
-  parseAdvanceQueueHeadsInstruction,
+  parseAcceptAdminInstruction,
+  parseAcceptRoleInstruction,
+  parseAdvanceQueueHeadInstruction,
   parseCancelDepositInstruction,
+  parseCancelPendingInstruction,
   parseCancelRedeemInstruction,
   parseClaimAssetsInstruction,
   parseClaimSharesInstruction,
@@ -98,20 +108,27 @@ import {
   parseInitializeInstruction,
   parsePauseInstruction,
   parsePayClaimInstruction,
+  parseProposeAdminInstruction,
+  parseProposeRoleInstruction,
   parseRefreshInstruction,
   parseRegisterGuaranteeInstruction,
   parseRequestDepositInstruction,
   parseRequestRedeemInstruction,
   parseRevokeOperatorInstruction,
+  parseRevokePauserInstruction,
   parseSetAllowlistRootInstruction,
   parseSetConfigInstruction,
+  parseSetGuardiansInstruction,
   parseSetPaymentsAccountInstruction,
-  parseSetRolesInstruction,
   parseSettlePayoutInstruction,
+  parseSetTreasuryAccountInstruction,
   parseSweepIncomeInstruction,
   parseUnpauseInstruction,
-  type AdvanceQueueHeadsAsyncInput,
+  type AcceptAdminInput,
+  type AcceptRoleInput,
+  type AdvanceQueueHeadAsyncInput,
   type CancelDepositAsyncInput,
+  type CancelPendingInput,
   type CancelRedeemAsyncInput,
   type ClaimAssetsAsyncInput,
   type ClaimSharesAsyncInput,
@@ -122,8 +139,11 @@ import {
   type FulfilDepositsAsyncInput,
   type FulfilRedeemsAsyncInput,
   type InitializeAsyncInput,
-  type ParsedAdvanceQueueHeadsInstruction,
+  type ParsedAcceptAdminInstruction,
+  type ParsedAcceptRoleInstruction,
+  type ParsedAdvanceQueueHeadInstruction,
   type ParsedCancelDepositInstruction,
+  type ParsedCancelPendingInstruction,
   type ParsedCancelRedeemInstruction,
   type ParsedClaimAssetsInstruction,
   type ParsedClaimSharesInstruction,
@@ -136,30 +156,38 @@ import {
   type ParsedInitializeInstruction,
   type ParsedPauseInstruction,
   type ParsedPayClaimInstruction,
+  type ParsedProposeAdminInstruction,
+  type ParsedProposeRoleInstruction,
   type ParsedRefreshInstruction,
   type ParsedRegisterGuaranteeInstruction,
   type ParsedRequestDepositInstruction,
   type ParsedRequestRedeemInstruction,
   type ParsedRevokeOperatorInstruction,
+  type ParsedRevokePauserInstruction,
   type ParsedSetAllowlistRootInstruction,
   type ParsedSetConfigInstruction,
+  type ParsedSetGuardiansInstruction,
   type ParsedSetPaymentsAccountInstruction,
-  type ParsedSetRolesInstruction,
   type ParsedSettlePayoutInstruction,
+  type ParsedSetTreasuryAccountInstruction,
   type ParsedSweepIncomeInstruction,
   type ParsedUnpauseInstruction,
   type PauseInput,
   type PayClaimAsyncInput,
+  type ProposeAdminInput,
+  type ProposeRoleInput,
   type RefreshAsyncInput,
   type RegisterGuaranteeAsyncInput,
   type RequestDepositAsyncInput,
   type RequestRedeemAsyncInput,
   type RevokeOperatorInput,
+  type RevokePauserInput,
   type SetAllowlistRootInput,
   type SetConfigAsyncInput,
+  type SetGuardiansInput,
   type SetPaymentsAccountInput,
-  type SetRolesInput,
   type SettlePayoutAsyncInput,
+  type SetTreasuryAccountInput,
   type SweepIncomeAsyncInput,
   type UnpauseInput,
 } from "../instructions";
@@ -175,6 +203,7 @@ import {
   findReservePda,
   findShareMintPda,
   findStatePda,
+  findUnsolicitedPda,
   findVaultAuthorityPda,
 } from "../pdas";
 
@@ -285,16 +314,21 @@ export enum MutavEvent {
   ClaimPaid,
   ConfigUpdated,
   DepositCancelled,
+  DepositFilled,
   DepositRequested,
   DepositsFulfilled,
   FeesContributed,
   FulfilHaltCleared,
+  FulfilHaltRaised,
   GuaranteeClosed,
   GuaranteeRegistered,
+  GuardiansUpdated,
+  HandoverCancelled,
   IncomeSwept,
   ModeChanged,
   OperatorRevoked,
   Paused,
+  PauserRevoked,
   PaymentsAccountUpdated,
   PayoutSettled,
   QueueHeadsAdvanced,
@@ -303,9 +337,11 @@ export enum MutavEvent {
   RedeemRequested,
   RedeemsFulfilled,
   ReserveFrozenDetected,
-  RolesUpdated,
+  RoleAccepted,
+  RoleProposed,
   SharesClaimed,
   StateRefreshed,
+  TreasuryAccountUpdated,
   Unpaused,
   VaultInitialized,
 }
@@ -384,6 +420,17 @@ export function identifyMutavEvent(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([186, 88, 178, 222, 52, 49, 139, 226]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.DepositFilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([35, 33, 229, 138, 116, 238, 192, 22]),
       ),
       0,
@@ -428,6 +475,17 @@ export function identifyMutavEvent(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([39, 74, 36, 179, 203, 54, 152, 119]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.FulfilHaltRaised;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([138, 189, 159, 88, 255, 202, 106, 95]),
       ),
       0,
@@ -445,6 +503,28 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.GuaranteeRegistered;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([95, 227, 219, 160, 108, 60, 210, 101]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.GuardiansUpdated;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([191, 4, 170, 231, 21, 161, 162, 239]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.HandoverCancelled;
   }
   if (
     containsBytes(
@@ -489,6 +569,17 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.Paused;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([16, 59, 14, 82, 120, 140, 215, 140]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.PauserRevoked;
   }
   if (
     containsBytes(
@@ -582,12 +673,23 @@ export function identifyMutavEvent(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([81, 37, 176, 32, 30, 204, 251, 246]),
+        new Uint8Array([130, 219, 17, 167, 202, 238, 104, 50]),
       ),
       0,
     )
   ) {
-    return MutavEvent.RolesUpdated;
+    return MutavEvent.RoleAccepted;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([168, 105, 155, 70, 211, 61, 123, 252]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RoleProposed;
   }
   if (
     containsBytes(
@@ -610,6 +712,17 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.StateRefreshed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([176, 203, 97, 129, 135, 22, 6, 11]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.TreasuryAccountUpdated;
   }
   if (
     containsBytes(
@@ -639,8 +752,11 @@ export function identifyMutavEvent(
 }
 
 export enum MutavInstruction {
-  AdvanceQueueHeads,
+  AcceptAdmin,
+  AcceptRole,
+  AdvanceQueueHead,
   CancelDeposit,
+  CancelPending,
   CancelRedeem,
   ClaimAssets,
   ClaimShares,
@@ -653,15 +769,19 @@ export enum MutavInstruction {
   Initialize,
   Pause,
   PayClaim,
+  ProposeAdmin,
+  ProposeRole,
   Refresh,
   RegisterGuarantee,
   RequestDeposit,
   RequestRedeem,
   RevokeOperator,
+  RevokePauser,
   SetAllowlistRoot,
   SetConfig,
+  SetGuardians,
   SetPaymentsAccount,
-  SetRoles,
+  SetTreasuryAccount,
   SettlePayout,
   SweepIncome,
   Unpause,
@@ -675,12 +795,34 @@ export function identifyMutavInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([111, 181, 141, 177, 121, 200, 92, 20]),
+        new Uint8Array([112, 42, 45, 90, 116, 181, 13, 170]),
       ),
       0,
     )
   ) {
-    return MutavInstruction.AdvanceQueueHeads;
+    return MutavInstruction.AcceptAdmin;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([52, 25, 7, 231, 196, 235, 119, 253]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.AcceptRole;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([253, 253, 8, 240, 172, 218, 101, 180]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.AdvanceQueueHead;
   }
   if (
     containsBytes(
@@ -692,6 +834,17 @@ export function identifyMutavInstruction(
     )
   ) {
     return MutavInstruction.CancelDeposit;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([74, 87, 109, 242, 64, 192, 151, 71]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.CancelPending;
   }
   if (
     containsBytes(
@@ -829,6 +982,28 @@ export function identifyMutavInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([121, 214, 199, 212, 87, 39, 117, 234]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ProposeAdmin;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([79, 5, 160, 90, 21, 127, 195, 5]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ProposeRole;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([170, 155, 22, 254, 147, 181, 49, 161]),
       ),
       0,
@@ -884,6 +1059,17 @@ export function identifyMutavInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([102, 31, 220, 17, 20, 144, 79, 78]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.RevokePauser;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([145, 238, 252, 173, 15, 3, 94, 23]),
       ),
       0,
@@ -906,6 +1092,17 @@ export function identifyMutavInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([166, 69, 140, 183, 157, 169, 253, 40]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.SetGuardians;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([0, 150, 170, 5, 132, 244, 20, 241]),
       ),
       0,
@@ -917,12 +1114,12 @@ export function identifyMutavInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([119, 86, 129, 161, 55, 23, 250, 12]),
+        new Uint8Array([158, 187, 115, 205, 54, 97, 189, 215]),
       ),
       0,
     )
   ) {
-    return MutavInstruction.SetRoles;
+    return MutavInstruction.SetTreasuryAccount;
   }
   if (
     containsBytes(
@@ -967,11 +1164,20 @@ export type ParsedMutavInstruction<
   TProgram extends string = "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9",
 > =
   | ({
-      instructionType: MutavInstruction.AdvanceQueueHeads;
-    } & ParsedAdvanceQueueHeadsInstruction<TProgram>)
+      instructionType: MutavInstruction.AcceptAdmin;
+    } & ParsedAcceptAdminInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.AcceptRole;
+    } & ParsedAcceptRoleInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.AdvanceQueueHead;
+    } & ParsedAdvanceQueueHeadInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.CancelDeposit;
     } & ParsedCancelDepositInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.CancelPending;
+    } & ParsedCancelPendingInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.CancelRedeem;
     } & ParsedCancelRedeemInstruction<TProgram>)
@@ -1009,6 +1215,12 @@ export type ParsedMutavInstruction<
       instructionType: MutavInstruction.PayClaim;
     } & ParsedPayClaimInstruction<TProgram>)
   | ({
+      instructionType: MutavInstruction.ProposeAdmin;
+    } & ParsedProposeAdminInstruction<TProgram>)
+  | ({
+      instructionType: MutavInstruction.ProposeRole;
+    } & ParsedProposeRoleInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.Refresh;
     } & ParsedRefreshInstruction<TProgram>)
   | ({
@@ -1024,17 +1236,23 @@ export type ParsedMutavInstruction<
       instructionType: MutavInstruction.RevokeOperator;
     } & ParsedRevokeOperatorInstruction<TProgram>)
   | ({
+      instructionType: MutavInstruction.RevokePauser;
+    } & ParsedRevokePauserInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.SetAllowlistRoot;
     } & ParsedSetAllowlistRootInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.SetConfig;
     } & ParsedSetConfigInstruction<TProgram>)
   | ({
+      instructionType: MutavInstruction.SetGuardians;
+    } & ParsedSetGuardiansInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.SetPaymentsAccount;
     } & ParsedSetPaymentsAccountInstruction<TProgram>)
   | ({
-      instructionType: MutavInstruction.SetRoles;
-    } & ParsedSetRolesInstruction<TProgram>)
+      instructionType: MutavInstruction.SetTreasuryAccount;
+    } & ParsedSetTreasuryAccountInstruction<TProgram>)
   | ({
       instructionType: MutavInstruction.SettlePayout;
     } & ParsedSettlePayoutInstruction<TProgram>)
@@ -1050,11 +1268,25 @@ export function parseMutavInstruction<TProgram extends string>(
 ): ParsedMutavInstruction<TProgram> {
   const instructionType = identifyMutavInstruction(instruction);
   switch (instructionType) {
-    case MutavInstruction.AdvanceQueueHeads: {
+    case MutavInstruction.AcceptAdmin: {
       assertIsInstructionWithAccounts(instruction);
       return {
-        instructionType: MutavInstruction.AdvanceQueueHeads,
-        ...parseAdvanceQueueHeadsInstruction(instruction),
+        instructionType: MutavInstruction.AcceptAdmin,
+        ...parseAcceptAdminInstruction(instruction),
+      };
+    }
+    case MutavInstruction.AcceptRole: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.AcceptRole,
+        ...parseAcceptRoleInstruction(instruction),
+      };
+    }
+    case MutavInstruction.AdvanceQueueHead: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.AdvanceQueueHead,
+        ...parseAdvanceQueueHeadInstruction(instruction),
       };
     }
     case MutavInstruction.CancelDeposit: {
@@ -1062,6 +1294,13 @@ export function parseMutavInstruction<TProgram extends string>(
       return {
         instructionType: MutavInstruction.CancelDeposit,
         ...parseCancelDepositInstruction(instruction),
+      };
+    }
+    case MutavInstruction.CancelPending: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.CancelPending,
+        ...parseCancelPendingInstruction(instruction),
       };
     }
     case MutavInstruction.CancelRedeem: {
@@ -1148,6 +1387,20 @@ export function parseMutavInstruction<TProgram extends string>(
         ...parsePayClaimInstruction(instruction),
       };
     }
+    case MutavInstruction.ProposeAdmin: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ProposeAdmin,
+        ...parseProposeAdminInstruction(instruction),
+      };
+    }
+    case MutavInstruction.ProposeRole: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ProposeRole,
+        ...parseProposeRoleInstruction(instruction),
+      };
+    }
     case MutavInstruction.Refresh: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1183,6 +1436,13 @@ export function parseMutavInstruction<TProgram extends string>(
         ...parseRevokeOperatorInstruction(instruction),
       };
     }
+    case MutavInstruction.RevokePauser: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.RevokePauser,
+        ...parseRevokePauserInstruction(instruction),
+      };
+    }
     case MutavInstruction.SetAllowlistRoot: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1197,6 +1457,13 @@ export function parseMutavInstruction<TProgram extends string>(
         ...parseSetConfigInstruction(instruction),
       };
     }
+    case MutavInstruction.SetGuardians: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.SetGuardians,
+        ...parseSetGuardiansInstruction(instruction),
+      };
+    }
     case MutavInstruction.SetPaymentsAccount: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1204,11 +1471,11 @@ export function parseMutavInstruction<TProgram extends string>(
         ...parseSetPaymentsAccountInstruction(instruction),
       };
     }
-    case MutavInstruction.SetRoles: {
+    case MutavInstruction.SetTreasuryAccount: {
       assertIsInstructionWithAccounts(instruction);
       return {
-        instructionType: MutavInstruction.SetRoles,
-        ...parseSetRolesInstruction(instruction),
+        instructionType: MutavInstruction.SetTreasuryAccount,
+        ...parseSetTreasuryAccountInstruction(instruction),
       };
     }
     case MutavInstruction.SettlePayout: {
@@ -1267,13 +1534,23 @@ export type MutavPluginAccounts = {
 };
 
 export type MutavPluginInstructions = {
-  advanceQueueHeads: (
-    input: AdvanceQueueHeadsAsyncInput,
-  ) => ReturnType<typeof getAdvanceQueueHeadsInstructionAsync> &
+  acceptAdmin: (
+    input: AcceptAdminInput,
+  ) => ReturnType<typeof getAcceptAdminInstruction> & SelfPlanAndSendFunctions;
+  acceptRole: (
+    input: AcceptRoleInput,
+  ) => ReturnType<typeof getAcceptRoleInstruction> & SelfPlanAndSendFunctions;
+  advanceQueueHead: (
+    input: AdvanceQueueHeadAsyncInput,
+  ) => ReturnType<typeof getAdvanceQueueHeadInstructionAsync> &
     SelfPlanAndSendFunctions;
   cancelDeposit: (
     input: CancelDepositAsyncInput,
   ) => ReturnType<typeof getCancelDepositInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  cancelPending: (
+    input: CancelPendingInput,
+  ) => ReturnType<typeof getCancelPendingInstruction> &
     SelfPlanAndSendFunctions;
   cancelRedeem: (
     input: CancelRedeemAsyncInput,
@@ -1322,6 +1599,12 @@ export type MutavPluginInstructions = {
     input: PayClaimAsyncInput,
   ) => ReturnType<typeof getPayClaimInstructionAsync> &
     SelfPlanAndSendFunctions;
+  proposeAdmin: (
+    input: ProposeAdminInput,
+  ) => ReturnType<typeof getProposeAdminInstruction> & SelfPlanAndSendFunctions;
+  proposeRole: (
+    input: ProposeRoleInput,
+  ) => ReturnType<typeof getProposeRoleInstruction> & SelfPlanAndSendFunctions;
   refresh: (
     input: RefreshAsyncInput,
   ) => ReturnType<typeof getRefreshInstructionAsync> & SelfPlanAndSendFunctions;
@@ -1341,6 +1624,9 @@ export type MutavPluginInstructions = {
     input: RevokeOperatorInput,
   ) => ReturnType<typeof getRevokeOperatorInstruction> &
     SelfPlanAndSendFunctions;
+  revokePauser: (
+    input: RevokePauserInput,
+  ) => ReturnType<typeof getRevokePauserInstruction> & SelfPlanAndSendFunctions;
   setAllowlistRoot: (
     input: SetAllowlistRootInput,
   ) => ReturnType<typeof getSetAllowlistRootInstruction> &
@@ -1349,13 +1635,17 @@ export type MutavPluginInstructions = {
     input: SetConfigAsyncInput,
   ) => ReturnType<typeof getSetConfigInstructionAsync> &
     SelfPlanAndSendFunctions;
+  setGuardians: (
+    input: SetGuardiansInput,
+  ) => ReturnType<typeof getSetGuardiansInstruction> & SelfPlanAndSendFunctions;
   setPaymentsAccount: (
     input: SetPaymentsAccountInput,
   ) => ReturnType<typeof getSetPaymentsAccountInstruction> &
     SelfPlanAndSendFunctions;
-  setRoles: (
-    input: SetRolesInput,
-  ) => ReturnType<typeof getSetRolesInstruction> & SelfPlanAndSendFunctions;
+  setTreasuryAccount: (
+    input: SetTreasuryAccountInput,
+  ) => ReturnType<typeof getSetTreasuryAccountInstruction> &
+    SelfPlanAndSendFunctions;
   settlePayout: (
     input: SettlePayoutAsyncInput,
   ) => ReturnType<typeof getSettlePayoutInstructionAsync> &
@@ -1371,16 +1661,17 @@ export type MutavPluginInstructions = {
 
 export type MutavPluginPdas = {
   state: typeof findStatePda;
+  config: typeof findConfigPda;
   pendingDeposits: typeof findPendingDepositsPda;
   vaultAuthority: typeof findVaultAuthorityPda;
   pendingRedemptions: typeof findPendingRedemptionsPda;
   claims: typeof findClaimsPda;
+  reserve: typeof findReservePda;
   guarantee: typeof findGuaranteePda;
   feeReceipt: typeof findFeeReceiptPda;
-  reserve: typeof findReservePda;
   claimFiling: typeof findClaimFilingPda;
-  config: typeof findConfigPda;
   shareMint: typeof findShareMintPda;
+  unsolicited: typeof findUnsolicitedPda;
   incomeReceipt: typeof findIncomeReceiptPda;
 };
 
@@ -1410,15 +1701,30 @@ export function mutavProgram() {
           vaultState: addSelfFetchFunctions(client, getVaultStateCodec()),
         },
         instructions: {
-          advanceQueueHeads: (input) =>
+          acceptAdmin: (input) =>
             addSelfPlanAndSendFunctions(
               client,
-              getAdvanceQueueHeadsInstructionAsync(input),
+              getAcceptAdminInstruction(input),
+            ),
+          acceptRole: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAcceptRoleInstruction(input),
+            ),
+          advanceQueueHead: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAdvanceQueueHeadInstructionAsync(input),
             ),
           cancelDeposit: (input) =>
             addSelfPlanAndSendFunctions(
               client,
               getCancelDepositInstructionAsync(input),
+            ),
+          cancelPending: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCancelPendingInstruction(input),
             ),
           cancelRedeem: (input) =>
             addSelfPlanAndSendFunctions(
@@ -1486,6 +1792,16 @@ export function mutavProgram() {
               client,
               getPayClaimInstructionAsync(input),
             ),
+          proposeAdmin: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getProposeAdminInstruction(input),
+            ),
+          proposeRole: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getProposeRoleInstruction(input),
+            ),
           refresh: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1514,6 +1830,11 @@ export function mutavProgram() {
               client,
               getRevokeOperatorInstruction(input),
             ),
+          revokePauser: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRevokePauserInstruction(input),
+            ),
           setAllowlistRoot: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1524,13 +1845,21 @@ export function mutavProgram() {
               client,
               getSetConfigInstructionAsync(input),
             ),
+          setGuardians: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetGuardiansInstruction(input),
+            ),
           setPaymentsAccount: (input) =>
             addSelfPlanAndSendFunctions(
               client,
               getSetPaymentsAccountInstruction(input),
             ),
-          setRoles: (input) =>
-            addSelfPlanAndSendFunctions(client, getSetRolesInstruction(input)),
+          setTreasuryAccount: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetTreasuryAccountInstruction(input),
+            ),
           settlePayout: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1549,16 +1878,17 @@ export function mutavProgram() {
         },
         pdas: {
           state: findStatePda,
+          config: findConfigPda,
           pendingDeposits: findPendingDepositsPda,
           vaultAuthority: findVaultAuthorityPda,
           pendingRedemptions: findPendingRedemptionsPda,
           claims: findClaimsPda,
+          reserve: findReservePda,
           guarantee: findGuaranteePda,
           feeReceipt: findFeeReceiptPda,
-          reserve: findReservePda,
           claimFiling: findClaimFilingPda,
-          config: findConfigPda,
           shareMint: findShareMintPda,
+          unsolicited: findUnsolicitedPda,
           incomeReceipt: findIncomeReceiptPda,
         },
         identifyAccount: identifyMutavAccount,
