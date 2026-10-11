@@ -7,8 +7,9 @@ import {
   getProposeRoleInstructionDataDecoder,
   type VaultConfig,
 } from '../../clients/js/src';
-import { composeAcceptRole, composeProposeRoles, composeSetCaps, ROLE_ADMIN, ROLE_OPERATOR, ROLE_PAUSER } from '../devnet/lib/compose';
+import { composeAcceptRole, composeProposeRoles, composeRoleChanges, composeSetCaps, ROLE_ADMIN, ROLE_OPERATOR, ROLE_PAUSER } from '../devnet/lib/compose';
 import { parseConfig } from '../devnet/lib/config';
+import { rolesTitle } from '../devnet/roles';
 import { filled, testAddress } from './fixtures';
 
 const DEFAULT = address('11111111111111111111111111111111');
@@ -93,9 +94,21 @@ describe('composeProposeRoles: stray pending handovers', () => {
     expect(kinds(await composeProposeRoles(cfg, c, admin, NOW))).toEqual([`cancel:${ROLE_OPERATOR}`, `cancel:${ROLE_PAUSER}`]);
   });
 
-  test('a pending admin the config does not name is cancelled', async () => {
-    const c = matching({ pendingAdmin: testAddress(213), pendingAdminExpiresAt: NOW + 10n });
-    expect(kinds(await composeProposeRoles(cfg, c, admin, NOW))).toEqual([`cancel:${ROLE_ADMIN}`]);
+  test('a pending admin the config does not name is refused without --cancel-admin (live or expired)', async () => {
+    const live = matching({ pendingAdmin: testAddress(213), pendingAdminExpiresAt: NOW + 10n });
+    await expect(composeProposeRoles(cfg, live, admin, NOW)).rejects.toThrow('--cancel-admin');
+    await expect(composeProposeRoles(cfg, live, admin, NOW)).rejects.toThrow('in flight');
+    const expired = matching({ pendingAdmin: testAddress(213), pendingAdminExpiresAt: NOW - 10n });
+    await expect(composeProposeRoles(cfg, expired, admin, NOW)).rejects.toThrow('expired');
+  });
+
+  test('with cancelAdmin the pending admin is cancelled and named', async () => {
+    const c = matching({ pendingAdmin: testAddress(213), pendingAdminExpiresAt: NOW + 10n, pendingPauser: testAddress(212) });
+    const r = await composeRoleChanges(cfg, c, admin, NOW, { cancelAdmin: true });
+    expect(kinds(r.instructions)).toEqual([`cancel:${ROLE_PAUSER}`, `cancel:${ROLE_ADMIN}`]);
+    expect(r.cancelled).toEqual(['pauser', 'admin']);
+    expect(rolesTitle(cfg, r.cancelled)).toContain('cancel_pending: pauser, admin');
+    expect(rolesTitle(cfg, [])).not.toContain('cancel_pending');
   });
 
   test('a pending admin the config names as nextAdmin is kept', async () => {

@@ -124,41 +124,71 @@ const DEFAULT_ADDRESS = address('11111111111111111111111111111111');
  *   first, since `propose_role` refuses while one waits.
  * - When the key already matches, any pending handover of that role (live
  *   or expired) is one the file does not ask for: `cancel_pending(role)`.
- * - A pending admin handover is cancelled (`cancel_pending(ROLE_ADMIN)`)
- *   unless the file names that key as `nextAdmin`. A chain admin other than
- *   the file's is refused: the admin moves only by `propose_admin` /
- *   `accept_admin`.
+ * - A pending admin handover the file does not name as `nextAdmin` is never
+ *   cancelled silently: it is refused unless `cancelAdmin` (roles.ts
+ *   `--cancel-admin`) is set, then `cancel_pending(ROLE_ADMIN)`. A chain
+ *   admin other than the file's is refused: the admin moves only by
+ *   `propose_admin` / `accept_admin`.
+ *
+ * `cancelled` names every role a `cancel_pending` is emitted for.
  */
-export async function composeProposeRoles(
+export type RoleCancel = 'operator' | 'pauser' | 'admin';
+
+export async function composeRoleChanges(
   cfg: DeployConfig,
   current: VaultConfig,
   admin: TransactionSigner,
   nowSecs: bigint = BigInt(Math.floor(Date.now() / 1000)),
-): Promise<Instruction[]> {
+  o: { cancelAdmin?: boolean } = {},
+): Promise<{ instructions: Instruction[]; cancelled: RoleCancel[] }> {
   if (current.admin !== cfg.admin) {
     throw new Error(`the chain admin is ${current.admin}, the config says ${cfg.admin}; the admin moves only through propose_admin / accept_admin`);
   }
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
   const base = { admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId };
-  const cancel = (role: number) => getCancelPendingInstruction({ ...base, role }, opts(cfg));
   const out: Instruction[] = [];
+  const cancelled: RoleCancel[] = [];
+  const cancel = (role: number, name: RoleCancel) => {
+    cancelled.push(name);
+    return getCancelPendingInstruction({ ...base, role }, opts(cfg));
+  };
   for (const [role, name, key, now, pending, expiresAt] of [
     [ROLE_OPERATOR, 'operator', cfg.operator, current.operator, current.pendingOperator, current.pendingOperatorExpiresAt],
     [ROLE_PAUSER, 'pauser', cfg.pauser, current.pauser, current.pendingPauser, current.pendingPauserExpiresAt],
   ] as const) {
     if (key === now) {
-      if (pending !== DEFAULT_ADDRESS) out.push(cancel(role));
+      if (pending !== DEFAULT_ADDRESS) out.push(cancel(role, name));
       continue;
     }
     const live = pending !== DEFAULT_ADDRESS && nowSecs <= expiresAt;
     if (live && pending === key) {
       throw new Error(`${name} ${key} is already proposed, awaiting accept_role (expires at ${expiresAt})`);
     }
-    if (live) out.push(cancel(role));
+    if (live) out.push(cancel(role, name));
     out.push(getProposeRoleInstruction({ ...base, role, key }, opts(cfg)));
   }
-  if (current.pendingAdmin !== DEFAULT_ADDRESS && current.pendingAdmin !== cfg.nextAdmin) out.push(cancel(ROLE_ADMIN));
-  return out;
+  if (current.pendingAdmin !== DEFAULT_ADDRESS && current.pendingAdmin !== cfg.nextAdmin) {
+    if (!o.cancelAdmin) {
+      const state = nowSecs <= current.pendingAdminExpiresAt ? `in flight until ${current.pendingAdminExpiresAt}` : 'expired';
+      throw new Error(
+        `an admin handover to ${current.pendingAdmin} is pending (${state}) and the config names no nextAdmin: ` +
+          'set nextAdmin to keep it, or pass --cancel-admin to cancel it in this proposal',
+      );
+    }
+    out.push(cancel(ROLE_ADMIN, 'admin'));
+  }
+  return { instructions: out, cancelled };
+}
+
+/** The instructions of `composeRoleChanges`. */
+export async function composeProposeRoles(
+  cfg: DeployConfig,
+  current: VaultConfig,
+  admin: TransactionSigner,
+  nowSecs?: bigint,
+  o: { cancelAdmin?: boolean } = {},
+): Promise<Instruction[]> {
+  return (await composeRoleChanges(cfg, current, admin, nowSecs, o)).instructions;
 }
 
 /** `accept_role(role)`, signed by the proposed key. */
