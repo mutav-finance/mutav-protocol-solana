@@ -2,6 +2,7 @@
 
 use anchor_lang::prelude::*;
 
+use crate::constants::CONFIG_SEED;
 use crate::{
     constants::field,
     errors::MutavError,
@@ -16,6 +17,8 @@ pub struct SetAllowlistRoot<'info> {
 
     #[account(
         mut,
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
         constraint = config.is_supported() @ MutavError::UnsupportedVersion,
         constraint = config.admin == admin.key() @ MutavError::Unauthorized,
     )]
