@@ -430,6 +430,48 @@ impl Fixture {
         )
     }
 
+    /// `approve_claim` of `c.notice` for `amount` at revision 0 (ADR 0021).
+    pub fn approve_claim_ix(&self, signer: &Pubkey, c: Claim, amount: u64) -> Instruction {
+        self.approve_claim_rev_ix(signer, c, amount, 0)
+    }
+
+    /// `approve_claim` of `c.notice` for `amount` at `expected_revision`.
+    pub fn approve_claim_rev_ix(
+        &self,
+        signer: &Pubkey,
+        c: Claim,
+        amount: u64,
+        expected_revision: u16,
+    ) -> Instruction {
+        let config = self.pdas.config;
+        let guarantee = guarantee_pda(&config, &c.id);
+        Instruction::new_with_bytes(
+            mutav::ID,
+            &mutav::instruction::ApproveClaim {
+                notice_ref_hash: c.notice,
+                amount,
+                expected_revision,
+            }
+            .data(),
+            mutav::accounts::ApproveClaim {
+                admin: *signer,
+                config,
+                guarantee,
+                claim_filing: claim_pda(&guarantee, &c.notice),
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    /// `approve_claim` of `c` for `c.amount`, signed by the admin.
+    pub fn approve_claim(&mut self, c: Claim) -> TransactionResult {
+        let admin = self.admin.insecure_clone();
+        let ix = self.approve_claim_ix(&admin.pubkey(), c, c.amount);
+        self.send(ix, &admin)
+    }
+
     /// `file_claim` signed by the operator.
     pub fn file_claim(&mut self, c: Claim) -> TransactionResult {
         let op = self.operator.insecure_clone();
@@ -505,6 +547,11 @@ impl Fixture {
                 "file_claim",
                 self.file_claim_ix(&op.pubkey(), claim),
                 op.insecure_clone(),
+            ),
+            (
+                "approve_claim",
+                self.approve_claim_ix(&self.admin.pubkey(), claim, claim.amount),
+                self.admin.insecure_clone(),
             ),
             (
                 "pay_claim",

@@ -145,6 +145,31 @@ macro_rules! claim_filing_fields {
     };
 }
 
+/// The current `ClaimFiling`: v1 with `revision` carved from the front of
+/// `_reserved` (ADR 0021 decision 8).
+macro_rules! claim_filing_current_fields {
+    ($t:ty) => {
+        $crate::spans!($t;
+            "version" => version,
+            "bump" => bump,
+            "guarantee" => guarantee,
+            "leg" => leg,
+            "notice_ref_hash" => notice_ref_hash,
+            "provision" => provision,
+            "filed_at" => filed_at,
+            "status" => status,
+            "paid_amount" => paid_amount,
+            "paid_at" => paid_at,
+            "payments_account" => payments_account,
+            "pix_e2e_hash" => pix_e2e_hash,
+            "settled_at" => settled_at,
+            "approved_amount" => approved_amount,
+            "revision" => revision,
+            "_reserved" => _reserved,
+        )
+    };
+}
+
 macro_rules! income_receipt_fields {
     ($t:ty) => {
         $crate::spans!($t;

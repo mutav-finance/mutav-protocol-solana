@@ -66,7 +66,9 @@ fn file_claim_books_the_provision() {
         (x.notice_ref_hash, x.provision, x.filed_at),
         (c.notice, 6_000 * BRL, 1_760_000_000)
     );
-    assert_eq!(x._reserved, [0; 192]);
+    assert_eq!(x._reserved, [0; 190]);
+    // The first version of the filing (ADR 0021 decision 8).
+    assert_eq!((x.revision, x.approved_amount), (0, 0));
 
     let gg = f.guarantee(&g.id);
     assert_eq!(
@@ -261,7 +263,7 @@ fn pay_claim_pays_the_payments_account_and_releases_the_provision() {
         (1_770_000_000, 0, [0; 32])
     );
     assert_eq!((p.provision, p.approved_amount), (5_000 * BRL, 0));
-    assert_eq!(p._reserved, [0; 192]);
+    assert_eq!(p._reserved, [0; 190]);
 
     let ev = events::<ClaimPaid>(&meta);
     assert_eq!(ev.len(), 1);
@@ -399,9 +401,9 @@ fn pay_claim_only_to_the_payments_account() {
 #[test]
 fn pay_claim_per_call_cap_at_the_boundary() {
     // Test caps: R$10k per call. Above it only an approval of the exact
-    // amount lets the reserve pay (ADR 0021); `approve_claim` comes later, so
-    // the approval is injected here. Until then such claims are paid
-    // bank-first.
+    // amount lets the reserve pay (ADR 0021). The approval is injected here
+    // to test `pay_claim`'s check on its own: `approve_claim` refuses any
+    // amount but the provision (`approve_claim.rs`).
     let (mut f, g) = book(40_000 * BRL, 30_000 * BRL, 0);
     // The admin raises the period cap so the window does not bind here.
     f.set_config(vec![mutav::ConfigParam::MaxClaimPerPeriod(30_000 * BRL)])
@@ -829,17 +831,17 @@ fn claim_padding_is_preserved_in_place() {
     let c = Claim::on(&g, BRL);
     f.file_claim(c).unwrap();
     let mut x = f.claim_filing(&c);
-    x._reserved = [0x3c; 192];
+    x._reserved = [0x3c; 190];
     f.write_claim_filing(&c, &x);
     let mut gg = f.guarantee(&g.id);
     gg._reserved = [0xc3; 203];
     f.write_guarantee(&gg);
     f.pay_claim(c).unwrap();
-    assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 192]);
+    assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 190]);
     assert_eq!(f.guarantee(&g.id)._reserved, [0xc3; 203]);
     let mut p = f.payout(&c);
-    p._reserved = [0x77; 192];
+    p._reserved = [0x77; 190];
     f.write_claim_filing(&c, &p);
     f.settle_payout(c, unique_hash()).unwrap();
-    assert_eq!(f.payout(&c)._reserved, [0x77; 192]);
+    assert_eq!(f.payout(&c)._reserved, [0x77; 190]);
 }

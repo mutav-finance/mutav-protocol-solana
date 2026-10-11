@@ -3,10 +3,10 @@
 //! **Never coverage-gated, no mode check, not paused** (spec §1 principle 4).
 //!
 //! Above `max_claim_per_call` the filing needs the reserve admin's approval
-//! of that exact amount (`ClaimFiling.approved_amount`, written by
-//! `approve_claim`, a later upgrade). Until `approve_claim` ships, such a
-//! claim is paid bank-first by MUTAV and stays filed; the reserve reimburses
-//! `payments_account` once the approval exists (ADR 0021).
+//! of that exact amount (`ClaimFiling.approved_amount`, written by the admin's
+//! `approve_claim`). MUTAV may still pay such a claim bank-first while the
+//! approval waits for the admin time lock; the reserve then reimburses
+//! `payments_account` (ADR 0021).
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
