@@ -14,8 +14,8 @@ import { Explorer } from "@/components/Explorer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { previewRegisterGuarantee, REFUSAL_TEXT } from "@/lib/gate";
 import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, parseHundredths } from "@/lib/format";
-import { agencyIdFor } from "@/lib/client/agency-ids";
-import { randomRef, REF } from "@/lib/refs";
+import { agencyIdFor, refsSaltFor } from "@/lib/client/operator-refs";
+import { REF } from "@/lib/refs";
 import { bytesToHex } from "@/lib/serde";
 import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE } from "@/lib/view";
 import { Action, Field, Grid, Note, RoleWarning, TextField, useLive } from "./shared";
@@ -131,9 +131,9 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
     return {
       kind: "register_guarantee" as const,
       id: await REF.guaranteeId(lease.trim()),
-      // Opaque random id the operator keeps per agency; salted refs hash.
+      // Opaque random id per agency and a refs-hash salt per lease, both kept by the operator.
       agencyId: agencyIdFor(agency.trim()),
-      refsHash: await REF.refsHash(lease.trim(), randomRef()),
+      refsHash: await REF.refsHash(lease.trim(), refsSaltFor(lease.trim())),
       defaultCover,
       exitCover,
     };
