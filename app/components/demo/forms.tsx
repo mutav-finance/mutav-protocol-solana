@@ -295,7 +295,7 @@ export function FileClaimForm({ p = "" }: { p?: string }) {
         <TextField id={`${p}fc-amt`} label="Claim amount (BRS)" value={amount} onChange={setAmount} numeric />
         <TextField id={`${p}fc-notice`} label="Notice reference" value={notice} onChange={setNotice} hint="one filing and one payment per notice" />
       </Grid>
-      <Note>Filing books a provision: NAV drops immediately, before any money moves. Not solvency-gated.</Note>
+      <Note>Filing books a provision: NAV drops immediately, before any money moves. Not gated by required coverage.</Note>
       <RoleWarning need="operator" />
       <Action
         label="file_claim"
@@ -369,7 +369,7 @@ export function BlockedPreview() {
     <PreviewBox ok={reg.fits && red.stoppedBy === null} title={reserve.state.mode === 0 && !reserve.solvency.underCovered ? "Reserve covered: gated actions open" : "Under-covered: gated actions blocked"}>
       {kv("New guarantee (R$4,000 cover)", reg.fits ? "would be accepted" : `refused: ${reg.refusal}`, reg.fits ? "var(--color-success)" : "var(--color-error)")}
       {kv(heads.length ? "Redemption fill (queue head)" : "Redemption fill (hypothetical 1 share)", red.stoppedBy ? `refused: ${red.stoppedBy}` : "would be filled", red.stoppedBy ? "var(--color-error)" : "var(--color-success)")}
-      {kv("Claim payment", "never solvency-gated", "var(--color-success)")}
+      {kv("Claim payment", "never gated by required coverage", "var(--color-success)")}
     </PreviewBox>
   );
 }

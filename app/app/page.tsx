@@ -13,13 +13,13 @@ const STEPS: [string, string, string][] = [
   ],
   [
     "02",
-    "The reserve covers it, gated by solvency",
+    "The reserve covers it, gated by required coverage",
     "A guarantee is accepted only if its cover fits in the reserve's free capital. When it would not fit, the program refuses it. No promise is made that the reserve cannot keep.",
   ],
   [
     "03",
     "Claims are paid from the reserve, never blocked",
-    "When rent goes unpaid, the claim is filed, paid from the reserve and settled by PIX, each step timestamped on-chain. The solvency gate never stops a claim payment.",
+    "When rent goes unpaid, the claim is filed, paid from the reserve and settled by PIX, each step timestamped on-chain. Required coverage never stops a claim payment.",
   ],
 ];
 
