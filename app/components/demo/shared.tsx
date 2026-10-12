@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Building blocks shared by the guided demo and the free-form operator panel:
+ * Building blocks shared by the operator console, /admin and /capital:
  * the connected wallet's role, the "how the numbers moved" table, field
  * wrappers and the action button with its inline transaction status.
  */
@@ -32,7 +32,7 @@ export function useLive(): Live {
 
 /**
  * Optional gate over every Action below it: /operator disables actions
- * unless the connected wallet is the configured operator. /demo sets none.
+ * unless the connected wallet is the configured operator.
  */
 const GateCtx = createContext<{ locked: boolean } | null>(null);
 export const ActionGate = GateCtx.Provider;

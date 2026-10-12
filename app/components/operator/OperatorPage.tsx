@@ -16,6 +16,9 @@ import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { RefreshButton } from "@/components/RefreshButton";
 import { RoleLine, RoleTag } from "@/components/RoleTag";
+import { MetricCard } from "@/components/MetricCard";
+import { Money, MoneyProvider } from "@/components/MoneyProvider";
+import { ReserveStats } from "@/components/ReserveStats";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallet } from "@/components/WalletProvider";
@@ -23,28 +26,15 @@ import { ActionGate, LiveProvider, Note, useLive } from "@/components/demo/share
 import { CloseGuaranteeForm, FeeForm, FileClaimForm, IncomeForm, PayClaimList, RegisterForm, SettleList } from "@/components/demo/forms";
 import { usePoll } from "@/lib/client/use-poll";
 import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
+import { CLUSTER } from "@/lib/client/env";
 import { claimCap, claimCapRefusal, claimWork, DUTIES } from "@/lib/operator";
 import type { OperatorHistory } from "@/lib/server/operator";
 import { claimsTimeline, isUnpaid, type Ledger, type ReserveView } from "@/lib/view";
 
 const REVOKED = "11111111111111111111111111111111";
 
-function Framing() {
-  const block = (when: string, body: ReactNode) => (
-    <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 10 }}>
-      <p className="font-mono" style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-3)", margin: "0 0 4px" }}>{when}</p>
-      <p className="font-body" style={{ fontSize: 14, color: "var(--color-text)", margin: 0, lineHeight: 1.5 }}>{body}</p>
-    </div>
-  );
-  return (
-    <div className="grid-2" style={{ gap: 16, marginTop: 14 }}>
-      {block("Today · launch and hackathon", <>MUTAV&apos;s team operates the reserve by hand from this page, with the operator wallet. The wallet signs each instruction.</>)}
-      {block("Later", <>This moves to MUTAV&apos;s backend: the same instructions, sent automatically by mutav-app with a KMS-held operator key.</>)}
-    </div>
-  );
-}
-
-function Who({ r, history }: { r: ReserveView; history: OperatorHistory | null }) {
+/** The connected wallet against VaultConfig.operator, as a status badge. */
+function Who({ r }: { r: ReserveView }) {
   const { address } = useWallet();
   const revoked = r.config.operator === REVOKED;
   const isOperator = !!address && address === r.config.operator;
@@ -54,12 +44,19 @@ function Who({ r, history }: { r: ReserveView; history: OperatorHistory | null }
       ? { color: "var(--color-success)", label: "CONNECTED AS OPERATOR · ACTIONS ENABLED" }
       : { color: "var(--color-copper)", label: address ? "READ-ONLY · THIS WALLET IS NOT THE OPERATOR" : "READ-ONLY · NO WALLET CONNECTED" };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <StatusBadge bordered color={badge.color} label={badge.label} />
-        {!isOperator && !revoked && <span className="font-body" style={{ fontSize: 13, color: "var(--color-text-2)" }}>Connect the operator wallet to act.</span>}
-      </div>
-      <Mono dim style={{ fontSize: 12 }}>
+    <>
+      <StatusBadge bordered color={badge.color} label={badge.label} />
+      {!isOperator && !revoked && <span className="font-body text-(--color-text-2) order-last text-[13px]">Connect the operator wallet to act.</span>}
+    </>
+  );
+}
+
+/** Developer detail: the operator key and its last role handover, folded away. */
+function KeyDetails({ r, history }: { r: ReserveView; history: OperatorHistory | null }) {
+  return (
+    <details className="border-t pt-3">
+      <summary className="font-body text-(--color-text-2) hover:text-(--color-text) cursor-pointer text-xs select-none">Details</summary>
+      <Mono dim style={{ fontSize: 12, display: "block", marginTop: 8 }}>
         operator key <Explorer value={r.config.operator} />
         {" · "}
         {history === null
@@ -70,7 +67,7 @@ function Who({ r, history }: { r: ReserveView; history: OperatorHistory | null }
               ? "this RPC keeps no VaultConfig history, so the last accept_role cannot be read"
               : `no accept_role in VaultConfig's last ${history.rolesScanned} transactions`}
       </Mono>
-    </div>
+    </details>
   );
 }
 
@@ -209,9 +206,11 @@ function Limits({ r, l }: { r: ReserveView; l: Ledger }) {
   const open = rows.filter((c) => c.stage !== "settled");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <Mono style={{ fontSize: 12, color: "var(--color-text-2)" }}>
-        {work.toPay} filed, waiting for pay_claim · {work.toSettle} paid, waiting for settle_payout
-      </Mono>
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
+        <MetricCard dense label="Claims to pay" tooltip="Filed, waiting for pay_claim." value={String(work.toPay)} />
+        <MetricCard dense label="Claims to settle" tooltip="Paid, waiting for settle_payout (the PIX record)." value={String(work.toSettle)} />
+        <MetricCard dense label="Free capital" tooltip="New cover must fit in it." value={<Money brs={r.coverage.freeCapital} block />} />
+      </div>
       <div className="grid-2">
         <ClaimCapChart cap={claimCap(r.config, r.state, r.now)} />
         <div style={{ border: "1px solid var(--color-border)", background: "var(--color-surface)", padding: "14px 16px" }}>
@@ -309,25 +308,27 @@ export function OperatorPage() {
   const d = poll.data;
   const locked = !d || !address || address !== d.reserve.config.operator || d.reserve.config.operator === REVOKED;
   return (
+    <MoneyProvider>
     <Page
+      kicker={`Operator · Solana ${CLUSTER}`}
       title="Operator"
       lede={
         <>
-          <RoleTag role="operator" bordered />
-          <Framing />
+          Today, during the launch and the hackathon, MUTAV&apos;s team operates the reserve by hand from this page: the operator wallet signs each instruction. Later, mutav-app&apos;s backend sends the same instructions with a KMS-held operator key.
         </>
+      }
+      aside={
+        <div className="flex flex-wrap items-start gap-3">
+          <RoleTag role="operator" bordered />
+          <RefreshButton onConfirmed={poll.refresh} />
+        </div>
       }
     >
       {poll.error && !d && <ReadError error={poll.error} />}
       {!d && !poll.error && <p className="font-mono" style={{ fontSize: 12, color: "var(--color-text-3)" }}>Reading the chain…</p>}
       {d && (
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh: async () => { await Promise.all([poll.refresh(), history.refresh()]); } }}>
-          <div style={{ padding: "0 0 24px" }}>
-            <Who r={d.reserve} history={history.data} />
-          </div>
-          <Section id="limits" title="Limits now" kicker="Live from the chain" roles={<RoleLine items={[{ role: "admin", prefix: "caps and SLA set by" }]} />} action={<RefreshButton onConfirmed={poll.refresh} />}>
-            <Limits r={d.reserve} l={d.ledger} />
-          </Section>
+          <ReserveStats r={d.reserve} sticky badges={<Who r={d.reserve} />} />
           <Section id="console" title="Console" kicker={locked ? "Read-only" : "Operator wallet connected"} roles={<RoleLine items={[{ role: "operator", prefix: "every action signed by" }]}>The program checks the signer; the wallet signs; the app holds no key.</RoleLine>}>
             {locked && <Note tone="warn">Read-only: connect the operator wallet to act. The forms stay visible so anyone can see what the operator can do.</Note>}
             {d && address && address === d.reserve.config.pendingOperator && (
@@ -336,15 +337,16 @@ export function OperatorPage() {
               </Note>
             )}
             <Console locked={locked} />
-            <Note>
-              For the six-step story with the gate refusal, see the <Link href="/demo" className="ext-link">guided demo</Link>.
-            </Note>
+          </Section>
+          <Section id="limits" title="Limits now" kicker="Live from the chain" roles={<RoleLine items={[{ role: "admin", prefix: "caps and SLA set by" }]} />}>
+            <Limits r={d.reserve} l={d.ledger} />
           </Section>
           <Section id="duties" title="Responsibilities" kicker="Today → later">
             <Duties />
           </Section>
           <Section id="activity" title="Recent activity" kicker="Operator transactions">
             <Activity history={history.data} error={history.error} />
+            <KeyDetails r={d.reserve} history={history.data} />
           </Section>
           <Section id="safety" title="If the operator key is compromised" kicker="Safety">
             <Safety r={d.reserve} />
@@ -352,5 +354,6 @@ export function OperatorPage() {
         </LiveProvider>
       )}
     </Page>
+    </MoneyProvider>
   );
 }

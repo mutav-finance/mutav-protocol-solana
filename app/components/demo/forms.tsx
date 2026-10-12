@@ -8,18 +8,17 @@
  * the last read and labelled PREVIEW.
  */
 import { useEffect, useMemo, useState } from "react";
-import { isValidIncomePeriod, previewRedeemFulfil, takeSplit } from "@mutav-finance/mutav-protocol-solana";
+import { isValidIncomePeriod, takeSplit } from "@mutav-finance/mutav-protocol-solana";
 import { Mono } from "@/components/Mono";
 import { Button } from "@/components/ui/button";
-import { Explorer } from "@/components/Explorer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { previewRegisterGuarantee, REFUSAL_TEXT } from "@/lib/gate";
-import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, parseHundredths } from "@/lib/format";
+import { fmtBps, fmtBrs, fmtTime, parseBrs, parseHundredths } from "@/lib/format";
 import { agencyIdFor, refsSaltFor } from "@/lib/client/operator-refs";
 import { nextRef, REF } from "@/lib/refs";
 import { claimCap } from "@/lib/operator";
 import { bytesToHex } from "@/lib/serde";
-import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE, isUnpaid } from "@/lib/view";
+import { claimsTimeline, GUARANTEE_ACTIVE, isUnpaid } from "@/lib/view";
 import { Action, Field, Grid, LastAction, Note, RoleWarning, TextField, useLastAction, useLive } from "./shared";
 
 const hex = (b: ArrayLike<number>) => bytesToHex(Uint8Array.from(b));
@@ -47,73 +46,26 @@ const kv = (k: string, v: string, color?: string) => (
   </div>
 );
 
-// ── Capital (MUTAV capital wallet + admin) ──────────────────────────────────
-
-export function DepositForm({ p = "" }: { p?: string }) {
-  const [amount, setAmount] = useState("10000");
-  const assets = parseBrs(amount);
-  const { reserve } = useLive();
-  const caps = reserve.config.caps;
-  const outOfRange = assets !== null && (assets < caps.minRequest || assets > caps.maxRequest);
-  return (
-    <div>
-      <Grid>
-        <TextField id={`${p}dep-amount`} label="Deposit (BRS)" value={amount} onChange={setAmount} numeric hint={`allowed ${fmtBrs(caps.minRequest, 0)} – ${fmtBrs(caps.maxRequest, 0)} per request`} />
-      </Grid>
-      {outOfRange && <Note tone="warn">Outside the per-request limits: the program will refuse it.</Note>}
-      <RoleWarning need="capital" />
-      <Action label="request_deposit" request={assets ? { kind: "request_deposit", assets } : null} />
-    </div>
-  );
-}
-
-/** Fulfilled deposit requests still waiting for `claim_shares`. */
-export function ClaimSharesList() {
-  const { ledger } = useLive();
-  const ready = ledger.deposits.filter((d) => d.data.status === DEPOSIT_FULFILLED);
-  if (ready.length === 0) return <Note>No fulfilled deposit waiting to be claimed.</Note>;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <RoleWarning need="capital" />
-      {ready.map((d) => (
-        <div key={d.address} style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <Mono style={{ fontSize: 12 }}>seq {d.data.seq.toString()} · {fmtBrs(d.data.assets)} → {fmtShares(d.data.sharesOut)} shares</Mono>
-          <Action label="claim_shares" request={{ kind: "claim_shares", seq: d.data.seq }} variant="outline" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export function PendingDeposits() {
-  const { ledger, reserve } = useLive();
-  const pending = ledger.deposits.filter((d) => d.data.status === 0).sort((a, b) => Number(a.data.seq - b.data.seq));
-  return pending.length === 0 ? (
-    <Note>No deposit waiting in the queue.</Note>
-  ) : (
-    <ul style={{ margin: 0, padding: 0 }}>
-      {pending.map((d) => (
-        <li key={d.address} style={{ listStyle: "none" }}>
-          <Mono style={{ fontSize: 12 }}>
-            seq {d.data.seq.toString()} · {fmtBrs(d.data.assets)} from <Explorer value={d.data.owner} />
-            {d.data.seq === reserve.state.depositHead ? " · queue head" : ""}
-          </Mono>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 // ── Guarantees ──────────────────────────────────────────────────────────────
+
+/**
+ * The recording script's prefill (docs/demo): the first lease reference, the
+ * agency, the rent and both cover multiples. Every field stays editable.
+ */
+export const REGISTER_DEFAULTS = { lease: "MTV-PF-0100", agency: "Imobiliária Planalto", rent: "1500", defMult: "6", exitMult: "6" } as const;
 
 export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: (refused: boolean) => void; p?: string }) {
   const { reserve, ledger } = useLive();
   const n = ledger.guarantees.length + 1;
-  const [lease, setLease] = useState(`lease-demo-${String(n).padStart(3, "0")}`);
-  const [agency, setAgency] = useState("Imobiliária Paulista");
-  const [rent, setRent] = useState("1500");
-  const [defMult, setDefMult] = useState("3");
-  const [exitMult, setExitMult] = useState("1");
+  const [lease, setLease] = useState<string>(REGISTER_DEFAULTS.lease);
+  // Until the presenter types a reference, skip one already registered (a rehearsal), so the send never collides.
+  const [leaseTyped, setLeaseTyped] = useState(false);
+  const [agency, setAgency] = useState<string>(REGISTER_DEFAULTS.agency);
+  const [rent, setRent] = useState<string>(REGISTER_DEFAULTS.rent);
+  const [defMult, setDefMult] = useState<string>(REGISTER_DEFAULTS.defMult);
+  const [exitMult, setExitMult] = useState<string>(REGISTER_DEFAULTS.exitMult);
+  // The last confirmed registration stays on screen (status, signature, before/after) after "Register another".
+  const last = useLastAction();
   // After a confirmed send the result holds (no preview against the new state)
   // until the user edits a field or asks for the next entry; `entry` remounts
   // the Action so its result clears.
@@ -141,6 +93,20 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
   );
   useEffect(() => onRefusedPreview?.(preview ? !preview.fits : false), [preview, onRefusedPreview]);
 
+  const registered = useMemo(() => new Set(ledger.guarantees.map((g) => hex(g.data.id))), [ledger.guarantees]);
+  useEffect(() => {
+    if (leaseTyped || held) return;
+    let cancelled = false;
+    void (async () => {
+      let ref = lease;
+      for (let i = 0; i < 100 && registered.has(await REF.guaranteeId(ref.trim())); i++) ref = nextRef(ref, n);
+      if (!cancelled && ref !== lease) setLease(ref);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lease, leaseTyped, held, registered, n]);
+
   const build = async () => {
     if (!rentBase || !lease.trim()) return null;
     return {
@@ -154,17 +120,32 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
     };
   };
 
+  // The gate's plain-English refusal for the free-capital case: what the cover needs against what is free.
+  const extra = preview ? preview.coverageRequiredAfter - preview.coverageRequiredBefore : 0n;
+  const refusedTitle = (pv: NonNullable<typeof preview>) =>
+    pv.refusal === "InsufficientFreeCapital" ? `Would be refused: needs ${fmtBrs(extra)}, free capital ${fmtBrs(pv.freeCapitalBefore)}` : `Would be refused: ${pv.refusal}`;
+
   return (
     <div>
+      {!held && <LastAction last={last.last} />}
       <Grid>
-        <TextField id={`${p}reg-lease`} label="Lease reference" value={lease} onChange={edit(setLease)} hint="hashed to the guarantee id" />
+        <TextField
+          id={`${p}reg-lease`}
+          label="Lease reference"
+          value={lease}
+          onChange={(v) => {
+            setLeaseTyped(true);
+            edit(setLease)(v);
+          }}
+          hint="hashed to the guarantee id"
+        />
         <TextField id={`${p}reg-agency`} label="Agency" value={agency} onChange={edit(setAgency)} hint="mapped to an opaque random id, kept off-chain" />
         <TextField id={`${p}reg-rent`} label="Monthly rent (BRS)" value={rent} onChange={edit(setRent)} numeric />
         <TextField id={`${p}reg-def`} label="Default cover (× rent)" value={defMult} onChange={edit(setDefMult)} numeric hint={fmtBrs(defaultCover, 0)} />
         <TextField id={`${p}reg-exit`} label="Exit cover (× rent)" value={exitMult} onChange={edit(setExitMult)} numeric hint={fmtBrs(exitCover, 0)} />
       </Grid>
       {preview && !held && (
-        <PreviewBox ok={preview.fits} title={preview.fits ? "Fits: the program should accept it" : `Would be refused: ${preview.refusal}`}>
+        <PreviewBox ok={preview.fits} title={preview.fits ? "Fits: the program should accept it" : refusedTitle(preview)}>
           {!preview.fits && preview.refusal && <Note tone="error">{REFUSAL_TEXT[preview.refusal]}</Note>}
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
             {kv("New cover", fmtBrs(preview.newCover))}
@@ -183,7 +164,11 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
           variant={preview && !preview.fits ? "outline" : "default"}
           request={build}
           disabled={!rentBase || !multOk}
-          onConfirmed={() => setHeld(true)}
+          onConfirmed={(signature, before) => {
+            setHeld(true);
+            last.confirmed(`register_guarantee · ${lease.trim()}`)(signature, before);
+          }}
+          onDone={last.done}
           refusal={preview ? { gate: { needed: preview.needed, stableAssets: preview.stableAssets, newCover: preview.newCover, maxCover: reserve.config.caps.maxCoverPerGuarantee } } : undefined}
           next={
             <Button
@@ -193,7 +178,7 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
                 startNext();
               }}
             >
-              Register another
+              Register another ({nextRef(lease, n)})
             </Button>
           }
         />
@@ -334,7 +319,12 @@ export function IncomeForm({ p = "" }: { p?: string }) {
 
 export function FileClaimForm({ p = "" }: { p?: string }) {
   const { ledger } = useLive();
-  const [g, setG] = useState("");
+  const [picked, setG] = useState("");
+  // Until one is chosen: the most recently registered active guarantee (the one the script just registered).
+  const latest = ledger.guarantees
+    .filter((x) => x.data.status === GUARANTEE_ACTIVE)
+    .reduce<(typeof ledger.guarantees)[number] | null>((a, x) => (!a || x.data.registeredAt > a.data.registeredAt ? x : a), null);
+  const g = picked || latest?.address || "";
   const [leg, setLeg] = useState<"1" | "2">("1");
   const [amount, setAmount] = useState("1500");
   const [notice, setNotice] = useState(`notice-demo-${ledger.filings.length + 1}`);
@@ -446,23 +436,3 @@ export function SettleList() {
     </div>
   );
 }
-
-// ── Under-coverage previews ─────────────────────────────────────────────────
-
-export function BlockedPreview() {
-  const { reserve, ledger } = useLive();
-  const reg = previewRegisterGuarantee(reserve.config, reserve.state, { defaultCover: 3_000_000_000n, exitCover: 1_000_000_000n });
-  const heads = ledger.redeems
-    .filter((r) => r.data.status === 0)
-    .sort((a, b) => Number(a.data.seq - b.data.seq))
-    .map((r) => ({ seq: r.data.seq, shares: r.data.shares }));
-  const red = previewRedeemFulfil(reserve.config, reserve.state, heads.length ? heads : [{ seq: 0n, shares: 1_000_000n }]);
-  return (
-    <PreviewBox ok={reg.fits && red.stoppedBy === null} title={reserve.state.mode === 0 && !reserve.coverage.underCovered ? "Reserve covered: gated actions open" : "Under-covered: gated actions blocked"}>
-      {kv("New guarantee (R$4,000 cover)", reg.fits ? "would be accepted" : `refused: ${reg.refusal}`, reg.fits ? "var(--color-success)" : "var(--color-error)")}
-      {kv(heads.length ? "Redemption fill (queue head)" : "Redemption fill (hypothetical 1 share)", red.stoppedBy ? `refused: ${red.stoppedBy}` : "would be filled", red.stoppedBy ? "var(--color-error)" : "var(--color-success)")}
-      {kv("Claim payment", "never gated by required coverage", "var(--color-success)")}
-    </PreviewBox>
-  );
-}
-
