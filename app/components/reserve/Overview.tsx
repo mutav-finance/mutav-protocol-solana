@@ -9,14 +9,15 @@
  *   3. What the program enforces: the two spec promises.
  * Side column: the latest movements of the ledger, then the reserve balance
  * over time rebuilt from those movements.
- * Renders on-chain values from /api/ledger; nothing beyond sums and shares.
+ * Renders on-chain values from /api/reserve, with counts from /api/accounts
+ * once in; the side column waits on /api/history alone. Nothing beyond sums and shares.
  */
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { InfoTooltip } from "@/components/InfoTooltip";
-import { useReserve } from "@/components/reserve/ReserveShell";
+import { Needs, useReserve } from "@/components/reserve/ReserveShell";
 import { HistoryChart } from "@/components/reserve/HistoryChart";
 import { FlowDiagram } from "@/components/reserve/FlowDiagram";
 import { CapacityLine, HeroAmount, Lead, abs, fmtAgo, plural } from "@/components/reserve/sections/shared";
@@ -70,15 +71,17 @@ const H3 = ({ id, children }: { id?: string; children: ReactNode }) => (
 const Dot = ({ color, size = 6 }: { color: string; size?: number }) => <span aria-hidden="true" className="shrink-0" style={{ width: size, height: size, background: color }} />;
 
 export function Overview() {
-  const { d } = useReserve();
+  const { d, reads } = useReserve();
   const r = d.reserve;
   const flows = moneyFlows(r.state, d.ledger).rows;
+  // The hero and the capital split render from the reserve; their counts fill in with the accounts read.
+  const l = reads.accounts === "ready" ? d.ledger : null;
   return (
     <div className="flex flex-col gap-10">
       <div className="grid grid-cols-1 items-start gap-10 min-[1120px]:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-14">
-          <Hero r={r} l={d.ledger} />
-          <WhereCapitalSits r={r} l={d.ledger} />
+          <Hero r={r} l={l} />
+          <WhereCapitalSits r={r} l={l} />
           <section aria-labelledby="flow-h" className="flex flex-col gap-4">
             <h3 id="flow-h" className="font-display text-(--color-text) m-0 text-base font-bold">
               How money moves
@@ -88,8 +91,10 @@ export function Overview() {
           <Promises />
         </div>
         <aside className="flex min-w-0 flex-col gap-10">
-          <RecentActivity r={r} rows={flows} />
-          <HistoryChart rows={flows} stableAssets={r.coverage.stableAssets} now={r.now} />
+          <Needs panel="overview.activity">
+            <RecentActivity r={r} rows={flows} />
+            <HistoryChart rows={flows} stableAssets={r.coverage.stableAssets} now={r.now} />
+          </Needs>
         </aside>
       </div>
     </div>
@@ -124,7 +129,7 @@ function programLine(r: ReserveView): { text: string; fine: boolean } {
   return { text: `Stopped: new ${list} (${why.join("; ")}).${open.length ? ` Open: ${open.join(", ")}.` : ""} Claim payments are never stopped.`, fine: false };
 }
 
-function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
+function Hero({ r, l }: { r: ReserveView; l: Ledger | null }) {
   const s = r.state;
   const sol = r.coverage;
   const covered = sol.stableAssets >= sol.coverageRequired;
@@ -146,9 +151,9 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
     </>
   );
 
-  const active = coverageRows(l.guarantees).filter((g) => g.active);
-  const agencies = new Set(active.map((g) => g.agencyId)).size;
-  const awaiting = claimsTimeline(l).filter((c) => isUnpaid(c.stage)).length;
+  const active = l ? coverageRows(l.guarantees).filter((g) => g.active) : null;
+  const agencies = active ? new Set(active.map((g) => g.agencyId)).size : 0;
+  const awaiting = l ? claimsTimeline(l).filter((c) => isUnpaid(c.stage)).length : null;
 
   const kpis: { label: string; value: ReactNode; def: string; href?: string }[] = [
     { label: "Free capital", value: <Money brs={sol.freeCapital} block />, def: "Free for new guarantees and redemptions." },
@@ -156,10 +161,12 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
     {
       label: "Remaining cover",
       value: <Money brs={s.remainingCoverTotal} block />,
-      def: `Still guaranteed on ${plural(active.length, "active guarantee")} at ${plural(agencies, "agency", "agencies")}.`,
+      def: active
+        ? `Still guaranteed on ${plural(active.length, "active guarantee")} at ${plural(agencies, "agency", "agencies")}.`
+        : `Still guaranteed on ${plural(s.activeGuarantees, "active guarantee")}.`,
       href: "/reserve/coverage",
     },
-    { label: "Set aside for claims", value: <Money brs={s.provisions} block />, def: `For ${plural(awaiting, "claim")} filed, not yet paid.`, href: "/reserve/claims" },
+    { label: "Set aside for claims", value: <Money brs={s.provisions} block />, def: awaiting === null ? "For claims filed, not yet paid." : `For ${plural(awaiting, "claim")} filed, not yet paid.`, href: "/reserve/claims" },
   ];
 
   const program = programLine(r);
@@ -264,10 +271,11 @@ function Donut({ parts, axis, center, centerLabel, centerColor }: { parts: [bigi
 
 type SplitRow = { label: string; sub: string; value: bigint; color: string; outline?: boolean; negative?: boolean };
 
-function splitRows(c: CapitalSplit, filed: number): SplitRow[] {
+/** `filed` null: the claim count is still loading (the accounts read). */
+function splitRows(c: CapitalSplit, filed: number | null): SplitRow[] {
   const under = c.shortfall > 0n;
   const rows: SplitRow[] = [
-    { label: "Set aside for claims", sub: filed ? `${plural(filed, "claim")} filed, not yet paid` : "booked when a claim is filed", value: c.provisions, color: PROVISION },
+    { label: "Set aside for claims", sub: filed ? `${plural(filed, "claim")} filed, not yet paid` : filed === null && c.provisions > 0n ? "claims filed, not yet paid" : "booked when a claim is filed", value: c.provisions, color: PROVISION },
   ];
   if (!under || c.restRequired > 0n) rows.push({ label: "Required buffer", sub: "Required beyond provisions (ratio or stress floor)", value: c.restRequired, color: REST });
   rows.push({ label: "Free capital", sub: under ? "nothing free while under-covered" : "Free for new guarantees and redemptions.", value: c.freeCapital, color: FREE });
@@ -275,14 +283,14 @@ function splitRows(c: CapitalSplit, filed: number): SplitRow[] {
   return rows;
 }
 
-function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
+function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger | null }) {
   const c = capitalSplit(r.coverage, r.state.provisions);
   const under = c.shortfall > 0n;
-  const filed = claimsTimeline(l).filter((x) => isUnpaid(x.stage)).length;
+  const filed = l ? claimsTimeline(l).filter((x) => isUnpaid(x.stage)).length : null;
   const rows = splitRows(c, filed);
   const committed = c.provisions + c.restRequired;
 
-  const pending = capitalQueue(r.state, l).deposits.reduce((s, x) => s + x.waiting, 0n);
+  const pending = l ? capitalQueue(r.state, l).deposits.reduce((s, x) => s + x.waiting, 0n) : r.state.pendingDepositsTotal;
   const outside = [pending > 0n && `${fmtBrs(pending)} deposits in line`, r.incomeInbox.amount > 0n && `${fmtBrs(r.incomeInbox.amount)} issuer income to sweep in`].filter(Boolean);
 
   const head = under

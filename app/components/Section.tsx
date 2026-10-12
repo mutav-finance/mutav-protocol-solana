@@ -98,3 +98,20 @@ export function ReadError({ error, onRetry }: { error: Error & { notConfigured?:
     </div>
   );
 }
+
+/**
+ * A panel waiting on a read the rest of the page does not need (e.g. the
+ * history behind an activity feed): a small state inside the panel, in the
+ * ReadError styles. Loading says what is coming; busy and failed reads show
+ * ReadError (busy retries on its own; a failure offers Retry).
+ */
+export function ReadPending({ status, label, error, onRetry }: { status: "loading" | "busy" | "error"; label: string; error?: (Error & { notConfigured?: boolean; busy?: boolean }) | null; onRetry?: () => void }) {
+  if (status === "error" && error) return <ReadError error={error} onRetry={onRetry} />;
+  return (
+    <div role="status" aria-busy={status === "loading"} style={{ border: "1px solid var(--color-border)", padding: "14px 16px", background: "var(--color-surface)" }}>
+      <p className="font-mono" style={{ fontSize: 12, color: "var(--color-text-2)", margin: 0 }}>
+        {status === "busy" ? "Chain busy, retrying…" : label}
+      </p>
+    </div>
+  );
+}

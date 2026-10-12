@@ -1,30 +1,76 @@
 "use client";
 
 /**
- * The /reserve platform shell: one read of /api/ledger shared by every tab.
+ * The /reserve platform shell: three reads shared by every tab, cheapest
+ * first (lib/client/reserve-reads.ts). The page renders once /api/reserve is
+ * in; panels that need /api/accounts or /api/history wait for them inside
+ * the panel (`<Needs>`), so the heavy history read never blanks a page.
  * Page header (kicker, title, the live line and the ? that opens "How to read
  * this page"), then a sticky tab row. Each tab owns its figures; this shell
  * does not repeat them.
  */
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoneyProvider, UsdSource } from "@/components/MoneyProvider";
-import { ReadError } from "@/components/Section";
+import { ReadError, ReadPending } from "@/components/Section";
 import { Button } from "@/components/ui/button";
 import { IntroDialog, introSeen } from "@/components/reserve/IntroDialog";
-import { usePoll } from "@/lib/client/use-poll";
+import { usePoll, type Poll } from "@/lib/client/use-poll";
+import { composeLedger, needs, panelStatus, readStatus, type Panel, type ReadPart, type ReadStatus } from "@/lib/client/reserve-reads";
+import type { LedgerAccounts, LedgerHistory, ReserveView } from "@/lib/view";
 import { fmtDuration, fmtTime } from "@/lib/format";
 import type { Data } from "@/components/reserve/sections/shared";
 
-type Ctx = { d: Data; refresh: () => Promise<void> };
+type Ctx = {
+  /** The reserve, and the ledger from whichever halves are in (a missing half is empty: check `usePanel`). */
+  d: Data;
+  refresh: () => Promise<void>;
+  reads: Record<ReadPart, ReadStatus>;
+  polls: Record<ReadPart, Poll<unknown>>;
+};
 const ReserveCtx = createContext<Ctx | null>(null);
 
-/** The shared /api/ledger read. Only rendered once the data is in. */
+/** The shared reads. Only rendered once /api/reserve is in. */
 export function useReserve(): Ctx {
   const c = useContext(ReserveCtx);
   if (!c) throw new Error("useReserve outside ReserveShell");
   return c;
+}
+
+/** Whether a panel's reads are in (lib/client/reserve-reads.ts: PANEL_NEEDS). */
+export function usePanel(panel: Panel) {
+  const { reads } = useReserve();
+  const s = panelStatus(panel, reads);
+  return { ...s, ready: s.status === "ready" };
+}
+
+const WAITING_LABEL: Record<ReadPart, string> = {
+  reserve: "Reading the chain…",
+  accounts: "Accounts loading…",
+  history: "History loading…",
+};
+
+/**
+ * Renders `children` once the panel's reads are in; until then, a small
+ * loading or busy state inside the panel. The rest of the page never waits.
+ */
+export function Needs({ panel, children }: { panel: Panel; children: ReactNode }) {
+  const { reads, polls } = useReserve();
+  const { status, waitingOn } = panelStatus(panel, reads);
+  const partial = needs(panel).includes("history") ? ((polls.history.data as LedgerHistory | null)?.fillsMissing ?? 0) : 0;
+  if ((status === "ready" || !waitingOn) && partial > 0)
+    return (
+      <div className="flex flex-col gap-3">
+        <p role="status" className="font-mono text-(--color-text-3) m-0 text-xs">
+          History loading: {partial} recent {partial === 1 ? "transaction" : "transactions"} not read yet.
+        </p>
+        {children}
+      </div>
+    );
+  if (status === "ready" || !waitingOn) return <>{children}</>;
+  const poll = polls[waitingOn];
+  return <ReadPending status={status} label={WAITING_LABEL[waitingOn]} error={poll.error} onRetry={() => void poll.refresh()} />;
 }
 
 /** The tabs, in order. `href` is the route; Overview is /reserve itself. The capital view is labelled "Money". */
@@ -51,10 +97,20 @@ function Skeleton() {
 }
 
 export function ReserveShell({ children }: { children: ReactNode }) {
-  const poll = usePoll<Data>("/api/ledger", 10_000);
+  const poll = usePoll<ReserveView>("/api/reserve", 10_000);
+  const accounts = usePoll<LedgerAccounts>("/api/accounts", 10_000);
+  const history = usePoll<LedgerHistory>("/api/history", 15_000);
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/reserve" ? pathname === "/reserve" : pathname.startsWith(href));
-  const d = poll.data;
+  const reads: Record<ReadPart, ReadStatus> = { reserve: readStatus(poll), accounts: readStatus(accounts), history: readStatus(history) };
+  const reserve = poll.data;
+  const d = useMemo<Data | null>(() => (reserve ? { reserve, ledger: composeLedger(accounts.data, history.data) } : null), [reserve, accounts.data, history.data]);
+  const refreshPoll = poll.refresh;
+  const refreshAccounts = accounts.refresh;
+  const refreshHistory = history.refresh;
+  const refresh = useCallback(async () => {
+    await Promise.all([refreshPoll(), refreshAccounts(), refreshHistory()]);
+  }, [refreshPoll, refreshAccounts, refreshHistory]);
   // null until the reader opens or closes the steps: then a first visit opens them once the first read is in (they quote it).
   const [intro, setIntro] = useState<boolean | null>(null);
   const introOpen = d !== null && (intro ?? !introSeen());
@@ -144,7 +200,7 @@ export function ReserveShell({ children }: { children: ReactNode }) {
           {poll.error && !d && <ReadError error={poll.error} onRetry={poll.refresh} />}
           {poll.loading && !d && <Skeleton />}
           {d && (
-            <ReserveCtx.Provider value={{ d, refresh: poll.refresh }}>
+            <ReserveCtx.Provider value={{ d, refresh, reads, polls: { reserve: poll, accounts, history } as Record<ReadPart, Poll<unknown>> }}>
               <div className="flex flex-col gap-4">
                 <UsdSource />
                 {/* Keyed by route so each view fades up on entry (globals.css: .mutav-view). */}
