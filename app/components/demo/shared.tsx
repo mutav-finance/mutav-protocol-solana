@@ -322,6 +322,7 @@ export function TextField({ id, label, value, onChange, hint, numeric }: { id: s
   );
 }
 
-export const Grid = ({ children }: { children: ReactNode }) => (
-  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, margin: "12px 0" }}>{children}</div>
+/** `flush`: no top margin, for a grid that opens its column. */
+export const Grid = ({ children, flush = false }: { children: ReactNode; flush?: boolean }) => (
+  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, margin: flush ? "0 0 12px" : "12px 0" }}>{children}</div>
 );

@@ -161,8 +161,8 @@ export function RegisterForm({ onRefusedPreview, p = "", aside }: { onRefusedPre
       {!held && <LastAction last={last.last} />}
       {/* Two columns from wide screens: the fields and the send on the left, the bounds and the gate preview beside them, so the button stays above the fold. */}
       <div className="grid items-start gap-x-8 gap-y-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col">
-          <Grid>
+        <div className="flex min-w-0 flex-col pt-3 xl:pt-0">
+          <Grid flush>
             <TextField
               id={`${p}reg-lease`}
               label="Lease reference"

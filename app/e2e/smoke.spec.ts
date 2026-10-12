@@ -141,7 +141,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   test("/admin — General controls, Money in & out, Allocation; direct signing labelled localnet-only", async ({ page }) => {
     await page.goto("/admin");
     const nav = page.getByRole("navigation", { name: "Admin sections" });
-    await expect(nav.getByRole("link")).toHaveText(["01 General controls", "02 Money in & out", "03 Allocation"]);
+    await expect(nav.getByRole("link")).toHaveText(["General controls", "Money in & out", "Allocation"]);
     for (const [id, heading] of [["general", "General controls"], ["money", "Money in & out"], ["allocation", "Allocation: BRS today, more assets through adapters"]]) {
       await expect(page.locator(`#${id}`).getByRole("heading", { name: heading, level: 2 })).toBeVisible();
     }
