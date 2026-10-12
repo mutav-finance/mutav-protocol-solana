@@ -23,6 +23,8 @@ import {
   getI64Encoder,
   getStructDecoder,
   getStructEncoder,
+  getU16Decoder,
+  getU16Encoder,
   getU64Decoder,
   getU64Encoder,
   getU8Decoder,
@@ -59,11 +61,46 @@ export type ClaimFiling = {
   /** `LEG_DEFAULT` / `LEG_EXIT`. */
   leg: number;
   noticeRefHash: ReadonlyUint8Array;
+  /** Provision booked by `file_claim`. Released by `pay_claim`. */
   provision: bigint;
   filedAt: bigint;
-  /** `CLAIM_FILED` / `CLAIM_PAID`. */
+  /**
+   * `CLAIM_FILED` / `CLAIM_PAID` / `CLAIM_WITHDRAWN` / `CLAIM_SETTLED`.
+   * `PAID` and `SETTLED` are terminal; `WITHDRAWN` returns to `FILED` only
+   * through an explicit re-file (a later upgrade).
+   */
   status: number;
-  /** Zeroed. Never read or written by logic. */
+  /** Amount paid by `pay_claim`. `0` until paid. */
+  paidAmount: bigint;
+  /** `0` until paid. */
+  paidAt: bigint;
+  /** Destination at payment time. Default until paid. */
+  paymentsAccount: Address;
+  /** Hash of the PIX end-to-end ID. Zero until settled. */
+  pixE2eHash: ReadonlyUint8Array;
+  /** `0` until settled. */
+  settledAt: bigint;
+  /**
+   * The exact amount the reserve admin approved for a claim above
+   * `max_claim_per_call` (`approve_claim`, ADR 0021). `0` = not approved.
+   * Written by `approve_claim` (always the provision); read by
+   * `pay_claim` above the per-call cap.
+   */
+  approvedAmount: bigint;
+  /**
+   * Carved from `_reserved` (ADR 0021 decision 8). `0` for a filing as
+   * `file_claim` creates it; every amendment or re-file (`amend_claim`,
+   * `refile_claim`, later upgrades) increments it and resets
+   * `approved_amount`. `approve_claim` must name it, so a proposal composed
+   * against an earlier version of the filing is refused even when the
+   * amount is the same again.
+   */
+  revision: number;
+  /**
+   * Zeroed. Never read or written by logic. Holds the ADR 0012 claim and
+   * settlement fields (114 bytes) with room to spare after the freeze,
+   * without a migration (spec §14.2, ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -74,11 +111,46 @@ export type ClaimFilingArgs = {
   /** `LEG_DEFAULT` / `LEG_EXIT`. */
   leg: number;
   noticeRefHash: ReadonlyUint8Array;
+  /** Provision booked by `file_claim`. Released by `pay_claim`. */
   provision: number | bigint;
   filedAt: number | bigint;
-  /** `CLAIM_FILED` / `CLAIM_PAID`. */
+  /**
+   * `CLAIM_FILED` / `CLAIM_PAID` / `CLAIM_WITHDRAWN` / `CLAIM_SETTLED`.
+   * `PAID` and `SETTLED` are terminal; `WITHDRAWN` returns to `FILED` only
+   * through an explicit re-file (a later upgrade).
+   */
   status: number;
-  /** Zeroed. Never read or written by logic. */
+  /** Amount paid by `pay_claim`. `0` until paid. */
+  paidAmount: number | bigint;
+  /** `0` until paid. */
+  paidAt: number | bigint;
+  /** Destination at payment time. Default until paid. */
+  paymentsAccount: Address;
+  /** Hash of the PIX end-to-end ID. Zero until settled. */
+  pixE2eHash: ReadonlyUint8Array;
+  /** `0` until settled. */
+  settledAt: number | bigint;
+  /**
+   * The exact amount the reserve admin approved for a claim above
+   * `max_claim_per_call` (`approve_claim`, ADR 0021). `0` = not approved.
+   * Written by `approve_claim` (always the provision); read by
+   * `pay_claim` above the per-call cap.
+   */
+  approvedAmount: number | bigint;
+  /**
+   * Carved from `_reserved` (ADR 0021 decision 8). `0` for a filing as
+   * `file_claim` creates it; every amendment or re-file (`amend_claim`,
+   * `refile_claim`, later upgrades) increments it and resets
+   * `approved_amount`. `approve_claim` must name it, so a proposal composed
+   * against an earlier version of the filing is refused even when the
+   * amount is the same again.
+   */
+  revision: number;
+  /**
+   * Zeroed. Never read or written by logic. Holds the ADR 0012 claim and
+   * settlement fields (114 bytes) with room to spare after the freeze,
+   * without a migration (spec §14.2, ADR 0019).
+   */
   reserved: ReadonlyUint8Array;
 };
 
@@ -95,7 +167,14 @@ export function getClaimFilingEncoder(): FixedSizeEncoder<ClaimFilingArgs> {
       ["provision", getU64Encoder()],
       ["filedAt", getI64Encoder()],
       ["status", getU8Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 64)],
+      ["paidAmount", getU64Encoder()],
+      ["paidAt", getI64Encoder()],
+      ["paymentsAccount", getAddressEncoder()],
+      ["pixE2eHash", fixEncoderSize(getBytesEncoder(), 32)],
+      ["settledAt", getI64Encoder()],
+      ["approvedAmount", getU64Encoder()],
+      ["revision", getU16Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 190)],
     ]),
     (value) => ({ ...value, discriminator: CLAIM_FILING_DISCRIMINATOR }),
   );
@@ -113,7 +192,14 @@ export function getClaimFilingDecoder(): FixedSizeDecoder<ClaimFiling> {
     ["provision", getU64Decoder()],
     ["filedAt", getI64Decoder()],
     ["status", getU8Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 64)],
+    ["paidAmount", getU64Decoder()],
+    ["paidAt", getI64Decoder()],
+    ["paymentsAccount", getAddressDecoder()],
+    ["pixE2eHash", fixDecoderSize(getBytesDecoder(), 32)],
+    ["settledAt", getI64Decoder()],
+    ["approvedAmount", getU64Decoder()],
+    ["revision", getU16Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 190)],
   ]);
 }
 
@@ -179,5 +265,5 @@ export async function fetchAllMaybeClaimFiling(
 }
 
 export function getClaimFilingSize(): number {
-  return 156;
+  return 380;
 }

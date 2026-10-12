@@ -3,9 +3,9 @@
 
 use mutav::{
     constants::*,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::{ClaimFiled, ClaimPaid, PayoutSettled},
-    solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
     RegisterGuaranteeArgs,
 };
@@ -24,17 +24,13 @@ fn book(capital: u64, default_cover: u64, exit_cover: u64) -> (Fixture, Register
     (f, args)
 }
 
-fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
-    Solvency::compute(&SolvencyInputs {
+fn coverage(c: &VaultConfig, s: &VaultState) -> Coverage {
+    Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
-        tesouro_units: s.tesouro_units,
-        tesouro_price: s.tesouro_price,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
         provisions: s.provisions,
-        buffer_earmark: s.buffer_earmark,
-        feature_flags: c.feature_flags,
-        head_starved: false,
+        stress_buffer: c.caps.stress_buffer,
     })
     .unwrap()
 }
@@ -70,7 +66,9 @@ fn file_claim_books_the_provision() {
         (x.notice_ref_hash, x.provision, x.filed_at),
         (c.notice, 6_000 * BRL, 1_760_000_000)
     );
-    assert_eq!(x._reserved, [0; 64]);
+    assert_eq!(x._reserved, [0; 190]);
+    // The first version of the filing (ADR 0021 decision 8).
+    assert_eq!((x.revision, x.approved_amount), (0, 0));
 
     let gg = f.guarantee(&g.id);
     assert_eq!(
@@ -105,11 +103,11 @@ fn demo_filed_claim_lowers_nav() {
     let (mut f, g) = book(100_000 * BRL, 20_000 * BRL, 0);
     f.inject_shares(100_000 * BRL);
     assert_eq!(f.nav(), NAV_SCALE);
-    let stable = solvency(&f.config(), &f.state()).stable_assets;
+    let stable = coverage(&f.config(), &f.state()).stable_assets;
 
     f.file_claim(Claim::on(&g, 2_000 * BRL)).expect("file");
     assert_eq!(f.nav(), 980_000_000); // 0.98
-    assert_eq!(solvency(&f.config(), &f.state()).stable_assets, stable);
+    assert_eq!(coverage(&f.config(), &f.state()).stable_assets, stable);
 }
 
 #[test]
@@ -146,8 +144,14 @@ fn file_claim_is_bounded_by_the_unprovisioned_cover_on_the_leg() {
 fn file_claim_rejects_bad_parameters() {
     let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
     assert_mutav_err(f.file_claim(Claim::on(&g, 0)), MutavError::InvalidParameter);
+    // Leg ids start at 1 (LEG_DEFAULT = 1, LEG_EXIT = 2): 0 names no leg.
+    assert_eq!((LEG_DEFAULT, LEG_EXIT), (1, 2));
     assert_mutav_err(
-        f.file_claim(Claim::on(&g, BRL).leg(2)),
+        f.file_claim(Claim::on(&g, BRL).leg(0)),
+        MutavError::InvalidParameter,
+    );
+    assert_mutav_err(
+        f.file_claim(Claim::on(&g, BRL).leg(3)),
         MutavError::InvalidParameter,
     );
     assert_mutav_err(
@@ -159,7 +163,7 @@ fn file_claim_rejects_bad_parameters() {
 #[test]
 fn file_claim_needs_an_active_guarantee() {
     let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
-    f.close_guarantee(g.id, g.agency_id).unwrap();
+    f.close_guarantee(g.id).unwrap();
     assert_mutav_err(
         f.file_claim(Claim::on(&g, BRL)),
         MutavError::GuaranteeNotActive,
@@ -185,18 +189,15 @@ fn file_claim_rejects_a_non_operator() {
 }
 
 #[test]
-fn file_claim_works_while_paused_under_covered_and_without_a_price() {
+fn file_claim_works_while_paused_and_under_covered() {
     let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
     let pauser = f.pauser.insecure_clone();
     f.send(f.pause_ix(&pauser.pubkey()), &pauser).unwrap();
     let mut s = f.state();
     s.mode = MODE_UNDER_COVERED;
     s.brs_balance = 0;
-    s.tesouro_units = 3; // stale TESOURO position: file_claim reads no price
-    s.buffer_earmark = 77;
     f.write_state(&s);
     f.file_claim(Claim::on(&g, BRL)).expect("never gated");
-    assert_eq!(f.state().buffer_earmark, 77);
 }
 
 #[test]
@@ -204,11 +205,9 @@ fn a_filed_claim_blocks_close_until_paid() {
     let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
     let c = Claim::on(&g, 3_000 * BRL);
     f.file_claim(c).unwrap();
-    assert_mutav_err(f.close_guarantee(g.id, g.agency_id), MutavError::OpenClaims);
+    assert_mutav_err(f.close_guarantee(g.id), MutavError::OpenClaims);
     f.pay_claim(c).unwrap();
-    let meta = f
-        .close_guarantee(g.id, g.agency_id)
-        .expect("close after payment");
+    let meta = f.close_guarantee(g.id).expect("close after payment");
     let ev = events::<mutav::events::GuaranteeClosed>(&meta);
     assert_eq!(ev[0].released_cover, 7_000 * BRL);
     assert_eq!(f.state().remaining_cover_total, 0);
@@ -245,33 +244,26 @@ fn pay_claim_pays_the_payments_account_and_releases_the_provision() {
     assert_eq!(s.remaining_cover_total, 25_000 * BRL);
     assert_eq!(s.coverage_required, 25_000 * BRL);
     assert_eq!(s.claims_paid_total, 5_000 * BRL);
-    assert_eq!(
-        (s.claim_period_start, s.claim_period_paid),
-        (1_770_000_000, 5_000 * BRL)
-    );
-
-    let a = f.agency(&g.agency_id);
-    assert_eq!(
-        (a.outstanding_cover, a.claims_paid_total),
-        (25_000 * BRL, 5_000 * BRL)
-    );
+    assert_eq!(s.claim_window_paid(), 5_000 * BRL as u128);
+    assert_eq!(s.claim_day_anchor, 1_770_000_000 / 86_400);
 
     let p = f.payout(&c);
     assert_eq!(
         (p.version, p.status, p.leg),
-        (PROGRAM_LAYOUT_VERSION, PAYOUT_PENDING, LEG_DEFAULT)
+        (PROGRAM_LAYOUT_VERSION, CLAIM_PAID, LEG_DEFAULT)
     );
     assert_ne!(p.bump, 0);
     assert_eq!(p.guarantee, guarantee_pda(&f.pdas.config, &g.id));
     assert_eq!(
-        (p.amount, p.notice_ref_hash, p.payments_account),
+        (p.paid_amount, p.notice_ref_hash, p.payments_account),
         (5_000 * BRL, c.notice, payments)
     );
     assert_eq!(
-        (p.paid_at, p.settled_at, p.pix_e2e_hash, p.late),
-        (1_770_000_000, 0, [0; 32], 0)
+        (p.paid_at, p.settled_at, p.pix_e2e_hash),
+        (1_770_000_000, 0, [0; 32])
     );
-    assert_eq!(p._reserved, [0; 64]);
+    assert_eq!((p.provision, p.approved_amount), (5_000 * BRL, 0));
+    assert_eq!(p._reserved, [0; 190]);
 
     let ev = events::<ClaimPaid>(&meta);
     assert_eq!(ev.len(), 1);
@@ -287,35 +279,64 @@ fn pay_claim_pays_the_payments_account_and_releases_the_provision() {
 }
 
 #[test]
-fn payment_may_differ_from_the_filed_provision() {
-    // The payment is bounded by the leg's remaining cover, not by the
-    // provision; the whole provision is released either way.
+fn pay_claim_pays_exactly_the_provision() {
+    // ADR 0021: the payment is the filing's provision, stated by the caller;
+    // any other amount is refused and nothing moves.
     let (mut f, g) = book(30_000 * BRL, 10_000 * BRL, 10_000 * BRL);
-    let more = Claim::on(&g, 2_000 * BRL);
-    f.file_claim(more).unwrap();
-    f.pay_claim(more.amount(9_000 * BRL))
-        .expect("more than the provision");
-    let less = Claim::on(&g, 4_000 * BRL).leg(LEG_EXIT);
-    f.file_claim(less).unwrap();
-    f.pay_claim(less.amount(1_000 * BRL))
-        .expect("less than the provision");
+    let c = Claim::on(&g, 2_000 * BRL);
+    f.file_claim(c).unwrap();
+    for wrong in [0, 2_000 * BRL - 1, 2_000 * BRL + 1, 9_000 * BRL, u64::MAX] {
+        assert_mutav_err(
+            f.pay_claim(c.amount(wrong)),
+            MutavError::ExpectedAmountMismatch,
+        );
+    }
+    assert_eq!(f.state().brs_balance, 30_000 * BRL);
+    let meta = f.pay_claim(c).expect("exactly the provision");
     let gg = f.guarantee(&g.id);
-    assert_eq!((gg.default_paid, gg.exit_paid), (9_000 * BRL, 1_000 * BRL));
-    assert_eq!((gg.provision_default, gg.provision_exit), (0, 0));
+    assert_eq!((gg.default_paid, gg.provision_default), (2_000 * BRL, 0));
     assert_eq!(f.state().provisions, 0);
-    assert_eq!(f.state().remaining_cover_total, 10_000 * BRL);
+    assert_eq!(f.claim_filing(&c).paid_amount, 2_000 * BRL);
+    // The event carries the totals after the payment.
+    let s = f.state();
+    let ev = events::<mutav::events::ClaimPaid>(&meta);
+    assert_eq!(ev[0].leg, LEG_DEFAULT, "the leg comes from the filing");
+    assert_eq!(
+        (
+            ev[0].provisions_after,
+            ev[0].coverage_required_after,
+            ev[0].window_paid,
+            ev[0].brs_balance_after,
+            ev[0].claims_paid_total
+        ),
+        (
+            s.provisions,
+            s.coverage_required,
+            2_000 * BRL,
+            s.brs_balance,
+            2_000 * BRL
+        )
+    );
 }
 
 #[test]
-fn pay_claim_is_bounded_by_the_remaining_cover_on_the_leg() {
-    let (mut f, g) = book(30_000 * BRL, 8_000 * BRL, 2_000 * BRL);
-    let c = Claim::on(&g, 1_000 * BRL);
+fn a_zero_provision_is_never_paid() {
+    // `file_claim` refuses 0; a zero provision (injected) is refused too.
+    let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
+    let c = Claim::on(&g, BRL);
     f.file_claim(c).unwrap();
-    assert_mutav_err(
-        f.pay_claim(c.amount(8_000 * BRL + 1)),
-        MutavError::ExceedsRemainingCover,
-    );
-    f.pay_claim(c.amount(8_000 * BRL)).expect("exactly the leg");
+    let mut x = f.claim_filing(&c);
+    x.provision = 0;
+    f.write_claim_filing(&c, &x);
+    assert_mutav_err(f.pay_claim(c.amount(0)), MutavError::InvalidParameter);
+}
+
+#[test]
+fn an_exact_payment_of_the_whole_leg() {
+    let (mut f, g) = book(30_000 * BRL, 8_000 * BRL, 2_000 * BRL);
+    let c = Claim::on(&g, 8_000 * BRL);
+    f.file_claim(c).unwrap();
+    f.pay_claim(c).expect("exactly the leg");
     assert_eq!(f.guarantee(&g.id).default_paid, 8_000 * BRL);
     // Nothing left on the default leg to file against.
     assert_mutav_err(
@@ -326,9 +347,8 @@ fn pay_claim_is_bounded_by_the_remaining_cover_on_the_leg() {
 
 #[test]
 fn pay_claim_cannot_take_another_open_filings_provision() {
-    // Two open filings on one leg (6k + 4k = the whole 10k cover). Paying the
-    // first above 6k would leave the second's provision above the cover left
-    // on the leg, breaking invariant 2. Bound: ADR 0014 (proposed).
+    // Two open filings on one leg (6k + 4k = the whole 10k cover). Each pays
+    // exactly its own provision, so neither can take the other's.
     let (mut f, g) = book(30_000 * BRL, 10_000 * BRL, 0);
     let a = Claim::on(&g, 6_000 * BRL);
     let b = Claim::on(&g, 4_000 * BRL);
@@ -336,7 +356,7 @@ fn pay_claim_cannot_take_another_open_filings_provision() {
     f.file_claim(b).unwrap();
     assert_mutav_err(
         f.pay_claim(a.amount(6_000 * BRL + 1)),
-        MutavError::ExceedsRemainingCover,
+        MutavError::ExpectedAmountMismatch,
     );
     f.pay_claim(a).expect("its own provision's worth");
     f.pay_claim(b).expect("the other filing still pays in full");
@@ -360,7 +380,7 @@ fn pay_claim_surfaces_a_broken_leg_invariant_instead_of_masking_it() {
     let mut gg = f.guarantee(&g.id);
     gg.default_paid = 7_000 * BRL; // remaining 3k < b's 4k provision
     f.write_guarantee(&gg);
-    assert_mutav_err(f.pay_claim(a.amount(1)), MutavError::MathOverflow);
+    assert_mutav_err(f.pay_claim(a), MutavError::MathOverflow);
 }
 
 #[test]
@@ -380,57 +400,78 @@ fn pay_claim_only_to_the_payments_account() {
 
 #[test]
 fn pay_claim_per_call_cap_at_the_boundary() {
-    // Test caps: R$10k per call.
-    let (mut f, g) = book(30_000 * BRL, 30_000 * BRL, 0);
-    let c = Claim::on(&g, BRL);
-    f.file_claim(c).unwrap();
-    assert_mutav_err(
-        f.pay_claim(c.amount(10_000 * BRL + 1)),
-        MutavError::ClaimCallCapExceeded,
-    );
-    f.pay_claim(c.amount(10_000 * BRL))
-        .expect("exactly the per-call cap");
+    // Test caps: R$10k per call. Above it only an approval of the exact
+    // amount lets the reserve pay (ADR 0021). The approval is injected here
+    // to test `pay_claim`'s check on its own: `approve_claim` refuses any
+    // amount but the provision (`approve_claim.rs`).
+    let (mut f, g) = book(40_000 * BRL, 30_000 * BRL, 0);
+    // The admin raises the period cap so the window does not bind here.
+    f.set_config(vec![mutav::ConfigParam::MaxClaimPerPeriod(30_000 * BRL)])
+        .unwrap();
+    let at = Claim::on(&g, 10_000 * BRL);
+    f.file_claim(at).unwrap();
+    f.pay_claim(at).expect("exactly the per-call cap");
+
+    let over = Claim::on(&g, 10_000 * BRL + 1);
+    f.file_claim(over).unwrap();
+    assert_mutav_err(f.pay_claim(over), MutavError::ClaimCallCapExceeded);
+    // An approval of any other amount does not count.
+    for approved in [10_000 * BRL, 10_000 * BRL + 2, u64::MAX] {
+        let mut x = f.claim_filing(&over);
+        x.approved_amount = approved;
+        f.write_claim_filing(&over, &x);
+        assert_mutav_err(f.pay_claim(over), MutavError::ClaimCallCapExceeded);
+    }
+    let mut x = f.claim_filing(&over);
+    x.approved_amount = 10_000 * BRL + 1;
+    f.write_claim_filing(&over, &x);
+    f.pay_claim(over).expect("approved exactly");
+    assert_eq!(f.state().claims_paid_total, 20_000 * BRL + 1);
 }
 
 #[test]
-fn pay_claim_per_period_cap_and_window_roll() {
-    // Test caps: R$20k per 30-day window.
-    let period = 30 * 86_400;
+fn pay_claim_per_period_cap_over_31_sliding_days() {
+    // Test caps: R$20k per 31-day window (ADR 0019): the payments of the
+    // last 31 UTC days, this one included.
+    const DAY: i64 = 86_400;
     let (mut f, g) = book(60_000 * BRL, 30_000 * BRL, 0);
     let g2 = guarantee_args(unique_hash(), 30_000 * BRL, 0);
     f.register(g2.clone()).unwrap();
-    let t0 = 1_700_000_000;
+    let t0 = 1_700_006_400; // the start of a UTC day
     set_time(&mut f.svm, t0);
 
-    let claims: Vec<Claim> = [(&g, 10_000), (&g, 9_000), (&g2, 2_000), (&g2, 1_000)]
-        .iter()
-        .map(|(g, k)| Claim::on(g, k * BRL))
-        .collect();
+    let claims: Vec<Claim> = [
+        (&g, 10_000 * BRL),
+        (&g, 9_000 * BRL),
+        (&g2, 1_000 * BRL + 1),
+        (&g2, 1_000 * BRL),
+        (&g2, 1_000 * BRL),
+        (&g2, 9_000 * BRL),
+    ]
+    .iter()
+    .map(|(g, k)| Claim::on(g, *k))
+    .collect();
     for c in &claims {
         f.file_claim(*c).unwrap();
     }
     f.pay_claim(claims[0]).unwrap();
+    // Day 15: R$9k more is still inside the window with the first.
+    set_time(&mut f.svm, t0 + 15 * DAY);
     f.pay_claim(claims[1]).unwrap();
     // R$19k paid: R$1k + 1 base unit is over, R$1k is exactly the cap.
-    assert_mutav_err(
-        f.pay_claim(claims[2].amount(1_000 * BRL + 1)),
-        MutavError::ClaimPeriodCapExceeded,
-    );
-    f.pay_claim(claims[2].amount(1_000 * BRL))
-        .expect("exactly the period cap");
-    assert_eq!(f.state().claim_period_paid, 20_000 * BRL);
+    assert_mutav_err(f.pay_claim(claims[2]), MutavError::ClaimPeriodCapExceeded);
+    f.pay_claim(claims[3]).expect("exactly the period cap");
 
-    // One second before the window ends: still full.
-    set_time(&mut f.svm, t0 + period - 1);
-    assert_mutav_err(f.pay_claim(claims[3]), MutavError::ClaimPeriodCapExceeded);
-    // At `claim_period_start + claim_period_secs` the window rolls.
-    set_time(&mut f.svm, t0 + period);
-    f.pay_claim(claims[3]).expect("new window");
-    let s = f.state();
-    assert_eq!(
-        (s.claim_period_start, s.claim_period_paid),
-        (t0 + period, 1_000 * BRL)
-    );
+    // The last second of day 30: the day-0 payment is still in the window.
+    set_time(&mut f.svm, t0 + 31 * DAY - 1);
+    assert_mutav_err(f.pay_claim(claims[4]), MutavError::ClaimPeriodCapExceeded);
+    // Day 31: the day-0 R$10k leaves; the day-15 R$10k stays.
+    set_time(&mut f.svm, t0 + 31 * DAY);
+    f.pay_claim(claims[4]).expect("day 0 left the window");
+    f.pay_claim(claims[5]).expect("R$20k in the last 31 days");
+    assert_eq!(f.state().claim_window_paid(), 20_000 * BRL as u128);
+    // Never more than the cap in any 31 days: a tumbling window would allow
+    // R$40k across its boundary.
 }
 
 #[test]
@@ -440,23 +481,29 @@ fn pay_claim_is_idempotent_per_notice() {
     f.file_claim(c).unwrap();
     f.pay_claim(c).unwrap();
     let before = f.state();
-    assert_already_in_use(f.pay_claim(c));
+    // The filing records the payment: a second call finds it `Paid`.
+    assert_mutav_err(f.pay_claim(c), MutavError::ClaimNotFiled);
     assert_eq!(f.state().brs_balance, before.brs_balance);
     assert_eq!(f.state().claims_paid_total, BRL);
 }
 
 #[test]
-fn pay_claim_needs_a_filed_claim_on_the_same_leg() {
+fn pay_claim_needs_a_filed_claim() {
     let (mut f, g) = book(20_000 * BRL, 10_000 * BRL, 10_000 * BRL);
     // No filing for this notice.
     assert_mutav_err(f.pay_claim(Claim::on(&g, BRL)), MutavError::ClaimNotFiled);
 
     let c = Claim::on(&g, BRL);
     f.file_claim(c).unwrap();
-    assert_mutav_err(f.pay_claim(c.leg(LEG_EXIT)), MutavError::LegMismatch);
+    // The leg comes from the filing, not the caller: the `Claim` helper's
+    // leg is not on the wire.
+    f.pay_claim(c.leg(LEG_EXIT))
+        .expect("leg read from the filing");
+    assert_eq!(f.guarantee(&g.id).default_paid, BRL);
+    let c = Claim::on(&g, BRL);
+    f.file_claim(c).unwrap();
 
-    // A filing that is no longer `Filed` (injected; the payout PDA would
-    // normally refuse first).
+    // A filing that is no longer `Filed`.
     let mut x = f.claim_filing(&c);
     x.status = CLAIM_PAID;
     f.write_claim_filing(&c, &x);
@@ -464,17 +511,9 @@ fn pay_claim_needs_a_filed_claim_on_the_same_leg() {
 }
 
 #[test]
-fn pay_claim_rejects_zero() {
-    let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
-    let c = Claim::on(&g, BRL);
-    f.file_claim(c).unwrap();
-    assert_mutav_err(f.pay_claim(c.amount(0)), MutavError::InvalidParameter);
-}
-
-#[test]
 fn pay_claim_needs_liquid_brs() {
-    // TESOURO is never sold implicitly (rule 6). Liquid BRS below the amount
-    // is injected (the reserve token account still holds it).
+    // Rule 6: a claim is paid from liquid BRS only. Liquid BRS below the
+    // amount is injected (the reserve token account still holds it).
     let (mut f, g) = book(10_000 * BRL, 10_000 * BRL, 0);
     let c = Claim::on(&g, 5_000 * BRL);
     f.file_claim(c).unwrap();
@@ -496,9 +535,9 @@ fn paying_at_c_one_leaves_free_capital_unchanged() {
     let (mut f, g) = book(50_000 * BRL, 30_000 * BRL, 0);
     let c = Claim::on(&g, 7_000 * BRL);
     f.file_claim(c).unwrap();
-    let before = solvency(&f.config(), &f.state());
+    let before = coverage(&f.config(), &f.state());
     f.pay_claim(c).unwrap();
-    let after = solvency(&f.config(), &f.state());
+    let after = coverage(&f.config(), &f.state());
     assert_eq!(after.free_capital, before.free_capital);
     assert_eq!(after.free_capital, 20_000 * BRL);
     assert_eq!(before.stable_assets - after.stable_assets, 7_000 * BRL);
@@ -516,9 +555,9 @@ fn pay_claim_rejects_a_non_operator() {
     }
 }
 
-/// Demo step: "`pay_claim` succeeds while under-covered". A TESOURO
-/// mark-down (injected as lost capital) leaves the reserve under-covered and
-/// paused; the claim is still paid.
+/// Demo step: "`pay_claim` succeeds while under-covered". Cover injected far
+/// above the stable assets leaves the reserve under-covered and paused; the
+/// claim is still paid.
 #[test]
 fn demo_pay_claim_succeeds_while_under_covered() {
     let (mut f, g) = book(30_000 * BRL, 30_000 * BRL, 0);
@@ -529,14 +568,11 @@ fn demo_pay_claim_succeeds_while_under_covered() {
     let mut s = f.state();
     s.mode = MODE_UNDER_COVERED;
     s.remaining_cover_total += 50_000 * BRL; // coverage far above stable assets
-    s.tesouro_units = 1_000; // stale TESOURO: pay_claim never reads the price
     f.write_state(&s);
-    // The unpriced TESOURO counts for nothing here; stable assets are far
-    // below coverage.
-    assert!(solvency(&f.config(), &f.state()).under_covered());
+    assert!(coverage(&f.config(), &f.state()).under_covered());
 
     let payments = f.config().payments_account;
-    f.pay_claim(c).expect("never refused for solvency");
+    f.pay_claim(c).expect("never refused by the coverage gate");
     assert_eq!(f.balance(&payments), 8_000 * BRL);
     assert_eq!(f.state().mode, MODE_UNDER_COVERED);
 }
@@ -544,38 +580,38 @@ fn demo_pay_claim_succeeds_while_under_covered() {
 proptest! {
     #![proptest_config(ProptestConfig { cases: 32, failure_persistence: None, ..ProptestConfig::default() })]
 
-    /// `pay_claim` is never refused for solvency or under-coverage (spec §1
-    /// principle 4, §5.4 rule 7), and neither reads nor writes
-    /// `buffer_earmark` (invariant 14): fuzz `stable_assets` far below
-    /// `coverage_required`, the stored mode, a non-zero earmark with
-    /// `INSTANT_EXIT` set, a stale TESOURO position, other provisions, the
-    /// pause flag, any coverage ratio in `[0.10, 2.0]` (ADR 0016) and issuer
-    /// income, partly swept and partly still in the inbox (ADR 0017).
+    /// `pay_claim` is never refused by the coverage gate or for under-coverage (spec §1
+    /// principle 4, §5.4 rule 7): fuzz `stable_assets` far below
+    /// `coverage_required`, the stored mode, other provisions, the pause
+    /// flag, any coverage ratio in `[0.10, 2.0]` (ADR 0016; above 1.0 only
+    /// as a stored value from an older binary), any stress buffer, up to
+    /// `u64::MAX` as a stored value (ADR 0022: the recompute saturates), and
+    /// issuer income, partly swept and partly still in the inbox (ADR 0017).
     #[test]
-    fn pay_claim_is_never_refused_for_solvency(
+    fn pay_claim_is_never_refused_for_coverage(
         cover in 1u64..=10_000,
         filed_frac in 1u64..=100,
-        pay_frac in 1u64..=100,
         extra_cover in 0u64..=1u64 << 50,
         extra_provisions in 0u64..=1u64 << 50,
-        earmark in 0u64..=1u64 << 50,
-        tesouro_units in 0u64..=1u64 << 40,
         under_covered: bool,
-        flag: bool,
         paused: bool,
         drain in 0u64..=100,
         coverage_ratio_bps in MIN_COVERAGE_RATIO_BPS..=20_000,
+        stress_buffer in prop_oneof![Just(0u64), 0u64..=1u64 << 50, Just(u64::MAX)],
         income in 0u64..=10_000,
     ) {
         let cover = cover * BRL;
         let (mut f, g) = book(cover, cover, 0);
         let filed = (cover * filed_frac / 100).max(1);
-        let amount = (cover * pay_frac / 100).max(1);
+        // `pay_claim` pays exactly the provision (ADR 0021).
+        let amount = filed;
         let c = Claim::on(&g, filed);
         f.file_claim(c).unwrap();
         // Issuer income: half swept into the reserve, the rest left in the
         // inbox, where `pay_claim` never reaches.
         let income = income * BRL;
+        // Income is swept only once shares exist (ADR 0023).
+        f.inject_shares(cover);
         f.pay_income(income);
         if income / 2 > 0 {
             f.sweep(income / 2).0.unwrap();
@@ -586,24 +622,21 @@ proptest! {
             f.send(f.pause_ix(&pauser.pubkey()), &pauser).unwrap();
         }
         let mut cfg = f.config();
-        cfg.feature_flags = if flag { INSTANT_EXIT } else { 0 };
         // Any c the program accepts, below and above 1.0 (ADR 0016).
         cfg.coverage_ratio_bps = coverage_ratio_bps;
+        cfg.caps.stress_buffer = stress_buffer;
         f.write_config(&cfg);
         let mut s = f.state();
         s.mode = if under_covered { MODE_UNDER_COVERED } else { MODE_NORMAL };
         s.remaining_cover_total += extra_cover;
         s.provisions += extra_provisions;
-        s.buffer_earmark = earmark;
-        s.tesouro_units = tesouro_units;
         // Liquid BRS anywhere between the amount and the whole reserve.
         s.brs_balance = amount + (cover - amount) * drain / 100;
         f.write_state(&s);
 
-        let res = f.pay_claim(c.amount(amount));
+        let res = f.pay_claim(c);
         prop_assert!(res.is_ok(), "refused: {:?}", res.err().map(|e| e.err));
         let after = f.state();
-        prop_assert_eq!(after.buffer_earmark, earmark);
         prop_assert_eq!(after.mode, s.mode);
         prop_assert_eq!(after.brs_balance, s.brs_balance - amount);
         prop_assert_eq!(after.provisions, s.provisions - filed);
@@ -624,8 +657,7 @@ fn paid(capital: u64, amount: u64) -> (Fixture, Claim) {
 }
 
 /// Demo step: "`settle_payout` records the PIX e2e hash". MUTAV offramps
-/// BRS→BRL, pays the agency by PIX and records the end-to-end ID's hash
-/// within the SLA.
+/// BRS→BRL, pays the agency by PIX and records the end-to-end ID's hash.
 #[test]
 fn demo_settle_payout_records_pix_e2e_hash() {
     let (mut f, c) = paid(10_000 * BRL, 4_000 * BRL);
@@ -635,31 +667,32 @@ fn demo_settle_payout_records_pix_e2e_hash() {
     let meta = f.settle_payout(c, pix).expect("settle");
 
     let p = f.payout(&c);
-    assert_eq!(p.status, PAYOUT_SETTLED);
+    assert_eq!(p.status, CLAIM_SETTLED);
     assert_eq!(p.pix_e2e_hash, pix);
     assert_eq!(p.settled_at, paid_at + 3 * 86_400);
-    assert_eq!(p.late, 0);
     let ev = events::<PayoutSettled>(&meta);
     assert_eq!(ev.len(), 1);
     let e = &ev[0];
     assert_eq!((e.config, e.ts), (f.pdas.config, paid_at + 3 * 86_400));
     assert_eq!(
-        (e.guarantee_id, e.notice_ref_hash, e.pix_e2e_hash, e.late),
-        (c.id, c.notice, pix, false)
+        (e.guarantee_id, e.notice_ref_hash, e.pix_e2e_hash),
+        (c.id, c.notice, pix)
     );
 }
 
+/// ADR 0019: the program sets no settlement deadline. A payout settled a
+/// year after payment records the same way as one settled the next day.
 #[test]
-fn settle_payout_flags_late_past_the_sla() {
-    // Test SLA: 10 days. Exactly at the SLA is on time; one second later is late.
-    let sla = 10 * 86_400;
-    for (delay, late) in [(sla, false), (sla + 1, true)] {
+fn settle_payout_has_no_deadline() {
+    for delay in [86_400, 365 * 86_400] {
         let (mut f, c) = paid(10_000 * BRL, BRL);
         let paid_at = f.payout(&c).paid_at;
         set_time(&mut f.svm, paid_at + delay);
-        let meta = f.settle_payout(c, unique_hash()).unwrap();
-        assert_eq!(f.payout(&c).late, late as u8, "delay {delay}");
-        assert_eq!(events::<PayoutSettled>(&meta)[0].late, late);
+        let pix = unique_hash();
+        let meta = f.settle_payout(c, pix).unwrap();
+        let p = f.payout(&c);
+        assert_eq!((p.status, p.settled_at), (CLAIM_SETTLED, paid_at + delay));
+        assert_eq!(events::<PayoutSettled>(&meta)[0].pix_e2e_hash, pix);
     }
 }
 
@@ -679,7 +712,7 @@ fn settle_payout_twice_fails() {
 fn settle_payout_needs_a_hash() {
     let (mut f, c) = paid(10_000 * BRL, BRL);
     assert_mutav_err(f.settle_payout(c, [0; 32]), MutavError::InvalidParameter);
-    assert_eq!(f.payout(&c).status, PAYOUT_PENDING);
+    assert_eq!(f.payout(&c).status, CLAIM_PAID);
 }
 
 #[test]
@@ -748,18 +781,20 @@ fn unknown_leg_or_status_is_refused() {
         f.write_claim_filing(&c, &x);
         assert_mutav_err(f.pay_claim(c), MutavError::UnsupportedVersion);
     }
-    // Payout: newer version, unknown status, unknown leg.
+    // Paid filing: newer version, a status this binary never writes
+    // (`CLAIM_WITHDRAWN`, ADR 0019), an unknown status, an unknown leg.
     for (version, status, leg) in [
-        (PROGRAM_LAYOUT_VERSION + 1, PAYOUT_PENDING, LEG_DEFAULT),
-        (PROGRAM_LAYOUT_VERSION, PAYOUT_SETTLED + 1, LEG_DEFAULT),
-        (PROGRAM_LAYOUT_VERSION, PAYOUT_PENDING, u8::MAX),
+        (PROGRAM_LAYOUT_VERSION + 1, CLAIM_PAID, LEG_DEFAULT),
+        (PROGRAM_LAYOUT_VERSION, CLAIM_WITHDRAWN, LEG_DEFAULT),
+        (PROGRAM_LAYOUT_VERSION, CLAIM_SETTLED + 1, LEG_DEFAULT),
+        (PROGRAM_LAYOUT_VERSION, CLAIM_PAID, u8::MAX),
     ] {
         let (mut f, c) = paid(10_000 * BRL, BRL);
         let mut p = f.payout(&c);
         p.version = version;
         p.status = status;
         p.leg = leg;
-        f.write_payout(&c, &p);
+        f.write_claim_filing(&c, &p);
         assert_mutav_err(
             f.settle_payout(c, unique_hash()),
             MutavError::UnsupportedVersion,
@@ -796,17 +831,17 @@ fn claim_padding_is_preserved_in_place() {
     let c = Claim::on(&g, BRL);
     f.file_claim(c).unwrap();
     let mut x = f.claim_filing(&c);
-    x._reserved = [0x3c; 64];
+    x._reserved = [0x3c; 190];
     f.write_claim_filing(&c, &x);
     let mut gg = f.guarantee(&g.id);
-    gg._reserved = [0xc3; 64];
+    gg._reserved = [0xc3; 203];
     f.write_guarantee(&gg);
     f.pay_claim(c).unwrap();
-    assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 64]);
-    assert_eq!(f.guarantee(&g.id)._reserved, [0xc3; 64]);
+    assert_eq!(f.claim_filing(&c)._reserved, [0x3c; 190]);
+    assert_eq!(f.guarantee(&g.id)._reserved, [0xc3; 203]);
     let mut p = f.payout(&c);
-    p._reserved = [0x77; 64];
-    f.write_payout(&c, &p);
+    p._reserved = [0x77; 190];
+    f.write_claim_filing(&c, &p);
     f.settle_payout(c, unique_hash()).unwrap();
-    assert_eq!(f.payout(&c)._reserved, [0x77; 64]);
+    assert_eq!(f.payout(&c)._reserved, [0x77; 190]);
 }

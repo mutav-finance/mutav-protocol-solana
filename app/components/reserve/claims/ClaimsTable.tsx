@@ -5,7 +5,9 @@
  * whole row opens its detail.
  * Timestamps, explorer links and the leg live in the expand row (progressive
  * disclosure), so the main row reads as status → guarantee → amount → speed.
- * Exceptions (paid late, past the deadline) sort first, then newest filing.
+ * Open claims (awaiting payment, then awaiting PIX) sort first, then newest filing.
+ * The program sets no settlement deadline (ADR 0019): the payout SLA is the
+ * operator platform's, so no row is marked late.
  */
 import { Fragment, useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
@@ -19,19 +21,18 @@ import { Num, Table, short } from "@/components/reserve/sections/shared";
 const PAGE = 10;
 
 const TIPS = {
-  Status: "Against the deadline to reach the landlord, set by the Reserve Admin. A payment not received in time is marked paid late on-chain at the next refresh.",
+  Status: "Filed, paid from the reserve, or received by the landlord (PIX), from the claim filing on-chain.",
   "Filed → paid": "From when the claim was filed to when it was paid.",
   "Paid → settled": "From payment to the landlord receiving it by PIX.",
 };
 
 type Status = { label: string; color: string; title?: string; rank: number };
 
-/** Status of one claim against the deadline: paid late (recorded on-chain), past the deadline (not yet recorded), awaiting payment, or on time. */
-export function slaStatus(c: ClaimRow): Status {
-  if (c.lateOnChain) return { label: "paid late", color: "var(--color-error)", rank: 0 };
-  if (c.overdue) return { label: "past deadline", color: "var(--color-copper)", title: "Marked paid late on-chain at the next refresh.", rank: 1 };
-  if (c.stage === "filed") return { label: "awaiting payment", color: "var(--color-text-3)", title: "Filed, not paid yet. The deadline to reach the landlord starts at payment.", rank: 2 };
-  return { label: "on time", color: "var(--color-text-3)", rank: 3 };
+/** Stage of one claim from its filing account: awaiting payment, paid (PIX pending), or settled. */
+export function claimStatus(c: ClaimRow): Status {
+  if (c.stage === "filed") return { label: "awaiting payment", color: "var(--color-text-3)", title: "Filed, not paid yet.", rank: 0 };
+  if (c.stage === "paid") return { label: "paid", color: "var(--color-text-3)", title: "Paid from the reserve; the landlord has not received it by PIX yet.", rank: 1 };
+  return { label: "settled", color: "var(--color-text-3)", rank: 2 };
 }
 
 /** 6px square badge with a mono label (brand status mark, no fill behind the text). */
@@ -58,7 +59,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [all, setAll] = useState(false);
   // Stable sort: exceptions first, newest filing within each group (claimsTimeline returns newest first).
-  const sorted = [...rows].sort((a, b) => slaStatus(a).rank - slaStatus(b).rank);
+  const sorted = [...rows].sort((a, b) => claimStatus(a).rank - claimStatus(b).rank);
   const visible = all ? sorted : sorted.slice(0, PAGE);
   const toggle = (id: string) =>
     setOpen((prev) => {
@@ -84,7 +85,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                   toggle(c.filing);
                 }}
               >
-                <td><StatusBadge s={slaStatus(c)} /></td>
+                <td><StatusBadge s={claimStatus(c)} /></td>
                 <td>
                   <span className="inline-flex items-baseline gap-2">
                     <Explorer value={c.guarantee} label={short(c.guaranteeId)} />
@@ -118,7 +119,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                       <Detail label="Filed">
                         <Explorer value={c.filing} label={fmtTime(c.filedAt)} />
                       </Detail>
-                      <Detail label="Paid">{c.payout && c.paidAt !== null ? <Explorer value={c.payout} label={fmtTime(c.paidAt)} /> : <span className="font-body text-(--color-text-3)">not paid yet</span>}</Detail>
+                      <Detail label="Paid">{c.paidAt !== null ? <Explorer value={c.filing} label={fmtTime(c.paidAt)} /> : <span className="font-body text-(--color-text-3)">not paid yet</span>}</Detail>
                       <Detail label="Received by landlord (PIX)">
                         {c.settledAt !== null ? <Mono style={{ fontSize: 12 }}>{fmtTime(c.settledAt)}</Mono> : <span className="font-body text-(--color-text-3)" style={{ fontSize: 12 }}>pending</span>}
                       </Detail>

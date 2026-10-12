@@ -12,7 +12,7 @@ Live: [reserve.mutav.finance](https://reserve.mutav.finance).
 | `/reserve` | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Explorer, and the permissionless `refresh`; snapshot charts of each |
 | `/investor` | The capital provider's view: allowlist status (on-chain root + `ALLOWLIST`), position, own queue entries, and `request_deposit` / `cancel_deposit` / `claim_shares` / `request_redeem` / `cancel_redeem` / `claim_assets`. Read-only unless the wallet's Merkle proof verifies |
 | `/operator` | Operator console: today MUTAV's team signs by hand with the operator wallet (later mutav-app's backend, KMS key). Live limits (claim caps window, payouts vs SLA, free capital), every operator instruction with its bound shown before signing, duties (today → later), recent operator transactions, safety. Actions enabled only for `VaultConfig.operator` |
-| `/demo` | Guided operator demo (six steps, with the solvency-gate preview); free-form operator actions are on `/operator` |
+| `/demo` | Guided operator demo (six steps, with the coverage-gate preview); free-form operator actions are on `/operator` |
 | `/admin` | `VaultConfig`, Squads v4 proposal builders (create / approve / execute, with the time lock), direct signing on localnet only |
 | `/simulator` | The reserve simulator, a standalone page (`public/simulator.html`): reserve sizing, coverage, yield against Selic |
 
@@ -21,9 +21,10 @@ Live: [reserve.mutav.finance](https://reserve.mutav.finance).
 - **Roles.** Every page tags who does what: **Reserve Admin** (Squads multisig, plus the pauser key), **Operator** (MUTAV's operator key), **Investor** (the allowlisted capital provider), and **Anyone** (cranks). The map lives in `lib/roles.ts`, and a unit test checks it against each instruction's signer constraint in `programs/mutav`.
 
 - **Reads** run in route handlers (`app/api/*`) through the protocol client's read helpers and decoders; pages poll them. Every number on screen comes from on-chain accounts. The gate preview uses the client's math mirror and is labelled as a preview.
-- **Writes**: a route composes an **unsigned** transaction (fee payer = the connected wallet), the wallet signs it (wallet-standard `solana:signTransaction`: Phantom, Solflare, Backpack), and `/api/tx/send` relays the signed bytes to the configured cluster. The relay refuses transactions for programs outside the pilot's set. No key exists anywhere in the app.
-- **Admin actions** are Squads v4 vault-transaction proposals (create + the creator's approval, then approvals, then execute after the time lock). On localnet, when `VaultConfig.admin` is not a Squads vault, `/admin` can sign directly, clearly labelled.
-- **Cluster guard**: `NEXT_PUBLIC_CLUSTER` is `localnet` or `devnet`; mainnet is refused by the env parser, the RPC URL check, the relay and the scripts.
+- **Writes**: a route composes an **unsigned** transaction (fee payer = the connected wallet). On **devnet** the wallet signs and sends it through its own RPC (wallet-standard `solana:signAndSendTransaction`: Phantom, Solflare, Backpack) and the app confirms through its read endpoint. On **localnet** the wallet signs (`solana:signTransaction`) and `/api/tx/send` relays the bytes to the local validator; that relay refuses on devnet, caps the body at 4 KB, and accepts only MUTAV, Squads (the configured multisig) and Compute Budget instructions. No key exists anywhere in the app.
+- **Hardening**: every route checks the RPC's genesis hash against the cluster; errors cut URLs to their host (an RPC API key never leaks); read routes are CDN-cached for 3 s and cached in process (3 s, 1 s for a fresh read); every response forbids framing and sniffing; pages carry a nonce CSP in report-only mode (`proxy.ts`). The staged WAF rate limit is in [`docs/waf-rule.md`](docs/waf-rule.md).
+- **Admin actions** are Squads v4 vault-transaction proposals (create + the creator's approval, then approvals, then execute after the time lock). Members can reject or cancel. A `set_config` proposal records the values it was built against in its memo, and this app refuses to execute it once one of them has moved (stale carry). The check is app-side only: executing from the Squads UI or another client skips it. The memo is read back from the history of the proposal's transaction account, so anyone who spams that account with transactions can make this app refuse to execute it (fail closed); the Squads UI remains the fallback. On localnet, when `VaultConfig.admin` is not a Squads vault, `/admin` can sign directly, clearly labelled.
+- **Cluster guard**: `NEXT_PUBLIC_CLUSTER` is `localnet` or `devnet`; mainnet is refused by the env parser, the RPC URL and genesis-hash checks, the relay and the scripts.
 
 ## Setup
 
@@ -43,7 +44,8 @@ Port 3001 is a suggestion: 3000 is often taken by another local project.
 | `PROGRAM_ID` | server, runtime | `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9` |
 | `CONFIG_ADDRESS` | server, runtime | the reserve's `VaultConfig` PDA |
 | `SQUADS_MULTISIG` | server, runtime | the Squads v4 multisig whose vault is `VaultConfig.admin` |
-| `ALLOWLIST` | server, runtime | allowlisted wallets (public), to build `request_deposit` proofs |
+| `ALLOWLIST` | server, runtime | allowlisted wallets (public), to build `request_deposit` proofs; `/admin` proposes its root (`set_allowlist_root`) |
+| `PAYMENTS_OWNER` | server, runtime | optional: the wallet expected to own the payments token account; `/admin` flags a different owner |
 
 Runtime variables are read per request, so a re-seeded localnet needs no rebuild.
 

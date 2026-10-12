@@ -48,10 +48,11 @@ export type IncomeSweptEvent = {
   ts: bigint;
   incomeRefHash: ReadonlyUint8Array;
   period: number;
-  gross: bigint;
-  take: bigint;
-  net: bigint;
+  amount: bigint;
   inboxAfter: bigint;
+  /** Running totals after the sweep. */
+  incomeTotal: bigint;
+  brsBalance: bigint;
 };
 
 export type IncomeSweptEventArgs = {
@@ -59,10 +60,11 @@ export type IncomeSweptEventArgs = {
   ts: number | bigint;
   incomeRefHash: ReadonlyUint8Array;
   period: number;
-  gross: number | bigint;
-  take: number | bigint;
-  net: number | bigint;
+  amount: number | bigint;
   inboxAfter: number | bigint;
+  /** Running totals after the sweep. */
+  incomeTotal: number | bigint;
+  brsBalance: number | bigint;
 };
 
 /** Gets the encoder for {@link IncomeSweptEventArgs} event data. */
@@ -73,10 +75,10 @@ export function getIncomeSweptEventEncoder(): FixedSizeEncoder<IncomeSweptEventA
       ["ts", getI64Encoder()],
       ["incomeRefHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["period", getU32Encoder()],
-      ["gross", getU64Encoder()],
-      ["take", getU64Encoder()],
-      ["net", getU64Encoder()],
+      ["amount", getU64Encoder()],
       ["inboxAfter", getU64Encoder()],
+      ["incomeTotal", getU64Encoder()],
+      ["brsBalance", getU64Encoder()],
     ]),
     [getConstantEncoder(INCOME_SWEPT_EVENT_DISCRIMINATOR)],
   );
@@ -90,10 +92,10 @@ export function getIncomeSweptEventDecoder(): FixedSizeDecoder<IncomeSweptEvent>
       ["ts", getI64Decoder()],
       ["incomeRefHash", fixDecoderSize(getBytesDecoder(), 32)],
       ["period", getU32Decoder()],
-      ["gross", getU64Decoder()],
-      ["take", getU64Decoder()],
-      ["net", getU64Decoder()],
+      ["amount", getU64Decoder()],
       ["inboxAfter", getU64Decoder()],
+      ["incomeTotal", getU64Decoder()],
+      ["brsBalance", getU64Decoder()],
     ]),
     [getConstantDecoder(INCOME_SWEPT_EVENT_DISCRIMINATOR)],
   );

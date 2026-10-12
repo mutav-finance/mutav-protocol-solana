@@ -133,10 +133,15 @@ export type SetPaymentsAccountInput<
   config: TAccountConfig;
   /**
    * The new payments token account (BRS). Its owner is MUTAV's payments
-   * wallet, an off-chain fact; the program records the account.
+   * wallet, an off-chain fact; the program records the account. It may
+   * not be owned by the operator (ADR 0020).
    */
   paymentsAccount: TAccountPaymentsAccount;
-  /** The current treasury token account, to compare (spec §2.1). */
+  /**
+   * The current treasury token account, to compare (spec §2.1). Read
+   * leniently in the handler (`load_money_account`): a closed account is
+   * skipped, so it never blocks replacing the payments account.
+   */
   treasuryAccount: TAccountTreasuryAccount;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
@@ -273,10 +278,15 @@ export type ParsedSetPaymentsAccountInstruction<
     config: TAccountMetas[1];
     /**
      * The new payments token account (BRS). Its owner is MUTAV's payments
-     * wallet, an off-chain fact; the program records the account.
+     * wallet, an off-chain fact; the program records the account. It may
+     * not be owned by the operator (ADR 0020).
      */
     paymentsAccount: TAccountMetas[2];
-    /** The current treasury token account, to compare (spec §2.1). */
+    /**
+     * The current treasury token account, to compare (spec §2.1). Read
+     * leniently in the handler (`load_money_account`): a closed account is
+     * skipped, so it never blocks replacing the payments account.
+     */
     treasuryAccount: TAccountMetas[3];
     eventAuthority: TAccountMetas[4];
     program: TAccountMetas[5];

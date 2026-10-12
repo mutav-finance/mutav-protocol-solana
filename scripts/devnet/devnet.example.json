@@ -1,46 +1,48 @@
 {
-  "_comment": "Devnet deploy config. Copy to a path outside the repo (it names real wallets), fill every <FILL: ...>, and pass it with --config. Values without <FILL> are proposals (spec §8, ADR 0016: c = 0.10); the founder confirms them (spec §12 Q3).",
+  "_comment": "Devnet deploy config. Copy to a path outside the repo (it names real wallets), fill every <FILL: ...>, and pass it with --config. Never put a key in it: addresses only. Two Squads v4 multisigs (spec §12 Q15): `squads` is the admin multisig (its vault is VaultConfig.admin, time lock >= 5 min) and `upgradeSquads` holds the program upgrade authority (time lock >= 1 h). The scripts derive each vault from multisig + vaultIndex and require it to equal `admin` / `upgradeAuthority`; deploy.ts and verify.ts require each multisig to be owned by the Squads v4 program, autonomous, with exactly these members (each able to vote), exactly this threshold and a time lock at or above the floor. Values without <FILL> are the locked devnet values (c = 0.25 and the caps of ADR 0028; fee take 2000); verify.ts checks them on-chain.",
   "cluster": "devnet",
   "programId": "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9",
   "reserveMint": "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4",
   "reserveTokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   "squads": {
-    "multisig": "<FILL: Squads v4 multisig address (members and threshold set at its creation)>",
+    "_comment": "Admin multisig: 2-of-2, time lock >= 300 s on devnet (24 h on the real pilot).",
+    "multisig": "<FILL: admin Squads v4 multisig address>",
     "vaultIndex": 0,
-    "timeLockFloorSecs": "<FILL: agreed time-lock floor in seconds (spec §12 Q15)>"
+    "members": ["<FILL: member 1 (Julia)>", "<FILL: member 2 (Draau stand-in on devnet)>"],
+    "threshold": 2,
+    "timeLockFloorSecs": 300
   },
-  "admin": "<FILL: the Squads vault (index above) — VaultConfig.admin>",
-  "upgradeAuthority": "<FILL: the vault that holds the upgrade authority — the same vault under Q15 option (a), the upgrade multisig's vault under (b)>",
+  "upgradeSquads": {
+    "_comment": "Upgrade multisig: same members, 2-of-2, time lock >= 3600 s on devnet (7 days on the real pilot).",
+    "multisig": "<FILL: upgrade Squads v4 multisig address>",
+    "vaultIndex": 0,
+    "members": ["<FILL: member 1 (Julia)>", "<FILL: member 2 (Draau stand-in on devnet)>"],
+    "threshold": 2,
+    "timeLockFloorSecs": 3600
+  },
+  "admin": "<FILL: the admin multisig's vault (index above): VaultConfig.admin>",
+  "upgradeAuthority": "<FILL: the upgrade multisig's vault (index above): the program upgrade authority>",
   "operator": "<FILL: operator pubkey — the KMS key from mutav-app, or a devnet test key>",
   "pauser": "<FILL: pauser pubkey>",
   "mutavCapitalWallet": "<FILL: MUTAV capital wallet (owns neither money account)>",
   "treasuryAccount": "<FILL: BRS token account receiving MUTAV's fee take>",
   "paymentsAccount": "<FILL: BRS token account receiving claim payments>",
-  "coverageRatioBps": 1000,
-  "feeTakeBps": "<FILL: take rate in bps, at most 3000 (spec §12 Q4)>",
-  "payoutSlaSecs": 172800,
+  "coverageRatioBps": 2500,
+  "feeTakeBps": 2000,
   "caps": {
-    "_comment": "BRS base units (6 dp). Sized for c = 0.10 (ADR 0016): R$300k reserve, R$40k per guarantee, R$10M per agency (well above maxTvl / 0.10 = R$3M, leaving room for fee growth, so it never binds while MUTAV's operator allocates every lease to this reserve), R$10k / R$20k claim payments per call / per 30 days, TESOURO 0% (no adapter on devnet), requests R$1k–R$100k, partial-fill floor R$500.",
-    "maxTvl": 300000000000,
-    "maxCoverPerGuarantee": 40000000000,
-    "maxCoverPerAgency": 10000000000000,
-    "maxClaimPerCall": 10000000000,
+    "_comment": "BRS base units (6 dp). The pilot parameters (ADR 0028, superseding the devnet caps of ADR 0016 / ADR 0022): c = 0.25, R$1M reserve (max_tvl), R$120k per guarantee, R$15k / R$20k claim payments per call / per 31 days (a 6x-rent eviction fits the per-call cap; the bounded loss from a compromised operator is R$20k per 31 days, about 2% of max_tvl), stress buffer R$19k, requests R$1k–R$100k. maxNavMoveBps is 10000 (100%) on devnet on purpose: the guard nets out guarantee fees and swept income per share (ADR 0017), but a claim provision or payment against a small demo reserve is a real NAV move and would trip it and halt fulfilment. If it trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
+    "maxTvl": 1000000000000,
+    "maxCoverPerGuarantee": 120000000000,
+    "maxClaimPerCall": 15000000000,
     "maxClaimPerPeriod": 20000000000,
-    "claimPeriodSecs": 2592000,
-    "maxTesouroShareBps": 0,
     "minRequest": 1000000000,
     "maxRequest": 100000000000,
-    "minFillAssets": 500000000
+    "maxNavMoveBps": 10000,
+    "stressBuffer": 19000000000
   },
-  "price": {
-    "_comment": "TESOURO is not held in the pilot (no adapter), so the price fields are placeholders. maxNavMoveBps is 10000 (100%) on devnet on purpose: the NAV-move guard measures the move gross, so a large guarantee-fee batch or claim payment against a small demo reserve would trip it and halt fulfilment. The inflow-adjusted guard is ADR 0013 (pending); until then, if the guard trips, the admin clears it with clear_fulfil_halt (ADR 0015). Lower it for the real pilot.",
-    "tesouroPriceAccount": "11111111111111111111111111111111",
-    "p0": 1000000000,
-    "t0": 0,
-    "yMaxBps": 1500,
-    "maxStalenessSecs": 86400,
-    "maxDeviationBps": 200,
-    "maxNavMoveBps": 10000
-  },
-  "allowlist": ["<FILL: MUTAV capital wallet, plus any devnet investor wallets>"]
+  "_guardians": "Optional pause-only guardian keys (set_guardians, at most 3, distinct, none an admin/operator/pauser key). Empty means none; verify.ts fails if the chain's guardians differ. roles.ts proposes set_guardians when they do.",
+  "guardians": [],
+  "allowlist": [
+    "<FILL: MUTAV capital wallet, plus any devnet investor wallets>"
+  ]
 }

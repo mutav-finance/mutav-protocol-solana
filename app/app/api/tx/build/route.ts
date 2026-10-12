@@ -1,12 +1,14 @@
 import { address } from "@solana/kit";
-import { readLedger, readReserve, rpcFor } from "@/lib/server/chain";
+import { guardedEnv, readDepositQueue, readReserve, rpcFor } from "@/lib/server/chain";
 import { ComposeError, composeInstructions, describeInstructions, isAdminKind, refuseOverlappingSetConfig, unsignedTransaction } from "@/lib/server/compose";
-import { serverEnv } from "@/lib/server/env";
 import { errorResponse } from "@/lib/server/respond";
-import { composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
+import { boundedBody } from "@/lib/server/relay";
+import { assertMember, composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 import type { TxRequest } from "@/lib/tx-kinds";
 import { MockChainError, mockEnabled } from "@/lib/server/mock";
+import { baselineMemo, setConfigFields } from "@/lib/config-diff";
+import { identifyMutavInstruction, MutavInstruction } from "@mutav-finance/mutav-protocol-solana";
 
 export type BuildBody = {
   request: TxRequest;
@@ -23,24 +25,40 @@ export type BuildBody = {
 export async function POST(req: Request) {
   try {
     if (mockEnabled()) throw new MockChainError();
-    const body = decode<BuildBody>(await req.text());
-    const env = serverEnv();
+    const body = decode<BuildBody>(await boundedBody(req));
+    const env = await guardedEnv();
     const signer = address(body.signer);
+    const admin = isAdminKind(body.request);
+    const viaSquads = admin && (body.via ?? "squads") === "squads";
+    // Refuse what the env alone refuses before any chain read: a request
+    // that will be refused costs no RPC.
+    if (viaSquads && !env.squadsMultisig) throw new ComposeError("SQUADS_MULTISIG is not set: no Squads proposal can be built");
+    if (admin && !viaSquads && env.cluster !== "localnet") {
+      throw new ComposeError("direct admin signing is localnet-only; on devnet the admin is a Squads vault");
+    }
     const reserve = await readReserve(env);
-    const ledger = body.request.kind === "refresh" ? await readLedger(env, reserve) : undefined;
+    const vault = viaSquads ? address(vaultAddress(env.squadsMultisig!)) : null;
+    if (vault && reserve.config.admin !== vault) throw new ComposeError(`VaultConfig.admin ${reserve.config.admin} is not the Squads vault ${vault}`);
+    // Only a deposit fill needs chain data beyond the reserve: the pending
+    // queue from the head (no program-account scans, no capital events).
+    // A proposal is built only for a multisig member (one account read, before the queue or proposal scans).
+    if (vault) await assertMember(env, signer);
+    const ledger = body.request.kind === "fulfil_deposits" ? { deposits: await readDepositQueue(env, reserve, body.request.count) } : undefined;
     const ctx = { reserve, ledger, allowlist: env.allowlist, env };
 
-    if (isAdminKind(body.request) && (body.via ?? "squads") === "squads") {
-      if (!env.squadsMultisig) throw new ComposeError("SQUADS_MULTISIG is not set: no Squads proposal can be built");
-      const vault = address(vaultAddress(env.squadsMultisig));
-      if (reserve.config.admin !== vault) throw new ComposeError(`VaultConfig.admin ${reserve.config.admin} is not the Squads vault ${vault}`);
+    if (vault) {
       if (body.request.kind === "set_config") refuseOverlappingSetConfig((await readMultisig(env, reserve.now)).proposals);
       const inner = await composeInstructions(body.request, vault, ctx);
-      const { tx, index } = await composeProposalCreate(env, signer, inner, `mutav ${body.request.kind}`);
+      // A set_config proposal records the values it was built against (A3 stale-carry check at execute).
+      const setConfig = inner.find((ix) => ix.data && ix.data.length >= 8 && identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig);
+      let memo = `mutav ${body.request.kind}`;
+      if (setConfig) {
+        const baseline = baselineMemo(setConfigFields(new Uint8Array(setConfig.data!)), reserve.config);
+        if (baseline === null) throw new ComposeError("this set_config changes too many fields to record their current values in the proposal memo (needed for the stale-carry check at execute): split it into smaller proposals");
+        memo = baseline;
+      }
+      const { tx, index } = await composeProposalCreate(env, signer, inner, memo);
       return jsonResponse({ tx, proposalIndex: index, instructions: describeInstructions(inner, reserve.config), via: "squads" });
-    }
-    if (isAdminKind(body.request) && env.cluster !== "localnet") {
-      throw new ComposeError("direct admin signing is localnet-only; on devnet the admin is a Squads vault");
     }
 
     const ixs = await composeInstructions(body.request, signer, ctx);

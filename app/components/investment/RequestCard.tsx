@@ -15,11 +15,15 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Action, Note, useLive } from "@/components/demo/shared";
 import { LABEL, TRACKING } from "./shared";
-import { BRS_DECIMALS, SHARE_DECIMALS, fmtShares, fmtUnits, parseBrs } from "@/lib/format";
+import { BRS_DECIMALS, SHARE_DECIMALS, fmtShares, fmtUnits, parseBrs, parseUnitsOrZero, toInput } from "@/lib/format";
+import { limitWithSlippage } from "@/lib/queue";
 import type { Money } from "@/lib/client/use-money";
 import type { InvestorView } from "@/lib/server/investor";
 
 type Side = "deposit" | "redeem";
+
+/** Room left for the NAV to move between the request and its fill, in the "limit at preview" price limit. */
+const LIMIT_SLIPPAGE_BPS = 100;
 
 /** One field of the form: label, a large amount, the unit, and a balance line. */
 function Field({ id, title, unit, value, onChange, foot, readOnly }: { id: string; title: string; unit: string; value: string; onChange?: (v: string) => void; foot: ReactNode; readOnly?: boolean }) {
@@ -50,13 +54,15 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
   const { reserve } = useLive();
   const caps = reserve.config.caps;
   const { sharesOutstanding } = reserve.state;
-  const { netAssets } = reserve.solvency;
+  const { netAssets } = reserve.coverage;
   const state = inv?.allowlist.state ?? null;
   const paused = reserve.config.paused;
   const canRequest = connected && state === "allowlisted" && !paused;
 
   const [side, setSide] = useState<Side>("deposit");
   const [input, setInput] = useState("");
+  // Price limit (min shares out / min BRS out). Blank = no limit (0 on-chain).
+  const [limit, setLimit] = useState("");
   const deposit = side === "deposit";
   const amount = parseBrs(input, deposit ? BRS_DECIMALS : SHARE_DECIMALS);
   const preview = amount ? (deposit ? sharesFor(amount, sharesOutstanding, netAssets) : assetsFor(amount, sharesOutstanding, netAssets)) : null;
@@ -66,9 +72,13 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
 
   const balance = deposit ? (inv?.brs.amount ?? null) : (inv?.shares.amount ?? null);
   const decimals = deposit ? BRS_DECIMALS : SHARE_DECIMALS;
+  const overBalance = !deposit && amount !== null && balance !== null && amount > balance;
+  const outDecimals = deposit ? SHARE_DECIMALS : BRS_DECIMALS;
+  const minOut = limit.trim() ? parseUnitsOrZero(limit, outDecimals) : 0n;
   const switchTo = (s: Side) => {
     setSide(s);
     setInput("");
+    setLimit("");
   };
   const blocked = paused ? null : !connected ? "Connect an approved wallet to request." : state === null ? "Checking access…" : canRequest ? null : "This wallet isn't approved. Access is by allowlist (KYC off-chain).";
 
@@ -114,6 +124,23 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
             readOnly
             foot={<span>{value !== null && money.fx ? `≈ ${money.fmt(value)} · ` : ""}At today&apos;s share price. The fill price sets the final amount.</span>}
           />
+          <Field
+            id="inv-limit"
+            title={deposit ? "Price limit: min shares (blank = none)" : "Price limit: min BRS (blank = none)"}
+            unit={deposit ? "shares" : "BRS"}
+            value={limit}
+            onChange={setLimit}
+            foot={
+              <>
+                <span>A fill below the limit stops at your request, which stays pending: you (or the admin) can cancel it.</span>
+                {preview !== null && preview > 0n && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setLimit(toInput(limitWithSlippage(preview, LIMIT_SLIPPAGE_BPS), outDecimals))} className="h-6 shrink-0 px-2 text-2xs">
+                    Preview − 1%
+                  </Button>
+                )}
+              </>
+            }
+          />
         </div>
 
         <p className="font-mono text-(--color-text-3) m-0 text-2xs">
@@ -122,13 +149,15 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
         {blocked && <p className="font-body text-(--color-text-2) m-0 text-center text-xs">{blocked}</p>}
         <div className="[&>div>button]:h-11 [&>div>button]:w-full [&>div>button:disabled]:bg-(--color-surface-3) [&>div>button:disabled]:text-(--color-text-3) [&>div>button:disabled]:opacity-100">
           {deposit ? (
-            <Action label="Request deposit" disabled={!canRequest} request={amount ? { kind: "request_deposit", assets: amount } : null} />
+            <Action label="Request deposit" disabled={!canRequest} request={amount && minOut !== null ? { kind: "request_deposit", assets: amount, minSharesOut: minOut } : null} />
           ) : (
-            <Action label="Request redemption" disabled={!canRequest} request={amount ? { kind: "request_redeem", shares: amount } : null} />
+            <Action label="Request redemption" disabled={!canRequest} request={amount && minOut !== null ? { kind: "request_redeem", shares: amount, minAssetsOut: minOut } : null} />
           )}
         </div>
         {paused && <Note tone="warn">Requests are paused by the Reserve Admin. Cancel and collect stay open.</Note>}
         {outside && <Note tone="warn">Outside the per-request limits: the program will refuse it.</Note>}
+        {overBalance && <Note tone="warn">More than this wallet holds ({fmtShares(balance!)}): the program will refuse it.</Note>}
+        {minOut === null && <Note tone="warn">The price limit is not {deposit ? "a share amount" : "a BRS amount"}.</Note>}
       </div>
       <HowItWorks />
     </section>

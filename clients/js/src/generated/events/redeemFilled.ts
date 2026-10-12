@@ -12,8 +12,6 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getBooleanDecoder,
-  getBooleanEncoder,
   getBytesEncoder,
   getConstantDecoder,
   getConstantEncoder,
@@ -46,11 +44,9 @@ export type RedeemFilledEvent = {
   ts: bigint;
   owner: Address;
   seq: bigint;
-  sharesFilled: bigint;
+  shares: bigint;
   assets: bigint;
   nav: bigint;
-  sharesRemaining: bigint;
-  partial: boolean;
 };
 
 export type RedeemFilledEventArgs = {
@@ -58,11 +54,9 @@ export type RedeemFilledEventArgs = {
   ts: number | bigint;
   owner: Address;
   seq: number | bigint;
-  sharesFilled: number | bigint;
+  shares: number | bigint;
   assets: number | bigint;
   nav: number | bigint;
-  sharesRemaining: number | bigint;
-  partial: boolean;
 };
 
 /** Gets the encoder for {@link RedeemFilledEventArgs} event data. */
@@ -73,11 +67,9 @@ export function getRedeemFilledEventEncoder(): FixedSizeEncoder<RedeemFilledEven
       ["ts", getI64Encoder()],
       ["owner", getAddressEncoder()],
       ["seq", getU64Encoder()],
-      ["sharesFilled", getU64Encoder()],
+      ["shares", getU64Encoder()],
       ["assets", getU64Encoder()],
       ["nav", getU64Encoder()],
-      ["sharesRemaining", getU64Encoder()],
-      ["partial", getBooleanEncoder()],
     ]),
     [getConstantEncoder(REDEEM_FILLED_EVENT_DISCRIMINATOR)],
   );
@@ -91,11 +83,9 @@ export function getRedeemFilledEventDecoder(): FixedSizeDecoder<RedeemFilledEven
       ["ts", getI64Decoder()],
       ["owner", getAddressDecoder()],
       ["seq", getU64Decoder()],
-      ["sharesFilled", getU64Decoder()],
+      ["shares", getU64Decoder()],
       ["assets", getU64Decoder()],
       ["nav", getU64Decoder()],
-      ["sharesRemaining", getU64Decoder()],
-      ["partial", getBooleanDecoder()],
     ]),
     [getConstantDecoder(REDEEM_FILLED_EVENT_DISCRIMINATOR)],
   );

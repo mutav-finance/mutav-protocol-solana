@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { capitalSplit, claimSpeed, coverBars, flowBars, frac, navBasis, solvencyMeter } from "../charts";
+import { capitalSplit, claimSpeed, coverBars, flowBars, frac, navBasis, coverageMeter } from "../charts";
 import type { ClaimRow, CoverageRow } from "../view";
 import { BRL } from "./fixtures";
 
@@ -12,18 +12,18 @@ describe("chart shaping", () => {
   });
 
   it("splits a covered reserve into backing and surplus", () => {
-    const m = solvencyMeter({ stableAssets: 28_300n * BRL, coverageRequired: 19_500n * BRL, freeCapital: 8_800n * BRL });
+    const m = coverageMeter({ stableAssets: 28_300n * BRL, coverageRequired: 19_500n * BRL, freeCapital: 8_800n * BRL });
     expect(m).toMatchObject({ axis: 28_300n * BRL, backing: 19_500n * BRL, surplus: 8_800n * BRL, shortfall: 0n, underCovered: false });
     expect(m.coveredBps).toBe(14_512n);
   });
 
   it("shows the shortfall of an under-covered reserve on the same axis", () => {
-    const m = solvencyMeter({ stableAssets: 10_000n * BRL, coverageRequired: 15_000n * BRL, freeCapital: 0n });
+    const m = coverageMeter({ stableAssets: 10_000n * BRL, coverageRequired: 15_000n * BRL, freeCapital: 0n });
     expect(m).toMatchObject({ axis: 15_000n * BRL, backing: 10_000n * BRL, surplus: 0n, shortfall: 5_000n * BRL, underCovered: true });
   });
 
   it("reports no coverage ratio when nothing is covered", () => {
-    expect(solvencyMeter({ stableAssets: 1n, coverageRequired: 0n, freeCapital: 1n }).coveredBps).toBeNull();
+    expect(coverageMeter({ stableAssets: 1n, coverageRequired: 0n, freeCapital: 1n }).coveredBps).toBeNull();
   });
 
   it("splits stable assets into net assets and provisions", () => {
@@ -39,13 +39,13 @@ describe("chart shaping", () => {
   });
 
   it("measures claim speed from on-chain timestamps, including pending time so far", () => {
-    const base = { guarantee: "G", guaranteeId: "g", leg: "default", noticeRefHash: "", provision: 0n, amount: 0n, pixE2eHash: null, lateOnChain: false, overdue: false } as const;
+    const base = { guarantee: "G", guaranteeId: "g", leg: "default", noticeRefHash: "", provision: 0n, amount: 0n, pixE2eHash: null } as const;
     const rows = [
-      { ...base, filing: "F2", filedAt: 200n, paidAt: 260n, settledAt: null, stage: "paid", fileToPay: 60n, payToSettle: null, payout: "P2" },
-      { ...base, filing: "F1", filedAt: 100n, paidAt: 110n, settledAt: 140n, stage: "settled", fileToPay: 10n, payToSettle: 30n, payout: "P1" },
-      { ...base, filing: "F3", filedAt: 300n, paidAt: null, settledAt: null, stage: "filed", fileToPay: null, payToSettle: null, payout: null },
+      { ...base, filing: "F2", filedAt: 200n, paidAt: 260n, settledAt: null, stage: "paid", fileToPay: 60n, payToSettle: null },
+      { ...base, filing: "F1", filedAt: 100n, paidAt: 110n, settledAt: 140n, stage: "settled", fileToPay: 10n, payToSettle: 30n },
+      { ...base, filing: "F3", filedAt: 300n, paidAt: null, settledAt: null, stage: "filed", fileToPay: null, payToSettle: null },
     ] as ClaimRow[];
-    const s = claimSpeed(rows, 50n, 400n);
+    const s = claimSpeed(rows, 400n);
     expect(s.claims.map((c) => [c.filing, c.fileToPay, c.payToSettle, c.pending])).toEqual([
       ["F1", 10n, 30n, false],
       ["F2", 60n, 140n, true],
@@ -53,30 +53,26 @@ describe("chart shaping", () => {
     ]);
     expect(s.payAxis).toBe(60n);
     expect(s.settleAxis).toBe(140n);
-    expect(claimSpeed(rows.slice(1, 2), 500n, 400n).settleAxis).toBe(500n);
   });
 
   it("totals flows by kind with the role that moved them", () => {
-    const { bars, axis } = flowBars({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, incomeNetToReserve: 1_500n, incomeTakeToTreasury: 0n, claimsPaid: 2_500n, depositsIn: 0n, redemptionsOut: 0n });
+    const { bars, axis } = flowBars({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, incomeNetToReserve: 1_500n, claimsPaid: 2_500n, depositsIn: 0n, redemptionsOut: 0n });
     expect(axis).toBe(2_500n);
     expect(bars.find((b) => b.key === "claims")).toMatchObject({ direction: "out", by: "operator", source: "state" });
     expect(bars.find((b) => b.key === "deposits")).toMatchObject({ direction: "in", by: "admin", requestedBy: "investor", source: "events" });
     expect(bars.find((b) => b.key === "take")).toMatchObject({ direction: "outside" });
-    // ADR 0017: issuer income flows in, swept by the operator; with a 0 take there is no take bar.
+    // ADR 0017: issuer income flows in, swept by the operator; there is no take on it (ADR 0019).
     expect(bars.find((b) => b.key === "income")).toMatchObject({ direction: "in", by: "operator", amount: 1_500n, source: "state" });
-    expect(bars.find((b) => b.key === "income-take")).toBeUndefined();
-    const withTake = flowBars({ feesNetToReserve: 0n, feeTakeToTreasury: 0n, incomeNetToReserve: 750n, incomeTakeToTreasury: 250n, claimsPaid: 0n, depositsIn: 0n, redemptionsOut: 0n });
-    expect(withTake.bars.find((b) => b.key === "income-take")).toMatchObject({ direction: "outside", amount: 250n });
   });
 
-  it("splits covered stable assets into provisions, the rest of required, earmark and free capital", () => {
-    const s = capitalSplit({ stableAssets: 58_700n * BRL, coverageRequired: 3_500n * BRL, earmarkEff: 200n * BRL, freeCapital: 55_000n * BRL }, 3_200n * BRL);
-    expect(s).toMatchObject({ provisions: 3_200n * BRL, restRequired: 300n * BRL, earmark: 200n * BRL, freeCapital: 55_000n * BRL, shortfall: 0n, axis: 58_700n * BRL });
-    expect(s.provisions + s.restRequired + s.earmark + s.freeCapital).toBe(s.stableAssets);
+  it("splits covered stable assets into provisions, the rest of required and free capital", () => {
+    const s = capitalSplit({ stableAssets: 58_700n * BRL, coverageRequired: 3_500n * BRL, freeCapital: 55_200n * BRL }, 3_200n * BRL);
+    expect(s).toMatchObject({ provisions: 3_200n * BRL, restRequired: 300n * BRL, freeCapital: 55_200n * BRL, shortfall: 0n, axis: 58_700n * BRL });
+    expect(s.provisions + s.restRequired + s.freeCapital).toBe(s.stableAssets);
   });
 
   it("commits every held unit and reports the shortfall when under-covered", () => {
-    const s = capitalSplit({ stableAssets: 3_100n * BRL, coverageRequired: 3_500n * BRL, earmarkEff: 0n, freeCapital: 0n }, 3_200n * BRL);
+    const s = capitalSplit({ stableAssets: 3_100n * BRL, coverageRequired: 3_500n * BRL, freeCapital: 0n }, 3_200n * BRL);
     expect(s).toMatchObject({ provisions: 3_100n * BRL, restRequired: 0n, freeCapital: 0n, shortfall: 400n * BRL, axis: 3_500n * BRL });
   });
 });

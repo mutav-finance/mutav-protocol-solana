@@ -11,11 +11,8 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
-  AGENCY_EXPOSURE_DISCRIMINATOR,
   CLAIM_FILING_DISCRIMINATOR,
-  FEE_RECEIPT_DISCRIMINATOR,
   INCOME_RECEIPT_DISCRIMINATOR,
-  PAYOUT_DISCRIMINATOR,
   fetchIncomeInbox,
   findIncomeReceiptPda,
   getIncomeReceiptDecoder,
@@ -26,23 +23,20 @@ import {
   getGuaranteeDecoder,
   fetchVaultConfig,
   fetchVaultState,
-  findAgencyExposurePda,
   findDepositRequestPda,
   findFeeReceiptPda,
   findRedeemRequestPda,
   findReserveAddresses,
-  getAgencyExposureDecoder,
   getClaimFilingDecoder,
-  getFeeReceiptDecoder,
-  getPayoutDecoder,
-  solvencyFromAccounts,
+  coverageFromAccounts,
   DEPOSITS_FULFILLED_EVENT_DISCRIMINATOR,
   REDEEMS_FULFILLED_EVENT_DISCRIMINATOR,
   getDepositsFulfilledEventDecoder,
   getRedeemsFulfilledEventDecoder,
 } from "@mutav-finance/mutav-protocol-solana";
 import { fetchEncodedAccount, getAddressDecoder } from "@solana/kit";
-import type { CapitalEvent, Ledger, ReserveView, Row, TokenFacts } from "../view";
+import type { CapitalEvent, Ledger, PaymentsFacts, ReserveView, Row, TokenFacts } from "../view";
+import { assertGenesis } from "../cluster";
 import { serverEnv, type ServerEnv } from "./env";
 
 export class NotConfiguredError extends Error {
@@ -53,6 +47,26 @@ let cached: { url: string; rpc: ReturnType<typeof createSolanaRpc> } | null = nu
 export function rpcFor(env: ServerEnv) {
   if (!cached || cached.url !== env.rpcUrl) cached = { url: env.rpcUrl, rpc: createSolanaRpc(env.rpcUrl) };
   return cached.rpc;
+}
+
+/** One genesis check per RPC URL per server instance (A4); a failed check is retried on the next request. */
+const genesisChecked = new Map<string, Promise<void>>();
+
+export function assertClusterGenesis(env: ServerEnv, read = async () => String(await rpcFor(env).getGenesisHash().send())): Promise<void> {
+  let p = genesisChecked.get(env.rpcUrl);
+  if (!p) {
+    p = read().then((hash) => assertGenesis(hash, env.cluster, env.rpcUrl));
+    p.catch(() => genesisChecked.delete(env.rpcUrl));
+    genesisChecked.set(env.rpcUrl, p);
+  }
+  return p;
+}
+
+/** The server env, after the RPC's genesis hash matched the cluster. Every route starts here. */
+export async function guardedEnv(): Promise<ServerEnv> {
+  const env = serverEnv();
+  await assertClusterGenesis(env);
+  return env;
 }
 
 /** Reads see a transaction as soon as it confirms (the RPC default is finalized, ~13 s behind). */
@@ -84,16 +98,13 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
   if (addresses.config !== env.configAddress) {
     throw new Error(`CONFIG_ADDRESS ${env.configAddress} is not the config PDA of its reserve mint under ${env.programId}`);
   }
-  const [state, clock, token, inbox] = await Promise.all([
+  const [state, clock, token, inbox, payments] = await Promise.all([
     fetchVaultState(rpc, addresses.state, READ),
     clusterNow(env),
     readTokenFacts(env, config.data.reserveMint, addresses.reserve),
     // ADR 0017: issuer income paid and not swept yet (never in NAV).
-    fetchIncomeInbox(rpc, {
-      vaultAuthority: addresses.vaultAuthority,
-      reserveMint: config.data.reserveMint,
-      tokenProgram: config.data.reserveTokenProgram,
-    }),
+    fetchIncomeInbox(rpc, { vaultAuthority: addresses.vaultAuthority, config: config.data }),
+    readPaymentsFacts(env, config.data.paymentsAccount),
   ]);
   return {
     cluster: env.cluster,
@@ -102,11 +113,35 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
     addresses,
     config: config.data,
     state: state.data,
-    solvency: solvencyFromAccounts(config.data, state.data),
+    coverage: coverageFromAccounts(config.data, state.data),
     now: clock.now,
     slot: clock.slot,
     token,
     incomeInbox: { address: inbox.address, exists: inbox.exists, amount: inbox.amount },
+    payments,
+  };
+}
+
+/**
+ * The payments token account's SPL facts (account layout: mint [0..32),
+ * owner [32..64), delegate option [72..76) + key [76..108), state [108],
+ * close-authority option [129..133) + key [133..165)).
+ */
+async function readPaymentsFacts(env: ServerEnv, account: Address): Promise<PaymentsFacts> {
+  const a = await fetchEncodedAccount(rpcFor(env), account, READ);
+  const expectedOwner = env.paymentsOwner;
+  if (!a.exists || (a.data as Uint8Array).length < 165) return { exists: false, owner: null, mint: null, delegate: null, closeAuthority: null, frozen: false, expectedOwner };
+  const d = a.data as Uint8Array;
+  const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
+  const ad = getAddressDecoder();
+  return {
+    exists: true,
+    mint: ad.decode(d.subarray(0, 32)),
+    owner: ad.decode(d.subarray(32, 64)),
+    delegate: dv.getUint32(72, true) === 1 ? ad.decode(d.subarray(76, 108)) : null,
+    frozen: d[108] === 2,
+    closeAuthority: dv.getUint32(129, true) === 1 ? ad.decode(d.subarray(133, 165)) : null,
+    expectedOwner,
   };
 }
 
@@ -152,38 +187,64 @@ const seqRange = (next: bigint) => {
   return Array.from({ length: Number(next - from) }, (_, i) => from + BigInt(i));
 };
 
+/** Accounts per getMultipleAccounts call (the RPC limit is 100). */
+const ACCOUNT_BATCH = 100;
+
+/** The deposit seqs still in the queue, head first: [depositHead, nextDepositSeq), at most min(max, MAX_SEQS). */
+export function depositQueueSeqs(state: Pick<ReserveView["state"], "depositHead" | "nextDepositSeq">, max = Number(MAX_SEQS)): bigint[] {
+  const { depositHead: head, nextDepositSeq: next } = state;
+  const cap = BigInt(Math.max(0, Math.min(Math.floor(max), Number(MAX_SEQS))));
+  const end = next - head > cap ? head + cap : next;
+  const out: bigint[] = [];
+  for (let s = head; s < end; s++) out.push(s);
+  return out;
+}
+
+/**
+ * The pending deposit requests a fill may include, and nothing else: only the
+ * DepositRequest PDAs from the head to the next seq (no program-account scans,
+ * no capital events), at most `count` (the fill's), for `fulfil_deposits`.
+ */
+export async function readDepositQueue(env: ServerEnv, reserve: ReserveView, count = Number(MAX_SEQS)): Promise<Ledger["deposits"]> {
+  const config = reserve.addresses.config as Address;
+  const o = { programAddress: env.programId };
+  const addrs = await Promise.all(depositQueueSeqs(reserve.state, count).map(async (seq) => (await findDepositRequestPda({ config, seq }, o))[0]));
+  const out: Ledger["deposits"] = [];
+  for (let k = 0; k < addrs.length; k += ACCOUNT_BATCH) {
+    const accs = await fetchAllMaybeDepositRequest(rpcFor(env), addrs.slice(k, k + ACCOUNT_BATCH), READ);
+    for (const a of accs) if (a.exists) out.push({ address: a.address, data: a.data });
+  }
+  return out;
+}
+
 export async function readLedger(env = serverEnv(), reserve?: ReserveView): Promise<Ledger> {
   const r = reserve ?? (await readReserve(env));
   const rpc = rpcFor(env);
   const o = { programAddress: env.programId };
   const config = r.addresses.config as Address;
 
-  const [guaranteesAll, filingsAll, payoutsAll, exposuresAll, feesAll, incomeAll] = await Promise.all([
+  const [guaranteesAll, filingsAll, receiptsAll] = await Promise.all([
     scan(env, GUARANTEE_DISCRIMINATOR, (b) => getGuaranteeDecoder().decode(b)),
     scan(env, CLAIM_FILING_DISCRIMINATOR, (b) => getClaimFilingDecoder().decode(b)),
-    scan(env, PAYOUT_DISCRIMINATOR, (b) => getPayoutDecoder().decode(b)),
-    scan(env, AGENCY_EXPOSURE_DISCRIMINATOR, (b) => getAgencyExposureDecoder().decode(b)),
-    scan(env, FEE_RECEIPT_DISCRIMINATOR, (b) => getFeeReceiptDecoder().decode(b)),
     scan(env, INCOME_RECEIPT_DISCRIMINATOR, (b) => getIncomeReceiptDecoder().decode(b)),
   ]);
+  // Guarantee fees and issuer income share one receipt type, told apart by
+  // `kind` (ADR 0019): 1 = FEE under the "fee" seed, 0 = ISSUER_STATEMENT.
+  const feesAll = receiptsAll.filter((r) => r.data.kind === 1);
+  const incomeAll = receiptsAll.filter((r) => r.data.kind === 0);
 
-  // Keep only accounts of this reserve: filings and payouts by guarantee, the
-  // rest by re-deriving their PDA under this config.
+  // Keep only accounts of this reserve: filings by guarantee, the rest by
+  // re-deriving their PDA under this config.
   const guaranteeOk = await Promise.all(guaranteesAll.map(async (g) => (await findGuaranteePda({ config, id: g.data.id }, o))[0] === g.address));
   const guarantees = guaranteesAll.filter((_, i) => guaranteeOk[i]);
   const mine = new Set(guarantees.map((g) => g.address as string));
   const filings = filingsAll.filter((f) => mine.has(f.data.guarantee));
-  const payouts = payoutsAll.filter((p) => mine.has(p.data.guarantee));
-  const exposureOk = await Promise.all(
-    exposuresAll.map(async (e) => (await findAgencyExposurePda({ config, agencyId: e.data.agencyId }, o))[0] === e.address),
-  );
   const feeOk = await Promise.all(
-    feesAll.map(async (f) => (await findFeeReceiptPda({ config, invoiceRefHash: f.data.invoiceRefHash }, o))[0] === f.address),
+    feesAll.map(async (f) => (await findFeeReceiptPda({ config, invoiceRefHash: f.data.refHash }, o))[0] === f.address),
   );
   const incomeOk = await Promise.all(
-    incomeAll.map(async (i) => (await findIncomeReceiptPda({ config, incomeRefHash: i.data.incomeRefHash }, o))[0] === i.address),
+    incomeAll.map(async (i) => (await findIncomeReceiptPda({ config, incomeRefHash: i.data.refHash }, o))[0] === i.address),
   );
-  const exposures = exposuresAll.filter((_, i) => exposureOk[i]);
   const blockTimeOf = async (slot: bigint): Promise<bigint | null> => {
     try {
       const t = await rpc.getBlockTime(slot).send();
@@ -212,8 +273,6 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
     capitalEvents,
     guarantees: guarantees.map((g) => ({ address: g.address, data: g.data })),
     filings,
-    payouts,
-    exposures,
     fees,
     income,
     deposits: depAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),

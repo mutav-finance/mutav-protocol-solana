@@ -27,8 +27,8 @@ use litesvm_token::{CreateAccount, CreateMint};
 use mutav::{
     constants::*,
     errors::MutavError,
-    state::{CapsInput, PriceInput, VaultConfig, VaultState},
-    InitializeArgs,
+    state::{CapsInput, VaultConfig, VaultState},
+    ConfigParam, InitializeArgs,
 };
 use solana_instruction::error::InstructionError;
 use solana_keypair::Keypair;
@@ -231,6 +231,7 @@ pub struct Pdas {
     pub pending_deposits: Pubkey,
     pub pending_redemptions: Pubkey,
     pub claims: Pubkey,
+    pub unsolicited: Pubkey,
     pub event_authority: Pubkey,
 }
 
@@ -248,6 +249,7 @@ impl Pdas {
             pending_deposits: pda(&[PENDING_DEPOSITS_SEED, c]),
             pending_redemptions: pda(&[PENDING_REDEMPTIONS_SEED, c]),
             claims: pda(&[CLAIMS_SEED, c]),
+            unsolicited: pda(&[UNSOLICITED_SEED, c]),
             event_authority: pda(&[b"__event_authority"]),
         }
     }
@@ -258,27 +260,14 @@ pub fn test_caps() -> CapsInput {
     CapsInput {
         max_tvl: 100_000 * BRL,
         max_cover_per_guarantee: 30_000 * BRL,
-        max_cover_per_agency: 60_000 * BRL,
         max_claim_per_call: 10_000 * BRL,
         max_claim_per_period: 20_000 * BRL,
-        claim_period_secs: 30 * 86_400,
-        max_tesouro_share_bps: 5_000,
         min_request: 1_000 * BRL,
         max_request: 30_000 * BRL,
-        min_fill_assets: 500 * BRL,
-    }
-}
-
-/// Test price bounds (placeholders; spec §12 Q2, Q21).
-pub fn test_price() -> PriceInput {
-    PriceInput {
-        tesouro_price_account: Pubkey::new_unique(),
-        p0: 1_000_000,
-        t0: 0,
-        y_max_bps: 1_500,
-        max_staleness_secs: 86_400,
-        max_deviation_bps: 200,
         max_nav_move_bps: 100,
+        stress_buffer: 0,
+        max_queue_wait_secs: 0,
+        max_reinstate_age: 0,
     }
 }
 
@@ -320,6 +309,7 @@ pub fn initialize_ix(a: &InitAccounts, args: InitializeArgs) -> Instruction {
             pending_deposits: p.pending_deposits,
             pending_redemptions: p.pending_redemptions,
             claims: p.claims,
+            unsolicited: p.unsolicited,
             income_inbox: income_inbox_address(
                 &p.authority,
                 &a.reserve_mint,
@@ -391,12 +381,18 @@ impl Fixture {
             &payments_owner,
             &token_program,
         );
+        // The role keys hold SOL, as real ones do: the admin pays the
+        // owner's token account when it cancels a deposit (ADR 0023).
+        let (admin, operator, pauser) = (Keypair::new(), Keypair::new(), Keypair::new());
+        for k in [&admin, &operator, &pauser] {
+            svm.airdrop(&k.pubkey(), 10_000_000_000).expect("airdrop");
+        }
         Self {
             svm,
             payer,
-            admin: Keypair::new(),
-            operator: Keypair::new(),
-            pauser: Keypair::new(),
+            admin,
+            operator,
+            pauser,
             mutav_capital_wallet: Keypair::new(),
             freeze_authority,
             reserve_mint,
@@ -424,9 +420,7 @@ impl Fixture {
             mutav_capital_wallet: self.mutav_capital_wallet.pubkey(),
             coverage_ratio_bps: 10_000,
             fee_take_bps: 2_000,
-            payout_sla_secs: 10 * 86_400,
             caps: test_caps(),
-            price: test_price(),
         }
     }
 
@@ -480,77 +474,49 @@ impl Fixture {
 // Admin instruction builders
 // ---------------------------------------------------------------------------
 
-/// `SetConfigArgs` that reproduce the current config exactly.
-pub fn set_config_args(c: &VaultConfig) -> mutav::SetConfigArgs {
-    use mutav::state::ExitInput;
-    mutav::SetConfigArgs {
-        coverage_ratio_bps: c.coverage_ratio_bps,
-        fee_take_bps: c.fee_take_bps,
-        payout_sla_secs: c.payout_sla_secs,
-        feature_flags: c.feature_flags,
-        mutav_capital_wallet: c.mutav_capital_wallet,
-        caps: CapsInput {
-            max_tvl: c.caps.max_tvl,
-            max_cover_per_guarantee: c.caps.max_cover_per_guarantee,
-            max_cover_per_agency: c.caps.max_cover_per_agency,
-            max_claim_per_call: c.caps.max_claim_per_call,
-            max_claim_per_period: c.caps.max_claim_per_period,
-            claim_period_secs: c.caps.claim_period_secs,
-            max_tesouro_share_bps: c.caps.max_tesouro_share_bps,
-            min_request: c.caps.min_request,
-            max_request: c.caps.max_request,
-            min_fill_assets: c.caps.min_fill_assets,
-        },
-        price: PriceInput {
-            tesouro_price_account: c.price.tesouro_price_account,
-            p0: c.price.p0,
-            t0: c.price.t0,
-            y_max_bps: c.price.y_max_bps,
-            max_staleness_secs: c.price.max_staleness_secs,
-            max_deviation_bps: c.price.max_deviation_bps,
-            max_nav_move_bps: c.price.max_nav_move_bps,
-        },
-        exit: ExitInput {
-            buffer_target_bps: c.exit.buffer_target_bps,
-            buffer_headroom_bps: c.exit.buffer_headroom_bps,
-            buffer_release_after_secs: c.exit.buffer_release_after_secs,
-            curve_version: c.exit.curve_version,
-            h_min_bps: c.exit.h_min_bps,
-            h_peg_bps: c.exit.h_peg_bps,
-            h_max_bps: c.exit.h_max_bps,
-            pressure_epoch_secs: c.exit.pressure_epoch_secs,
-            min_instant_assets: c.exit.min_instant_assets,
-            max_instant_per_tx: c.exit.max_instant_per_tx,
-            max_instant_per_wallet: c.exit.max_instant_per_wallet,
-            max_instant_per_period: c.exit.max_instant_per_period,
-            instant_period_secs: c.exit.instant_period_secs,
-            min_hold_secs: c.exit.min_hold_secs,
-            max_price_age_secs: c.exit.max_price_age_secs,
-            allowlist_root: c.exit.allowlist_root,
-            barred: c.exit.barred,
-        },
-        income_take_bps: c.income_take_bps,
-    }
+/// Every `ConfigParam` at its current value in `c` (a no-op `set_config`).
+pub fn all_params(c: &VaultConfig) -> Vec<ConfigParam> {
+    use ConfigParam::*;
+    let k = &c.caps;
+    vec![
+        CoverageRatioBps(c.coverage_ratio_bps),
+        FeeTakeBps(c.fee_take_bps),
+        FeatureFlags(c.feature_flags),
+        MutavCapitalWallet(c.mutav_capital_wallet),
+        MaxTvl(k.max_tvl),
+        MaxCoverPerGuarantee(k.max_cover_per_guarantee),
+        MaxClaimPerCall(k.max_claim_per_call),
+        MaxClaimPerPeriod(k.max_claim_per_period),
+        MinRequest(k.min_request),
+        MaxRequest(k.max_request),
+        MaxNavMoveBps(k.max_nav_move_bps),
+        StressBuffer(k.stress_buffer),
+        MaxQueueWaitSecs(k.max_queue_wait_secs),
+        MaxReinstateAge(k.max_reinstate_age),
+    ]
 }
+
+/// The NAV bounds that accept every NAV.
+pub const ANY_NAV: mutav::NavBounds = mutav::NavBounds {
+    min: 0,
+    max: u64::MAX,
+};
 
 impl Fixture {
     fn ix(&self, data: Vec<u8>, metas: Vec<anchor_lang::prelude::AccountMeta>) -> Instruction {
         Instruction::new_with_bytes(mutav::ID, &data, metas)
     }
 
-    pub fn set_config_ix(
-        &self,
-        signer: &Pubkey,
-        args: mutav::SetConfigArgs,
-        treasury: &Pubkey,
-    ) -> Instruction {
+    pub fn set_config_ix(&self, signer: &Pubkey, params: Vec<ConfigParam>) -> Instruction {
+        let c = self.config();
         self.ix(
-            mutav::instruction::SetConfig { args }.data(),
+            mutav::instruction::SetConfig { params }.data(),
             mutav::accounts::SetConfig {
                 admin: *signer,
                 config: self.pdas.config,
-                treasury_account: *treasury,
-                payments_account: self.config().payments_account,
+                state: self.pdas.state,
+                treasury_account: c.treasury_account,
+                payments_account: c.payments_account,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -558,12 +524,120 @@ impl Fixture {
         )
     }
 
-    pub fn set_roles_ix(&self, signer: &Pubkey, operator: Pubkey, pauser: Pubkey) -> Instruction {
+    fn admin_role_metas(&self, signer: &Pubkey) -> Vec<anchor_lang::prelude::AccountMeta> {
+        mutav::accounts::AdminRoleUpdate {
+            admin: *signer,
+            config: self.pdas.config,
+            event_authority: self.pdas.event_authority,
+            program: mutav::ID,
+        }
+        .to_account_metas(None)
+    }
+
+    pub fn propose_role_ix(&self, signer: &Pubkey, role: u8, key: Pubkey) -> Instruction {
         self.ix(
-            mutav::instruction::SetRoles { operator, pauser }.data(),
-            mutav::accounts::SetRoles {
+            mutav::instruction::ProposeRole { role, key }.data(),
+            self.admin_role_metas(signer),
+        )
+    }
+
+    pub fn propose_admin_ix(&self, signer: &Pubkey, key: Pubkey) -> Instruction {
+        self.ix(
+            mutav::instruction::ProposeAdmin { key }.data(),
+            self.admin_role_metas(signer),
+        )
+    }
+
+    pub fn cancel_pending_ix(&self, signer: &Pubkey, role: u8) -> Instruction {
+        self.ix(
+            mutav::instruction::CancelPending { role }.data(),
+            self.admin_role_metas(signer),
+        )
+    }
+
+    pub fn set_guardians_ix(&self, signer: &Pubkey, guardians: [Pubkey; 3]) -> Instruction {
+        self.ix(
+            mutav::instruction::SetGuardians { guardians }.data(),
+            self.admin_role_metas(signer),
+        )
+    }
+
+    /// `accept_role`; the money accounts are passed for the operator only.
+    pub fn accept_role_ix(&self, new_key: &Pubkey, role: u8) -> Instruction {
+        let c = self.config();
+        let money = role == mutav::constants::ROLE_OPERATOR;
+        self.accept_role_accounts_ix(
+            new_key,
+            role,
+            money.then_some(c.treasury_account),
+            money.then_some(c.payments_account),
+        )
+    }
+
+    pub fn accept_role_accounts_ix(
+        &self,
+        new_key: &Pubkey,
+        role: u8,
+        treasury_account: Option<Pubkey>,
+        payments_account: Option<Pubkey>,
+    ) -> Instruction {
+        self.ix(
+            mutav::instruction::AcceptRole { role }.data(),
+            mutav::accounts::AcceptRole {
+                new_key: *new_key,
+                config: self.pdas.config,
+                treasury_account,
+                payments_account,
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    pub fn accept_admin_ix(&self, new_admin: &Pubkey) -> Instruction {
+        self.ix(
+            mutav::instruction::AcceptAdmin {}.data(),
+            mutav::accounts::AcceptAdmin {
+                new_admin: *new_admin,
+                config: self.pdas.config,
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    /// The admin proposes `key` for `role` and `key` accepts.
+    pub fn handover(&mut self, role: u8, key: &Keypair) -> TransactionResult {
+        let admin = self.admin.insecure_clone();
+        let ix = self.propose_role_ix(&admin.pubkey(), role, key.pubkey());
+        self.send(ix, &admin)?;
+        let ix = self.accept_role_ix(&key.pubkey(), role);
+        self.send(ix, key)
+    }
+
+    pub fn revoke_pauser_ix(&self, signer: &Pubkey) -> Instruction {
+        self.ix(
+            mutav::instruction::RevokePauser {}.data(),
+            mutav::accounts::RevokePauser {
                 admin: *signer,
                 config: self.pdas.config,
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    pub fn set_treasury_account_ix(&self, signer: &Pubkey, treasury: &Pubkey) -> Instruction {
+        self.ix(
+            mutav::instruction::SetTreasuryAccount {}.data(),
+            mutav::accounts::SetTreasuryAccount {
+                admin: *signer,
+                config: self.pdas.config,
+                treasury_account: *treasury,
+                payments_account: self.config().payments_account,
                 event_authority: self.pdas.event_authority,
                 program: mutav::ID,
             }
@@ -643,10 +717,20 @@ impl Fixture {
         )
     }
 
-    /// `set_config` signed by the admin with the current treasury.
-    pub fn set_config(&mut self, args: mutav::SetConfigArgs) -> TransactionResult {
-        let treasury = self.config().treasury_account;
-        let ix = self.set_config_ix(&self.admin.pubkey(), args, &treasury);
+    /// `refresh` then `set_config(params)` signed by the admin, in one
+    /// transaction, as `/admin` composes it (a change of `c`, the NAV-move
+    /// bound or the stress buffer needs a `refresh` in the same slot).
+    pub fn set_config(&mut self, params: Vec<ConfigParam>) -> TransactionResult {
+        let ix = self.set_config_ix(&self.admin.pubkey(), params);
+        let admin = self.admin.insecure_clone();
+        let payer = self.payer.insecure_clone();
+        let refresh = self.refresh_ix();
+        send_ixs(&mut self.svm, &[refresh, ix], &[&payer, &admin])
+    }
+
+    /// `set_config(params)` alone, without a `refresh` first.
+    pub fn set_config_alone(&mut self, params: Vec<ConfigParam>) -> TransactionResult {
+        let ix = self.set_config_ix(&self.admin.pubkey(), params);
         let admin = self.admin.insecure_clone();
         self.send(ix, &admin)
     }
@@ -691,7 +775,7 @@ impl Fixture {
     /// in an order where each succeeds on a fresh fixture. Each entry is
     /// `(name, instruction, signer)`. Extend this list as instructions land:
     /// padding, version and earmark tests walk it. The operator instructions
-    /// come first, before `set_roles` and `revoke_operator` replace the
+    /// come first, before the role handover and `revoke_operator` replace the
     /// operator.
     pub fn pilot_instructions(&mut self) -> Vec<(&'static str, Instruction, Keypair)> {
         let mut out = self.book_instructions();
@@ -705,24 +789,58 @@ impl Fixture {
         let admin = self.admin.insecure_clone();
         let c = self.config();
 
-        let mut args = set_config_args(&c);
-        args.fee_take_bps = c.fee_take_bps + 1;
-        args.caps.max_tvl = c.caps.max_tvl + 1;
-        args.exit.buffer_target_bps = 500;
-        let set_config = self.set_config_ix(&admin.pubkey(), args, &c.treasury_account);
+        let set_config = self.set_config_ix(
+            &admin.pubkey(),
+            vec![
+                ConfigParam::FeeTakeBps(c.fee_take_bps + 1),
+                ConfigParam::MaxTvl(c.caps.max_tvl + 1),
+            ],
+        );
 
+        // The treasury moves first; the payments move then checks against
+        // the new treasury.
+        let new_treasury = self.token_account(&Pubkey::new_unique());
+        let set_treasury = self.set_treasury_account_ix(&admin.pubkey(), &new_treasury);
         let new_payments = self.token_account(&Pubkey::new_unique());
         let set_payments =
-            self.set_payments_account_ix(&admin.pubkey(), &new_payments, &c.treasury_account);
+            self.set_payments_account_ix(&admin.pubkey(), &new_payments, &new_treasury);
 
-        let (op, pa) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let (op, pa, ad) = (Keypair::new(), Keypair::new(), Keypair::new());
+        for k in [&op, &pa, &ad] {
+            self.svm
+                .airdrop(&k.pubkey(), 1_000_000_000)
+                .expect("airdrop");
+        }
+        let guardian = Pubkey::new_unique();
+        let a = admin.pubkey();
         vec![
             ("set_config", set_config, admin.insecure_clone()),
             (
-                "set_roles",
-                self.set_roles_ix(&admin.pubkey(), op, pa),
+                "propose_role",
+                self.propose_role_ix(&a, ROLE_OPERATOR, op.pubkey()),
                 admin.insecure_clone(),
             ),
+            (
+                "accept_role",
+                self.accept_role_ix(&op.pubkey(), ROLE_OPERATOR),
+                op.insecure_clone(),
+            ),
+            (
+                "propose_role",
+                self.propose_role_ix(&a, ROLE_PAUSER, pa.pubkey()),
+                admin.insecure_clone(),
+            ),
+            (
+                "cancel_pending",
+                self.cancel_pending_ix(&a, ROLE_PAUSER),
+                admin.insecure_clone(),
+            ),
+            (
+                "set_guardians",
+                self.set_guardians_ix(&a, [guardian, Pubkey::default(), Pubkey::default()]),
+                admin.insecure_clone(),
+            ),
+            ("set_treasury_account", set_treasury, admin.insecure_clone()),
             ("set_payments_account", set_payments, admin.insecure_clone()),
             (
                 "set_allowlist_root",
@@ -744,6 +862,17 @@ impl Fixture {
                 self.revoke_operator_ix(&admin.pubkey()),
                 admin.insecure_clone(),
             ),
+            (
+                "revoke_pauser",
+                self.revoke_pauser_ix(&a),
+                admin.insecure_clone(),
+            ),
+            (
+                "propose_admin",
+                self.propose_admin_ix(&a, ad.pubkey()),
+                admin.insecure_clone(),
+            ),
+            ("accept_admin", self.accept_admin_ix(&ad.pubkey()), ad),
         ]
     }
 }

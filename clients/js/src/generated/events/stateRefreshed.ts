@@ -49,13 +49,20 @@ export type StateRefreshedEvent = {
   stableAssets: bigint;
   coverageRequired: bigint;
   surplus: bigint;
-  bufferEarmark: bigint;
-  freeCapital: bigint;
   provisions: bigint;
   navPerShare: bigint;
   mode: number;
-  tesouroPrice: bigint;
-  priceStale: boolean;
+  /**
+   * The NAV-move guard's inputs (spec §7): the previous published NAV,
+   * the NAV per share verified inflows added since, and the NAV the guard
+   * compared (net of those inflows).
+   */
+  prevNavPerShare: bigint;
+  inflowNav: bigint;
+  guardNav: bigint;
+  sharesOutstanding: bigint;
+  netAssets: bigint;
+  fulfilHalted: boolean;
 };
 
 export type StateRefreshedEventArgs = {
@@ -64,13 +71,20 @@ export type StateRefreshedEventArgs = {
   stableAssets: number | bigint;
   coverageRequired: number | bigint;
   surplus: number | bigint;
-  bufferEarmark: number | bigint;
-  freeCapital: number | bigint;
   provisions: number | bigint;
   navPerShare: number | bigint;
   mode: number;
-  tesouroPrice: number | bigint;
-  priceStale: boolean;
+  /**
+   * The NAV-move guard's inputs (spec §7): the previous published NAV,
+   * the NAV per share verified inflows added since, and the NAV the guard
+   * compared (net of those inflows).
+   */
+  prevNavPerShare: number | bigint;
+  inflowNav: number | bigint;
+  guardNav: number | bigint;
+  sharesOutstanding: number | bigint;
+  netAssets: number | bigint;
+  fulfilHalted: boolean;
 };
 
 /** Gets the encoder for {@link StateRefreshedEventArgs} event data. */
@@ -82,13 +96,15 @@ export function getStateRefreshedEventEncoder(): FixedSizeEncoder<StateRefreshed
       ["stableAssets", getU64Encoder()],
       ["coverageRequired", getU64Encoder()],
       ["surplus", getU64Encoder()],
-      ["bufferEarmark", getU64Encoder()],
-      ["freeCapital", getU64Encoder()],
       ["provisions", getU64Encoder()],
       ["navPerShare", getU64Encoder()],
       ["mode", getU8Encoder()],
-      ["tesouroPrice", getU64Encoder()],
-      ["priceStale", getBooleanEncoder()],
+      ["prevNavPerShare", getU64Encoder()],
+      ["inflowNav", getU64Encoder()],
+      ["guardNav", getU64Encoder()],
+      ["sharesOutstanding", getU64Encoder()],
+      ["netAssets", getU64Encoder()],
+      ["fulfilHalted", getBooleanEncoder()],
     ]),
     [getConstantEncoder(STATE_REFRESHED_EVENT_DISCRIMINATOR)],
   );
@@ -103,13 +119,15 @@ export function getStateRefreshedEventDecoder(): FixedSizeDecoder<StateRefreshed
       ["stableAssets", getU64Decoder()],
       ["coverageRequired", getU64Decoder()],
       ["surplus", getU64Decoder()],
-      ["bufferEarmark", getU64Decoder()],
-      ["freeCapital", getU64Decoder()],
       ["provisions", getU64Decoder()],
       ["navPerShare", getU64Decoder()],
       ["mode", getU8Decoder()],
-      ["tesouroPrice", getU64Decoder()],
-      ["priceStale", getBooleanDecoder()],
+      ["prevNavPerShare", getU64Decoder()],
+      ["inflowNav", getU64Decoder()],
+      ["guardNav", getU64Decoder()],
+      ["sharesOutstanding", getU64Decoder()],
+      ["netAssets", getU64Decoder()],
+      ["fulfilHalted", getBooleanDecoder()],
     ]),
     [getConstantDecoder(STATE_REFRESHED_EVENT_DISCRIMINATOR)],
   );

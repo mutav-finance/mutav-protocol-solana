@@ -32,13 +32,14 @@ import {
   findGuaranteePda,
   findIncomeInboxAddress,
   findReserveAddresses,
-  getSetRolesInstruction,
+  getProposeRoleInstruction,
   MUTAV_PROGRAM_ADDRESS,
+  TOKEN_PROGRAM_ADDRESS,
 } from "@mutav-finance/mutav-protocol-solana";
 import { readReserve } from "../lib/server/chain";
 import { composeInstructions } from "../lib/server/compose";
 import { serverEnv } from "../lib/server/env";
-import { REF } from "../lib/refs";
+import { randomRef, REF } from "../lib/refs";
 import { fromHex } from "../lib/serde";
 import type { TxRequest } from "../lib/tx-kinds";
 import { assertLocal, defaultKeysDir, localKeys, protocolLib, signAndSend, type Role } from "./lib/local";
@@ -55,6 +56,8 @@ export type SeedResult = {
   keysDir: string;
   keys: Record<Role, { path: string; address: string }>;
   operator: string;
+  /** What the operator keeps off-chain: agency label → opaque id, lease → refs_hash salt. */
+  operatorRefs: { agencyIds: Record<string, string>; refsSalts: Record<string, string> };
 };
 
 export function appEnv(url: string, config?: string, allowlist: string[] = []) {
@@ -109,7 +112,10 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     programId: MUTAV_PROGRAM_ADDRESS,
     reserveMint: mint,
     reserveTokenProgram: p.TOKEN_PROGRAM,
-    squads: { multisig: s("deployer").address, vaultIndex: 0, timeLockFloorSecs: 0 },
+    // Localnet: one throwaway key stands in for both multisigs (the admin
+    // signs directly); the parser needs their members and threshold.
+    squads: { multisig: s("deployer").address, vaultIndex: 0, members: [s("admin").address], threshold: 1, timeLockFloorSecs: 0 },
+    upgradeSquads: { multisig: s("deployer").address, vaultIndex: 0, members: [s("admin").address], threshold: 1, timeLockFloorSecs: 0 },
     admin: s("admin").address,
     upgradeAuthority: s("admin").address,
     operator: s("operator").address,
@@ -121,20 +127,15 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     // so localnet mirrors devnet.
     coverageRatioBps: 1_000,
     feeTakeBps: 2_000,
-    payoutSlaSecs: 172_800,
     caps: {
       maxTvl: "300000000000",
       maxCoverPerGuarantee: "40000000000",
-      maxCoverPerAgency: "10000000000000",
       maxClaimPerCall: "10000000000",
       maxClaimPerPeriod: "20000000000",
-      claimPeriodSecs: 2_592_000,
-      maxTesouroShareBps: 0,
       minRequest: "1000000000",
       maxRequest: "100000000000",
-      minFillAssets: "500000000",
+      maxNavMoveBps: 10_000,
     },
-    price: { tesouroPriceAccount: "11111111111111111111111111111111", p0: 1_000_000_000, t0: 0, yMaxBps: 1_500, maxStalenessSecs: 86_400, maxDeviationBps: 200, maxNavMoveBps: 10_000 },
     allowlist,
   });
   await p.send(rpc, s("admin"), [await p.composeInitialize(cfg, { upgradeAuthority: s("admin"), payer: s("admin") })]);
@@ -149,18 +150,22 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   await go("admin", { kind: "fulfil_deposits", count: 1 }, "fulfil_deposits (admin)");
   await go("capital", { kind: "claim_shares", seq: 0n }, "claim_shares");
 
-  console.log("\n== seed: two guarantees");
+  console.log("\n== seed: three guarantees");
+  // Opaque random agency ids, held by the operator (here, this run).
+  // Opaque agency ids and refs-hash salts, kept by the operator (here, for
+  // this run, returned in the seed result) so each refs_hash can be re-checked.
+  const agencyIds = new Map<string, string>();
+  const agencyId = (agency: string) => agencyIds.get(agency) ?? (agencyIds.set(agency, randomRef()), agencyIds.get(agency)!);
+  const refsSalts = new Map<string, string>();
+  const refsSalt = (lease: string) => refsSalts.get(lease) ?? (refsSalts.set(lease, randomRef()), refsSalts.get(lease)!);
   const lease = async (leaseLabel: string, agency: string, rent: bigint) =>
     go(
       "operator",
       {
         kind: "register_guarantee",
         id: await REF.guaranteeId(leaseLabel),
-        agencyId: await REF.agencyId(agency),
-        refsHash: await REF.refsHash(leaseLabel),
-        rent: rent * BRL,
-        defaultMultiplierBps: 30_000,
-        exitMultiplierBps: 10_000,
+        agencyId: agencyId(agency),
+        refsHash: await REF.refsHash(leaseLabel, refsSalt(leaseLabel)),
         defaultCover: 3n * rent * BRL,
         exitCover: rent * BRL,
       },
@@ -168,6 +173,9 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     );
   await lease("lease-sp-001", "Imobiliária Paulista", 2_500n);
   await lease("lease-rj-001", "Rio Imóveis", 3_000n);
+  // Enough cover (R$38,000 in all) that the under-covered scenario (c = 1.0)
+  // puts coverage required above the stable assets (about R$29,500).
+  await lease("lease-mg-001", "Minas Lar", 4_000n);
 
   console.log("\n== seed: one guarantee fee");
   await go("operator", { kind: "contribute_fees", invoiceRefHash: await REF.invoice("INV-2026-0001"), amount: 1_000n * BRL }, "contribute_fees R$1,000 (20% take to the treasury)");
@@ -175,7 +183,8 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   console.log("\n== seed: one month of issuer income (ADR 0017)");
   // Nora pays the income inbox (here: the local mint authority mints into it).
   const reserveAddrs = await findReserveAddresses(mint);
-  const inbox = await findIncomeInboxAddress({ vaultAuthority: reserveAddrs.vaultAuthority, reserveMint: mint });
+  // The seeded reserve mint is classic SPL Token, so the inbox is derived under it.
+  const inbox = await findIncomeInboxAddress({ vaultAuthority: reserveAddrs.vaultAuthority, reserveMint: mint, tokenProgram: TOKEN_PROGRAM_ADDRESS });
   spl(["mint", mint, "1500", inbox]);
   log(`Nora pays R$1,500 into the income inbox ${inbox}`);
   await go("operator", { kind: "sweep_income", incomeRefHash: await REF.income("NORA-202609-01"), period: 202_609, amount: 1_200n * BRL }, "sweep_income R$1,200 (statement 2026-09); R$300 stays in the inbox");
@@ -183,37 +192,42 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   console.log("\n== seed: one settled claim (timeline history)");
   const [guarantee] = await findGuaranteePda({ config, id: fromHex(await REF.guaranteeId("lease-sp-001")) });
   const notice = await REF.notice("notice-sp-001-2026-09");
-  await go("operator", { kind: "file_claim", guarantee, leg: 0, amount: 2_500n * BRL, noticeRefHash: notice }, "file_claim R$2,500 (default leg)");
-  await go("operator", { kind: "pay_claim", guarantee, leg: 0, amount: 2_500n * BRL, noticeRefHash: notice }, "pay_claim R$2,500");
+  await go("operator", { kind: "file_claim", guarantee, leg: 1, amount: 2_500n * BRL, noticeRefHash: notice }, "file_claim R$2,500 (default leg)");
+  await go("operator", { kind: "pay_claim", guarantee, leg: 1, amount: 2_500n * BRL, noticeRefHash: notice }, "pay_claim R$2,500");
   await go("operator", { kind: "settle_payout", guarantee, noticeRefHash: notice, pixE2eHash: await REF.pixE2e("E1234567820261006120000demo0001") }, "settle_payout (PIX E2E hash)");
 
-  let operator = s("operator").address as string;
+  const operator = s("operator").address as string;
   if (opts.operator) {
     console.log("\n== seed: hand the operator role to your wallet");
     const op = address(opts.operator);
     await p.airdrop(rpc, op, 10);
     spl(["mint", mint, "10000", await ata(op)]);
     const a = await findReserveAddresses(mint);
+    // Two-step handover (ADR 0020): the admin proposes; the wallet accepts
+    // with `accept_role(1)` within 72 hours (it holds its own key).
     await signAndSend(rpc, s("admin").address, [s("admin")], [
-      getSetRolesInstruction({ admin: s("admin"), config, eventAuthority: a.eventAuthority, program: MUTAV_PROGRAM_ADDRESS, operator: op, pauser: s("pauser").address }),
+      getProposeRoleInstruction({ admin: s("admin"), config, eventAuthority: a.eventAuthority, program: MUTAV_PROGRAM_ADDRESS, role: 1, key: op }),
     ]);
-    operator = op;
-    log(`set_roles: operator = ${op} (funded with 10 SOL and R$10,000 BRS)`);
+    log(`propose_role: operator = ${op} (funded with 10 SOL and R$10,000 BRS); sign accept_role(1) from that wallet to take the role`);
   }
 
   await go("pauser", { kind: "refresh" }, "refresh (publish NAV, coverage and mode)");
 
   const keys = Object.fromEntries(Object.entries(k).map(([r, v]) => [r, { path: v.path, address: v.signer.address }])) as unknown as SeedResult["keys"];
-  return { url, programId: MUTAV_PROGRAM_ADDRESS, config, reserveMint: mint, allowlist, keysDir, keys, operator };
+  return { url, programId: MUTAV_PROGRAM_ADDRESS, config, reserveMint: mint, allowlist, keysDir, keys, operator, operatorRefs: { agencyIds: Object.fromEntries(agencyIds), refsSalts: Object.fromEntries(refsSalts) } };
 }
 
-/** Demo step 5: raise the coverage ratio so the reserve is under-covered (or restore it), then refresh. */
+/**
+ * Demo step 5: raise the coverage ratio to c = 1.0 (the program maximum) so
+ * the reserve is under-covered: the seeded remaining cover (about R$35,500)
+ * exceeds the stable assets (about R$29,500). Or restore it. Then refresh.
+ */
 export async function setScenario(url: string, keysDir: string, scenario: "under-covered" | "normal", config: string) {
   assertLocal(url);
   const p = await protocolLib();
   const k = await localKeys(keysDir, p.run);
   // Restores the seeded c = 0.10 (ADR 0016).
-  const ratio = scenario === "under-covered" ? 15_000 : 1_000;
+  const ratio = scenario === "under-covered" ? 10_000 : 1_000;
   await act(url, config, [], k.admin.signer, { kind: "set_config", coverageRatioBps: ratio }, `set_config coverage_ratio_bps = ${ratio}`);
   await act(url, config, [], k.pauser.signer, { kind: "refresh" }, "refresh");
 }

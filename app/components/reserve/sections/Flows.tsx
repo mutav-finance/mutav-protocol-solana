@@ -218,7 +218,8 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
     { label: "Guarantee fees", sub: `after ${fmtBrs(totals.feeTakeToTreasury, 0)} MUTAV fee (${fmtPct(r.config.feeTakeBps)})`, amount: totals.feesNetToReserve, dir: "in" },
     {
       label: "Issuer income",
-      sub: totals.incomeTakeToTreasury > 0n ? `from the BRS issuer, monthly · after ${fmtBrs(totals.incomeTakeToTreasury, 0)} MUTAV fee (${fmtPct(r.config.incomeTakeBps)})` : "from the BRS issuer, monthly",
+      // No take on issuer income (ADR 0019).
+      sub: "from the BRS issuer, monthly",
       amount: totals.incomeNetToReserve,
       dir: "in",
     },

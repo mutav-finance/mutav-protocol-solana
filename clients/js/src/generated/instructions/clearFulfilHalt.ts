@@ -40,8 +40,14 @@ import {
   type ResolvedInstructionAccount,
   type ResolvedInstructionAccountMeta,
 } from "@solana/kit/program-client-core";
-import { findStatePda } from "../pdas";
+import { findReservePda, findStatePda } from "../pdas";
 import { MUTAV_PROGRAM_ADDRESS } from "../programs";
+import {
+  getNavBoundsDecoder,
+  getNavBoundsEncoder,
+  type NavBounds,
+  type NavBoundsArgs,
+} from "../types";
 
 export const CLEAR_FULFIL_HALT_DISCRIMINATOR: ReadonlyUint8Array =
   new Uint8Array([72, 92, 0, 5, 100, 214, 187, 39]);
@@ -57,6 +63,7 @@ export type ClearFulfilHaltInstruction<
   TAccountAdmin extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountState extends string | AccountMeta<string> = string,
+  TAccountReserve extends string | AccountMeta<string> = string,
   TAccountEventAuthority extends string | AccountMeta<string> = string,
   TAccountProgram extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -74,6 +81,9 @@ export type ClearFulfilHaltInstruction<
       TAccountState extends string
         ? WritableAccount<TAccountState>
         : TAccountState,
+      TAccountReserve extends string
+        ? ReadonlyAccount<TAccountReserve>
+        : TAccountReserve,
       TAccountEventAuthority extends string
         ? ReadonlyAccount<TAccountEventAuthority>
         : TAccountEventAuthority,
@@ -86,13 +96,17 @@ export type ClearFulfilHaltInstruction<
 
 export type ClearFulfilHaltInstructionData = {
   discriminator: ReadonlyUint8Array;
+  navBounds: NavBounds;
 };
 
-export type ClearFulfilHaltInstructionDataArgs = {};
+export type ClearFulfilHaltInstructionDataArgs = { navBounds: NavBoundsArgs };
 
 export function getClearFulfilHaltInstructionDataEncoder(): FixedSizeEncoder<ClearFulfilHaltInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
+    getStructEncoder([
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["navBounds", getNavBoundsEncoder()],
+    ]),
     (value) => ({ ...value, discriminator: CLEAR_FULFIL_HALT_DISCRIMINATOR }),
   );
 }
@@ -100,6 +114,7 @@ export function getClearFulfilHaltInstructionDataEncoder(): FixedSizeEncoder<Cle
 export function getClearFulfilHaltInstructionDataDecoder(): FixedSizeDecoder<ClearFulfilHaltInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["navBounds", getNavBoundsDecoder()],
   ]);
 }
 
@@ -117,6 +132,7 @@ export type ClearFulfilHaltAsyncInput<
   TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -124,14 +140,21 @@ export type ClearFulfilHaltAsyncInput<
   admin: TAccountAdmin;
   config: TAccountConfig;
   state?: TAccountState;
+  /**
+   * Read for its freeze state (ADR 0020): a new baseline is never set
+   * while the reserve's BRS cannot move.
+   */
+  reserve?: TAccountReserve;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
+  navBounds: ClearFulfilHaltInstructionDataArgs["navBounds"];
 };
 
 export async function getClearFulfilHaltInstructionAsync<
   TAccountAdmin extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -140,6 +163,7 @@ export async function getClearFulfilHaltInstructionAsync<
     TAccountAdmin,
     TAccountConfig,
     TAccountState,
+    TAccountReserve,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -158,6 +182,10 @@ export async function getClearFulfilHaltInstructionAsync<
     ResolvedInstructionAccountMeta<
       TAccountState,
       InstructionAccountInputAddress<TAccountState>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -180,6 +208,11 @@ export async function getClearFulfilHaltInstructionAsync<
     admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
+    reserve: {
+      value: input.reserve ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -196,9 +229,23 @@ export async function getClearFulfilHaltInstructionAsync<
     ResolvedInstructionAccount
   >;
 
+  // Original args.
+  const args = { ...input };
+
   // Resolve default values.
   if (!accounts.state.value) {
     accounts.state.value = await findStatePda(
+      {
+        config: getAddressFromResolvedInstructionAccount(
+          "config",
+          accounts.config.value,
+        ),
+      },
+      { programAddress },
+    );
+  }
+  if (!accounts.reserve.value) {
+    accounts.reserve.value = await findReservePda(
       {
         config: getAddressFromResolvedInstructionAccount(
           "config",
@@ -214,10 +261,13 @@ export async function getClearFulfilHaltInstructionAsync<
       getAccountMeta("admin", accounts.admin),
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
+      getAccountMeta("reserve", accounts.reserve),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
-    data: getClearFulfilHaltInstructionDataEncoder().encode({}),
+    data: getClearFulfilHaltInstructionDataEncoder().encode(
+      args as ClearFulfilHaltInstructionDataArgs,
+    ),
     programAddress,
   } as ClearFulfilHaltInstruction<
     TProgramAddress,
@@ -234,6 +284,10 @@ export async function getClearFulfilHaltInstructionAsync<
       InstructionAccountInputAddress<TAccountState>
     >,
     ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
+    >,
+    ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
       InstructionAccountInputAddress<TAccountEventAuthority>
     >,
@@ -248,6 +302,7 @@ export type ClearFulfilHaltInput<
   TAccountAdmin extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountState extends InstructionAccountInput = InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
@@ -255,14 +310,21 @@ export type ClearFulfilHaltInput<
   admin: TAccountAdmin;
   config: TAccountConfig;
   state: TAccountState;
+  /**
+   * Read for its freeze state (ADR 0020): a new baseline is never set
+   * while the reserve's BRS cannot move.
+   */
+  reserve: TAccountReserve;
   eventAuthority: TAccountEventAuthority;
   program: TAccountProgram;
+  navBounds: ClearFulfilHaltInstructionDataArgs["navBounds"];
 };
 
 export function getClearFulfilHaltInstruction<
   TAccountAdmin extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountState extends InstructionAccountInput,
+  TAccountReserve extends InstructionAccountInput,
   TAccountEventAuthority extends InstructionAccountInput,
   TAccountProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof MUTAV_PROGRAM_ADDRESS,
@@ -271,6 +333,7 @@ export function getClearFulfilHaltInstruction<
     TAccountAdmin,
     TAccountConfig,
     TAccountState,
+    TAccountReserve,
     TAccountEventAuthority,
     TAccountProgram
   >,
@@ -288,6 +351,10 @@ export function getClearFulfilHaltInstruction<
   ResolvedInstructionAccountMeta<
     TAccountState,
     InstructionAccountInputAddress<TAccountState>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountReserve,
+    InstructionAccountInputAddress<TAccountReserve>
   >,
   ResolvedInstructionAccountMeta<
     TAccountEventAuthority,
@@ -309,6 +376,11 @@ export function getClearFulfilHaltInstruction<
     admin: { value: input.admin ?? null, isSigner: true, isWritable: false },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     state: { value: input.state ?? null, isSigner: false, isWritable: true },
+    reserve: {
+      value: input.reserve ?? null,
+      isSigner: false,
+      isWritable: false,
+    },
     eventAuthority: {
       value: input.eventAuthority ?? null,
       isSigner: false,
@@ -325,15 +397,21 @@ export function getClearFulfilHaltInstruction<
     ResolvedInstructionAccount
   >;
 
+  // Original args.
+  const args = { ...input };
+
   return Object.freeze({
     accounts: [
       getAccountMeta("admin", accounts.admin),
       getAccountMeta("config", accounts.config),
       getAccountMeta("state", accounts.state),
+      getAccountMeta("reserve", accounts.reserve),
       getAccountMeta("eventAuthority", accounts.eventAuthority),
       getAccountMeta("program", accounts.program),
     ],
-    data: getClearFulfilHaltInstructionDataEncoder().encode({}),
+    data: getClearFulfilHaltInstructionDataEncoder().encode(
+      args as ClearFulfilHaltInstructionDataArgs,
+    ),
     programAddress,
   } as ClearFulfilHaltInstruction<
     TProgramAddress,
@@ -348,6 +426,10 @@ export function getClearFulfilHaltInstruction<
     ResolvedInstructionAccountMeta<
       TAccountState,
       InstructionAccountInputAddress<TAccountState>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountReserve,
+      InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
       TAccountEventAuthority,
@@ -369,8 +451,13 @@ export type ParsedClearFulfilHaltInstruction<
     admin: TAccountMetas[0];
     config: TAccountMetas[1];
     state: TAccountMetas[2];
-    eventAuthority: TAccountMetas[3];
-    program: TAccountMetas[4];
+    /**
+     * Read for its freeze state (ADR 0020): a new baseline is never set
+     * while the reserve's BRS cannot move.
+     */
+    reserve: TAccountMetas[3];
+    eventAuthority: TAccountMetas[4];
+    program: TAccountMetas[5];
   };
   data: ClearFulfilHaltInstructionData;
 };
@@ -383,12 +470,12 @@ export function parseClearFulfilHaltInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedClearFulfilHaltInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 5) {
+  if (instruction.accounts.length < 6) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 5,
+        expectedAccountMetas: 6,
       },
     );
   }
@@ -404,6 +491,7 @@ export function parseClearFulfilHaltInstruction<
       admin: getNextAccount(),
       config: getNextAccount(),
       state: getNextAccount(),
+      reserve: getNextAccount(),
       eventAuthority: getNextAccount(),
       program: getNextAccount(),
     },

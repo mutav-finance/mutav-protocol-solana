@@ -23,6 +23,17 @@ import {
 } from "@solana/kit";
 import {
   buildAllowlist,
+  capsInputFromConfig,
+  configParamsDiff,
+  configParamsNeedRefresh,
+  conversionNav,
+  getAcceptRoleInstruction,
+  getCancelPendingInstruction,
+  getProposeRoleInstruction,
+  publishedNav,
+  navBoundsAround,
+  coverageFromAccounts,
+  type NavBounds,
   fetchGuarantee,
   getCancelDepositInstruction,
   getCancelRedeemInstruction,
@@ -35,10 +46,7 @@ import {
   findIncomeInboxAddress,
   findIncomeReceiptPda,
   isValidIncomePeriod,
-  findHolderStatePda,
-  findPayoutPda,
   findRedeemRequestPda,
-  findAgencyExposurePda,
   getClaimSharesInstruction,
   getClearFulfilHaltInstruction,
   getCloseGuaranteeInstruction,
@@ -52,7 +60,6 @@ import {
   getRegisterGuaranteeInstruction,
   getRequestDepositInstruction,
   getSetAllowlistRootInstruction,
-  getSetRolesInstruction,
   getSetPaymentsAccountInstruction,
   getRevokeOperatorInstruction,
   getSetConfigInstruction,
@@ -64,7 +71,7 @@ import {
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
 import { ALLOWLIST_TEXT, checkAllowlist } from "../allowlist";
-import { reserveConfigError } from "../reserve-assets";
+import { allowlistedFillCount } from "../queue";
 import { capsError, generalConfigError, rolesError } from "../admin";
 import { pendingSetConfig, pendingSetConfigText, setConfigChanges, type ConfigChange } from "../config-diff";
 import { fromHex } from "../serde";
@@ -77,6 +84,13 @@ import { serverEnv, type ServerEnv } from "./env";
 export const SYSTEM_PROGRAM = address("11111111111111111111111111111111");
 export const TOKEN_PROGRAM = address("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 export const ASSOCIATED_TOKEN_PROGRAM = address("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+
+/** `close_guarantee` reason RELEASED and the role ids of `propose_role` (ADR 0020). */
+const CLOSE_RELEASED = 1;
+const ROLE_OPERATOR = 1;
+const ROLE_PAUSER = 2;
+/** Default NAV tolerance of a fill or halt-clear proposal: ±1%. */
+export const DEFAULT_NAV_TOLERANCE_BPS = 100;
 
 export async function associatedTokenAddress(owner: Address, mint: Address, tokenProgram: Address = TOKEN_PROGRAM) {
   const e = getAddressEncoder();
@@ -116,8 +130,8 @@ const withRemaining = (ix: Instruction, accounts: { address: Address; role: Acco
 
 export type ComposeContext = {
   reserve: ReserveView;
-  /** Needed for `refresh` (pending payouts) and for `request_deposit` (allowlist). */
-  ledger?: Pick<Ledger, "payouts" | "guarantees">;
+  /** The pending deposit queue (fills check head owners); only `fulfil_deposits` reads it. */
+  ledger?: Partial<Pick<Ledger, "deposits">>;
   /** Allowlisted owners, to build the Merkle proof for `request_deposit` / `request_redeem`. */
   allowlist?: string[];
   /** Server env for re-reads (defaults to process.env). */
@@ -151,25 +165,30 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
   const tokenProgram = r.config.reserveTokenProgram;
   const signer = createNoopSigner(signerAddress);
   const common = { config, eventAuthority: a.eventAuthority, program: programAddress };
+  const refreshIx = () =>
+    getRefreshInstruction(
+      { ...common, state: a.state, reserve: a.reserve, pendingDeposits: a.pendingDeposits, pendingRedemptions: a.pendingRedemptions, claims: a.claims },
+      o,
+    );
+  // The NAV the admin sees now, ± a tolerance (ADR 0023): a proposal that
+  // executes after a larger move is refused with `NavOutOfBounds`. Fills
+  // check the conversion NAV; `clear_fulfil_halt` checks the published NAV
+  // (`published`), so its default bounds centre on that one.
+  const navBounds = (draft?: { min: bigint; max: bigint }, published = false): NavBounds => {
+    if (draft) {
+      if (draft.min > draft.max) throw new ComposeError("NAV bounds: min must be ≤ max");
+      return draft;
+    }
+    const sol = coverageFromAccounts(r.config, r.state);
+    const nav = published ? publishedNav(sol.netAssets, r.state.sharesOutstanding) : conversionNav(r.state.sharesOutstanding, sol.netAssets);
+    return navBoundsAround(nav, DEFAULT_NAV_TOLERANCE_BPS);
+  };
 
   switch (req.kind) {
     // ── public ──────────────────────────────────────────────────────────────
     case "refresh": {
-      const ix = getRefreshInstruction(
-        { ...common, state: a.state, reserve: a.reserve, pendingDeposits: a.pendingDeposits, pendingRedemptions: a.pendingRedemptions, claims: a.claims },
-        o,
-      );
-      // (Guarantee, Payout) pairs for every pending payout, so `refresh` records late flags.
-      const pending = (ctx.ledger?.payouts ?? []).filter((p) => p.data.status === 0).slice(0, 10);
-      return [
-        withRemaining(
-          ix,
-          pending.flatMap((p) => [
-            { address: address(p.data.guarantee), role: AccountRole.READONLY },
-            { address: address(p.address), role: AccountRole.WRITABLE },
-          ]),
-        ),
-      ];
+      // `refresh` takes no remaining accounts (no payout SLA, ADR 0019).
+      return [refreshIx()];
     }
 
     // ── operator ────────────────────────────────────────────────────────────
@@ -177,7 +196,6 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       const id = bytes32(req.id, "id");
       const agencyId = bytes32(req.agencyId, "agencyId");
       const [guarantee] = await findGuaranteePda({ config, id }, o);
-      const [agencyExposure] = await findAgencyExposurePda({ config, agencyId }, o);
       return [
         getRegisterGuaranteeInstruction(
           {
@@ -185,15 +203,12 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             operator: signer,
             state: a.state,
             guarantee,
-            agencyExposure,
+            reserve: a.reserve,
             payer: signer,
             systemProgram: SYSTEM_PROGRAM,
             id,
             agencyId,
             refsHash: bytes32(req.refsHash, "refsHash"),
-            rent: req.rent,
-            defaultMultiplierBps: req.defaultMultiplierBps,
-            exitMultiplierBps: req.exitMultiplierBps,
             defaultCover: req.defaultCover,
             exitCover: req.exitCover,
           },
@@ -203,8 +218,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     }
     case "close_guarantee": {
       const g = await guaranteeAccount(ctx, req.guarantee);
-      const [agencyExposure] = await findAgencyExposurePda({ config, agencyId: g.data.agencyId }, o);
-      return [getCloseGuaranteeInstruction({ ...common, operator: signer, state: a.state, guarantee: g.address, agencyExposure, id: g.data.id }, o)];
+      return [getCloseGuaranteeInstruction({ ...common, operator: signer, state: a.state, guarantee: g.address, id: g.data.id, reason: req.reason ?? CLOSE_RELEASED }, o)];
     }
     case "contribute_fees": {
       const invoiceRefHash = bytes32(req.invoiceRefHash, "invoiceRefHash");
@@ -245,7 +259,6 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             incomeReceipt,
             incomeInbox: await findIncomeInboxAddress({ vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram }),
             reserve: a.reserve,
-            treasuryAccount: r.config.treasuryAccount,
             vaultAuthority: a.vaultAuthority,
             reserveMint: mint,
             tokenProgram,
@@ -274,8 +287,6 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       const g = await guaranteeAccount(ctx, req.guarantee);
       const noticeRefHash = bytes32(req.noticeRefHash, "noticeRefHash");
       const [claimFiling] = await findClaimFilingPda({ guarantee: g.address, noticeRefHash }, o);
-      const [payout] = await findPayoutPda({ guarantee: g.address, noticeRefHash }, o);
-      const [agencyExposure] = await findAgencyExposurePda({ config, agencyId: g.data.agencyId }, o);
       return [
         getPayClaimInstruction(
           {
@@ -283,19 +294,14 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             operator: signer,
             state: a.state,
             guarantee: g.address,
-            agencyExposure,
             claimFiling,
-            payout,
             reserve: a.reserve,
             paymentsAccount: r.config.paymentsAccount,
             vaultAuthority: a.vaultAuthority,
             reserveMint: mint,
             tokenProgram,
-            payer: signer,
-            systemProgram: SYSTEM_PROGRAM,
-            leg: req.leg,
-            amount: req.amount,
             noticeRefHash,
+            expectedAmount: req.amount,
           },
           o,
         ),
@@ -304,10 +310,10 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "settle_payout": {
       const guarantee = address(req.guarantee);
       const noticeRefHash = bytes32(req.noticeRefHash, "noticeRefHash");
-      const [payout] = await findPayoutPda({ guarantee, noticeRefHash }, o);
+      const [claimFiling] = await findClaimFilingPda({ guarantee, noticeRefHash }, o);
       return [
         getSettlePayoutInstruction(
-          { ...common, operator: signer, guarantee, payout, noticeRefHash, pixE2eHash: bytes32(req.pixE2eHash, "pixE2eHash") },
+          { ...common, operator: signer, guarantee, claimFiling, noticeRefHash, pixE2eHash: bytes32(req.pixE2eHash, "pixE2eHash") },
           o,
         ),
       ];
@@ -324,14 +330,14 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             owner: signer,
             state: a.state,
             depositRequest: (await findDepositRequestPda({ config, seq }, o))[0],
-            holderState: (await findHolderStatePda({ config, owner: signerAddress }, o))[0],
             source: await associatedTokenAddress(signerAddress, mint, tokenProgram),
             pendingDeposits: a.pendingDeposits,
             reserveMint: mint,
             tokenProgram,
             systemProgram: SYSTEM_PROGRAM,
             assets: req.assets,
-            proof,
+            minSharesOut: priceLimit(req.minSharesOut),
+            eligibility: { __kind: "Merkle", proof },
           },
           o,
         ),
@@ -342,7 +348,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
         getCancelDepositInstruction(
           {
             ...common,
-            owner: signer,
+            signer,
+            owner: signerAddress,
             state: a.state,
             depositRequest: (await findDepositRequestPda({ config, seq: req.seq }, o))[0],
             destination: await associatedTokenAddress(signerAddress, mint, tokenProgram),
@@ -371,7 +378,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             shareTokenProgram: TOKEN_PROGRAM,
             systemProgram: SYSTEM_PROGRAM,
             shares: req.shares,
-            proof,
+            minAssetsOut: priceLimit(req.minAssetsOut),
+            eligibility: { __kind: "Merkle", proof },
           },
           o,
         ),
@@ -382,7 +390,9 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
         getCancelRedeemInstruction(
           {
             ...common,
-            owner: signer,
+            // The investor cancels its own request (the program also lets the admin).
+            signer,
+            owner: signerAddress,
             state: a.state,
             redeemRequest: (await findRedeemRequestPda({ config, seq: req.seq }, o))[0],
             ownerShares: await associatedTokenAddress(signerAddress, a.shareMint),
@@ -396,8 +406,8 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       ];
     }
     case "claim_assets": {
+      // The program creates the owner's token account if needed (ADR 0023).
       return [
-        await createAtaIdempotent(signerAddress, signerAddress, mint, tokenProgram),
         getClaimAssetsInstruction(
           {
             ...common,
@@ -416,18 +426,15 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     }
     case "claim_shares": {
       return [
-        await createAtaIdempotent(signerAddress, signerAddress, a.shareMint),
         getClaimSharesInstruction(
           {
             ...common,
             owner: signer,
             depositRequest: (await findDepositRequestPda({ config, seq: req.seq }, o))[0],
-            holderState: (await findHolderStatePda({ config, owner: signerAddress }, o))[0],
             shareMint: a.shareMint,
             ownerShares: await associatedTokenAddress(signerAddress, a.shareMint),
             vaultAuthority: a.vaultAuthority,
             shareTokenProgram: TOKEN_PROGRAM,
-            systemProgram: SYSTEM_PROGRAM,
           },
           o,
         ),
@@ -436,9 +443,13 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
 
     // ── admin (direct on localnet, or inside a Squads proposal) ─────────────
     case "fulfil_deposits": {
-      const seqs = queueSeqs(r.state.depositHead, r.state.nextDepositSeq, req.count);
+      // Head owners must still be on the current allowlist (the admin cancels
+      // a de-listed owner's deposit instead of filling it): fill up to the
+      // first one that is not.
+      const { count, end } = await allowlistedDepositFill(ctx, req.count);
+      const seqs = queueSeqs(r.state.depositHead, end, count === 0 ? 0 : req.count);
       const ix = getFulfilDepositsInstruction(
-        { ...common, admin: signer, state: a.state, pendingDeposits: a.pendingDeposits, reserve: a.reserve, vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram, count: req.count },
+        { ...common, admin: signer, state: a.state, pendingDeposits: a.pendingDeposits, reserve: a.reserve, vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram, count, navBounds: navBounds(req.navBounds) },
         o,
       );
       const pdas = await Promise.all(seqs.map(async (seq) => (await findDepositRequestPda({ config, seq }, o))[0]));
@@ -461,6 +472,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
           shareTokenProgram: TOKEN_PROGRAM,
           count: req.count,
           maxAssets: req.maxAssets,
+          navBounds: navBounds(req.navBounds),
         },
         o,
       );
@@ -474,7 +486,24 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "set_roles": {
       const bad = rolesError(req, r.config.admin);
       if (bad) throw new ComposeError(bad);
-      return [getSetRolesInstruction({ ...common, admin: signer, operator: address(req.operator), pauser: address(req.pauser) }, o)];
+      // Two-step handover (ADR 0020): propose each changed key; the new key
+      // signs `accept_role` itself. A key already pending is refused; another
+      // unexpired pending key is cancelled first, in the same proposal
+      // (`propose_role` refuses while one waits).
+      const out: Instruction[] = [];
+      const c = r.config;
+      for (const [role, name, key, now, pending, expiresAt] of [
+        [ROLE_OPERATOR, "operator", req.operator, c.operator, c.pendingOperator, c.pendingOperatorExpiresAt],
+        [ROLE_PAUSER, "pauser", req.pauser, c.pauser, c.pendingPauser, c.pendingPauserExpiresAt],
+      ] as const) {
+        if (key === now) continue;
+        const live = pending !== SYSTEM_PROGRAM /* the default key */ && r.now <= expiresAt;
+        if (live && pending === key) throw new ComposeError(`the ${name} key ${key} is already proposed, awaiting accept_role`);
+        if (live) out.push(getCancelPendingInstruction({ ...common, admin: signer, role }, o));
+        out.push(getProposeRoleInstruction({ ...common, admin: signer, role, key: address(key) }, o));
+      }
+      if (out.length === 0) throw new ComposeError("operator and pauser already hold these keys");
+      return out;
     }
     case "set_payments_account": {
       if (!isAddress(req.paymentsAccount)) throw new ComposeError("payments account is not an address");
@@ -484,44 +513,62 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "unpause":
       return [getUnpauseInstruction({ ...common, admin: signer }, o)];
     case "clear_fulfil_halt":
-      return [getClearFulfilHaltInstruction({ ...common, admin: signer, state: a.state }, o)];
+      return [getClearFulfilHaltInstruction({ ...common, admin: signer, state: a.state, reserve: a.reserve, navBounds: navBounds(req.navBounds, true) }, o)];
     case "set_config": {
       // Write only what changed; carry every other field over as it is on-chain.
       const c = r.config;
-      const { reserved: _c, ...caps } = c.caps;
-      const { reserved: _p, ...price } = c.price;
-      const { reserved: _e, ...exit } = c.exit;
-      void _c;
-      void _p;
-      void _e;
-      const bad = generalConfigError(req) ?? capsError({ ...caps, ...(req.caps ?? {}) }) ?? reserveConfigError(req);
+      const caps = capsInputFromConfig(c.caps);
+      const bad = generalConfigError(req) ?? capsError({ ...caps, ...(req.caps ?? {}) });
       if (bad) throw new ComposeError(bad);
-      const { tesouroPriceAccount, ...priceDraft } = req.price ?? {};
+      // Sparse (ADR 0026): one param per field that differs from on-chain.
+      const params = configParamsDiff(c, {
+        coverageRatioBps: req.coverageRatioBps ?? c.coverageRatioBps,
+        feeTakeBps: req.feeTakeBps ?? c.feeTakeBps,
+        featureFlags: c.featureFlags,
+        mutavCapitalWallet: c.mutavCapitalWallet,
+        caps: { ...caps, ...(req.caps ?? {}), ...(req.maxNavMoveBps !== undefined ? { maxNavMoveBps: req.maxNavMoveBps } : {}) },
+      });
+      if (params.length === 0) throw new ComposeError("nothing to change: every field already has this value");
+      const setConfig = getSetConfigInstruction(
+        { ...common, admin: signer, state: a.state, treasuryAccount: c.treasuryAccount, paymentsAccount: c.paymentsAccount, params },
+        o,
+      );
+      // c, the NAV-move bound and the stress buffer need a refresh in the same
+      // slot before set_config, and one after it so the mode reflects the new
+      // values at once.
+      return configParamsNeedRefresh(params) ? [refreshIx(), setConfig, refreshIx()] : [setConfig];
+    }
+    case "set_allowlist_root": {
+      // A9: the root comes from the server's ALLOWLIST, the same list the
+      // proofs are built from; a list sent by the browser must match it.
+      const listed = ctx.allowlist ?? [];
+      if (listed.length === 0) throw new ComposeError("ALLOWLIST is empty on the server: set it (public wallet addresses) and redeploy before proposing a root");
+      if (req.owners && !sameSet(req.owners, listed)) {
+        throw new ComposeError("the wallets sent differ from the server's ALLOWLIST: proofs are built from ALLOWLIST, so change ALLOWLIST and redeploy, then propose its root");
+      }
+      const tree = await buildAllowlist(listed.map((x) => address(x)));
+      return [getSetAllowlistRootInstruction({ ...common, admin: signer, root: tree.root }, o)];
+    }
+    case "cancel_pending":
+      return [getCancelPendingInstruction({ ...common, admin: signer, role: req.role }, o)];
+    case "accept_role": {
+      const c = r.config;
+      const [pending, expiresAt, name] = req.role === ROLE_OPERATOR ? [c.pendingOperator, c.pendingOperatorExpiresAt, "operator"] : [c.pendingPauser, c.pendingPauserExpiresAt, "pauser"];
+      if (pending === SYSTEM_PROGRAM) throw new ComposeError(`no ${name} handover is pending`);
+      if (pending !== signerAddress) throw new ComposeError(`the connected wallet is not the proposed ${name} key ${pending}`);
+      if (r.now > expiresAt) throw new ComposeError(`the ${name} proposal expired; the admin proposes it again`);
       return [
-        getSetConfigInstruction(
+        getAcceptRoleInstruction(
           {
             ...common,
-            admin: signer,
-            treasuryAccount: c.treasuryAccount,
-            paymentsAccount: c.paymentsAccount,
-            coverageRatioBps: req.coverageRatioBps ?? c.coverageRatioBps,
-            feeTakeBps: req.feeTakeBps ?? c.feeTakeBps,
-            payoutSlaSecs: req.payoutSlaSecs ?? c.payoutSlaSecs,
-            featureFlags: c.featureFlags,
-            mutavCapitalWallet: c.mutavCapitalWallet,
-            caps: { ...caps, ...(req.caps ?? {}), ...(req.maxTesouroShareBps !== undefined ? { maxTesouroShareBps: req.maxTesouroShareBps } : {}) },
-            price: { ...price, ...priceDraft, ...(tesouroPriceAccount !== undefined ? { tesouroPriceAccount: address(tesouroPriceAccount) } : {}) },
-            exit,
-            // Bounded by MAX_INCOME_TAKE_BPS, which is 0 until spec §12 Q47 (ADR 0017): only 0 composes.
-            incomeTakeBps: req.incomeTakeBps ?? c.incomeTakeBps,
+            newKey: signer,
+            // The operator check needs the money accounts (the new operator owns neither, ADR 0020).
+            ...(req.role === ROLE_OPERATOR ? { treasuryAccount: c.treasuryAccount, paymentsAccount: c.paymentsAccount } : {}),
+            role: req.role,
           },
           o,
         ),
       ];
-    }
-    case "set_allowlist_root": {
-      const tree = await buildAllowlist(req.owners.map((x) => address(x)));
-      return [getSetAllowlistRootInstruction({ ...common, admin: signer, root: tree.root }, o)];
     }
   }
 }
@@ -537,6 +584,43 @@ async function allowlistProof(ctx: ComposeContext, owner: Address): Promise<Uint
   if (check.state === "not-listed" || !listed.includes(owner)) throw new ComposeError("the connected wallet is not in ALLOWLIST, so no Merkle proof can be built");
   if (!check.proof) throw new ComposeError(ALLOWLIST_TEXT[check.state]);
   return check.proof;
+}
+
+/** A price limit as the program stores it: 0 = none (ADR 0023). */
+function priceLimit(v: bigint | undefined): bigint {
+  if (v === undefined) return 0n;
+  if (v < 0n || v > 0xffff_ffff_ffff_ffffn) throw new ComposeError("price limit out of range");
+  return v;
+}
+
+const sameSet = (a: readonly string[], b: readonly string[]) => {
+  const x = new Set(a.map((s) => s.trim()));
+  const y = new Set(b);
+  return x.size === y.size && [...x].every((k) => y.has(k));
+};
+
+/**
+ * How many deposits to fill, and the seq to stop before: the pending
+ * requests from the head up to the first whose owner is not on the current
+ * allowlist (ALLOWLIST, verified against the on-chain root). Refuses when
+ * the head itself is de-listed: cancel it first.
+ */
+async function allowlistedDepositFill(ctx: ComposeContext, count: number): Promise<{ count: number; end: bigint }> {
+  const r = ctx.reserve;
+  const end = r.state.nextDepositSeq;
+  if (!ctx.ledger?.deposits) return { count, end };
+  const listed = ctx.allowlist ?? [];
+  const root = Uint8Array.from(r.config.investorAllowlistRoot);
+  if (listed.length > 0 && !root.every((x) => x === 0)) {
+    const tree = await buildAllowlist(listed.map((x) => address(x)));
+    if (!tree.root.every((x, i) => x === root[i])) throw new ComposeError(ALLOWLIST_TEXT["list-mismatch"]);
+  }
+  const fill = allowlistedFillCount(r.state, { deposits: ctx.ledger.deposits, redeems: [] }, listed, count);
+  if (!fill.blocked) return { count, end };
+  if (fill.count === 0) {
+    throw new ComposeError(`deposit seq ${fill.blocked.seq} at the head belongs to ${fill.blocked.owner}, who is not on the current allowlist: cancel it (cancel_deposit, owner or admin) before filling`);
+  }
+  return { count: fill.count, end: fill.blocked.seq };
 }
 
 /** Seqs from the head, skipping none, at most `count`. */
@@ -579,7 +663,7 @@ export function describeInstructions(ixs: Instruction[], config?: VaultConfig) {
     // Callers pass only MUTAV instructions with a config (the build route's composed set).
     if (config && ix.data && ix.data.length >= 8) {
       try {
-        if (identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig) changes = setConfigChanges(new Uint8Array(ix.data), config, accounts[2]?.address);
+        if (identifyMutavInstruction(ix.data) === MutavInstruction.SetConfig) changes = setConfigChanges(new Uint8Array(ix.data), config);
       } catch {
         changes = undefined;
       }
@@ -589,8 +673,9 @@ export function describeInstructions(ixs: Instruction[], config?: VaultConfig) {
 }
 
 /**
- * Refuses a second set_config while one is live in the multisig: set_config
- * writes every field, so the later one would undo the earlier when both run.
+ * Refuses a second set_config while one is live in the multisig: both were
+ * composed against the same on-chain values, so the later one could undo a
+ * field the earlier one changes when both run.
  */
 export function refuseOverlappingSetConfig(proposals: Parameters<typeof pendingSetConfig>[0]) {
   const pending = pendingSetConfig(proposals);

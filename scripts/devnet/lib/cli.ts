@@ -34,24 +34,7 @@ export function opt(args: Args, key: string): string | undefined {
   return typeof v === 'string' ? v : undefined;
 }
 
-const LOCAL = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\/?$/;
-
-export const isLocalUrl = (url: string) => LOCAL.test(url);
-
-/**
- * Cluster guard. Local URLs pass. A remote URL needs `--confirm-cluster
- * devnet` (spelled out, so a copied command cannot hit a cluster by
- * accident). Mainnet is refused: its deploy goes through the release
- * workflow and a Squads proposal (spec §14.5).
- */
-export function guardCluster(url: string, confirm: string | undefined): 'local' | 'devnet' {
-  if (isLocalUrl(url)) return 'local';
-  if (/mainnet/i.test(url)) throw new Error('mainnet is out of scope for scripts/devnet (spec §14.5 runbook)');
-  if (confirm !== 'devnet') {
-    throw new Error(`${url} is not local: pass --confirm-cluster devnet to run against devnet`);
-  }
-  return 'devnet';
-}
+export { assertConfigCluster, guardCluster, isLocalUrl } from './cluster';
 
 /** Repo root (scripts/devnet/lib -> ../../..). */
 export const REPO_ROOT = resolve(import.meta.dir, '..', '..', '..');

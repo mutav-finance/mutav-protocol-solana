@@ -9,7 +9,7 @@
  * Layout (shared visual reference): [B+C] one hero tile (remaining cover, the
  * split bar between unpaid rent and move-out debts, and a 2-cell strip), [E]
  * the guarantee table with per-row detail on expand, [E] the agency table with
- * cap meters, [F] the totals that close the sums. What is set aside for filed
+ * share meters (the program sets no per-agency cap, ADR 0019), [F] the totals that close the sums. What is set aside for filed
  * claims lives on the Claims tab.
  */
 import { useState, type ReactNode } from "react";
@@ -36,9 +36,6 @@ const LABEL_STYLE = { letterSpacing: "0.01em" };
 /** Leg colours: one meaning everywhere on the page (hero bar, strip swatches, row bars). The default leg reads as "Unpaid rent", the exit leg as "Move-out debts". */
 const LEG = { default: C.ink, exit: C.mid };
 
-/** Cap use, one format and one rounding everywhere on the page. */
-const capUse = (a: AgencyRow) => fmtBps(a.capUsedBps, 2);
-
 /** `part` as a share of `whole`, for display only; an em dash when there is no whole. */
 const share = (part: bigint, whole: bigint) => (whole > 0n ? fmtBps((part * 10_000n) / whole, 1) : "—");
 
@@ -56,7 +53,7 @@ const COVER_TIPS = {
   "Move-out debts left": "The exit leg: limit for the tenant's debts up to and at the end of occupation, minus what was already paid on it.",
 };
 const AGENCY_TIPS = {
-  "Share of agency cap": "Remaining cover of the agency ÷ the per-agency cap set by the Reserve Admin.",
+  "Share of remaining cover": "Remaining cover of the agency ÷ remaining cover of every active guarantee. The program sets no per-agency cap.",
   "Active / total": "Active guarantees of all those registered for the agency.",
 };
 
@@ -90,13 +87,11 @@ function MiniBar({ segs }: { segs: { f: number; color: string }[] }) {
   );
 }
 
-/** Cap meter: usage against the per-agency cap; the track end is the cap, marked by a 2px tick. Red only past the cap. */
-function CapMeter({ a }: { a: AgencyRow }) {
-  const over = a.capUsedBps > 10_000n;
+/** Share meter: the agency's remaining cover against the remaining cover of every active guarantee. */
+function ShareMeter({ a, total }: { a: AgencyRow; total: bigint }) {
   return (
     <span aria-hidden="true" className="relative inline-block h-2 w-24 shrink-0 border" style={{ background: "var(--color-chart-track)" }}>
-      <span className="mv-grow absolute inset-y-0 left-0 block" style={{ width: `${frac(a.capUsedBps, 10_000n) * 100}%`, background: over ? C.bad : C.ink }} />
-      <span className="absolute -inset-y-px right-0 block w-[2px]" style={{ background: "var(--color-text)" }} />
+      <span className="mv-grow absolute inset-y-0 left-0 block" style={{ width: `${frac(a.outstandingCover, total) * 100}%`, background: C.ink }} />
     </span>
   );
 }
@@ -158,9 +153,6 @@ function GuaranteeRow({ g, axis, agency }: { g: CoverageRow; axis: bigint; agenc
         <tr id={detailId} className="bg-(--color-surface-2)">
           <td colSpan={GUARANTEE_HEAD.length}>
             <dl className="m-0 grid grid-cols-2 gap-x-8 gap-y-3 py-1 pl-8 md:grid-cols-4">
-              <Detail term="Rent">
-                <Mono>{fmtBrs(g.rent)}</Mono>
-              </Detail>
               <Detail term="Open claims">
                 <Mono>{g.openClaims}</Mono>
               </Detail>
@@ -192,8 +184,7 @@ function Detail({ term, children }: { term: string; children: ReactNode }) {
 export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   const fmtBrs = useFmt();
   const rows = byRemaining(coverageRows(l.guarantees));
-  const cap = r.config.caps.maxCoverPerAgency;
-  const agencies = agencyRows(l.exposures, cap);
+  const agencies = agencyRows(l.guarantees);
   const sum = activeRemainingCover(rows);
   const active = rows.filter((g) => g.active);
   const closed = rows.filter((g) => !g.active);
@@ -214,7 +205,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
 
   // [F] Totals that close the sums. Coverage required is max(ceil(c × remaining cover), provisions)
   // (spec §4, ADR 0016); the ratio leg comes from the client's math mirror with provisions at 0.
-  const s = r.solvency;
+  const s = r.coverage;
   const byRatio = coverageRequired(r.state.remainingCoverTotal, r.config.coverageRatioBps, 0n);
   const totals: TotalsTerm[][] = [
     [
@@ -228,7 +219,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       { op: "=", label: "Coverage required (higher of the two)", value: fmtBrs(s.coverageRequired), result: true },
     ],
   ];
-  // The third sum only when it closes exactly (no buffer earmark held back, not under-covered).
+  // The third sum only when it closes exactly (not under-covered).
   if (s.stableAssets >= s.coverageRequired && s.stableAssets - s.coverageRequired === s.freeCapital)
     totals.push([
       { label: "Reserve balance", value: fmtBrs(s.stableAssets) },
@@ -272,7 +263,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <BlockHead title="By guarantee" note="Largest remaining cover first. Open a row for rent, claims and the account." aside={<LegLegend />} />
+        <BlockHead title="By guarantee" note="Largest remaining cover first. Open a row for claims and the account." aside={<LegLegend />} />
         {rows.length === 0 ? (
           <Empty>No guarantees registered yet. Each one appears here once the Operator registers it.</Empty>
         ) : (
@@ -299,28 +290,24 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
         )}
       </div>
 
-      {/* [E] Per agency: concentration against the cap, read as a meter. */}
+      {/* [E] Per agency: concentration as a share of remaining cover, read as a meter. */}
       <div className="flex flex-col gap-4">
         <BlockHead
           title="By agency"
-          note={
-            <>
-              Cap per agency: <Mono style={{ color: "var(--color-text)" }}>{fmtBrs(cap, 0)}</Mono>. The tick marks the cap.
-            </>
-          }
+          note="The program sets no per-agency cap; the meter is each agency's share of remaining cover."
         />
         {agencies.length === 0 ? (
           <Empty>No agency exposure yet.</Empty>
         ) : (
-          <Table label="Per-agency exposure" head={["Agency", ["Remaining cover", "num"], ["Share of agency cap", "num"], ["Active / total", "num"], ["Claims paid", "num"]]} tips={AGENCY_TIPS}>
+          <Table label="Per-agency exposure" head={["Agency", ["Remaining cover", "num"], ["Share of remaining cover", "num"], ["Active / total", "num"], ["Claims paid", "num"]]} tips={AGENCY_TIPS}>
             {agencies.map((a) => (
-              <tr key={a.address}>
+              <tr key={a.agencyId}>
                 <td><AgencyCell id={a.agencyId} /></td>
                 <Num>{fmtBrs(a.outstandingCover)}</Num>
                 <td className="num">
                   <span className="inline-flex items-center gap-3">
-                    <CapMeter a={a} />
-                    <Mono style={a.capUsedBps > 10_000n ? { color: "var(--color-error)" } : undefined}>{capUse(a)}</Mono>
+                    <ShareMeter a={a} total={sum} />
+                    <Mono>{share(a.outstandingCover, sum)}</Mono>
                   </span>
                 </td>
                 <td className="num">

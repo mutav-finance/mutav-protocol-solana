@@ -8,7 +8,7 @@
  * ~/.config/solana/mutav/mutav-keypair.json). It is only handed to the
  * Solana CLI, which deploys to the local validator.
  *
- * deploy (deploy.ts) → initialize → set_roles → set_config (caps) →
+ * deploy (deploy.ts) → initialize → propose_role / accept_role → set_config (caps) →
  * set_allowlist_root → post-deploy checks, plus one allowlisted
  * `request_deposit` to prove the root and proofs match the program.
  *
@@ -29,11 +29,11 @@ import {
   type TransactionSigner,
 } from '@solana/kit';
 import {
+  MUTAV_PROGRAM_ADDRESS,
   buildAllowlist,
   fetchReserve,
   fetchVaultConfig,
   findDepositRequestPda,
-  findHolderStatePda,
   findReserveAddresses,
   getRequestDepositInstruction,
 } from '../../clients/js/src';
@@ -46,14 +46,18 @@ import {
   composeInitialize,
   composeSetAllowlistRoot,
   composeSetCaps,
-  composeSetRoles,
+  composeAcceptRole,
+  composeProposeRoles,
+  ROLE_OPERATOR,
+  ROLE_PAUSER,
   programDataAddress,
   TOKEN_PROGRAM,
 } from './lib/compose';
 import { postDeployChecks } from './lib/checks';
-import { airdrop, assertNoProcess, LocalCluster, run, send, tempDir } from './lib/local';
+import { run } from './lib/exec';
+import { airdrop, assertNoProcess, LocalCluster, send, tempDir } from './lib/local';
 import { accountData } from './lib/rpc';
-import { main as deploy } from './deploy';
+import { deploy } from './deploy';
 
 const RPC_PORT = 28899;
 const URL = `http://127.0.0.1:${RPC_PORT}`;
@@ -120,21 +124,16 @@ export async function dryRun(programKeypair?: string) {
     const treasury = await ata(treasuryOwner!.address);
     const payments = await ata(paymentsOwner!.address);
 
-    step('deploy (scripts/devnet/deploy.ts)');
-    const { programId } = await deploy({
-      url: URL,
-      payer: deployer,
-      'upgrade-authority': vault!.address,
-      ...(programKeypair ? { 'program-keypair': programKeypair } : {}),
-    });
-
     // The same config shape as devnet.example.json, filled for this run.
+    const standIn = { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, members: [vault!.address], threshold: 1, timeLockFloorSecs: 0 };
     const cfg: DeployConfig = parseConfig({
       cluster: 'localnet',
-      programId,
+      programId: MUTAV_PROGRAM_ADDRESS,
       reserveMint: mint,
       reserveTokenProgram: TOKEN_PROGRAM,
-      squads: { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, timeLockFloorSecs: 86_400 },
+      // One throwaway key stands in for both Squads vaults (no Squads program locally).
+      squads: standIn,
+      upgradeSquads: standIn,
       admin: vault!.address,
       upgradeAuthority: vault!.address,
       operator: op1!.address,
@@ -144,44 +143,46 @@ export async function dryRun(programKeypair?: string) {
       paymentsAccount: payments,
       coverageRatioBps: 10_000,
       feeTakeBps: 2_000,
-      payoutSlaSecs: 172_800,
       caps: {
         maxTvl: '50000000000',
         maxCoverPerGuarantee: '30000000000',
-        maxCoverPerAgency: '60000000000',
         maxClaimPerCall: '10000000000',
         maxClaimPerPeriod: '20000000000',
-        claimPeriodSecs: 2_592_000,
-        maxTesouroShareBps: 0,
         minRequest: '1000000000',
         maxRequest: '30000000000',
-        minFillAssets: '500000000',
-      },
-      price: {
-        tesouroPriceAccount: '11111111111111111111111111111111',
-        p0: 1_000_000_000,
-        t0: 0,
-        yMaxBps: 1_500,
-        maxStalenessSecs: 86_400,
-        maxDeviationBps: 200,
         maxNavMoveBps: 10_000,
       },
       allowlist: [capital!.address, investor!.address],
     });
+    step('deploy (scripts/devnet/deploy.ts)');
+    const { programId } = await deploy({
+      url: URL,
+      confirmCluster: undefined,
+      payer: deployer,
+      upgradeAuthority: vault!.address,
+      cfg,
+      localStandIn: true,
+      ...(programKeypair ? { programKeypair } : {}),
+    });
+
     const sendAs = (signer: TransactionSigner, ixs: Instruction[]) => send(rpc, signer, ixs);
 
     step('initialize (signed by the upgrade authority = vault stand-in)');
     await sendAs(vault!, [await composeInitialize(cfg, { upgradeAuthority: vault!, payer: vault! })]);
 
-    step('set_roles (rotate operator and pauser)');
-    const rotated = { ...cfg, operator: op2!.address, pauser: pause2!.address };
-    await sendAs(vault!, [await composeSetRoles(rotated, vault!)]);
-
-    step('set_config (caps from the config file)');
+    step('propose_role + accept_role (rotate operator and pauser, ADR 0020)');
     const a = await findReserveAddresses(mint, { programAddress: programId });
+    const rotated = { ...cfg, operator: op2!.address, pauser: pause2!.address };
+    const before = (await fetchVaultConfig(rpc, a.config)).data;
+    await sendAs(vault!, await composeProposeRoles(rotated, before, vault!));
+    for (const s of [op2!, pause2!]) await airdrop(rpc, s.address, 1);
+    await sendAs(op2!, [await composeAcceptRole(rotated, before, ROLE_OPERATOR, op2!)]);
+    await sendAs(pause2!, [await composeAcceptRole(rotated, before, ROLE_PAUSER, pause2!)]);
+
+    step('set_config (sparse: only the caps that differ from the chain)');
     const current = (await fetchVaultConfig(rpc, a.config)).data;
     const raised = { ...cfg, caps: { ...cfg.caps, maxTvl: 100_000n * BRL } };
-    await sendAs(vault!, [await composeSetCaps(raised, current, vault!)]);
+    await sendAs(vault!, await composeSetCaps(raised, current, vault!));
 
     step('set_allowlist_root');
     const tree = await buildAllowlist(cfg.allowlist);
@@ -198,9 +199,9 @@ export async function dryRun(programKeypair?: string) {
       allowlistRoot: tree.root,
     });
     if (r.config.data.caps.maxTvl !== 100_000n * BRL) failures.push('caps.maxTvl not updated');
-    if (r.config.data.price.maxNavMoveBps !== 10_000) failures.push('price.maxNavMoveBps not written');
+    if (r.config.data.caps.maxNavMoveBps !== 10_000) failures.push('caps.maxNavMoveBps not written');
     if (failures.length) throw new Error(`post-deploy checks failed:\n  ${failures.join('\n  ')}`);
-    console.log('upgrade authority == vault; feature_flags == 0; buffer_earmark == 0; roles, caps, root as configured');
+    console.log('upgrade authority == vault; feature_flags == 0; roles, caps, root as configured');
 
     step('allowlisted request_deposit (root and proof accepted by the program)');
     const investorBrs = await ata(investor!.address);
@@ -213,7 +214,6 @@ export async function dryRun(programKeypair?: string) {
           config: a.config,
           state: a.state,
           depositRequest: (await findDepositRequestPda({ config: a.config, seq }, { programAddress: programId }))[0],
-          holderState: (await findHolderStatePda({ config: a.config, owner: investor!.address }, { programAddress: programId }))[0],
           source: investorBrs,
           pendingDeposits: a.pendingDeposits,
           reserveMint: mint,
@@ -221,7 +221,8 @@ export async function dryRun(programKeypair?: string) {
           eventAuthority: a.eventAuthority,
           program: programId,
           assets: 1_000n * BRL,
-          proof: tree.proofs.get(investor!.address)!,
+          minSharesOut: 0n,
+          eligibility: { __kind: 'Merkle', proof: tree.proofs.get(investor!.address)! },
         },
         { programAddress: programId },
       ),

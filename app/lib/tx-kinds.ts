@@ -9,30 +9,34 @@ export type OperatorTx =
       id: string;
       agencyId: string;
       refsHash: string;
-      rent: bigint;
-      defaultMultiplierBps: number;
-      exitMultiplierBps: number;
       defaultCover: bigint;
       exitCover: bigint;
     }
-  | { kind: "close_guarantee"; guarantee: string }
+  /** `reason`: 1 RELEASED (default), 2 VOID: nothing paid (ADR 0020). */
+  | { kind: "close_guarantee"; guarantee: string; reason?: 1 | 2 }
   | { kind: "contribute_fees"; invoiceRefHash: string; amount: bigint }
   /** ADR 0017: sweep one issuer income statement from the income inbox into the reserve. `period` is YYYYMM. */
   | { kind: "sweep_income"; incomeRefHash: string; period: number; amount: bigint }
-  | { kind: "file_claim"; guarantee: string; leg: 0 | 1; amount: bigint; noticeRefHash: string }
-  | { kind: "pay_claim"; guarantee: string; leg: 0 | 1; amount: bigint; noticeRefHash: string }
+  | { kind: "file_claim"; guarantee: string; leg: 1 | 2; amount: bigint; noticeRefHash: string }
+  /** Pays exactly the filing's provision: `amount` is sent as `expected_amount` (ADR 0021); `leg` is read from the filing. */
+  | { kind: "pay_claim"; guarantee: string; leg: 1 | 2; amount: bigint; noticeRefHash: string }
   | { kind: "settle_payout"; guarantee: string; noticeRefHash: string; pixE2eHash: string };
 
 /** The allowlisted capital provider's instructions (spec §5.5); `seq` names the owner's request. */
 export type InvestorTx =
-  | { kind: "request_deposit"; assets: bigint }
+  /** `minSharesOut`: the owner's price limit (ADR 0023); 0 or absent = none. */
+  | { kind: "request_deposit"; assets: bigint; minSharesOut?: bigint }
   | { kind: "cancel_deposit"; seq: bigint }
   | { kind: "claim_shares"; seq: bigint }
-  | { kind: "request_redeem"; shares: bigint }
+  /** `minAssetsOut`: the owner's price limit (ADR 0023); 0 or absent = none. */
+  | { kind: "request_redeem"; shares: bigint; minAssetsOut?: bigint }
   | { kind: "cancel_redeem"; seq: bigint }
   | { kind: "claim_assets"; seq: bigint };
 
 export type PublicTx = { kind: "refresh" };
+
+/** The proposed operator or pauser key takes its role, signing itself (ADR 0020). 1 = operator, 2 = pauser. */
+export type RoleTx = { kind: "accept_role"; role: 1 | 2 };
 
 /** `PriceParams` fields the admin may change through `set_config` (spec §7). Addresses travel as base58. */
 export type PriceDraft = Partial<{
@@ -45,40 +49,37 @@ export type PriceDraft = Partial<{
   maxNavMoveBps: number;
 }>;
 
+/** NAV per share range (`NAV_SCALE`) a fill or halt clear may run at (ADR 0023). */
+export type NavBoundsDraft = { min: bigint; max: bigint };
+
 export type AdminTx =
-  | { kind: "fulfil_deposits"; count: number }
-  | { kind: "fulfil_redeems"; count: number; maxAssets: bigint }
+  /** `navBounds` defaults to the current NAV ± `DEFAULT_NAV_TOLERANCE_BPS`. */
+  | { kind: "fulfil_deposits"; count: number; navBounds?: NavBoundsDraft }
+  | { kind: "fulfil_redeems"; count: number; maxAssets: bigint; navBounds?: NavBoundsDraft }
   | { kind: "pause" }
   | { kind: "unpause" }
-  | { kind: "clear_fulfil_halt" }
+  | { kind: "clear_fulfil_halt"; navBounds?: NavBoundsDraft }
   | {
       kind: "set_config";
       coverageRatioBps?: number;
       /** MUTAV's take from each guarantee fee, `≤ MAX_FEE_TAKE_BPS` (3_000). */
       feeTakeBps?: number;
-      caps?: Partial<Record<"maxTvl" | "maxCoverPerGuarantee" | "maxCoverPerAgency" | "maxClaimPerCall" | "maxClaimPerPeriod" | "minRequest" | "maxRequest" | "minFillAssets" | "claimPeriodSecs", bigint>>;
-      /** `payout_sla_secs`: payment → PIX settlement before a payout is late (≥ 0). */
-      payoutSlaSecs?: bigint;
-      /**
-       * `caps.max_tesouro_share_bps`, the complement of the settlement floor
-       * (ADR 0018). TODO(rename): becomes `min_settlement_bps`; the app sends
-       * `10_000 − V` for a floor of V until the program field is replaced.
-       */
-      maxTesouroShareBps?: number;
-      /** TESOURO price parameters (spec §7); blank fields carry over. */
-      price?: PriceDraft;
-      /** MUTAV's take from issuer income (ADR 0017); `≤ MAX_INCOME_TAKE_BPS`, 0 until spec §12 Q47. */
-      incomeTakeBps?: number;
+      caps?: Partial<Record<"maxTvl" | "maxCoverPerGuarantee" | "maxClaimPerCall" | "maxClaimPerPeriod" | "minRequest" | "maxRequest", bigint>>;
+      /** `caps.max_nav_move_bps`, the NAV-move guard (spec §7), 0–10_000. */
+      maxNavMoveBps?: number;
     }
-  | { kind: "set_allowlist_root"; owners: string[] }
-  /** Replace the operator and pauser keys (distinct from the admin and each other). */
+  /** The root of the server's ALLOWLIST (A9); `owners`, when sent, must be that same list or the server refuses. */
+  | { kind: "set_allowlist_root"; owners?: string[] }
+  /** Clear a pending handover before it is accepted (1 operator, 2 pauser, 3 admin). */
+  | { kind: "cancel_pending"; role: 1 | 2 | 3 }
+  /** Propose new operator and pauser keys (distinct from the admin and each other); each new key then signs `accept_role` (ADR 0020). */
   | { kind: "set_roles"; operator: string; pauser: string }
   /** Point claim payments at a new BRS token account (spec §2.1 checks run on-chain). */
   | { kind: "set_payments_account"; paymentsAccount: string }
   /** Pauser key or admin, no time lock: clears the operator at once. */
   | { kind: "revoke_operator" };
 
-export type TxRequest = OperatorTx | InvestorTx | PublicTx | AdminTx;
+export type TxRequest = OperatorTx | InvestorTx | PublicTx | RoleTx | AdminTx;
 export type TxKind = TxRequest["kind"];
 
 export const ADMIN_KINDS: ReadonlySet<TxKind> = new Set([
@@ -90,6 +91,7 @@ export const ADMIN_KINDS: ReadonlySet<TxKind> = new Set([
   "set_allowlist_root",
   "set_roles",
   "set_payments_account",
+  "cancel_pending",
 ]);
 export const OPERATOR_KINDS: ReadonlySet<TxKind> = new Set([
   "register_guarantee",
@@ -102,7 +104,8 @@ export const OPERATOR_KINDS: ReadonlySet<TxKind> = new Set([
 ]);
 
 /** Which configured role the program checks as signer, for the UI warning. */
-export function expectedSigner(kind: TxKind): "operator" | "admin" | "pauser-or-admin" | "investor" | "anyone" {
+export function expectedSigner(kind: TxKind): "operator" | "admin" | "pauser-or-admin" | "investor" | "anyone" | "proposed key" {
+  if (kind === "accept_role") return "proposed key";
   if (OPERATOR_KINDS.has(kind)) return "operator";
   if (ADMIN_KINDS.has(kind)) return "admin";
   if (kind === "pause" || kind === "revoke_operator") return "pauser-or-admin";

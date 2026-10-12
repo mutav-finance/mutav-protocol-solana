@@ -1,4 +1,5 @@
-//! `request_deposit(assets, proof)` (spec §5.5).
+//! `request_deposit(assets, min_shares_out, eligibility)` (spec §5.5;
+//! ADR 0023). `min_shares_out` is the owner's price limit (`0` = none).
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
@@ -9,18 +10,22 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::DepositRequested,
-    instructions::capital::{require_allowlisted, require_request_size},
-    state::{DepositRequest, HolderState, VaultConfig, VaultState},
+    instructions::capital::{require_eligible, require_request_size, Eligibility},
+    state::{DepositRequest, VaultConfig, VaultState},
 };
 
 #[event_cpi]
 #[derive(Accounts)]
 pub struct RequestDeposit<'info> {
-    /// The investor. Pays the request's and `HolderState`'s rent.
+    /// The investor. Pays the request's rent.
     #[account(mut)]
     pub owner: Signer<'info>,
 
-    #[account(constraint = config.is_supported() @ MutavError::UnsupportedVersion)]
+    #[account(
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
+        constraint = config.is_supported() @ MutavError::UnsupportedVersion,
+    )]
     pub config: Box<Account<'info, VaultConfig>>,
 
     #[account(
@@ -40,16 +45,6 @@ pub struct RequestDeposit<'info> {
     )]
     pub deposit_request: Box<Account<'info, DepositRequest>>,
 
-    #[account(
-        init_if_needed,
-        payer = owner,
-        space = HOLDER_STATE_SIZE,
-        seeds = [HOLDER_SEED, config.key().as_ref(), owner.key().as_ref()],
-        bump,
-        constraint = holder_state.is_supported() @ MutavError::UnsupportedVersion,
-    )]
-    pub holder_state: Box<Account<'info, HolderState>>,
-
     /// The owner's BRS account. Owner, never delegate (spec §5).
     #[account(
         mut,
@@ -64,7 +59,7 @@ pub struct RequestDeposit<'info> {
     #[account(address = config.reserve_mint @ MutavError::InvalidMint)]
     pub reserve_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    #[account(address = config.reserve_token_program @ MutavError::InvalidMint)]
+    #[account(address = config.reserve_token_program @ MutavError::InvalidTokenProgram)]
     pub token_program: Interface<'info, TokenInterface>,
 
     pub system_program: Program<'info, System>,
@@ -73,12 +68,13 @@ pub struct RequestDeposit<'info> {
 pub fn handle_request_deposit(
     ctx: Context<RequestDeposit>,
     assets: u64,
-    proof: Vec<[u8; 32]>,
+    min_shares_out: u64,
+    eligibility: Eligibility,
 ) -> Result<()> {
     let config = &ctx.accounts.config;
     let owner = ctx.accounts.owner.key();
     require!(!config.paused, MutavError::Paused);
-    require_allowlisted(config, &owner, &proof)?;
+    require_eligible(config, &owner, &eligibility)?;
     require_request_size(config, assets)?;
     // The source's owner is the signer (account constraint).
 
@@ -112,11 +108,8 @@ pub fn handle_request_deposit(
     r.seq = seq;
     r.assets = assets;
     r.requested_at = now;
+    r.min_shares_out = min_shares_out;
     r.status = DEPOSIT_PENDING;
-
-    ctx.accounts
-        .holder_state
-        .stamp(ctx.bumps.holder_state, owner, now);
 
     emit_cpi!(DepositRequested {
         config: ctx.accounts.config.key(),
@@ -124,6 +117,7 @@ pub fn handle_request_deposit(
         owner,
         seq,
         assets,
+        min_shares_out,
     });
     Ok(())
 }

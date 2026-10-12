@@ -2,8 +2,21 @@
  * Post-deploy checks (plan Task 12): read-only, pure over decoded data, so
  * they run the same against a local validator, a fork or devnet.
  */
-import { getAddressDecoder, type Address } from '@solana/kit';
+import { address, getAddressDecoder, type Address } from '@solana/kit';
 import type { VaultConfig, VaultState } from '../../../clients/js/src';
+import { programDataHash } from './hash';
+
+const DEFAULT_ADDRESS = address('11111111111111111111111111111111');
+
+/**
+ * The deployed bytecode is the verified build: the ProgramData program
+ * bytes (header stripped, trailing zeros trimmed, as `solana-verify
+ * get-program-hash` computes them) hash to `expected`.
+ */
+export function checkProgramHash(programData: Uint8Array, expected: string): string[] {
+  const got = programDataHash(programData);
+  return got === expected ? [] : [`program hash is ${got}, expected ${expected} (solana-verify get-program-hash)`];
+}
 
 /**
  * Upgrade authority from a BPF Loader Upgradeable `ProgramData` account:
@@ -18,12 +31,57 @@ export function programDataUpgradeAuthority(data: Uint8Array): Address | null {
   return getAddressDecoder().decode(data.subarray(13, 45));
 }
 
+const TOKEN_2022_PROGRAM = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+/** Base Mint and Account sizes; Token-2022 puts its account type byte right after an Account's 165. */
+const MINT_LEN = 82;
+const ACCOUNT_LEN = 165;
+const ACCOUNT_TYPE_MINT = 1;
+
+/**
+ * Mint-sized: a classic SPL mint is exactly 82 bytes; a Token-2022 mint is
+ * 82 bytes, or longer than 165 with account type byte 1 (Mint). A 165-byte
+ * token account (or a Token-2022 account with extensions) is refused.
+ */
+function isMintSized(owner: Address, data: Uint8Array): boolean {
+  if (data.length === MINT_LEN) return true;
+  if (owner !== TOKEN_2022_PROGRAM) return false;
+  return data.length > ACCOUNT_LEN && data[ACCOUNT_LEN] === ACCOUNT_TYPE_MINT;
+}
+
+/** Every cap is sized for BRS base units (6 dp); a 9-dp mint would shrink them 1000x. */
+export const RESERVE_DECIMALS = 6;
+
+/**
+ * The reserve mint as read from the chain: owned by the configured token
+ * program, mint-sized, initialised, with 6 decimals. Returns the failures.
+ */
+export function checkReserveMint(
+  account: { owner: Address; data: Uint8Array } | null,
+  cfg: { reserveMint: Address; reserveTokenProgram: Address },
+): string[] {
+  if (!account) return [`reserve mint ${cfg.reserveMint} not found`];
+  const out: string[] = [];
+  if (account.owner !== cfg.reserveTokenProgram) {
+    out.push(`reserve mint ${cfg.reserveMint} is owned by ${account.owner}, not reserveTokenProgram ${cfg.reserveTokenProgram}`);
+  }
+  // SPL Token / Token-2022 base Mint layout: decimals at 44, is_initialized at 45.
+  if (!isMintSized(account.owner, account.data)) {
+    return [...out, `reserve mint ${cfg.reserveMint} is not a mint (${account.data.length} bytes)`];
+  }
+  if (account.data[45] !== 1) out.push(`reserve mint ${cfg.reserveMint} is not initialised`);
+  const decimals = account.data[44]!;
+  if (decimals !== RESERVE_DECIMALS) out.push(`reserve mint ${cfg.reserveMint} has decimals ${decimals}, expected ${RESERVE_DECIMALS}`);
+  return out;
+}
+
 export type Expected = {
   upgradeAuthority: Address;
   admin: Address;
   operator?: Address;
   pauser?: Address;
   allowlistRoot?: Uint8Array;
+  /** The guardians the config names (none when empty); the on-chain set must match. */
+  guardians?: Address[];
 };
 
 /** Returns the failed checks; empty means all pass. */
@@ -37,7 +95,6 @@ export function postDeployChecks(
   const ua = programDataUpgradeAuthority(programData);
   if (ua !== e.upgradeAuthority) out.push(`upgrade authority is ${ua ?? 'none (immutable)'}, expected ${e.upgradeAuthority}`);
   if (config.featureFlags !== 0n) out.push(`feature_flags is ${config.featureFlags}, expected 0`);
-  if (state.bufferEarmark !== 0n) out.push(`buffer_earmark is ${state.bufferEarmark}, expected 0`);
   if (config.admin !== e.admin) out.push(`admin is ${config.admin}, expected ${e.admin}`);
   if (e.operator && config.operator !== e.operator) out.push(`operator is ${config.operator}, expected ${e.operator}`);
   if (e.pauser && config.pauser !== e.pauser) out.push(`pauser is ${config.pauser}, expected ${e.pauser}`);
@@ -45,6 +102,22 @@ export function postDeployChecks(
     const got = Buffer.from(config.investorAllowlistRoot as Uint8Array).toString('hex');
     const want = Buffer.from(e.allowlistRoot).toString('hex');
     if (got !== want) out.push(`allowlist root is ${got}, expected ${want}`);
+  }
+  // A pending handover could hand a role over after the checks pass.
+  for (const [role, key] of [
+    ['operator', config.pendingOperator],
+    ['pauser', config.pendingPauser],
+    ['admin', config.pendingAdmin],
+  ] as const) {
+    if (key !== DEFAULT_ADDRESS) out.push(`pending ${role} handover to ${key}: accept or cancel_pending it first`);
+  }
+  if (e.guardians) {
+    const set = (xs: readonly Address[]) => xs.filter((x) => x !== DEFAULT_ADDRESS).sort();
+    const got = set(config.guardians);
+    const want = set(e.guardians);
+    if (JSON.stringify(got) !== JSON.stringify(want)) {
+      out.push(`guardians are [${got.join(', ')}], expected [${want.join(', ')}]`);
+    }
   }
   if (config.paused) out.push('reserve is paused');
   return out;

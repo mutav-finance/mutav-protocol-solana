@@ -1,29 +1,32 @@
 import { describe, expect, test } from 'bun:test';
 import {
   assetsFor,
-  computeSolvency,
+  computeCoverage,
   conversionNav,
   coverageRequired,
   MIN_COVERAGE_RATIO_BPS,
-  headStarved,
   MathOverflowError,
   mulDiv,
   navPerShare,
+  publishedNav,
   NAV_SCALE,
-  PRICE_SCALE,
   sharesFor,
   VIRTUAL_OFFSET,
   INSTANT_EXIT,
   isValidIncomePeriod,
-  MAX_INCOME_TAKE_BPS,
   takeSplit,
-  type SolvencyInputs,
+  claimWindowPaid,
+  stressTerm,
+  U64_MAX,
+  isUnderwater,
+  redeemSizeError,
+  SUB_MINIMUM_EXIT_FLOOR_DIVISOR,
+  type CoverageInputs,
 } from '../src';
 import { outcome, vectors } from './vectors';
 
 describe('constants match the program', () => {
   test('scales, offset and flags', () => {
-    expect(PRICE_SCALE.toString()).toBe(vectors.constants.priceScale);
     expect(NAV_SCALE.toString()).toBe(vectors.constants.navScale);
     expect(VIRTUAL_OFFSET.toString()).toBe(vectors.constants.virtualOffset);
     expect(INSTANT_EXIT.toString()).toBe(vectors.constants.instantExit);
@@ -41,6 +44,16 @@ describe('coverageRequired (ADR 0016)', () => {
     // At c ≥ 1 provisions ≤ cover never bind.
     expect(coverageRequired(100_000n, 10_000, 100_000n)).toBe(100_000n);
     expect(coverageRequired(100_000n, 15_000, 100_000n)).toBe(150_000n);
+  });
+
+  test('the stress buffer covers the next claims, up to the unprovisioned cover (ADR 0022)', () => {
+    expect(coverageRequired(100_000n, 1_000, 4_000n, 19_000n)).toBe(23_000n);
+    expect(coverageRequired(10_000n, 1_000, 4_000n, 19_000n)).toBe(10_000n);
+    expect(coverageRequired(1_000_000n, 1_000, 4_000n, 19_000n)).toBe(100_000n);
+    expect(coverageRequired(0n, 1_000, 0n, 19_000n)).toBe(0n);
+    // Saturates instead of exceeding u64.
+    expect(stressTerm(U64_MAX, U64_MAX - 1n, U64_MAX)).toBe(U64_MAX);
+    expect(stressTerm(5n, 9n, U64_MAX)).toBe(9n);
   });
 });
 
@@ -62,31 +75,25 @@ describe('share conversion parity', () => {
   });
 });
 
-describe('solvency parity (earmark_eff, free_capital, liquid_budget, …)', () => {
-  test.each(vectors.solvency.map((v: any, i: number) => [i, v]))('case %i', (_i, v: any) => {
+describe('coverage parity (free_capital, liquid_budget, …)', () => {
+  test.each(vectors.coverage.map((v: any, i: number) => [i, v]))('case %i', (_i, v: any) => {
     const i = v.input;
-    const input: SolvencyInputs = {
+    const input: CoverageInputs = {
       brsBalance: BigInt(i.brsBalance),
-      tesouroUnits: BigInt(i.tesouroUnits),
-      tesouroPrice: BigInt(i.tesouroPrice),
       remainingCoverTotal: BigInt(i.remainingCoverTotal),
       coverageRatioBps: i.coverageRatioBps,
       provisions: BigInt(i.provisions),
-      bufferEarmark: BigInt(i.bufferEarmark),
-      featureFlags: BigInt(i.featureFlags),
-      headStarved: i.headStarved,
+      stressBuffer: BigInt(i.stressBuffer),
     };
     if (v.output === 'error') {
-      expect(() => computeSolvency(input)).toThrow(MathOverflowError);
+      expect(() => computeCoverage(input)).toThrow(MathOverflowError);
       return;
     }
-    const s = computeSolvency(input);
+    const s = computeCoverage(input);
     expect({
-      tesouroValue: s.tesouroValue.toString(),
       stableAssets: s.stableAssets.toString(),
       coverageRequired: s.coverageRequired.toString(),
       surplus: s.surplus.toString(),
-      earmarkEff: s.earmarkEff.toString(),
       freeCapital: s.freeCapital.toString(),
       liquidBudget: s.liquidBudget.toString(),
       netAssets: s.netAssets.toString(),
@@ -95,9 +102,9 @@ describe('solvency parity (earmark_eff, free_capital, liquid_budget, …)', () =
     }).toEqual(v.output);
   });
 
-  test('the vectors cover the earmark branches', () => {
-    const outs = vectors.solvency.filter((v: any) => v.output !== 'error');
-    expect(outs.some((v: any) => v.output.earmarkEff !== '0')).toBe(true);
+  test('the vectors cover the branches', () => {
+    const outs = vectors.coverage.filter((v: any) => v.output !== 'error');
+    expect(vectors.coverage.some((v: any) => v.output === 'error')).toBe(true);
     expect(outs.some((v: any) => v.output.mode === 1)).toBe(true);
     // c < 1 with the provisions term binding.
     expect(
@@ -105,14 +112,25 @@ describe('solvency parity (earmark_eff, free_capital, liquid_budget, …)', () =
         (v: any) => v.input.coverageRatioBps < 10_000 && v.output.coverageRequired === v.input.provisions && v.input.provisions !== '0',
       ),
     ).toBe(true);
-    expect(outs.some((v: any) => v.input.headStarved && v.input.featureFlags !== '0')).toBe(true);
   });
 });
 
-describe('head starvation parity', () => {
-  test.each(vectors.headStarved.map((v: any, i: number) => [i, v]))('case %i', (_i, v: any) => {
-    const at = v.headRequestedAt === null ? null : BigInt(v.headRequestedAt);
-    expect(headStarved(BigInt(v.now), at, BigInt(v.bufferReleaseAfterSecs))).toBe(v.starved);
+describe('claim window (ADR 0019)', () => {
+  const DAY = 86_400n;
+  const d0 = 20_000n;
+  const ring = (entries: [bigint, bigint][]) => {
+    const b = Array(31).fill(0n) as bigint[];
+    for (const [day, v] of entries) b[Number(day % 31n)] = v;
+    return b;
+  };
+  test('keeps exactly the last 31 UTC days', () => {
+    const state = { claimDayBuckets: ring([[d0, 5n], [d0 + 30n, 7n]]), claimDayAnchor: d0 + 30n };
+    expect(claimWindowPaid(state, (d0 + 30n) * DAY)).toBe(12n);
+    expect(claimWindowPaid(state, (d0 + 31n) * DAY)).toBe(7n);
+    expect(claimWindowPaid(state, (d0 + 31n) * DAY - 1n)).toBe(12n);
+    expect(claimWindowPaid(state, (d0 + 61n) * DAY)).toBe(0n);
+    // A clock before the anchor keeps the anchor.
+    expect(claimWindowPaid(state, d0 * DAY)).toBe(12n);
   });
 });
 
@@ -124,11 +142,6 @@ describe('input validation', () => {
 });
 
 describe('issuer income (ADR 0017)', () => {
-  test('the take cap matches the program (0 until decided)', () => {
-    expect(MAX_INCOME_TAKE_BPS).toBe(vectors.constants.maxIncomeTakeBps);
-    expect(MAX_INCOME_TAKE_BPS).toBe(0);
-  });
-
   test('takeSplit rounds the take down, in the reserve’s favour', () => {
     expect(takeSplit(1_000_000_003n, 2_500)).toEqual({ take: 250_000_000n, net: 750_000_003n });
     expect(takeSplit(7n, 2_000)).toEqual({ take: 1n, net: 6n });
@@ -138,5 +151,34 @@ describe('issuer income (ADR 0017)', () => {
   test('periods are YYYYMM months, as the program checks', () => {
     for (const p of [202_610, 202_601, 202_612]) expect(isValidIncomePeriod(p)).toBe(true);
     for (const p of [0, 202_600, 202_613, 2_026, 199_912, 1_000_001, 202_610.5]) expect(isValidIncomePeriod(p)).toBe(false);
+  });
+});
+
+describe('publishedNav', () => {
+  test('mirrors pricing::published_nav', () => {
+    expect(publishedNav(1_000n, 0n)).toBe(0n);
+    expect(publishedNav(0n, 0n)).toBe(0n);
+    expect(publishedNav(0n, 1_000n)).toBe(1n);
+    expect(publishedNav(1_000n, 1_000n)).toBe(1_000_000_000n);
+  });
+});
+
+describe('capital rules parity (ADR 0029)', () => {
+  test('the sub-minimum exit floor divisor matches the program', () => {
+    expect(SUB_MINIMUM_EXIT_FLOOR_DIVISOR.toString()).toBe(vectors.constants.subMinimumExitFloorDivisor);
+  });
+  test.each(vectors.capitalRules.underwater.map((v: any, i: number) => [i, v]))('underwater %i', (_i, v: any) => {
+    expect(isUnderwater(BigInt(v.netAssets), BigInt(v.sharesOutstanding))).toBe(v.underwater);
+  });
+  test.each(vectors.capitalRules.redeemSize.map((v: any, i: number) => [i, v]))('redeem size %i', (_i, v: any) => {
+    expect(
+      redeemSizeError(BigInt(v.value), BigInt(v.remainder), v.canonical, BigInt(v.minRequest), BigInt(v.maxRequest)),
+    ).toBe(v.error);
+  });
+  test('the vectors cover every outcome', () => {
+    const errs = new Set(vectors.capitalRules.redeemSize.map((v: any) => v.error));
+    expect(errs).toEqual(new Set([null, 'RequestTooSmall', 'RequestTooLarge']));
+    const u = vectors.capitalRules.underwater.map((v: any) => v.underwater);
+    expect(u.includes(true) && u.includes(false)).toBe(true);
   });
 });

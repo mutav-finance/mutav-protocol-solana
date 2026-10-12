@@ -12,8 +12,6 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getBooleanDecoder,
-  getBooleanEncoder,
   getBytesEncoder,
   getConstantDecoder,
   getConstantEncoder,
@@ -47,7 +45,6 @@ export type AssetsClaimedEvent = {
   owner: Address;
   seq: bigint;
   assets: bigint;
-  closed: boolean;
 };
 
 export type AssetsClaimedEventArgs = {
@@ -56,7 +53,6 @@ export type AssetsClaimedEventArgs = {
   owner: Address;
   seq: number | bigint;
   assets: number | bigint;
-  closed: boolean;
 };
 
 /** Gets the encoder for {@link AssetsClaimedEventArgs} event data. */
@@ -68,7 +64,6 @@ export function getAssetsClaimedEventEncoder(): FixedSizeEncoder<AssetsClaimedEv
       ["owner", getAddressEncoder()],
       ["seq", getU64Encoder()],
       ["assets", getU64Encoder()],
-      ["closed", getBooleanEncoder()],
     ]),
     [getConstantEncoder(ASSETS_CLAIMED_EVENT_DISCRIMINATOR)],
   );
@@ -83,7 +78,6 @@ export function getAssetsClaimedEventDecoder(): FixedSizeDecoder<AssetsClaimedEv
       ["owner", getAddressDecoder()],
       ["seq", getU64Decoder()],
       ["assets", getU64Decoder()],
-      ["closed", getBooleanDecoder()],
     ]),
     [getConstantDecoder(ASSETS_CLAIMED_EVENT_DISCRIMINATOR)],
   );

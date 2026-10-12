@@ -53,13 +53,19 @@ export type IncomeReceipt = {
   discriminator: ReadonlyUint8Array;
   version: number;
   bump: number;
-  /** Commitment to the issuer's statement (amount and reference). */
-  incomeRefHash: ReadonlyUint8Array;
-  /** The statement's month, `YYYYMM`. */
+  /**
+   * `INCOME_KIND_ISSUER_STATEMENT` (`sweep_income`) or `INCOME_KIND_FEE`
+   * (`contribute_fees`). `INCOME_KIND_UNSOLICITED` and
+   * `INCOME_KIND_BACKSTOP` are reserved for a later upgrade.
+   */
+  kind: number;
+  /** Commitment to the issuer's statement or the fee invoice. */
+  refHash: ReadonlyUint8Array;
+  /** The statement's month, `YYYYMM`. `0` for a fee. */
   period: number;
-  /** Amount swept out of the income inbox. */
+  /** Amount received. */
   gross: bigint;
-  /** MUTAV's take, sent to the treasury. */
+  /** MUTAV's take, sent to the treasury (fees only; `0` for income). */
   take: bigint;
   /** Net into `reserve`. */
   net: bigint;
@@ -71,13 +77,19 @@ export type IncomeReceipt = {
 export type IncomeReceiptArgs = {
   version: number;
   bump: number;
-  /** Commitment to the issuer's statement (amount and reference). */
-  incomeRefHash: ReadonlyUint8Array;
-  /** The statement's month, `YYYYMM`. */
+  /**
+   * `INCOME_KIND_ISSUER_STATEMENT` (`sweep_income`) or `INCOME_KIND_FEE`
+   * (`contribute_fees`). `INCOME_KIND_UNSOLICITED` and
+   * `INCOME_KIND_BACKSTOP` are reserved for a later upgrade.
+   */
+  kind: number;
+  /** Commitment to the issuer's statement or the fee invoice. */
+  refHash: ReadonlyUint8Array;
+  /** The statement's month, `YYYYMM`. `0` for a fee. */
   period: number;
-  /** Amount swept out of the income inbox. */
+  /** Amount received. */
   gross: number | bigint;
-  /** MUTAV's take, sent to the treasury. */
+  /** MUTAV's take, sent to the treasury (fees only; `0` for income). */
   take: number | bigint;
   /** Net into `reserve`. */
   net: number | bigint;
@@ -93,7 +105,8 @@ export function getIncomeReceiptEncoder(): FixedSizeEncoder<IncomeReceiptArgs> {
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["version", getU8Encoder()],
       ["bump", getU8Encoder()],
-      ["incomeRefHash", fixEncoderSize(getBytesEncoder(), 32)],
+      ["kind", getU8Encoder()],
+      ["refHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["period", getU32Encoder()],
       ["gross", getU64Encoder()],
       ["take", getU64Encoder()],
@@ -111,7 +124,8 @@ export function getIncomeReceiptDecoder(): FixedSizeDecoder<IncomeReceipt> {
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["version", getU8Decoder()],
     ["bump", getU8Decoder()],
-    ["incomeRefHash", fixDecoderSize(getBytesDecoder(), 32)],
+    ["kind", getU8Decoder()],
+    ["refHash", fixDecoderSize(getBytesDecoder(), 32)],
     ["period", getU32Decoder()],
     ["gross", getU64Decoder()],
     ["take", getU64Decoder()],
@@ -187,5 +201,5 @@ export async function fetchAllMaybeIncomeReceipt(
 }
 
 export function getIncomeReceiptSize(): number {
-  return 142;
+  return 143;
 }

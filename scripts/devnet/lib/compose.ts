@@ -13,14 +13,25 @@ import {
   type TransactionSigner,
 } from '@solana/kit';
 import {
+  configParamsDiff,
+  configParamsNeedRefresh,
   findIncomeInboxAddress,
   findReserveAddresses,
+  getAcceptRoleInstruction,
+  getCancelPendingInstruction,
   getInitializeInstruction,
+  getProposeRoleInstruction,
+  getRefreshInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
-  getSetRolesInstruction,
+  getSetGuardiansInstruction,
   type VaultConfig,
 } from '../../../clients/js/src';
+
+/** Role ids of `propose_role` / `accept_role` (ADR 0020). */
+export const ROLE_OPERATOR = 1;
+export const ROLE_PAUSER = 2;
+export const ROLE_ADMIN = 3;
 import type { DeployConfig } from './config';
 
 export const BPF_LOADER_UPGRADEABLE = address('BPFLoaderUpgradeab1e11111111111111111111111');
@@ -69,6 +80,7 @@ export async function composeInitialize(
       pendingDeposits: a.pendingDeposits,
       pendingRedemptions: a.pendingRedemptions,
       claims: a.claims,
+      unsolicited: a.unsolicited,
       // ADR 0017: the income inbox Nora pays, created idempotently.
       incomeInbox: await findIncomeInboxAddress({
         vaultAuthority: a.vaultAuthority,
@@ -88,65 +100,199 @@ export async function composeInitialize(
       mutavCapitalWallet: cfg.mutavCapitalWallet,
       coverageRatioBps: cfg.coverageRatioBps,
       feeTakeBps: cfg.feeTakeBps,
-      payoutSlaSecs: cfg.payoutSlaSecs,
-      caps: cfg.caps,
-      price: cfg.price,
+      // ADR 0019 carves left out of the file start off (0).
+      caps: {
+        ...cfg.caps,
+        stressBuffer: cfg.caps.stressBuffer ?? 0n,
+        maxQueueWaitSecs: cfg.caps.maxQueueWaitSecs ?? 0n,
+        maxReinstateAge: cfg.caps.maxReinstateAge ?? 0n,
+      },
     },
     opts(cfg),
   );
 }
 
-/** `set_roles(operator, pauser)` from the config. Admin. */
-export async function composeSetRoles(cfg: DeployConfig, admin: TransactionSigner): Promise<Instruction> {
+const DEFAULT_ADDRESS = address('11111111111111111111111111111111');
+
+/**
+ * The role proposal that brings the chain to the file, as one proposal
+ * (ADR 0020):
+ *
+ * - `propose_role` for each of operator and pauser whose key differs from
+ *   the file. A handover already pending for the requested key is refused
+ *   ("awaiting accept_role": the key signs `accept_role`, nothing to
+ *   propose). Another unexpired pending key gets `cancel_pending(role)`
+ *   first, since `propose_role` refuses while one waits.
+ * - When the key already matches, any pending handover of that role (live
+ *   or expired) is one the file does not ask for: `cancel_pending(role)`.
+ * - A pending admin handover the file does not name as `nextAdmin` is never
+ *   cancelled silently: it is refused unless `cancelAdmin` (roles.ts
+ *   `--cancel-admin`) is set, then `cancel_pending(ROLE_ADMIN)`. A chain
+ *   admin other than the file's is refused: the admin moves only by
+ *   `propose_admin` / `accept_admin`.
+ *
+ * `cancelled` names every role a `cancel_pending` is emitted for.
+ */
+export type RoleCancel = 'operator' | 'pauser' | 'admin';
+
+export async function composeRoleChanges(
+  cfg: DeployConfig,
+  current: VaultConfig,
+  admin: TransactionSigner,
+  nowSecs: bigint = BigInt(Math.floor(Date.now() / 1000)),
+  o: { cancelAdmin?: boolean } = {},
+): Promise<{ instructions: Instruction[]; cancelled: RoleCancel[] }> {
+  if (current.admin !== cfg.admin) {
+    throw new Error(`the chain admin is ${current.admin}, the config says ${cfg.admin}; the admin moves only through propose_admin / accept_admin`);
+  }
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
-  return getSetRolesInstruction(
+  const base = { admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId };
+  const out: Instruction[] = [];
+  const cancelled: RoleCancel[] = [];
+  const cancel = (role: number, name: RoleCancel) => {
+    cancelled.push(name);
+    return getCancelPendingInstruction({ ...base, role }, opts(cfg));
+  };
+  for (const [role, name, key, now, pending, expiresAt] of [
+    [ROLE_OPERATOR, 'operator', cfg.operator, current.operator, current.pendingOperator, current.pendingOperatorExpiresAt],
+    [ROLE_PAUSER, 'pauser', cfg.pauser, current.pauser, current.pendingPauser, current.pendingPauserExpiresAt],
+  ] as const) {
+    if (key === now) {
+      if (pending !== DEFAULT_ADDRESS) out.push(cancel(role, name));
+      continue;
+    }
+    const live = pending !== DEFAULT_ADDRESS && nowSecs <= expiresAt;
+    if (live && pending === key) {
+      throw new Error(`${name} ${key} is already proposed, awaiting accept_role (expires at ${expiresAt})`);
+    }
+    if (live) out.push(cancel(role, name));
+    out.push(getProposeRoleInstruction({ ...base, role, key }, opts(cfg)));
+  }
+  if (current.pendingAdmin !== DEFAULT_ADDRESS && current.pendingAdmin !== cfg.nextAdmin) {
+    if (!o.cancelAdmin) {
+      const state = nowSecs <= current.pendingAdminExpiresAt ? `in flight until ${current.pendingAdminExpiresAt}` : 'expired';
+      throw new Error(
+        `an admin handover to ${current.pendingAdmin} is pending (${state}) and the config names no nextAdmin: ` +
+          'set nextAdmin to keep it, or pass --cancel-admin to cancel it in this proposal',
+      );
+    }
+    out.push(cancel(ROLE_ADMIN, 'admin'));
+  }
+  return { instructions: out, cancelled };
+}
+
+/** The instructions of `composeRoleChanges`. */
+export async function composeProposeRoles(
+  cfg: DeployConfig,
+  current: VaultConfig,
+  admin: TransactionSigner,
+  nowSecs?: bigint,
+  o: { cancelAdmin?: boolean } = {},
+): Promise<Instruction[]> {
+  return (await composeRoleChanges(cfg, current, admin, nowSecs, o)).instructions;
+}
+
+/** The three guardian slots the config asks for, padded with the default key. */
+export function guardianSlots(cfg: Pick<DeployConfig, 'guardians'>): Address[] {
+  const g = cfg.guardians ?? [];
+  return [0, 1, 2].map((i) => g[i] ?? DEFAULT_ADDRESS);
+}
+
+/** Guardian sets as sorted lists without default slots, for comparison. */
+export const guardianSet = (xs: readonly Address[]) => xs.filter((x) => x !== DEFAULT_ADDRESS).sort();
+
+/**
+ * `set_guardians` with the config's guardians (all three slots in one step),
+ * or nothing when the chain already holds the same set. Admin.
+ */
+export async function composeSetGuardians(cfg: DeployConfig, current: VaultConfig, admin: TransactionSigner): Promise<Instruction[]> {
+  const want = guardianSlots(cfg);
+  if (JSON.stringify(guardianSet(want)) === JSON.stringify(guardianSet(current.guardians))) return [];
+  const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
+  return [getSetGuardiansInstruction({ admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId, guardians: want }, opts(cfg))];
+}
+
+/** `accept_role(role)`, signed by the proposed key. */
+export async function composeAcceptRole(
+  cfg: DeployConfig,
+  current: VaultConfig,
+  role: number,
+  newKey: TransactionSigner,
+): Promise<Instruction> {
+  const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
+  return getAcceptRoleInstruction(
     {
-      admin,
+      newKey,
       config: a.config,
+      // The money accounts are checked for the operator only (ADR 0020).
+      treasuryAccount: role === ROLE_OPERATOR ? current.treasuryAccount : undefined,
+      paymentsAccount: role === ROLE_OPERATOR ? current.paymentsAccount : undefined,
       eventAuthority: a.eventAuthority,
       program: cfg.programId,
-      operator: cfg.operator,
-      pauser: cfg.pauser,
+      role,
     },
     opts(cfg),
   );
 }
 
 /**
- * `set_config` writing the file's caps, price bounds, coverage ratio, take
- * rate and SLA, and keeping every other field as it is on-chain (`current`).
- * `feature_flags`, `exit` and `income_take_bps` are carried over unchanged,
- * never set here.
+ * `set_config` with only the fields where the file's caps, coverage ratio
+ * and take rate differ from the chain (`current`), sparse (ADR 0026). When a
+ * change needs it (`configParamsNeedRefresh`) the proposal is
+ * `refresh, set_config, refresh`, as the app composes it: the first makes
+ * `set_config` pass its same-slot check, the trailing one applies the new
+ * values to the reserve mode at once. `feature_flags` and the capital
+ * wallet are never set here; a stress buffer, queue wait or reinstate age
+ * missing from the file keeps the chain's value. Empty when nothing differs.
  */
 export async function composeSetCaps(
   cfg: DeployConfig,
   current: VaultConfig,
   admin: TransactionSigner,
-): Promise<Instruction> {
+): Promise<Instruction[]> {
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
-  const { reserved: _r, ...exit } = current.exit;
-  return getSetConfigInstruction(
+  const params = configParamsDiff(current, {
+    coverageRatioBps: cfg.coverageRatioBps,
+    feeTakeBps: cfg.feeTakeBps,
+    featureFlags: current.featureFlags,
+    mutavCapitalWallet: current.mutavCapitalWallet,
+    // A carve left out of the file keeps the chain's value (no reset).
+    caps: {
+      ...cfg.caps,
+      stressBuffer: cfg.caps.stressBuffer ?? current.caps.stressBuffer,
+      maxQueueWaitSecs: cfg.caps.maxQueueWaitSecs ?? current.caps.maxQueueWaitSecs,
+      maxReinstateAge: cfg.caps.maxReinstateAge ?? current.caps.maxReinstateAge,
+    },
+  });
+  if (params.length === 0) return [];
+  const setConfig = getSetConfigInstruction(
     {
       admin,
       config: a.config,
+      state: a.state,
       treasuryAccount: current.treasuryAccount,
       paymentsAccount: current.paymentsAccount,
       eventAuthority: a.eventAuthority,
       program: cfg.programId,
-      coverageRatioBps: cfg.coverageRatioBps,
-      feeTakeBps: cfg.feeTakeBps,
-      payoutSlaSecs: cfg.payoutSlaSecs,
-      featureFlags: current.featureFlags,
-      mutavCapitalWallet: current.mutavCapitalWallet,
-      caps: cfg.caps,
-      price: cfg.price,
-      exit,
-      // Carried over: the take on issuer income is never set from the file
-      // (ADR 0017; the program caps it at 0 until §12 Q47 is decided).
-      incomeTakeBps: current.incomeTakeBps,
+      params,
     },
     opts(cfg),
   );
+  if (!configParamsNeedRefresh(params)) return [setConfig];
+  const refresh = getRefreshInstruction(
+    {
+      config: a.config,
+      state: a.state,
+      reserve: a.reserve,
+      pendingDeposits: a.pendingDeposits,
+      pendingRedemptions: a.pendingRedemptions,
+      claims: a.claims,
+      eventAuthority: a.eventAuthority,
+      program: cfg.programId,
+    },
+    opts(cfg),
+  );
+  return [refresh, setConfig, refresh];
 }
 
 /** `set_allowlist_root(root)`. Admin. */

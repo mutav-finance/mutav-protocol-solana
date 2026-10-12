@@ -13,8 +13,6 @@ import {
   fixEncoderSize,
   getAddressDecoder,
   getAddressEncoder,
-  getBooleanDecoder,
-  getBooleanEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getConstantDecoder,
@@ -47,7 +45,6 @@ export type PayoutSettledEvent = {
   guaranteeId: ReadonlyUint8Array;
   noticeRefHash: ReadonlyUint8Array;
   pixE2eHash: ReadonlyUint8Array;
-  late: boolean;
 };
 
 export type PayoutSettledEventArgs = {
@@ -56,7 +53,6 @@ export type PayoutSettledEventArgs = {
   guaranteeId: ReadonlyUint8Array;
   noticeRefHash: ReadonlyUint8Array;
   pixE2eHash: ReadonlyUint8Array;
-  late: boolean;
 };
 
 /** Gets the encoder for {@link PayoutSettledEventArgs} event data. */
@@ -68,7 +64,6 @@ export function getPayoutSettledEventEncoder(): FixedSizeEncoder<PayoutSettledEv
       ["guaranteeId", fixEncoderSize(getBytesEncoder(), 32)],
       ["noticeRefHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["pixE2eHash", fixEncoderSize(getBytesEncoder(), 32)],
-      ["late", getBooleanEncoder()],
     ]),
     [getConstantEncoder(PAYOUT_SETTLED_EVENT_DISCRIMINATOR)],
   );
@@ -83,7 +78,6 @@ export function getPayoutSettledEventDecoder(): FixedSizeDecoder<PayoutSettledEv
       ["guaranteeId", fixDecoderSize(getBytesDecoder(), 32)],
       ["noticeRefHash", fixDecoderSize(getBytesDecoder(), 32)],
       ["pixE2eHash", fixDecoderSize(getBytesDecoder(), 32)],
-      ["late", getBooleanDecoder()],
     ]),
     [getConstantDecoder(PAYOUT_SETTLED_EVENT_DISCRIMINATOR)],
   );

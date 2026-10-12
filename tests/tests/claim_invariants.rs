@@ -80,23 +80,6 @@ impl Book {
             s.remaining_cover_total, total,
             "{ctx}: remaining_cover_total"
         );
-
-        for ag in &self.agencies {
-            if f.svm.get_account(&agency_pda(&f.pdas.config, ag)).is_none() {
-                continue;
-            }
-            let mine: u64 = self
-                .active
-                .iter()
-                .filter(|(_, a)| a == ag)
-                .map(|(id, _)| remaining_cover(&f.guarantee(id)))
-                .sum();
-            assert_eq!(
-                f.agency(ag).outstanding_cover,
-                mine,
-                "{ctx}: agency outstanding_cover"
-            );
-        }
     }
 }
 
@@ -110,7 +93,8 @@ fn run(seed: u64, steps: usize) {
         open: Vec::new(),
     };
     let mut now = clock(&f.svm).unix_timestamp.max(1_750_000_000);
-    let period = f.config().caps.claim_period_secs;
+    // Past the 31-day claim window (ADR 0019).
+    let period = 31 * 86_400;
 
     for step in 0..steps {
         let ctx = format!("seed {seed:#x} step {step}");
@@ -132,15 +116,15 @@ fn run(seed: u64, steps: usize) {
                     .filter(|&i| book.open.iter().all(|(c, _)| c.id != book.active[i].0))
                     .collect();
                 if let Some(&i) = closable.get(rng.below(closable.len().max(1) as u64) as usize) {
-                    let (id, ag) = book.active.swap_remove(i);
-                    f.close_guarantee(id, ag)
+                    let (id, _) = book.active.swap_remove(i);
+                    f.close_guarantee(id)
                         .unwrap_or_else(|e| panic!("{ctx} close: {:?}", e.err));
                 }
             }
             // File: any amount in the leg's unprovisioned cover.
             3..=5 if !book.active.is_empty() => {
                 let (id, ag) = book.active[rng.below(book.active.len() as u64) as usize];
-                let l = rng.below(2) as u8;
+                let l = LEG_DEFAULT + rng.below(2) as u8;
                 let (cover, paid, prov) = leg(&f.guarantee(&id), l);
                 let unprov = cover - paid - prov;
                 if unprov > 0 {
@@ -157,29 +141,25 @@ fn run(seed: u64, steps: usize) {
                     book.open.push((c, amount));
                 }
             }
-            // Pay an open filing: partial, exact provision, over the
-            // provision within the ADR 0014 bound, or one above the bound.
+            // Pay an open filing: exactly its provision (ADR 0021), or a
+            // stated amount that differs from it, which is refused.
             _ if !book.open.is_empty() => {
                 let i = rng.below(book.open.len() as u64) as usize;
                 let (c, p) = book.open[i];
-                let (cover, paid, prov) = leg(&f.guarantee(&c.id), c.leg);
-                let unprov = cover - paid - prov;
-                let bound = p + unprov;
                 // A fresh period per payment keeps the period cap out of play.
                 now += period;
                 set_time(&mut f.svm, now);
                 let (amount, ok) = match rng.below(4) {
-                    0 => (1 + rng.below(p), true),
-                    1 => (p, true),
-                    2 => (p + rng.below(unprov + 1), true),
-                    _ => (bound + 1, false),
+                    0 => (p - 1 - rng.below(p), false),
+                    3 => (p + 1 + rng.below(p), false),
+                    _ => (p, true),
                 };
                 let res = f.pay_claim(c.amount(amount));
                 if ok {
-                    res.unwrap_or_else(|e| panic!("{ctx} pay {amount}/{bound}: {:?}", e.err));
+                    res.unwrap_or_else(|e| panic!("{ctx} pay {amount}: {:?}", e.err));
                     book.open.swap_remove(i);
                 } else {
-                    assert_mutav_err(res, MutavError::ExceedsRemainingCover);
+                    assert_mutav_err(res, MutavError::ExpectedAmountMismatch);
                 }
             }
             _ => {}
@@ -196,8 +176,8 @@ fn run(seed: u64, steps: usize) {
             .unwrap_or_else(|e| panic!("seed {seed:#x} drain: {:?}", e.err));
         book.assert_matches(&f, "drain");
     }
-    for (id, ag) in std::mem::take(&mut book.active) {
-        f.close_guarantee(id, ag)
+    for (id, _) in std::mem::take(&mut book.active) {
+        f.close_guarantee(id)
             .unwrap_or_else(|e| panic!("seed {seed:#x} final close: {:?}", e.err));
     }
     let s = f.state();

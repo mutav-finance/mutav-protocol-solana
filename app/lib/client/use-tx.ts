@@ -3,6 +3,10 @@ import { useCallback, useState } from "react";
 import { useWallet } from "@/components/WalletProvider";
 import type { TxRequest } from "../tx-kinds";
 import { ApiError, getJson, postJson } from "./api";
+import { CLUSTER } from "./env";
+import { NOT_SEEN_HINT_SECS, notSeenText, transportFor, walletSendError } from "./transport";
+
+const st90 = (cluster: string) => `not confirmed on ${cluster} after 90 s`;
 
 export type TxPhase = "idle" | "building" | "signing" | "sending" | "confirming" | "confirmed" | "failed";
 
@@ -26,11 +30,13 @@ function programError(message: string, logs: string[] | null): string {
 }
 
 /**
- * Compose (server) → sign (wallet) → relay (server) → confirm. `build` returns
- * the unsigned transaction to sign; by default it is /api/tx/build for `req`.
+ * Compose (server) → sign and send → confirm (server read). `build` returns
+ * the unsigned transaction; by default it is /api/tx/build for `req`. On
+ * devnet the wallet signs and sends through its own RPC; on localnet the
+ * wallet signs and the localnet-only relay sends (see lib/client/transport).
  */
 export function useTx(onConfirmed?: () => void) {
-  const { address, signTransaction } = useWallet();
+  const { address, signTransaction, signAndSendTransaction } = useWallet();
   const [state, setState] = useState<TxState>(IDLE);
 
   const runWith = useCallback(
@@ -39,28 +45,39 @@ export function useTx(onConfirmed?: () => void) {
         setState({ ...IDLE, phase: "building" });
         const built = await build();
         setState((s) => ({ ...s, phase: "signing", instructions: built.instructions ?? null, proposalIndex: built.proposalIndex ?? null }));
-        const signed = await signTransaction(built.tx);
-        setState((s) => ({ ...s, phase: "sending" }));
-        const { signature } = await postJson<{ signature: string }>("/api/tx/send", { tx: signed });
+        let signature: string;
+        if (transportFor(CLUSTER) === "wallet-send") {
+          try {
+            signature = await signAndSendTransaction(built.tx);
+          } catch (e) {
+            throw new Error(walletSendError((e as Error).message, CLUSTER));
+          }
+        } else {
+          const signed = await signTransaction(built.tx);
+          setState((s) => ({ ...s, phase: "sending" }));
+          signature = (await postJson<{ signature: string }>("/api/tx/send", { tx: signed })).signature;
+        }
         setState((s) => ({ ...s, phase: "confirming", signature }));
         for (let i = 0; i < 90; i++) {
-          const st = await getJson<{ status: string; err?: unknown }>(`/api/tx/status?sig=${signature}`);
+          const st = await getJson<{ status: string; err?: unknown }>(`/api/tx/status?sig=${encodeURIComponent(signature)}`);
           if (st.status === "failed") throw new Error(`transaction failed: ${JSON.stringify(st.err, (_, v) => (typeof v === "bigint" ? v.toString() : v))}`);
           if (st.status === "confirmed" || st.status === "finalized") {
-            setState((s) => ({ ...s, phase: "confirmed" }));
+            setState((s) => ({ ...s, phase: "confirmed", error: null }));
             onConfirmed?.();
             return signature;
           }
+          // Still unseen: the wallet may have sent it to another cluster.
+          if (i === NOT_SEEN_HINT_SECS && st.status === "pending") setState((s) => ({ ...s, error: notSeenText(CLUSTER, NOT_SEEN_HINT_SECS) }));
           await new Promise((r) => setTimeout(r, 1000));
         }
-        throw new Error("not confirmed after 90 s");
+        throw new Error(st90(CLUSTER));
       } catch (e) {
         const logs = e instanceof ApiError ? e.logs : null;
         setState((s) => ({ ...s, phase: "failed", error: programError((e as Error).message, logs), logs }));
         return null;
       }
     },
-    [signTransaction, onConfirmed],
+    [signTransaction, signAndSendTransaction, onConfirmed],
   );
 
   const run = useCallback(

@@ -1,0 +1,1234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MUTAV Technical Reference</title>
+<meta name="description" content="Technical reference for the MUTAV reserve program on Solana: addresses, authorities, accounts, instructions, math, invariants and upgrade rules. For auditors and integrators.">
+<style>
+:root{
+  --bg:#f7f5f1; --surface:#ffffff; --surface-2:#f0ece4; --ink:#1b1916; --ink-2:#55504a; --ink-3:#8a837a;
+  --line:#e2dcd2; --accent:#b8740a; --accent-soft:#f6e6c8; --copper:#a4532e;
+  --ok:#2f7d4f; --ok-soft:#dcefe2; --warn:#a15c00; --warn-soft:#fbe9cf; --risk:#a33a2a; --risk-soft:#f7dcd6;
+  --blue:#2f5f9e; --blue-soft:#dde7f4; --code-bg:#f0ece4;
+  --radius:10px; --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+  --bg:#121110; --surface:#1b1a18; --surface-2:#242220; --ink:#efebe5; --ink-2:#b9b2a8; --ink-3:#857e75;
+  --line:#312e2a; --accent:#e8a020; --accent-soft:#3a2c12; --copper:#d4845a;
+  --ok:#6cc08f; --ok-soft:#1c2e23; --warn:#e8a020; --warn-soft:#352812; --risk:#ec8a78; --risk-soft:#3a1f1a;
+  --blue:#82aee6; --blue-soft:#1b2838; --code-bg:#242220;
+  color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121110; --surface:#1b1a18; --surface-2:#242220; --ink:#efebe5; --ink-2:#b9b2a8; --ink-3:#857e75;
+  --line:#312e2a; --accent:#e8a020; --accent-soft:#3a2c12; --copper:#d4845a;
+  --ok:#6cc08f; --ok-soft:#1c2e23; --warn:#e8a020; --warn-soft:#352812; --risk:#ec8a78; --risk-soft:#3a1f1a;
+  --blue:#82aee6; --blue-soft:#1b2838; --code-bg:#242220;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 var(--sans);font-variant-numeric:tabular-nums}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.84em;background:var(--code-bg);padding:.1em .35em;border-radius:4px;overflow-wrap:anywhere}
+pre{font-family:var(--mono);font-size:13px;background:var(--code-bg);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;overflow-x:auto;line-height:1.6;margin:16px 0}
+pre code{background:none;padding:0;font-size:inherit;overflow-wrap:normal}
+pre.formula{border-left:3px solid var(--accent);color:var(--ink)}
+.wrap{max-width:900px;margin:0 auto;padding:0 16px}
+/* cover */
+header.cover{background:var(--surface);border-bottom:1px solid var(--line)}
+header.cover .wrap{padding-top:40px;padding-bottom:32px}
+.eyebrow{font:600 12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 clamp(28px,5vw,42px)/1.12 var(--sans);margin:14px 0 10px;letter-spacing:-.015em}
+.lede{color:var(--ink-2);font-size:18px;margin:0}
+.status-line{margin:12px 0 0;font-size:14px;color:var(--ink-2);border-left:3px solid var(--accent);padding-left:10px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{font:500 12px/1 var(--sans);border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);padding:6px 10px;border-radius:999px}
+.chip.hot{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-weight:600}
+.disclaimer{margin:18px 0 0;font-size:13px;color:var(--ink-3)}
+.theme-btn{float:right;font:500 12px var(--sans);background:none;border:1px solid var(--line);color:var(--ink-2);border-radius:999px;padding:6px 10px;cursor:pointer}
+/* contents */
+nav.contents{margin:28px 0 8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
+nav.contents .toc-h{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin:0 0 8px;font-family:var(--mono)}
+nav.contents ol{list-style:none;margin:0;padding:0;columns:2 280px;column-gap:28px}
+nav.contents li{break-inside:avoid;margin:3px 0}
+nav.contents a{text-decoration:none;color:var(--ink)}
+nav.contents a:hover{color:var(--accent)}
+.tnum{display:inline-block;min-width:26px;font:600 12px var(--mono);color:var(--accent)}
+/* body */
+main section.level2{padding:36px 0 4px}
+h2{font-size:24px;line-height:1.25;margin:0 0 12px;letter-spacing:-.01em}
+h2 .num{font:600 13px var(--mono);color:var(--accent);margin-right:10px;vertical-align:3px}
+h3{font-size:17px;margin:26px 0 8px}
+h4{font-size:15px;margin:0 0 8px}
+p{margin:0 0 14px}
+main ul,main ol{padding-left:22px;margin:0 0 14px}
+main li{margin:5px 0}
+.anchor{color:var(--ink-3);text-decoration:none;margin-left:6px;font-weight:400;opacity:0;transition:opacity .15s}
+h2:hover .anchor,h3:hover .anchor,.ix:hover .anchor{opacity:1}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;line-height:1.5}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);margin:12px 0 18px}
+.tbl th,.tbl td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);font-weight:600;background:var(--surface-2)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl td code{white-space:nowrap;overflow-wrap:normal}
+.tbl td code.addr{white-space:normal;overflow-wrap:anywhere;word-break:break-all}
+.tbl td.num,.tbl th.num{text-align:right;white-space:nowrap}
+.tbl.matrix td,.tbl.matrix th{text-align:center;white-space:nowrap}
+.tbl.matrix td:first-child,.tbl.matrix th:first-child{text-align:left}
+.tbl tr.grp td{background:var(--surface-2);font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.y{color:var(--ok);font-weight:700} .n{color:var(--ink-3)} .t{color:var(--warn);font:600 11px var(--mono)}
+.muted{color:var(--ink-3)}
+.tbd{color:var(--warn);font-weight:600}
+.note{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:0 var(--radius) var(--radius) 0;padding:12px 16px;margin:14px 0 18px;font-size:15px}
+.note.warn{border-left-color:var(--warn)}
+.note p:last-child{margin-bottom:0}
+/* instruction cards */
+.ix{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;margin:12px 0}
+.ix h4 code{font-size:.92em}
+.ix dl{display:grid;grid-template-columns:84px 1fr;gap:4px 14px;margin:0;font-size:14px;line-height:1.55}
+.ix dt{color:var(--ink-3);font:600 11px/1.9 var(--mono);text-transform:uppercase;letter-spacing:.05em}
+.ix dd{margin:0}
+.tag{display:inline-block;font:600 10.5px/1 var(--mono);letter-spacing:.05em;text-transform:uppercase;padding:4px 6px;border-radius:5px;margin-left:6px;vertical-align:2px}
+.tag.new{background:var(--accent-soft);color:var(--accent)}
+.tag.chg{background:var(--blue-soft);color:var(--blue)}
+/* figures */
+figure.fig{margin:22px 0 24px}
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px;overflow-x:auto}
+.diagram svg{display:block;width:100%;min-width:640px;height:auto}
+figcaption{font-size:13.5px;color:var(--ink-2);margin-top:8px;line-height:1.5}
+.d-box{fill:var(--surface-2);stroke:var(--line)} .d-core{fill:var(--accent-soft);stroke:var(--accent)} .d-out{fill:var(--risk-soft);stroke:var(--risk)}
+.d-wallet{fill:var(--surface);stroke:var(--ink-3)} .d-acct{fill:var(--blue-soft);stroke:var(--blue)} .d-okb{fill:var(--ok-soft);stroke:var(--ok)}
+.d-t{fill:var(--ink);font:600 13px var(--sans)} .d-s{fill:var(--ink-2);font:11.5px var(--sans)} .d-m{fill:var(--ink-2);font:11px var(--mono)}
+.d-zone{fill:var(--ink-3);font:700 11px var(--mono);letter-spacing:.08em}
+.s-acc,.s-ok,.s-risk,.s-blue,.s-ink{fill:none;stroke-width:1.6}
+.s-acc{stroke:var(--accent)} .s-ok{stroke:var(--ok)} .s-risk{stroke:var(--risk)} .s-blue{stroke:var(--blue)} .s-ink{stroke:var(--ink-3)}
+.mk-acc{fill:var(--accent)} .mk-ok{fill:var(--ok)} .mk-risk{fill:var(--risk)} .mk-blue{fill:var(--blue)} .mk-ink{fill:var(--ink-3)}
+.dash{stroke-dasharray:5 4}
+footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;color:var(--ink-3);font-size:13px}
+@media (max-width:560px){
+  body{font-size:15.5px}
+  .theme-btn{float:none;margin-bottom:12px}
+  h2{font-size:21px}
+  nav.contents ol{columns:1}
+  .ix dl{grid-template-columns:1fr;gap:0 0}
+  .ix dd{margin-bottom:6px}
+}
+@page{size:A4;margin:16mm 15mm 18mm}
+@media print{
+  html:root:not([data-print]){
+  --bg:#f7f5f1; --surface:#ffffff; --surface-2:#f0ece4; --ink:#1b1916; --ink-2:#55504a; --ink-3:#8a837a;
+  --line:#e2dcd2; --accent:#b8740a; --accent-soft:#f6e6c8; --copper:#a4532e;
+  --ok:#2f7d4f; --ok-soft:#dcefe2; --warn:#a15c00; --warn-soft:#fbe9cf; --risk:#a33a2a; --risk-soft:#f7dcd6;
+  --blue:#2f5f9e; --blue-soft:#dde7f4; --code-bg:#f0ece4;
+  color-scheme:light;
+  }
+  body{background:#fff;font-size:10.5pt;line-height:1.5}
+  .theme-btn,.anchor{display:none}
+  .wrap{max-width:none;padding:0}
+  header.cover{background:#fff;border-bottom:none}
+  main section.level2{break-before:page;padding-top:0}
+  .tbl-wrap,.diagram{overflow:visible}
+  .diagram svg{min-width:0}
+  .tbl{font-size:9pt}
+  .tbl td code{white-space:normal;overflow-wrap:anywhere}
+  .tbl tr,figure.fig,pre,.ix,nav.contents li{break-inside:avoid}
+  h2,h3{break-after:avoid}
+  a{color:inherit;text-decoration:none}
+  pre{white-space:pre-wrap}
+}
+</style>
+</head>
+<body>
+<header class="cover">
+  <div class="wrap">
+    <button class="theme-btn" id="themeBtn" type="button">Toggle theme</button>
+    <div class="eyebrow">mutav reserve program · Solana</div>
+    <h1>MUTAV Technical Reference</h1>
+    <p class="lede">Addresses, authorities, accounts, instructions, math and invariants of the <code>mutav</code> program, for auditors and integrators.</p>
+    <p class="status-line">Describes the devnet binary on <code>main</code>: the v1 layout, the pilot parameters of ADR 0028 and the claims and capital rules of ADR 0029. Generated from the structured docs in <code>docs/</code>; <code>docs/spec.md</code> and <code>docs/decisions/</code> are the source of truth.</p>
+    <div class="meta">
+      <span class="chip hot">Devnet binary</span>
+      <span class="chip hot">2026-10-11</span>
+      <span class="chip">Layout v1</span>
+      <span class="chip">Anchor · classic SPL Token</span>
+      <span class="chip">Devnet deploy pending</span>
+    </div>
+    <p class="disclaimer">Unaudited software. Not legal advice. Not an offer of securities. During the pilot the reserve is not open to public investment. Where a value is chosen at deploy or still open, this page says so instead of guessing.</p>
+  </div>
+</header>
+<main class="wrap">
+<nav class="contents" aria-label="Contents"><h2 class="toc-h">Contents</h2><ol>
+<li><a href="#overview"><span class="tnum">1</span>Overview</a></li>
+<li><a href="#configuration"><span class="tnum">2</span>Configuration &amp; reference</a></li>
+<li><a href="#roles"><span class="tnum">3</span>Roles &amp; permissions</a></li>
+<li><a href="#accounts"><span class="tnum">4</span>Accounts</a></li>
+<li><a href="#instructions"><span class="tnum">5</span>Instructions</a></li>
+<li><a href="#economics"><span class="tnum">6</span>Economics &amp; math</a></li>
+<li><a href="#lifecycles"><span class="tnum">7</span>Lifecycles</a></li>
+<li><a href="#invariants"><span class="tnum">8</span>Invariants</a></li>
+<li><a href="#incident"><span class="tnum">9</span>Pause, guardians &amp; incident recovery</a></li>
+<li><a href="#events-errors"><span class="tnum">10</span>Events &amp; errors</a></li>
+<li><a href="#sdk"><span class="tnum">11</span>Client SDK</a></li>
+<li><a href="#upgrades"><span class="tnum">12</span>Upgrade rules &amp; layout freeze</a></li>
+<li><a href="#security"><span class="tnum">13</span>Security reviews &amp; known limitations</a></li>
+<li><a href="#glossary"><span class="tnum">14</span>Glossary</a></li>
+</ol></nav>
+
+<!-- ============================================================ 1 -->
+<section id="overview" class="level2">
+<h2><span class="num">1</span>Overview<a class="anchor" href="#overview" aria-label="Link to this section">#</a></h2>
+<p>MUTAV is an institutional <em>fiador</em> for Brazilian rental leases. The <code>mutav</code> program holds a BRL reserve in BRS (a BRL token issued by Nora) and records every guarantee MUTAV gives, with its remaining cover. It mints reserve shares to allowlisted capital providers at an on-chain NAV, and it gates new guarantees and redemption fills on <strong>required coverage</strong> against the registered cover. The coverage gate never applies to a claim payment: within admin-set caps, a claim payment always goes through. The program keeps internal accounting, so tokens sent to it do not move NAV. It prices nothing, decides no claim and holds no personal data: those duties stay in the MUTAV platform, which acts on-chain through the operator key.</p>
+<p><strong>Architecture in one line.</strong> Reserve admin (Squads multisig), operator key, pauser and guardians sign instructions to <code>mutav</code>; one <code>VaultConfig</code> per reserve mint; a vault authority PDA owns every reserve token account and the share mint; clients compose unsigned transactions through <code>@mutav-finance/mutav-protocol-solana</code>.</p>
+<p class="note">The reserve is operational infrastructure that backs the guarantees, not a yield product. During the pilot the reserve is not open to public investment.</p>
+
+<figure class="fig">
+<div class="diagram">
+<svg viewBox="0 0 860 380" role="img" aria-labelledby="fig1t fig1d">
+<title id="fig1t">Architecture and money flows</title>
+<desc id="fig1d">Signers on the left call the mutav program. The vault authority PDA owns the reserve token accounts. BRS leaves only to the payments account, the treasury, the claims escrow and on to its owner, or back to the owner of a cancelled deposit.</desc>
+<defs>
+<marker id="a-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="mk-acc"/></marker>
+<marker id="a-risk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="mk-risk"/></marker>
+<marker id="a-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="mk-ink"/></marker>
+</defs>
+<text x="20" y="22" class="d-zone">SIGNERS</text>
+<text x="300" y="22" class="d-zone">PROGRAM</text>
+<text x="600" y="22" class="d-zone">TOKEN ACCOUNTS (VAULT AUTHORITY)</text>
+<rect x="20" y="36" width="210" height="50" rx="8" class="d-wallet"/><text x="32" y="57" class="d-t">Reserve admin</text><text x="32" y="75" class="d-s">Squads multisig vault, time-locked</text>
+<rect x="20" y="96" width="210" height="50" rx="8" class="d-wallet"/><text x="32" y="117" class="d-t">Operator</text><text x="32" y="135" class="d-s">guarantees, fees, income, claims</text>
+<rect x="20" y="156" width="210" height="50" rx="8" class="d-wallet"/><text x="32" y="177" class="d-t">Pauser · guardians</text><text x="32" y="195" class="d-s">pause; pauser also revokes operator</text>
+<rect x="20" y="216" width="210" height="50" rx="8" class="d-wallet"/><text x="32" y="237" class="d-t">Capital providers</text><text x="32" y="255" class="d-s">allowlisted entry, open exit, FIFO</text>
+<rect x="20" y="276" width="210" height="50" rx="8" class="d-wallet"/><text x="32" y="297" class="d-t">Anyone</text><text x="32" y="315" class="d-s">refresh, advance_queue_head</text>
+<rect x="290" y="110" width="220" height="150" rx="10" class="d-core"/>
+<text x="304" y="136" class="d-t">mutav</text>
+<text x="304" y="156" class="d-m">VaultConfig ["config", mint]</text>
+<text x="304" y="174" class="d-m">VaultState  ["state", config]</text>
+<text x="304" y="192" class="d-m">Guarantee · ClaimFiling</text>
+<text x="304" y="210" class="d-m">Deposit/RedeemRequest · receipts</text>
+<text x="304" y="232" class="d-s">vault authority PDA signs</text>
+<text x="304" y="248" class="d-s">every outbound transfer</text>
+<path d="M230,61 C260,61 262,140 288,150" class="s-ink" marker-end="url(#a-ink)"/>
+<path d="M230,121 C258,121 262,165 288,170" class="s-ink" marker-end="url(#a-ink)"/>
+<path d="M230,181 L288,190" class="s-ink" marker-end="url(#a-ink)"/>
+<path d="M230,241 C258,241 262,215 288,212" class="s-ink" marker-end="url(#a-ink)"/>
+<path d="M230,301 C262,301 262,240 288,240" class="s-ink" marker-end="url(#a-ink)"/>
+<rect x="600" y="36" width="240" height="38" rx="7" class="d-acct"/><text x="612" y="60" class="d-t">reserve (BRS, tracked)</text>
+<rect x="600" y="82" width="240" height="38" rx="7" class="d-acct"/><text x="612" y="106" class="d-t">pending_deposits (BRS)</text>
+<rect x="600" y="128" width="240" height="38" rx="7" class="d-acct"/><text x="612" y="152" class="d-t">pending_redemptions (shares)</text>
+<rect x="600" y="174" width="240" height="38" rx="7" class="d-acct"/><text x="612" y="198" class="d-t">claims (BRS owed to holders)</text>
+<rect x="600" y="220" width="240" height="38" rx="7" class="d-box"/><text x="612" y="244" class="d-t">income inbox (ATA, untracked)</text>
+<rect x="600" y="266" width="240" height="38" rx="7" class="d-box"/><text x="612" y="290" class="d-t">unsolicited (untracked, empty)</text>
+<path d="M510,160 C560,160 560,55 598,55" class="s-acc" marker-end="url(#a-acc)"/>
+<path d="M510,185 L598,192" class="s-acc" marker-end="url(#a-acc)"/>
+<path d="M720,220 C760,200 760,80 742,76" class="s-ink dash" marker-end="url(#a-ink)"/>
+<rect x="290" y="300" width="100" height="56" rx="8" class="d-out"/><text x="300" y="322" class="d-t">payments</text><text x="300" y="340" class="d-s">pay_claim</text>
+<rect x="400" y="300" width="100" height="56" rx="8" class="d-okb"/><text x="410" y="322" class="d-t">treasury</text><text x="410" y="340" class="d-s">fee take</text>
+<path d="M600,55 C470,55 420,280 345,298" class="s-risk dash" marker-end="url(#a-risk)"/>
+<text x="290" y="374" class="d-s">BRS leaves only to: payments account · treasury · claims escrow → owner · owner of a cancelled deposit</text>
+</svg>
+</div>
+<figcaption>Figure 1. Signers, the program and the token accounts it owns. Solid amber: inbound booking paths. Dashed red: claim payments to MUTAV's payments account. Dashed grey: <code>sweep_income</code> from the income inbox. The income inbox and the <code>unsolicited</code> account hold untracked money that never counts toward NAV.</figcaption>
+</figure>
+</section>
+
+<!-- ============================================================ 2 -->
+<section id="configuration" class="level2">
+<h2><span class="num">2</span>Configuration &amp; reference<a class="anchor" href="#configuration" aria-label="Link to this section">#</a></h2>
+<p>Every address, authority, parameter and constant of the program as built in the devnet binary. The program ID is declared in code but the program is not yet deployed to devnet. The reserve PDAs below are derived from the declared program ID and the devnet reserve mint with the client's <code>findReserveAddresses</code>; they become live accounts once <code>initialize</code> runs under that ID.</p>
+
+<h3 id="cfg-program">2.1 Program<a class="anchor" href="#cfg-program">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Component</th><th>Devnet address</th><th>Explorer</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Program ID</td><td><code class="addr">8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9</code></td><td><a href="https://explorer.solana.com/address/8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9?cluster=devnet">view</a></td><td>Declared in <code>lib.rs</code> and <code>Anchor.toml</code>. Deploy pending.</td></tr>
+<tr><td>Loader</td><td><code class="addr">BPFLoaderUpgradeab1e11111111111111111111111</code></td><td></td><td>BPF Loader Upgradeable. ProgramData is derived by the loader from the program ID.</td></tr>
+<tr><td>Upgrade authority</td><td>Set at deploy</td><td></td><td>The vault of the upgrade multisig (Squads v4, long time lock).</td></tr>
+<tr><td>IDL</td><td>Set at deploy</td><td></td><td>Program Metadata account, written by the upgrade authority in the same Squads proposal as each upgrade.</td></tr>
+<tr><td>Event authority</td><td><code class="addr">AquHfairQemYYusuBkppBWmgBK6zgmtw1vk5aoAZnHWx</code></td><td><a href="https://explorer.solana.com/address/AquHfairQemYYusuBkppBWmgBK6zgmtw1vk5aoAZnHWx?cluster=devnet">view</a></td><td>PDA <code>["__event_authority"]</code>, used by Anchor <code>emit_cpi!</code>.</td></tr>
+</tbody></table></div>
+
+<h3 id="cfg-mints">2.2 Mints and token programs<a class="anchor" href="#cfg-mints">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Component</th><th>Devnet address</th><th>Explorer</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Reserve mint (BRS)</td><td><code class="addr">BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4</code></td><td><a href="https://explorer.solana.com/address/BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4?cluster=devnet">view</a></td><td>The issuer's devnet BRS. Classic SPL Token, 6 decimals. Stored in <code>VaultConfig.reserve_mint</code>; immutable after <code>initialize</code>, which requires 6 decimals.</td></tr>
+<tr><td>Reserve token program</td><td><code class="addr">TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA</code></td><td><a href="https://explorer.solana.com/address/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA?cluster=devnet">view</a></td><td>Classic SPL Token. Stored as <code>reserve_token_program</code>; any other program fails with <code>InvalidTokenProgram</code>.</td></tr>
+<tr><td>Share mint</td><td><code class="addr">EmusG8JSunj1ZWJTDQEyTE2jfg5wRojwhXWTmH39hqfs</code></td><td><a href="https://explorer.solana.com/address/EmusG8JSunj1ZWJTDQEyTE2jfg5wRojwhXWTmH39hqfs?cluster=devnet">view</a></td><td>PDA <code>["share_mint", config]</code>. Classic SPL Token, 6 decimals. Mint and freeze authority: the vault authority PDA.</td></tr>
+<tr><td>Associated Token program</td><td><code class="addr">ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL</code></td><td></td><td>Derives the income inbox.</td></tr>
+</tbody></table></div>
+<p>The mint guard in <code>initialize</code> refuses a Token-2022 reserve mint with any of: permanent delegate, transfer hook, transfer fee or transfer-fee authority, non-transferable, default-frozen, scaled UI amount, interest-bearing or pausable.</p>
+
+<h3 id="cfg-pdas">2.3 Reserve-level PDAs<a class="anchor" href="#cfg-pdas">#</a></h3>
+<p>Every PDA except <code>VaultConfig</code> includes the config address in its seeds. Seed strings are distinct; a seed-collision test covers every prefix.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Name</th><th>Seeds</th><th>Devnet address</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>VaultConfig</code></td><td><code>["config", reserve_mint]</code></td><td><code class="addr">8CDkR7ausijvx2tY4qBLanZ4yxExZht4MrHeM87WC63u</code></td><td>Configuration, roles, caps. One per reserve mint.</td></tr>
+<tr><td><code>VaultState</code></td><td><code>["state", config]</code></td><td><code class="addr">4bmZKvPDq8MWpVBbTBuQun4fexefRjzVcePWrT51npHi</code></td><td>Internal accounting, queue heads, claim window.</td></tr>
+<tr><td>Vault authority</td><td><code>["authority", config]</code></td><td><code class="addr">BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK</code></td><td>Holds no data. Owns every reserve token account. Mint and freeze authority of the share mint.</td></tr>
+<tr><td><code>reserve</code></td><td><code>["reserve", config]</code></td><td><code class="addr">7zEMG3rnN5VEmcBNECJmLg9nJqCKtxz7VK2kREWvjA5m</code></td><td>Liquid reserve BRS. Tracked by <code>brs_balance</code>.</td></tr>
+<tr><td><code>pending_deposits</code></td><td><code>["pending_deposits", config]</code></td><td><code class="addr">4pS5twyH3icCja8kmEsTgFfEXyDZCjj7ajrb9AV2NJvS</code></td><td>BRS escrowed by deposit requests.</td></tr>
+<tr><td><code>pending_redemptions</code></td><td><code>["pending_redemptions", config]</code></td><td><code class="addr">GsP2K22t8xqkVEWt82PCAGFSWp9uN4GifVNRLuw7q3PY</code></td><td>Shares escrowed by redeem requests.</td></tr>
+<tr><td><code>claims</code></td><td><code>["claims", config]</code></td><td><code class="addr">5bMo1dQfWyS2bqpUGtmX528JF639HboVDZueTsAsSXv9</code></td><td>BRS owed to holders on filled redemptions, waiting for <code>claim_assets</code>.</td></tr>
+<tr><td><code>unsolicited</code></td><td><code>["unsolicited", config]</code></td><td><code class="addr">maSJLaMsH4K9KJBDUyDhanMRwrbzXbn8vuGL5rJ4KvP</code></td><td>Created at <code>initialize</code>, empty in this release. Never counted in stable assets, NAV or coverage. The instructions that move money in and out of it come with a later upgrade.</td></tr>
+<tr><td>Income inbox</td><td>ATA of (vault authority, token program, reserve mint)</td><td><code class="addr">KLcyCunPGYocfRvAjWkLSPbMScHxcAuBfR56UqDA2NP</code></td><td>Where the issuer pays its monthly revenue share. Untracked until <code>sweep_income</code> books a statement.</td></tr>
+</tbody></table></div>
+<p>The reserve's money is split across separate token accounts, so a freeze of one account does not trap every balance. <code>reserve</code> is a PDA, not an associated token account, so a mistaken send to the vault authority's "wallet" address lands in the income inbox, outside NAV.</p>
+
+<h3 id="cfg-record-pdas">2.4 Record PDAs<a class="anchor" href="#cfg-record-pdas">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Account</th><th>Seeds</th><th>Created by</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>Guarantee</code></td><td><code>["guarantee", config, id]</code></td><td><code>register_guarantee</code></td><td>One per lease. A second registration of the same <code>id</code> fails at account creation. Never closed.</td></tr>
+<tr><td><code>ClaimFiling</code></td><td><code>["claim", guarantee, notice_ref_hash]</code></td><td><code>file_claim</code></td><td>One per notice: provision, status, <code>approved_amount</code> (0 until the admin's <code>approve_claim</code>), <code>revision</code>, and the payment and settlement record. A second payment of the same notice is refused by its status. Never closed.</td></tr>
+<tr><td><code>IncomeReceipt</code> (fee)</td><td><code>["fee", config, invoice_ref_hash]</code></td><td><code>contribute_fees</code></td><td><code>kind = FEE</code>. Each invoice's guarantee fee counts once. The separate prefix keeps invoice and statement references from colliding. Never closed.</td></tr>
+<tr><td><code>IncomeReceipt</code></td><td><code>["income", config, ref_hash]</code></td><td><code>sweep_income</code></td><td><code>kind = ISSUER_STATEMENT</code>. Each swept statement counts once. The later <code>book_unsolicited</code> adds <code>UNSOLICITED</code> and <code>BACKSTOP</code>. Never closed.</td></tr>
+<tr><td><code>DepositRequest</code></td><td><code>["deposit", config, seq]</code>, <code>seq</code> u64 LE</td><td><code>request_deposit</code></td><td>One FIFO deposit request. Closed on claim or on the owner's cancel; the admin's cancel parks it.</td></tr>
+<tr><td><code>RedeemRequest</code></td><td><code>["redeem", config, seq]</code>, <code>seq</code> u64 LE</td><td><code>request_redeem</code></td><td>One FIFO redeem request. Closed on claim or on the owner's cancel; the admin's cancel parks it.</td></tr>
+</tbody></table></div>
+<p>There is no per-holder account (the open-exit rule reads the owner's share balance) and no per-agency account (per-agency figures are derived off-chain from <code>Guarantee.agency_id</code>).</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Seed</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><code>exit_buffer</code>, <code>exit_limit</code>, <code>instant_exit</code>, <code>adapter_state</code></td><td>Reserved for later features. No v1 PDA uses them. <code>adapter_state</code> is the seed of the per-adapter account of ADR 0027.</td></tr>
+<tr><td><code>notice</code></td><td>Held for the planned <code>ClaimNotice</code> account.</td></tr>
+<tr><td><code>agency</code>, <code>payout</code>, <code>holder</code></td><td>Retired before the layout freeze with the per-agency exposure account, the <code>Payout</code> account and <code>HolderState</code>. Never reused.</td></tr>
+</tbody></table></div>
+
+<h3 id="cfg-authorities">2.5 Authorities<a class="anchor" href="#cfg-authorities">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Authority</th><th>Holder</th><th>Devnet address</th><th>Can do</th></tr></thead>
+<tbody>
+<tr><td>Program upgrade authority</td><td>Upgrade multisig vault (Squads v4)</td><td>Set at deploy</td><td>Sign <code>initialize</code> and program upgrades.</td></tr>
+<tr><td>Reserve admin (<code>VaultConfig.admin</code>)</td><td>Admin multisig vault (Squads v4)</td><td>Set at deploy</td><td>Caps, coverage ratio, stress buffer, roles and guardians, <code>revoke_pauser</code>, money accounts, allowlist, capital fills, deposit and redeem cancels (which park the request), claim approvals above the per-call cap, unpause, halt clearing. Unsolicited money comes with a later upgrade. Rotated only by <code>propose_admin</code> then <code>accept_admin</code>.</td></tr>
+<tr><td>Operator (<code>VaultConfig.operator</code>)</td><td>Hot key</td><td>Set at deploy</td><td>Guarantees (register, close), guarantee fees, issuer income, claims (file, pay) and settlement records. <code>Pubkey::default()</code> when revoked. On devnet a keypair generated at deploy and used by hand from the operator console; later a KMS-backed key in the MUTAV platform.</td></tr>
+<tr><td>Pauser (<code>VaultConfig.pauser</code>)</td><td>Separate key</td><td>Set at deploy</td><td><code>pause</code> and <code>revoke_operator</code>, with no time lock.</td></tr>
+<tr><td>Guardians (<code>VaultConfig.guardians</code>)</td><td>Up to 3 keys, appointed by the admin in one step</td><td>Set at deploy</td><td><code>pause</code> only in the pilot. Devnet starts with 1 guardian, separate from the pauser. With the first adapter upgrade, also the risk-reducing adapter actions of ADR 0027.</td></tr>
+<tr><td>Share mint authority</td><td>Vault authority PDA</td><td><code class="addr">BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK</code></td><td>Mints shares only in <code>claim_shares</code>.</td></tr>
+<tr><td>Share freeze authority</td><td>Vault authority PDA</td><td><code class="addr">BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK</code></td><td>Unused by v1. Kept so share-transfer restrictions stay possible without a new mint.</td></tr>
+<tr><td>Reserve token accounts owner</td><td>Vault authority PDA</td><td><code class="addr">BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK</code></td><td>Owns <code>reserve</code>, <code>pending_deposits</code>, <code>pending_redemptions</code>, <code>claims</code>, <code>unsolicited</code> and the income inbox.</td></tr>
+<tr><td>BRS mint authority (issuer)</td><td>Account owned by the issuer's minting program</td><td><code class="addr">7764rLMKF8fd4daejEESKBDPjE5EQBEQNgKCKNCpMwJv</code></td><td>Owner program <code class="addr">9fBSeVHUCaHHUzkktiRp5Yn35emxx3S1ERzn7oHsi8je</code>. Read 2026-10-06 (spec §12 Q34).</td></tr>
+<tr><td>BRS freeze authority (issuer)</td><td>Issuer wallet</td><td><code class="addr">nora7ZTxmDrLdVheVazpsthHFB8u3JzgHeyh9foTZWC</code></td><td>Can freeze any BRS token account, the reserve's included. Mainnet arrangements are open (spec §12 Q34).</td></tr>
+<tr><td>Treasury account</td><td>MUTAV BRS token account</td><td>Set at deploy</td><td>Receives MUTAV's take of each guarantee fee. Not owned by the operator, the capital wallet or the vault authority.</td></tr>
+<tr><td>Payments account</td><td>MUTAV BRS token account</td><td>Set at deploy</td><td>Only destination of claim payments. Same ownership rules as the treasury, and distinct from it.</td></tr>
+<tr><td>MUTAV capital wallet</td><td>Allowlisted wallet</td><td>Set at deploy</td><td>Disclosed on-chain in <code>mutav_capital_wallet</code>. Uses the same queues as any capital provider.</td></tr>
+</tbody></table></div>
+<p>Roles are distinct keys. The operator, pauser and admin change only when the new key signs its acceptance (<code>accept_role</code>, <code>accept_admin</code>). Each pending handover expires 72 hours after its proposal, and <code>cancel_pending</code> clears one. <code>revoke_operator</code> clears the operator and the pending operator key; <code>revoke_pauser</code> (admin) clears the pauser and the pending pauser key. Guardians are set in one step with <code>set_guardians</code>.</p>
+
+<h3 id="cfg-multisigs">2.6 Multisigs and time locks<a class="anchor" href="#cfg-multisigs">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Multisig</th><th>Holds</th><th>Devnet</th><th>Real pilot and mainnet</th></tr></thead>
+<tbody>
+<tr><td>Admin multisig</td><td><code>VaultConfig.admin</code></td><td>Squads v4, 2-of-2, time lock 5 min (floor 300 s checked by the scripts)</td><td>24 h</td></tr>
+<tr><td>Upgrade multisig</td><td>Program upgrade authority</td><td>Same members, 2-of-2, time lock 1 h (floor 3,600 s checked by the scripts)</td><td>7 days, and never shorter than <code>max_queue_wait_secs</code> once the exit fallback is on</td></tr>
+</tbody></table></div>
+<p>On devnet the two members are two wallets standing in for the founders. Hardware-wallet keys replace them before real money. Both multisigs have no config authority, so members, threshold and time lock change only through their own proposals. The Squads time lock counts from approval.</p>
+
+<h3 id="cfg-params">2.7 Devnet and pilot parameters (ADR 0028)<a class="anchor" href="#cfg-params">#</a></h3>
+<p>Amounts in R$ and in BRS base units (6 decimals, 1 BRS = R$1). These are the values of ADR 0028, the same for devnet and the pilot; <code>verify.ts</code> checks them on-chain after a devnet deploy and fails one that holds the old values.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Parameter</th><th>Field</th><th class="num">Value</th><th class="num">Base units</th></tr></thead>
+<tbody>
+<tr><td>Coverage ratio <em>c</em></td><td><code>coverage_ratio_bps</code></td><td class="num">0.25 (floor 0.10)</td><td class="num">2,500 bps</td></tr>
+<tr><td>Stress buffer</td><td><code>caps.stress_buffer</code></td><td class="num">R$19,000</td><td class="num">19,000,000,000</td></tr>
+<tr><td>Max reserve size</td><td><code>caps.max_tvl</code></td><td class="num">R$1,000,000</td><td class="num">1,000,000,000,000</td></tr>
+<tr><td>Cover per guarantee</td><td><code>caps.max_cover_per_guarantee</code></td><td class="num">R$120,000</td><td class="num">120,000,000,000</td></tr>
+<tr><td>Claim payment per call</td><td><code>caps.max_claim_per_call</code></td><td class="num">R$15,000</td><td class="num">15,000,000,000</td></tr>
+<tr><td>Claim payments per sliding 31-day window</td><td><code>caps.max_claim_per_period</code></td><td class="num">R$20,000</td><td class="num">20,000,000,000</td></tr>
+<tr><td>Request size</td><td><code>caps.min_request</code> / <code>caps.max_request</code></td><td class="num">R$1,000 to R$100,000</td><td class="num">1,000,000,000 / 100,000,000,000</td></tr>
+<tr><td>NAV-move bound</td><td><code>caps.max_nav_move_bps</code></td><td class="num">100% on devnet</td><td class="num">10,000 bps</td></tr>
+<tr><td>Exit fallback wait</td><td><code>caps.max_queue_wait_secs</code></td><td class="num">0 (off)</td><td class="num">0 s</td></tr>
+<tr><td>Reinstatement window</td><td><code>caps.max_reinstate_age</code></td><td class="num">0 (unused until <code>reinstate_guarantee</code>; 30 days planned)</td><td class="num">0 s</td></tr>
+<tr><td>Fee take</td><td><code>fee_take_bps</code></td><td class="num">20%</td><td class="num">2,000 bps</td></tr>
+<tr><td>Feature flags</td><td><code>feature_flags</code></td><td class="num">None</td><td class="num">0</td></tr>
+<tr><td>Guardians</td><td><code>guardians</code></td><td class="num">1</td><td class="num"></td></tr>
+<tr><td>Pending handover expiry</td><td>Program rule</td><td class="num">72 hours</td><td class="num">259,200 s</td></tr>
+<tr><td>Settlement floor</td><td>None in v1</td><td class="num">100% BRS</td><td class="num">adapter share 0%</td></tr>
+<tr><td>Unsolicited dust threshold</td><td>Off-chain (runbook and app)</td><td class="num">R$10</td><td class="num">no on-chain field</td></tr>
+<tr><td>Unsolicited return window</td><td>Off-chain (runbook)</td><td class="num">30 days</td><td class="num">no on-chain field</td></tr>
+</tbody></table></div>
+<p>The claim window is 31 daily buckets: a payment goes through only if the payments of the last 31 days plus this one stay within <code>max_claim_per_period</code>, so no 30-day span pays more than the cap. Its length is fixed by the bucket count, not by a parameter. There is no take on issuer income in v1: the field was removed and returns as a carve if a take is ever decided (spec §12 Q47).</p>
+<p>The devnet NAV-move bound is 100% on purpose: on a small demo reserve a single claim is a real NAV move and would halt fills. The guard is proven in LiteSVM tests and is lowered for the real pilot; that value is not decided yet. Every other value above is set by ADR 0028 for the pilot too.</p>
+<p><strong>Why these values (ADR 0028).</strong> <em>c</em> = 0.25 holds a quarter of every lease's remaining cover, two and a half times the program floor, because the first real book is small and its loss data is not ours yet. <code>max_tvl</code> (R$1M) is the ceiling of a capital plan that arrives with the book, not a target. The operator pays claims without the multisig up to R$15k per call and R$20k per 31 days: a 6×-rent eviction (R$13,200 at a R$2,200 rent) fits the per-call cap, and the bounded loss from a compromised operator key stays R$20k per 31 days, about 2% of <code>max_tvl</code>. R$120k per guarantee fits the working product (R$39,600: 12× + 6× a R$2,200 rent) with room. At <em>c</em> = 0.25 each such lease needs R$9,900 of required coverage. Raising any cap is a time-locked multisig action.</p>
+
+<h3 id="cfg-constants">2.8 Program constants<a class="anchor" href="#cfg-constants">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Constant</th><th class="num">Value</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>PROGRAM_LAYOUT_VERSION</code></td><td class="num">1</td><td>Written by every <code>init</code>. Accounts with a higher version are refused.</td></tr>
+<tr><td><code>MIN_COVERAGE_RATIO_BPS</code></td><td class="num">1,000</td><td>Floor on <em>c</em> (0.10).</td></tr>
+<tr><td><code>MAX_COVERAGE_RATIO_BPS</code></td><td class="num">10,000</td><td><em>c</em> lies in [1,000, 10,000] bps, which keeps the gates' arithmetic within range (ADR 0022).</td></tr>
+<tr><td><code>MAX_FEE_TAKE_BPS</code></td><td class="num">3,000</td><td>Maximum fee take (30%).</td></tr>
+<tr><td><code>BPS_DENOMINATOR</code></td><td class="num">10,000</td><td>100%.</td></tr>
+<tr><td><code>NAV_SCALE</code></td><td class="num">10<sup>9</sup></td><td>Fixed-point scale of NAV per share.</td></tr>
+<tr><td><code>CLAIM_WINDOW_DAYS</code></td><td class="num">31</td><td>Daily buckets of the claim window.</td></tr>
+<tr><td><code>VIRTUAL_OFFSET</code></td><td class="num">1</td><td><em>V</em> = 10<sup>0</sup>. One share is worth 1 BRS at launch.</td></tr>
+<tr><td><code>RESERVE_DECIMALS</code>, <code>SHARE_DECIMALS</code></td><td class="num">6</td><td>Reserve and share mint decimals. <code>initialize</code> refuses any other reserve mint.</td></tr>
+<tr><td><code>MAX_FULFIL_BATCH</code></td><td class="num">8</td><td>Most requests per fill call. <code>count</code> from 1 to 8.</td></tr>
+<tr><td><code>MAX_ADAPTERS</code></td><td class="num">8</td><td>Bits of <code>adapter_bitmap</code>. <code>adapter_count</code> and the bitmap are 0 in v1; adapter state lives in its own <code>AdapterState</code> account.</td></tr>
+<tr><td><code>MAX_CONFIG_PARAMS</code></td><td class="num">16</td><td>Most <code>ConfigParam</code> values per <code>set_config</code>. Duplicates are refused with <code>DuplicateParam</code>.</td></tr>
+<tr><td><code>HANDOVER_WINDOW_SECS</code></td><td class="num">259,200</td><td>72 hours to accept a proposed role or admin key.</td></tr>
+<tr><td><code>SUB_MINIMUM_EXIT_FLOOR_DIVISOR</code></td><td class="num">10</td><td>An exit of the balance below <code>min_request</code> must be worth at least <code>max(1, min_request / 10)</code> (ADR 0029).</td></tr>
+<tr><td><code>MAX_ALLOWLIST_PROOF_LEN</code></td><td class="num">32</td><td>Deepest Merkle proof (2<sup>32</sup> leaves).</td></tr>
+<tr><td><code>SUPPORTED_FEATURES</code></td><td class="num">0</td><td>No optional feature can be switched on in v1.</td></tr>
+<tr><td>Maximum guardians</td><td class="num">3</td><td>Pause-only keys in the pilot.</td></tr>
+</tbody></table></div>
+
+<h3 id="cfg-status">2.9 Status constants<a class="anchor" href="#cfg-status">#</a></h3>
+<p>Statuses, legs, kinds and modes are <code>u8</code> constants, never Borsh enums. An unknown value fails closed with <code>UnsupportedVersion</code>. <code>u8</code> selectors (role, leg, queue, close reason) start at 1; 0 is <code>InvalidParameter</code>.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Field</th><th>Values</th></tr></thead>
+<tbody>
+<tr><td><code>VaultState.mode</code></td><td><code>MODE_NORMAL = 0</code>, <code>MODE_UNDER_COVERED = 1</code></td></tr>
+<tr><td><code>Guarantee.status</code></td><td><code>ACTIVE = 0</code>, <code>CLOSED = 1</code></td></tr>
+<tr><td><code>Guarantee.close_reason</code></td><td><code>CLOSE_RELEASED = 1</code>, <code>CLOSE_VOID = 2</code>. 0 = still active.</td></tr>
+<tr><td><code>ClaimFiling.leg</code></td><td><code>LEG_DEFAULT = 1</code> (rent and charges in arrears), <code>LEG_EXIT = 2</code> (end-of-occupation debts)</td></tr>
+<tr><td><code>ClaimFiling.status</code></td><td><code>FILED = 0</code>, <code>PAID = 1</code>, <code>WITHDRAWN = 2</code>, <code>SETTLED = 3</code>. Append-only. This binary moves <code>FILED → PAID → SETTLED</code>; <code>WITHDRAWN</code> is reserved and neither written nor accepted.</td></tr>
+<tr><td><code>DepositRequest.status</code></td><td><code>PENDING = 0</code>, <code>FULFILLED = 1</code>, <code>CANCELLED = 2</code> (parked by the admin's cancel, BRS still owed to the owner; ADR 0030)</td></tr>
+<tr><td><code>RedeemRequest.status</code></td><td><code>PENDING = 0</code>, <code>FILLED = 1</code>, <code>CANCELLED = 2</code> (parked by the admin's cancel, shares still owed to the owner; ADR 0030). The owner's cancel closes the request.</td></tr>
+<tr><td><code>IncomeReceipt.kind</code></td><td><code>ISSUER_STATEMENT = 0</code>, <code>FEE = 1</code>. Reserved: <code>UNSOLICITED = 2</code>, <code>BACKSTOP = 3</code>.</td></tr>
+<tr><td>Roles</td><td><code>ROLE_OPERATOR = 1</code>, <code>ROLE_PAUSER = 2</code>, <code>ROLE_ADMIN = 3</code> (<code>cancel_pending</code> only)</td></tr>
+<tr><td><code>advance_queue_head</code> queue</td><td><code>QUEUE_DEPOSIT = 1</code>, <code>QUEUE_REDEEM = 2</code></td></tr>
+<tr><td><code>FulfilHaltRaised.source</code></td><td><code>HALT_SOURCE_REFRESH = 1</code>; <code>HALT_SOURCE_FULFIL_DEPOSITS = 2</code> and <code>HALT_SOURCE_FULFIL_REDEEMS = 3</code> reserved</td></tr>
+</tbody></table></div>
+<p>Argument enums are Borsh enums, append-only: <code>ConfigParam</code> (one variant per settable field) and <code>Eligibility</code> (<code>Merkle { proof }</code> only; an attestation variant is appended when built).</p>
+</section>
+
+<!-- ============================================================ 3 -->
+<section id="roles" class="level2">
+<h2><span class="num">3</span>Roles &amp; permissions<a class="anchor" href="#roles" aria-label="Link to this section">#</a></h2>
+<p>The operator and the reserve admin are separate parties and may be separate companies. In the devnet release MUTAV holds both, with different keys. The split is the core security rule.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Role</th><th>Owns</th><th>Key</th></tr></thead>
+<tbody>
+<tr><td><strong>Operator</strong></td><td>Contracts, agencies and the whole guarantee and claim cycle. Judges whether a lease is valid and whether a claim is owed. Registers and closes guarantees, books guarantee fees and issuer income, files and pays claims, records settlement. Only <code>pay_claim</code> is irreversible, and it is bounded by the admin's caps.</td><td>Hot key</td></tr>
+<tr><td><strong>Reserve admin</strong></td><td>The reserve's financial health and security through ceilings: caps, coverage ratio, stress buffer, roles, guardians, accounts, allowlist, capital fills, parking a request that blocks a queue, approval of claim amounts above the per-call cap, unpause, halt clearing. Later also unsolicited money. It does not judge contracts.</td><td>Admin multisig vault</td></tr>
+<tr><td><strong>Pauser</strong></td><td>Emergency stop. <code>pause</code> and <code>revoke_operator</code>, with no time lock.</td><td>Separate key</td></tr>
+<tr><td><strong>Guardians</strong></td><td><code>pause</code> only. Cannot revoke, unpause or change anything.</td><td>Up to 3 keys</td></tr>
+<tr><td><strong>Capital provider (owner)</strong></td><td>Own requests: deposit, redeem, cancel, claim. Entry is allowlisted; exit is open to any wallet that already holds shares.</td><td>Own wallet</td></tr>
+<tr><td><strong>Anyone</strong></td><td>Cranks that need no judgment: <code>refresh</code>, <code>advance_queue_head</code>.</td><td>Any signer</td></tr>
+</tbody></table></div>
+<p><strong>The most a compromised operator can cost is the admin-set claim caps</strong> (R$15k per call, R$20k per 31 days). Claim payments are the only irreversible operator action, and they land in MUTAV's own payments account.</p>
+
+<h3 id="matrix">3.1 Instruction × role matrix<a class="anchor" href="#matrix">#</a></h3>
+<p><span class="y">●</span> may sign. "Under pause": whether the instruction runs while the reserve is paused. "Coverage gate": whether it is refused when the reserve does not hold its required coverage.</p>
+<div class="tbl-wrap"><table class="tbl matrix">
+<thead><tr><th>Instruction</th><th>Admin</th><th>Operator</th><th>Pauser</th><th>Guardian</th><th>Owner</th><th>Anyone</th><th>Under pause</th><th>Coverage gate</th></tr></thead>
+<tbody>
+<tr class="grp"><td colspan="9">Admin and roles</td></tr>
+<tr><td><code>initialize</code></td><td colspan="6">upgrade authority only</td><td>n/a</td><td class="n">no</td></tr>
+<tr><td><code>set_config</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>propose_role</code> / <code>accept_role</code></td><td class="y">●</td><td colspan="5">accept: the proposed key</td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>propose_admin</code> / <code>accept_admin</code></td><td class="y">●</td><td colspan="5">accept: the proposed admin</td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>cancel_pending</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>set_guardians</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>revoke_pauser</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>set_payments_account</code> / <code>set_treasury_account</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>set_allowlist_root</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>clear_fulfil_halt</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>pause</code></td><td class="y">●</td><td></td><td class="y">●</td><td class="y">●</td><td></td><td></td><td>n/a</td><td class="n">no</td></tr>
+<tr><td><code>unpause</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>n/a</td><td class="n">no</td></tr>
+<tr><td><code>revoke_operator</code></td><td class="y">●</td><td></td><td class="y">●</td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr class="grp"><td colspan="9">Capital fills (admin)</td></tr>
+<tr><td><code>fulfil_deposits</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>refused</td><td class="n">no*</td></tr>
+<tr><td><code>fulfil_redeems</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>refused</td><td class="y">yes</td></tr>
+<tr class="grp"><td colspan="9">Guarantees, fees, income (operator)</td></tr>
+<tr><td><code>register_guarantee</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>refused</td><td class="y">yes</td></tr>
+<tr><td><code>close_guarantee</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>contribute_fees</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>sweep_income</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr class="grp"><td colspan="9">Claims (operator; approval by the admin)</td></tr>
+<tr><td><code>file_claim</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">never</td></tr>
+<tr><td><code>pay_claim</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">never</td></tr>
+<tr><td><code>settle_payout</code></td><td></td><td class="y">●</td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">never</td></tr>
+<tr><td><code>approve_claim</code></td><td class="y">●</td><td></td><td></td><td></td><td></td><td></td><td>runs</td><td class="n">never</td></tr>
+<tr class="grp"><td colspan="9">Capital (owner)</td></tr>
+<tr><td><code>request_deposit</code></td><td></td><td></td><td></td><td></td><td class="y">●</td><td></td><td>refused</td><td class="n">no</td></tr>
+<tr><td><code>cancel_deposit</code></td><td class="y">●</td><td></td><td></td><td></td><td class="y">●</td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>claim_shares</code></td><td></td><td></td><td></td><td></td><td class="y">●</td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>request_redeem</code></td><td></td><td></td><td></td><td></td><td class="y">●</td><td></td><td>refused</td><td class="n">no</td></tr>
+<tr><td><code>cancel_redeem</code></td><td class="y">●</td><td></td><td></td><td></td><td class="y">●</td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>claim_assets</code></td><td></td><td></td><td></td><td></td><td class="y">●</td><td></td><td>runs</td><td class="n">no</td></tr>
+<tr class="grp"><td colspan="9">Public</td></tr>
+<tr><td><code>refresh</code></td><td></td><td></td><td></td><td></td><td></td><td class="y">●</td><td>runs</td><td class="n">no</td></tr>
+<tr><td><code>advance_queue_head</code></td><td></td><td></td><td></td><td></td><td></td><td class="y">●</td><td>runs</td><td class="n">no</td></tr>
+</tbody></table></div>
+<p class="muted">* <code>fulfil_deposits</code> is allowed while the reserve is under-covered, because it is the recapitalisation path. It is still refused with <code>ReserveUnderwater</code> when the reserve is underwater, and by the reserve-size cap.</p>
+<p><strong>Pause scope.</strong> Pause stops only capital flows and new guarantees: <code>request_deposit</code>, <code>request_redeem</code>, <code>fulfil_deposits</code>, <code>fulfil_redeems</code> and <code>register_guarantee</code>. Every other instruction runs under pause. It never stops a claim and never traps a holder's money. Only the admin unpauses. The coverage gate (and the under-covered mode check) applies to <code>register_guarantee</code> and <code>fulfil_redeems</code> only.</p>
+<p><strong>Not in this binary</strong> (planned for later upgrades): <code>amend_claim</code>, <code>refile_claim</code>, claim withdrawal, <code>reinstate_guarantee</code>, the unsolicited-money instructions (<code>skim</code>, <code>classify_unsolicited</code>, <code>book_unsolicited</code>, <code>return_unsolicited</code>, the surplus-share burn), the adapter instructions and instant exit.</p>
+</section>
+
+<!-- ============================================================ 4 -->
+<section id="accounts" class="level2">
+<h2><span class="num">4</span>Accounts<a class="anchor" href="#accounts" aria-label="Link to this section">#</a></h2>
+<p>Every program-owned account starts with <code>version: u8</code> and <code>bump: u8</code> and ends with a zeroed <code>_reserved</code> array. Fixed-size types only: no <code>Option</code>, <code>Vec</code> or <code>String</code>. Sizes include the 8-byte Anchor discriminator, are pinned in <code>constants.rs</code> and asserted against <code>8 + INIT_SPACE</code>; field offsets are pinned by the golden layout test against <code>tests/fixtures/layout/v1/</code>. New fields are carved from the front of <code>_reserved</code>, so sizes never change after the freeze.</p>
+
+<h3 id="acc-sizes">4.1 Sizes and padding<a class="anchor" href="#acc-sizes">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Account</th><th class="num">Size (bytes)</th><th class="num"><code>_reserved</code></th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>VaultConfig</code></td><td class="num">1,181</td><td class="num">411</td><td>Holds the pending role keys with per-role expiry, <code>pending_admin</code> and its expiry, <code>guardians[3]</code>, <code>adapter_count</code> and <code>adapter_bitmap</code>. The padding test reserves room for the phase-2 exit parameters and the buffer earmark.</td></tr>
+<tr><td><code>VaultState</code></td><td class="num">688</td><td class="num">224</td><td>Holds the claim window: 31 daily buckets and the day anchor (256 bytes). Room is held for phase 2's <code>InstantExitState</code> (88 bytes).</td></tr>
+<tr><td><code>Guarantee</code></td><td class="num">377</td><td class="num">203</td><td>Grown from 64 before the freeze, to hold the fiança-lifecycle fields (88 bytes) without migration.</td></tr>
+<tr><td><code>ClaimFiling</code></td><td class="num">380</td><td class="num">192</td><td>Holds <code>approved_amount</code> and the payment and settlement fields of the former <code>Payout</code> account; room for the lifecycle claim and settlement fields (114 bytes).</td></tr>
+<tr><td><code>IncomeReceipt</code></td><td class="num">143</td><td class="num">64</td><td>Holds <code>kind</code>.</td></tr>
+<tr><td><code>DepositRequest</code></td><td class="num">155</td><td class="num">56</td><td>Holds <code>min_shares_out</code>.</td></tr>
+<tr><td><code>RedeemRequest</code></td><td class="num">155</td><td class="num">48</td><td>Holds <code>min_assets_out</code> and <code>shares_filled</code>. The padding test reserves room for the partial-fill fields.</td></tr>
+<tr><td>Nested <code>Caps</code></td><td class="num"></td><td class="num">32</td><td>Holds <code>stress_buffer</code>, <code>max_queue_wait_secs</code> and <code>max_reinstate_age</code>. A later concentration limit is carved here.</td></tr>
+</tbody></table></div>
+<p class="muted">Removed before the freeze (ADR 0019, ADR 0026): the <code>Payout</code> account (merged into <code>ClaimFiling</code>), <code>FeeReceipt</code> (now <code>IncomeReceipt</code> with <code>kind = FEE</code>), <code>HolderState</code>, <code>AgencyExposure</code> with the per-agency cap, the payout SLA fields, <code>claim_period_secs</code>, the phase-2 exit parameters and earmark, the global TESOURO price fields, the cached <code>stable_assets</code>, the income take, <code>min_fill_assets</code> and the partial-fill request fields, <code>pending_notices</code>, the inline adapter slots and <code>max_allocated_bps</code>. Retired <code>ConfigUpdated</code> field ids and seeds are never reused.</p>
+
+<h3 id="acc-carved">4.2 Fields carved for the devnet release<a class="anchor" href="#acc-carved">#</a></h3>
+<p>Every carved field reads zero as the safe default on an account written before the carve.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Account</th><th>Field</th><th>Type</th><th>Zero means</th></tr></thead>
+<tbody>
+<tr><td><code>VaultConfig</code></td><td><code>pending_operator</code>, <code>pending_pauser</code>, and their <code>_expires_at</code></td><td><code>Pubkey</code> ×2, <code>i64</code> ×2</td><td>No pending handover</td></tr>
+<tr><td><code>VaultConfig</code></td><td><code>pending_admin</code>, <code>pending_admin_expires_at</code></td><td><code>Pubkey</code>, <code>i64</code></td><td>No pending handover</td></tr>
+<tr><td><code>VaultConfig</code></td><td><code>guardians</code></td><td><code>[Pubkey; 3]</code></td><td>Empty slot</td></tr>
+<tr><td><code>VaultConfig</code></td><td><code>adapter_count</code>, <code>adapter_bitmap</code></td><td><code>u8</code> ×2</td><td>BRS only</td></tr>
+<tr><td><code>VaultConfig</code></td><td><code>disabled_ops</code>, <code>kyc_attester</code>, <code>attestation_program</code>, <code>required_attestation_type</code>, <code>attester_epoch</code></td><td></td><td>Off. Read by no instruction of this binary</td></tr>
+<tr><td><code>Guarantee</code></td><td><code>close_reason</code></td><td><code>u8</code></td><td>Active, or closed before the reason was recorded</td></tr>
+<tr><td><code>Caps</code></td><td><code>stress_buffer</code></td><td><code>u64</code></td><td>No stress term</td></tr>
+<tr><td><code>Caps</code></td><td><code>max_reinstate_age</code></td><td><code>i64</code></td><td>No reinstatement</td></tr>
+<tr><td><code>Caps</code></td><td><code>max_queue_wait_secs</code></td><td><code>i64</code></td><td>Exit fallback off</td></tr>
+<tr><td><code>VaultState</code></td><td><code>claim_day_buckets</code>, <code>claim_day_anchor</code></td><td><code>[u64; 31]</code>, <code>i64</code></td><td>No payments in the window</td></tr>
+<tr><td><code>ClaimFiling</code></td><td><code>approved_amount</code></td><td><code>u64</code></td><td>No approval; the per-call cap applies. Written zero in this release</td></tr>
+<tr><td><code>ClaimFiling</code></td><td><code>payments_account</code>, <code>paid_at</code>, <code>paid_amount</code>, <code>pix_e2e_hash</code>, <code>settled_at</code></td><td></td><td>Not paid, not settled</td></tr>
+<tr><td><code>IncomeReceipt</code></td><td><code>kind</code></td><td><code>u8</code></td><td>An issuer statement</td></tr>
+</tbody></table></div>
+
+<h3 id="acc-contents">4.3 Account contents<a class="anchor" href="#acc-contents">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Account</th><th>Fields</th></tr></thead>
+<tbody>
+<tr class="grp"><td colspan="2">VaultConfig · <code>["config", reserve_mint]</code></td></tr>
+<tr><td>Header</td><td><code>version</code>, <code>bump</code>, <code>authority_bump</code></td></tr>
+<tr><td>Roles</td><td><code>admin</code>, <code>operator</code>, <code>pauser</code>, the pending keys and their expiry times, <code>guardians</code></td></tr>
+<tr><td>Mint</td><td><code>reserve_mint</code>, <code>reserve_token_program</code>, <code>reserve_decimals</code> (immutable after <code>initialize</code>; 6), <code>share_mint</code></td></tr>
+<tr><td>Economics</td><td><code>coverage_ratio_bps</code> (<em>c</em>, 1,000 to 10,000), <code>fee_take_bps</code> (at most 3,000)</td></tr>
+<tr><td>Accounts</td><td><code>payments_account</code>, <code>treasury_account</code> (distinct, owned by none of the vault authority, the operator or the capital wallet), <code>mutav_capital_wallet</code></td></tr>
+<tr><td>Allowlist</td><td><code>investor_allowlist_root</code></td></tr>
+<tr><td>Limits</td><td><code>caps</code>: <code>max_tvl</code>, <code>max_cover_per_guarantee</code>, <code>max_claim_per_call</code>, <code>max_claim_per_period</code> (per 31-day window), <code>min_request</code>, <code>max_request</code>, <code>max_nav_move_bps</code>, <code>stress_buffer</code>, <code>max_queue_wait_secs</code>, <code>max_reinstate_age</code></td></tr>
+<tr><td>Flags</td><td><code>paused</code>, <code>feature_flags</code> (0 in v1, fail-closed)</td></tr>
+<tr><td>Later</td><td><code>adapter_count</code>, <code>adapter_bitmap</code> (0); <code>disabled_ops</code>, <code>kyc_attester</code>, <code>attestation_program</code>, <code>required_attestation_type</code>, <code>attester_epoch</code> (unused)</td></tr>
+<tr class="grp"><td colspan="2">VaultState · <code>["state", config]</code></td></tr>
+<tr><td>Health</td><td><code>mode</code>, <code>remaining_cover_total</code>, <code>coverage_required</code>, <code>provisions</code>, <code>fulfil_halted</code>, <code>last_refresh_ts</code>, <code>last_refresh_slot</code>. Stable assets are computed at every gate, not stored.</td></tr>
+<tr><td>Tracked balances</td><td><code>brs_balance</code>, <code>pending_deposits_total</code>, <code>pending_redeem_shares</code>, <code>claimable_assets_total</code></td></tr>
+<tr><td>Shares and NAV</td><td><code>shares_outstanding</code>, <code>nav_per_share</code>, <code>inflow_nav</code></td></tr>
+<tr><td>Queues</td><td><code>next_deposit_seq</code>, <code>deposit_head</code>, <code>next_redeem_seq</code>, <code>redeem_head</code></td></tr>
+<tr><td>Claim window</td><td><code>claim_day_buckets</code>, <code>claim_day_anchor</code></td></tr>
+<tr><td>Counters</td><td><code>active_guarantees</code>, <code>fees_in_total</code>, <code>fee_take_total</code>, <code>claims_paid_total</code>, <code>income_total</code>, <code>deposited_assets_total</code>, <code>minted_shares_total</code>, <code>redeemed_shares_total</code>, <code>redeemed_assets_total</code></td></tr>
+<tr class="grp"><td colspan="2">Guarantee · <code>["guarantee", config, id]</code></td></tr>
+<tr><td>Fields</td><td><code>id</code>, <code>agency_id</code>, <code>refs_hash</code>; <code>default_cover</code>, <code>exit_cover</code> (absolute leg sub-limits, never changed after registration); <code>default_paid</code>, <code>exit_paid</code>; <code>provision_default</code>, <code>provision_exit</code>; <code>open_claims</code>; <code>status</code>; <code>registered_at</code>, <code>closed_at</code> (0 while active); <code>close_reason</code></td></tr>
+<tr class="grp"><td colspan="2">ClaimFiling · <code>["claim", guarantee, notice_ref_hash]</code></td></tr>
+<tr><td>Fields</td><td><code>guarantee</code>, <code>leg</code>, <code>notice_ref_hash</code>, <code>provision</code>, <code>filed_at</code>, <code>status</code>, <code>approved_amount</code>, <code>payments_account</code> at payment time, <code>paid_at</code>, <code>paid_amount</code>, <code>pix_e2e_hash</code>, <code>settled_at</code>. There is no separate payout account.</td></tr>
+<tr class="grp"><td colspan="2">Requests</td></tr>
+<tr><td><code>DepositRequest</code></td><td><code>owner</code>, <code>seq</code>, <code>assets</code>, <code>shares_out</code>, <code>nav_at_fulfil</code>, <code>requested_at</code>, <code>fulfilled_at</code>, <code>status</code>, <code>min_shares_out</code></td></tr>
+<tr><td><code>RedeemRequest</code></td><td><code>owner</code>, <code>seq</code>, <code>shares</code>, <code>assets_out</code>, <code>nav_at_fill</code>, <code>requested_at</code>, <code>filled_at</code>, <code>status</code>, <code>shares_filled</code>, <code>min_assets_out</code>. Whole fills only.</td></tr>
+<tr class="grp"><td colspan="2">Receipts</td></tr>
+<tr><td><code>IncomeReceipt</code></td><td><code>kind</code>, <code>ref_hash</code> (invoice or statement commitment), <code>period</code> (<code>YYYYMM</code>, 0 for a fee), <code>gross</code>, <code>take</code> (the guarantee-fee take; 0 for every other kind), <code>net</code>, <code>slot</code></td></tr>
+</tbody></table></div>
+<p>Token accounts (<code>reserve</code>, <code>pending_deposits</code>, <code>pending_redemptions</code>, <code>claims</code>, <code>unsolicited</code>, the income inbox) are ordinary SPL Token accounts owned by the vault authority. Rent is about 6,960 lamports per byte.</p>
+</section>
+
+<!-- ============================================================ 5 -->
+<section id="instructions" class="level2">
+<h2><span class="num">5</span>Instructions<a class="anchor" href="#instructions" aria-label="Link to this section">#</a></h2>
+<p><strong>Common rules.</strong> An account whose <code>version</code> is above 1, or whose status, leg, kind or mode byte is unknown, is refused with <code>UnsupportedVersion</code>. Every BRS transfer uses <code>transfer_checked</code> with the stored reserve mint and token program. A debit from a capital provider requires the token account's owner to be the signer; delegates are never used. Every program account is checked by seeds and canonical bump; token accounts by mint, owner and token program. Math is <code>u128</code>, checked, rounded in the reserve's favour (<code>MathOverflow</code> on overflow). Events are emitted with <code>emit_cpi!</code>. <code>cancel_deposit</code>, <code>claim_shares</code>, <code>cancel_redeem</code> and <code>claim_assets</code> create the owner's associated token account idempotently; the caller pays its rent.</p>
+
+<h3 id="ix-init">5.1 Upgrade authority<a class="anchor" href="#ix-init">#</a></h3>
+<div class="ix" id="ix-initialize"><h4><code>initialize(args)</code><a class="anchor" href="#ix-initialize">#</a></h4><dl>
+<dt>Signer</dt><dd>The program upgrade authority, checked against ProgramData. Cannot be front-run.</dd>
+<dt>Args</dt><dd><code>InitializeArgs { admin, operator, pauser, mutav_capital_wallet, coverage_ratio_bps, fee_take_bps, caps: CapsInput }</code>. The treasury and payments token accounts are passed as accounts.</dd>
+<dt>Rules</dt><dd>Reserve mint has 6 decimals and passes the mint guard. Roles set and distinct. Parameter bounds as <code>set_config</code>. Treasury and payments accounts hold the reserve mint, are distinct, are plain accounts (no delegate, no close authority, not frozen), and are owned by none of: the vault authority, the operator, the capital wallet.</dd>
+<dt>Effects</dt><dd>Creates <code>VaultConfig</code>, an empty <code>VaultState</code>, the share mint, <code>reserve</code>, <code>pending_deposits</code>, <code>pending_redemptions</code>, <code>claims</code>, <code>unsolicited</code> and, idempotently, the income inbox. Allowlist root, feature flags, adapter fields, pending role keys and guardians start at zero.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>UnsupportedMintExtension</code>, <code>InvalidMint</code>, <code>InvalidParameter</code>, <code>RolesNotDistinct</code>, <code>FeatureNotSupported</code>, <code>InvalidIncomeSource</code>, <code>InvalidTreasuryAccount</code>, <code>InvalidPaymentsAccount</code>.</dd>
+<dt>Event</dt><dd><code>VaultInitialized { admin, operator, pauser, reserve_mint, share_mint }</code>.</dd></dl></div>
+
+<h3 id="ix-admin">5.2 Reserve admin<a class="anchor" href="#ix-admin">#</a></h3>
+<p>The admin is the vault of the admin multisig. Every admin instruction goes through a Squads proposal and waits for the time lock: 5 minutes on devnet, 24 hours for the real pilot. <code>pause</code> is also open to the pauser and guardians, and <code>revoke_operator</code> to the pauser, with no delay.</p>
+
+<div class="ix" id="ix-set_config"><h4><code>set_config(params: Vec&lt;ConfigParam&gt;)</code><a class="anchor" href="#ix-set_config">#</a></h4><dl>
+<dt>Args</dt><dd>A sparse list of 1 to 16 <code>ConfigParam</code> values: <code>CoverageRatioBps</code>, <code>FeeTakeBps</code>, <code>FeatureFlags</code>, <code>MutavCapitalWallet</code>, and one per <code>Caps</code> field (<code>MaxTvl</code>, <code>MaxCoverPerGuarantee</code>, <code>MaxClaimPerCall</code>, <code>MaxClaimPerPeriod</code>, <code>MinRequest</code>, <code>MaxRequest</code>, <code>MaxNavMoveBps</code>, <code>StressBuffer</code>, <code>MaxQueueWaitSecs</code>, <code>MaxReinstateAge</code>). Variants are append-only. There is no payout SLA, no per-agency cap, no claim period length and no income take.</dd>
+<dt>Rules</dt><dd>A field set twice is refused with <code>DuplicateParam</code>. The whole resulting config is validated: <code>1,000 ≤ coverage_ratio_bps ≤ 10,000</code>; <code>fee_take_bps ≤ 3,000</code>; flags inside <code>SUPPORTED_FEATURES</code>; <code>max_nav_move_bps ≤ 10,000</code>; <code>max_tvl &gt; 0</code>, <code>max_cover_per_guarantee &gt; 0</code>; <code>max_claim_per_call &gt; 0</code> and <code>max_claim_per_period ≥ max_claim_per_call</code>; <code>0 &lt; min_request ≤ max_request</code>; <code>stress_buffer ≤ max_tvl</code> (0 turns the stress term off); <code>mutav_capital_wallet</code> set. A change of <code>coverage_ratio_bps</code>, <code>max_nav_move_bps</code> or <code>stress_buffer</code> needs a <code>refresh</code> in the same slot (<code>RefreshRequired</code>); the admin console puts <code>refresh</code> first in the same transaction.</dd>
+<dt>Effects</dt><dd>Writes only the listed fields. Recomputes the cached <code>coverage_required</code> (checked: fails closed); <code>mode</code> is left to <code>refresh</code>. A refusal reverts every param of the call.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>DuplicateParam</code>, <code>FeatureNotSupported</code>, <code>RefreshRequired</code>, <code>InvalidMint</code>, <code>InvalidTreasuryAccount</code>, <code>InvalidPaymentsAccount</code>, <code>MathOverflow</code>.</dd>
+<dt>Event</dt><dd>One <code>ConfigUpdated { field, old, new }</code> per changed field.</dd></dl></div>
+
+<div class="ix" id="ix-roles"><h4><code>propose_role(role, key)</code> · <code>accept_role(role)</code><a class="anchor" href="#ix-roles">#</a></h4><dl>
+<dt>Signer</dt><dd>Propose: admin. Accept: the proposed key.</dd>
+<dt>Rules</dt><dd><code>role</code> is <code>ROLE_OPERATOR</code> (1) or <code>ROLE_PAUSER</code> (2). Each role has its own pending key and expiry, 72 hours after the proposal. The key is not the default key, differs from the other roles and is not a guardian. Refused with <code>HandoverPending</code> while an unexpired handover for that role waits. Accept: the signer is the pending key (<code>NoPendingHandover</code>, <code>Unauthorized</code>), before expiry (<code>HandoverExpired</code>); distinctness is re-checked. For the operator, the payments and treasury accounts are passed and must not be owned by the new key.</dd>
+<dt>Effects</dt><dd>Propose stores the pending key and its expiry. Accept moves it into the live role. A typo can never appoint a key nobody holds.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>RolesNotDistinct</code>, <code>HandoverPending</code>, <code>NoPendingHandover</code>, <code>HandoverExpired</code>, <code>InvalidTreasuryAccount</code>, <code>InvalidPaymentsAccount</code>.</dd>
+<dt>Events</dt><dd><code>RoleProposed { role, key, expires_at }</code>, <code>RoleAccepted { role, old, new }</code>, plus <code>ConfigUpdated</code> per changed field.</dd></dl></div>
+
+<div class="ix" id="ix-admin-handover"><h4><code>propose_admin(key)</code> · <code>accept_admin()</code> · <code>cancel_pending(role)</code><a class="anchor" href="#ix-admin-handover">#</a></h4><dl>
+<dt>Signer</dt><dd><code>propose_admin</code>, <code>cancel_pending</code>: admin. <code>accept_admin</code>: the proposed admin.</dd>
+<dt>Effects</dt><dd>Two-step rotation of <code>VaultConfig.admin</code> through <code>pending_admin</code>, with its own 72-hour expiry, under the same rules as <code>propose_role</code> (role <code>ROLE_ADMIN</code> = 3). <code>accept_admin</code> clears the pending operator and pauser handovers the old admin proposed. <code>cancel_pending(role)</code> clears a pending operator, pauser or admin handover. Runbook: rotate Squads members while both keys are live.</dd>
+<dt>Events</dt><dd><code>RoleProposed</code>, <code>RoleAccepted</code>, <code>HandoverCancelled { role, key }</code>.</dd></dl></div>
+
+<div class="ix" id="ix-guardians"><h4><code>set_guardians(guardians: [Pubkey; 3])</code><a class="anchor" href="#ix-guardians">#</a></h4><dl>
+<dt>Signer</dt><dd>Admin, in one step: guardians do not accept.</dd>
+<dt>Rules</dt><dd>Writes all three slots. <code>Pubkey::default()</code> empties a slot. A set slot may not repeat another or hold the admin, operator or pauser key (<code>RolesNotDistinct</code>).</dd>
+<dt>Event</dt><dd><code>GuardiansUpdated { guardians }</code>, plus <code>ConfigUpdated</code> per changed slot.</dd></dl></div>
+
+<div class="ix" id="ix-money-accounts"><h4><code>set_payments_account()</code> · <code>set_treasury_account()</code> · <code>set_allowlist_root(root)</code><a class="anchor" href="#ix-money-accounts">#</a></h4><dl>
+<dt>Rules</dt><dd>The new token account holds the reserve mint, differs from the other money account, is a plain account (no delegate, no close authority, not frozen), and is owned by none of: the capital wallet, the operator, the vault authority. The allowlist root gates entry, not exit.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidMint</code>, <code>InvalidPaymentsAccount</code>, <code>InvalidTreasuryAccount</code>.</dd>
+<dt>Events</dt><dd><code>PaymentsAccountUpdated { old, new }</code>, <code>TreasuryAccountUpdated { old, new }</code>, <code>AllowlistRootUpdated { root }</code>.</dd></dl></div>
+
+<div class="ix" id="ix-clear_fulfil_halt"><h4><code>clear_fulfil_halt(nav_bounds)</code><a class="anchor" href="#ix-clear_fulfil_halt">#</a></h4><dl>
+<dt>Rules</dt><dd>Takes the seeds-checked <code>reserve</code>. <code>nav_bounds.min ≤ nav_bounds.max</code>. <code>fulfil_halted</code> is set (else <code>InvalidParameter</code>). A frozen reserve counts as 0 BRS and the instruction refuses with <code>ReserveFrozen</code>. The new baseline, the published NAV now, lies inside <code>nav_bounds</code> (<code>NavOutOfBounds</code>), so a proposal waiting on the time lock never resets the guard to a NAV the admin did not review.</dd>
+<dt>Effects</dt><dd>Clears the halt, sets the guard baseline to the current published NAV, resets <code>inflow_nav</code>.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>ReserveFrozen</code>, <code>NavOutOfBounds</code>.</dd>
+<dt>Event</dt><dd><code>FulfilHaltCleared { nav_per_share }</code>.</dd></dl></div>
+
+<div class="ix" id="ix-pause"><h4><code>pause()</code> · <code>unpause()</code> · <code>revoke_operator()</code> · <code>revoke_pauser()</code><a class="anchor" href="#ix-pause">#</a></h4><dl>
+<dt>Signer</dt><dd><code>pause</code>: admin, pauser or a guardian. <code>unpause</code>: admin. <code>revoke_operator</code>: pauser or admin. <code>revoke_pauser</code>: admin.</dd>
+<dt>Effects</dt><dd><code>pause</code> and <code>unpause</code> set or clear <code>paused</code>. <code>revoke_operator</code> sets the operator to <code>Pubkey::default()</code> at once and clears the pending operator key (not the pending pauser key); operator instructions fail from the next slot. <code>revoke_pauser</code> clears the pauser and the pending pauser key; the admin and guardians can still pause.</dd>
+<dt>Events</dt><dd><code>Paused { by }</code>, <code>Unpaused { by }</code>, <code>OperatorRevoked { by }</code>, <code>PauserRevoked { by }</code>.</dd></dl></div>
+
+<div class="ix" id="ix-fulfil_deposits"><h4><code>fulfil_deposits(count, nav_bounds)</code><a class="anchor" href="#ix-fulfil_deposits">#</a></h4><dl>
+<dt>Args</dt><dd><code>count</code> 1 to 8. <code>nav_bounds: NavBounds { min, max }</code>, composed by the admin console when the proposal is created. Request accounts as remaining accounts.</dd>
+<dt>Rules</dt><dd>Strict FIFO from <code>deposit_head</code>, with the skip proof for closed seqs, fulfilled requests and requests parked by the admin. Not paused. Not halted. Refused with <code>ReserveUnderwater</code> when the reserve is underwater. The NAV-move guard is evaluated inline at batch start (the <code>refresh</code> rule, net of <code>inflow_nav</code>): a move beyond <code>max_nav_move_bps</code> refuses with <code>FulfilHalted</code> but does not latch the halt; the next <code>refresh</code> does. Each fill's NAV is inside <code>nav_bounds</code>. A request that would mint 0 shares stops the batch (<code>RequestTooSmall</code>), and so does one below the owner's <code>min_shares_out</code> (<code>PriceLimitNotMet</code>); either fails the call only when nothing was filled. <code>stable_assets + Σ assets ≤ max_tvl</code>. <code>pending_deposits</code> and <code>reserve</code> not frozen.</dd>
+<dt>Effects</dt><dd>Per request: <code>shares_out = shares_for(assets)</code> at the live NAV after the earlier fills, BRS from <code>pending_deposits</code> to <code>reserve</code>, status <code>FULFILLED</code>, head advanced. The batch that mints the first shares seeds the guard baseline. Shares are minted later by <code>claim_shares</code>.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>Paused</code>, <code>FulfilHalted</code>, <code>ReserveUnderwater</code>, <code>NavOutOfBounds</code>, <code>RequestTooSmall</code>, <code>PriceLimitNotMet</code>, <code>TvlCapExceeded</code>, <code>ReserveFrozen</code>, <code>QueueOrderViolation</code>, <code>FeatureNotSupported</code>.</dd>
+<dt>Events</dt><dd><code>DepositFilled</code> per fill; <code>DepositsFulfilled</code> per batch.</dd></dl></div>
+
+<div class="ix" id="ix-fulfil_redeems"><h4><code>fulfil_redeems(count, max_assets, nav_bounds)</code><a class="anchor" href="#ix-fulfil_redeems">#</a></h4><dl>
+<dt>Rules</dt><dd>Up to <code>count</code> requests in strict FIFO from <code>redeem_head</code>. Not paused. Mode normal and the coverage gate passes (<code>stable_assets ≥ coverage_required</code>), else <code>UnderCovered</code>. Not halted. Not underwater. Guard evaluated inline. Per head, valued at the current NAV: a head worth 0 BRS is never filled, and the batch stops with it untouched; budget before every fill <code>min(max_assets − paid, free_capital, liquid_budget)</code>, whole fills only; a value below the owner's <code>min_assets_out</code> stops the batch (<code>PriceLimitNotMet</code>). Fill NAV inside <code>nav_bounds</code>. <code>reserve</code> and <code>claims</code> not frozen.</dd>
+<dt>Effects</dt><dd>Burns the escrowed shares, moves <code>assets_for(shares)</code> BRS from <code>reserve</code> to <code>claims</code>, status <code>FILLED</code>. The batch that burns the last shares clears the guard baseline to 0. A call that fills nothing fails with the reason the head stopped.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>Paused</code>, <code>UnderCovered</code>, <code>FulfilHalted</code>, <code>ReserveUnderwater</code>, <code>ReserveFrozen</code>, <code>InsufficientFreeCapital</code>, <code>InsufficientLiquidBalance</code>, <code>NavOutOfBounds</code>, <code>RequestTooSmall</code>, <code>PriceLimitNotMet</code>, <code>QueueOrderViolation</code>.</dd>
+<dt>Events</dt><dd><code>RedeemFilled</code> per fill; <code>RedeemsFulfilled</code> per batch (with <code>idle_free_capital</code>).</dd></dl></div>
+<p>The admin may also sign <code>cancel_deposit</code> for a pending deposit, for example when a wallet leaves the allowlist with a deposit pending, and <code>cancel_redeem</code> for a head that cannot fill. The admin's cancel <strong>parks</strong> the request (ADR 0030): nothing moves, the queue moves past it, and only the owner collects the escrow. See <a href="#ix-cancel_deposit"><code>cancel_deposit</code></a> and <a href="#ix-cancel_redeem"><code>cancel_redeem</code></a> under the capital provider.</p>
+
+<div class="ix" id="ix-approve_claim"><h4><code>approve_claim(notice_ref_hash, amount, expected_revision)</code><a class="anchor" href="#ix-approve_claim">#</a></h4><dl>
+<dt>Signer</dt><dd>Admin (the Squads vault, through the admin time lock). The operator, the pauser and the guardians cannot approve. Never paused, never coverage-gated, no mode check; it works with the operator revoked.</dd>
+<dt>Rules</dt><dd>(1) The filing is <code>FILED</code> (<code>ClaimNotFiled</code>); a paid or settled filing takes no approval. (2) <code>amount &gt; 0</code> (<code>InvalidParameter</code>). (3) <code>amount == filing.provision</code> (<code>ExpectedAmountMismatch</code>). (4) <code>expected_revision == filing.revision</code> (<code>ClaimRevisionMismatch</code>), so a proposal composed against an earlier version of the filing is refused when it executes. (5) No cap is read. The admin approves the amount that may leave the reserve, not the claim's validity.</dd>
+<dt>Effects</dt><dd>Sets <code>approved_amount = amount</code> on the filing; re-approving the same amount is idempotent. It moves no funds. Above <code>max_claim_per_call</code>, <code>pay_claim</code> then pays the filing when <code>approved_amount</code> equals the provision. Approved payments count toward the sliding 31-day cap. If the payment would not fit, the same proposal bundles a <code>set_config</code> raise of <code>max_claim_per_period</code>, and a later <code>set_config</code> lowers it back. The planned <code>amend_claim</code> and <code>refile_claim</code> will reset the approval to 0.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>UnsupportedVersion</code>, <code>ClaimNotFiled</code>, <code>InvalidParameter</code>, <code>ExpectedAmountMismatch</code>, <code>ClaimRevisionMismatch</code>.</dd>
+<dt>Event</dt><dd><code>ClaimApproved { guarantee_id, leg, notice_ref_hash, amount, revision, previous_amount, max_claim_per_call }</code> (<code>previous_amount</code>: the approval it replaces, 0 = none).</dd></dl></div>
+
+<h3 id="ix-operator">5.3 Operator: guarantees and money in<a class="anchor" href="#ix-operator">#</a></h3>
+<div class="ix" id="ix-register_guarantee"><h4><code>register_guarantee(args)</code><a class="anchor" href="#ix-register_guarantee">#</a></h4><dl>
+<dt>Args</dt><dd><code>RegisterGuaranteeArgs { id, agency_id, refs_hash, default_cover, exit_cover }</code>.</dd>
+<dt>Accounts</dt><dd><code>config</code>, <code>state</code>, <code>guarantee</code> (init), the seeds-checked <code>reserve</code>, operator, payer.</dd>
+<dt>Rules</dt><dd>Not paused. Mode normal. Reserve not frozen (a frozen reserve counts as 0 BRS; <code>ReserveFrozen</code>). The reserve holds its required coverage before the registration (<code>UnderCovered</code>). <code>0 &lt; default_cover + exit_cover ≤ max_cover_per_guarantee</code>. <code>coverage_required</code> after the registration <code>≤ stable_assets</code> (<code>InsufficientFreeCapital</code>), computed checked.</dd>
+<dt>Effects</dt><dd>Creates the guarantee <code>ACTIVE</code>; adds its cover to <code>remaining_cover_total</code>; increments <code>active_guarantees</code>; recomputes <code>coverage_required</code>. <code>agency_id</code> is stored; there is no per-agency cap.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>Paused</code>, <code>UnderCovered</code>, <code>ReserveFrozen</code>, <code>InvalidParameter</code>, <code>GuaranteeCapExceeded</code>, <code>InsufficientFreeCapital</code>, <code>MathOverflow</code>; account in use on a duplicate <code>id</code>.</dd>
+<dt>Event</dt><dd><code>GuaranteeRegistered</code>.</dd></dl></div>
+
+<div class="ix" id="ix-close_guarantee"><h4><code>close_guarantee(id, reason)</code><a class="anchor" href="#ix-close_guarantee">#</a></h4><dl>
+<dt>Args</dt><dd><code>reason</code>: <code>CLOSE_RELEASED</code> (1, the fiança ended) or <code>CLOSE_VOID</code> (2, the lease never took effect, or the registration was an error).</dd>
+<dt>Rules</dt><dd><code>ACTIVE</code> and <code>open_claims == 0</code>. <code>VOID</code> also needs <code>default_paid + exit_paid == 0</code>.</dd>
+<dt>Effects</dt><dd>Removes the remaining cover from the totals; <code>status = CLOSED</code>, <code>closed_at = now</code>, <code>close_reason = reason</code>. Never coverage-gated: it releases liability; the cached <code>coverage_required</code> write saturates. Runs under pause. Reversible once the later <code>reinstate_guarantee</code> ships; until then a close is final.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>GuaranteeNotActive</code>, <code>OpenClaims</code>, <code>GuaranteeHasPayments</code>.</dd>
+<dt>Event</dt><dd><code>GuaranteeClosed</code>.</dd></dl></div>
+
+<div class="ix" id="ix-contribute_fees"><h4><code>contribute_fees(invoice_ref_hash, amount)</code><a class="anchor" href="#ix-contribute_fees">#</a></h4><dl>
+<dt>Signer</dt><dd>Operator, who also signs the BRS transfer from its own account.</dd>
+<dt>Rules</dt><dd><code>amount &gt; 0</code>. Source is the operator's own BRS account. Treasury matches the config. The fee receipt must not exist. Refused with <code>NoSharesOutstanding</code> while <code>shares_outstanding == 0</code>. Never paused, never coverage-gated.</dd>
+<dt>Effects</dt><dd><code>take = floor(amount × fee_take_bps / 10,000)</code> to the treasury; <code>net = amount − take</code> to <code>reserve</code>; <code>brs_balance += net</code>; counters; <code>inflow_nav</code> updated; <code>IncomeReceipt</code> with <code>kind = FEE</code>. Never mints shares.</dd>
+<dt>Backstop</dt><dd>Also MUTAV's interim recapitalisation path when the reserve is underwater (ADR 0029): a fresh <code>invoice_ref_hash</code> that mutav-app records as a backstop, no shares minted, counted as a verified inflow; the take applies, so MUTAV sends <code>needed / (1 − take)</code>, rounded up.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>InvalidMint</code>, <code>InvalidTokenProgram</code>, <code>InvalidTreasuryAccount</code>, <code>NoSharesOutstanding</code>; account in use on a duplicate invoice.</dd>
+<dt>Event</dt><dd><code>FeesContributed</code>.</dd></dl></div>
+
+<div class="ix" id="ix-sweep_income"><h4><code>sweep_income(income_ref_hash, period, amount)</code><a class="anchor" href="#ix-sweep_income">#</a></h4><dl>
+<dt>Signer</dt><dd>Operator. The vault authority signs the transfer.</dd>
+<dt>Rules</dt><dd><code>amount &gt; 0</code>; <code>period</code> a valid <code>YYYYMM</code>; the inbox is the vault authority's ATA for BRS; <code>amount ≤</code> inbox balance; inbox and reserve not frozen; receipt must not exist. No treasury account: no take on issuer income in v1. Refused with <code>NoSharesOutstanding</code> while no shares exist (the money waits in the inbox). Never paused, never coverage-gated.</dd>
+<dt>Effects</dt><dd>Moves the whole amount into <code>reserve</code>, checking post-CPI deltas. <code>IncomeReceipt</code> with <code>kind = ISSUER_STATEMENT</code>. Updates <code>income_total</code> and <code>inflow_nav</code>.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidParameter</code>, <code>NoSharesOutstanding</code>, <code>InvalidMint</code>, <code>InvalidTokenProgram</code>, <code>InvalidIncomeSource</code>, <code>IncomeExceedsInbox</code>, <code>ReserveFrozen</code>, <code>PostCpiCheckFailed</code>.</dd>
+<dt>Event</dt><dd><code>IncomeSwept</code>.</dd></dl></div>
+
+<h3 id="ix-claims">5.4 Operator: claims<a class="anchor" href="#ix-claims">#</a></h3>
+<div class="ix" id="ix-file_claim"><h4><code>file_claim(leg, amount, notice_ref_hash)</code><a class="anchor" href="#ix-file_claim">#</a></h4><dl>
+<dt>Signer</dt><dd>Operator, after MUTAV approved the payment request in its platform.</dd>
+<dt>Rules</dt><dd><code>leg</code> is <code>LEG_DEFAULT</code> (1) or <code>LEG_EXIT</code> (2). Guarantee <code>ACTIVE</code>. <code>0 &lt; amount ≤ leg_cover − leg_paid − leg_provision</code>. No cap on the filed amount. Never paused, never coverage-gated.</dd>
+<dt>Effects</dt><dd><code>ClaimFiling { FILED, provision: amount }</code>. The leg's provision, <code>open_claims</code> and <code>state.provisions</code> rise. NAV reflects the claim at once. The cached <code>coverage_required</code> write saturates.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>GuaranteeNotActive</code>, <code>InvalidParameter</code>, <code>ExceedsRemainingCover</code>; account in use on a duplicate notice.</dd>
+<dt>Event</dt><dd><code>ClaimFiled</code>.</dd></dl></div>
+
+<div class="ix" id="ix-pay_claim"><h4><code>pay_claim(notice_ref_hash, expected_amount)</code><a class="anchor" href="#ix-pay_claim">#</a></h4><dl>
+<dt>Rules</dt><dd>(1) Filing <code>FILED</code> (<code>ClaimNotFiled</code>). (2) <code>expected_amount == filing.provision</code> (<code>ExpectedAmountMismatch</code>): the payment is exactly the provision. (3) The other open filings of the leg still fit in the cover left (<code>ExceedsRemainingCover</code>). (4) If the provision exceeds <code>max_claim_per_call</code>, <code>approved_amount == provision</code> (<code>ClaimCallCapExceeded</code>); only the admin's <code>approve_claim</code> writes it. (5) Payments of the last 31 UTC days plus this one <code>≤ max_claim_per_period</code> (<code>ClaimPeriodCapExceeded</code>). (6) Destination is <code>payments_account</code>. (7) <code>brs_balance ≥ provision</code> (<code>InsufficientLiquidBalance</code>) and reserve not frozen. <strong>No coverage, mode, pause or NAV-guard check.</strong></dd>
+<dt>Effects</dt><dd>Transfers BRS from <code>reserve</code> to the payments account. Leg paid rises; the leg's provision falls. Filing <code>PAID</code> with <code>payments_account</code>, <code>paid_at</code>, <code>paid_amount</code>; <code>open_claims −= 1</code>. <code>remaining_cover_total</code>, <code>provisions</code> and <code>brs_balance</code> fall. Today's bucket and the lifetime counters rise. The stress term and the cached <code>coverage_required</code> write saturate and never fail.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>ClaimNotFiled</code>, <code>ExpectedAmountMismatch</code>, <code>InvalidParameter</code>, <code>ExceedsRemainingCover</code>, <code>ClaimCallCapExceeded</code>, <code>ClaimPeriodCapExceeded</code>, <code>InvalidPaymentsAccount</code>, <code>InsufficientLiquidBalance</code>, <code>ReserveFrozen</code>.</dd>
+<dt>Event</dt><dd><code>ClaimPaid</code>.</dd></dl></div>
+
+<div class="ix" id="ix-settle_payout"><h4><code>settle_payout(notice_ref_hash, pix_e2e_hash)</code><a class="anchor" href="#ix-settle_payout">#</a></h4><dl>
+<dt>Signer</dt><dd>Operator, after MUTAV paid the agency by Pix.</dd>
+<dt>Rules</dt><dd>The filing is <code>PAID</code> (<code>PayoutAlreadySettled</code> if already <code>SETTLED</code>, else <code>ClaimNotPaid</code>). The hash is non-zero.</dd>
+<dt>Effects</dt><dd>Writes <code>pix_e2e_hash</code> and <code>settled_at</code> on the <code>ClaimFiling</code> and sets it <code>SETTLED</code>. A settlement record only: the program has no payout deadline; the service level lives in the operator platform.</dd>
+<dt>Event</dt><dd><code>PayoutSettled { guarantee_id, notice_ref_hash, pix_e2e_hash }</code>.</dd></dl></div>
+<p><strong>Bank-first payment.</strong> MUTAV may pay the agency by Pix from its own bank account first; the reserve then reimburses the payments account through <code>pay_claim</code>. A claim above <code>max_claim_per_call</code> may be paid this way while its approval waits on the admin time lock; it stays filed, and the reserve reimburses the payments account once the approval exists.</p>
+
+<h3 id="ix-capital">5.5 Capital provider (owner)<a class="anchor" href="#ix-capital">#</a></h3>
+<p>Entry is allowlisted. Exit is open to any wallet that already holds shares. MUTAV's capital wallet uses the same queues with no special treatment. During the pilot the reserve is not open to public investment.</p>
+<div class="ix" id="ix-request_deposit"><h4><code>request_deposit(assets, min_shares_out, eligibility)</code><a class="anchor" href="#ix-request_deposit">#</a></h4><dl>
+<dt>Rules</dt><dd>Not paused. <code>Eligibility::Merkle { proof }</code> against the allowlist root. <code>min_request ≤ assets ≤ max_request</code>. Source owned by the signer. <code>min_shares_out</code> is the owner's price limit (0 = none).</dd>
+<dt>Effects</dt><dd>Escrows BRS in <code>pending_deposits</code> at a new tail <code>seq</code>. Two requests sent at once race for the same seq; the client retries with the next.</dd>
+<dt>Errors</dt><dd><code>Paused</code>, <code>Unauthorized</code>, <code>NotAllowlisted</code>, <code>RequestTooSmall</code>, <code>RequestTooLarge</code>, <code>InvalidMint</code>, <code>InvalidTokenProgram</code>.</dd>
+<dt>Event</dt><dd><code>DepositRequested { owner, seq, assets, min_shares_out }</code>.</dd></dl></div>
+
+<div class="ix" id="ix-cancel_deposit"><h4><code>cancel_deposit()</code> · <code>claim_shares()</code><a class="anchor" href="#ix-cancel_deposit">#</a></h4><dl>
+<dt>Signer</dt><dd>Cancel: the owner or the admin. Claim: the owner. All run under pause.</dd>
+<dt>Rules</dt><dd>Admin's cancel: <code>PENDING</code>. Owner's cancel: <code>PENDING</code> or <code>CANCELLED</code>. Claim: <code>FULFILLED</code>. When the admin cancels, the owner is not a signer; the owner account is bound to the address stored in the request.</dd>
+<dt>Effects</dt><dd>The admin's cancel parks the request (<code>status = CANCELLED</code>, ADR 0030): no transfer, no account creation, no close; the BRS stays in <code>pending_deposits</code> and in <code>pending_deposits_total</code>, owed to the owner. Fills skip it, <code>advance_queue_head</code> moves past it and <code>claim_shares</code> refuses it; the owner cannot make the park fail. The owner's cancel refunds the BRS into the owner's associated token account, created idempotently with the owner as payer, and closes the request with its rent to the owner. Claim (<code>FULFILLED</code>) mints <code>shares_out</code> and closes the request.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidRequestStatus</code>.</dd>
+<dt>Events</dt><dd><code>DepositParked { owner, seq, assets, by }</code> (admin), <code>DepositCancelled { owner, seq, assets, by }</code> (owner), <code>SharesClaimed { owner, seq, shares }</code>.</dd></dl></div>
+
+<div class="ix" id="ix-request_redeem"><h4><code>request_redeem(shares, min_assets_out, eligibility)</code><a class="anchor" href="#ix-request_redeem">#</a></h4><dl>
+<dt>Signer</dt><dd>Owner, never a delegate.</dd>
+<dt>Rules</dt><dd>Not paused. <code>shares &gt; 0</code>. <strong>Holders skip the allowlist:</strong> <code>eligibility</code> is checked only when the debited share account is empty. <strong>Size rule</strong> (ADR 0029, on the value in BRS at the current NAV): 0 is refused; above <code>max_request</code> is refused; at or above <code>min_request</code> is a normal request. Below <code>min_request</code> only an exit of the balance is accepted: it debits the owner's canonical share associated token account, leaves a remainder worth less than <code>min_request</code>, and is worth at least <code>max(1, min_request / 10)</code> (R$100 at the R$1,000 minimum). A balance below that floor waits: it stays transferable and valued at NAV.</dd>
+<dt>Effects</dt><dd>Escrows shares in <code>pending_redemptions</code> at a new tail <code>seq</code>.</dd>
+<dt>Errors</dt><dd><code>Paused</code>, <code>Unauthorized</code>, <code>NotAllowlisted</code>, <code>InvalidParameter</code>, <code>RequestTooSmall</code>, <code>RequestTooLarge</code>, <code>InvalidMint</code>.</dd>
+<dt>Event</dt><dd><code>RedeemRequested { owner, seq, shares, min_assets_out }</code>.</dd></dl></div>
+
+<div class="ix" id="ix-cancel_redeem"><h4><code>cancel_redeem()</code> · <code>claim_assets()</code><a class="anchor" href="#ix-cancel_redeem">#</a></h4><dl>
+<dt>Signer</dt><dd>Cancel: the owner or the admin. Claim: the owner. All run under pause.</dd>
+<dt>Rules</dt><dd>Admin's cancel: <code>PENDING</code>. Owner's cancel: <code>PENDING</code> or <code>CANCELLED</code>. Claim: <code>FILLED</code>. When the admin cancels, the owner account is bound to the address stored in the request.</dd>
+<dt>Effects</dt><dd>The admin's cancel parks the request (<code>status = CANCELLED</code>, ADR 0030) to remove a head that cannot fill (worth 0 BRS, or a <code>min_assets_out</code> no fill can meet): nothing moves, and the shares stay in <code>pending_redemptions</code>, in <code>pending_redeem_shares</code> and in <code>shares_outstanding</code>, owed to the owner. Fills skip it, <code>advance_queue_head</code> moves past it and <code>claim_assets</code> refuses it. The owner's cancel returns the escrowed shares to the owner's share associated token account, created idempotently with the owner as payer, and closes the request with its rent to the owner. Claim (<code>FILLED</code>) pays <code>assets_out</code> from <code>claims</code> to the owner's BRS account and closes the request.</dd>
+<dt>Errors</dt><dd><code>Unauthorized</code>, <code>InvalidRequestStatus</code>.</dd>
+<dt>Events</dt><dd><code>RedeemParked { owner, seq, shares, by }</code> (admin), <code>RedeemCancelled { owner, seq, shares_returned, by }</code> (owner), <code>AssetsClaimed { owner, seq, assets }</code>.</dd></dl></div>
+
+<h3 id="ix-public">5.6 Anyone<a class="anchor" href="#ix-public">#</a></h3>
+<div class="ix" id="ix-refresh"><h4><code>refresh()</code><a class="anchor" href="#ix-refresh">#</a></h4><dl>
+<dt>Effects</dt><dd>(1) Detects frozen reserve token accounts, emits <code>ReserveFrozenDetected</code>, counts a frozen reserve as 0 BRS. (2) Recomputes stable assets, coverage required, surplus, free capital, net assets and the published NAV. (3) Runs the NAV-move guard net of <code>inflow_nav</code>; on a trip it latches <code>fulfil_halted</code> and emits <code>FulfilHaltRaised</code> (source <code>HALT_SOURCE_REFRESH</code>); this is how a move first refused inline by a fill is recorded. Resets <code>inflow_nav</code>. (4) Sets the mode; <code>ModeChanged</code> on a transition. Records <code>last_refresh_slot</code>, which <code>set_config</code> checks.</dd>
+<dt>Event</dt><dd><code>StateRefreshed</code>.</dd></dl></div>
+
+<div class="ix" id="ix-advance"><h4><code>advance_queue_head(queue, max)</code><a class="anchor" href="#ix-advance">#</a></h4><dl>
+<dt>Rules</dt><dd><code>queue</code> is <code>QUEUE_DEPOSIT</code> (1) or <code>QUEUE_REDEEM</code> (2). Skip proof per seq: the account is the PDA for that seq and is closed, or is a fulfilled deposit, a filled redemption or a request parked by the admin (<code>CANCELLED</code>). Moves no money. Never paused.</dd>
+<dt>Effects</dt><dd>Advances one queue head over dead seqs; stops at the first live one.</dd>
+<dt>Errors</dt><dd><code>InvalidParameter</code>, <code>QueueOrderViolation</code>, <code>UnsupportedVersion</code>.</dd>
+<dt>Event</dt><dd><code>QueueHeadsAdvanced { redeem_head, deposit_head }</code>.</dd></dl></div>
+
+<h3 id="ix-later">5.7 Planned for later upgrades<a class="anchor" href="#ix-later">#</a></h3>
+<p>Not in this binary. Their design is decided and the layout already holds their fields.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Instruction</th><th>Signer</th><th>Planned design</th></tr></thead>
+<tbody>
+<tr><td><code>amend_claim(notice_ref_hash, new_amount)</code></td><td>Operator</td><td><code>FILED</code> only. Lower releases the difference; higher books more within the leg's unprovisioned cover; 0 sets <code>WITHDRAWN</code> and releases the whole provision. Any amendment resets <code>approved_amount</code>.</td></tr>
+<tr><td><code>refile_claim(leg, amount, notice_ref_hash)</code></td><td>Operator</td><td><code>WITHDRAWN</code> only. Returns the filing to <code>FILED</code> with a fresh provision; an old approval is never reused.</td></tr>
+<tr><td><code>reinstate_guarantee(id)</code></td><td>Operator</td><td><code>CLOSED</code> and <code>now − closed_at ≤ max_reinstate_age</code> (30 days planned). No coverage gate, no cap check; runs under pause. Restores the remaining cover.</td></tr>
+<tr><td><code>skim(account)</code></td><td>Anyone</td><td>Moves <code>balance − tracked total</code> of <code>reserve</code>, <code>pending_deposits</code> or <code>claims</code> into <code>unsolicited</code>. Books nothing.</td></tr>
+<tr><td><code>classify_unsolicited(amount)</code></td><td>Admin</td><td>Moves BRS that is on no issuer statement from the income inbox into <code>unsolicited</code>.</td></tr>
+<tr><td><code>book_unsolicited(amount, ref_hash, kind)</code></td><td>Admin</td><td>Moves BRS from <code>unsolicited</code> into <code>reserve</code> as an inflow, kind <code>UNSOLICITED</code> or <code>BACKSTOP</code>. No shares minted; refused while no shares exist. Replaces the interim <code>contribute_fees</code> backstop.</td></tr>
+<tr><td><code>return_unsolicited(source, amount, destination, ref_hash)</code></td><td>Admin</td><td>Only to the source of the original transfer (its signature committed in <code>ref_hash</code>). Sources: <code>Unsolicited</code>, <code>PendingRedemptionsSurplus</code>, <code>Foreign</code> (classic SPL mints only, never BRS, the share mint or an adapter mint), <code>Lamports</code> (above rent-exempt). Never from the income inbox or <code>reserve</code>.</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================================================ 6 -->
+<section id="economics" class="level2">
+<h2><span class="num">6</span>Economics &amp; math<a class="anchor" href="#economics" aria-label="Link to this section">#</a></h2>
+<p>All amounts are BRS base units; BRS is valued at par with BRL. Products use <code>u128</code> and narrow back to <code>u64</code>, failing with <code>MathOverflow</code> instead of truncating. The core primitive is <code>mul_div(a, b, d, rounding)</code>. Rounding is always in the reserve's favour: down for what it pays or mints, up for what it requires or is owed. Inputs are tracked balances only. The code lives in <code>programs/mutav/src/math.rs</code> and <code>coverage.rs</code>, mirrored in the client's <code>math.ts</code>.</p>
+
+<h3 id="m-coverage">6.1 Coverage quantities<a class="anchor" href="#m-coverage">#</a></h3>
+<pre class="formula"><code>stable_assets         = brs_balance + adapter_value        // tracked only; frozen reserve = 0; adapter_value = 0 in v1
+                                                           // computed at every gate, never cached
+remaining_cover(g)    = (default_cover − default_paid) + (exit_cover − exit_paid)
+remaining_cover_total = Σ remaining_cover(g) over guarantees not CLOSED
+unprovisioned_cover   = max(0, remaining_cover_total − provisions)
+
+coverage_required     = max( ceil(coverage_ratio_bps × remaining_cover_total / 10,000),
+                             provisions + min(stress_buffer, unprovisioned_cover) )
+
+surplus               = max(0, stable_assets − coverage_required)
+free_capital          = surplus
+liquid_budget         = max(0, brs_balance − provisions)
+net_assets            = max(0, stable_assets − provisions)
+mode                  = UNDER_COVERED if stable_assets &lt; coverage_required, else NORMAL
+underwater            = shares_outstanding &gt; 0 and net_assets × 10^9 &lt; shares_outstanding</code></pre>
+<ul>
+<li><code>coverage_required ≥ provisions</code> always: filed claims are held in full. A provision lowers NAV (through <code>net_assets</code>), never <code>stable_assets</code>.</li>
+<li>One helper (<code>coverage::coverage_required</code>) computes it for every gate and every cached recompute. The stress term saturates. On the claim path (<code>file_claim</code>, <code>pay_claim</code>, <code>close_guarantee</code>) the cached write saturates too (<code>u64::MAX</code> on overflow), so those instructions never fail on it; <code>register_guarantee</code> and <code>set_config</code> compute it checked and fail closed.</li>
+<li><code>stress_buffer ≤ max_tvl</code>; 0 turns the stress term off. <code>set_config</code> recomputes the cache after any change.</li>
+</ul>
+<p><strong>Stress buffer.</strong> Claims arrive per event: one month's rent per default claim, one exit payment at the end of the occupation. The stress buffer is the R$ amount of the claims that could be filed next, not every full cover. The admin sizes it from the portfolio (for example the three largest rents plus one exit payment). Devnet and pilot: R$19,000, set and locked. It gates new guarantees and redemption fills; it never gates a claim payment.</p>
+
+<p><strong>Illustrative example</strong> (not devnet data), with <em>c</em> = 0.25 and <code>stress_buffer</code> = R$19,000:</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Quantity</th><th>Computation</th><th class="num">Value</th></tr></thead>
+<tbody>
+<tr><td>Inputs</td><td><code>remaining_cover_total</code> R$200,000 · <code>provisions</code> R$5,000 · <code>brs_balance</code> = <code>stable_assets</code> R$100,000</td><td class="num"></td></tr>
+<tr><td>Ratio term</td><td>0.25 × 200,000</td><td class="num">R$50,000</td></tr>
+<tr><td>Stress term</td><td>5,000 + min(19,000, 195,000)</td><td class="num">R$24,000</td></tr>
+<tr><td><code>coverage_required</code></td><td>max(50,000, 24,000)</td><td class="num">R$50,000</td></tr>
+<tr><td><code>free_capital</code></td><td>100,000 − 50,000</td><td class="num">R$50,000</td></tr>
+<tr><td><code>liquid_budget</code> = <code>net_assets</code></td><td>100,000 − 5,000</td><td class="num">R$95,000</td></tr>
+</tbody></table></div>
+<p>A new guarantee of R$39,600 cover would raise the ratio term to R$59,900. It fits, because R$59,900 ≤ R$100,000.</p>
+
+<h3 id="m-gate">6.2 The coverage gate<a class="anchor" href="#m-gate">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Instruction</th><th>Gate</th></tr></thead>
+<tbody>
+<tr><td><code>register_guarantee</code></td><td>Mode normal, <code>stable_assets ≥ coverage_required</code> before, and <code>coverage_required</code> with the new cover <code>≤ stable_assets</code>. A frozen reserve counts as 0 BRS.</td></tr>
+<tr><td><code>fulfil_redeems</code></td><td>Mode normal, <code>stable_assets ≥ coverage_required</code> at batch start, not underwater, and each fill <code>≤ min(max_assets − paid, free_capital, liquid_budget)</code>, recomputed before every fill.</td></tr>
+<tr><td>Every other instruction</td><td>Not gated: <code>file_claim</code>, <code>pay_claim</code>, <code>settle_payout</code>, <code>approve_claim</code>, <code>contribute_fees</code>, <code>sweep_income</code>, <code>close_guarantee</code>, cancels and claims, the cranks. The later claim instructions and <code>reinstate_guarantee</code> are not gated either.</td></tr>
+</tbody></table></div>
+<p><code>fulfil_deposits</code> is not coverage-gated, because it brings capital in. It is refused while the reserve is underwater (<code>ReserveUnderwater</code>), so new money never buys the holders' losses at a near-zero price, and by <code>stable_assets + Σ assets ≤ max_tvl</code>.</p>
+
+<h3 id="m-shares">6.3 NAV and share pricing<a class="anchor" href="#m-shares">#</a></h3>
+<pre class="formula"><code>V                  = 1                                                   // virtual offset 10^0
+shares_for(assets) = floor(assets × (shares_outstanding + V) / (net_assets + 1))
+assets_for(shares) = floor(shares × (net_assets + 1) / (shares_outstanding + V))
+conversion_nav     = floor((net_assets + 1) × 10^9 / (shares_outstanding + V))
+published_nav      = 0                                                   if shares_outstanding = 0
+                   = max(1, floor(net_assets × 10^9 / shares_outstanding))   otherwise</code></pre>
+<ul>
+<li>With <code>V = 1</code> and a 6-decimal share mint, one share is worth 1 BRS at launch.</li>
+<li><code>net_assets</code> excludes pending deposits and claimable assets. Escrowed redeem shares stay in <code>shares_outstanding</code> until a fill burns them. <code>shares_outstanding</code> = minted supply + shares owed on filled, unclaimed deposits.</li>
+<li>Every fill is priced at the NAV of that fill and rounds in the reserve's favour, so a fill never lowers NAV per share.</li>
+<li>A deposit that would mint 0 shares, a redemption head worth 0 BRS, or a head whose price limit is not met stops the batch (<code>RequestTooSmall</code>, <code>PriceLimitNotMet</code>).</li>
+<li><strong>Inflows wait for the first shares.</strong> <code>contribute_fees</code> and <code>sweep_income</code> are refused with <code>NoSharesOutstanding</code> while <code>shares_outstanding == 0</code>, so no inflow can be lost to share rounding.</li>
+<li><strong>Underwater.</strong> NAV per share below the smallest published unit while shares are outstanding. An empty reserve is not underwater. Both fills refuse with <code>ReserveUnderwater</code>; cancels stay open; recovery is a MUTAV backstop (see §5.3).</li>
+</ul>
+
+<h3 id="m-fees">6.4 Fee take and income intake<a class="anchor" href="#m-fees">#</a></h3>
+<pre class="formula"><code>guarantee fee:  take = floor(amount × fee_take_bps / 10,000)      → treasury_account
+                net  = amount − take                              → reserve   (NAV rises, no shares)
+issuer income:  amount                                            → reserve   (receipt kind ISSUER_STATEMENT)</code></pre>
+<p>Devnet and pilot <code>fee_take_bps = 2,000</code> (20%); the program maximum is 3,000. There is no take on issuer income in v1. Issuer income is the issuer's partnership revenue, paid into the income inbox at an off-chain contractual rate; BRS itself bears no yield. Income is never a guarantee fee and never enters <code>fees_in_total</code>.</p>
+
+<h3 id="m-guard">6.5 NAV-move guard and fill bounds<a class="anchor" href="#m-guard">#</a></h3>
+<pre class="formula"><code>at each inflow (contribute_fees, sweep_income):
+    inflow_nav += ceil(net × 10^9 / shares_outstanding)              // saturating
+guard_nav   = max(1, published_nav − inflow_nav)                     // 0 if no shares
+halt if       |guard_nav − baseline| × 10,000 &gt; max_nav_move_bps × baseline
+              (only when baseline &gt; 0 and guard_nav &gt; 0)</code></pre>
+<ul>
+<li>Measured per share, so fills in the same window do not distort it.</li>
+<li>Evaluated in <code>refresh</code> and inline once at the start of both fills. The inline check refuses with <code>FulfilHalted</code> but does not latch: a failed instruction cannot write state. The next <code>refresh</code> (anyone) latches <code>fulfil_halted</code>.</li>
+<li>The halt is sticky. Only <code>clear_fulfil_halt</code> clears it, resetting the baseline to the current published NAV and <code>inflow_nav</code> to 0.</li>
+<li>The baseline is seeded by the <code>fulfil_deposits</code> batch that mints the first shares, and cleared to 0 by the <code>fulfil_redeems</code> batch that burns the last ones, so a new first deposit is never compared with a NAV that belonged to old holders.</li>
+<li>Fills and <code>clear_fulfil_halt</code> take <code>nav_bounds { min, max }</code>, composed when the proposal is created. A fill whose <code>conversion_nav</code> is outside the range is refused with <code>NavOutOfBounds</code>.</li>
+</ul>
+
+<h3 id="m-claims">6.6 Claim bounds and the 31-day window<a class="anchor" href="#m-claims">#</a></h3>
+<pre class="formula"><code>unprovisioned(leg) = leg_cover − leg_paid − leg_provision
+
+file_claim:   0 &lt; amount ≤ unprovisioned(leg)
+pay_claim:    expected_amount == filing.provision
+              provision ≤ (leg_cover − leg_paid) − (leg_provision − provision)
+              provision ≤ max_claim_per_call  or  approved_amount == provision
+              Σ last 31 daily buckets + provision ≤ max_claim_per_period
+              provision ≤ brs_balance, reserve not frozen
+
+window:       day    = max(floor(now / 86,400), claim_day_anchor)
+              clear every bucket more than 30 days before day
+              window = Σ claim_day_buckets over the last 31 days, today included
+              require  window + amount ≤ max_claim_per_period
+              then     claim_day_buckets[day mod 31] += amount</code></pre>
+<p>The rule is exact: no weighting or estimate. Because every 30-day span lies inside some 31-day window of whole days, no 30-day span pays out more than the cap, approved payments included. A property test checks the rule across bucket reuse and a cap change mid-window. Devnet and pilot: R$15,000 per call, R$20,000 per 31-day window.</p>
+
+<h3 id="m-caps">6.7 Caps<a class="anchor" href="#m-caps">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Cap</th><th>Enforced in</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td><code>max_tvl</code></td><td><code>fulfil_deposits</code></td><td><code>stable_assets + Σ assets ≤ max_tvl</code></td></tr>
+<tr><td><code>max_cover_per_guarantee</code></td><td><code>register_guarantee</code></td><td><code>default_cover + exit_cover ≤ cap</code></td></tr>
+<tr><td><code>max_claim_per_call</code></td><td><code>pay_claim</code></td><td><code>&gt; 0</code>. Exceeded only with an exact <code>approved_amount</code>, written by the admin's <code>approve_claim</code></td></tr>
+<tr><td><code>max_claim_per_period</code></td><td><code>pay_claim</code></td><td>Sliding 31-day window, strict, approved payments included; <code>≥ max_claim_per_call</code></td></tr>
+<tr><td><code>min_request</code>, <code>max_request</code></td><td>both requests</td><td>The redemption size rule of §5.5; a value of 0 is always refused</td></tr>
+<tr><td><code>stress_buffer</code></td><td>through <code>coverage_required</code></td><td><code>≤ max_tvl</code></td></tr>
+<tr><td><code>max_nav_move_bps</code></td><td><code>refresh</code>, both fills</td><td>The NAV-move guard</td></tr>
+</tbody></table></div>
+<p>There is no per-agency cap. The settlement floor is 100% in v1 because the reserve holds BRS only.</p>
+</section>
+
+<!-- ============================================================ 7 -->
+<section id="lifecycles" class="level2">
+<h2><span class="num">7</span>Lifecycles<a class="anchor" href="#lifecycles" aria-label="Link to this section">#</a></h2>
+
+<h3 id="lc-guarantee">7.1 Guarantee and claim<a class="anchor" href="#lc-guarantee">#</a></h3>
+<figure class="fig">
+<div class="diagram">
+<svg viewBox="0 0 760 220" role="img" aria-labelledby="fig2t fig2d">
+<title id="fig2t">Guarantee and claim states</title>
+<desc id="fig2d">A guarantee is registered ACTIVE and closes as VOID or RELEASED; reinstatement is a later upgrade. A claim is FILED, then PAID, then SETTLED with the Pix hash. WITHDRAWN is reserved for a later upgrade.</desc>
+<defs><marker id="b-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" class="mk-ink"/></marker></defs>
+<text x="16" y="22" class="d-zone">GUARANTEE</text>
+<rect x="16" y="36" width="130" height="40" rx="8" class="d-core"/><text x="44" y="61" class="d-t">ACTIVE</text>
+<rect x="330" y="36" width="130" height="40" rx="8" class="d-box"/><text x="358" y="61" class="d-t">CLOSED</text>
+<path d="M146,48 L328,48" class="s-ink" marker-end="url(#b-ink)"/><text x="160" y="42" class="d-m">close_guarantee(RELEASED | VOID)</text>
+<path d="M330,66 L148,66" class="s-ink dash" marker-end="url(#b-ink)"/><text x="160" y="86" class="d-m">later: reinstate_guarantee</text>
+<text x="490" y="52" class="d-s">VOID: nothing paid, no open claim</text>
+<text x="490" y="68" class="d-s">RELEASED: no open claim</text>
+<text x="16" y="124" class="d-zone">CLAIM FILING</text>
+<rect x="16" y="138" width="110" height="40" rx="8" class="d-core"/><text x="42" y="163" class="d-t">FILED</text>
+<rect x="250" y="138" width="110" height="40" rx="8" class="d-out"/><text x="282" y="163" class="d-t">PAID</text>
+<rect x="500" y="138" width="120" height="40" rx="8" class="d-okb"/><text x="522" y="163" class="d-t">SETTLED</text>
+<rect x="250" y="186" width="130" height="28" rx="8" class="d-box"/><text x="262" y="205" class="d-t">WITHDRAWN</text>
+<path d="M126,152 L248,152" class="s-ink" marker-end="url(#b-ink)"/><text x="132" y="146" class="d-m">pay_claim (exact)</text>
+<path d="M360,158 L498,158" class="s-ink" marker-end="url(#b-ink)"/><text x="370" y="150" class="d-m">settle_payout(pix hash)</text>
+<path d="M126,170 C180,196 200,200 248,200" class="s-ink dash" marker-end="url(#b-ink)"/><text x="400" y="205" class="d-s">reserved: later amend_claim(0) / refile_claim</text>
+</svg>
+</div>
+<figcaption>Figure 2. States in the devnet binary. Dashed transitions are later upgrades. The fuller fiança lifecycle (exoneration, lease end, exhaustion, claims tail) is planned work.</figcaption>
+</figure>
+<ul>
+<li><strong>Register</strong> (operator): coverage-gated, capped per guarantee. Cover counts in <code>remaining_cover_total</code> at once.</li>
+<li><strong>Close</strong> (operator): <code>RELEASED</code> or <code>VOID</code>; requires no open claim. Releases remaining cover. The account is never closed, so the public claims history stays readable.</li>
+<li><strong>File</strong>: the operator books the provision; NAV drops at once.</li>
+<li><strong>Pay</strong>: exactly the provision, to the payments account. Never refused for coverage, mode, pause or the NAV guard. Above <code>max_claim_per_call</code> it needs the admin's <code>approve_claim</code> of the exact provision; while the approval waits on the time lock, MUTAV may pay bank-first.</li>
+<li><strong>Settle</strong>: the operator records the Pix end-to-end hash after MUTAV pays the agency.</li>
+</ul>
+
+<h3 id="lc-queues">7.2 Deposit and redemption queues<a class="anchor" href="#lc-queues">#</a></h3>
+<ul>
+<li>Each request is its own PDA at a monotonically increasing <code>seq</code>. Seqs are never reused. Two requests sent at once may race on the seq; the client retries.</li>
+<li>The admin fills in strict FIFO order at the NAV of the fill, inside its <code>nav_bounds</code>. Up to 8 per call.</li>
+<li><strong>Whole fills only in v1.</strong> A head larger than the budget waits until free capital grows. The consoles show what a stuck head needs against what is available.</li>
+<li>Owners cancel or claim at any time, also under pause. The admin can park a pending request that blocks the queue (ADR 0030); the escrow stays owed to the owner, and only the owner collects it with its own cancel. There is no expiry and no sweep. <code>advance_queue_head</code> clears dead and parked seqs.</li>
+<li>Entry is allowlisted. Exit is open to any holder, with the sub-minimum exit rule of §5.5.</li>
+<li>MUTAV's capital wallet uses the same queues with no special treatment. During the pilot the reserve is not open to public investment.</li>
+</ul>
+
+<h3 id="lc-flags">7.3 Reserve-level flags<a class="anchor" href="#lc-flags">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Flag</th><th>Set by</th><th>Cleared by</th><th>Stops</th></tr></thead>
+<tbody>
+<tr><td><code>mode = UNDER_COVERED</code></td><td><code>refresh</code>, when stable assets are below <code>coverage_required</code></td><td><code>refresh</code>, once capital comes in or cover runs off</td><td>New guarantees and redemption fills. Never claim payments. Public label: "reserve below target; MUTAV backstop active"</td></tr>
+<tr><td><code>fulfil_halted</code></td><td><code>refresh</code>, on a NAV move beyond the bound net of verified inflows</td><td><code>clear_fulfil_halt(nav_bounds)</code> (admin)</td><td>Deposit and redemption fills. Sticky</td></tr>
+<tr><td><code>paused</code></td><td><code>pause</code> (pauser, guardian, admin)</td><td><code>unpause</code> (admin)</td><td>Requests, fills and new guarantees only</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================================================ 8 -->
+<section id="invariants" class="level2">
+<h2><span class="num">8</span>Invariants<a class="anchor" href="#invariants" aria-label="Link to this section">#</a></h2>
+<p>The rules the program keeps after every instruction. Numbers match <code>docs/security/invariants.md</code>. <em>Later</em> rows describe instructions not in the devnet binary.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th class="num">#</th><th>Invariant</th></tr></thead>
+<tbody>
+<tr class="grp"><td colspan="2">A. Accounting</td></tr>
+<tr><td class="num">1</td><td><code>stable_assets</code> uses only tracked balances; it never reads raw token balances.</td></tr>
+<tr><td class="num">2</td><td>Token balances are at least the tracked totals: <code>reserve ≥ brs_balance</code>, <code>pending_deposits ≥ pending_deposits_total</code>, <code>claims ≥ claimable_assets_total</code>, <code>pending_redemptions ≥ pending_redeem_shares</code>.</td></tr>
+<tr><td class="num">3</td><td>With no outside transfers into <code>reserve</code>, <code>reserve.amount == brs_balance</code> after any sequence.</td></tr>
+<tr><td class="num">4</td><td>Share supply plus shares owed on filled, unclaimed deposits equals <code>shares_outstanding</code>.</td></tr>
+<tr><td class="num">5</td><td>Open redeem shares sum to <code>pending_redeem_shares</code>; assets owed on filled, unclaimed redemptions sum to <code>claimable_assets_total</code>.</td></tr>
+<tr><td class="num">6</td><td>A frozen reserve token account counts as 0 BRS in every coverage computation that reads it.</td></tr>
+<tr class="grp"><td colspan="2">B. Guarantees and cover</td></tr>
+<tr><td class="num">7</td><td>On each leg: <code>leg_paid ≤ leg_cover</code> and <code>leg_provision ≤ leg_cover − leg_paid</code>, with any number of open filings.</td></tr>
+<tr><td class="num">8</td><td><code>remaining_cover_total</code> = Σ remaining cover of non-closed guarantees; <code>provisions</code> = Σ provision of <code>FILED</code> filings.</td></tr>
+<tr><td class="num">9</td><td><code>default_cover</code> and <code>exit_cover</code> never change after registration.</td></tr>
+<tr><td class="num">10</td><td>A guarantee closes only when active with no open claim; a <code>VOID</code> close also needs nothing paid.</td></tr>
+<tr><td class="num">11</td><td><em>Later:</em> <code>reinstate_guarantee</code> reverses a close within <code>max_reinstate_age</code>.</td></tr>
+<tr class="grp"><td colspan="2">C. Coverage</td></tr>
+<tr><td class="num">12</td><td><code>coverage_required ≥ provisions</code>, and <code>1,000 ≤ coverage_ratio_bps ≤ 10,000</code>.</td></tr>
+<tr><td class="num">13</td><td>A provision lowers NAV only, never <code>stable_assets</code>.</td></tr>
+<tr><td class="num">14</td><td>Gated actions (<code>register_guarantee</code>, each redemption fill) fit within the free capital computed before them, and need mode normal.</td></tr>
+<tr><td class="num">15</td><td>The coverage gate never refuses <code>pay_claim</code>; pause, mode and the NAV guard do not apply to it either. Only the filing checks, the caps, liquid BRS or a frozen reserve can stop it.</td></tr>
+<tr><td class="num">16</td><td>The claim path (<code>file_claim</code>, <code>pay_claim</code>, <code>close_guarantee</code>) cannot fail on the cached <code>coverage_required</code> write; <code>register_guarantee</code> and <code>set_config</code> fail closed.</td></tr>
+<tr class="grp"><td colspan="2">D. Claims</td></tr>
+<tr><td class="num">17</td><td><code>pay_claim</code> pays exactly the provision, only to <code>payments_account</code>, at most once per filing.</td></tr>
+<tr><td class="num">18</td><td>A payment above <code>max_claim_per_call</code> needs <code>approved_amount == provision</code>. In the devnet binary every such payment is refused and MUTAV pays bank-first.</td></tr>
+<tr><td class="num">19</td><td><em>Later:</em> every <code>amend_claim</code> resets any approval; <code>refile_claim</code> accepts only <code>WITHDRAWN</code> and never reuses an approval.</td></tr>
+<tr><td class="num">20</td><td>Payments of the last 31 UTC days plus the payment being made stay within <code>max_claim_per_period</code>, so no 30-day span pays out more than the cap.</td></tr>
+<tr><td class="num">21</td><td>The most a compromised operator key can cost is the claim caps (R$15k per call, R$20k per 31 days).</td></tr>
+<tr class="grp"><td colspan="2">E. Capital and NAV</td></tr>
+<tr><td class="num">22</td><td>Every fill is priced at the NAV of that fill and rounds in the reserve's favour, so it never lowers NAV per share.</td></tr>
+<tr><td class="num">23</td><td>Every deposit fill mints more than 0 shares.</td></tr>
+<tr><td class="num">24</td><td>No inflow raises NAV while <code>shares_outstanding == 0</code> (<code>NoSharesOutstanding</code>).</td></tr>
+<tr><td class="num">25</td><td>No deposit or redemption fill while the reserve is underwater (<code>ReserveUnderwater</code>).</td></tr>
+<tr><td class="num">26</td><td>Every fill passes the inline NAV-move guard and falls inside the admin's <code>nav_bounds</code>. The inline refusal does not latch; <code>refresh</code> latches. The first-share batch seeds the baseline; the last-share batch clears it.</td></tr>
+<tr><td class="num">27</td><td>Strict FIFO; whole fills; a redeem head worth 0 BRS is never filled; the owner cancels it, or the admin parks it.</td></tr>
+<tr><td class="num">28</td><td>Entry is allowlisted; exit is open to holders. Below <code>min_request</code> only an exit of the balance from the canonical share account, leaving a remainder worth less than <code>min_request</code>, worth at least <code>max(1, min_request / 10)</code>.</td></tr>
+<tr><td class="num">29</td><td>NAV rises from guarantee fees only through <code>contribute_fees</code> and from issuer income only through <code>sweep_income</code> (later also <code>book_unsolicited</code>), each by exactly its net amount, with no shares minted.</td></tr>
+<tr><td class="num">30</td><td><code>inflow_nav</code> = Σ <code>ceil(net × 10^9 / shares_outstanding)</code> over inflows since the last refresh or halt clear, saturating.</td></tr>
+<tr class="grp"><td colspan="2">F. Money paths</td></tr>
+<tr><td class="num">31</td><td>BRS leaves the reserve's token accounts only to: the payments account (claims), the treasury (fee take), the claims escrow and on to its owner, or the owner of a cancelled pending deposit. <em>Later:</em> a return from <code>unsolicited</code> only to the original sender.</td></tr>
+<tr><td class="num">32</td><td>The income inbox's only exit is <code>reserve</code> (<code>sweep_income</code>). Issuer income is never returned.</td></tr>
+<tr><td class="num">33</td><td>The treasury and payments accounts are distinct BRS accounts, owned by none of the vault authority, the operator or the capital wallet.</td></tr>
+<tr class="grp"><td colspan="2">G. Roles, pause and layout</td></tr>
+<tr><td class="num">34</td><td>Roles are distinct, non-default keys; they change only on the new key's acceptance, within 72 hours. Revocation is immediate. Guardians never repeat a key or hold a role key.</td></tr>
+<tr><td class="num">35</td><td>Pause stops only capital flows and new guarantees.</td></tr>
+<tr><td class="num">36</td><td><code>_reserved</code> bytes are never read or written by logic and survive every instruction. A version above 1 or an unknown status is refused.</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================================================ 9 -->
+<section id="incident" class="level2">
+<h2><span class="num">9</span>Pause, guardians &amp; incident recovery<a class="anchor" href="#incident" aria-label="Link to this section">#</a></h2>
+<h3 id="pause-scope">9.1 Pause scope<a class="anchor" href="#pause-scope">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Stopped by pause</th><th>Always open</th></tr></thead>
+<tbody><tr>
+<td><code>request_deposit</code>, <code>request_redeem</code>, <code>fulfil_deposits</code>, <code>fulfil_redeems</code>, <code>register_guarantee</code>.</td>
+<td>Every claim instruction (<code>file_claim</code>, <code>pay_claim</code>, <code>settle_payout</code>, <code>approve_claim</code>), <code>close_guarantee</code>, <code>contribute_fees</code>, <code>sweep_income</code>, <code>cancel_deposit</code>, <code>cancel_redeem</code>, <code>claim_shares</code>, <code>claim_assets</code>, <code>refresh</code>, <code>advance_queue_head</code>, admin configuration and role instructions, <code>revoke_operator</code>, <code>revoke_pauser</code>, <code>clear_fulfil_halt</code>.</td>
+</tr></tbody></table></div>
+<p>Pause never traps holders' money and never blocks a claim. The pauser and guardians pause with no time lock; the admin through its time lock. Only the admin unpauses.</p>
+
+<h3 id="frozen">9.2 Frozen reserve<a class="anchor" href="#frozen">#</a></h3>
+<p>The issuer can freeze any BRS account. <code>refresh</code> emits <code>ReserveFrozenDetected</code> and counts a frozen reserve as 0 BRS; <code>register_guarantee</code>, both fills and <code>clear_fulfil_halt</code> refuse with <code>ReserveFrozen</code>. A freeze also blocks <code>pay_claim</code>; MUTAV then pays the agency by Pix from its own bank and the reserve reimburses the payments account after the freeze lifts. The reserve's money is split across separate token accounts so one freeze does not trap everything.</p>
+
+<h3 id="underwater">9.3 Underwater reserve<a class="anchor" href="#underwater">#</a></h3>
+<p>Both fills refuse with <code>ReserveUnderwater</code>, so new money never pays for old losses. Cancels stay open. Until <code>book_unsolicited(BACKSTOP)</code> ships, the operator recapitalises with <code>contribute_fees</code> under a fresh <code>invoice_ref_hash</code> recorded as a backstop, sending <code>needed / (1 − take)</code>. No shares are minted, so the money raises NAV for every holder. Claim payments continue within the caps throughout.</p>
+
+<h3 id="operator-compromise">9.4 Operator-compromise runbook<a class="anchor" href="#operator-compromise">#</a></h3>
+<ol>
+<li><strong>Freeze.</strong> The pauser runs <code>revoke_operator</code> at once (it also clears the pending operator key), and <code>pause</code> if needed. If the pauser key is suspect, the admin runs <code>revoke_pauser</code>.</li>
+<li><strong>Appoint.</strong> The admin proposes a new operator with <code>propose_role(OPERATOR, key)</code>; the new key accepts with <code>accept_role</code> within 72 hours. A new pauser can be proposed in the same Squads proposal.</li>
+<li><strong>Reconcile.</strong> The new operator compares the platform's contract registry and audit trail with on-chain events and <code>refs_hash</code> values since the compromise.</li>
+<li><strong>Correct with ordinary operator actions.</strong> Fake registrations: <code>close_guarantee(VOID)</code>. Until the later claim instructions ship, a fake filing stays provisioned and is never paid; later, <code>amend_claim(0)</code> withdraws it and <code>reinstate_guarantee</code> undoes a wrongful close. No admin rollback instruction exists.</li>
+<li><strong>Accept the bounded loss.</strong> Claim payments made with the compromised key are irreversible, bounded by the caps, and landed in MUTAV's own payments account.</li>
+<li><strong>Resume.</strong> The admin signs no redemption fill until reconciliation is done.</li>
+</ol>
+<p><strong>Pauser compromise.</strong> A stolen pauser key can stop claim payments by revoking the operator until a new operator accepts. The admin removes it with <code>revoke_pauser</code> and proposes a replacement; bank-first payment covers the gap. <strong>Admin key compromise.</strong> One member key cannot act alone: the multisig needs the threshold and the time lock, during which members can reject and the pauser can pause. <strong>Detection.</strong> The app shows an operator-activity feed (registrations, closes, filings and payments in the last 24 hours), and a monitor alerts when the owner of the payments account changes.</p>
+</section>
+
+<!-- ============================================================ 10 -->
+<section id="events-errors" class="level2">
+<h2><span class="num">10</span>Events &amp; errors<a class="anchor" href="#events-errors" aria-label="Link to this section">#</a></h2>
+<p>Events are emitted with <code>emit_cpi!</code>. Every event carries <code>config: Pubkey</code> and <code>ts: i64</code>. Existing events never change fields after the freeze; indexers decode by discriminator and skip unknown events.</p>
+<h3 id="events">10.1 Events<a class="anchor" href="#events">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Event</th><th>Fields (besides <code>config</code>, <code>ts</code>)</th></tr></thead>
+<tbody>
+<tr><td><code>VaultInitialized</code></td><td><code>admin, operator, pauser, reserve_mint, share_mint</code></td></tr>
+<tr><td><code>ConfigUpdated</code></td><td><code>field: u16, old: [u8; 32], new: [u8; 32]</code>. Integers little-endian, zero-padded. Field ids are append-only; a retired id is never reused. Also emitted by the role, guardian, pause and money-account instructions.</td></tr>
+<tr><td><code>RoleProposed</code> · <code>RoleAccepted</code> · <code>HandoverCancelled</code></td><td><code>role, key, expires_at</code> · <code>role, old, new</code> · <code>role, key</code></td></tr>
+<tr><td><code>GuardiansUpdated</code></td><td><code>guardians</code></td></tr>
+<tr><td><code>OperatorRevoked</code> · <code>PauserRevoked</code> · <code>Paused</code> · <code>Unpaused</code></td><td><code>by</code></td></tr>
+<tr><td><code>PaymentsAccountUpdated</code> · <code>TreasuryAccountUpdated</code></td><td><code>old, new</code></td></tr>
+<tr><td><code>AllowlistRootUpdated</code></td><td><code>root</code></td></tr>
+<tr><td><code>GuaranteeRegistered</code></td><td><code>id, agency_id, refs_hash, default_cover, exit_cover, remaining_cover_total, coverage_required, active_guarantees</code></td></tr>
+<tr><td><code>GuaranteeClosed</code></td><td><code>id, reason, released_cover, remaining_cover_total, coverage_required, active_guarantees</code></td></tr>
+<tr><td><code>FeesContributed</code></td><td><code>invoice_ref_hash, gross, take, net, fees_in_total, fee_take_total, brs_balance</code></td></tr>
+<tr><td><code>IncomeSwept</code></td><td><code>income_ref_hash, period, amount, inbox_after, income_total, brs_balance</code></td></tr>
+<tr><td><code>ClaimFiled</code></td><td><code>guarantee_id, leg, amount, notice_ref_hash, provisions_after, coverage_required_after</code></td></tr>
+<tr><td><code>ClaimPaid</code></td><td><code>guarantee_id, leg, amount, notice_ref_hash, payments_account, provisions_after, coverage_required_after, window_paid, brs_balance_after, claims_paid_total</code></td></tr>
+<tr><td><code>PayoutSettled</code></td><td><code>guarantee_id, notice_ref_hash, pix_e2e_hash</code></td></tr>
+<tr><td><code>ClaimApproved</code></td><td><code>guarantee_id, leg, notice_ref_hash, amount, revision, previous_amount, max_claim_per_call</code></td></tr>
+<tr><td><code>DepositRequested</code> · <code>DepositCancelled</code> · <code>SharesClaimed</code></td><td><code>owner, seq, assets, min_shares_out</code> · <code>owner, seq, assets, by</code> · <code>owner, seq, shares</code></td></tr>
+<tr><td><code>DepositParked</code> · <code>RedeemParked</code></td><td><code>owner, seq, assets, by</code> · <code>owner, seq, shares, by</code> (the admin's cancel; ADR 0030)</td></tr>
+<tr><td><code>DepositFilled</code></td><td><code>owner, seq, assets, shares, nav, shares_outstanding_after, net_assets_after</code></td></tr>
+<tr><td><code>DepositsFulfilled</code></td><td><code>from_seq, to_seq, assets, shares, nav, deposited_assets_total, minted_shares_total</code></td></tr>
+<tr><td><code>RedeemRequested</code></td><td><code>owner, seq, shares, min_assets_out</code></td></tr>
+<tr><td><code>RedeemFilled</code></td><td><code>owner, seq, shares, assets, nav</code></td></tr>
+<tr><td><code>RedeemsFulfilled</code></td><td><code>from_seq, to_seq, shares, assets, nav, idle_free_capital, redeemed_shares_total, redeemed_assets_total</code></td></tr>
+<tr><td><code>RedeemCancelled</code> · <code>AssetsClaimed</code></td><td><code>owner, seq, shares_returned, by</code> · <code>owner, seq, assets</code></td></tr>
+<tr><td><code>QueueHeadsAdvanced</code></td><td><code>redeem_head, deposit_head</code></td></tr>
+<tr><td><code>StateRefreshed</code></td><td><code>stable_assets, coverage_required, surplus, provisions, nav_per_share, mode, prev_nav_per_share, inflow_nav, guard_nav, shares_outstanding, net_assets, fulfil_halted</code></td></tr>
+<tr><td><code>FulfilHaltRaised</code></td><td><code>prev_nav_per_share, guard_nav, inflow_nav, max_nav_move_bps, source</code></td></tr>
+<tr><td><code>ModeChanged</code></td><td><code>from, to, deficit</code></td></tr>
+<tr><td><code>ReserveFrozenDetected</code></td><td><code>token_account</code></td></tr>
+<tr><td><code>FulfilHaltCleared</code></td><td><code>nav_per_share</code></td></tr>
+</tbody></table></div>
+<p>Events of the later upgrades (claim amendment and withdrawal, reinstatement, unsolicited money, the claim-notice gate, adapters) are appended when those features are built.</p>
+
+<h3 id="errors">10.2 Errors<a class="anchor" href="#errors">#</a></h3>
+<p>Anchor custom errors, numbered from 6000 in the enum order of <code>errors.rs</code>. The list is append-only from the first devnet deploy. Dead errors (adapter, price and claim-notice errors v1 never raises) and the per-agency cap error were removed before the freeze; they return, appended, with the features that raise them.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th class="num">Code</th><th>Name</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td class="num">6000</td><td><code>Unauthorized</code></td><td>The signer may not run this instruction.</td></tr>
+<tr><td class="num">6001</td><td><code>RolesNotDistinct</code></td><td>Roles (and guardians) must be distinct keys.</td></tr>
+<tr><td class="num">6002</td><td><code>Paused</code></td><td>The reserve is paused.</td></tr>
+<tr><td class="num">6003</td><td><code>InvalidParameter</code></td><td>An argument or config value is out of bounds.</td></tr>
+<tr><td class="num">6004</td><td><code>InvalidMint</code></td><td>Wrong mint.</td></tr>
+<tr><td class="num">6005</td><td><code>UnsupportedMintExtension</code></td><td>The mint guard refused the reserve mint.</td></tr>
+<tr><td class="num">6006</td><td><code>ReserveFrozen</code></td><td>A reserve token account is frozen.</td></tr>
+<tr><td class="num">6007</td><td><code>UnderCovered</code></td><td>The reserve is under-covered.</td></tr>
+<tr><td class="num">6008</td><td><code>InsufficientFreeCapital</code></td><td>Not enough free capital.</td></tr>
+<tr><td class="num">6009</td><td><code>InsufficientLiquidBalance</code></td><td>Not enough liquid BRS.</td></tr>
+<tr><td class="num">6010</td><td><code>FulfilHalted</code></td><td>The NAV-move guard halted fills, or would halt them.</td></tr>
+<tr><td class="num">6011</td><td><code>TvlCapExceeded</code></td><td>The fill would exceed <code>max_tvl</code>.</td></tr>
+<tr><td class="num">6012</td><td><code>GuaranteeCapExceeded</code></td><td>The cover exceeds <code>max_cover_per_guarantee</code>.</td></tr>
+<tr><td class="num">6013</td><td><code>GuaranteeNotActive</code></td><td>The guarantee is not active.</td></tr>
+<tr><td class="num">6014</td><td><code>OpenClaims</code></td><td>The guarantee has open claims.</td></tr>
+<tr><td class="num">6015</td><td><code>ExceedsRemainingCover</code></td><td>The amount exceeds the leg's remaining unprovisioned cover.</td></tr>
+<tr><td class="num">6016</td><td><code>ClaimNotFiled</code></td><td>No filed claim for this notice.</td></tr>
+<tr><td class="num">6017</td><td><code>ClaimCallCapExceeded</code></td><td>Above the per-call cap without a matching approval.</td></tr>
+<tr><td class="num">6018</td><td><code>ClaimPeriodCapExceeded</code></td><td>Above the 31-day window cap.</td></tr>
+<tr><td class="num">6019</td><td><code>InvalidPaymentsAccount</code></td><td>Wrong or disallowed payments account.</td></tr>
+<tr><td class="num">6020</td><td><code>PayoutAlreadySettled</code></td><td>The claim payment is already settled.</td></tr>
+<tr><td class="num">6021</td><td><code>NotAllowlisted</code></td><td>The wallet is not in the allowlist.</td></tr>
+<tr><td class="num">6022</td><td><code>RequestTooSmall</code></td><td>Below <code>min_request</code> (or the sub-minimum exit rule), or a fill worth 0.</td></tr>
+<tr><td class="num">6023</td><td><code>RequestTooLarge</code></td><td>Above <code>max_request</code>.</td></tr>
+<tr><td class="num">6024</td><td><code>InvalidRequestStatus</code></td><td>The request is not in the required status.</td></tr>
+<tr><td class="num">6025</td><td><code>QueueOrderViolation</code></td><td>Not the queue head, or a bad skip.</td></tr>
+<tr><td class="num">6026</td><td><code>PostCpiCheckFailed</code></td><td>Balances moved other than expected.</td></tr>
+<tr><td class="num">6027</td><td><code>MathOverflow</code></td><td>Checked math failed.</td></tr>
+<tr><td class="num">6028</td><td><code>FeatureNotSupported</code></td><td>A feature bit outside <code>SUPPORTED_FEATURES</code>, or a reserve with adapters.</td></tr>
+<tr><td class="num">6029</td><td><code>InvalidTreasuryAccount</code></td><td>Wrong or disallowed treasury account.</td></tr>
+<tr><td class="num">6030</td><td><code>UnsupportedVersion</code></td><td>Unknown layout version or status byte.</td></tr>
+<tr><td class="num">6031</td><td><code>InvalidIncomeSource</code></td><td>The source is not the income inbox, or the inbox is frozen.</td></tr>
+<tr><td class="num">6032</td><td><code>IncomeExceedsInbox</code></td><td>The amount exceeds the inbox balance.</td></tr>
+<tr><td class="num">6033</td><td><code>InvalidTokenProgram</code></td><td>Not the reserve's token program.</td></tr>
+<tr><td class="num">6034</td><td><code>ClaimNotPaid</code></td><td><code>settle_payout</code> on a filing that is not <code>PAID</code>.</td></tr>
+<tr><td class="num">6035</td><td><code>DuplicateParam</code></td><td><code>set_config</code> received the same field twice.</td></tr>
+<tr><td class="num">6036</td><td><code>ExpectedAmountMismatch</code></td><td><code>pay_claim</code>'s <code>expected_amount</code>, or <code>approve_claim</code>'s <code>amount</code>, is not the filing's provision.</td></tr>
+<tr><td class="num">6037</td><td><code>NavOutOfBounds</code></td><td>The NAV is outside the proposal's <code>nav_bounds</code>.</td></tr>
+<tr><td class="num">6038</td><td><code>NoPendingHandover</code></td><td>No handover is pending for this role.</td></tr>
+<tr><td class="num">6039</td><td><code>HandoverExpired</code></td><td>The pending handover is past its 72-hour window.</td></tr>
+<tr><td class="num">6040</td><td><code>GuaranteeHasPayments</code></td><td>A <code>VOID</code> close of a guarantee with claim payments.</td></tr>
+<tr><td class="num">6041</td><td><code>HandoverPending</code></td><td>An unexpired handover already waits for this role.</td></tr>
+<tr><td class="num">6042</td><td><code>RefreshRequired</code></td><td><code>set_config</code> changed a coverage or NAV-guard field without a <code>refresh</code> in the same slot.</td></tr>
+<tr><td class="num">6043</td><td><code>PriceLimitNotMet</code></td><td>The head's <code>min_shares_out</code> or <code>min_assets_out</code> is not met.</td></tr>
+<tr><td class="num">6044</td><td><code>ReserveUnderwater</code></td><td>A fill while the reserve is underwater.</td></tr>
+<tr><td class="num">6045</td><td><code>NoSharesOutstanding</code></td><td><code>contribute_fees</code> or <code>sweep_income</code> while no shares exist.</td></tr>
+<tr><td class="num">6046</td><td><code>ClaimRevisionMismatch</code></td><td><code>approve_claim</code>'s <code>expected_revision</code> is not the filing's revision: the filing changed since the approval was proposed.</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============================================================ 11 -->
+<section id="sdk" class="level2">
+<h2><span class="num">11</span>Client SDK<a class="anchor" href="#sdk" aria-label="Link to this section">#</a></h2>
+<p><code>@mutav-finance/mutav-protocol-solana</code> (in <code>clients/js</code>, MIT, Copyright (c) 2026 MUTAV, ESM, built on <code>@solana/kit</code>). It composes instructions and reads accounts. <strong>It never signs and holds no keys</strong>: the caller's wallet, the operator key in the MUTAV platform, or the admins' wallets through a Squads proposal sign. A CI script (<code>scripts/check-no-keys.sh</code>) fails on secret-key or signing APIs in the source.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Module</th><th>Contents</th></tr></thead>
+<tbody>
+<tr><td><code>generated/</code></td><td>Codama output from the Anchor IDL: one builder per instruction (<code>get&lt;Name&gt;Instruction</code>, <code>get&lt;Name&gt;InstructionAsync</code>), account decoders and fetchers, events, errors, <code>MUTAV_PROGRAM_ADDRESS</code>, IDL-described PDAs. Regenerated in the same PR as any IDL change; CI fails on a diff.</td></tr>
+<tr><td><code>pdas</code></td><td><code>findReserveAddresses(reserveMint)</code>, <code>findDepositRequestPda</code>, <code>findRedeemRequestPda</code>, <code>findOwnerTokenAddress</code>, <code>findIncomeInboxAddress</code> (token program required).</td></tr>
+<tr><td><code>reads</code></td><td><code>fetchReserve</code> (config and state in one <code>getMultipleAccounts</code> snapshot, plus the coverage snapshot), <code>fetchGuaranteesForReserve</code>, <code>fetchClaimFilingsForGuarantee</code>, <code>fetchIncomeReceiptsForReserve</code>, <code>getDepositQueuePosition</code>, <code>getRedeemQueuePosition</code>, <code>fetchIncomeInbox</code>.</td></tr>
+<tr><td><code>math</code></td><td>Exact <code>bigint</code> mirror of <code>math.rs</code> and <code>coverage.rs</code>: <code>mulDiv</code>, <code>sharesFor</code>, <code>assetsFor</code>, <code>conversionNav</code>, <code>coverageRequired</code>, <code>stressTerm</code>, <code>surplus</code>, <code>liquidBudget</code>, <code>netAssets</code>, <code>navPerShare</code>, <code>publishedNav</code>, <code>claimWindowPaid</code>, <code>isUnderwater</code>, <code>redeemSizeError</code>, <code>computeCoverage</code>, <code>takeSplit</code>, <code>isValidIncomePeriod</code>. The NAV-move guard is not mirrored.</td></tr>
+<tr><td><code>preview</code></td><td><code>previewDepositFulfil</code> and <code>previewRedeemFulfil</code> return <code>{ fills, stoppedBy }</code>, applying the program's checks in program order; <code>coverageFromAccounts</code>. Labelled as previews in every UI.</td></tr>
+<tr><td><code>allowlist</code></td><td>Domain-separated Merkle leaves and nodes, <code>buildAllowlist</code>, <code>verifyAllowlistProof</code>; proofs up to 32 levels.</td></tr>
+<tr><td><code>config</code></td><td><code>configParamsDiff</code> and <code>configParamsNeedRefresh</code> for sparse <code>set_config</code> proposals, <code>MAX_CONFIG_PARAMS</code>, <code>navBoundsAround</code> and <code>ANY_NAV</code> for <code>nav_bounds</code>, <code>capsInputFromConfig</code> for <code>initialize</code>.</td></tr>
+</tbody></table></div>
+<p>Shared test vectors computed by the program crate (<code>tests/fixtures/client/vectors.json</code>) are checked by both the Rust tests and the client's Bun tests: math, coverage figures, PDAs, allowlist proofs and the encoding of every instruction. Typical integration: read with <code>fetchReserve</code>, preview with the math mirror, build an instruction with the generated builder, and hand the unsigned transaction to the wallet (or wrap it in a Squads proposal for admin instructions).</p>
+</section>
+
+<!-- ============================================================ 12 -->
+<section id="upgrades" class="level2">
+<h2><span class="num">12</span>Upgrade rules &amp; layout freeze<a class="anchor" href="#upgrades" aria-label="Link to this section">#</a></h2>
+<h3 id="multisigs">12.1 Two multisigs<a class="anchor" href="#multisigs">#</a></h3>
+<p>Authority is split across two Squads v4 multisigs with the same members: the admin multisig (5 minutes on devnet, 24 hours on a real-money pilot) and the upgrade multisig (1 hour on devnet, 7 days on a real-money pilot). Day-to-day admin work needs a short wait; replacing the program needs a long one, so holders can react. Both have no config authority; the time lock counts from approval; no multisig config change during an upgrade window. Pause and <code>revoke_operator</code> are not time-locked. The deploy scripts check the Squads v4 owner, the exact member set, the exact threshold and the time-lock floors, and refuse any cluster other than devnet by genesis hash.</p>
+
+<h3 id="layout-rules">12.2 Layout rules<a class="anchor" href="#layout-rules">#</a></h3>
+<ul>
+<li><strong>R1.</strong> First fields <code>version</code> (1) and <code>bump</code>. <strong>R1b.</strong> A version above the binary's, or an unknown status, is refused.</li>
+<li><strong>R2.</strong> Fixed-size types only; statuses are <code>u8</code> constants; nested config structs end with their own <code>_reserved: [u8; 32]</code>.</li>
+<li><strong>R3.</strong> Carved fields read zero as the safe default; flags are <code>u8</code> or bits in a <code>u64</code>, never <code>bool</code>.</li>
+<li><strong>R4.</strong> <code>_reserved</code> is last, zeroed, never touched by logic; fields are carved from its front.</li>
+<li><strong>R5.</strong> Append-only: never reorder, retype or delete; a retired field becomes <code>_deprecated_&lt;name&gt;</code>; never rename an account struct.</li>
+<li><strong>R6.</strong> Update in place, so bytes written by a newer binary survive a rollback.</li>
+<li><strong>R7.</strong> Sizes pinned with a compile-time assertion per account. <strong>R8.</strong> Large accounts are boxed.</li>
+</ul>
+
+<h3 id="freeze">12.3 The layout freeze<a class="anchor" href="#freeze">#</a></h3>
+<p>The first devnet deploy freezes layout v1. Before it, the grown padding, the removals of ADR 0019 and ADR 0026, the carves of §4.2, the new arguments (<code>close_guarantee</code>'s <code>reason</code>, the <code>nav_bounds</code> of the fills and <code>clear_fulfil_halt</code>, <code>Eligibility</code>, <code>pay_claim</code>'s <code>expected_amount</code>, the sparse <code>set_config</code>, <code>advance_queue_head(queue, max)</code>) and the new instructions, events and errors land together, and the golden fixtures (<code>tests/fixtures/layout/v1/</code>) are regenerated once more. After it, every change is a carve from padding or a new account, checked against the v1 fixtures. Layout tests cover golden layouts, v1 to v2 decoding, live fixtures, padding preservation, padding zero at init, the version guard, feature flags and reserved room for every planned carve.</p>
+
+<h3 id="idl-compat">12.4 Client and IDL compatibility<a class="anchor" href="#idl-compat">#</a></h3>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Change</th><th>Allowed</th></tr></thead>
+<tbody>
+<tr><td>New instruction, account type, event or error (appended)</td><td>Yes. Minor client version.</td></tr>
+<tr><td>New <code>ConfigParam</code> variant (appended)</td><td>Yes. Variants are never removed or reordered.</td></tr>
+<tr><td>Field carved from <code>_reserved</code></td><td>Yes. Existing sizes and offsets unchanged.</td></tr>
+<tr><td>Changing an instruction's arguments or accounts</td><td>No. Add a <code>_v2</code> instruction.</td></tr>
+<tr><td>Changing an event's fields</td><td>No. Add a new event.</td></tr>
+<tr><td>Reordering, retyping, removing fields or errors; resizing an account</td><td>No.</td></tr>
+</tbody></table></div>
+<p>An <code>idl-compat</code> CI job diffs the IDL against the last release and fails on any "No" row. Errors, <code>ConfigUpdated</code> field ids and seeds are append-only and never reused.</p>
+
+<h3 id="upgrade-runbook">12.5 Release workflow<a class="anchor" href="#upgrade-runbook">#</a></h3>
+<ol>
+<li><strong>Before merge.</strong> ADR and spec update in the same PR; new fields carved from <code>_reserved</code>; no diff in the <code>pay_claim</code> path; layout, padding-preservation, <code>idl-compat</code>, Codama and full LiteSVM suites green.</li>
+<li><strong>Rehearse</strong> on a Surfpool fork of the live cluster against real accounts, then on devnet with the same threshold and time lock.</li>
+<li><strong>Build and buffer.</strong> <code>release.yml</code> (manual) runs a verifiable build, records the hash, writes the buffer and sets its authority to the upgrade vault.</li>
+<li><strong>Propose</strong> one Squads vault transaction: <code>ExtendProgramChecked</code> first if needed, then <code>Upgrade</code>, the IDL write and the verify record.</li>
+<li><strong>Review.</strong> Each signer reproduces the hash and decodes every instruction; any <code>SetAuthority</code> is a reason to reject.</li>
+<li><strong>Execute</strong> after the time lock; verify the on-chain hash; smoke-check that carved fields read zero.</li>
+<li><strong>Enable features later</strong> in a separate time-locked <code>set_config</code>.</li>
+</ol>
+<p>Rollback: fast is <code>pause</code>; slow is a time-locked upgrade back to the previous verified binary, safe because older binaries preserve <code>_reserved</code> bytes (R6) and refuse rewritten accounts (R1b).</p>
+</section>
+
+<!-- ============================================================ 13 -->
+<section id="security" class="level2">
+<h2><span class="num">13</span>Security reviews &amp; known limitations<a class="anchor" href="#security" aria-label="Link to this section">#</a></h2>
+<h3 id="reviews">13.1 Reviews to date<a class="anchor" href="#reviews">#</a></h3>
+<p>The program is unaudited. An internal pre-devnet review cycle is under way; its report is published after its fixes land. An independent audit is planned before mainnet; its auditor and date are not yet chosen.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Step</th><th>Scope</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Adversarial review (2026-10-09)</td><td>Five read-only reviews in parallel: account checks and roles; economics and math; queues, lifecycle and layout; client and scripts; pilot app.</td><td>Done. All decisions taken.</td></tr>
+<tr><td>Whole-protocol review (2026-10-10)</td><td>Findings from three published audits of a comparable Solana program, mapped by vulnerability class.</td><td>Done. Two-step handover, guardians, two multisigs and open owner cancels under pause adopted.</td></tr>
+<tr><td>OWASP Smart Contract Top 10 (2026) pass</td><td>The target design checked against each category.</td><td>Done.</td></tr>
+<tr><td>Simplification review (2026-10-10)</td><td>Remove state the pilot does not use before the freeze.</td><td>Done (ADR 0026).</td></tr>
+<tr><td>Claims and capital rules (2026-10-11)</td><td>Stress buffer, underwater reserve, inline guard, exit size rule, following the solana-foundation/vault and OnRe references.</td><td>Done (ADR 0029).</td></tr>
+<tr><td>Fix wave</td><td>Bounded PRs, tests first, ADR and spec for every economic change.</td><td>In progress.</td></tr>
+<tr><td>Internal security audit</td><td>A fresh review of the fixed code before deploy.</td><td>Pending.</td></tr>
+</tbody></table></div>
+<p><strong>Test suites.</strong> LiteSVM integration and property tests (including that <code>pay_claim</code> is never refused by the coverage gate), invariant checks, layout tests, compute-unit guard, client parity tests, script tests, app unit tests with a forbidden-words scan of UI copy, and on-demand Surfpool fork tests. CI gates every PR on <code>cargo fmt</code>, <code>anchor build</code>, the test suite, Codama regeneration, client tests, the no-keys check, script tests, app checks and <code>idl-compat</code>. Release builds keep overflow checks on.</p>
+
+<h3 id="limitations">13.2 Known limitations and planned work<a class="anchor" href="#limitations">#</a></h3>
+<p>None of the items below is a feature of this release. Where a later feature needs room, it is already carved or reserved.</p>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Item</th><th>v1 behaviour</th><th>Timing</th></tr></thead>
+<tbody>
+<tr><td>Partial fills at the queue head (ADR 0010)</td><td>Whole fills only; a large head waits for free capital.</td><td>First upgrade</td></tr>
+<tr><td>Claim approval, amendment, withdrawal (ADR 0021)</td><td>Above-cap claims refused and paid bank-first; filings cannot be amended or withdrawn.</td><td>First upgrade</td></tr>
+<tr><td>Guarantee reinstatement</td><td>A close is final; <code>max_reinstate_age</code> is 0.</td><td>First upgrade</td></tr>
+<tr><td>Cumulative NAV-guard baseline</td><td>A slow drift below the bound across refreshes is not caught; devnet bound is 100%.</td><td>First upgrade</td></tr>
+<tr><td>Exit fallback (ADR 0025)</td><td><code>max_queue_wait_secs</code> = 0, off.</td><td>Before outside capital</td></tr>
+<tr><td>Claim-notice gate</td><td>Not in v1. Runbook: file the claim before any fill.</td><td>Before outside capital</td></tr>
+<tr><td>Transfer-restricted shares</td><td>Devnet shares transfer freely; the share freeze authority is unused.</td><td>Before mainnet</td></tr>
+<tr><td>Unsolicited money and the booked backstop (ADR 0024)</td><td><code>unsolicited</code> exists and stays empty; backstop through <code>contribute_fees</code>.</td><td>Later</td></tr>
+<tr><td>Adapters and a second reserve asset (ADR 0027, Proposed)</td><td>BRS only; settlement floor 100%.</td><td>Later</td></tr>
+<tr><td>Phase-2 instant exit</td><td>Designed; <code>SUPPORTED_FEATURES = 0</code>.</td><td>Later</td></tr>
+<tr><td>Fiança lifecycle states (ADR 0012)</td><td>ACTIVE or CLOSED only.</td><td>Later</td></tr>
+</tbody></table></div>
+<p><strong>Accepted constraints.</strong> Operator claim payments are final but bounded by the caps. The issuer's freeze authority is a single key (acceptable for devnet; raised with the issuer before mainnet). No on-chain per-agency concentration limit. No take on issuer income. Small balances below the exit floor wait. Concurrent requests race on the sequence number and retry. Payout deadlines live off-chain.</p>
+</section>
+
+<!-- ============================================================ 14 -->
+<section id="glossary" class="level2">
+<h2><span class="num">14</span>Glossary<a class="anchor" href="#glossary" aria-label="Link to this section">#</a></h2>
+<div class="tbl-wrap"><table class="tbl">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Fiança (fiança onerosa)</td><td>A paid personal guarantee of a lease under Brazilian law (Lei 8.245/91 art. 37 II). MUTAV is the fiador (guarantor). One <code>Guarantee</code> account per lease.</td></tr>
+<tr><td>Valor afiançado</td><td>The R$ ceiling of one fiança: <code>default_cover + exit_cover</code>.</td></tr>
+<tr><td>Default leg / exit leg</td><td>Sub-limits for rent and charges in arrears, and for end-of-occupation debts.</td></tr>
+<tr><td>Remaining cover</td><td>Cover not yet paid on a guarantee.</td></tr>
+<tr><td>Claim; claim payment</td><td>A payment request from the agency on the landlord's behalf (<code>ClaimFiling</code>); the payment MUTAV makes from the reserve (<code>pay_claim</code>), recorded on the same filing.</td></tr>
+<tr><td>Provision</td><td>The amount of a filed, unpaid claim. It lowers NAV at once and is always held in <code>coverage_required</code>.</td></tr>
+<tr><td>Guarantee fee</td><td>What the tenant pays for the fiança. Net of MUTAV's take, it enters the reserve and raises NAV.</td></tr>
+<tr><td>BRS</td><td>A BRL-pegged token on Solana issued by Nora. The reserve's only asset in v1. 6 decimals; 1 BRS = R$1.</td></tr>
+<tr><td>Issuer income</td><td>The issuer's partnership revenue, paid to the income inbox and booked by <code>sweep_income</code>.</td></tr>
+<tr><td>Coverage ratio (<em>c</em>)</td><td>Share of remaining cover the reserve must hold; floor 0.10, pilot 0.25.</td></tr>
+<tr><td>Stress buffer</td><td>Admin-set amount for the claims that could be filed next, added on top of provisions. R$19k in the pilot.</td></tr>
+<tr><td>Required coverage; coverage gate</td><td>What the reserve must hold (<code>coverage_required</code>); the check that refuses new guarantees and redemption fills the reserve cannot back. It never applies to a claim payment.</td></tr>
+<tr><td>Free capital</td><td>Stable assets above required coverage. Backs new guarantees and redemptions.</td></tr>
+<tr><td>NAV per share</td><td>Net assets divided by shares outstanding, scaled by 10<sup>9</sup>.</td></tr>
+<tr><td>Under-covered</td><td>Stable assets below required coverage. Public label: "reserve below target; MUTAV backstop active".</td></tr>
+<tr><td>Underwater</td><td>NAV per share below the smallest published unit while shares are outstanding. Both fills refuse.</td></tr>
+<tr><td>Backstop</td><td>MUTAV's own BRS booked into the reserve without minting shares, to recapitalise it.</td></tr>
+<tr><td>Settlement floor</td><td>Minimum share of stable assets held in BRS. 100% in v1.</td></tr>
+<tr><td>Income inbox</td><td>The vault authority's associated token account for BRS. Untracked.</td></tr>
+<tr><td>Pix</td><td>Brazil's instant payment system. <code>pix_e2e_hash</code> commits to a Pix end-to-end ID.</td></tr>
+<tr><td>Squads</td><td>Multisig program on Solana. Its vault address is the admin or upgrade authority.</td></tr>
+<tr><td>PDA · ATA · CPI</td><td>Program-derived address; associated token account; cross-program invocation.</td></tr>
+<tr><td>Carve</td><td>Turning bytes at the front of <code>_reserved</code> into a new field without changing the account size.</td></tr>
+<tr><td>Layout freeze</td><td>From the devnet deploy, v1 layouts change only by carves or new accounts.</td></tr>
+</tbody></table></div>
+</section>
+</main>
+<footer><div class="wrap">MUTAV Technical Reference · devnet binary · 2026-10-11 · generated from the structured docs in <code>docs/</code>; where this page and <code>docs/spec.md</code> or <code>docs/decisions/</code> differ, they win. Code: MIT License, Copyright (c) 2026 MUTAV. The MUTAV name and brand are not MIT-licensed. Unaudited software.</div></footer>
+<script>
+(function(){
+  var root=document.documentElement;
+  try{var t=localStorage.getItem('mutav-theme'); if(t==='dark'||t==='light') root.setAttribute('data-theme',t);}catch(e){}
+  var btn=document.getElementById('themeBtn');
+  if(btn) btn.addEventListener('click',function(){
+    var dark=false;
+    try{dark=window.matchMedia('(prefers-color-scheme: dark)').matches;}catch(e){}
+    var cur=root.getAttribute('data-theme') || (dark?'dark':'light');
+    var next=cur==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next);
+    try{localStorage.setItem('mutav-theme',next);}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>

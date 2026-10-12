@@ -2,14 +2,16 @@
 //! fills (ADR 0010).
 
 use anchor_lang::{prelude::*, AccountsClose};
-use anchor_spl::token_interface::{
-    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
 };
 
 use crate::{
     constants::*,
     errors::MutavError,
     events::AssetsClaimed,
+    instructions::capital::{create_owner_ata, owner_ata},
     state::{RedeemRequest, VaultConfig, VaultState},
 };
 
@@ -20,7 +22,11 @@ pub struct ClaimAssets<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
-    #[account(constraint = config.is_supported() @ MutavError::UnsupportedVersion)]
+    #[account(
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
+        constraint = config.is_supported() @ MutavError::UnsupportedVersion,
+    )]
     pub config: Box<Account<'info, VaultConfig>>,
 
     #[account(
@@ -40,13 +46,15 @@ pub struct ClaimAssets<'info> {
     )]
     pub redeem_request: Box<Account<'info, RedeemRequest>>,
 
-    /// The owner's BRS account (owner and mint checked).
+    /// The owner's associated token account for the reserve mint; created
+    /// idempotently in the handler, the owner paying its rent (ADR 0023).
+    /// CHECK: address-bound to the owner's associated token account.
     #[account(
         mut,
-        constraint = destination.owner == owner.key() @ MutavError::Unauthorized,
-        constraint = destination.mint == config.reserve_mint @ MutavError::InvalidMint,
+        address = owner_ata(&owner.key(), &config.reserve_mint, &config.reserve_token_program)
+            @ MutavError::Unauthorized,
     )]
-    pub destination: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub destination: UncheckedAccount<'info>,
 
     #[account(mut, seeds = [CLAIMS_SEED, config.key().as_ref()], bump)]
     pub claims: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -58,17 +66,30 @@ pub struct ClaimAssets<'info> {
     #[account(address = config.reserve_mint @ MutavError::InvalidMint)]
     pub reserve_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    #[account(address = config.reserve_token_program @ MutavError::InvalidMint)]
+    #[account(address = config.reserve_token_program @ MutavError::InvalidTokenProgram)]
     pub token_program: Interface<'info, TokenInterface>,
+
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
 }
 
 pub fn handle_claim_assets(ctx: Context<ClaimAssets>) -> Result<()> {
-    // Never paused. Neither reads nor writes `buffer_earmark`. A frozen
+    // Never paused. A frozen
     // destination fails the transfer, so nothing changes and the amount stays
     // claimable.
     let r = &ctx.accounts.redeem_request;
-    require!(r.assets_claimable > 0, MutavError::InvalidRequestStatus);
-    let (seq, assets, owner) = (r.seq, r.assets_claimable, r.owner);
+    require!(r.status == REDEEM_FILLED, MutavError::InvalidRequestStatus);
+    let (seq, assets, owner) = (r.seq, r.assets_out, r.owner);
+    let a = &ctx.accounts;
+    create_owner_ata(
+        a.owner.to_account_info(),
+        a.destination.to_account_info(),
+        a.owner.to_account_info(),
+        a.reserve_mint.to_account_info(),
+        a.system_program.to_account_info(),
+        a.token_program.to_account_info(),
+        a.associated_token_program.key(),
+    )?;
 
     let config_key = ctx.accounts.config.key();
     let authority_seeds: &[&[u8]] = &[
@@ -97,24 +118,17 @@ pub fn handle_claim_assets(ctx: Context<ClaimAssets>) -> Result<()> {
         .checked_sub(assets)
         .ok_or(MutavError::MathOverflow)?;
 
-    let r = &mut ctx.accounts.redeem_request;
-    r.assets_claimable = 0;
-    let closed = r.shares_remaining == 0;
-
     emit_cpi!(AssetsClaimed {
         config: config_key,
         ts: Clock::get()?.unix_timestamp,
         owner,
         seq,
         assets,
-        closed,
     });
 
-    // Close rule (spec §3.8): `shares_remaining == 0 && assets_claimable == 0`.
-    if closed {
-        ctx.accounts
-            .redeem_request
-            .close(ctx.accounts.owner.to_account_info())?;
-    }
+    // A filled request closes once its assets are claimed (spec §3.8).
+    ctx.accounts
+        .redeem_request
+        .close(ctx.accounts.owner.to_account_info())?;
     Ok(())
 }

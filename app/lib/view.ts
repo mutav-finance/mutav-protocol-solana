@@ -4,15 +4,12 @@
  * is a projection or a sum of account fields.
  */
 import type {
-  AgencyExposure,
   ClaimFiling,
   DepositRequest,
-  FeeReceipt,
   Guarantee,
   IncomeReceipt,
-  Payout,
   RedeemRequest,
-  Solvency,
+  Coverage,
   VaultConfig,
   VaultState,
 } from "@mutav-finance/mutav-protocol-solana";
@@ -38,10 +35,10 @@ export type Ledger = {
   /** Fills of the capital queue, newest first (request accounts close when claimed). */
   capitalEvents: CapitalEvent[];
   guarantees: Row<Guarantee>[];
+  /** Claim filings; a paid filing carries its payment and settlement (ADR 0019). */
   filings: Row<ClaimFiling>[];
-  payouts: Row<Payout>[];
-  exposures: Row<AgencyExposure>[];
-  fees: (Row<FeeReceipt> & { blockTime: bigint | null })[];
+  /** Guarantee-fee receipts (`IncomeReceipt` of kind FEE, ADR 0019). */
+  fees: (Row<IncomeReceipt> & { blockTime: bigint | null })[];
   /** Swept issuer income statements (ADR 0017), one IncomeReceipt each. */
   income: (Row<IncomeReceipt> & { blockTime: bigint | null })[];
   deposits: Row<DepositRequest>[];
@@ -78,7 +75,7 @@ export type ReserveView = {
   config: VaultConfig;
   state: VaultState;
   /** The §4 quantities recomputed from these accounts with the client's math mirror. */
-  solvency: Solvency;
+  coverage: Coverage;
   /** Cluster time (unix seconds) and slot of the read. */
   now: bigint;
   slot: bigint;
@@ -89,16 +86,53 @@ export type ReserveView = {
    * never counts toward NAV.
    */
   incomeInbox: { address: string; exists: boolean; amount: bigint };
+  /** The payments token account's SPL facts, for the watcher alert (absent in older reads and tests). */
+  payments?: PaymentsFacts;
 };
 
-export const LEG = { default: 0, exit: 1 } as const;
+/** SPL facts of the payments token account (where pay_claim sends BRS). */
+export type PaymentsFacts = {
+  exists: boolean;
+  /** Token-account owner (the wallet that can move the BRS out). */
+  owner: string | null;
+  mint: string | null;
+  delegate: string | null;
+  closeAuthority: string | null;
+  frozen: boolean;
+  /** PAYMENTS_OWNER from the server env: the owner the admin expects, when set. */
+  expectedOwner: string | null;
+};
+
+/**
+ * Watcher alerts on the payments account (AV-3 follow-up): every claim
+ * payment lands there, so its owner changing, a delegate or close authority
+ * appearing, or the owner being the operator key, is worth a red flag.
+ */
+export function paymentsAlerts(p: PaymentsFacts | undefined, c: Pick<VaultConfig, "operator" | "reserveMint">): string[] {
+  if (!p) return [];
+  if (!p.exists) return ["the payments account does not exist"];
+  const out: string[] = [];
+  if (p.expectedOwner && p.owner !== p.expectedOwner) out.push(`its owner is ${p.owner}, not the expected ${p.expectedOwner} (PAYMENTS_OWNER): the owner changed`);
+  if (p.owner === c.operator) out.push("it is owned by the operator key: a compromised operator could pay claims to itself");
+  if (p.mint !== null && p.mint !== c.reserveMint) out.push("it is not a BRS account");
+  if (p.delegate) out.push(`it has a delegate (${p.delegate}) who can move its BRS`);
+  if (p.closeAuthority) out.push(`it has a close authority (${p.closeAuthority})`);
+  if (p.frozen) out.push("it is frozen: pay_claim into it fails");
+  return out;
+}
+
+/** `ClaimFiling.leg` ids (LEG_DEFAULT = 1, LEG_EXIT = 2; 0 names no leg). */
+export const LEG = { default: 1, exit: 2 } as const;
 export const legName = (leg: number) => (leg === LEG.exit ? "exit" : "default");
 
 export const GUARANTEE_ACTIVE = 0;
 export const CLAIM_FILED = 0;
-export const PAYOUT_SETTLED = 1;
+export const CLAIM_PAID = 1;
+export const CLAIM_SETTLED = 3;
 export const DEPOSIT_PENDING = 0;
 export const DEPOSIT_FULFILLED = 1;
+/** Parked by the admin's cancel (ADR 0030): the escrow is still the owner's to collect with `cancel_deposit`. */
+export const DEPOSIT_CANCELLED = 2;
 
 export const MODE_LABEL = (mode: number) => (mode === 0 ? "Normal" : "UnderCovered");
 
@@ -108,7 +142,6 @@ export type CoverageRow = {
   address: string;
   id: string;
   agencyId: string;
-  rent: bigint;
   defaultRemaining: bigint;
   exitRemaining: bigint;
   remaining: bigint;
@@ -127,7 +160,6 @@ export function coverageRows(guarantees: Row<Guarantee>[]): CoverageRow[] {
         address,
         id: bytesToHex(new Uint8Array(g.id)),
         agencyId: bytesToHex(new Uint8Array(g.agencyId)),
-        rent: g.rent,
         defaultRemaining,
         exitRemaining,
         remaining: defaultRemaining + exitRemaining,
@@ -145,26 +177,32 @@ export const activeRemainingCover = (rows: CoverageRow[]) =>
   rows.filter((r) => r.active).reduce((s, r) => s + r.remaining, 0n);
 
 export type AgencyRow = {
-  address: string;
   agencyId: string;
+  /** Remaining cover of the agency's active guarantees. */
   outstandingCover: bigint;
   activeGuarantees: number;
   claimsPaidTotal: bigint;
-  /** Share of the per-agency cap in use, in bps. */
-  capUsedBps: bigint;
 };
 
-export function agencyRows(exposures: Row<AgencyExposure>[], maxCoverPerAgency: bigint): AgencyRow[] {
-  return exposures
-    .map(({ address, data: a }) => ({
-      address,
-      agencyId: bytesToHex(new Uint8Array(a.agencyId)),
-      outstandingCover: a.outstandingCover,
-      activeGuarantees: a.activeGuarantees,
-      claimsPaidTotal: a.claimsPaidTotal,
-      capUsedBps: maxCoverPerAgency === 0n ? 0n : (a.outstandingCover * 10_000n) / maxCoverPerAgency,
-    }))
-    .sort((a, b) => (b.outstandingCover > a.outstandingCover ? 1 : b.outstandingCover < a.outstandingCover ? -1 : 0));
+/**
+ * Per-agency figures derived from the guarantee accounts: the program keeps
+ * no per-agency account or cap (ADR 0019).
+ */
+export function agencyRows(guarantees: Row<Guarantee>[]): AgencyRow[] {
+  const by = new Map<string, AgencyRow>();
+  for (const { data: g } of guarantees) {
+    const agencyId = bytesToHex(new Uint8Array(g.agencyId));
+    const row = by.get(agencyId) ?? { agencyId, outstandingCover: 0n, activeGuarantees: 0, claimsPaidTotal: 0n };
+    if (g.status === GUARANTEE_ACTIVE) {
+      row.outstandingCover += g.defaultCover - g.defaultPaid + (g.exitCover - g.exitPaid);
+      row.activeGuarantees += 1;
+    }
+    row.claimsPaidTotal += g.defaultPaid + g.exitPaid;
+    by.set(agencyId, row);
+  }
+  return [...by.values()].sort((a, b) =>
+    b.outstandingCover > a.outstandingCover ? 1 : b.outstandingCover < a.outstandingCover ? -1 : 0,
+  );
 }
 
 // ── Claims timeline ─────────────────────────────────────────────────────────
@@ -173,7 +211,6 @@ export type ClaimStage = "filed" | "paid" | "settled";
 
 export type ClaimRow = {
   filing: string;
-  payout: string | null;
   guarantee: string;
   guaranteeId: string;
   leg: "default" | "exit";
@@ -188,45 +225,35 @@ export type ClaimRow = {
   /** Seconds from filing to payment, and from payment to PIX settlement. */
   fileToPay: bigint | null;
   payToSettle: bigint | null;
-  /** `Payout.late` as recorded on-chain (set by `settle_payout` or `refresh`). */
-  lateOnChain: boolean;
-  /** Pending and already past the SLA at `now`; `refresh` will record it as late. */
-  overdue: boolean;
 };
 
-const key = (guarantee: string, hash: ArrayLike<number>) =>
-  `${guarantee}:${bytesToHex(Uint8Array.from(hash))}`;
-
-export function claimsTimeline(
-  ledger: Pick<Ledger, "guarantees" | "filings" | "payouts">,
-  payoutSlaSecs: bigint,
-  now: bigint,
-): ClaimRow[] {
+/**
+ * One row per claim filing. The filing records its payment and settlement
+ * (ADR 0019); the program sets no settlement deadline (the payout SLA is the
+ * operator platform's).
+ */
+export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">): ClaimRow[] {
   const ids = new Map(ledger.guarantees.map((g) => [g.address, bytesToHex(new Uint8Array(g.data.id))]));
-  const payouts = new Map(ledger.payouts.map((p) => [key(p.data.guarantee, p.data.noticeRefHash), p]));
   return ledger.filings
     .map(({ address, data: f }): ClaimRow => {
-      const p = payouts.get(key(f.guarantee, f.noticeRefHash)) ?? null;
-      const settled = p !== null && p.data.status === PAYOUT_SETTLED;
-      const zeroHash = p ? p.data.pixE2eHash.every((x) => x === 0) : true;
+      const settled = f.status === CLAIM_SETTLED;
+      const paid = settled || f.status === CLAIM_PAID;
+      const zeroHash = f.pixE2eHash.every((x) => x === 0);
       return {
         filing: address,
-        payout: p?.address ?? null,
         guarantee: f.guarantee,
         guaranteeId: ids.get(f.guarantee) ?? "",
         leg: legName(f.leg),
         noticeRefHash: bytesToHex(new Uint8Array(f.noticeRefHash)),
         provision: f.provision,
-        amount: p?.data.amount ?? null,
+        amount: paid ? f.paidAmount : null,
         filedAt: f.filedAt,
-        paidAt: p?.data.paidAt ?? null,
-        settledAt: settled ? p!.data.settledAt : null,
-        pixE2eHash: p && !zeroHash ? bytesToHex(new Uint8Array(p.data.pixE2eHash)) : null,
-        stage: settled ? "settled" : p ? "paid" : "filed",
-        fileToPay: p ? p.data.paidAt - f.filedAt : null,
-        payToSettle: settled ? p!.data.settledAt - p!.data.paidAt : null,
-        lateOnChain: p !== null && p.data.late !== 0,
-        overdue: p !== null && !settled && now > p.data.paidAt + payoutSlaSecs,
+        paidAt: paid ? f.paidAt : null,
+        settledAt: settled ? f.settledAt : null,
+        pixE2eHash: !zeroHash ? bytesToHex(new Uint8Array(f.pixE2eHash)) : null,
+        stage: settled ? "settled" : paid ? "paid" : "filed",
+        fileToPay: paid ? f.paidAt - f.filedAt : null,
+        payToSettle: settled ? f.settledAt - f.paidAt : null,
       };
     })
     .sort((a, b) => Number(b.filedAt - a.filedAt));
@@ -253,17 +280,16 @@ export type FlowRow = {
 export type FlowTotals = {
   feesNetToReserve: bigint;
   feeTakeToTreasury: bigint;
-  /** Issuer income swept into the reserve, and its take (ADR 0017). */
+  /** Issuer income swept into the reserve (ADR 0017); there is no take on it (ADR 0019). */
   incomeNetToReserve: bigint;
-  incomeTakeToTreasury: bigint;
   claimsPaid: bigint;
   depositsIn: bigint;
   redemptionsOut: bigint;
 };
 
 export function moneyFlows(
-  state: Pick<VaultState, "feesInTotal" | "feeTakeTotal" | "claimsPaidTotal" | "incomeTotal" | "incomeTakeTotal">,
-  ledger: Pick<Ledger, "fees" | "income" | "payouts" | "capitalEvents">,
+  state: Pick<VaultState, "feesInTotal" | "feeTakeTotal" | "claimsPaidTotal" | "incomeTotal">,
+  ledger: Pick<Ledger, "fees" | "income" | "filings" | "capitalEvents">,
 ): {
   totals: FlowTotals;
   rows: FlowRow[];
@@ -275,8 +301,9 @@ export function moneyFlows(
   for (const i of ledger.income) {
     rows.push({ kind: "income", account: i.address, at: i.blockTime, reserveDelta: i.data.net, treasury: i.data.take, detail: `statement ${fmtPeriod(i.data.period)}` });
   }
-  for (const p of ledger.payouts) {
-    rows.push({ kind: "claim", account: p.address, at: p.data.paidAt, reserveDelta: -p.data.amount, treasury: 0n, detail: legName(p.data.leg) });
+  for (const p of ledger.filings) {
+    if (p.data.status !== CLAIM_PAID && p.data.status !== CLAIM_SETTLED) continue;
+    rows.push({ kind: "claim", account: p.address, at: p.data.paidAt, reserveDelta: -p.data.paidAmount, treasury: 0n, detail: legName(p.data.leg) });
   }
   let depositsIn = 0n;
   let redemptionsOut = 0n;
@@ -300,7 +327,6 @@ export function moneyFlows(
       feesNetToReserve: state.feesInTotal,
       feeTakeToTreasury: state.feeTakeTotal,
       incomeNetToReserve: state.incomeTotal,
-      incomeTakeToTreasury: state.incomeTakeTotal,
       claimsPaid: state.claimsPaidTotal,
       depositsIn,
       redemptionsOut,
@@ -343,14 +369,14 @@ export function capitalQueue(
       position: i + 1,
     }));
   const redeems = ledger.redeems
-    .filter((r) => r.data.sharesRemaining > 0n && r.data.seq >= state.redeemHead)
+    .filter((r) => r.data.status === REDEEM_PENDING && r.data.seq >= state.redeemHead)
     .sort((a, b) => Number(a.data.seq - b.data.seq))
     .map((r, i): QueueRow => ({
       side: "redeem",
       address: r.address,
       seq: r.data.seq,
       owner: r.data.owner,
-      waiting: r.data.sharesRemaining,
+      waiting: r.data.shares,
       requestedAt: r.data.requestedAt,
       position: i + 1,
     }));
@@ -365,19 +391,19 @@ export function configSummary(c: VaultConfig) {
     params: {
       coverageRatioBps: c.coverageRatioBps,
       feeTakeBps: c.feeTakeBps,
-      payoutSlaSecs: c.payoutSlaSecs,
       featureFlags: c.featureFlags,
       paused: c.paused,
     },
     caps: c.caps,
-    price: c.price,
     allowlistRoot: bytesToHex(new Uint8Array(c.investorAllowlistRoot)),
   };
 }
 
 // ── Investor ────────────────────────────────────────────────────────────────
 
-export const REDEEM_STATUS = ["pending", "partially filled", "filled", "cancelled"] as const;
+export const REDEEM_PENDING = 0;
+/** `REDEEM_CANCELLED = 2`: parked by the admin's cancel (ADR 0030); the owner collects with `cancel_redeem`. */
+export const REDEEM_STATUS = ["pending", "filled", "parked"] as const;
 
 /** One of the connected investor's queue entries, with the actions the program would accept now. */
 export type InvestorRequest = {
@@ -409,32 +435,36 @@ export function investorRequests(
     .filter((d) => d.data.owner === owner)
     .map((d): InvestorRequest => {
       const pending = d.data.status === DEPOSIT_PENDING;
+      const parked = d.data.status === DEPOSIT_CANCELLED;
       return {
         side: "deposit",
         address: d.address,
         seq: d.data.seq,
-        status: pending ? "pending" : "fulfilled",
+        status: pending ? "pending" : parked ? "parked" : "fulfilled",
         requestedAt: d.data.requestedAt,
-        waiting: pending ? d.data.assets : 0n,
-        claimable: pending ? 0n : d.data.sharesOut,
+        waiting: pending || parked ? d.data.assets : 0n,
+        claimable: pending || parked ? 0n : d.data.sharesOut,
         position: depPos.get(d.address) ?? null,
-        actions: pending ? ["cancel_deposit"] : ["claim_shares"],
+        actions: pending || parked ? ["cancel_deposit"] : ["claim_shares"],
       };
     });
   const redeems = ledger.redeems
     .filter((r) => r.data.owner === owner)
     .map((r): InvestorRequest => {
       const actions: InvestorRequest["actions"] = [];
-      if (r.data.sharesRemaining > 0n) actions.push("cancel_redeem");
-      if (r.data.assetsClaimable > 0n) actions.push("claim_assets");
+      const pending = r.data.status === REDEEM_PENDING;
+      // A parked request (ADR 0030) is out of the queue; its owner collects the shares.
+      const parked = r.data.status === REDEEM_STATUS.indexOf("parked");
+      if (pending || parked) actions.push("cancel_redeem");
+      else actions.push("claim_assets");
       return {
         side: "redeem",
         address: r.address,
         seq: r.data.seq,
         status: REDEEM_STATUS[r.data.status] ?? `status ${r.data.status}`,
         requestedAt: r.data.requestedAt,
-        waiting: r.data.sharesRemaining,
-        claimable: r.data.assetsClaimable,
+        waiting: pending || parked ? r.data.shares : 0n,
+        claimable: pending || parked ? 0n : r.data.assetsOut,
         position: redPos.get(r.address) ?? null,
         actions,
       };

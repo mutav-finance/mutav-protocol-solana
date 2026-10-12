@@ -1,0 +1,54 @@
+# Known exceptions for scripts/check-no-keys.sh (CI: clients/js/src, app/, scripts/).
+# Format: <path glob> [regex]. A glob alone allows every hit in the file; with a
+# regex, only hits whose line matches it and holds no other forbidden pattern
+# once the matches are removed. Paths are relative to the repo root.
+# Keep entries narrow and say why. Never add a file that reads a real key.
+
+# Localnet-only tooling: throwaway keys in temp dirs or outside the repo,
+# refuses non-local URLs (CLAUDE.md: only app/scripts/ may sign).
+app/scripts/*
+scripts/devnet/dry-run.ts
+# Signs with in-memory test signers; logs the validator to a file. The CLI
+# runner lives in lib/exec.ts, which is scanned.
+scripts/devnet/lib/local.ts signTransactionMessageWithSigners|Bun\.file\(this\.logPath
+
+# The fixture test of this checker holds one hit per pattern on purpose.
+scripts/test/check-no-keys.test.ts
+
+# The connected wallet signs (wallet-standard solana:signTransaction); the app holds no key.
+app/components/WalletProvider.tsx signTransaction
+app/lib/client/use-tx.ts signTransaction
+# On devnet the wallet signs AND sends (solana:signAndSendTransaction, A1); the app holds no key.
+app/components/WalletProvider.tsx SolanaSignAndSendTransaction(Feature)?|signAndSendTransaction
+app/lib/client/use-tx.ts signAndSendTransaction
+app/lib/client/transport.ts solana:sign(AndSend)?Transaction
+app/lib/server/relay.ts solana:signAndSendTransaction
+app/app/api/tx/send/route.ts solana:signAndSendTransaction
+app/lib/__tests__/relay.test.ts solana:sign(AndSend)?Transaction
+# A6: hashes the static simulator's inline scripts for the report-only CSP.
+app/next.config.ts import \{ readFileSync \} from "node:fs"|readFileSync\(join\(process\.cwd\(\), "public", "simulator\.html"\)
+# A5 tests: a fake API key inside an RPC URL, to prove errors redact it.
+app/lib/__tests__/cluster.test.ts SECRETKEY
+app/lib/__tests__/respond.test.ts SECRETKEY
+
+# The app's own guards name the forbidden APIs.
+app/eslint.config.mjs createKeyPair[A-Za-z]*|generateKeyPair[A-Za-z]*
+app/lib/__tests__/guards.test.ts keyApis = /[^/]*/
+
+# Tests and the e2e harness read source, spec, JSON and pid files, never key files.
+app/lib/__tests__/* readFileSync
+app/e2e/* readFileSync
+scripts/test/* readFileSync|Bun\.file\(|-keypair\.json
+
+# Config, IDL and vector files (JSON), never keys.
+scripts/devnet/lib/config.ts readFileSync
+scripts/devnet/allowlist.ts readFileSync
+scripts/generate-client.ts readFileSync
+scripts/idl-compat.ts Bun\.file\(
+
+# Reads the program binary (--so, never a key) to check its executable hash.
+scripts/devnet/deploy.ts import \{ readFileSync, statSync \} from 'node:fs'|readSo: \(p\) => readFileSync\(p\)
+
+# The program keypair path handed to the Solana CLI; never opened.
+scripts/devnet/deploy.ts -keypair\.json
+scripts/devnet/lib/cli.ts -keypair\.json

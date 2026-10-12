@@ -5,27 +5,23 @@
 use anchor_lang::prelude::Pubkey;
 use mutav::{
     constants::*,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::IncomeSwept,
     math::shares_for,
-    solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
 };
 use mutav_tests::helpers::*;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
-fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
-    Solvency::compute(&SolvencyInputs {
+fn coverage(c: &VaultConfig, s: &VaultState) -> Coverage {
+    Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
-        tesouro_units: s.tesouro_units,
-        tesouro_price: s.tesouro_price,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
         provisions: s.provisions,
-        buffer_earmark: s.buffer_earmark,
-        feature_flags: c.feature_flags,
-        head_starved: false,
+        stress_buffer: c.caps.stress_buffer,
     })
     .unwrap()
 }
@@ -136,8 +132,8 @@ fn sweep_moves_the_statement_into_the_reserve_and_raises_nav() {
     let s = f.state();
     assert_eq!(s.brs_balance, 101_000 * BRL);
     assert_eq!(s.income_total, 1_000 * BRL);
-    assert_eq!(s.income_take_total, 0);
-    assert_eq!(s.inflows_since_refresh, 1_000 * BRL);
+    // The guard's counter is per share: 1,000 / 100,000 shares = 0.01.
+    assert_eq!(s.inflow_nav, NAV_SCALE / 100);
     assert_eq!(s.fees_in_total, 0, "income is not a guarantee fee");
     assert_eq!(f.balance(&f.income_inbox()), 0);
     assert_eq!(f.balance(&f.pdas.reserve), 101_000 * BRL);
@@ -149,8 +145,13 @@ fn sweep_moves_the_statement_into_the_reserve_and_raises_nav() {
 
     let rec = f.income_receipt(&r);
     assert_eq!(
-        (rec.version, rec.income_ref_hash, rec.period),
-        (PROGRAM_LAYOUT_VERSION, r, 202_610)
+        (rec.version, rec.kind, rec.ref_hash, rec.period),
+        (
+            PROGRAM_LAYOUT_VERSION,
+            INCOME_KIND_ISSUER_STATEMENT,
+            r,
+            202_610
+        )
     );
     assert_ne!(rec.bump, 0);
     assert_eq!(
@@ -166,10 +167,7 @@ fn sweep_moves_the_statement_into_the_reserve_and_raises_nav() {
         (e.config, e.ts, e.income_ref_hash, e.period),
         (f.pdas.config, 1_760_000_000, r, 202_610)
     );
-    assert_eq!(
-        (e.gross, e.take, e.net, e.inbox_after),
-        (1_000 * BRL, 0, 1_000 * BRL, 0)
-    );
+    assert_eq!((e.amount, e.inbox_after), (1_000 * BRL, 0));
 }
 
 #[test]
@@ -183,7 +181,7 @@ fn nav_and_stable_assets_rise_only_on_the_sweep() {
     f.refresh().unwrap();
     let mid = f.state();
     assert_eq!(mid.brs_balance, before.brs_balance);
-    assert_eq!(mid.stable_assets, before.stable_assets);
+    assert_eq!(mid.brs_balance, before.brs_balance);
     assert_eq!(mid.nav_per_share, before.nav_per_share);
 
     // A stray transfer straight into `reserve` does not move it either
@@ -191,14 +189,14 @@ fn nav_and_stable_assets_rise_only_on_the_sweep() {
     let reserve = f.pdas.reserve;
     f.mint_brs(&reserve, 3_000 * BRL);
     f.refresh().unwrap();
-    assert_eq!(f.state().stable_assets, before.stable_assets);
+    assert_eq!(f.state().brs_balance, before.brs_balance);
     assert_eq!(f.state().nav_per_share, before.nav_per_share);
 
     // The sweep books it.
     f.sweep(5_000 * BRL).0.unwrap();
     f.refresh().unwrap();
     let after = f.state();
-    assert_eq!(after.stable_assets, before.stable_assets + 5_000 * BRL);
+    assert_eq!(after.brs_balance, before.brs_balance + 5_000 * BRL);
     assert_eq!(after.nav_per_share, NAV_SCALE + 50_000_000);
     assert!(!after.fulfil_halted, "a 5% inflow does not trip the guard");
     // Invariant 4: the stray 3,000 stays untracked in `reserve`.
@@ -363,11 +361,11 @@ fn wrong_mint_or_token_program_is_refused() {
     let mut a = f.income_accounts();
     a.token_program = TOKEN_2022_PROGRAM;
     let ix = f.sweep_income_ix(a, unique_hash(), PERIOD, 1);
-    assert_mutav_err(f.send(ix, &o), MutavError::InvalidMint);
+    assert_mutav_err(f.send(ix, &o), MutavError::InvalidTokenProgram);
 }
 
 #[test]
-fn only_the_reserve_receives_the_net_and_only_the_treasury_the_take() {
+fn only_the_reserve_receives_income() {
     let mut f = funded();
     f.pay_income(1_000 * BRL);
     let o = op(&f);
@@ -378,13 +376,6 @@ fn only_the_reserve_receives_the_net_and_only_the_treasury_the_take() {
         f.send(ix, &o),
         anchor_lang::error::ErrorCode::ConstraintSeeds,
     );
-
-    for other in [f.payments, f.token_account(&Pubkey::new_unique())] {
-        let mut a = f.income_accounts();
-        a.treasury = other;
-        let ix = f.sweep_income_ix(a, unique_hash(), PERIOD, 1);
-        assert_mutav_err(f.send(ix, &o), MutavError::InvalidTreasuryAccount);
-    }
 
     let mut a = f.income_accounts();
     a.vault_authority = Pubkey::new_unique();
@@ -422,14 +413,10 @@ fn a_revoked_or_rotated_operator_cannot_sweep() {
     let old = op(&f);
 
     // Rotated by the admin: the old key is refused, the new one works.
-    let admin = f.admin.insecure_clone();
     let new_op = Keypair::new();
-    let pauser = f.config().pauser;
-    f.send(
-        f.set_roles_ix(&admin.pubkey(), new_op.pubkey(), pauser),
-        &admin,
-    )
-    .unwrap();
+    f.svm.airdrop(&new_op.pubkey(), 1_000_000_000).unwrap();
+    f.handover(mutav::constants::ROLE_OPERATOR, &new_op)
+        .unwrap();
     let ix = f.sweep_income_ix(f.income_accounts(), unique_hash(), PERIOD, 500 * BRL);
     assert_mutav_err(f.send(ix, &old), MutavError::Unauthorized);
     let mut a = f.income_accounts();
@@ -455,11 +442,16 @@ fn a_frozen_inbox_or_reserve_fails_closed_and_changes_nothing() {
     let mut f = funded();
     f.pay_income(1_000 * BRL);
     let inbox = f.income_inbox();
-    for frozen in [inbox, f.pdas.reserve] {
+    // A frozen inbox is not a valid source; a frozen reserve is the usual
+    // reserve freeze.
+    for (frozen, err) in [
+        (inbox, MutavError::InvalidIncomeSource),
+        (f.pdas.reserve, MutavError::ReserveFrozen),
+    ] {
         f.set_frozen(&frozen, true);
         let before = snapshot(&f);
         let (res, r) = f.sweep(1_000 * BRL);
-        assert_mutav_err(res, MutavError::ReserveFrozen);
+        assert_mutav_err(res, err);
         assert_eq!(snapshot(&f), before);
         assert!(f
             .svm
@@ -486,38 +478,27 @@ fn a_newer_vault_state_is_refused() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn sweep_works_while_paused_under_covered_with_notices_and_a_stale_price() {
-    // Not paused, never solvency-gated, no mode check, not gated by claim
-    // notices: money coming in is always accepted (ADR 0017). It reads
-    // neither the price nor `buffer_earmark`.
+fn sweep_works_while_paused_and_under_covered() {
+    // Not paused, never coverage-gated, no mode check: money coming in is
+    // always accepted (ADR 0017).
     let mut f = funded();
     let pauser = f.pauser.insecure_clone();
     f.send(f.pause_ix(&pauser.pubkey()), &pauser).unwrap();
     f.pay_income(2_000 * BRL);
     f.sweep(1_000 * BRL).0.expect("paused");
 
-    let mut c = f.config();
-    c.feature_flags = INSTANT_EXIT;
-    f.write_config(&c);
     let mut s = f.state();
     s.mode = MODE_UNDER_COVERED;
     s.remaining_cover_total = 10_000_000 * BRL;
-    s.pending_notices = 2;
-    s.tesouro_units = 7; // a TESOURO position with no fresh price
-    s.buffer_earmark = 123;
     f.write_state(&s);
-    f.sweep(1_000 * BRL)
-        .0
-        .expect("under-covered, notices pending, stale price, injected earmark");
+    f.sweep(1_000 * BRL).0.expect("under-covered");
     let s = f.state();
     assert_eq!(s.brs_balance, 102_000 * BRL);
-    assert_eq!(s.buffer_earmark, 123, "earmark untouched");
     assert_eq!(s.mode, MODE_UNDER_COVERED, "mode is refresh's job");
-    assert_eq!(s.pending_notices, 2);
 }
 
 #[test]
-fn income_raises_free_capital_for_the_solvency_gate() {
+fn income_raises_free_capital_for_the_coverage_gate() {
     // c = 1.0: 100,000 of capital backs 100,000 of cover. A registration
     // that does not fit before the sweep fits after it.
     let mut f = funded();
@@ -533,10 +514,10 @@ fn income_raises_free_capital_for_the_solvency_gate() {
     // Unswept income in the inbox does not help.
     f.pay_income(2_000 * BRL);
     assert_mutav_err(f.register(g.clone()), MutavError::InsufficientFreeCapital);
-    assert_eq!(solvency(&f.config(), &f.state()).free_capital, 10_000 * BRL);
+    assert_eq!(coverage(&f.config(), &f.state()).free_capital, 10_000 * BRL);
 
     f.sweep(2_000 * BRL).0.unwrap();
-    assert_eq!(solvency(&f.config(), &f.state()).free_capital, 12_000 * BRL);
+    assert_eq!(coverage(&f.config(), &f.state()).free_capital, 12_000 * BRL);
     f.register(g).expect("fits after the sweep");
 }
 
@@ -569,45 +550,27 @@ fn a_large_income_payment_does_not_halt_fulfilment() {
 }
 
 // ---------------------------------------------------------------------------
-// MUTAV's take (`income_take_bps`, capped by `MAX_INCOME_TAKE_BPS`)
+// No take on issuer income (ADR 0019)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn set_config_refuses_any_take_above_the_program_cap() {
-    let mut f = Fixture::new();
-    assert_eq!(MAX_INCOME_TAKE_BPS, 0, "cap TBD: fails closed at 0");
-    let mut args = set_config_args(&f.config());
-    args.income_take_bps = MAX_INCOME_TAKE_BPS + 1;
-    assert_mutav_err(f.set_config(args.clone()), MutavError::InvalidParameter);
-    args.income_take_bps = MAX_INCOME_TAKE_BPS;
-    f.set_config(args).expect("at the cap");
-    assert_eq!(f.config().income_take_bps, 0);
-}
-
-#[test]
-fn an_injected_take_goes_to_the_treasury_rounded_down() {
-    // A take set by a later binary (25%): the split mirrors `contribute_fees`
-    // and rounds the take down, in the reserve's favour.
+fn all_issuer_income_builds_the_reserve() {
     let mut f = funded();
-    let mut c = f.config();
-    c.income_take_bps = 2_500;
-    f.write_config(&c);
-    let treasury = c.treasury_account;
+    let treasury = f.config().treasury_account;
     f.pay_income(1_000 * BRL + 3);
     let (res, r) = f.sweep(1_000 * BRL + 3);
     let meta = res.unwrap();
-    // take = floor(1,000.000003 × 0.25) = 250.000000 (0.75 base units drop).
-    let take = 250 * BRL;
-    let net = 750 * BRL + 3;
-    assert_eq!(f.balance(&treasury), take);
+    assert_eq!(f.balance(&treasury), 0);
     let s = f.state();
-    assert_eq!(s.brs_balance, 100_000 * BRL + net);
-    assert_eq!((s.income_total, s.income_take_total), (net, take));
-    assert_eq!(s.inflows_since_refresh, net);
+    assert_eq!(s.brs_balance, 101_000 * BRL + 3);
+    assert_eq!(s.income_total, 1_000 * BRL + 3);
     let rec = f.income_receipt(&r);
-    assert_eq!((rec.gross, rec.take, rec.net), (1_000 * BRL + 3, take, net));
+    assert_eq!(
+        (rec.gross, rec.take, rec.net),
+        (1_000 * BRL + 3, 0, 1_000 * BRL + 3)
+    );
     let e = &events::<IncomeSwept>(&meta)[0];
-    assert_eq!((e.take, e.net, e.inbox_after), (take, net, 0));
+    assert_eq!((e.amount, e.inbox_after), (1_000 * BRL + 3, 0));
 }
 
 // ---------------------------------------------------------------------------
@@ -625,7 +588,17 @@ fn no_drift_between_the_reserve_and_brs_balance() {
         x ^= x << 13;
         x ^= x >> 7;
         x ^= x << 17;
-        let mut ixs = f.pilot_instructions();
+        // Role changes are left out: they would retire the fixture's keys.
+        let mut ixs: Vec<_> = f
+            .pilot_instructions()
+            .into_iter()
+            .filter(|(n, _, _)| {
+                !matches!(
+                    *n,
+                    "accept_role" | "accept_admin" | "revoke_operator" | "revoke_pauser"
+                )
+            })
+            .collect();
         let (name, ix, signer) = ixs.swap_remove((x % ixs.len() as u64) as usize);
         let _ = f.send(ix, &signer);
         let s = f.state();
@@ -637,7 +610,6 @@ fn no_drift_between_the_reserve_and_brs_balance() {
     }
     let s = f.state();
     assert!(s.income_total > 0, "the sequence swept income");
-    assert_eq!(s.income_take_total, 0);
 }
 
 /// Timing scenario (documentation for the transparency copy): a deposit

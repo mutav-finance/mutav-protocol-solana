@@ -23,6 +23,8 @@ import {
   getI64Encoder,
   getStructDecoder,
   getStructEncoder,
+  getU32Decoder,
+  getU32Encoder,
   getU64Decoder,
   getU64Encoder,
   type Address,
@@ -47,9 +49,12 @@ export type GuaranteeRegisteredEvent = {
   id: ReadonlyUint8Array;
   agencyId: ReadonlyUint8Array;
   refsHash: ReadonlyUint8Array;
-  rent: bigint;
   defaultCover: bigint;
   exitCover: bigint;
+  /** Running totals after the registration. */
+  remainingCoverTotal: bigint;
+  coverageRequired: bigint;
+  activeGuarantees: number;
 };
 
 export type GuaranteeRegisteredEventArgs = {
@@ -58,9 +63,12 @@ export type GuaranteeRegisteredEventArgs = {
   id: ReadonlyUint8Array;
   agencyId: ReadonlyUint8Array;
   refsHash: ReadonlyUint8Array;
-  rent: number | bigint;
   defaultCover: number | bigint;
   exitCover: number | bigint;
+  /** Running totals after the registration. */
+  remainingCoverTotal: number | bigint;
+  coverageRequired: number | bigint;
+  activeGuarantees: number;
 };
 
 /** Gets the encoder for {@link GuaranteeRegisteredEventArgs} event data. */
@@ -72,9 +80,11 @@ export function getGuaranteeRegisteredEventEncoder(): FixedSizeEncoder<Guarantee
       ["id", fixEncoderSize(getBytesEncoder(), 32)],
       ["agencyId", fixEncoderSize(getBytesEncoder(), 32)],
       ["refsHash", fixEncoderSize(getBytesEncoder(), 32)],
-      ["rent", getU64Encoder()],
       ["defaultCover", getU64Encoder()],
       ["exitCover", getU64Encoder()],
+      ["remainingCoverTotal", getU64Encoder()],
+      ["coverageRequired", getU64Encoder()],
+      ["activeGuarantees", getU32Encoder()],
     ]),
     [getConstantEncoder(GUARANTEE_REGISTERED_EVENT_DISCRIMINATOR)],
   );
@@ -89,9 +99,11 @@ export function getGuaranteeRegisteredEventDecoder(): FixedSizeDecoder<Guarantee
       ["id", fixDecoderSize(getBytesDecoder(), 32)],
       ["agencyId", fixDecoderSize(getBytesDecoder(), 32)],
       ["refsHash", fixDecoderSize(getBytesDecoder(), 32)],
-      ["rent", getU64Decoder()],
       ["defaultCover", getU64Decoder()],
       ["exitCover", getU64Decoder()],
+      ["remainingCoverTotal", getU64Decoder()],
+      ["coverageRequired", getU64Decoder()],
+      ["activeGuarantees", getU32Decoder()],
     ]),
     [getConstantDecoder(GUARANTEE_REGISTERED_EVENT_DISCRIMINATOR)],
   );

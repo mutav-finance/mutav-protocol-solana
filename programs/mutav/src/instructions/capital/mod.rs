@@ -1,13 +1,11 @@
 //! Investor capital, async (spec §5.5, §5.6; ADRs 0008, 0010). MUTAV's
 //! capital wallet uses the same flow as every investor.
 //!
-//! Async deposit/redeem core adapted from `solana-foundation/vault`
-//! (`programs/async_vault/src/instructions/`, commit c359962), MIT License,
-//! Copyright (c) 2026 Solana Foundation. See `NOTICE`.
-//! Changes: Merkle allowlist, request-size limits, strict FIFO queues by
+//! Design reference: the async request lifecycle of `solana-foundation/vault`;
+//! no code is copied (see docs/provenance.md). Design notes: Merkle allowlist, request-size limits, strict FIFO queues by
 //! `seq` with a skip proof, admin fulfilment at the NAV at fulfil, gated by
-//! pause, claim notices, the NAV-move guard, `free_capital` and
-//! `liquid_budget`; owner-only debits; `HolderState` stamps.
+//! pause, the NAV-move guard, `free_capital` and
+//! `liquid_budget`; owner-only debits.
 
 pub mod cancel_deposit;
 pub mod cancel_redeem;
@@ -28,25 +26,122 @@ pub use request_deposit::*;
 pub use request_redeem::*;
 
 use anchor_lang::{prelude::*, Discriminator};
+use anchor_spl::associated_token::{self, get_associated_token_address_with_program_id};
 
 use crate::{
     allowlist,
     constants::{DEPOSIT_SEED, REDEEM_SEED},
     errors::MutavError,
-    state::VaultConfig,
+    pricing::{guard_nav, nav_move_exceeds, published_nav},
+    state::{VaultConfig, VaultState},
 };
 
-/// `owner` is on the investor allowlist (spec §5.5).
-pub(crate) fn require_allowlisted(
-    config: &VaultConfig,
-    owner: &Pubkey,
-    proof: &[[u8; 32]],
+/// The NAV per share range (`NAV_SCALE`) a fill may run at (ADR 0023).
+/// `/admin` composes it at proposal time around the NAV it shows; a fill at
+/// a NAV outside `[min, max]` refuses with `NavOutOfBounds`, so a proposal
+/// that waits on the time lock never executes at a NAV the admin did not
+/// agree to.
+///
+/// Fills (`fulfil_deposits`, `fulfil_redeems`) check the conversion NAV, the
+/// price each fill converts at (`V = 1` on an empty reserve).
+/// `clear_fulfil_halt` checks the published NAV (`nav_per_share`, floored at
+/// 1, and 0 with no shares outstanding).
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NavBounds {
+    pub min: u64,
+    pub max: u64,
+}
+
+impl NavBounds {
+    /// `min ≤ max`, else `InvalidParameter`.
+    pub fn validate(&self) -> Result<()> {
+        require!(self.min <= self.max, MutavError::InvalidParameter);
+        Ok(())
+    }
+
+    /// `nav` is inside the bounds, else `NavOutOfBounds`.
+    pub fn check(&self, nav: u64) -> Result<()> {
+        require!(
+            self.min <= nav && nav <= self.max,
+            MutavError::NavOutOfBounds
+        );
+        Ok(())
+    }
+}
+
+/// The fills' own NAV-move guard (ADR 0023): the rule `refresh` applies,
+/// evaluated inline at the NAV the fill would use. Measured from the last
+/// published NAV (`state.nav_per_share`, the guard's baseline) to the NAV
+/// now, net of the NAV per share verified inflows added since
+/// (`state.inflow_nav`, ADR 0017). A move beyond `max_nav_move_bps` refuses
+/// with `FulfilHalted`: no fill runs across a move the guard would halt,
+/// even before a `refresh` records it. The refusal changes nothing; the next
+/// `refresh` raises the halt.
+pub(crate) fn require_nav_within_guard(
+    state: &VaultState,
+    net_assets: u64,
+    max_nav_move_bps: u16,
 ) -> Result<()> {
+    let published = published_nav(net_assets, state.shares_outstanding)?;
+    let moved = guard_nav(published, state.inflow_nav);
     require!(
-        allowlist::verify(&config.investor_allowlist_root, owner, proof),
-        MutavError::NotAllowlisted
+        !nav_move_exceeds(state.nav_per_share, moved, max_nav_move_bps),
+        MutavError::FulfilHalted
     );
     Ok(())
+}
+
+/// An underwater reserve ([`crate::coverage::is_underwater`]; ADR 0022,
+/// ADR 0029): NAV per share below the smallest published unit while shares
+/// are outstanding. A deposit would buy the holders' losses at a near-zero
+/// price and a redemption would pay nothing, so both fills refuse with
+/// `ReserveUnderwater` until NAV is restored (spec §6: interim recovery).
+pub(crate) fn require_not_underwater(shares_outstanding: u64, net_assets: u64) -> Result<()> {
+    require!(
+        !crate::coverage::is_underwater(net_assets, shares_outstanding),
+        MutavError::ReserveUnderwater
+    );
+    Ok(())
+}
+
+/// How an investor shows it may enter the reserve (spec §5.5).
+///
+/// **Append-only.** Borsh encodes the variant index, so a variant is never
+/// removed or reordered; an attestation variant (`kyc_attester`, carved in
+/// `VaultConfig`) is added at the end when it is built.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
+pub enum Eligibility {
+    /// A proof that the owner is a leaf of `investor_allowlist_root`.
+    Merkle { proof: Vec<[u8; 32]> },
+}
+
+/// `owner` is eligible (spec §5.5): on the investor allowlist.
+pub(crate) fn require_eligible(
+    config: &VaultConfig,
+    owner: &Pubkey,
+    eligibility: &Eligibility,
+) -> Result<()> {
+    match eligibility {
+        Eligibility::Merkle { proof } => require!(
+            allowlist::verify(&config.investor_allowlist_root, owner, proof),
+            MutavError::NotAllowlisted
+        ),
+    }
+    Ok(())
+}
+
+/// The remaining accounts of a gate (`refresh`, `fulfil_deposits`,
+/// `fulfil_redeems`): the first `config.adapter_count` are the `AdapterState`
+/// PDAs in bitmap order (ADR 0018, ADR 0027), the rest follow (request PDAs).
+/// This binary values no adapter, so a reserve with adapters fails closed
+/// (`FeatureNotSupported`); with `adapter_count == 0` every remaining
+/// account is passed through unchanged.
+pub(crate) fn split_adapter_accounts<'a, 'info>(
+    config: &VaultConfig,
+    remaining: &'a [AccountInfo<'info>],
+) -> Result<&'a [AccountInfo<'info>]> {
+    require!(config.adapter_count == 0, MutavError::FeatureNotSupported);
+    Ok(remaining)
 }
 
 /// `caps.min_request ≤ assets ≤ caps.max_request` (spec §5.5, §8).
@@ -60,6 +155,39 @@ pub(crate) fn require_request_size(config: &VaultConfig, assets: u64) -> Result<
         MutavError::RequestTooLarge
     );
     Ok(())
+}
+
+/// The owner's associated token account for `mint` under `token_program`:
+/// the only destination of a refund, a share mint or a redemption payout
+/// (ADR 0023).
+pub fn owner_ata(owner: &Pubkey, mint: &Pubkey, token_program: &Pubkey) -> Pubkey {
+    get_associated_token_address_with_program_id(owner, mint, token_program)
+}
+
+/// Creates `ata` (the owner's associated token account for `mint`) if it
+/// does not exist, with `payer` paying the rent (ADR 0023). Idempotent: an
+/// existing account is left as is. The address is checked by the caller's
+/// account constraint and again by the associated token program.
+pub(crate) fn create_owner_ata<'info>(
+    payer: AccountInfo<'info>,
+    ata: AccountInfo<'info>,
+    owner: AccountInfo<'info>,
+    mint: AccountInfo<'info>,
+    system_program: AccountInfo<'info>,
+    token_program: AccountInfo<'info>,
+    associated_token_program: Pubkey,
+) -> Result<()> {
+    associated_token::create_idempotent(CpiContext::new(
+        associated_token_program,
+        associated_token::Create {
+            payer,
+            associated_token: ata,
+            authority: owner,
+            mint,
+            system_program,
+            token_program,
+        },
+    ))
 }
 
 /// `DepositRequest` PDA of `seq`.

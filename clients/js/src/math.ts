@@ -1,6 +1,6 @@
 /**
- * TypeScript mirror of the program's math and solvency modules
- * (`programs/mutav/src/{math,solvency}.rs`, spec §4), for previews.
+ * TypeScript mirror of the program's math and coverage modules
+ * (`programs/mutav/src/{math,coverage}.rs`, spec §4), for previews.
  *
  * Every value is a `bigint` in base units. Each function rounds exactly as the
  * program does, in the reserve's favour, and throws `MathOverflowError` where
@@ -12,21 +12,11 @@
  */
 
 export const U64_MAX = (1n << 64n) - 1n;
-const I64_MIN = -(1n << 63n);
-const I64_MAX = (1n << 63n) - 1n;
 
 /** Basis-point denominator (`10_000` = 100%). */
 export const BPS_DENOMINATOR = 10_000n;
 /** Program minimum for `coverage_ratio_bps`: c ≥ 0.10 (ADR 0016). */
 export const MIN_COVERAGE_RATIO_BPS = 1_000;
-/**
- * Program cap on `income_take_bps` (ADR 0017). Its value is TBD (spec §12
- * Q47), so the program fails closed at 0: all issuer income builds the
- * reserve.
- */
-export const MAX_INCOME_TAKE_BPS = 0;
-/** Scale of TESOURO prices: BRS base units per TESOURO base unit × 10^9. */
-export const PRICE_SCALE = 1_000_000_000n;
 /** Scale of NAV per share: `NAV_SCALE` is NAV 1.0. */
 export const NAV_SCALE = 1_000_000_000n;
 /** Share-conversion virtual offset `V = 10^0 = 1` (spec §12 Q20). */
@@ -52,20 +42,12 @@ function u64(x: bigint, what = 'value'): bigint {
   return x;
 }
 
-function i64(x: bigint, what = 'value'): bigint {
-  if (typeof x !== 'bigint' || x < I64_MIN || x > I64_MAX) {
-    throw new RangeError(`${what} must be an i64 bigint, got ${String(x)}`);
-  }
-  return x;
-}
-
 function toU64(x: bigint): bigint {
   if (x > U64_MAX) throw new MathOverflowError();
   return x;
 }
 
 const satSub = (a: bigint, b: bigint) => (a > b ? a - b : 0n);
-const min = (...xs: bigint[]) => xs.reduce((m, x) => (x < m ? x : m));
 
 export type Rounding = 'down' | 'up';
 
@@ -122,68 +104,44 @@ export function conversionNav(sharesOutstanding: bigint, netAssets: bigint): big
   );
 }
 
-/** Value of the TESOURO position in BRS base units, rounded down. */
-export const tesouroValue = (units: bigint, boundedPrice: bigint) =>
-  mulDiv(units, boundedPrice, PRICE_SCALE, 'down');
-
-/** `brs_balance + tesouro_value`. */
-export function stableAssets(brsBalance: bigint, tesouroValue: bigint): bigint {
-  return toU64(u64(brsBalance) + u64(tesouroValue));
+/**
+ * `provisions + min(stress_buffer, max(0, remaining_cover_total − provisions))`,
+ * saturating at `u64::MAX` (`coverage::stress_term`, ADR 0022).
+ */
+export function stressTerm(remainingCoverTotal: bigint, provisions: bigint, stressBuffer: bigint): bigint {
+  const p = u64(provisions, 'provisions');
+  const unprovisioned = satSub(u64(remainingCoverTotal, 'remainingCoverTotal'), p);
+  const b = u64(stressBuffer, 'stressBuffer');
+  const sum = p + (b < unprovisioned ? b : unprovisioned);
+  return sum > U64_MAX ? U64_MAX : sum;
 }
 
 /**
- * `max(ceil(c × remaining_cover_total / 10_000), provisions)` (ADR 0016).
- * Filed claims stay fully covered when `c < 1`; at `c ≥ 1` the provisions
- * term never binds.
+ * `max(ceil(c × remaining_cover_total / 10_000), provisions + min(stress_buffer,
+ * unprovisioned))` (ADR 0016, ADR 0022). Filed claims, plus the claims that
+ * could be filed next (`stressBuffer`, `VaultConfig.caps.stressBuffer`), stay
+ * covered when `c < 1`.
+ *
+ * `stressBuffer` defaults to `0n` (ADR 0016's formula) only so existing
+ * callers keep compiling: pass the config's value to match the program.
  */
 export function coverageRequired(
   remainingCoverTotal: bigint,
   coverageRatioBps: number | bigint,
   provisions: bigint,
+  stressBuffer = 0n,
 ): bigint {
   const byRatio = mulDiv(remainingCoverTotal, BigInt(coverageRatioBps), BPS_DENOMINATOR, 'up');
-  const p = u64(provisions, 'provisions');
-  return byRatio > p ? byRatio : p;
+  const floor = stressTerm(remainingCoverTotal, provisions, stressBuffer);
+  return byRatio > floor ? byRatio : floor;
 }
 
 /** `max(0, stable_assets − coverage_required)`. */
 export const surplus = (stableAssets: bigint, coverageRequired: bigint) =>
   satSub(u64(stableAssets), u64(coverageRequired));
 
-/**
- * `now − head_requested_at > buffer_release_after_secs > 0`. `headRequestedAt`
- * is `null` when the instruction does not hold the queue head.
- */
-export function headStarved(
-  now: bigint,
-  headRequestedAt: bigint | null,
-  bufferReleaseAfterSecs: bigint,
-): boolean {
-  i64(now, 'now');
-  i64(bufferReleaseAfterSecs, 'bufferReleaseAfterSecs');
-  if (headRequestedAt === null || bufferReleaseAfterSecs <= 0n) return false;
-  return now - i64(headRequestedAt, 'headRequestedAt') > bufferReleaseAfterSecs;
-}
-
-export type EarmarkInputs = {
-  featureFlags: bigint;
-  bufferEarmark: bigint;
-  surplus: bigint;
-  brsBalance: bigint;
-  provisions: bigint;
-  headStarved: boolean;
-};
-
-/** `0` with `INSTANT_EXIT` clear or a starved head, else `min(earmark, surplus, max(0, brs − provisions))`. */
-export function earmarkEff(i: EarmarkInputs): bigint {
-  if ((u64(i.featureFlags) & INSTANT_EXIT) === 0n || i.headStarved) return 0n;
-  return min(u64(i.bufferEarmark), u64(i.surplus), satSub(u64(i.brsBalance), u64(i.provisions)));
-}
-
-export const freeCapital = (surplus: bigint, earmarkEff: bigint) => satSub(u64(surplus), u64(earmarkEff));
-
-export const liquidBudget = (brsBalance: bigint, provisions: bigint, earmarkEff: bigint) =>
-  satSub(satSub(u64(brsBalance), u64(provisions)), u64(earmarkEff));
+/** Liquid BRS a redemption fill may use: `max(0, brs_balance − provisions)`. */
+export const liquidBudget = (brsBalance: bigint, provisions: bigint) => satSub(u64(brsBalance), u64(provisions));
 
 export const netAssets = (stableAssets: bigint, provisions: bigint) =>
   satSub(u64(stableAssets), u64(provisions));
@@ -194,25 +152,32 @@ export function navPerShare(netAssets: bigint, sharesOutstanding: bigint): bigin
   return mulDiv(netAssets, NAV_SCALE, sharesOutstanding, 'down');
 }
 
-export type SolvencyInputs = {
+/**
+ * The NAV `refresh` publishes and `clear_fulfil_halt` checks against its
+ * `nav_bounds` (`pricing::published_nav`): `0` with no shares outstanding,
+ * otherwise `navPerShare` floored at `1`. Fills check `conversionNav` instead.
+ */
+export function publishedNav(netAssets: bigint, sharesOutstanding: bigint): bigint {
+  if (u64(sharesOutstanding) === 0n) return 0n;
+  const nav = navPerShare(netAssets, sharesOutstanding);
+  return nav > 1n ? nav : 1n;
+}
+
+export type CoverageInputs = {
   brsBalance: bigint;
-  tesouroUnits: bigint;
-  /** Bounded TESOURO price, `PRICE_SCALE`. */
-  tesouroPrice: bigint;
   remainingCoverTotal: bigint;
   coverageRatioBps: number;
   provisions: bigint;
-  bufferEarmark: bigint;
-  featureFlags: bigint;
-  headStarved: boolean;
+  /** `VaultConfig.caps.stressBuffer` (ADR 0022). Omitted = `0n`. */
+  stressBuffer?: bigint;
 };
 
-export type Solvency = {
-  tesouroValue: bigint;
+export type Coverage = {
+  /** The tracked BRS balance: the pilot reserve holds BRS only (ADR 0019). */
   stableAssets: bigint;
   coverageRequired: bigint;
   surplus: bigint;
-  earmarkEff: bigint;
+  /** Equal to `surplus` (no instant-exit earmark, ADR 0019). */
   freeCapital: bigint;
   liquidBudget: bigint;
   netAssets: bigint;
@@ -223,29 +188,18 @@ export type Solvency = {
   deficit: bigint;
 };
 
-/** Every spec §4 quantity for one snapshot (the program's `Solvency::compute`). */
-export function computeSolvency(i: SolvencyInputs): Solvency {
-  const tv = tesouroValue(i.tesouroUnits, i.tesouroPrice);
-  const stable = stableAssets(i.brsBalance, tv);
-  const required = coverageRequired(i.remainingCoverTotal, i.coverageRatioBps, i.provisions);
+/** Every spec §4 quantity for one snapshot (the program's `Coverage::compute`). */
+export function computeCoverage(i: CoverageInputs): Coverage {
+  const stable = u64(i.brsBalance);
+  const required = coverageRequired(i.remainingCoverTotal, i.coverageRatioBps, i.provisions, i.stressBuffer ?? 0n);
   const sur = surplus(stable, required);
-  const earmark = earmarkEff({
-    featureFlags: i.featureFlags,
-    bufferEarmark: i.bufferEarmark,
-    surplus: sur,
-    brsBalance: i.brsBalance,
-    provisions: i.provisions,
-    headStarved: i.headStarved,
-  });
   const underCovered = stable < required;
   return {
-    tesouroValue: tv,
     stableAssets: stable,
     coverageRequired: required,
     surplus: sur,
-    earmarkEff: earmark,
-    freeCapital: freeCapital(sur, earmark),
-    liquidBudget: liquidBudget(i.brsBalance, i.provisions, earmark),
+    freeCapital: sur,
+    liquidBudget: liquidBudget(i.brsBalance, i.provisions),
     netAssets: netAssets(stable, i.provisions),
     mode: underCovered ? MODE_UNDER_COVERED : MODE_NORMAL,
     underCovered,
@@ -253,10 +207,74 @@ export function computeSolvency(i: SolvencyInputs): Solvency {
   };
 }
 
+/** @deprecated Renamed to {@link CoverageInputs}; kept for existing consumers. */
+export type SolvencyInputs = CoverageInputs;
+/** @deprecated Renamed to {@link Coverage}; kept for existing consumers. */
+export type Solvency = Coverage;
+/** @deprecated Renamed to {@link computeCoverage}; kept for existing consumers. */
+export const computeSolvency = computeCoverage;
+
 /**
- * The split `sweep_income` (and `contribute_fees`) applies: `take =
- * floor(amount × takeBps / 10_000)` to the treasury, `net = amount − take`
- * into the reserve, rounded in the reserve's favour (ADR 0017).
+ * An underwater reserve (`coverage::is_underwater`, ADR 0022, ADR 0029):
+ * shares outstanding and `net_assets × NAV_SCALE < shares_outstanding`
+ * (NAV per share below the smallest published unit). Both fills refuse
+ * with `ReserveUnderwater`.
+ */
+export function isUnderwater(netAssets: bigint, sharesOutstanding: bigint): boolean {
+  const so = u64(sharesOutstanding, 'sharesOutstanding');
+  return so > 0n && u64(netAssets, 'netAssets') * NAV_SCALE < so;
+}
+
+/** `min_request / SUB_MINIMUM_EXIT_FLOOR_DIVISOR` is the floor of a sub-minimum exit (ADR 0029). */
+export const SUB_MINIMUM_EXIT_FLOOR_DIVISOR = 10n;
+
+/**
+ * The `request_redeem` size rule (`math::redeem_size_error`, ADR 0029), on
+ * values in BRS at the current NAV: `null` when accepted, else the error.
+ * `remainder` is what the request leaves in the debited share account;
+ * `canonical` says that account is the owner's share associated token account.
+ */
+export function redeemSizeError(
+  value: bigint,
+  remainder: bigint,
+  canonical: boolean,
+  minRequest: bigint,
+  maxRequest: bigint,
+): 'RequestTooSmall' | 'RequestTooLarge' | null {
+  if (value === 0n) return 'RequestTooSmall';
+  if (value > maxRequest) return 'RequestTooLarge';
+  if (value >= minRequest) return null;
+  const q = minRequest / SUB_MINIMUM_EXIT_FLOOR_DIVISOR;
+  const floor = q > 1n ? q : 1n;
+  return canonical && remainder < minRequest && value >= floor ? null : 'RequestTooSmall';
+}
+
+/** Length of the claim-payment window in days (ADR 0019). */
+export const CLAIM_WINDOW_DAYS = 31;
+
+/**
+ * Claim payments counted against `max_claim_per_period` at `now`: the
+ * buckets of the last 31 UTC days, after the roll `pay_claim` applies
+ * (ADR 0019). Mirrors `VaultState::roll_claim_window` + `claim_window_paid`.
+ */
+export function claimWindowPaid(
+  state: { claimDayBuckets: readonly bigint[]; claimDayAnchor: bigint },
+  now: bigint,
+): bigint {
+  const day = (now >= 0n ? now : now - 86_399n) / 86_400n;
+  const d = day > state.claimDayAnchor ? day : state.claimDayAnchor;
+  const gap = d - state.claimDayAnchor;
+  const n = BigInt(CLAIM_WINDOW_DAYS);
+  if (gap >= n) return 0n;
+  const cleared = new Set<number>();
+  for (let x = state.claimDayAnchor + 1n; x <= d; x++) cleared.add(Number(((x % n) + n) % n));
+  return state.claimDayBuckets.reduce((sum, b, i) => (cleared.has(i) ? sum : sum + b), 0n);
+}
+
+/**
+ * The split `contribute_fees` applies: `take = floor(amount × takeBps /
+ * 10_000)` to the treasury, `net = amount − take` into the reserve, rounded in
+ * the reserve's favour. Issuer income has no take (ADR 0019).
  */
 export function takeSplit(amount: bigint, takeBps: number): { take: bigint; net: bigint } {
   const take = mulDiv(amount, BigInt(takeBps), BPS_DENOMINATOR, 'down');

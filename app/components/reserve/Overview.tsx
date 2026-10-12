@@ -27,7 +27,7 @@ import { capitalQueue, claimsTimeline, coverageRows, moneyFlows, type FlowRow, t
 
 /** The two promises the spec makes, each linked to the view that shows them. */
 const PROMISES: [string, string, string, string][] = [
-  ["Claim payments are never blocked by solvency.", "The gate stops new guarantees and redemptions only.", "/reserve/claims", "See claims"],
+  ["Claim payments are never blocked by required coverage.", "The gate stops new guarantees and redemptions only.", "/reserve/claims", "See claims"],
   ["Capital requests need an approved wallet.", "An on-chain allowlist gates deposits and redemptions (KYC off-chain). Every approved wallet waits in the same line.", "/reserve/capital#queue", "See the capital queue"],
 ];
 
@@ -92,7 +92,7 @@ export function Overview() {
         </div>
         <aside className="flex min-w-0 flex-col gap-10">
           <RecentActivity r={r} rows={flows} />
-          <HistoryChart rows={flows} stableAssets={r.solvency.stableAssets} now={r.now} />
+          <HistoryChart rows={flows} stableAssets={r.coverage.stableAssets} now={r.now} />
         </aside>
       </div>
     </div>
@@ -130,7 +130,7 @@ function programLine(r: ReserveView): { text: string; fine: boolean } {
 function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
   const fmtBrs = useFmt();
   const s = r.state;
-  const sol = r.solvency;
+  const sol = r.coverage;
   const covered = sol.stableAssets >= sol.coverageRequired;
   const status = covered ? "var(--color-success)" : "var(--color-error)";
   const ratio = fmtRatio(sol.stableAssets, sol.coverageRequired);
@@ -152,7 +152,7 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
 
   const active = coverageRows(l.guarantees).filter((g) => g.active);
   const agencies = new Set(active.map((g) => g.agencyId)).size;
-  const awaiting = claimsTimeline(l, r.config.payoutSlaSecs, r.now).filter((c) => c.stage === "filed").length;
+  const awaiting = claimsTimeline(l).filter((c) => c.stage === "filed").length;
 
   const kpis: { label: string; value: string; def: string; href?: string }[] = [
     { label: "Free capital", value: fmtBrs(sol.freeCapital), def: "Free for new guarantees and redemptions." },
@@ -227,7 +227,6 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
 
 const PROVISION = "var(--color-copper)";
 const REST = "var(--color-chart-2)";
-const EARMARK = "var(--color-text-3)";
 const FREE = "var(--color-chart-1)";
 const SHORT = "var(--color-error)";
 
@@ -267,7 +266,6 @@ function splitRows(c: CapitalSplit, filed: number, coverageRatioBps: number): Sp
     { label: "Set aside for claims", sub: filed ? `${plural(filed, "claim")} filed, not yet paid` : "booked when a claim is filed", value: c.provisions, color: PROVISION },
   ];
   if (!under || c.restRequired > 0n) rows.push({ label: "Required buffer", sub: `rest of the ${fmtPct(coverageRatioBps)} held on remaining cover`, value: c.restRequired, color: REST });
-  if (c.earmark > 0n) rows.push({ label: "Buffer earmark", sub: "surplus held back from free capital", value: c.earmark, color: EARMARK });
   rows.push({ label: "Free capital", sub: under ? "nothing free while under-covered" : "Free for new guarantees and redemptions.", value: c.freeCapital, color: FREE });
   if (under) rows.push({ label: "Shortfall", sub: "required, not held", value: c.shortfall, color: SHORT, outline: true, negative: true });
   return rows;
@@ -275,9 +273,9 @@ function splitRows(c: CapitalSplit, filed: number, coverageRatioBps: number): Sp
 
 function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
   const fmtBrs = useFmt();
-  const c = capitalSplit(r.solvency, r.state.provisions);
+  const c = capitalSplit(r.coverage, r.state.provisions);
   const under = c.shortfall > 0n;
-  const filed = claimsTimeline(l, r.config.payoutSlaSecs, r.now).filter((x) => x.stage === "filed").length;
+  const filed = claimsTimeline(l).filter((x) => x.stage === "filed").length;
   const rows = splitRows(c, filed, r.config.coverageRatioBps);
   const committed = c.provisions + c.restRequired;
 
@@ -298,7 +296,7 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
         note:
           committed === 0n
             ? "Nothing is committed. All of it is free for new guarantees and redemptions."
-            : `${fmtBrs(committed)} is committed to claims and cover.${c.earmark > 0n ? ` ${fmtBrs(c.earmark)} is held back as the buffer earmark.` : ""} The rest is free for new guarantees and redemptions.`,
+            : `${fmtBrs(committed)} is committed to claims and cover. The rest is free for new guarantees and redemptions.`,
       };
 
   const grid = "grid grid-cols-[minmax(0,1fr)_auto_72px] items-center gap-x-6 gap-y-1 border-t px-6 py-3.5 sm:px-8";
@@ -311,7 +309,7 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
       <div className="bg-(--color-surface) flex flex-col border">
         <div className="flex flex-wrap items-center gap-x-12 gap-y-8 p-6 sm:p-8">
           <Donut
-            parts={under ? [[c.stableAssets, PROVISION], [c.shortfall, SHORT]] : [[c.provisions, PROVISION], [c.restRequired, REST], [c.earmark, EARMARK], [c.freeCapital, FREE]]}
+            parts={under ? [[c.stableAssets, PROVISION], [c.shortfall, SHORT]] : [[c.provisions, PROVISION], [c.restRequired, REST], [c.freeCapital, FREE]]}
             axis={c.axis}
             center={under ? share(c.stableAssets, c.axis) : share(c.freeCapital, c.stableAssets)}
             centerLabel={under ? "of required held" : "free"}

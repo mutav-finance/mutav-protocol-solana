@@ -39,8 +39,7 @@ fn frozen_reserve_fails_pay_claim_cleanly_and_retry_succeeds_after_thaw() {
     assert_eq!(f.raw(&f.pdas.state), state);
     assert_eq!(f.raw(&guarantee_pda(&f.pdas.config, &g.id)), guarantee);
     assert_eq!(f.claim_filing(&c).status, mutav::constants::CLAIM_FILED);
-    let payout = payout_pda(&guarantee_pda(&f.pdas.config, &g.id), &c.notice);
-    assert!(f.svm.get_account(&payout).is_none(), "no payout recorded");
+    assert_eq!(f.claim_filing(&c).paid_at, 0, "no payment recorded");
 
     set_frozen(&mut f, &reserve, false);
     f.pay_claim(c).expect("retry after thaw");
@@ -71,7 +70,7 @@ fn frozen_investor_destination_keeps_the_assets_claimable() {
     assert!(f.claim_assets(&a, seq).is_err(), "frozen destination");
     assert_eq!(f.raw(&f.pdas.state), state);
     let after = f.redeem_request(seq).expect("still open");
-    assert_eq!(after.assets_claimable, req.assets_claimable);
+    assert_eq!(after.assets_out, req.assets_out);
     assert_eq!(after.status, mutav::constants::REDEEM_FILLED);
     set_frozen(&mut f, &brs, false);
     f.claim_assets(&a, seq).expect("claim after thaw");

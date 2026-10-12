@@ -24,41 +24,41 @@ import {
 export type CapsInput = {
   maxTvl: bigint;
   maxCoverPerGuarantee: bigint;
-  maxCoverPerAgency: bigint;
   maxClaimPerCall: bigint;
   maxClaimPerPeriod: bigint;
-  claimPeriodSecs: bigint;
-  maxTesouroShareBps: number;
   minRequest: bigint;
   maxRequest: bigint;
-  minFillAssets: bigint;
+  maxNavMoveBps: number;
+  stressBuffer: bigint;
+  maxQueueWaitSecs: bigint;
+  maxReinstateAge: bigint;
 };
 
 export type CapsInputArgs = {
   maxTvl: number | bigint;
   maxCoverPerGuarantee: number | bigint;
-  maxCoverPerAgency: number | bigint;
   maxClaimPerCall: number | bigint;
   maxClaimPerPeriod: number | bigint;
-  claimPeriodSecs: number | bigint;
-  maxTesouroShareBps: number;
   minRequest: number | bigint;
   maxRequest: number | bigint;
-  minFillAssets: number | bigint;
+  maxNavMoveBps: number;
+  stressBuffer: number | bigint;
+  maxQueueWaitSecs: number | bigint;
+  maxReinstateAge: number | bigint;
 };
 
 export function getCapsInputEncoder(): FixedSizeEncoder<CapsInputArgs> {
   return getStructEncoder([
     ["maxTvl", getU64Encoder()],
     ["maxCoverPerGuarantee", getU64Encoder()],
-    ["maxCoverPerAgency", getU64Encoder()],
     ["maxClaimPerCall", getU64Encoder()],
     ["maxClaimPerPeriod", getU64Encoder()],
-    ["claimPeriodSecs", getI64Encoder()],
-    ["maxTesouroShareBps", getU16Encoder()],
     ["minRequest", getU64Encoder()],
     ["maxRequest", getU64Encoder()],
-    ["minFillAssets", getU64Encoder()],
+    ["maxNavMoveBps", getU16Encoder()],
+    ["stressBuffer", getU64Encoder()],
+    ["maxQueueWaitSecs", getI64Encoder()],
+    ["maxReinstateAge", getI64Encoder()],
   ]);
 }
 
@@ -66,14 +66,14 @@ export function getCapsInputDecoder(): FixedSizeDecoder<CapsInput> {
   return getStructDecoder([
     ["maxTvl", getU64Decoder()],
     ["maxCoverPerGuarantee", getU64Decoder()],
-    ["maxCoverPerAgency", getU64Decoder()],
     ["maxClaimPerCall", getU64Decoder()],
     ["maxClaimPerPeriod", getU64Decoder()],
-    ["claimPeriodSecs", getI64Decoder()],
-    ["maxTesouroShareBps", getU16Decoder()],
     ["minRequest", getU64Decoder()],
     ["maxRequest", getU64Decoder()],
-    ["minFillAssets", getU64Decoder()],
+    ["maxNavMoveBps", getU16Decoder()],
+    ["stressBuffer", getU64Decoder()],
+    ["maxQueueWaitSecs", getI64Decoder()],
+    ["maxReinstateAge", getI64Decoder()],
   ]);
 }
 

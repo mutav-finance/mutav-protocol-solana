@@ -1,10 +1,10 @@
 /**
  * One investor's position, read from the chain: its BRS and reserve-share
- * token accounts (associated token accounts), its HolderState, and its
- * allowlist status against the on-chain root. Read-only.
+ * token accounts (associated token accounts) and its allowlist status against
+ * the on-chain root. Read-only.
  */
 import { address, fetchEncodedAccount, type Address } from "@solana/kit";
-import { fetchMaybeHolderState, findHolderStatePda } from "@mutav-finance/mutav-protocol-solana";
+import { buildAllowlist } from "@mutav-finance/mutav-protocol-solana";
 import { checkAllowlist, type AllowlistState } from "../allowlist";
 import { bytesToHex } from "../serde";
 import type { ReserveView } from "../view";
@@ -22,11 +22,13 @@ export type InvestorView = {
     root: string;
     /** Size of the server's public ALLOWLIST (the leaves behind the root). */
     listSize: number;
+    /** The server's public ALLOWLIST, and the root it hashes to (hex; null when empty). The admin proposes this root (A9). */
+    owners: string[];
+    listRoot: string | null;
   };
   /** Token balances in base units; null when the account does not exist yet. */
   brs: { account: string; amount: bigint | null };
   shares: { account: string; amount: bigint | null };
-  holderState: { address: string; lastSharesInTs: bigint } | null;
 };
 
 /** SPL token account `amount`: u64 LE at [64..72). */
@@ -39,28 +41,25 @@ async function tokenAmount(env: ServerEnv, account: Address): Promise<bigint | n
 
 export async function readInvestor(env: ServerEnv, r: ReserveView, ownerParam: string | null): Promise<InvestorView> {
   const root = bytesToHex(Uint8Array.from(r.config.investorAllowlistRoot));
-  const base = { root, listSize: env.allowlist.length };
+  const listRoot = env.allowlist.length ? bytesToHex((await buildAllowlist(env.allowlist)).root) : null;
+  const base = { root, listSize: env.allowlist.length, owners: env.allowlist.map(String), listRoot };
   if (!ownerParam) {
-    return { owner: null, allowlist: { state: null, ...base }, brs: { account: "", amount: null }, shares: { account: "", amount: null }, holderState: null };
+    return { owner: null, allowlist: { state: null, ...base }, brs: { account: "", amount: null }, shares: { account: "", amount: null } };
   }
   const owner = address(ownerParam);
-  const o = { programAddress: env.programId };
-  const [brsAta, shareAta, [holder]] = await Promise.all([
+  const [brsAta, shareAta] = await Promise.all([
     associatedTokenAddress(owner, r.config.reserveMint, r.config.reserveTokenProgram),
     associatedTokenAddress(owner, address(r.addresses.shareMint), TOKEN_PROGRAM),
-    findHolderStatePda({ config: address(r.addresses.config), owner }, o),
   ]);
-  const [check, brs, shares, hs] = await Promise.all([
+  const [check, brs, shares] = await Promise.all([
     checkAllowlist(r.config.investorAllowlistRoot, env.allowlist, owner),
     tokenAmount(env, brsAta),
     tokenAmount(env, shareAta),
-    fetchMaybeHolderState(rpcFor(env), holder, READ),
   ]);
   return {
     owner,
     allowlist: { state: check.state, ...base },
     brs: { account: brsAta, amount: brs },
     shares: { account: shareAta, amount: shares },
-    holderState: hs.exists ? { address: hs.address, lastSharesInTs: hs.data.lastSharesInTs } : null,
   };
 }

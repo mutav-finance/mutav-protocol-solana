@@ -42,6 +42,9 @@ export function statusName(x: InvestorRequest): string {
       return "Filled";
     case "cancelled":
       return "Cancelled";
+    case "parked":
+      // Parked by the admin's cancel (ADR 0030): out of the queue; the owner collects with cancel_deposit / cancel_redeem.
+      return "Parked";
     default:
       return x.status;
   }

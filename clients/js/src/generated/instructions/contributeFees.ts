@@ -187,6 +187,10 @@ export type ContributeFeesAsyncInput<
   operator: TAccountOperator;
   config: TAccountConfig;
   state?: TAccountState;
+  /**
+   * The fee's `IncomeReceipt` (kind `FEE`): one per invoice, so a second
+   * contribution of the same invoice fails here.
+   */
   feeReceipt?: TAccountFeeReceipt;
   /**
    * The operator's own BRS token account (fees reach it via PIX → BRS).
@@ -509,6 +513,10 @@ export type ContributeFeesInput<
   operator: TAccountOperator;
   config: TAccountConfig;
   state: TAccountState;
+  /**
+   * The fee's `IncomeReceipt` (kind `FEE`): one per invoice, so a second
+   * contribution of the same invoice fails here.
+   */
   feeReceipt: TAccountFeeReceipt;
   /**
    * The operator's own BRS token account (fees reach it via PIX → BRS).
@@ -779,6 +787,10 @@ export type ParsedContributeFeesInstruction<
     operator: TAccountMetas[0];
     config: TAccountMetas[1];
     state: TAccountMetas[2];
+    /**
+     * The fee's `IncomeReceipt` (kind `FEE`): one per invoice, so a second
+     * contribution of the same invoice fails here.
+     */
     feeReceipt: TAccountMetas[3];
     /**
      * The operator's own BRS token account (fees reach it via PIX → BRS).

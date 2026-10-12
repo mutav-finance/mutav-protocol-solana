@@ -32,24 +32,23 @@ import {
 import {
   buildAllowlist,
   fetchReserve,
-  findAgencyExposurePda,
   findClaimFilingPda,
   findDepositRequestPda,
   findFeeReceiptPda,
   findGuaranteePda,
-  findHolderStatePda,
-  findPayoutPda,
   findReserveAddresses,
   getClaimSharesInstruction,
   getContributeFeesInstruction,
   getFileClaimInstruction,
+  ANY_NAV,
   getFulfilDepositsInstruction,
   getPayClaimInstruction,
   getRegisterGuaranteeInstruction,
   getRequestDepositInstruction,
   getSettlePayoutInstruction,
+  fetchClaimFiling,
   fetchGuarantee,
-  fetchPayout,
+  MUTAV_PROGRAM_ADDRESS,
 } from '../clients/js/src';
 import { opt, parseArgs } from '../scripts/devnet/lib/cli';
 import {
@@ -60,7 +59,7 @@ import {
 } from '../scripts/devnet/lib/compose';
 import { parseConfig } from '../scripts/devnet/lib/config';
 import { airdrop, assertNoProcess, LocalCluster, run, send, tempDir, type LocalRpc } from '../scripts/devnet/lib/local';
-import { main as deploy } from '../scripts/devnet/deploy';
+import { deploy } from '../scripts/devnet/deploy';
 
 export const BRS_DEVNET_MINT = address('BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4');
 const PORT = 38899;
@@ -143,24 +142,17 @@ export async function forkHappyPath(programKeypair?: string) {
     );
     for (const s of [vault!, operator!, investor!]) await airdrop(rpc, s.address, 10);
 
-    step('deploy into the fork');
-    const { programId } = await deploy({
-      url: URL,
-      payer: deployer,
-      'upgrade-authority': vault!.address,
-      ...(programKeypair ? { 'program-keypair': programKeypair } : {}),
-    });
-    const po = { programAddress: programId };
-
-    step('initialize with the real BRS mint (mint guard)');
     const treasury = await setTokenBalance(treasuryOwner!.address, BRS_DEVNET_MINT, 0n);
     const payments = await setTokenBalance(paymentsOwner!.address, BRS_DEVNET_MINT, 0n);
+    const standIn = { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, members: [vault!.address], threshold: 1, timeLockFloorSecs: 0 };
     const cfg = parseConfig({
       cluster: 'localnet',
-      programId,
+      programId: MUTAV_PROGRAM_ADDRESS,
       reserveMint: BRS_DEVNET_MINT,
       reserveTokenProgram: TOKEN_PROGRAM,
-      squads: { multisig: (await generateKeyPairSigner()).address, vaultIndex: 0, timeLockFloorSecs: 86_400 },
+      // One throwaway key stands in for both Squads vaults (no Squads program locally).
+      squads: standIn,
+      upgradeSquads: standIn,
       admin: vault!.address,
       upgradeAuthority: vault!.address,
       operator: operator!.address,
@@ -170,18 +162,25 @@ export async function forkHappyPath(programKeypair?: string) {
       paymentsAccount: payments,
       coverageRatioBps: 10_000,
       feeTakeBps: 2_000,
-      payoutSlaSecs: 172_800,
       caps: {
-        maxTvl: '100000000000', maxCoverPerGuarantee: '30000000000', maxCoverPerAgency: '60000000000',
-        maxClaimPerCall: '10000000000', maxClaimPerPeriod: '20000000000', claimPeriodSecs: 2_592_000,
-        maxTesouroShareBps: 0, minRequest: '1000000000', maxRequest: '30000000000', minFillAssets: '500000000',
-      },
-      price: {
-        tesouroPriceAccount: '11111111111111111111111111111111', p0: 1_000_000_000, t0: 0, yMaxBps: 1_500,
-        maxStalenessSecs: 86_400, maxDeviationBps: 200, maxNavMoveBps: 10_000,
+        maxTvl: '100000000000', maxCoverPerGuarantee: '30000000000', maxClaimPerCall: '10000000000',
+        maxClaimPerPeriod: '20000000000', minRequest: '1000000000', maxRequest: '30000000000', maxNavMoveBps: 10_000,
       },
       allowlist: [capital!.address, investor!.address],
     });
+    step('deploy into the fork');
+    const { programId } = await deploy({
+      url: URL,
+      confirmCluster: undefined,
+      payer: deployer,
+      upgradeAuthority: vault!.address,
+      cfg,
+      localStandIn: true,
+      ...(programKeypair ? { programKeypair } : {}),
+    });
+    const po = { programAddress: programId };
+
+    step('initialize with the real BRS mint (mint guard)');
     const sendAs = (s: TransactionSigner, ixs: Instruction[]) => send(rpc, s, ixs);
     await sendAs(vault!, [await composeInitialize(cfg, { upgradeAuthority: vault!, payer: vault! })]);
     const a = await findReserveAddresses(BRS_DEVNET_MINT, po);
@@ -196,13 +195,13 @@ export async function forkHappyPath(programKeypair?: string) {
     const investorBrs = await setTokenBalance(investor!.address, BRS_DEVNET_MINT, deposit);
     const seq = r.state.data.nextDepositSeq;
     const [depositRequest] = await findDepositRequestPda({ config: a.config, seq }, po);
-    const [holderState] = await findHolderStatePda({ config: a.config, owner: investor!.address }, po);
     await sendAs(investor!, [
       getRequestDepositInstruction(
         {
-          owner: investor!, config: a.config, state: a.state, depositRequest, holderState, source: investorBrs,
+          owner: investor!, config: a.config, state: a.state, depositRequest, source: investorBrs,
           pendingDeposits: a.pendingDeposits, reserveMint: BRS_DEVNET_MINT, tokenProgram: TOKEN_PROGRAM,
-          eventAuthority: a.eventAuthority, program: programId, assets: deposit, proof: tree.proofs.get(investor!.address)!,
+          eventAuthority: a.eventAuthority, program: programId, assets: deposit, minSharesOut: 0n,
+          eligibility: { __kind: 'Merkle', proof: tree.proofs.get(investor!.address)! },
         },
         po,
       ),
@@ -211,7 +210,7 @@ export async function forkHappyPath(programKeypair?: string) {
       {
         admin: vault!, config: a.config, state: a.state, pendingDeposits: a.pendingDeposits, reserve: a.reserve,
         vaultAuthority: a.vaultAuthority, reserveMint: BRS_DEVNET_MINT, tokenProgram: TOKEN_PROGRAM,
-        eventAuthority: a.eventAuthority, program: programId, count: 1,
+        eventAuthority: a.eventAuthority, program: programId, count: 1, navBounds: ANY_NAV,
       },
       po,
     );
@@ -220,7 +219,7 @@ export async function forkHappyPath(programKeypair?: string) {
     await sendAs(investor!, [
       getClaimSharesInstruction(
         {
-          owner: investor!, config: a.config, depositRequest, holderState, shareMint: a.shareMint,
+          owner: investor!, config: a.config, depositRequest, shareMint: a.shareMint,
           ownerShares: investorShares, vaultAuthority: a.vaultAuthority, eventAuthority: a.eventAuthority, program: programId,
         },
         po,
@@ -235,14 +234,12 @@ export async function forkHappyPath(programKeypair?: string) {
     const id = bytes32('fork-guarantee-1');
     const agencyId = bytes32('fork-agency-1');
     const [guarantee] = await findGuaranteePda({ config: a.config, id }, po);
-    const [agencyExposure] = await findAgencyExposurePda({ config: a.config, agencyId }, po);
     const op = { operator: operator!, config: a.config, eventAuthority: a.eventAuthority, program: programId };
     await sendAs(operator!, [
       getRegisterGuaranteeInstruction(
         {
-          ...op, state: a.state, guarantee, agencyExposure, payer: operator!,
-          id, agencyId, refsHash: bytes32('refs'), rent: 1_000n * BRL, defaultMultiplierBps: 10_000,
-          exitMultiplierBps: 5_000, defaultCover: 1_000n * BRL, exitCover: 500n * BRL,
+          ...op, state: a.state, guarantee, reserve: a.reserve, payer: operator!,
+          id, agencyId, refsHash: bytes32('refs'), defaultCover: 1_000n * BRL, exitCover: 500n * BRL,
         },
         po,
       ),
@@ -265,34 +262,33 @@ export async function forkHappyPath(programKeypair?: string) {
     const notice = bytes32('notice-1');
     const claim = 400n * BRL;
     const [claimFiling] = await findClaimFilingPda({ guarantee, noticeRefHash: notice }, po);
-    const [payout] = await findPayoutPda({ guarantee, noticeRefHash: notice }, po);
     await sendAs(operator!, [
       getFileClaimInstruction(
-        { ...op, state: a.state, guarantee, claimFiling, payer: operator!, leg: 0, amount: claim, noticeRefHash: notice },
+        { ...op, state: a.state, guarantee, claimFiling, payer: operator!, leg: 1, amount: claim, noticeRefHash: notice },
         po,
       ),
     ]);
     await sendAs(operator!, [
       getPayClaimInstruction(
         {
-          ...op, state: a.state, guarantee, agencyExposure, claimFiling, payout, reserve: a.reserve,
+          ...op, state: a.state, guarantee, claimFiling, reserve: a.reserve,
           paymentsAccount: payments, vaultAuthority: a.vaultAuthority, reserveMint: BRS_DEVNET_MINT,
-          tokenProgram: TOKEN_PROGRAM, payer: operator!, leg: 0, amount: claim, noticeRefHash: notice,
+          tokenProgram: TOKEN_PROGRAM, noticeRefHash: notice, expectedAmount: claim,
         },
         po,
       ),
     ]);
     check((await tokenAmount(rpc, payments)) === claim, 'claim payment reached the payments account');
     await sendAs(operator!, [
-      getSettlePayoutInstruction({ ...op, guarantee, payout, noticeRefHash: notice, pixE2eHash: bytes32('pix-e2e-1') }, po),
+      getSettlePayoutInstruction({ ...op, guarantee, claimFiling, noticeRefHash: notice, pixE2eHash: bytes32('pix-e2e-1') }, po),
     ]);
     const g = await fetchGuarantee(rpc, guarantee);
-    const p = await fetchPayout(rpc, payout);
+    const p = await fetchClaimFiling(rpc, claimFiling);
     check(g.data.defaultPaid === claim, 'guarantee records the paid default leg');
-    check(p.data.status === 1, 'payout settled');
+    check(p.data.status === 3 && p.data.paidAmount === claim, 'claim paid and settled');
     r = await fetchReserve(rpc, BRS_DEVNET_MINT, po);
     check(r.state.data.brsBalance === deposit + fee - 20n * BRL - claim, 'reserve = deposit + fee − take − claim');
-    check(r.state.data.bufferEarmark === 0n && r.config.data.featureFlags === 0n, 'earmark and feature flags stay 0');
+    check(r.config.data.featureFlags === 0n, 'feature flags stay 0');
     console.log('\nFORK HAPPY PATH PASSED');
   } finally {
     step('stop Surfpool');

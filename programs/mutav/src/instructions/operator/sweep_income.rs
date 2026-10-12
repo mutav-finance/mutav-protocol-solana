@@ -16,7 +16,7 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::IncomeSwept,
-    math::{mul_div, Rounding},
+    pricing::inflow_nav,
     state::{IncomeReceipt, VaultConfig, VaultState},
 };
 
@@ -63,12 +63,6 @@ pub struct SweepIncome<'info> {
     #[account(mut, seeds = [RESERVE_SEED, config.key().as_ref()], bump)]
     pub reserve: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// The whitelisted MUTAV treasury: receives the take when
-    /// `income_take_bps > 0`.
-    /// CHECK: address-checked; the token program validates it on transfer.
-    #[account(mut, address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
-    pub treasury_account: UncheckedAccount<'info>,
-
     /// The vault authority: owns the inbox and `reserve` and signs the
     /// transfers.
     /// CHECK: data-less PDA, seeds-checked.
@@ -78,7 +72,7 @@ pub struct SweepIncome<'info> {
     #[account(address = config.reserve_mint @ MutavError::InvalidMint)]
     pub reserve_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    #[account(address = config.reserve_token_program @ MutavError::InvalidMint)]
+    #[account(address = config.reserve_token_program @ MutavError::InvalidTokenProgram)]
     pub token_program: Interface<'info, TokenInterface>,
 
     #[account(mut)]
@@ -98,11 +92,17 @@ pub fn handle_sweep_income(
     period: u32,
     amount: u64,
 ) -> Result<()> {
-    // Not paused, never solvency-gated, no mode check, not gated by claim
+    // Not paused, never coverage-gated, no mode check, not gated by claim
     // notices: money coming in is always accepted, as with `contribute_fees`
-    // (ADR 0017). Reads neither the price nor `buffer_earmark`.
+    // (ADR 0017).
     require!(amount > 0, MutavError::InvalidParameter);
     require!(is_valid_period(period), MutavError::InvalidParameter);
+    // Inflows wait for the first shares (ADR 0023): the income stays in the
+    // inbox until the first deposit is filled.
+    require!(
+        ctx.accounts.state.shares_outstanding > 0,
+        MutavError::NoSharesOutstanding
+    );
 
     let a = &ctx.accounts;
     let inbox = get_associated_token_address_with_program_id(
@@ -116,32 +116,19 @@ pub fn handle_sweep_income(
         amount <= a.income_inbox.amount,
         MutavError::IncomeExceedsInbox
     );
-    require!(
-        !a.income_inbox.is_frozen() && !a.reserve.is_frozen(),
-        MutavError::ReserveFrozen
-    );
+    // A frozen inbox cannot be a source of income: the issuer (or the
+    // mint's freeze authority) stopped it. A frozen `reserve` is the reserve
+    // freeze every inflow reports.
+    require!(!a.income_inbox.is_frozen(), MutavError::InvalidIncomeSource);
+    require!(!a.reserve.is_frozen(), MutavError::ReserveFrozen);
 
-    let take = mul_div(
-        amount,
-        a.config.income_take_bps as u64,
-        BPS_DENOMINATOR as u64,
-        Rounding::Down,
-    )?;
-    let net = amount.checked_sub(take).ok_or(MutavError::MathOverflow)?;
+    // All issuer income builds the reserve: there is no take (ADR 0019).
+    let net = amount;
     let reserve_before = a.reserve.amount;
     let inbox_before = a.income_inbox.amount;
+    transfer_from_inbox(a, a.reserve.to_account_info(), net)?;
 
-    if take > 0 {
-        let to = a.treasury_account.to_account_info();
-        transfer_from_inbox(a, to, take)?;
-    }
-    if net > 0 {
-        let to = a.reserve.to_account_info();
-        transfer_from_inbox(a, to, net)?;
-    }
-
-    // Post-CPI check: `reserve` rose by exactly `net`, the inbox fell by
-    // exactly `amount`.
+    // Post-CPI check: `reserve` rose and the inbox fell by exactly `amount`.
     ctx.accounts.reserve.reload()?;
     ctx.accounts.income_inbox.reload()?;
     let reserve_after = ctx.accounts.reserve.amount;
@@ -161,24 +148,21 @@ pub fn handle_sweep_income(
         .income_total
         .checked_add(net)
         .ok_or(MutavError::MathOverflow)?;
-    state.income_take_total = state
-        .income_take_total
-        .checked_add(take)
-        .ok_or(MutavError::MathOverflow)?;
-    // A verified inflow: the NAV-move guard measures net of it.
-    state.inflows_since_refresh = state
-        .inflows_since_refresh
-        .checked_add(net)
-        .ok_or(MutavError::MathOverflow)?;
+    // A verified inflow: the NAV-move guard measures net of the NAV per
+    // share it adds (ADR 0017). Saturating, so an inflow is never refused;
+    // a saturated counter reads as a fall and halts (fail closed).
+    state.inflow_nav = state
+        .inflow_nav
+        .saturating_add(inflow_nav(net, state.shares_outstanding));
 
     let clock = Clock::get()?;
     let r = &mut ctx.accounts.income_receipt;
     r.version = PROGRAM_LAYOUT_VERSION;
     r.bump = ctx.bumps.income_receipt;
-    r.income_ref_hash = income_ref_hash;
+    r.kind = INCOME_KIND_ISSUER_STATEMENT;
+    r.ref_hash = income_ref_hash;
     r.period = period;
     r.gross = amount;
-    r.take = take;
     r.net = net;
     r.slot = clock.slot;
 
@@ -187,10 +171,10 @@ pub fn handle_sweep_income(
         ts: clock.unix_timestamp,
         income_ref_hash,
         period,
-        gross: amount,
-        take,
-        net,
+        amount,
         inbox_after,
+        income_total: ctx.accounts.state.income_total,
+        brs_balance: ctx.accounts.state.brs_balance,
     });
     Ok(())
 }

@@ -44,8 +44,8 @@ function Stats({ r, money }: { r: ReserveView; money: Money }) {
   return (
     <div role="group" aria-label="Reserve figures" className="bg-(--color-surface-2) grid grid-cols-1 gap-x-6 gap-y-4 border px-5 py-4 sm:grid-cols-3">
       <Stat label="Share price" tip="Reserve value after claims set aside, per share." value={fmtSharePrice(r.state.navPerShare)} />
-      <Stat label="Reserve balance" tip={`BRS the reserve holds now.${usd}`} value={money.fmt(r.solvency.stableAssets)} />
-      <Stat label="Free capital" tip={`What the reserve can use for redemptions and new guarantees.${usd}`} value={money.fmt(r.solvency.freeCapital)} />
+      <Stat label="Reserve balance" tip={`BRS the reserve holds now.${usd}`} value={money.fmt(r.coverage.stableAssets)} />
+      <Stat label="Free capital" tip={`What the reserve can use for redemptions and new guarantees.${usd}`} value={money.fmt(r.coverage.freeCapital)} />
     </div>
   );
 }

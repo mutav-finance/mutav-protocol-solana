@@ -8,18 +8,41 @@
  */
 import { readFileSync } from 'node:fs';
 import { address, type Address } from '@solana/kit';
-import type { CapsInputArgs, PriceInputArgs } from '../../../clients/js/src';
+import type { CapsInputArgs } from '../../../clients/js/src';
+
+/** A Squads v4 multisig as the deploy expects to find it on-chain. */
+export type MultisigConfig = {
+  multisig: Address;
+  vaultIndex: number;
+  /** Exactly these members, each with the vote permission. */
+  members: Address[];
+  /** Exactly this threshold. */
+  threshold: number;
+  /** The multisig's `time_lock` must be at least this. */
+  timeLockFloorSecs: number;
+};
+
+/** Devnet time-lock floors (governance decision: admin 5 min, upgrade 1 h). */
+export const DEVNET_TIME_LOCK_FLOORS = { admin: 300, upgrade: 3_600 } as const;
 
 export type DeployConfig = {
   cluster: 'localnet' | 'devnet';
   programId: Address;
   reserveMint: Address;
   reserveTokenProgram: Address;
-  /** Squads v4 multisig whose vault is `admin`. */
-  squads: { multisig: Address; vaultIndex: number; timeLockFloorSecs: number };
-  /** `VaultConfig.admin`: the Squads vault. */
+  /** Admin multisig: its vault is `VaultConfig.admin` (short time lock). */
+  squads: MultisigConfig;
+  /** Upgrade multisig: its vault is the program upgrade authority (long time lock; spec §12 Q15). */
+  upgradeSquads: MultisigConfig;
+  /** `VaultConfig.admin`: the admin multisig's vault. */
   admin: Address;
-  /** Program upgrade authority: the same vault, or the upgrade multisig's (spec §12 Q15). */
+  /**
+   * Optional: the key an in-flight admin handover (`propose_admin`) is meant
+   * for. Any other pending admin is cancelled by roles.ts, and verify.ts
+   * fails while one is pending.
+   */
+  nextAdmin?: Address;
+  /** Program upgrade authority: the upgrade multisig's vault. */
   upgradeAuthority: Address;
   operator: Address;
   pauser: Address;
@@ -28,24 +51,31 @@ export type DeployConfig = {
   paymentsAccount: Address;
   coverageRatioBps: number;
   feeTakeBps: number;
-  payoutSlaSecs: bigint;
-  caps: CapsInputArgs & {
+  caps: Omit<CapsInputArgs, 'stressBuffer' | 'maxQueueWaitSecs' | 'maxReinstateAge'> & {
     maxTvl: bigint;
     maxCoverPerGuarantee: bigint;
-    maxCoverPerAgency: bigint;
     maxClaimPerCall: bigint;
+    /** Per 31-day window (ADR 0019). */
     maxClaimPerPeriod: bigint;
-    claimPeriodSecs: bigint;
     minRequest: bigint;
     maxRequest: bigint;
-    minFillAssets: bigint;
+    maxNavMoveBps: number;
+    /** ADR 0019 carves. Absent: `initialize` writes 0 (off) and `caps.ts` keeps the chain's value. */
+    stressBuffer?: bigint;
+    maxQueueWaitSecs?: bigint;
+    maxReinstateAge?: bigint;
   };
-  price: PriceInputArgs & { p0: bigint; t0: bigint; maxStalenessSecs: bigint };
   /** Owners allowlisted for `request_deposit` / `request_redeem`. */
   allowlist: Address[];
+  /**
+   * Optional pause-only guardian keys (`set_guardians`, up to 3). Absent or
+   * empty means no guardian: verify.ts fails on any guardian set on-chain.
+   */
+  guardians?: Address[];
 };
 
 const FILL = /^<FILL/;
+const DEFAULT_KEY = address('11111111111111111111111111111111');
 
 function walkPlaceholders(v: unknown, path: string, out: string[]) {
   if (typeof v === 'string' && FILL.test(v)) out.push(`${path}: ${v}`);
@@ -60,6 +90,7 @@ const big = (v: unknown, path: string) => {
   if (typeof v === 'string' && /^-?\d+$/.test(v)) return BigInt(v);
   throw new Error(`${path} must be an integer (use a string above 2^53)`);
 };
+const optBig = (v: unknown, path: string) => (v === undefined || v === null ? undefined : big(v, path));
 const int = (v: unknown, path: string, max: number) => {
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > max) {
     throw new Error(`${path} must be an integer in [0, ${max}]`);
@@ -75,6 +106,22 @@ const addr = (v: unknown, path: string) => {
   }
 };
 
+function multisigConfig(raw: any, path: string): MultisigConfig {
+  const multisig = addr(raw?.multisig, `${path}.multisig`);
+  if (!Array.isArray(raw?.members) || raw.members.length === 0) throw new Error(`${path}.members must list the multisig's members`);
+  const members = raw.members.map((m: unknown, i: number) => addr(m, `${path}.members[${i}]`));
+  if (new Set(members).size !== members.length) throw new Error(`${path}.members must be distinct`);
+  const threshold = int(raw?.threshold, `${path}.threshold`, 65_535);
+  if (threshold < 1 || threshold > members.length) throw new Error(`${path}.threshold must be in [1, ${members.length}] (the member count)`);
+  return {
+    multisig,
+    vaultIndex: int(raw?.vaultIndex, `${path}.vaultIndex`, 255),
+    members,
+    threshold,
+    timeLockFloorSecs: int(raw?.timeLockFloorSecs, `${path}.timeLockFloorSecs`, 2 ** 32 - 1),
+  };
+}
+
 /** Parse and validate a config object. Throws listing every unfilled placeholder. */
 export function parseConfig(raw: any): DeployConfig {
   const missing: string[] = [];
@@ -88,12 +135,10 @@ export function parseConfig(raw: any): DeployConfig {
     programId: addr(raw.programId, 'programId'),
     reserveMint: addr(raw.reserveMint, 'reserveMint'),
     reserveTokenProgram: addr(raw.reserveTokenProgram, 'reserveTokenProgram'),
-    squads: {
-      multisig: addr(raw.squads?.multisig, 'squads.multisig'),
-      vaultIndex: int(raw.squads?.vaultIndex, 'squads.vaultIndex', 255),
-      timeLockFloorSecs: int(raw.squads?.timeLockFloorSecs, 'squads.timeLockFloorSecs', 2 ** 32 - 1),
-    },
+    squads: multisigConfig(raw.squads, 'squads'),
+    upgradeSquads: multisigConfig(raw.upgradeSquads, 'upgradeSquads'),
     admin: addr(raw.admin, 'admin'),
+    ...(raw.nextAdmin === undefined || raw.nextAdmin === null ? {} : { nextAdmin: addr(raw.nextAdmin, 'nextAdmin') }),
     upgradeAuthority: addr(raw.upgradeAuthority, 'upgradeAuthority'),
     operator: addr(raw.operator, 'operator'),
     pauser: addr(raw.pauser, 'pauser'),
@@ -102,41 +147,58 @@ export function parseConfig(raw: any): DeployConfig {
     paymentsAccount: addr(raw.paymentsAccount, 'paymentsAccount'),
     coverageRatioBps: int(raw.coverageRatioBps, 'coverageRatioBps', 65_535),
     feeTakeBps: int(raw.feeTakeBps, 'feeTakeBps', 65_535),
-    payoutSlaSecs: big(raw.payoutSlaSecs, 'payoutSlaSecs'),
     caps: {
       maxTvl: big(raw.caps?.maxTvl, 'caps.maxTvl'),
       maxCoverPerGuarantee: big(raw.caps?.maxCoverPerGuarantee, 'caps.maxCoverPerGuarantee'),
-      maxCoverPerAgency: big(raw.caps?.maxCoverPerAgency, 'caps.maxCoverPerAgency'),
       maxClaimPerCall: big(raw.caps?.maxClaimPerCall, 'caps.maxClaimPerCall'),
       maxClaimPerPeriod: big(raw.caps?.maxClaimPerPeriod, 'caps.maxClaimPerPeriod'),
-      claimPeriodSecs: big(raw.caps?.claimPeriodSecs, 'caps.claimPeriodSecs'),
-      maxTesouroShareBps: bps(raw.caps?.maxTesouroShareBps, 'caps.maxTesouroShareBps'),
       minRequest: big(raw.caps?.minRequest, 'caps.minRequest'),
       maxRequest: big(raw.caps?.maxRequest, 'caps.maxRequest'),
-      minFillAssets: big(raw.caps?.minFillAssets, 'caps.minFillAssets'),
-    },
-    price: {
-      tesouroPriceAccount: addr(raw.price?.tesouroPriceAccount, 'price.tesouroPriceAccount'),
-      p0: big(raw.price?.p0, 'price.p0'),
-      t0: big(raw.price?.t0, 'price.t0'),
-      yMaxBps: bps(raw.price?.yMaxBps, 'price.yMaxBps'),
-      maxStalenessSecs: big(raw.price?.maxStalenessSecs, 'price.maxStalenessSecs'),
-      maxDeviationBps: bps(raw.price?.maxDeviationBps, 'price.maxDeviationBps'),
-      maxNavMoveBps: bps(raw.price?.maxNavMoveBps, 'price.maxNavMoveBps'),
+      maxNavMoveBps: bps(raw.caps?.maxNavMoveBps, 'caps.maxNavMoveBps'),
+      // ADR 0019 carves; absent means "not set by this file" (see the type).
+      stressBuffer: optBig(raw.caps?.stressBuffer, 'caps.stressBuffer'),
+      maxQueueWaitSecs: optBig(raw.caps?.maxQueueWaitSecs, 'caps.maxQueueWaitSecs'),
+      maxReinstateAge: optBig(raw.caps?.maxReinstateAge, 'caps.maxReinstateAge'),
     },
     allowlist: (raw.allowlist ?? []).map((a: unknown, i: number) => addr(a, `allowlist[${i}]`)),
+    ...(raw.guardians === undefined || raw.guardians === null
+      ? {}
+      : { guardians: (Array.isArray(raw.guardians) ? raw.guardians : [raw.guardians]).map((a: unknown, i: number) => addr(a, `guardians[${i}]`)) }),
   };
 
   // Program bounds (validate_params, validate_roles).
   if (c.feeTakeBps > 3_000) throw new Error('feeTakeBps must be <= 3000 (program maximum, 30%)');
-  if (c.coverageRatioBps < 1_000) throw new Error('coverageRatioBps must be >= 1000 (program minimum, c = 0.10; ADR 0016)');
+  if (c.coverageRatioBps < 1_000 || c.coverageRatioBps > 10_000) {
+    throw new Error('coverageRatioBps must be in [1000, 10000] (program bounds, 0.10 <= c <= 1.0; ADR 0016, ADR 0022)');
+  }
   if (c.caps.minRequest > c.caps.maxRequest) throw new Error('caps.minRequest must be <= caps.maxRequest');
-  if (c.caps.claimPeriodSecs <= 0n) throw new Error('caps.claimPeriodSecs must be > 0');
-  if (c.payoutSlaSecs < 0n || c.price.maxStalenessSecs < 0n) throw new Error('durations must be >= 0');
   const roles = [c.admin, c.operator, c.pauser];
   if (new Set(roles).size !== 3) throw new Error('admin, operator and pauser must be distinct');
   if (c.treasuryAccount === c.paymentsAccount) throw new Error('treasuryAccount and paymentsAccount must differ');
   if (c.allowlist.length === 0) throw new Error('allowlist is empty (a zero root allowlists nobody)');
+  // set_guardians bounds: three slots, distinct, none an admin/operator/pauser key.
+  if (c.guardians) {
+    if (c.guardians.length > 3) throw new Error('guardians holds at most 3 keys');
+    if (new Set(c.guardians).size !== c.guardians.length) throw new Error('guardians must be distinct');
+    if (c.guardians.includes(DEFAULT_KEY)) throw new Error('guardians must not hold the default key (leave the slot out instead)');
+    if (c.guardians.some((g) => roles.includes(g))) throw new Error('a guardian must not be the admin, operator or pauser key');
+  }
+
+  // Governance (two multisigs, devnet time-lock floors). The localnet dry run
+  // stands one throwaway key in for both.
+  if (c.cluster === 'devnet') {
+    if (c.squads.multisig === c.upgradeSquads.multisig) throw new Error('squads and upgradeSquads must be different multisigs (admin and upgrade)');
+    if (c.admin === c.upgradeAuthority) throw new Error('admin and upgradeAuthority must be different vaults');
+    if (c.squads.timeLockFloorSecs < DEVNET_TIME_LOCK_FLOORS.admin) {
+      throw new Error(`squads.timeLockFloorSecs must be >= ${DEVNET_TIME_LOCK_FLOORS.admin} on devnet`);
+    }
+    if (c.upgradeSquads.timeLockFloorSecs < DEVNET_TIME_LOCK_FLOORS.upgrade) {
+      throw new Error(`upgradeSquads.timeLockFloorSecs must be >= ${DEVNET_TIME_LOCK_FLOORS.upgrade} on devnet`);
+    }
+    for (const k of ['squads', 'upgradeSquads'] as const) {
+      if (c[k].threshold < 2) throw new Error(`${k}.threshold must be >= 2 on devnet`);
+    }
+  }
   return c;
 }
 

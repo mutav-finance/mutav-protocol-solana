@@ -1,20 +1,19 @@
-//! `DepositRequest` and `RedeemRequest` (spec §3.8; ADR 0010).
+//! `DepositRequest` and `RedeemRequest` (spec §3.8).
 //!
-//! Async request skeleton adapted from `solana-foundation/vault`
-//! (`programs/async_vault/src/state/`, commit c359962), MIT License,
-//! Copyright (c) 2026 Solana Foundation. See `NOTICE`.
-//! Changes: one PDA per FIFO `seq` (not per owner), `u8` statuses, the
-//! partial-fill fields of ADR 0010 and `_reserved` padding.
+//! Design reference: the request accounts of `solana-foundation/vault`; no
+//! code is copied (see docs/provenance.md). Design notes: one PDA per FIFO `seq` (not per owner), `u8` statuses and
+//! `_reserved` padding.
 
 use anchor_lang::prelude::*;
 
 use crate::constants::{
-    DEPOSIT_FULFILLED, DEPOSIT_PENDING, DEPOSIT_REQUEST_SIZE, PROGRAM_LAYOUT_VERSION,
-    REDEEM_CANCELLED, REDEEM_FILLED, REDEEM_PARTIALLY_FILLED, REDEEM_PENDING, REDEEM_REQUEST_SIZE,
+    DEPOSIT_CANCELLED, DEPOSIT_FULFILLED, DEPOSIT_PENDING, DEPOSIT_REQUEST_SIZE,
+    PROGRAM_LAYOUT_VERSION, REDEEM_CANCELLED, REDEEM_FILLED, REDEEM_PENDING, REDEEM_REQUEST_SIZE,
 };
 
 /// Seeds: `["deposit", config, seq]` (`seq` as `u64` little-endian). Rent is
-/// paid by the owner and returned on `claim_shares` or `cancel_deposit`.
+/// paid by the owner and returned on `claim_shares` or the owner's
+/// `cancel_deposit` (an admin cancel parks the request; ADR 0030).
 #[account]
 #[derive(InitSpace)]
 pub struct DepositRequest {
@@ -31,10 +30,16 @@ pub struct DepositRequest {
     pub nav_at_fulfil: u64,
     pub requested_at: i64,
     pub fulfilled_at: i64,
-    /// `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED`.
+    /// `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED` / `DEPOSIT_CANCELLED`
+    /// (ADR 0030).
     pub status: u8,
+    /// The owner's price limit: the fewest shares this request accepts
+    /// (ADR 0023). `0` = no limit. A fill that would mint fewer stops the
+    /// batch at this request; the request stays pending until the owner (or
+    /// the admin) cancels it or the price recovers.
+    pub min_shares_out: u64,
     /// Zeroed. Never read or written by logic.
-    pub _reserved: [u8; 64],
+    pub _reserved: [u8; 56],
 }
 
 const _: () = assert!(8 + DepositRequest::INIT_SPACE == DEPOSIT_REQUEST_SIZE);
@@ -43,14 +48,18 @@ impl DepositRequest {
     /// Version guard (spec §14.2 R1b): known version and status.
     pub fn is_supported(&self) -> bool {
         self.version <= PROGRAM_LAYOUT_VERSION
-            && matches!(self.status, DEPOSIT_PENDING | DEPOSIT_FULFILLED)
+            && matches!(
+                self.status,
+                DEPOSIT_PENDING | DEPOSIT_FULFILLED | DEPOSIT_CANCELLED
+            )
     }
 }
 
-/// Seeds: `["redeem", config, seq]` (`seq` as `u64` little-endian). Supports
-/// partial fills at the queue head (ADR 0010); the pilot binary fills whole
-/// requests only, but every partial-fill field is real from the pilot, since
-/// requests live at an upgrade cannot be migrated (spec §14.2).
+/// Seeds: `["redeem", config, seq]` (`seq` as `u64` little-endian). Filled
+/// whole, at the NAV of the fill; the partial fills of ADR 0010 are carved
+/// from `_reserved` when they are built (ADR 0019). Rent is paid by the owner
+/// and returned on `claim_assets` or the owner's `cancel_redeem` (an admin
+/// cancel parks the request; ADR 0030).
 #[account]
 #[derive(InitSpace)]
 pub struct RedeemRequest {
@@ -59,27 +68,29 @@ pub struct RedeemRequest {
     pub owner: Pubkey,
     /// FIFO position. Never changes.
     pub seq: u64,
-    /// Shares escrowed by `request_redeem`. Immutable.
-    pub shares_requested: u64,
-    /// Escrowed in `pending_redemptions`, not yet filled. `0` after a cancel.
-    pub shares_remaining: u64,
-    /// Cumulative shares burned by fills.
-    pub shares_filled: u64,
-    /// Cumulative BRS moved to `claims`, each fill at its own NAV.
-    pub assets_filled: u64,
-    /// BRS in `claims` owed to this request and not yet claimed.
-    pub assets_claimable: u64,
-    pub fill_count: u16,
-    /// Conversion price at the last fill (`NAV_SCALE`).
-    pub last_fill_nav: u64,
+    /// Shares escrowed in `pending_redemptions`. Immutable.
+    pub shares: u64,
+    /// BRS moved to `claims` at the fill, owed to the owner. Set at fill.
+    pub assets_out: u64,
+    /// Conversion price at the fill (`NAV_SCALE`).
+    pub nav_at_fill: u64,
     pub requested_at: i64,
-    /// `0` until the first fill.
-    pub last_fill_at: i64,
-    /// `REDEEM_PENDING` / `REDEEM_PARTIALLY_FILLED` / `REDEEM_FILLED` /
-    /// `REDEEM_CANCELLED`.
+    /// `0` until filled.
+    pub filled_at: i64,
+    /// `REDEEM_PENDING` / `REDEEM_FILLED` / `REDEEM_CANCELLED` (ADR 0030).
     pub status: u8,
-    /// Zeroed. Never read or written by logic.
-    pub _reserved: [u8; 64],
+    // -- carved from `_reserved` by ADR 0019 (8 bytes) --
+    /// Shares burned by fills: `0` while pending, `shares` after the whole
+    /// fill. The remainder is derived, `shares − shares_filled`, so the
+    /// partial fills of ADR 0010 only add their own counters later.
+    pub shares_filled: u64,
+    /// The owner's price limit: the least BRS this request accepts
+    /// (ADR 0023). `0` = no limit. A fill that would pay less stops the
+    /// batch at this request.
+    pub min_assets_out: u64,
+    /// Zeroed. Never read or written by logic. Holds the rest of the ADR 0010
+    /// partial-fill fields without a migration (ADR 0019).
+    pub _reserved: [u8; 48],
 }
 
 const _: () = assert!(8 + RedeemRequest::INIT_SPACE == REDEEM_REQUEST_SIZE);
@@ -90,7 +101,12 @@ impl RedeemRequest {
         self.version <= PROGRAM_LAYOUT_VERSION
             && matches!(
                 self.status,
-                REDEEM_PENDING | REDEEM_PARTIALLY_FILLED | REDEEM_FILLED | REDEEM_CANCELLED
+                REDEEM_PENDING | REDEEM_FILLED | REDEEM_CANCELLED
             )
+    }
+
+    /// Shares still escrowed: `shares − shares_filled`.
+    pub fn shares_remaining(&self) -> u64 {
+        self.shares.saturating_sub(self.shares_filled)
     }
 }

@@ -1,6 +1,6 @@
 /**
  * StatusBadge — the brand status atom: a 6×6px square + JetBrains Mono label,
- * colored by status (see STYLE.md §3.5). Shared by SolvencyChip and the
+ * colored by status (see STYLE.md §3.5). Shared by CoverageChip and the
  * operator cockpit's coverage status so the badge styling lives in one place.
  *
  * `bordered` wraps it in a surface box with a status-colored border (standalone

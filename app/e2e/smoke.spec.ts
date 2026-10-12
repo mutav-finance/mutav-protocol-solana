@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /** The spec's language rule, checked on what actually renders. */
-const BANNED = /\b(premiums?|insurance|insured|policy|policies|policyholders?|yield vault)\b/i;
+const BANNED = /\b(premiums?|(re)?insur(ance|ed|ers?)|polic(y|ies)|policyholders?|yield vault|sinistros?|fund|coverage[ -]gat(e|ed|es|ing))\b/i;
 
 async function noBannedWords(page: Page) {
   const text = await page.locator("body").innerText();
@@ -19,8 +19,9 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("backed by a reserve anyone can verify");
     const strip = page.getByTestId("live-strip");
     await expect(strip).toContainText("LIVE FROM LOCALNET");
-    // Seeded: R$30,000 in, R$1,000 fee (R$800 net), R$2,500 claim paid → R$28,300.
-    await expect(strip).toContainText("R$ 28,300.00");
+    // Seeded: R$30,000 in, R$1,000 fee (R$800 net), R$1,200 issuer income swept
+    // (ADR 0017), R$2,500 claim paid → R$29,500.
+    await expect(strip).toContainText("R$ 29,500.00");
     await expect(page.locator(".react-flow__node")).toHaveCount(9);
     await expect(page.getByRole("heading", { name: "Who does what" })).toBeVisible();
     for (const role of ["Reserve Admin", "Operator", "Investor"]) await expect(page.locator(".role-grid").getByRole("heading", { name: role })).toBeVisible();
@@ -42,7 +43,9 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByText("R$ 28,300.00").first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Where the capital sits" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
-    await expect(page.getByText("Claim payments are never blocked by solvency.")).toBeVisible();
+    await expect(page.getByText("Claim payments are never blocked by required coverage.")).toBeVisible();
+    // The legal floor (founder decision, 2026-10-11): the demo banner on every page.
+    await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Not open to public investment.");
     await noBannedWords(page);
   });
 
@@ -59,16 +62,16 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
 
   test("/reserve tabs — coverage, claims, capital, risks, verify", async ({ page }) => {
     await page.goto("/reserve/coverage");
-    await expect(page.getByText("2 active guarantees")).toBeVisible();
-    await expect(page.getByRole("table", { name: "Remaining cover by guarantee" }).locator("tbody tr")).toHaveCount(2);
-    await expect(page.getByRole("table", { name: "Per-agency exposure" }).locator("tbody tr")).toHaveCount(2);
+    await expect(page.getByText("3 active guarantees")).toBeVisible();
+    await expect(page.getByRole("table", { name: "Remaining cover by guarantee" }).locator("tbody tr")).toHaveCount(3);
+    await expect(page.getByRole("table", { name: "Per-agency exposure" }).locator("tbody tr")).toHaveCount(3);
     await noBannedWords(page);
 
     await page.goto("/reserve/claims");
     const claims = page.getByRole("table", { name: "Claims timeline" });
     await expect(claims.locator("tbody tr")).toHaveCount(1);
-    await expect(claims).toContainText("on time");
-    await expect(page.getByText("Claim payments are never blocked by solvency or by a pause.")).toBeVisible();
+    await expect(claims).toContainText("default");
+    await expect(page.getByText("Claim payments are never blocked by required coverage or by a pause.")).toBeVisible();
     await noBannedWords(page);
 
     await page.goto("/reserve/capital");
@@ -101,11 +104,14 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
 
     const step2 = page.locator("#step-2");
     const preview = step2.getByTestId("gate-preview");
-    // Free capital is R$8,800: a R$1,500 rent at 3× + 1× (R$6,000 of cover) fits…
+    // At c = 0.10 (ADR 0016) free capital is R$27,550: a R$1,500 rent at 3× + 1×
+    // (R$6,000 of cover) fits, and so does R$3,000 (R$12,000)…
     await expect(preview).toContainText("Fits");
-    // …and R$3,000 at 3× + 1× (R$12,000) does not.
     await step2.getByLabel("Monthly rent (BRS)").fill("3000");
-    await expect(preview).toContainText("Would be refused: InsufficientFreeCapital");
+    await expect(preview).toContainText("Fits");
+    // …while R$12,000 (R$48,000 of cover) is above max_cover_per_guarantee (R$40,000).
+    await step2.getByLabel("Monthly rent (BRS)").fill("12000");
+    await expect(preview).toContainText("Would be refused: GuaranteeCapExceeded");
     await expect(step2.getByRole("button", { name: /Send anyway/ })).toBeVisible();
     await expect(page.getByText("NO WALLET CONNECTED")).toBeVisible();
     await noBannedWords(page);
@@ -157,7 +163,8 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByText("READ-ONLY · NO WALLET CONNECTED")).toBeVisible();
     await expect(page.getByRole("figure", { name: "Claim-payment caps" })).toContainText("R$ 2,500 / R$ 20,000");
     await expect(page.locator("#console").getByRole("button", { name: "register_guarantee" })).toBeDisabled();
-    await expect(page.getByRole("table", { name: "Operator duties" }).locator("tbody tr")).toHaveCount(6);
+    // register, close, contribute_fees, sweep_income (ADR 0017), file, pay, settle.
+    await expect(page.getByRole("table", { name: "Operator duties" }).locator("tbody tr")).toHaveCount(7);
     await expect(page.getByRole("heading", { name: "If the operator key is compromised" })).toBeVisible();
     await noBannedWords(page);
   });
@@ -165,7 +172,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   test("/simulator — static reserve simulator in protocol terms, one full view", async ({ page }) => {
     await page.goto("/simulator");
     await expect(page.getByRole("heading", { name: "Reserve simulator", level: 1 })).toBeVisible();
-    await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0,1");
+    await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0,25");
     await expect(page.locator("#glance")).toContainText("Coverage & safety");
     await expect(page.locator("#chart")).toContainText("Stable assets vs coverage required");
     await expect(page.locator("#kstrip")).toContainText("What the reserve earns");
@@ -174,7 +181,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
 
     // inputs read like outputs (pt-BR) and accept pasted values with or without separators
     await page.getByRole("tab", { name: "Capital" }).click();
-    const start = page.getByLabel(/Starting capital/);
+    const start = page.getByRole("textbox", { name: /Starting capital/ });
     await expect(start).toHaveValue("300.000");
     await start.fill("250000");
     await start.blur();

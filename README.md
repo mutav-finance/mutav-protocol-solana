@@ -13,7 +13,7 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 | [`/operator`](https://reserve.mutav.finance/operator) | Operator console. During the pilot MUTAV's team signs by hand with the operator wallet; later mutav-app's backend sends the same instructions with a KMS-held key |
 | [`/investor`](https://reserve.mutav.finance/investor) | Capital-provider view, gated by the on-chain allowlist. The pilot runs on MUTAV's own capital and is not open to public investment |
 | [`/admin`](https://reserve.mutav.finance/admin) | Reserve Admin: Squads v4 proposals (create, approve, execute after the time lock) |
-| [`/demo`](https://reserve.mutav.finance/demo) | Guided six-step walkthrough, with the solvency-gate preview |
+| [`/demo`](https://reserve.mutav.finance/demo) | Guided six-step walkthrough, with the coverage-gate preview |
 | [`/simulator`](https://reserve.mutav.finance/simulator) | Reserve simulator: size the reserve, coverage, yield against Selic |
 
 > **Status:** the app is live; the program (`8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9`) is being deployed to devnet under a Squads multisig. Until the reserve is initialized, the live pages show a "being deployed" notice instead of numbers. To see every page with data today, run the app against a seeded local validator ([Pilot app](#pilot-app)).
@@ -22,14 +22,14 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 
 **Where to look in the code:**
 
-- [`programs/mutav/src/solvency.rs`](programs/mutav/src/solvency.rs): the solvency gate, which refuses any capital movement that would leave the guarantees under-covered. It never blocks a claim payment.
+- [`programs/mutav/src/coverage.rs`](programs/mutav/src/coverage.rs): the coverage gate, which refuses any capital movement that would leave the guarantees under-covered. It never blocks a claim payment.
 - [`programs/mutav/src/instructions/`](programs/mutav/src/instructions/): instructions by area: `admin/` (config, roles, pause), `operator/` (guarantees, guarantee fees, claims), `capital/` (the deposit and redemption queue), `public/` (permissionless `refresh`).
 - [`tests/`](tests/): LiteSVM integration tests. [`clients/js/`](clients/js/): the Codama client the app reads through.
 - [`app/`](app/): the pilot web app. It holds no keys; wallets sign.
 
 ## Pilot
 
-The goal of the pilot is to prove that a digital-asset reserve can be run as a viable operation: MUTAV operates it, and anyone can verify it. It runs with real money and real guarantees under a **low ceiling** of hard on-chain caps (proposed, and the devnet starting values: coverage ratio `c` = 0.10, the program floor; R$300k maximum reserve; R$40k maximum cover per guarantee; R$10M per agency, well above `max_tvl` / 0.10, so it never binds; R$10k / R$20k claim payments per call / per 30 days). The reserve holds `c` × the remaining cover of every guarantee, and never less than the filed claims ([ADR 0016](docs/decisions/0016-coverage-ratio-below-one.md)). Admins raise the caps only as the pilot proves itself. See [`docs/spec.md`](docs/spec.md#8-caps) for the full list.
+The goal of the pilot is to prove that a digital-asset reserve can be run as a viable operation: MUTAV operates it, and anyone can verify it. It runs with real money and real guarantees under a **low ceiling** of hard on-chain caps (the founders' pilot values, also on devnet, [ADR 0028](docs/decisions/0028-pilot-parameters.md): coverage ratio `c` = 0.25; R$1M maximum reserve; R$120k maximum cover per guarantee; R$15k / R$20k operator claim payments per call / per 31 days, so a compromised operator key can take at most R$20k in any 31 days, about 2% of the maximum reserve; R$19k stress buffer; BRS only). The reserve holds `c` × the remaining cover of every guarantee, and never less than the filed claims ([ADR 0016](docs/decisions/0016-coverage-ratio-below-one.md)). Admins raise the caps only as the pilot proves itself. See [`docs/spec.md`](docs/spec.md#8-caps) for the full list.
 
 The pilot reserve holds BRS (Nora Finance, 1:1 BRL stablecoin). More assets can be added later through whitelisted, capped adapters: Etherfuse TESOURO (tokenized Brazilian treasury) is the first candidate, pending an Etherfuse BRS path ([ADR 0018](docs/decisions/0018-brs-only-pilot-reserve.md)).
 
@@ -45,7 +45,7 @@ This repo ships the on-chain program, a TypeScript client that composes transact
 mutav-protocol-solana/
 ├── programs/
 │   ├── mutav/                    # core program: custody, shares, NAV, exposure registry,
-│   │                             # solvency gate, async queue, roles, claim payments
+│   │                             # coverage gate, async queue, roles, claim payments
 │   ├── mutav-adapter-interface/  # crate: shared adapter discriminators and layouts
 │   └── mutav-adapter-mock/       # devnet and tests only
 ├── tests/                        # LiteSVM integration tests
@@ -102,7 +102,7 @@ No command in this repo runs in watch mode.
 
 ## Pilot app
 
-[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana, live at [reserve.mutav.finance](https://reserve.mutav.finance): `/` landing (story, live reserve strip, who does what, protocol diagram), `/reserve` public transparency (health, coverage, claims timeline, flows, every account on Explorer, with snapshot charts), `/operator` the operator console, `/investor` the allowlist-gated capital-provider view, `/admin` Squads v4 proposal builders, `/demo` a guided walkthrough with the solvency-gate preview, and `/simulator` the reserve simulator. Every action is tagged with the role that signs it: Reserve Admin, Operator or Investor. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
+[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana, live at [reserve.mutav.finance](https://reserve.mutav.finance): `/` landing (story, live reserve strip, who does what, protocol diagram), `/reserve` public transparency (health, coverage, claims timeline, flows, every account on Explorer, with snapshot charts), `/operator` the operator console, `/investor` the allowlist-gated capital-provider view, `/admin` Squads v4 proposal builders, `/demo` a guided walkthrough with the coverage-gate preview, and `/simulator` the reserve simulator. Every action is tagged with the role that signs it: Reserve Admin, Operator or Investor. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
 
 Run it locally against a seeded validator (port 3001, since 3000 is often taken):
 
@@ -120,43 +120,68 @@ Checks: `bun run typecheck && bun run test && NEXT_PUBLIC_CLUSTER=localnet bun r
 
 ## Deploying
 
-The scripts in `scripts/devnet/` compose instructions; they never open a key file and never sign. The upgrade authority and `VaultConfig.admin` belong to a Squads v4 vault. Every admin step is therefore written as an **unsigned Squads proposal** (`*.json`), and members create, approve and execute it from mutav-app `apps/admin` or the Squads app. Only `deploy.ts` touches keys: it passes keypair **paths**, kept outside the repo, to the Solana CLI. Each script refuses a non-local URL unless you pass `--confirm-cluster devnet`. They are not built for mainnet: mainnet goes through `.github/workflows/release.yml` and the spec §14.5 runbook.
+The scripts in `scripts/devnet/` compose instructions; they never open a key file and never sign. Two Squads v4 multisigs hold authority: the **admin** multisig (`squads`, its vault is `VaultConfig.admin`, time lock ≥ 5 min on devnet) and the **upgrade** multisig (`upgradeSquads`, its vault is the program upgrade authority, time lock ≥ 1 h on devnet). Every admin step is therefore written as an **unsigned Squads proposal** (`*.json`), and members create, approve and execute it from mutav-app `apps/admin` or the Squads app. Only `deploy.ts` touches keys: it passes keypair **paths**, kept outside the repo, to the Solana CLI, and refuses a payer file readable by group or other (`chmod 600`).
+
+Every script that reads the chain takes a full http(s) `--url` (cluster monikers such as `m` or `devnet`, and empty values, are refused) and checks the RPC's genesis hash: mainnet is always refused, a loopback URL counts as local, and any other URL needs `--confirm-cluster devnet` and devnet's genesis hash. The cluster must match the config's `cluster`. They are not built for mainnet: mainnet goes through `.github/workflows/release.yml` and the spec §14.5 runbook.
 
 ```sh
 # 0. Rehearse everything against a throwaway local validator.
 anchor build
 bun scripts/devnet/dry-run.ts --program-keypair ~/.config/solana/mutav/mutav-keypair.json
 
-# 1. Fill a copy of scripts/devnet/devnet.example.json outside the repo (every <FILL: …>).
+# 1. Fill a copy of scripts/devnet/devnet.example.json outside the repo (every <FILL: …>):
+#    both multisigs, their exact members, the vaults, roles and money accounts.
+#    Build with `solana-verify build` and record the executable hash of the verified build.
 CFG=~/mutav/devnet.json; RPC=https://api.devnet.solana.com
+HASH=$(solana-verify get-executable-hash target/deploy/mutav.so)
 
-# 2. Deploy, then hand the upgrade authority to the Squads vault.
-bun scripts/devnet/deploy.ts --url $RPC --confirm-cluster devnet \
+# 2. Deploy, then hand the upgrade authority to the upgrade multisig's vault.
+#    Refuses before any CLI call unless --upgrade-authority equals the config's
+#    upgradeAuthority and the vault derived from upgradeSquads, and both
+#    multisigs pass the checks below, and the .so's executable hash equals
+#    --expected-hash (the verified build). A failed handover prints the retry command.
+bun scripts/devnet/deploy.ts --config $CFG --url $RPC --confirm-cluster devnet \
   --payer ~/.config/solana/mutav/deployer.json \
   --program-keypair ~/.config/solana/mutav/mutav-keypair.json \
-  --upgrade-authority <SQUADS_VAULT>
+  --upgrade-authority <UPGRADE_VAULT> --expected-hash $HASH
 
-# 3. Proposals (fund the vault with ~0.1 SOL first: it pays rent for initialize).
+# 3. Proposals. init.json is for the upgrade multisig (fund its vault with ~0.1 SOL
+#    first: it pays rent for initialize); the others are for the admin multisig.
+#    init.ts refuses a reserve mint without 6 decimals or under another token program.
 bun scripts/devnet/init.ts      --config $CFG --url $RPC --confirm-cluster devnet --out init.json
 bun scripts/devnet/allowlist.ts --config $CFG --proofs allowlist-proofs.json --out allowlist.json
 #    … execute both, then if needed:
+#    roles.ts also cancels any pending operator or pauser handover the config does not ask for.
+#    A pending admin is kept if the config names it as `nextAdmin`; otherwise roles.ts refuses unless --cancel-admin is passed.
 bun scripts/devnet/roles.ts     --config $CFG --out roles.json
 bun scripts/devnet/caps.ts      --config $CFG --url $RPC --confirm-cluster devnet --out caps.json
 
-# 4. Post-deploy checks.
-bun scripts/devnet/verify.ts --config $CFG --url $RPC --confirm-cluster devnet
+# 4. Post-deploy checks. initialize does not set the allowlist root: run this only after
+#    allowlist.json (and roles.json, if any) has executed.
+bun scripts/devnet/verify.ts --config $CFG --url $RPC --confirm-cluster devnet --expected-hash $HASH
 ```
+
+Before the devnet deploy, follow [Turning on idl-compat at deploy](docs/technical-resources/deployment-and-operations.md#turning-on-idl-compat-at-deploy). Tag the deployed commit `v1.0.0-devnet` with a GitHub release carrying the verified `mutav.json`, `mutav.so` and `mutav.hash`.
+
+Program upgrades go through `scripts/release/upgrade-proposal.ts` (run by `.github/workflows/release.yml`), which also takes `--expected-hash`: it refuses unless the buffer is owned by BPF Loader Upgradeable, its authority is the upgrade vault and its program bytes hash to the expected value (as `solana-verify get-buffer-hash`), and ProgramData's upgrade authority is the vault.
 
 `verify.ts` checks:
 
-- the upgrade authority is the configured vault;
-- `feature_flags == 0` and `buffer_earmark == 0`;
-- admin, operator, pauser and the allowlist root are as configured;
-- the Squads multisig has `config_authority == Pubkey::default()`, `time_lock ≥` the agreed floor, and a sane threshold.
+- the deployed program is the verified build: the ProgramData program bytes hash to `--expected-hash` (as `solana-verify get-program-hash`);
+- the upgrade authority is the upgrade multisig's vault;
+- `feature_flags == 0`;
+- admin, operator, pauser and the allowlist root are as configured, with no pending operator, pauser or admin handover, and the guardians are exactly the config's `guardians` (none when empty);
+- every other `VaultConfig` field equals the config file, field by field (c, fee take, every cap including `max_nav_move_bps`, 6 decimals, mint, token program, money accounts, capital wallet);
+- on devnet, the locked devnet values (`scripts/devnet/lib/compare.ts`); a `max_claim_per_period` raised for a large claim payment is reported until it is lowered again;
+- the treasury and payments accounts hold the reserve mint and are not owned by the operator;
+- the reserve mint is owned by `reserveTokenProgram` and has 6 decimals;
+- both multisigs are owned by the Squads v4 program, autonomous (`config_authority == Pubkey::default()`), with exactly the configured members (each able to vote), exactly the configured threshold, and `time_lock ≥` the floor.
+
+`bun run check:no-keys` scans `clients/js/src`, `app/` and `scripts/` for key-handling and signing APIs; the known exceptions (localnet-only tooling, wallet-side signing) are listed in `scripts/no-keys-allowlist.txt`.
 
 After the deploy, dump the live `VaultConfig` and `VaultState` into `tests/fixtures/layout/v1/` (spec §14.7).
 
-The devnet example sets `price.maxNavMoveBps = 10000`. The NAV-move guard measures the move gross, so on a small demo reserve a guarantee-fee batch or a claim payment would otherwise trip it and halt fulfilment. The inflow-adjusted guard is ADR 0013, which is pending. Until it lands, the admin can clear a tripped guard with `clear_fulfil_halt` (ADR 0015). Lower the bound for the real pilot.
+The devnet example sets `caps.maxNavMoveBps = 10000`. The NAV-move guard measures the move gross, so on a small demo reserve a guarantee-fee batch or a claim payment would otherwise trip it and halt fulfilment. The inflow-adjusted guard is ADR 0013, which is pending. Until it lands, the admin can clear a tripped guard with `clear_fulfil_halt` (ADR 0015). Lower the bound for the real pilot.
 
 ### Devnet addresses
 
@@ -193,4 +218,10 @@ The program is **unaudited and pre-pilot**. Do not deposit funds you are not pre
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). Third-party code adapted under the MIT license is attributed in `NOTICE` and in the affected file headers.
+- **Code:** MIT, Copyright (c) 2026 MUTAV. See [LICENSE](LICENSE). Versions up to commit `9c883d5` were published under Apache-2.0 and remain available under those terms.
+- **Brand:** the MUTAV name, logo (`app/public/brand/logo-mutav.svg`) and brand assets are not licensed under MIT.
+- **Fonts:** the app and the simulator use Geist, Inter and JetBrains Mono under the SIL Open Font License 1.1.
+
+### Acknowledgements
+
+[`solana-foundation/vault`](https://github.com/solana-foundation/vault) (MIT) and [`onre-finance/onre-sol`](https://github.com/onre-finance/onre-sol) (MIT) informed MUTAV's design: the account and authority structure, the async request lifecycle, the mint-extension guard and the upgrade-readiness patterns. No code from either is included. See [docs/provenance.md](docs/provenance.md).

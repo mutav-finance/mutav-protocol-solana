@@ -26,10 +26,11 @@ use anchor_lang::{prelude::Pubkey, InstructionData};
 use mutav::{
     allowlist,
     constants::*,
-    math::{assets_for, conversion_nav, mul_div, shares_for, Rounding},
-    solvency::{head_starved, nav_per_share, Solvency, SolvencyInputs},
-    state::{CapsInput, PriceInput},
-    InitializeArgs, RegisterGuaranteeArgs,
+    coverage::{is_underwater, nav_per_share, Coverage, CoverageInputs},
+    errors::MutavError,
+    math::{assets_for, conversion_nav, mul_div, redeem_size_error, shares_for, Rounding},
+    state::CapsInput,
+    ConfigParam, Eligibility, InitializeArgs, NavBounds, RegisterGuaranteeArgs,
 };
 use serde_json::{json, Value};
 
@@ -89,10 +90,6 @@ impl Rng {
 }
 
 fn s(x: u64) -> Value {
-    Value::String(x.to_string())
-}
-
-fn si(x: i64) -> Value {
     Value::String(x.to_string())
 }
 
@@ -169,14 +166,12 @@ fn conversion_vectors(rng: &mut Rng) -> Value {
     )
 }
 
-fn solvency_case(i: &SolvencyInputs) -> Value {
-    let out = match Solvency::compute(i) {
+fn coverage_case(i: &CoverageInputs) -> Value {
+    let out = match Coverage::compute(i) {
         Ok(o) => json!({
-            "tesouroValue": s(o.tesouro_value),
             "stableAssets": s(o.stable_assets),
             "coverageRequired": s(o.coverage_required),
             "surplus": s(o.surplus),
-            "earmarkEff": s(o.earmark_eff),
             "freeCapital": s(o.free_capital),
             "liquidBudget": s(o.liquid_budget),
             "netAssets": s(o.net_assets),
@@ -188,122 +183,166 @@ fn solvency_case(i: &SolvencyInputs) -> Value {
     json!({
         "input": {
             "brsBalance": s(i.brs_balance),
-            "tesouroUnits": s(i.tesouro_units),
-            "tesouroPrice": s(i.tesouro_price),
             "remainingCoverTotal": s(i.remaining_cover_total),
             "coverageRatioBps": i.coverage_ratio_bps,
             "provisions": s(i.provisions),
-            "bufferEarmark": s(i.buffer_earmark),
-            "featureFlags": s(i.feature_flags),
-            "headStarved": i.head_starved,
+            "stressBuffer": s(i.stress_buffer),
         },
         "output": out,
     })
 }
 
-fn solvency_vectors(rng: &mut Rng) -> Value {
-    let base = SolvencyInputs {
+fn coverage_vectors(rng: &mut Rng) -> Value {
+    let base = CoverageInputs {
         brs_balance: 60_000,
-        tesouro_units: 40_000,
-        tesouro_price: 1_005_000_000,
         remaining_cover_total: 80_000,
         coverage_ratio_bps: 10_000,
         provisions: 2_000,
-        buffer_earmark: 5_000,
-        feature_flags: INSTANT_EXIT,
-        head_starved: false,
+        stress_buffer: 0,
     };
     let mut cases = vec![
         base,
-        // The pilot: flag clear, so the earmark has no effect.
-        SolvencyInputs {
-            feature_flags: 0,
-            ..base
-        },
-        // Starved head releases the earmark.
-        SolvencyInputs {
-            head_starved: true,
-            ..base
-        },
         // Under-covered.
-        SolvencyInputs {
+        CoverageInputs {
             remaining_cover_total: 200_000,
             ..base
         },
-        // Liquidity term binds.
-        SolvencyInputs {
+        // Provisions bind.
+        CoverageInputs {
             provisions: 58_000,
             ..base
         },
         // c at the 0.10 floor (ADR 0016): the ratio term binds, then the
         // provisions term binds.
-        SolvencyInputs {
+        CoverageInputs {
             coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
             ..base
         },
-        SolvencyInputs {
+        CoverageInputs {
             coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
             provisions: 30_000,
             ..base
         },
         // Overflow paths.
-        SolvencyInputs {
-            brs_balance: MAX,
-            tesouro_units: 1,
-            tesouro_price: PRICE_SCALE,
+        CoverageInputs {
+            remaining_cover_total: MAX,
+            coverage_ratio_bps: 10_001,
             ..base
         },
-        SolvencyInputs {
+        CoverageInputs {
             brs_balance: MAX,
-            tesouro_units: 0,
             provisions: MAX,
             remaining_cover_total: MAX,
             ..base
         },
-        SolvencyInputs::default(),
+        // The stress buffer (ADR 0022): it binds over the ratio term, is
+        // limited by the unprovisioned cover, and saturates.
+        CoverageInputs {
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            provisions: 4_000,
+            stress_buffer: 19_000,
+            ..base
+        },
+        CoverageInputs {
+            remaining_cover_total: 10_000,
+            coverage_ratio_bps: MIN_COVERAGE_RATIO_BPS,
+            provisions: 4_000,
+            stress_buffer: 19_000,
+            ..base
+        },
+        CoverageInputs {
+            remaining_cover_total: MAX,
+            provisions: MAX - 1,
+            stress_buffer: MAX,
+            ..base
+        },
+        CoverageInputs {
+            remaining_cover_total: 5,
+            provisions: 9,
+            stress_buffer: MAX,
+            ..base
+        },
+        CoverageInputs::default(),
     ];
-    for k in 0..300 {
-        let tesouro_units = if k % 3 == 0 { 0 } else { rng.amount() };
-        cases.push(SolvencyInputs {
-            brs_balance: rng.amount(),
-            tesouro_units,
-            tesouro_price: rng.next() % (3 * PRICE_SCALE),
-            remaining_cover_total: rng.amount(),
-            coverage_ratio_bps: rng.bps(),
-            provisions: rng.amount(),
-            buffer_earmark: rng.amount(),
-            feature_flags: rng.next() % 4,
-            head_starved: rng.next() % 4 == 0,
+    for k in 0..300u64 {
+        let (brs, cover, c, prov) = (rng.amount(), rng.amount(), rng.bps(), rng.amount());
+        // Derived without drawing from `rng`, so the vectors after these
+        // stay where they were.
+        let stress = match k % 4 {
+            0 => 0,
+            1 => cover / 7,
+            2 => brs ^ prov,
+            _ => MAX,
+        };
+        cases.push(CoverageInputs {
+            brs_balance: brs,
+            remaining_cover_total: cover,
+            coverage_ratio_bps: c,
+            provisions: prov,
+            stress_buffer: stress,
         });
     }
-    Value::Array(cases.iter().map(solvency_case).collect())
+    Value::Array(cases.iter().map(coverage_case).collect())
 }
 
-fn starvation_vectors() -> Value {
-    let cases: &[(i64, Option<i64>, i64)] = &[
-        (1_000, Some(0), 999),
-        (1_000, Some(0), 1_000),
-        (1_000, Some(0), 0),
-        (1_000, None, 10),
-        (i64::MIN, Some(i64::MAX), 1),
-        (i64::MAX, Some(i64::MIN), 1),
-        (1_700_000_000, Some(1_699_000_000), 86_400),
-        (1_700_000_000, Some(1_699_999_000), 86_400),
-        (5, Some(10), -1),
+/// The underwater test and the `request_redeem` size rule (ADR 0029).
+fn capital_rule_vectors(rng: &mut Rng) -> Value {
+    let mut under: Vec<(u64, u64)> = vec![
+        (0, 0),
+        (0, 1),
+        (1, 1_000_000_000),
+        (1, 1_000_000_001),
+        (MAX, MAX),
+        (0, MAX),
     ];
-    Value::Array(
-        cases
+    for _ in 0..100 {
+        let shares = rng.amount();
+        let net = match rng.next() % 3 {
+            0 => shares / 1_000_000_000,
+            1 => (shares / 1_000_000_000).saturating_sub(1),
+            _ => rng.amount(),
+        };
+        under.push((net, shares));
+    }
+    let name = |e: Option<MutavError>| match e {
+        None => Value::Null,
+        Some(MutavError::RequestTooSmall) => Value::String("RequestTooSmall".into()),
+        Some(MutavError::RequestTooLarge) => Value::String("RequestTooLarge".into()),
+        Some(other) => panic!("unexpected {}", other as u32),
+    };
+    let mut sizes: Vec<(u64, u64, bool, u64, u64)> = vec![
+        (0, 0, true, 1_000, 100_000),
+        (100_001, 0, true, 1_000, 100_000),
+        (1_000, 50_000, false, 1_000, 100_000),
+        (500, 0, true, 1_000, 100_000),
+        (500, 999, true, 1_000, 100_000),
+        (500, 1_000, true, 1_000, 100_000),
+        (500, 0, false, 1_000, 100_000),
+        (100, 0, true, 1_000, 100_000),
+        (99, 0, true, 1_000, 100_000),
+        (1, 0, true, 5, 10),
+    ];
+    for _ in 0..200 {
+        let min = 1 + rng.next() % 2_000_000_000;
+        let max = min + rng.next() % 200_000_000_000;
+        let value = rng.next() % (max + max / 10 + 1);
+        let remainder = rng.next() % (2 * min);
+        sizes.push((value, remainder, rng.next() % 2 == 0, min, max));
+    }
+    json!({
+        "underwater": under
             .iter()
-            .map(|&(now, at, after)| {
-                json!({
-                    "now": si(now),
-                    "headRequestedAt": at.map(si).unwrap_or(Value::Null),
-                    "bufferReleaseAfterSecs": si(after),
-                    "starved": head_starved(now, at, after),
-                })
-            })
-            .collect(),
-    )
+            .map(|(n, sh)| json!({ "netAssets": s(*n), "sharesOutstanding": s(*sh), "underwater": is_underwater(*n, *sh) }))
+            .collect::<Vec<_>>(),
+        "redeemSize": sizes
+            .iter()
+            .map(|(v, r, c, mn, mx)| json!({
+                "value": s(*v), "remainder": s(*r), "canonical": c,
+                "minRequest": s(*mn), "maxRequest": s(*mx),
+                "error": name(redeem_size_error(*v, *r, *c, *mn, *mx)),
+            }))
+            .collect::<Vec<_>>(),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +354,9 @@ fn pda_vectors(rng: &mut Rng) -> Value {
     let reserve_mint = rng.pubkey();
     let owner = rng.pubkey();
     let id = rng.bytes32();
-    let agency_id = rng.bytes32();
+    // Was the `AgencyExposure` seed input (retired, ADR 0019). Still drawn so
+    // the vectors after it do not move.
+    let _ = rng.bytes32();
     let invoice = rng.bytes32();
     let notice = rng.bytes32();
     let seq: u64 = 42;
@@ -329,7 +370,6 @@ fn pda_vectors(rng: &mut Rng) -> Value {
             "reserveMint": reserve_mint.to_string(),
             "owner": owner.to_string(),
             "guaranteeId": hex(&id),
-            "agencyId": hex(&agency_id),
             "invoiceRefHash": hex(&invoice),
             "noticeRefHash": hex(&notice),
             "seq": s(seq),
@@ -344,15 +384,13 @@ fn pda_vectors(rng: &mut Rng) -> Value {
             "pendingDeposits": pda(&[PENDING_DEPOSITS_SEED, c]).to_string(),
             "pendingRedemptions": pda(&[PENDING_REDEMPTIONS_SEED, c]).to_string(),
             "claims": pda(&[CLAIMS_SEED, c]).to_string(),
+            "unsolicited": pda(&[UNSOLICITED_SEED, c]).to_string(),
             "eventAuthority": pda(&[b"__event_authority"]).to_string(),
             "guarantee": guarantee.to_string(),
-            "agencyExposure": pda(&[AGENCY_SEED, c, &agency_id]).to_string(),
             "feeReceipt": pda(&[FEE_SEED, c, &invoice]).to_string(),
             "claimFiling": pda(&[CLAIM_SEED, guarantee.as_ref(), &notice]).to_string(),
-            "payout": pda(&[PAYOUT_SEED, guarantee.as_ref(), &notice]).to_string(),
             "depositRequest": pda(&[DEPOSIT_SEED, c, &seq.to_le_bytes()]).to_string(),
             "redeemRequest": pda(&[REDEEM_SEED, c, &seq.to_le_bytes()]).to_string(),
-            "holderState": pda(&[HOLDER_SEED, c, owner.as_ref()]).to_string(),
             "incomeReceipt": pda(&[INCOME_SEED, c, &INCOME_REF_HASH]).to_string(),
             // ADR 0017: the vault authority's associated token account for
             // the reserve mint, under the classic SPL Token program.
@@ -394,32 +432,20 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         id: rng.bytes32(),
         agency_id: rng.bytes32(),
         refs_hash: rng.bytes32(),
-        rent: 3_500_000_000,
-        default_multiplier_bps: 30_000,
-        exit_multiplier_bps: 10_000,
         default_cover: 10_500_000_000,
         exit_cover: 3_500_000_000,
     };
     let caps = CapsInput {
         max_tvl: 100_000_000_000,
         max_cover_per_guarantee: 30_000_000_000,
-        max_cover_per_agency: 60_000_000_000,
         max_claim_per_call: 10_000_000_000,
         max_claim_per_period: 20_000_000_000,
-        claim_period_secs: 2_592_000,
-        max_tesouro_share_bps: 0,
         min_request: 1_000_000_000,
         max_request: 30_000_000_000,
-        min_fill_assets: 500_000_000,
-    };
-    let price = PriceInput {
-        tesouro_price_account: Pubkey::default(),
-        p0: 1_000_000,
-        t0: -5,
-        y_max_bps: 1_500,
-        max_staleness_secs: 86_400,
-        max_deviation_bps: 200,
         max_nav_move_bps: 10_000,
+        stress_buffer: 19_000_000_000,
+        max_queue_wait_secs: 0,
+        max_reinstate_age: 30 * 86_400,
     };
     let init = InitializeArgs {
         admin: rng.pubkey(),
@@ -428,31 +454,38 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         mutav_capital_wallet: rng.pubkey(),
         coverage_ratio_bps: 10_000,
         fee_take_bps: 2_000,
-        payout_sla_secs: 172_800,
-        caps: caps.clone(),
-        price: price.clone(),
+        caps,
     };
     let caps_json = json!({
         "maxTvl": s(caps.max_tvl),
         "maxCoverPerGuarantee": s(caps.max_cover_per_guarantee),
-        "maxCoverPerAgency": s(caps.max_cover_per_agency),
         "maxClaimPerCall": s(caps.max_claim_per_call),
         "maxClaimPerPeriod": s(caps.max_claim_per_period),
-        "claimPeriodSecs": si(caps.claim_period_secs),
-        "maxTesouroShareBps": caps.max_tesouro_share_bps,
         "minRequest": s(caps.min_request),
         "maxRequest": s(caps.max_request),
-        "minFillAssets": s(caps.min_fill_assets),
+        "maxNavMoveBps": caps.max_nav_move_bps,
+        "stressBuffer": s(caps.stress_buffer),
+        "maxQueueWaitSecs": s(caps.max_queue_wait_secs as u64),
+        "maxReinstateAge": s(caps.max_reinstate_age as u64),
     });
-    let price_json = json!({
-        "tesouroPriceAccount": price.tesouro_price_account.to_string(),
-        "p0": s(price.p0),
-        "t0": si(price.t0),
-        "yMaxBps": price.y_max_bps,
-        "maxStalenessSecs": si(price.max_staleness_secs),
-        "maxDeviationBps": price.max_deviation_bps,
-        "maxNavMoveBps": price.max_nav_move_bps,
-    });
+    let nav_bounds = NavBounds {
+        min: 990_000_000,
+        max: 1_010_000_000,
+    };
+    let nav_json = json!({ "min": s(nav_bounds.min), "max": s(nav_bounds.max) });
+    let params = vec![
+        ConfigParam::CoverageRatioBps(1_000),
+        ConfigParam::MaxTvl(300_000_000_000),
+        ConfigParam::MutavCapitalWallet(operator),
+        ConfigParam::MaxReinstateAge(-1),
+    ];
+    let params_json = json!([
+        { "__kind": "CoverageRatioBps", "fields": [1_000] },
+        { "__kind": "MaxTvl", "fields": [s(300_000_000_000)] },
+        { "__kind": "MutavCapitalWallet", "fields": [operator.to_string()] },
+        { "__kind": "MaxReinstateAge", "fields": ["-1"] },
+    ]);
+    let guardians = [rng.pubkey(), Pubkey::default(), rng.pubkey()];
     let hexes = |v: &[[u8; 32]]| v.iter().map(|p| hex(p)).collect::<Vec<_>>();
     Value::Array(vec![
         ix(
@@ -464,16 +497,70 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
                 "mutavCapitalWallet": init.mutav_capital_wallet.to_string(),
                 "coverageRatioBps": init.coverage_ratio_bps,
                 "feeTakeBps": init.fee_take_bps,
-                "payoutSlaSecs": si(init.payout_sla_secs),
                 "caps": caps_json,
-                "price": price_json,
             }}),
             mutav::instruction::Initialize { args: init }.data(),
         ),
         ix(
-            "setRoles",
-            json!({ "operator": operator.to_string(), "pauser": pauser.to_string() }),
-            mutav::instruction::SetRoles { operator, pauser }.data(),
+            "setConfig",
+            json!({ "params": params_json }),
+            mutav::instruction::SetConfig { params }.data(),
+        ),
+        ix(
+            "proposeRole",
+            json!({ "role": ROLE_PAUSER, "key": pauser.to_string() }),
+            mutav::instruction::ProposeRole {
+                role: ROLE_PAUSER,
+                key: pauser,
+            }
+            .data(),
+        ),
+        ix(
+            "acceptRole",
+            json!({ "role": ROLE_OPERATOR }),
+            mutav::instruction::AcceptRole {
+                role: ROLE_OPERATOR,
+            }
+            .data(),
+        ),
+        ix(
+            "proposeAdmin",
+            json!({ "key": operator.to_string() }),
+            mutav::instruction::ProposeAdmin { key: operator }.data(),
+        ),
+        ix(
+            "acceptAdmin",
+            json!({}),
+            mutav::instruction::AcceptAdmin {}.data(),
+        ),
+        ix(
+            "cancelPending",
+            json!({ "role": ROLE_ADMIN }),
+            mutav::instruction::CancelPending { role: ROLE_ADMIN }.data(),
+        ),
+        ix(
+            "setGuardians",
+            json!({ "guardians": guardians.iter().map(|g| g.to_string()).collect::<Vec<_>>() }),
+            mutav::instruction::SetGuardians { guardians }.data(),
+        ),
+        ix(
+            "revokePauser",
+            json!({}),
+            mutav::instruction::RevokePauser {}.data(),
+        ),
+        ix(
+            "setTreasuryAccount",
+            json!({}),
+            mutav::instruction::SetTreasuryAccount {}.data(),
+        ),
+        ix(
+            "closeGuarantee",
+            json!({ "id": hex(&reg.id), "reason": CLOSE_VOID }),
+            mutav::instruction::CloseGuarantee {
+                id: reg.id,
+                reason: CLOSE_VOID,
+            }
+            .data(),
         ),
         ix(
             "setAllowlistRoot",
@@ -486,9 +573,6 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
                 "id": hex(&reg.id),
                 "agencyId": hex(&reg.agency_id),
                 "refsHash": hex(&reg.refs_hash),
-                "rent": s(reg.rent),
-                "defaultMultiplierBps": reg.default_multiplier_bps,
-                "exitMultiplierBps": reg.exit_multiplier_bps,
                 "defaultCover": s(reg.default_cover),
                 "exitCover": s(reg.exit_cover),
             }}),
@@ -515,11 +599,10 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         ),
         ix(
             "payClaim",
-            json!({ "leg": LEG_EXIT, "amount": s(MAX), "noticeRefHash": hex(&notice) }),
+            json!({ "noticeRefHash": hex(&notice), "expectedAmount": s(MAX) }),
             mutav::instruction::PayClaim {
-                leg: LEG_EXIT,
-                amount: MAX,
                 notice_ref_hash: notice,
+                expected_amount: MAX,
             }
             .data(),
         ),
@@ -534,47 +617,68 @@ fn instruction_vectors(rng: &mut Rng) -> Value {
         ),
         ix(
             "requestDeposit",
-            json!({ "assets": s(5_000_000_000), "proof": hexes(&proof) }),
+            json!({
+                "assets": s(5_000_000_000),
+                "minSharesOut": s(4_950_000_000),
+                "eligibility": { "__kind": "Merkle", "proof": hexes(&proof) },
+            }),
             mutav::instruction::RequestDeposit {
                 assets: 5_000_000_000,
-                proof: proof.clone(),
+                min_shares_out: 4_950_000_000,
+                eligibility: Eligibility::Merkle {
+                    proof: proof.clone(),
+                },
             }
             .data(),
         ),
         ix(
             "requestRedeem",
-            json!({ "shares": s(1), "proof": Vec::<String>::new() }),
+            json!({
+                "shares": s(1),
+                "minAssetsOut": s(0),
+                "eligibility": { "__kind": "Merkle", "proof": Vec::<String>::new() },
+            }),
             mutav::instruction::RequestRedeem {
                 shares: 1,
-                proof: vec![],
+                min_assets_out: 0,
+                eligibility: Eligibility::Merkle { proof: vec![] },
             }
             .data(),
         ),
         ix(
             "fulfilDeposits",
-            json!({ "count": 8 }),
-            mutav::instruction::FulfilDeposits { count: 8 }.data(),
-        ),
-        ix(
-            "fulfilRedeems",
-            json!({ "count": 3, "maxAssets": s(MAX) }),
-            mutav::instruction::FulfilRedeems {
-                count: 3,
-                max_assets: MAX,
+            json!({ "count": 8, "navBounds": nav_json.clone() }),
+            mutav::instruction::FulfilDeposits {
+                count: 8,
+                nav_bounds,
             }
             .data(),
         ),
         ix(
-            "advanceQueueHeads",
-            json!({ "max": 255 }),
-            mutav::instruction::AdvanceQueueHeads { max: 255 }.data(),
+            "fulfilRedeems",
+            json!({ "count": 3, "maxAssets": s(MAX), "navBounds": nav_json.clone() }),
+            mutav::instruction::FulfilRedeems {
+                count: 3,
+                max_assets: MAX,
+                nav_bounds,
+            }
+            .data(),
+        ),
+        ix(
+            "advanceQueueHead",
+            json!({ "queue": QUEUE_REDEEM, "max": 255 }),
+            mutav::instruction::AdvanceQueueHead {
+                queue: QUEUE_REDEEM,
+                max: 255,
+            }
+            .data(),
         ),
         ix("refresh", json!({}), mutav::instruction::Refresh {}.data()),
         ix("pause", json!({}), mutav::instruction::Pause {}.data()),
         ix(
             "clearFulfilHalt",
-            json!({}),
-            mutav::instruction::ClearFulfilHalt {}.data(),
+            json!({ "navBounds": nav_json }),
+            mutav::instruction::ClearFulfilHalt { nav_bounds }.data(),
         ),
         ix(
             "sweepIncome",
@@ -598,25 +702,25 @@ fn build() -> Value {
     json!({
         "_comment": "Generated by tests/tests/client_vectors.rs (MUTAV_WRITE_VECTORS=1). Do not edit by hand.",
         "constants": {
-            "priceScale": s(PRICE_SCALE),
             "navScale": s(NAV_SCALE),
             "virtualOffset": s(VIRTUAL_OFFSET),
             "bpsDenominator": BPS_DENOMINATOR,
             "minCoverageRatioBps": MIN_COVERAGE_RATIO_BPS,
-            "maxIncomeTakeBps": MAX_INCOME_TAKE_BPS,
             "instantExit": s(INSTANT_EXIT),
             "modeNormal": MODE_NORMAL,
             "modeUnderCovered": MODE_UNDER_COVERED,
             "maxAllowlistProofLen": MAX_ALLOWLIST_PROOF_LEN,
             "maxFulfilBatch": MAX_FULFIL_BATCH,
+            "subMinimumExitFloorDivisor": s(SUB_MINIMUM_EXIT_FLOOR_DIVISOR),
         },
         "mulDiv": mul_div_vectors(&mut rng),
         "conversion": conversion_vectors(&mut rng),
-        "solvency": solvency_vectors(&mut rng),
-        "headStarved": starvation_vectors(),
+        "coverage": coverage_vectors(&mut rng),
         "pdas": pda_vectors(&mut rng),
         "allowlist": allowlist_vectors(&mut rng),
         "instructions": instruction_vectors(&mut rng),
+        // Own seed, after the others, so the vectors above do not move.
+        "capitalRules": capital_rule_vectors(&mut Rng(0x4558_4954_5f52_554c)),
     })
 }
 

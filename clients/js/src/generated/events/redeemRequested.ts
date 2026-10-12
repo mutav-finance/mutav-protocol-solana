@@ -45,6 +45,8 @@ export type RedeemRequestedEvent = {
   owner: Address;
   seq: bigint;
   shares: bigint;
+  /** The owner's price limit: the least BRS a fill may pay out. */
+  minAssetsOut: bigint;
 };
 
 export type RedeemRequestedEventArgs = {
@@ -53,6 +55,8 @@ export type RedeemRequestedEventArgs = {
   owner: Address;
   seq: number | bigint;
   shares: number | bigint;
+  /** The owner's price limit: the least BRS a fill may pay out. */
+  minAssetsOut: number | bigint;
 };
 
 /** Gets the encoder for {@link RedeemRequestedEventArgs} event data. */
@@ -64,6 +68,7 @@ export function getRedeemRequestedEventEncoder(): FixedSizeEncoder<RedeemRequest
       ["owner", getAddressEncoder()],
       ["seq", getU64Encoder()],
       ["shares", getU64Encoder()],
+      ["minAssetsOut", getU64Encoder()],
     ]),
     [getConstantEncoder(REDEEM_REQUESTED_EVENT_DISCRIMINATOR)],
   );
@@ -78,6 +83,7 @@ export function getRedeemRequestedEventDecoder(): FixedSizeDecoder<RedeemRequest
       ["owner", getAddressDecoder()],
       ["seq", getU64Decoder()],
       ["shares", getU64Decoder()],
+      ["minAssetsOut", getU64Decoder()],
     ]),
     [getConstantDecoder(REDEEM_REQUESTED_EVENT_DISCRIMINATOR)],
   );

@@ -45,6 +45,8 @@ export type DepositRequestedEvent = {
   owner: Address;
   seq: bigint;
   assets: bigint;
+  /** The owner's price limit: the fewest shares a fill may mint. */
+  minSharesOut: bigint;
 };
 
 export type DepositRequestedEventArgs = {
@@ -53,6 +55,8 @@ export type DepositRequestedEventArgs = {
   owner: Address;
   seq: number | bigint;
   assets: number | bigint;
+  /** The owner's price limit: the fewest shares a fill may mint. */
+  minSharesOut: number | bigint;
 };
 
 /** Gets the encoder for {@link DepositRequestedEventArgs} event data. */
@@ -64,6 +68,7 @@ export function getDepositRequestedEventEncoder(): FixedSizeEncoder<DepositReque
       ["owner", getAddressEncoder()],
       ["seq", getU64Encoder()],
       ["assets", getU64Encoder()],
+      ["minSharesOut", getU64Encoder()],
     ]),
     [getConstantEncoder(DEPOSIT_REQUESTED_EVENT_DISCRIMINATOR)],
   );
@@ -78,6 +83,7 @@ export function getDepositRequestedEventDecoder(): FixedSizeDecoder<DepositReque
       ["owner", getAddressDecoder()],
       ["seq", getU64Decoder()],
       ["assets", getU64Decoder()],
+      ["minSharesOut", getU64Decoder()],
     ]),
     [getConstantDecoder(DEPOSIT_REQUESTED_EVENT_DISCRIMINATOR)],
   );

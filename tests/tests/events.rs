@@ -35,18 +35,13 @@ fn assert_covered(name: &str, meta: &litesvm::types::TransactionMetadata, moves:
             assert!(moves.contains(&Transfer(e.net)), "{name}");
         }
         "sweep_income" => {
-            // One event covering both transfers out of the inbox (take to
-            // the treasury, net to the reserve).
+            // One event for the one transfer out of the inbox, into the
+            // reserve (no take on issuer income, ADR 0019).
             let ev = events::<IncomeSwept>(meta);
             assert_eq!(ev.len(), 1, "{name}");
             let e = &ev[0];
-            assert!(
-                only_transfers && moves.len() == 1 + (e.take > 0) as usize,
-                "{name}"
-            );
-            assert_eq!(transfers(moves), e.gross, "{name}");
-            assert_eq!(e.take + e.net, e.gross, "{name}");
-            assert!(moves.contains(&Transfer(e.net)), "{name}");
+            assert!(only_transfers && moves.len() == 1, "{name}");
+            assert_eq!(transfers(moves), e.amount, "{name}");
         }
         "pay_claim" => {
             let ev = events::<ClaimPaid>(meta);
@@ -127,7 +122,7 @@ fn assert_redeem_batch(meta: &litesvm::types::TransactionMetadata, moves: &[Toke
     let batch = events::<RedeemsFulfilled>(meta);
     assert!(!fills.is_empty());
     assert_eq!(batch.len(), 1);
-    let shares: u64 = fills.iter().map(|e| e.shares_filled).sum();
+    let shares: u64 = fills.iter().map(|e| e.shares).sum();
     let assets: u64 = fills.iter().map(|e| e.assets).sum();
     assert_eq!((batch[0].shares, batch[0].assets), (shares, assets));
     assert_eq!(moves, &[Burn(shares), Transfer(assets)]);

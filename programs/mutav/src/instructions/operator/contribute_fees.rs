@@ -10,7 +10,8 @@ use crate::{
     errors::MutavError,
     events::FeesContributed,
     math::{mul_div, Rounding},
-    state::{FeeReceipt, VaultConfig, VaultState},
+    pricing::inflow_nav,
+    state::{IncomeReceipt, VaultConfig, VaultState},
 };
 
 #[event_cpi]
@@ -34,14 +35,16 @@ pub struct ContributeFees<'info> {
     )]
     pub state: Box<Account<'info, VaultState>>,
 
+    /// The fee's `IncomeReceipt` (kind `FEE`): one per invoice, so a second
+    /// contribution of the same invoice fails here.
     #[account(
         init,
         payer = payer,
-        space = FEE_RECEIPT_SIZE,
+        space = INCOME_RECEIPT_SIZE,
         seeds = [FEE_SEED, config.key().as_ref(), invoice_ref_hash.as_ref()],
         bump,
     )]
-    pub fee_receipt: Box<Account<'info, FeeReceipt>>,
+    pub fee_receipt: Box<Account<'info, IncomeReceipt>>,
 
     /// The operator's own BRS token account (fees reach it via PIX → BRS).
     /// Must be owned by the operator: spending through a delegate is refused
@@ -63,7 +66,7 @@ pub struct ContributeFees<'info> {
     #[account(address = config.reserve_mint @ MutavError::InvalidMint)]
     pub reserve_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    #[account(address = config.reserve_token_program @ MutavError::InvalidMint)]
+    #[account(address = config.reserve_token_program @ MutavError::InvalidTokenProgram)]
     pub token_program: Interface<'info, TokenInterface>,
 
     #[account(mut)]
@@ -77,9 +80,15 @@ pub fn handle_contribute_fees(
     invoice_ref_hash: [u8; 32],
     amount: u64,
 ) -> Result<()> {
-    // Never paused, never solvency-gated (ADR 0009). Reads neither the price
-    // nor `buffer_earmark` (spec §4 ratchet scope).
+    // Never paused, never coverage-gated (ADR 0009).
     require!(amount > 0, MutavError::InvalidParameter);
+    // Inflows wait for the first shares (ADR 0023): with no shares, the fee
+    // would be priced into the first deposit instead of the reserve's
+    // holders. The fee waits with the operator.
+    require!(
+        ctx.accounts.state.shares_outstanding > 0,
+        MutavError::NoSharesOutstanding
+    );
 
     let take = mul_div(
         amount,
@@ -112,17 +121,19 @@ pub fn handle_contribute_fees(
         .fee_take_total
         .checked_add(take)
         .ok_or(MutavError::MathOverflow)?;
-    // A verified inflow: the NAV-move guard measures net of it (ADR 0017).
-    state.inflows_since_refresh = state
-        .inflows_since_refresh
-        .checked_add(net)
-        .ok_or(MutavError::MathOverflow)?;
+    // A verified inflow: the NAV-move guard measures net of the NAV per
+    // share it adds (ADR 0017). Saturating, so an inflow is never refused;
+    // a saturated counter reads as a fall and halts (fail closed).
+    state.inflow_nav = state
+        .inflow_nav
+        .saturating_add(inflow_nav(net, state.shares_outstanding));
 
     let clock = Clock::get()?;
     let r = &mut ctx.accounts.fee_receipt;
     r.version = PROGRAM_LAYOUT_VERSION;
     r.bump = ctx.bumps.fee_receipt;
-    r.invoice_ref_hash = invoice_ref_hash;
+    r.kind = INCOME_KIND_FEE;
+    r.ref_hash = invoice_ref_hash;
     r.gross = amount;
     r.take = take;
     r.net = net;
@@ -135,6 +146,9 @@ pub fn handle_contribute_fees(
         gross: amount,
         take,
         net,
+        fees_in_total: ctx.accounts.state.fees_in_total,
+        fee_take_total: ctx.accounts.state.fee_take_total,
+        brs_balance: ctx.accounts.state.brs_balance,
     });
     Ok(())
 }

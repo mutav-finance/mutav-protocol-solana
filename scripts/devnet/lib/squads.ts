@@ -40,7 +40,18 @@ export type SquadsMultisig = {
   members: { key: Address; permissions: number }[];
 };
 
+/** A vault index from the command line: a decimal integer in [0, 255]; absent means 0. */
+export function parseVaultIndex(v: string | undefined): number {
+  if (v === undefined) return 0;
+  if (!/^\d{1,3}$/.test(v) || Number(v) > 255) throw new Error(`vault index must be an integer in [0, 255], got "${v}"`);
+  return Number(v);
+}
+
 export async function squadsVaultAddress(multisig: Address, vaultIndex = 0): Promise<Address> {
+  // The seed is one byte: 256 or NaN would silently wrap to another vault.
+  if (!Number.isInteger(vaultIndex) || vaultIndex < 0 || vaultIndex > 255) {
+    throw new Error(`vault index must be an integer in [0, 255], got ${vaultIndex}`);
+  }
   const utf8 = getUtf8Encoder();
   const [vault] = await getProgramDerivedAddress({
     programAddress: SQUADS_V4_PROGRAM,
@@ -88,19 +99,51 @@ export function decodeSquadsMultisig(data: Uint8Array): SquadsMultisig {
 /** Squads `Permission` bits. */
 export const PERMISSION = { initiate: 1, vote: 2, execute: 4 } as const;
 
+/** What a multisig must look like (from the deploy config). */
+export type ExpectedMultisig = { members: Address[]; threshold: number; timeLockFloorSecs: number };
+
 /**
- * Launch checks on the multisig (spec §14.5 step 8, plan Task 12):
- * autonomous (`config_authority == default`), `time_lock ≥ floor`, and a
- * threshold that at least 1 and no more than the voting members.
- * Returns the failures; empty means the multisig passes.
+ * Launch checks on the multisig (spec §14.5 step 8): autonomous
+ * (`config_authority == default`), `time_lock ≥` the floor, exactly the
+ * configured members, each able to vote, and exactly the configured
+ * threshold. Returns the failures; empty means the multisig passes.
  */
-export function checkSquadsMultisig(m: SquadsMultisig, timeLockFloorSecs: number): string[] {
+export function checkSquadsMultisig(m: SquadsMultisig, e: ExpectedMultisig): string[] {
   const out: string[] = [];
   if (m.configAuthority !== DEFAULT_PUBKEY) {
     out.push(`config_authority is ${m.configAuthority}; must be Pubkey::default() (an autonomous multisig)`);
   }
-  if (m.timeLock < timeLockFloorSecs) out.push(`time_lock ${m.timeLock}s is below the floor ${timeLockFloorSecs}s`);
+  if (m.timeLock < e.timeLockFloorSecs) out.push(`time_lock ${m.timeLock}s is below the floor ${e.timeLockFloorSecs}s`);
+  const want = new Set<string>(e.members);
+  const got = new Map<string, number>(m.members.map((x) => [x.key, x.permissions]));
+  for (const k of want) {
+    const p = got.get(k);
+    if (p === undefined) out.push(`missing member ${k}`);
+    else if (!(p & PERMISSION.vote)) out.push(`member ${k} cannot vote (permissions ${p})`);
+  }
+  for (const k of got.keys()) if (!want.has(k)) out.push(`unexpected member ${k}`);
+  if (m.threshold !== e.threshold) out.push(`threshold ${m.threshold}, expected ${e.threshold}`);
   const voters = m.members.filter((x) => x.permissions & PERMISSION.vote).length;
   if (m.threshold < 1 || m.threshold > voters) out.push(`threshold ${m.threshold} with ${voters} voting member(s)`);
   return out;
+}
+
+/**
+ * The multisig account as read from the chain: owned by the Squads v4
+ * program, decodable, and passing `checkSquadsMultisig`. Each failure is
+ * prefixed with `<label> multisig:`.
+ */
+export function checkSquadsAccount(
+  account: { owner: Address; data: Uint8Array } | null,
+  e: ExpectedMultisig,
+  label: string,
+): string[] {
+  const tag = (f: string) => `${label} multisig: ${f}`;
+  if (!account) return [`${label} multisig not found`];
+  if (account.owner !== SQUADS_V4_PROGRAM) return [tag(`account owner is ${account.owner}, not owned by the Squads v4 program ${SQUADS_V4_PROGRAM}`)];
+  try {
+    return checkSquadsMultisig(decodeSquadsMultisig(account.data), e).map(tag);
+  } catch (err) {
+    return [tag((err as Error).message)];
+  }
 }

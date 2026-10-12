@@ -1,9 +1,8 @@
 //! Token safety checks. Every check fails closed.
 //!
-//! The mint guard is adapted from `solana-foundation/vault`
-//! (`programs/async_vault/src/utils.rs`, `validate_asset_mint_extensions_from_acct_info`,
-//! commit c359962), MIT License, Copyright (c) 2026 Solana Foundation. See `NOTICE`.
-//! Changes: rejects every extension listed in spec §5.1 (PC-19, ADR 0017), and
+//! The mint guard's structure follows `validate_asset_mint_extensions_from_acct_info`
+//! in `solana-foundation/vault` (MIT), extended and rewritten for MUTAV (see
+//! docs/provenance.md). Design notes: rejects every extension listed in spec §5.1 (PC-19, ADR 0017), and
 //! a transfer fee in either the older or the newer epoch configuration.
 
 use anchor_lang::prelude::*;
@@ -18,7 +17,8 @@ use anchor_spl::token_2022::spl_token_2022::{
 use crate::errors::MutavError;
 
 /// Rejects a Token-2022 reserve mint with `PermanentDelegate`, `TransferHook`,
-/// a non-zero `TransferFee`, `NonTransferable`, `DefaultAccountState = Frozen`
+/// a non-zero `TransferFee` or a transfer-fee config authority (which could
+/// set a fee later, ADR 0020), `NonTransferable`, `DefaultAccountState = Frozen`
 /// (spec §5.1, PC-19), `ScaledUiAmount`, `InterestBearingConfig` or `Pausable`
 /// (ADR 0017). Classic SPL Token mints pass.
 ///
@@ -46,7 +46,9 @@ pub fn check_reserve_mint(mint: &AccountInfo) -> Result<()> {
                 let older = u16::from(cfg.older_transfer_fee.transfer_fee_basis_points);
                 let newer = u16::from(cfg.newer_transfer_fee.transfer_fee_basis_points);
                 // Both epochs: a fee scheduled for the next epoch counts too.
-                if older != 0 || newer != 0 {
+                // An authority that may set a fee later fails closed.
+                let authority: Option<Pubkey> = cfg.transfer_fee_config_authority.into();
+                if older != 0 || newer != 0 || authority.is_some() {
                     return err!(MutavError::UnsupportedMintExtension);
                 }
             }

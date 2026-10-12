@@ -1,6 +1,12 @@
-//! `pay_claim` (spec §5.4): pays a filed claim to the whitelisted payments
-//! account. **Never solvency-gated, no mode check, not paused** (spec §1
-//! principle 4). It reads neither the TESOURO price nor `buffer_earmark`.
+//! `pay_claim(notice_ref_hash, expected_amount)` (spec §5.4; ADR 0021): pays
+//! a filed claim's provision, exactly, to the whitelisted payments account.
+//! **Never coverage-gated, no mode check, not paused** (spec §1 principle 4).
+//!
+//! Above `max_claim_per_call` the filing needs the reserve admin's approval
+//! of that exact amount (`ClaimFiling.approved_amount`, written by the admin's
+//! `approve_claim`). MUTAV may still pay such a claim bank-first while the
+//! approval waits for the admin time lock; the reserve then reimburses
+//! `payments_account` (ADR 0021).
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
@@ -9,19 +15,21 @@ use anchor_spl::token_interface::{
 
 use crate::{
     constants::*,
+    coverage::coverage_required_saturating,
     errors::MutavError,
     events::ClaimPaid,
-    solvency::coverage_required,
-    state::{AgencyExposure, ClaimFiling, Guarantee, Payout, VaultConfig, VaultState},
+    state::{ClaimFiling, Guarantee, VaultConfig, VaultState},
 };
 
 #[event_cpi]
 #[derive(Accounts)]
-#[instruction(leg: u8, amount: u64, notice_ref_hash: [u8; 32])]
+#[instruction(notice_ref_hash: [u8; 32])]
 pub struct PayClaim<'info> {
     pub operator: Signer<'info>,
 
     #[account(
+        seeds = [CONFIG_SEED, config.reserve_mint.as_ref()],
+        bump = config.bump,
         constraint = config.is_supported() @ MutavError::UnsupportedVersion,
         constraint = config.is_operator(&operator.key()) @ MutavError::Unauthorized,
     )]
@@ -43,14 +51,6 @@ pub struct PayClaim<'info> {
     )]
     pub guarantee: Box<Account<'info, Guarantee>>,
 
-    #[account(
-        mut,
-        seeds = [AGENCY_SEED, config.key().as_ref(), guarantee.agency_id.as_ref()],
-        bump = agency_exposure.bump,
-        constraint = agency_exposure.is_supported() @ MutavError::UnsupportedVersion,
-    )]
-    pub agency_exposure: Box<Account<'info, AgencyExposure>>,
-
     /// CHECK: the `ClaimFiling` at `["claim", guarantee, notice_ref_hash]`.
     /// Decoded in the handler, so a missing filing fails with
     /// `ClaimNotFiled` (spec §5.4 rule 1) rather than a framework error.
@@ -60,15 +60,6 @@ pub struct PayClaim<'info> {
         bump,
     )]
     pub claim_filing: UncheckedAccount<'info>,
-
-    #[account(
-        init,
-        payer = payer,
-        space = PAYOUT_SIZE,
-        seeds = [PAYOUT_SEED, guarantee.key().as_ref(), notice_ref_hash.as_ref()],
-        bump,
-    )]
-    pub payout: Box<Account<'info, Payout>>,
 
     #[account(mut, seeds = [RESERVE_SEED, config.key().as_ref()], bump)]
     pub reserve: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -88,22 +79,16 @@ pub struct PayClaim<'info> {
     #[account(address = config.reserve_mint @ MutavError::InvalidMint)]
     pub reserve_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    #[account(address = config.reserve_token_program @ MutavError::InvalidMint)]
+    #[account(address = config.reserve_token_program @ MutavError::InvalidTokenProgram)]
     pub token_program: Interface<'info, TokenInterface>,
-
-    #[account(mut)]
-    pub payer: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
 pub fn handle_pay_claim(
     ctx: Context<PayClaim>,
-    leg: u8,
-    amount: u64,
     notice_ref_hash: [u8; 32],
+    expected_amount: u64,
 ) -> Result<()> {
-    // Rule 1: a filed claim on this leg.
+    // Rule 1: a filed claim.
     let filing_info = ctx.accounts.claim_filing.to_account_info();
     require!(
         *filing_info.owner == crate::ID && !filing_info.data_is_empty(),
@@ -112,14 +97,23 @@ pub fn handle_pay_claim(
     let mut filing = ClaimFiling::try_deserialize(&mut &filing_info.try_borrow_data()?[..])?;
     require!(filing.is_supported(), MutavError::UnsupportedVersion);
     require!(filing.status == CLAIM_FILED, MutavError::ClaimNotFiled);
-    require!(filing.leg == leg, MutavError::LegMismatch);
+    let leg = filing.leg;
 
-    // Rule 2 (ADR 0014): `0 < amount ≤ filing.provision + (leg_cover −
-    // leg_paid − leg_provision)` — this filing's provision plus the leg's
-    // unprovisioned cover, so the other open filings' provisions still fit in
-    // the cover left after this payment (invariant 2). Checked throughout: an
-    // underflow means invariant 2 is already broken, and must surface.
+    // Rule 2 (ADR 0021): the payment is exactly the provision, and the
+    // caller states it, so a filing changed after the caller read it is
+    // never paid at an amount the caller did not see.
+    require!(
+        expected_amount == filing.provision,
+        MutavError::ExpectedAmountMismatch
+    );
+    let amount = filing.provision;
     require!(amount > 0, MutavError::InvalidParameter);
+
+    // Rule 3 (ADR 0014): `amount ≤ filing.provision + (leg_cover − leg_paid −
+    // leg_provision)`, so the other open filings' provisions still fit in the
+    // cover left after this payment (invariant 2). An exact payment always
+    // meets it; checked throughout: an underflow means invariant 2 is already
+    // broken, and must surface.
     let g = &ctx.accounts.guarantee;
     let (cover, paid, leg_provision) = g.leg(leg)?;
     let remaining = cover.checked_sub(paid).ok_or(MutavError::MathOverflow)?;
@@ -131,41 +125,36 @@ pub fn handle_pay_claim(
         .ok_or(MutavError::MathOverflow)?;
     require!(amount <= bound, MutavError::ExceedsRemainingCover);
 
-    // Rule 3: per-call cap.
+    // Rule 4: per-call cap. Above it, only the exact amount the reserve
+    // admin approved (ADR 0021).
     let caps = &ctx.accounts.config.caps;
-    require!(
-        amount <= caps.max_claim_per_call,
-        MutavError::ClaimCallCapExceeded
-    );
+    if amount > caps.max_claim_per_call {
+        require!(
+            filing.approved_amount == amount,
+            MutavError::ClaimCallCapExceeded
+        );
+    }
 
-    // Rule 4: roll the window, then the per-period cap.
+    // Rule 5: the sliding window (ADR 0019). The payments of the last
+    // `CLAIM_WINDOW_DAYS` UTC days, this one included, stay within the cap.
     let now = Clock::get()?.unix_timestamp;
     let state = &mut ctx.accounts.state;
-    if now
-        >= state
-            .claim_period_start
-            .saturating_add(caps.claim_period_secs)
-    {
-        state.claim_period_start = now;
-        state.claim_period_paid = 0;
-    }
-    let period_paid = state
-        .claim_period_paid
-        .checked_add(amount)
-        .ok_or(MutavError::MathOverflow)?;
+    // The effective day: a clock step back keeps the anchor's day, and the
+    // payment is booked there.
+    let day = state.roll_claim_window(now.div_euclid(SECONDS_PER_DAY));
     require!(
-        period_paid <= caps.max_claim_per_period,
+        state.claim_window_paid() + amount as u128 <= caps.max_claim_per_period as u128,
         MutavError::ClaimPeriodCapExceeded
     );
 
-    // Rule 5 (destination) is an account constraint. Rule 6: liquid BRS;
-    // TESOURO is never sold implicitly.
+    // Rule 6 (destination) is an account constraint. Rule 7: liquid BRS;
+    // nothing else is sold to pay a claim.
     require!(
         state.brs_balance >= amount,
         MutavError::InsufficientLiquidBalance
     );
     require!(!ctx.accounts.reserve.is_frozen(), MutavError::ReserveFrozen);
-    // Rule 7: no solvency check, no mode check, no pause check.
+    // Rule 8: no coverage check, no mode check, no pause check.
 
     let config_key = ctx.accounts.config.key();
     let authority_seeds: &[&[u8]] = &[
@@ -202,54 +191,46 @@ pub fn handle_pay_claim(
         .open_claims
         .checked_sub(1)
         .ok_or(MutavError::MathOverflow)?;
-    // In place (R6): only the status byte changes; padding is re-written
-    // from the decoded value.
+    // The payment, recorded on the filing in place (R6): the padding is
+    // re-written from the decoded value. A paid filing is never paid again.
     filing.status = CLAIM_PAID;
+    filing.paid_amount = amount;
+    filing.paid_at = now;
+    filing.payments_account = ctx.accounts.payments_account.key();
     filing.try_serialize(&mut &mut filing_info.try_borrow_mut_data()?[..])?;
 
     state.provisions = state
         .provisions
         .checked_sub(released)
         .ok_or(MutavError::MathOverflow)?;
-    state.brs_balance -= amount; // checked by rule 6
+    state.brs_balance -= amount; // checked by rule 7
     state.remaining_cover_total = state
         .remaining_cover_total
         .checked_sub(amount)
         .ok_or(MutavError::MathOverflow)?;
-    state.coverage_required = coverage_required(
+    // The cached value saturates: a claim payment is never refused for it
+    // (ADR 0022 decision 3).
+    state.coverage_required = coverage_required_saturating(
         state.remaining_cover_total,
         ctx.accounts.config.coverage_ratio_bps,
         state.provisions,
-    )?;
-    state.claim_period_paid = period_paid;
+        ctx.accounts.config.caps.stress_buffer,
+    );
+    let bucket = state.claim_bucket_mut(day);
+    *bucket = bucket.checked_add(amount).ok_or(MutavError::MathOverflow)?;
     state.claims_paid_total = state
         .claims_paid_total
         .checked_add(amount)
         .ok_or(MutavError::MathOverflow)?;
 
-    let agency = &mut ctx.accounts.agency_exposure;
-    agency.outstanding_cover = agency
-        .outstanding_cover
-        .checked_sub(amount)
-        .ok_or(MutavError::MathOverflow)?;
-    agency.claims_paid_total = agency
-        .claims_paid_total
-        .checked_add(amount)
-        .ok_or(MutavError::MathOverflow)?;
-
-    let guarantee_key = ctx.accounts.guarantee.key();
+    let window_paid = u64::try_from(state.claim_window_paid()).unwrap_or(u64::MAX);
+    let (provisions_after, coverage_required_after, brs_balance_after, claims_paid_total) = (
+        state.provisions,
+        state.coverage_required,
+        state.brs_balance,
+        state.claims_paid_total,
+    );
     let payments_account = ctx.accounts.payments_account.key();
-    let p = &mut ctx.accounts.payout;
-    p.version = PROGRAM_LAYOUT_VERSION;
-    p.bump = ctx.bumps.payout;
-    p.guarantee = guarantee_key;
-    p.leg = leg;
-    p.amount = amount;
-    p.notice_ref_hash = notice_ref_hash;
-    p.payments_account = payments_account;
-    p.status = PAYOUT_PENDING;
-    p.paid_at = now;
-
     emit_cpi!(ClaimPaid {
         config: config_key,
         ts: now,
@@ -258,6 +239,11 @@ pub fn handle_pay_claim(
         amount,
         notice_ref_hash,
         payments_account,
+        provisions_after,
+        coverage_required_after,
+        window_paid,
+        brs_balance_after,
+        claims_paid_total,
     });
     Ok(())
 }

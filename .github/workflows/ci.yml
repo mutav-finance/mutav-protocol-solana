@@ -98,9 +98,11 @@ jobs:
       - name: Typecheck client
         run: bun run typecheck
 
-      # The client composes; the caller signs (CLAUDE.md).
-      - name: No secret-key or signing APIs in the client
-        run: bash scripts/check-no-keys.sh clients/js/src
+      # The client composes; the caller signs (CLAUDE.md). The app and the
+      # scripts too, apart from the exceptions named in the allowlist
+      # (localnet-only tooling, wallet signing, JSON reads).
+      - name: No secret-key or signing APIs (client, app, scripts)
+        run: bash scripts/check-no-keys.sh --allowlist scripts/no-keys-allowlist.txt clients/js/src app scripts
 
       - name: Client tests (math parity, PDAs, encoding, reads)
         run: bun test

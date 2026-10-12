@@ -34,7 +34,7 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
   const fmtBrs = useFmt();
   const [step, setStep] = useState(0);
   const next = useRef<HTMLButtonElement>(null);
-  const covered = r.solvency.stableAssets >= r.solvency.coverageRequired;
+  const covered = r.coverage.stableAssets >= r.coverage.coverageRequired;
   const steps: { title: string; body: string; evidence: ReactNode }[] = [
     {
       title: "Every number on this page is read from Solana.",
@@ -44,7 +44,7 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
     {
       title: "One question: can the reserve cover every guarantee?",
       body: "The reserve balance must stay above coverage required. If it falls below, the program stops new guarantees and redemptions, never claim payments.",
-      evidence: `${fmtBrs(r.solvency.stableAssets)} held ${covered ? "≥" : "<"} ${fmtBrs(r.solvency.coverageRequired)} required`,
+      evidence: `${fmtBrs(r.coverage.stableAssets)} held ${covered ? "≥" : "<"} ${fmtBrs(r.coverage.coverageRequired)} required`,
     },
     {
       title: "Check it yourself.",

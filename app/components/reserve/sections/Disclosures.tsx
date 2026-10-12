@@ -15,7 +15,7 @@ import { useFmt } from "@/components/MoneyProvider";
 import { type ReserveView } from "@/lib/view";
 
 import { Section } from "@/components/Section";
-import { BlockHead, Lead, fmtSpan } from "@/components/reserve/sections/shared";
+import { BlockHead, Lead } from "@/components/reserve/sections/shared";
 import type { Data } from "@/components/reserve/sections/shared";
 
 const LABEL = { letterSpacing: "0.01em" } as const;
@@ -57,7 +57,7 @@ function ClaimLimits({ r }: { r: ReserveView }) {
       />
       <div className="grid grid-cols-1 gap-px border sm:grid-cols-2" style={{ background: "var(--color-border)" }}>
         {cell("Max per claim payment", fmtBrs(caps.maxClaimPerCall), "for one claim payment")}
-        {cell(`Max in any ${fmtSpan(caps.claimPeriodSecs)}`, fmtBrs(caps.maxClaimPerPeriod), "all claim payments together")}
+        {cell("Max in any 31 days", fmtBrs(caps.maxClaimPerPeriod), "all claim payments together")}
       </div>
     </section>
   );

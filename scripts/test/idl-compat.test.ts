@@ -57,7 +57,7 @@ function base(): Idl {
   };
 }
 
-const typeOf = (idl: Idl, name: string) => idl.types.find((t) => t.name === name)!.type.fields!;
+const typeOf = (idl: Idl, name: string) => idl.types.find((t) => t.name === name)!.type.fields as { name: string; type: any }[];
 
 describe('compareIdl', () => {
   test('an identical IDL is compatible', () => {
@@ -146,10 +146,204 @@ describe('compareIdl', () => {
   });
 });
 
+// Enum fixtures (ADR 0026: variants are append-only).
+const enumDef = (name: string, variants: { name: string; fields?: any[] }[]) => ({ name, type: { kind: 'enum', variants } });
+const variants = (idl: Idl, name: string) => idl.types.find((t) => t.name === name)!.type.variants!;
+
+function withEnums(): Idl {
+  const idl = base();
+  idl.instructions.push(
+    {
+      name: 'set_config',
+      discriminator: [4, 0, 0, 0, 0, 0, 0, 0],
+      accounts: [{ name: 'admin', signer: true }],
+      args: [{ name: 'params', type: { vec: { defined: { name: 'ConfigParam' } } } }],
+    },
+    {
+      name: 'request_deposit',
+      discriminator: [5, 0, 0, 0, 0, 0, 0, 0],
+      accounts: [{ name: 'owner', signer: true }],
+      args: [
+        { name: 'amount', type: 'u64' },
+        { name: 'eligibility', type: { defined: { name: 'Eligibility' } } },
+      ],
+    },
+  );
+  idl.accounts.push({ name: 'Guarantee', discriminator: [8, 8, 8, 8, 8, 8, 8, 8] });
+  idl.events.push({ name: 'Returned', discriminator: [6, 0, 0, 0, 0, 0, 0, 0] });
+  idl.types.push(
+    // Tuple variants, like ConfigParam.
+    enumDef('ConfigParam', [
+      { name: 'CoverageRatioBps', fields: ['u16'] },
+      { name: 'FeeTakeBps', fields: ['u16'] },
+      { name: 'MaxTvl', fields: ['u64'] },
+    ]),
+    // A named-field variant, like Eligibility.
+    enumDef('Eligibility', [{ name: 'Merkle', fields: [{ name: 'proof', type: { vec: { array: ['u8', 32] } } }] }]),
+    enumDef('Status', [{ name: 'Active' }, { name: 'Closed' }]),
+    enumDef('Source', [{ name: 'Unsolicited' }, { name: 'Foreign' }]),
+    struct('Guarantee', [
+      ['status', { defined: { name: 'Status' } }],
+      ['amount', 'u64'],
+      ['_reserved', { array: ['u8', 16] }],
+    ]),
+    struct('Returned', [
+      ['source', { defined: { name: 'Source' } }],
+      ['amount', 'u64'],
+    ]),
+  );
+  return idl;
+}
+
+describe('compareIdl: enums are append-only', () => {
+  test('an identical IDL with enums is compatible', () => {
+    expect(compareIdl(withEnums(), withEnums())).toEqual([]);
+  });
+
+  test('appending variants passes (instruction, account and event enums)', () => {
+    const next = withEnums();
+    variants(next, 'ConfigParam').push({ name: 'MaxRequest', fields: ['u64'] });
+    variants(next, 'Eligibility').push({ name: 'Open' });
+    variants(next, 'Status').push({ name: 'Defaulted' });
+    variants(next, 'Source').push({ name: 'Lamports' });
+    expect(compareIdl(withEnums(), next)).toEqual([]);
+  });
+
+  test('reordering instruction-arg variants fails', () => {
+    const next = withEnums();
+    const v = variants(next, 'ConfigParam');
+    [v[0], v[1]] = [v[1]!, v[0]!];
+    const out = compareIdl(withEnums(), next).join('\n');
+    expect(out).toContain('instruction set_config: args changed');
+    expect(out).toContain('ConfigParam: variant 0 CoverageRatioBps -> FeeTakeBps');
+  });
+
+  test('retyping a tuple variant fails', () => {
+    const next = withEnums();
+    variants(next, 'ConfigParam')[2]!.fields = ['u32'];
+    expect(compareIdl(withEnums(), next).join('\n')).toContain('ConfigParam::MaxTvl');
+  });
+
+  test('retyping a named-field variant fails', () => {
+    const next = withEnums();
+    variants(next, 'Eligibility')[0]!.fields = [{ name: 'proof', type: { vec: { array: ['u8', 20] } } }];
+    expect(compareIdl(withEnums(), next).join('\n')).toContain('instruction request_deposit: args changed');
+  });
+
+  test('removing a variant fails, even the last one', () => {
+    const next = withEnums();
+    variants(next, 'ConfigParam').pop();
+    expect(compareIdl(withEnums(), next).join('\n')).toContain('ConfigParam::MaxTvl: variant 2 removed');
+  });
+
+  test('renaming a variant fails', () => {
+    const next = withEnums();
+    variants(next, 'ConfigParam')[1]!.name = 'FeeBps';
+    expect(compareIdl(withEnums(), next).join('\n')).toContain('variant 1 FeeTakeBps -> FeeBps');
+  });
+
+  test('inserting a variant before the end fails', () => {
+    const next = withEnums();
+    variants(next, 'ConfigParam').splice(1, 0, { name: 'FeatureFlags', fields: ['u64'] });
+    expect(compareIdl(withEnums(), next).length).toBeGreaterThan(0);
+  });
+
+  test('account enums: reorder fails; a variant that grows the account fails', () => {
+    const reorder = withEnums();
+    const v = variants(reorder, 'Status');
+    [v[0], v[1]] = [v[1]!, v[0]!];
+    expect(compareIdl(withEnums(), reorder).join('\n')).toContain('Guarantee.status');
+
+    const grow = withEnums();
+    variants(grow, 'Status').push({ name: 'Paid', fields: ['u64'] });
+    expect(compareIdl(withEnums(), grow).join('\n')).toContain('Guarantee: size');
+  });
+
+  test('event enums: reorder and removal fail', () => {
+    const reorder = withEnums();
+    const v = variants(reorder, 'Source');
+    [v[0], v[1]] = [v[1]!, v[0]!];
+    expect(compareIdl(withEnums(), reorder).join('\n')).toContain('event Returned');
+
+    const removed = withEnums();
+    variants(removed, 'Source').pop();
+    expect(compareIdl(withEnums(), removed).join('\n')).toContain('event Returned');
+  });
+});
+
+describe('compareIdl: instruction account seeds and addresses', () => {
+  const withPda = () => {
+    const idl = base();
+    idl.instructions[0]!.accounts[0] = { name: 'config', pda: { seeds: [{ kind: 'const', value: [1, 2] }] } };
+    idl.instructions[0]!.accounts.push({ name: 'system_program', address: '11111111111111111111111111111111' });
+    return idl;
+  };
+  test('unchanged seeds and addresses pass', () => {
+    expect(compareIdl(withPda(), withPda())).toEqual([]);
+  });
+  test('changed PDA seeds fail', () => {
+    const next = withPda();
+    next.instructions[0]!.accounts[0] = { name: 'config', pda: { seeds: [{ kind: 'const', value: [1, 3] }] } };
+    expect(compareIdl(withPda(), next).join('\n')).toContain('refresh: accounts changed');
+  });
+  test('a changed fixed address fails', () => {
+    const next = withPda();
+    next.instructions[0]!.accounts[2]!.address = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+    expect(compareIdl(withPda(), next).join('\n')).toContain('refresh: accounts changed');
+  });
+});
+
+describe('compareIdl: fails closed on unmodelled types', () => {
+  const withType = (t: any, def?: any) => {
+    const idl = base();
+    idl.instructions[1]!.args.push({ name: 'x', type: t });
+    if (def) idl.types.push(def);
+    return idl;
+  };
+  test.each([
+    ['a type alias', { defined: { name: 'Alias' } }, { name: 'Alias', type: { kind: 'type', alias: 'u64' } }, "kind 'type'"],
+    ['a generic type', { defined: { name: 'G' } }, { name: 'G', generics: [{ kind: 'type', name: 'T' }], type: { kind: 'struct', fields: [] } }, 'generic types'],
+    ['generic arguments', { defined: { name: 'RegisterArgs', generics: [{ kind: 'type', type: 'u8' }] } }, undefined, 'generic arguments'],
+    ['a generic parameter', { generic: 'T' }, undefined, 'generic parameters'],
+    ['a coption', { coption: 'pubkey' }, undefined, 'coption'],
+    ['a generic array length', { array: ['u8', { generic: 'N' }] }, undefined, 'array length'],
+    ['an unknown form', { hashMap: ['u8', 'u8'] }, undefined, 'not supported'],
+  ])('%s throws', (_label, t, def, msg) => {
+    const idl = withType(t, def);
+    expect(() => compareIdl(idl, idl)).toThrow(msg as string);
+  });
+  test('an unmodelled type in account data throws too', () => {
+    const idl = base();
+    idl.types.find((t) => t.name === 'VaultState')!.type.fields!.splice(0, 0, { name: 'o', type: { coption: 'u64' } } as any);
+    expect(() => compareIdl(idl, idl)).toThrow('coption');
+  });
+});
+
+describe('compareIdl: errors are append-only', () => {
+  test('a new error inserted into a gap below the last code fails', () => {
+    const prev = base();
+    prev.errors.push({ code: 6005, name: 'Later', msg: '' });
+    const next = base();
+    next.errors.push({ code: 6003, name: 'Inserted', msg: '' }, { code: 6005, name: 'Later', msg: '' });
+    expect(compareIdl(prev, next).join('\n')).toContain('error 6003 Inserted: inserted below the last released code 6005');
+  });
+});
+
 describe('the program IDL', () => {
   const path = `${import.meta.dir}/../../target/idl/mutav.json`;
   test.skipIf(!existsSync(path))('is compatible with itself', async () => {
     const idl = await Bun.file(path).json();
     expect(compareIdl(idl, idl)).toEqual([]);
+  });
+  test.skipIf(!existsSync(path))('refuses a reordered or removed enum variant', async () => {
+    const idl: Idl = await Bun.file(path).json();
+    const e = idl.types.find((t) => t.type.kind === 'enum' && (t.type.variants?.length ?? 0) > 1);
+    if (!e) return;
+    const next: Idl = structuredClone(idl);
+    next.types.find((t) => t.name === e.name)!.type.variants!.reverse();
+    expect(compareIdl(idl, next).length).toBeGreaterThan(0);
+    const removed: Idl = structuredClone(idl);
+    removed.types.find((t) => t.name === e.name)!.type.variants!.pop();
+    expect(compareIdl(idl, removed).length).toBeGreaterThan(0);
   });
 });

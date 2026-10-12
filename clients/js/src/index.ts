@@ -7,3 +7,4 @@ export * from './pdas';
 export * from './preview';
 export * from './reads';
 export * from './allowlist';
+export * from './config';

@@ -1,6 +1,10 @@
 # Implementation plan — hackathon build
 
+> Superseded wording: this plan describes forking `solana-foundation/vault` code. The program was written for MUTAV and no upstream code remains; see [provenance](provenance.md).
+
 *Window: 2026-10-01 → 2026-10-12. Submission due **2026-10-12, 23:59 BRT**. Business rules: [`spec.md`](spec.md). Decisions: [`decisions/`](decisions/).*
+
+> **Superseded layout (2026-10-10).** [ADR 0019](decisions/0019-v1-layout-for-the-devnet-release.md) fixed the v1 layout for the devnet release after these tasks were written. Where a task below names `AgencyExposure`, `Payout`, `HolderState`, `FeeReceipt`, `PriceParams`, `ExitParams`, the buffer earmark, `pending_notices`, the partial-fill request fields, `min_fill_assets`, the payout SLA, the per-agency cap or the settlement floor, the current layout is in spec §3 and §14.2: those were removed or merged before the freeze, and the ones still planned return as carves.
 
 ## How to use this plan
 
@@ -15,7 +19,7 @@
 | Dates | Tasks |
 |---|---|
 | Oct 1 | 0 — scaffold and docs |
-| Oct 2 | 1 — core state, initialize, roles, pause · 2 — math and solvency · 2a — upgrade readiness |
+| Oct 2 | 1 — core state, initialize, roles, pause · 2 — math and coverage · 2a — upgrade readiness |
 | Oct 3 | 3 — register/close guarantee · 3a — fiança lifecycle (ADR 0012) · 4 — guarantee fees |
 | Oct 4 | 5 — claims and payouts (categories, admin over-cap path, quitação) |
 | Oct 4–5 | 6 — async deposits and redemptions · 7 — MUTAV capital |
@@ -75,10 +79,10 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - ADR 0012 config fields: `set_config` rejects `optional_categories` bits outside `SUPPORTED_OPTIONAL_CATEGORIES` (`InvalidParameter`) and negative `claims_tail_secs` / `payment_term_secs`; `claims_tail_secs` above the 3-year bound is rejected; `backstop_amount` and `backstop_commitment_hash` are settable and each emits `ConfigUpdated`; all five start at `0` after `initialize`.
 - **Done when:** all tests pass; every account starts with `version`/`bump` and ends with the padding budget of spec §14.2 (`VaultConfig` 512, `VaultState` 256, `Guarantee` 192, `ClaimFiling` and `Payout` 128, others 64; `Caps`, `PriceParams`, `ExitParams` 32 each), with the ADR 0012 fields carved from the front; statuses and modes are `u8` constants; `VaultConfig` carries `feature_flags`, `mutav_capital_wallet` and a zeroed `ExitParams`; events emitted via `emit_cpi!`. **Layout freeze checklist** (spec §14.2) ticked: `MAX_ADAPTERS` pinned (spec §12 Q33 answered: `MAX_ADAPTERS = 8`, `AdapterEntry._reserved` 64 bytes, decided 2026-10-06), nested tails present, event set and error list final. Layout tests are in Task 2a.
 
-## Task 2 — Math and solvency module (Oct 2)
+## Task 2 — Math and coverage module (Oct 2)
 
 - **Goal:** pure functions for `u128` `mul_div` with explicit rounding, share conversion with a virtual offset, `stable_assets`, `coverage_required`, `surplus`, `earmark_eff` (stored level, headroom, liquidity and starvation terms), earmark-aware `free_capital`, `liquid_budget`, `net_assets`, NAV per share (spec §4).
-- **Files:** `programs/mutav/src/{math.rs,solvency.rs}`; `tests/rounding.rs`, unit tests in-module.
+- **Files:** `programs/mutav/src/{math.rs,coverage.rs}`; `tests/rounding.rs`, unit tests in-module.
 - **Tests first:**
   - Property tests: `assets_for(shares_for(x)) ≤ x`; rounding always favours the reserve; no overflow at `u64::MAX` inputs (errors, never wraps).
   - `coverage_required` rounds up; `free_capital` saturates at 0; `net_assets` saturates at 0.
@@ -109,8 +113,8 @@ Layout fields for anything built later are carved from the `_reserved` padding (
 
 ## Task 3 — Register and close guarantees (Oct 3)
 
-- **Goal:** `Guarantee`, `AgencyExposure`; `register_guarantee` (solvency-gated, per-guarantee and per-agency caps, storing the valor afiançado with `contract_cap_hash` and `landlord_mandate_hash`) and `close_guarantee(id, reason)` with the ADR 0012 state rules.
-- **Files:** `state/guarantee.rs`, `state/agency.rs`, `instructions/operator/{register_guarantee.rs,close_guarantee.rs}`; `tests/solvency_gate.rs`, `tests/caps.rs`, `tests/lifecycle.rs`.
+- **Goal:** `Guarantee`, `AgencyExposure`; `register_guarantee` (coverage-gated, per-guarantee and per-agency caps, storing the valor afiançado with `contract_cap_hash` and `landlord_mandate_hash`) and `close_guarantee(id, reason)` with the ADR 0012 state rules.
+- **Files:** `state/guarantee.rs`, `state/agency.rs`, `instructions/operator/{register_guarantee.rs,close_guarantee.rs}`; `tests/coverage_gate.rs`, `tests/caps.rs`, `tests/lifecycle.rs`.
 - **Tests first:**
   - Registration succeeds exactly up to `free_capital` and fails one base unit above (`InsufficientFreeCapital`); the check is `coverage_required_after + earmark_eff_before ≤ stable_assets` (spec §5.2 rule 5), also with an injected earmark and flag.
   - A zero `contract_cap_hash` or `landlord_mandate_hash` is rejected (`InvalidParameter`); both are stored and appear in `GuaranteeRegistered`; the lifecycle fields start at `0`.
@@ -161,7 +165,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
 
 - **Goal:** take Nora's monthly BRS revenue share into the reserve: the income inbox created at `initialize`, `sweep_income` (spec §5.3a), and the three changes the design review put before the devnet layout freeze (NAV-move guard net of inflows, mint guard for `ScaledUiAmount` / `InterestBearingConfig` / `Pausable`, income fields carved from padding; `reserve` stays a PDA).
 - **Files:** `instructions/operator/sweep_income.rs`, `instructions/admin/initialize.rs`, `state/income.rs`, `pricing.rs`, `token_guard.rs`; `tests/income.rs`, `tests/mint_guard.rs`, `tests/under_coverage.rs`, the layout and padding tests.
-- **Built (2026-10-07), before the layout freeze.** Happy path, every error, idempotency per statement, the inbox bound, operator-only, always open (paused, under-covered, notices, stale price), NAV and `stable_assets` rising only on the sweep, the solvency gate, freezes, the guard (a large fee batch or income payment no longer halts; a shock of the same size still does), an injected take, no drift between `reserve` and `brs_balance`, and the deposit-timing scenario. The `pay_claim` property test also fuzzes inbox income. **Built later:** the admin recovery path for untracked BRS and the phase-2 timing guard (§12 Q49).
+- **Built (2026-10-07), before the layout freeze.** Happy path, every error, idempotency per statement, the inbox bound, operator-only, always open (paused, under-covered, notices, stale price), NAV and `stable_assets` rising only on the sweep, the coverage gate, freezes, the guard (a large fee batch or income payment no longer halts; a shock of the same size still does), an injected take, no drift between `reserve` and `brs_balance`, and the deposit-timing scenario. The `pay_claim` property test also fuzzes inbox income. **Built later:** the admin recovery path for untracked BRS and the phase-2 timing guard (§12 Q49).
 
 ## Task 5 — Claims and payouts (Oct 4)
 
@@ -172,13 +176,13 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - `pay_claim` pays only `payments_account`; any other destination fails (`InvalidPaymentsAccount`).
   - `amount ≤ remaining cover on leg`; per-call and per-period caps at the boundary; the period window rolls.
   - Second `pay_claim` for the same notice fails (idempotency).
-  - **Property test:** `pay_claim` is never refused for solvency or under-coverage (fuzz `stable_assets` below `coverage_required`).
+  - **Property test:** `pay_claim` is never refused by the coverage gate or for under-coverage (fuzz `stable_assets` below `coverage_required`).
   - At `c = 1.0`, paying a claim leaves `free_capital` unchanged.
   - At `c < 1` (floor 0.10, ADR 0016), paying a claim lowers `free_capital` by `(1 − c)` times the amount, can tip the reserve into under-coverage at the next `refresh`, and is never refused; `coverage_required` never falls below `provisions`.
   - Frozen `reserve` → `ReserveFrozen`, clean failure, retry succeeds after thaw.
   - **Carried from 2a:**
     - `ClaimFilingV1` and `PayoutV1` golden layouts; padding zero at init; unknown leg or status constants refused with `UnsupportedVersion`; `file_claim`, `pay_claim` and `settle_payout` added to `Fixture::pilot_instructions()`.
-    - `pay_claim` neither reads nor writes `buffer_earmark` and is never refused: the solvency property test above also fuzzes an injected earmark with `INSTANT_EXIT` set (spec §4 invariant 14).
+    - `pay_claim` neither reads nor writes `buffer_earmark` and is never refused: the coverage property test above also fuzzes an injected earmark with `INSTANT_EXIT` set (spec §4 invariant 14).
     - `ClaimNoticeV1` golden layout, with the claim notices (built later).
   - `settle_payout` records `pix_e2e_hash`; late flag set when past the SLA; second settle fails.
   - **Categories (spec §3.13):** `CAT_UNSPECIFIED` and unknown codes fail (`CategoryNotAllowed`); `CAT_DAMAGE`, `CAT_COURT_COSTS`, `CAT_TERMINATION_PENALTY` and `CAT_ABANDONMENT` fail on the default leg; `CAT_TERMINATION_PENALTY` fails while `optional_categories == 0` and succeeds once bit 0 is set; `CAT_DAMAGE` and `CAT_ABANDONMENT` fail with `KeysNotReturned` before `record_keys_returned`; a zero `debt_calc_hash` or a future `request_complete_ts` fails; `pay_claim` with a category that differs from the filing fails (`CategoryMismatch`); the category, `request_complete_ts` and flags reach the `Payout` and the events.
@@ -188,7 +192,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - **Admin over-cap path:** `pay_claim_admin` by a non-admin fails (`Unauthorized`); it pays above `max_claim_per_call` and past an exhausted period window; it does not move `claim_period_paid`; it still pays only `payments_account`, within remaining cover and liquid BRS; it sets `PAYOUT_ADMIN_PATH` and `admin_claims_paid_total`; it works while paused, in under-coverage and with a stale price; executed through a Squads v4 vault transaction (Task 13).
   - **Backstop reimbursement:** `flags = PAYOUT_BACKSTOP_REIMBURSEMENT` on either path pays the same `payments_account`, adds to `backstop_reimbursed_total`, and still obeys every cover rule; any other caller-set bit fails (`InvalidParameter`).
   - **Quitação:** `settle_payout` with a zero `quitacao_hash` fails; on success the `Payout` stores `quitacao_hash` and copies `landlord_mandate_hash` from the guarantee, and `PayoutSettled` carries both.
-  - **Property test (extended):** across random lifecycle states, tails, categories, flags and both paths, `pay_claim` and `pay_claim_admin` are never refused for solvency, mode, guarantee status or tail expiry on a validly filed claim.
+  - **Property test (extended):** across random lifecycle states, tails, categories, flags and both paths, `pay_claim` and `pay_claim_admin` are never refused by the coverage gate or for mode, guarantee status or tail expiry on a validly filed claim.
   - **Claim notices:** flag increments `pending_notices`; duplicate notice fails; close as `Paid` requires the `ClaimFiling` to be `PAID`; close as `FullyProvisioned` requires `leg_provision == leg_cover − leg_paid`; **a notice whose filing has a provision smaller than the eventual payment cannot be closed as filed** (`NoticeNotResolved`); close as `Withdrawn`; notices never affect `file_claim`, `pay_claim`, `settle_payout` or `close_guarantee`; flag and close work while paused and in under-coverage.
 - **Done when:** tests pass; the payout flow matches [ADR 0003](decisions/0003-payments-operated-by-mutav.md).
 
@@ -247,7 +251,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
 ## Task 8 — Under-coverage mode and price safety (Oct 6)
 
 - **Goal:** `mode` transitions; TESOURO valued at `min(on-chain price, accrual curve)` with staleness and deviation bounds; NAV-move guard halting fulfilment.
-- **Files:** `pricing.rs`, `solvency.rs`; `tests/solvency_gate.rs`, `tests/pricing.rs`.
+- **Files:** `pricing.rs`, `coverage.rs`; `tests/coverage_gate.rs`, `tests/pricing.rs`.
 - **Tests first:**
   - A mark-down below `coverage_required` → `UnderCovered`: `register_guarantee`, `fulfil_redeems`, `allocate` fail; `pay_claim`, `pay_claim_admin`, `notify_exoneration` and `record_keys_returned` succeed; `backstop_amount` stays out of `stable_assets` and `coverage_required`.
   - Recovery returns `mode` to `Normal`.
@@ -268,7 +272,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
   - The vault authority never appears as a signer in the CPI (inspect instruction accounts).
   - A malicious mock that moves extra tokens or mints shares fails the post-CPI check.
   - Adapter cap and TESOURO share cap at the boundary.
-  - Allocation fails when it would breach the solvency post-condition, or the liquidity post-condition `brs_balance_after ≥ provisions + earmark_eff_before` (`InsufficientLiquidBalance`); with an injected earmark `E` (flag set), a failing allocation leaves `buffer_earmark` unchanged.
+  - Allocation fails when it would breach the coverage post-condition, or the liquidity post-condition `brs_balance_after ≥ provisions + earmark_eff_before` (`InsufficientLiquidBalance`); with an injected earmark `E` (flag set), a failing allocation leaves `buffer_earmark` unchanged.
   - **CPI depth:** `allocate` and `deallocate` succeed when executed through a Squads v4 vault transaction (Task 13); the mock adapter makes one CPI level and emits no self-CPI events.
   - **Deallocate rule:** in under-coverage, deallocating TESOURO → BRS at or above its bounded value succeeds; a deallocation that lowers `stable_assets` fails with `WorsensCoverage`. In normal mode, any value loss must fit in `free_capital`.
   - **Carried from 2a:** with an injected earmark and flag, `allocate` capacity shrinks by exactly `earmark_eff`; `allocate`, `deallocate`, `whitelist_adapter` and `remove_adapter` added to `Fixture::pilot_instructions()`; adapter entry padding preserved.
@@ -300,7 +304,7 @@ Layout fields for anything built later are carved from the `_reserved` padding (
 - **Tests first:** client unit tests (Bun) for PDA derivation against known addresses, instruction encoding round-trips, math-mirror parity with Rust test vectors (including `earmark_eff`, `free_capital`, `liquid_budget`, the partial-fill sizing and the ADR 0012 `canFile` / `canClose` predicates); a grep check that fails CI on secret-key APIs.
 - **IDL compatibility:** an `idl-compat` CI job, active from the first tagged release, diffs `target/idl/mutav.json` against the last released IDL and fails on changed instruction args/accounts, account sizes, field offsets or types, renumbered errors, or changed events (spec §14.4).
 - **Done when:** CI regenerates the client and finds no diff; package published (GitHub Packages or npm, under `@mutav-finance`) and installable from mutav-app.
-- **Built in Phase D (2026-10-06).** `clients/js/src/{pdas,math,preview,reads}.ts` on top of the Codama output. The Rust test `tests/tests/client_vectors.rs` exports math, solvency (with `earmark_eff`, `free_capital`, `liquid_budget`), PDA, allowlist and instruction-encoding vectors into `tests/fixtures/client/vectors.json` and fails when the file is stale; the Bun tests in `clients/js/test/` check the client against the same file. CI runs `scripts/check-no-keys.sh` on `clients/js/src`, the client and script tests, and an `idl-compat` job (`scripts/idl-compat.ts`) that stays inactive until a `v*` tag exists and then diffs against the `mutav.json` asset of that release. **Not done:** publishing (needs approval; the package is publish-ready, see `clients/js/README.md`); the partial-fill sizing parity, deferred with partial fills (ADR 0010).
+- **Built in Phase D (2026-10-06).** `clients/js/src/{pdas,math,preview,reads}.ts` on top of the Codama output. The Rust test `tests/tests/client_vectors.rs` exports math, coverage (with `earmark_eff`, `free_capital`, `liquid_budget`), PDA, allowlist and instruction-encoding vectors into `tests/fixtures/client/vectors.json` and fails when the file is stale; the Bun tests in `clients/js/test/` check the client against the same file. CI runs `scripts/check-no-keys.sh` on `clients/js/src`, the client and script tests, and an `idl-compat` job (`scripts/idl-compat.ts`) that stays inactive until a `v*` tag exists and then diffs against the `mutav.json` asset of that release. **Not done:** publishing (needs approval; the package is publish-ready, see `clients/js/README.md`); the partial-fill sizing parity, deferred with partial fills (ADR 0010).
 
 ## Task 12 — Devnet deploy with Squads as upgrade authority (Oct 7–8)
 

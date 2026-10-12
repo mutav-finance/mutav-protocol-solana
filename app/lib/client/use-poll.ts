@@ -13,7 +13,8 @@ export type Poll<T> = {
 
 /**
  * Poll a read route. Pauses while the tab is hidden; `refresh()` reads now
- * (used right after a transaction confirms).
+ * (used right after a transaction confirms) and skips the CDN's 3 s read
+ * cache with a fresh query parameter, so "how the numbers moved" is current.
  */
 export function usePoll<T>(url: string, intervalMs = 10_000): Poll<T> {
   const [data, setData] = useState<T | null>(null);
@@ -23,9 +24,9 @@ export function usePoll<T>(url: string, intervalMs = 10_000): Poll<T> {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const alive = useRef(true);
 
-  const read = useCallback(async () => {
+  const read = useCallback(async (fresh = false) => {
     try {
-      const d = await getJson<T>(url);
+      const d = await getJson<T>(fresh ? `${url}${url.includes("?") ? "&" : "?"}fresh=${Date.now()}` : url);
       if (!alive.current) return;
       setData(d);
       setError(null);
@@ -50,5 +51,6 @@ export function usePoll<T>(url: string, intervalMs = 10_000): Poll<T> {
     };
   }, [read, intervalMs]);
 
-  return { data, error, loading, updatedAt, refresh: read };
+  const refresh = useCallback(() => read(true), [read]);
+  return { data, error, loading, updatedAt, refresh };
 }

@@ -3,7 +3,7 @@
 /**
  * The MUTAV program on Solana as a blueprint (React Flow, static): the
  * reserve, its escrows, the treasury and payments accounts, the operator, the
- * admin Squads multisig, Nora's BRS, and the solvency gate between them.
+ * admin Squads multisig, Nora's BRS, and the coverage gate between them.
  *
  * Amber marks only the reserve and the gate; the three roles carry their
  * role colour and marker (lib/roles). Pan/zoom/drag are off. Below
@@ -79,7 +79,7 @@ const n = (id: string, x: number, y: number, data: BoxData): Node<BoxData> => ({
 
 const NODES: Node<BoxData>[] = [
   n("operator", 0, 20, { title: "OPERATOR", sub: "MUTAV platform key\nregisters · fees · claims", w: 190, h: 74, role: "operator" }),
-  n("gate", 300, 26, { title: "SOLVENCY GATE", sub: "new cover must fit\nin free capital", w: 170, h: 62, gate: true }),
+  n("gate", 300, 26, { title: "COVERAGE GATE", sub: "new cover must fit\nin free capital", w: 170, h: 62, gate: true }),
   n("admin", 840, 20, { title: "RESERVE ADMIN", sub: "Squads M-of-N multisig\ntime-locked proposals", w: 200, h: 74, role: "admin" }),
   n("reserve", 380, 170, { title: "RESERVE", sub: "BRS held by the program\nNAV · coverage · free capital\nshares minted at NAV", w: 260, h: 130, accent: true }),
   n("escrows", 820, 186, { title: "ESCROWS", sub: "pending deposits\npending redemptions\nclaims (filled redemptions)", w: 220, h: 98 }),
@@ -118,7 +118,7 @@ const EDGES: Edge[] = [
 
 const MOBILE: [string, string, Role?][] = [
   ["Operator", "Registers guarantees, contributes guarantee fees, files, pays and settles claims.", "operator"],
-  ["Solvency gate", "A new guarantee is accepted only if its cover fits in free capital. Redemptions pass the same gate."],
+  ["Coverage gate", "A new guarantee is accepted only if its cover fits in free capital. Redemptions pass the same gate."],
   ["Reserve", "BRS held by the program. Publishes NAV, coverage required and free capital."],
   ["Investor", "Requests deposits and redemptions, then claims shares or assets. Allowlist-gated; in the pilot, MUTAV's capital wallet.", "investor"],
   ["Escrows", "Deposits and redemptions wait in FIFO escrows until the Reserve Admin fulfils them."],

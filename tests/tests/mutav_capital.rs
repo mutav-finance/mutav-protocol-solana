@@ -45,14 +45,14 @@ fn mutav_capital_wallet_deposits_and_redeems_through_the_queue() {
         MutavError::InsufficientFreeCapital,
     );
     // Run-off frees capital; then MUTAV is filled at the NAV of its fill.
-    f.close_guarantee(g1.id, g1.agency_id).unwrap();
+    f.close_guarantee(g1.id).unwrap();
     f.fulfil_redeems(1, u64::MAX, &[mine])
         .expect("filled after run-off");
     let r = f.redeem_request(mine).unwrap();
     assert_eq!(r.status, REDEEM_FILLED);
     f.claim_assets(&m, mine).unwrap();
-    assert_eq!(f.balance(&m.brs), r.assets_filled);
-    assert!(r.assets_filled > 20_000 * BRL, "priced at NAV > 1.0");
+    assert_eq!(f.balance(&m.brs), r.assets_out);
+    assert!(r.assets_out > 20_000 * BRL, "priced at NAV > 1.0");
     f.assert_capital_invariants("mutav capital");
 }
 
@@ -69,9 +69,10 @@ fn fulfil_deposits_works_in_under_coverage() {
     f.register(guarantee_args(unique_hash(), 30_000 * BRL, 0))
         .unwrap();
     // The admin raises `c` to 1.5: coverage 45,000 > 30,000 of stable assets.
-    let mut args = set_config_args(&f.config());
-    args.coverage_ratio_bps = 15_000;
-    f.set_config(args).unwrap();
+    // (Injected: `set_config` refuses c above 1.0 since ADR 0022.)
+    let mut c = f.config();
+    c.coverage_ratio_bps = 15_000;
+    f.write_config(&c);
     // `refresh` (Task 10) would record the mode; the gates also check inline.
     let mut s = f.state();
     s.mode = MODE_UNDER_COVERED;
@@ -102,6 +103,10 @@ fn fulfil_deposits_works_in_under_coverage() {
 #[test]
 fn pause_blocks_capital_flows_and_new_guarantees_only() {
     let mut f = Fixture::new();
+    // The claim payment below moves NAV by more than the test bound of 1%;
+    // this test is about pause scope, so the guard takes the devnet value.
+    f.set_config(vec![mutav::ConfigParam::MaxNavMoveBps(10_000)])
+        .unwrap();
     let a = f.investor(40_000 * BRL);
     let list = f.allowlist(&[a.pubkey()]);
     f.deposit(&a, &list, 30_000 * BRL);
@@ -147,8 +152,7 @@ fn pause_blocks_capital_flows_and_new_guarantees_only() {
     f.pay_claim(c2).expect("pay_claim");
     f.settle_payout(c1, unique_hash()).expect("settle_payout");
     f.settle_payout(c2, unique_hash()).expect("settle_payout");
-    f.close_guarantee(g.id, g.agency_id)
-        .expect("close_guarantee");
+    f.close_guarantee(g.id).expect("close_guarantee");
     f.advance_queue_heads(4, &[r_cancel, r_fill, r_live], &[d_cancel, d_fill])
         .expect("advance_queue_heads");
     f.cancel_redeem(&a, r_live).expect("cancel_redeem");

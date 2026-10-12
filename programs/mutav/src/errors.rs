@@ -2,6 +2,8 @@
 //!
 //! Codes are numbered by enum order, so this list is **append-only** from the
 //! first devnet deploy: new errors go at the end; none is reordered or removed.
+//! Errors no instruction could raise were removed before the freeze
+//! (ADR 0019); later features append their own.
 
 use anchor_lang::prelude::*;
 
@@ -27,18 +29,12 @@ pub enum MutavError {
     InsufficientFreeCapital,
     #[msg("Insufficient liquid balance")]
     InsufficientLiquidBalance,
-    #[msg("Price is stale")]
-    StalePrice,
-    #[msg("Price deviation beyond the bound")]
-    PriceDeviation,
     #[msg("Fulfilment is halted by the NAV-move guard")]
     FulfilHalted,
     #[msg("TVL cap exceeded")]
     TvlCapExceeded,
     #[msg("Per-guarantee cap exceeded")]
     GuaranteeCapExceeded,
-    #[msg("Per-agency cap exceeded")]
-    AgencyCapExceeded,
     #[msg("Guarantee is not active")]
     GuaranteeNotActive,
     #[msg("Guarantee has open claims")]
@@ -47,9 +43,7 @@ pub enum MutavError {
     ExceedsRemainingCover,
     #[msg("Claim has not been filed")]
     ClaimNotFiled,
-    #[msg("Leg does not match the claim filing")]
-    LegMismatch,
-    #[msg("Per-call claim payment cap exceeded")]
+    #[msg("Above the per-call claim cap without a matching approval")]
     ClaimCallCapExceeded,
     #[msg("Per-period claim payment cap exceeded")]
     ClaimPeriodCapExceeded,
@@ -67,14 +61,6 @@ pub enum MutavError {
     InvalidRequestStatus,
     #[msg("Queue order violation")]
     QueueOrderViolation,
-    #[msg("Adapter is not whitelisted")]
-    AdapterNotWhitelisted,
-    #[msg("Adapter cap exceeded")]
-    AdapterCapExceeded,
-    #[msg("TESOURO share cap exceeded")]
-    TesouroShareCapExceeded,
-    #[msg("Operation worsens coverage")]
-    WorsensCoverage,
     #[msg("Post-CPI check failed")]
     PostCpiCheckFailed,
     #[msg("Math overflow")]
@@ -83,14 +69,38 @@ pub enum MutavError {
     FeatureNotSupported,
     #[msg("Invalid treasury account")]
     InvalidTreasuryAccount,
-    #[msg("A claim notice is pending")]
-    ClaimNoticePending,
-    #[msg("Claim notice is not resolved")]
-    NoticeNotResolved,
     #[msg("Unsupported account version or status")]
     UnsupportedVersion,
     #[msg("Income source is not the reserve's income inbox")]
     InvalidIncomeSource,
     #[msg("Amount exceeds the income inbox balance")]
     IncomeExceedsInbox,
+    #[msg("Token program is not the reserve's token program")]
+    InvalidTokenProgram,
+    #[msg("Claim has not been paid")]
+    ClaimNotPaid,
+    #[msg("A config parameter appears more than once")]
+    DuplicateParam,
+    #[msg("Expected amount does not match the claim's provision")]
+    ExpectedAmountMismatch,
+    #[msg("NAV per share is outside the given bounds")]
+    NavOutOfBounds,
+    #[msg("No handover is pending for this role")]
+    NoPendingHandover,
+    #[msg("The pending handover has expired")]
+    HandoverExpired,
+    #[msg("Guarantee has claim payments")]
+    GuaranteeHasPayments,
+    #[msg("A handover is already pending for this role")]
+    HandoverPending,
+    #[msg("Refresh the reserve in the same slot first")]
+    RefreshRequired,
+    #[msg("The head request's price limit is not met")]
+    PriceLimitNotMet,
+    #[msg("NAV per share is below the smallest published unit while shares are outstanding")]
+    ReserveUnderwater,
+    #[msg("No shares are outstanding")]
+    NoSharesOutstanding,
+    #[msg("The claim filing changed since the approval was proposed")]
+    ClaimRevisionMismatch,
 }

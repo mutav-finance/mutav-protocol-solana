@@ -57,11 +57,11 @@ function Ticker({ r }: { r: ReserveView }) {
   const s = r.state;
   return (
     <div className="grid-metrics" data-testid="demo-ticker">
-      <MetricCard dense label="Stable assets" value={fmtBrs(r.solvency.stableAssets)} />
-      <MetricCard dense label="Coverage required" value={fmtBrs(r.solvency.coverageRequired)} />
-      <MetricCard dense label="Free capital" value={fmtBrs(r.solvency.freeCapital)} />
+      <MetricCard dense label="Stable assets" value={fmtBrs(r.coverage.stableAssets)} />
+      <MetricCard dense label="Coverage required" value={fmtBrs(r.coverage.coverageRequired)} />
+      <MetricCard dense label="Free capital" value={fmtBrs(r.coverage.freeCapital)} />
       <MetricCard dense label="Provisions" value={fmtBrs(s.provisions)} />
-      <MetricCard dense label="NAV (from accounts)" value={fmtNav(navPerShare(r.solvency.netAssets, s.sharesOutstanding))} />
+      <MetricCard dense label="NAV (from accounts)" value={fmtNav(navPerShare(r.coverage.netAssets, s.sharesOutstanding))} />
       <MetricCard dense label="Mode" value={MODE_LABEL(s.mode)} />
     </div>
   );
@@ -131,12 +131,12 @@ export function DemoPage() {
                 <FileClaimForm />
               </Step>
 
-              <Step n={5} title="Under-coverage: claims are still paid" instruction="pay_claim (with mode = UnderCovered)" roles={["admin", "operator"]} why={<>When stable assets fall below coverage required, the reserve is under-covered: new guarantees and redemptions are frozen. Claim payments are not. They never pass the solvency gate.</>}>
+              <Step n={5} title="Under-coverage: claims are still paid" instruction="pay_claim (with mode = UnderCovered)" roles={["admin", "operator"]} why={<>When stable assets fall below coverage required, the reserve is under-covered: new guarantees and redemptions are frozen. Claim payments are not. They never pass the coverage gate.</>}>
                 <Sub title="a. Put the reserve under coverage (set_config)" role="admin">
                   <BlockedPreview />
                   <Note>
                     {CLUSTER === "localnet" ? (
-                      <>Seeded scenario: run <code className="font-mono">bun scripts/localnet.ts scenario under-covered</code> (raises the coverage ratio to 150% through <code className="font-mono">set_config</code>), or raise it from <Link href="/admin#actions" className="ext-link">/admin</Link>. Restore with <code className="font-mono">scenario normal</code>.</>
+                      <>Seeded scenario: run <code className="font-mono">bun scripts/localnet.ts scenario under-covered</code> (raises the coverage ratio to 100%, the program maximum, through <code className="font-mono">set_config</code>: the seeded cover then exceeds the stable assets), or raise it from <Link href="/admin#actions" className="ext-link">/admin</Link>. Restore with <code className="font-mono">scenario normal</code>.</>
                     ) : (
                       <>On devnet the coverage ratio is raised through a Squads <code className="font-mono">set_config</code> proposal from <Link href="/admin#actions" className="ext-link">/admin</Link>.</>
                     )}

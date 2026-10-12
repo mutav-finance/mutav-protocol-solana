@@ -9,7 +9,8 @@
 import Link from "next/link";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
-import { Action } from "@/components/demo/shared";
+import { Action, Note, useLive } from "@/components/demo/shared";
+import { depositHead, redeemHead, type HeadStatus } from "@/lib/queue";
 import type { Money } from "@/lib/client/use-money";
 import type { InvestorView } from "@/lib/server/investor";
 import type { InvestorRequest } from "@/lib/view";
@@ -82,7 +83,7 @@ function Row({ x, now, connected, money, last }: { x: InvestorRequest; now: bigi
   );
 }
 
-/** Verify footer, collapsed: the allowlist root and the wallet's holder account. */
+/** Verify footer, collapsed: the allowlist root (the v1 layout has no holder account). */
 function Verify({ inv }: { inv: InvestorView | null }) {
   if (!inv) return null;
   const root = inv.allowlist.root;
@@ -96,14 +97,6 @@ function Verify({ inv }: { inv: InvestorView | null }) {
           {root.length > 9 ? `${root.slice(0, 4)}…${root.slice(-4)}` : root}
         </Mono>
       </span>
-      {inv.holderState && (
-        <>
-          <span aria-hidden="true">·</span>
-          <span className="inline-flex items-center gap-1.5">
-            Holder <Explorer value={inv.holderState.address} />
-          </span>
-        </>
-      )}
       </p>
     </details>
   );
@@ -112,6 +105,13 @@ function Verify({ inv }: { inv: InvestorView | null }) {
 export function QueueEntries({ rows, owner, connected, inv, money, now }: { rows: InvestorRequest[]; owner: string | null; connected: boolean; inv: InvestorView | null; money: Money; now: bigint }) {
   const sorted = sortRows(rows);
   const ready = rows.filter((x) => x.claimable > 0n).length;
+  // Why a request at the head of its queue would not fill now (preview).
+  const { reserve, ledger } = useLive();
+  const heads = owner
+    ? [depositHead(reserve.config, reserve.state, reserve.coverage, ledger, null), redeemHead(reserve.config, reserve.state, reserve.coverage, ledger)].filter(
+        (h): h is HeadStatus => h !== null && h.owner === owner && h.stuck.length > 0,
+      )
+    : [];
   return (
     <section aria-labelledby="queue-h" className="flex min-w-0 flex-col gap-3">
       <div className="flex items-baseline justify-between gap-3">
@@ -134,11 +134,16 @@ export function QueueEntries({ rows, owner, connected, inv, money, now }: { rows
       ) : rows.length === 0 ? (
         <p className="font-body text-(--color-text-3) m-0 py-3 text-[13px]">No open requests. New deposits and redemptions appear here.</p>
       ) : (
+        <>
+        {heads.map((h) => (
+          <Note key={h.side} tone="warn">Your {h.side} seq {h.seq.toString()} heads the queue and would not fill now (PREVIEW): {h.stuck.join("; ")}.</Note>
+        ))}
         <ul className="m-0 flex flex-col p-0" aria-label="Your queue entries">
           {sorted.map((x, i) => (
             <Row key={x.address} x={x} now={now} connected={connected} money={money} last={i === sorted.length - 1} />
           ))}
         </ul>
+        </>
       )}
       <Verify inv={inv} />
     </section>

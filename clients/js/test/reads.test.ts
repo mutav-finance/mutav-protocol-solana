@@ -11,10 +11,11 @@ import {
   INCOME_RECEIPT_DISCRIMINATOR,
   TOKEN_PROGRAM_ADDRESS,
   fetchGuaranteesForReserve,
-  fetchPayoutsForGuarantee,
+  fetchClaimFilingsForGuarantee,
   fetchReserve,
+  findClaimFilingPda,
+  findFeeReceiptPda,
   findGuaranteePda,
-  findPayoutPda,
   findRedeemRequestPda,
   findDepositRequestPda,
   findReserveAddresses,
@@ -23,11 +24,19 @@ import {
   getGuaranteeEncoder,
   getGuaranteeSize,
   GUARANTEE_DISCRIMINATOR,
-  getPayoutDecoder,
-  getPayoutEncoder,
-  getPayoutSize,
-  PAYOUT_DISCRIMINATOR,
+  getClaimFilingDecoder,
+  getClaimFilingEncoder,
+  getClaimFilingSize,
+  CLAIM_FILING_DISCRIMINATOR,
   getRedeemQueuePosition,
+  DEPOSIT_CANCELLED,
+  DEPOSIT_FULFILLED,
+  DEPOSIT_PENDING,
+  REDEEM_CANCELLED,
+  REDEEM_FILLED,
+  REDEEM_PENDING,
+  isParked,
+  isQueued,
   getRedeemRequestDecoder,
   getRedeemRequestEncoder,
   getRedeemRequestSize,
@@ -67,14 +76,14 @@ async function setup() {
 }
 
 describe('fetchReserve', () => {
-  test('decodes config and state and derives the solvency snapshot', async () => {
+  test('decodes config and state and derives the coverage snapshot', async () => {
     const { rpc, a } = await setup();
     const r = await fetchReserve(rpc as never, MINT);
     expect(r.addresses.config).toBe(a.config);
     expect(r.config.data.reserveMint).toBe(MINT);
     expect(r.state.data.brsBalance).toBe(10_000n);
-    expect(r.solvency.surplus).toBe(6_000n);
-    expect(r.solvency.freeCapital).toBe(6_000n);
+    expect(r.coverage.surplus).toBe(6_000n);
+    expect(r.coverage.freeCapital).toBe(6_000n);
   });
 
   test('throws when the reserve is not initialized', async () => {
@@ -83,8 +92,8 @@ describe('fetchReserve', () => {
   });
 });
 
-describe('guarantees and payouts', () => {
-  test('lists only this reserve’s guarantees and a guarantee’s payouts', async () => {
+describe('guarantees and claim filings', () => {
+  test('lists only this reserve’s guarantees and a guarantee’s filings', async () => {
     const { rpc, a } = await setup();
     const mk = (id: number) => ({
       ...blank(getGuaranteeSize(), GUARANTEE_DISCRIMINATOR as Uint8Array, (b) =>
@@ -106,24 +115,27 @@ describe('guarantees and payouts', () => {
     expect(gs.map((g) => g.address).sort()).toEqual([g1, g2].sort());
 
     const notice = new Uint8Array(32).fill(9);
-    const [p1] = await findPayoutPda({ guarantee: g1, noticeRefHash: notice });
-    const payout = {
-      ...blank(getPayoutSize(), PAYOUT_DISCRIMINATOR as Uint8Array, (b) => getPayoutDecoder().decode(b)),
+    const [p1] = await findClaimFilingPda({ guarantee: g1, noticeRefHash: notice });
+    const filing = {
+      ...blank(getClaimFilingSize(), CLAIM_FILING_DISCRIMINATOR as Uint8Array, (b) =>
+        getClaimFilingDecoder().decode(b),
+      ),
       version: 1,
       guarantee: g1,
       noticeRefHash: notice,
-      amount: 42n,
+      status: 1,
+      paidAmount: 42n,
     };
-    rpc.set(p1, getPayoutEncoder().encode(payout) as Uint8Array);
-    const ps = await fetchPayoutsForGuarantee(rpc as never, g1);
+    rpc.set(p1, getClaimFilingEncoder().encode(filing) as Uint8Array);
+    const ps = await fetchClaimFilingsForGuarantee(rpc as never, g1);
     expect(ps.map((p) => p.address)).toEqual([p1]);
-    expect(ps[0]!.data.amount).toBe(42n);
-    expect(await fetchPayoutsForGuarantee(rpc as never, g2)).toEqual([]);
+    expect(ps[0]!.data.paidAmount).toBe(42n);
+    expect(await fetchClaimFilingsForGuarantee(rpc as never, g2)).toEqual([]);
   });
 });
 
 describe('queue positions', () => {
-  async function putRedeem(rpc: FakeRpc, config: Address, seq: bigint, sharesRemaining: bigint, status: number) {
+  async function putRedeem(rpc: FakeRpc, config: Address, seq: bigint, shares: bigint, status: number) {
     const [addr] = await findRedeemRequestPda({ config, seq });
     const r = {
       ...blank(getRedeemRequestSize(), REDEEM_REQUEST_DISCRIMINATOR as Uint8Array, (b) =>
@@ -131,8 +143,7 @@ describe('queue positions', () => {
       ),
       version: 1,
       seq,
-      sharesRequested: sharesRemaining,
-      sharesRemaining,
+      shares,
       status,
     };
     rpc.set(addr, getRedeemRequestEncoder().encode(r) as Uint8Array);
@@ -142,13 +153,32 @@ describe('queue positions', () => {
     const { rpc, a } = await setup();
     await putRedeem(rpc, a.config, 0n, 100n, 0); // open
     // seq 1 closed (no account)
-    await putRedeem(rpc, a.config, 2n, 0n, 3); // cancelled: dead
+    await putRedeem(rpc, a.config, 2n, 80n, 1); // filled: dead
     await putRedeem(rpc, a.config, 3n, 50n, 0); // ours
     const p = await getRedeemQueuePosition(rpc as never, a.config, 3n);
     expect(p).toEqual({ seq: 3n, head: 0n, isHead: false, requestsAhead: 1, amountAhead: 100n, open: true });
     const h = await getRedeemQueuePosition(rpc as never, a.config, 0n);
     expect(h.isHead).toBe(true);
     expect(h.requestsAhead).toBe(0);
+  });
+
+  test('redeem: a request parked by the admin is dead for the queue (ADR 0030)', async () => {
+    const { rpc, a } = await setup();
+    await putRedeem(rpc, a.config, 0n, 100n, REDEEM_CANCELLED); // parked: dead
+    await putRedeem(rpc, a.config, 1n, 50n, REDEEM_PENDING); // ours
+    const p = await getRedeemQueuePosition(rpc as never, a.config, 1n);
+    expect(p).toEqual({ seq: 1n, head: 0n, isHead: true, requestsAhead: 0, amountAhead: 0n, open: true });
+    const parked = await getRedeemQueuePosition(rpc as never, a.config, 0n);
+    expect(parked.open).toBe(false);
+  });
+
+  test('request status helpers', () => {
+    expect([DEPOSIT_PENDING, DEPOSIT_FULFILLED, DEPOSIT_CANCELLED]).toEqual([0, 1, 2]);
+    expect([REDEEM_PENDING, REDEEM_FILLED, REDEEM_CANCELLED]).toEqual([0, 1, 2]);
+    expect(isQueued({ status: REDEEM_PENDING })).toBe(true);
+    expect(isQueued({ status: REDEEM_CANCELLED })).toBe(false);
+    expect(isParked({ status: DEPOSIT_CANCELLED })).toBe(true);
+    expect(isParked({ status: DEPOSIT_FULFILLED })).toBe(false);
   });
 
   test('redeem: a seq past the queue end is not open', async () => {
@@ -183,16 +213,22 @@ describe('queue positions', () => {
 describe('issuer income (ADR 0017)', () => {
   test('reads the inbox balance, and reports a missing inbox', async () => {
     const { rpc, a } = await setup();
-    const r = { vaultAuthority: a.vaultAuthority, reserveMint: MINT };
+    const config = { reserveMint: MINT, reserveTokenProgram: TOKEN_PROGRAM_ADDRESS };
+    const r = { vaultAuthority: a.vaultAuthority, config };
+    const inboxAddress = await findIncomeInboxAddress({
+      vaultAuthority: a.vaultAuthority,
+      reserveMint: MINT,
+      tokenProgram: TOKEN_PROGRAM_ADDRESS,
+    });
     expect(await fetchIncomeInbox(rpc as never, r)).toEqual({
-      address: await findIncomeInboxAddress(r),
+      address: inboxAddress,
       exists: false,
       amount: 0n,
     });
     // An SPL token account (165 bytes) holding 1,234.5 BRS.
     const acc = new Uint8Array(165);
     new DataView(acc.buffer).setBigUint64(64, 1_234_500_000n, true);
-    rpc.set(await findIncomeInboxAddress(r), acc, TOKEN_PROGRAM_ADDRESS);
+    rpc.set(inboxAddress, acc, TOKEN_PROGRAM_ADDRESS);
     const inbox = await fetchIncomeInbox(rpc as never, r);
     expect(inbox.exists).toBe(true);
     expect(inbox.amount).toBe(1_234_500_000n);
@@ -205,7 +241,7 @@ describe('issuer income (ADR 0017)', () => {
         getIncomeReceiptDecoder().decode(b),
       ),
       version: 1,
-      incomeRefHash: new Uint8Array(32).fill(fill),
+      refHash: new Uint8Array(32).fill(fill),
       period: 202_610,
       gross: 1_000n,
       net: 1_000n,
@@ -219,8 +255,15 @@ describe('issuer income (ADR 0017)', () => {
     const [r3] = await findIncomeReceiptPda({ config: other.config, incomeRefHash: new Uint8Array(32).fill(3) });
     rpc.set(r3, getIncomeReceiptEncoder().encode(mk(3, 7n)) as Uint8Array);
 
+    // A fee receipt (kind 1) under the "fee" seed counts too (ADR 0019).
+    const [r4] = await findFeeReceiptPda({ config: a.config, invoiceRefHash: new Uint8Array(32).fill(4) });
+    rpc.set(r4, getIncomeReceiptEncoder().encode({ ...mk(4, 3n), kind: 1, period: 0 }) as Uint8Array);
+    // A kind-0 receipt at the fee address is not this reserve's.
+    const [r5] = await findFeeReceiptPda({ config: a.config, invoiceRefHash: new Uint8Array(32).fill(5) });
+    rpc.set(r5, getIncomeReceiptEncoder().encode(mk(5, 4n)) as Uint8Array);
+
     const rs = await fetchIncomeReceiptsForReserve(rpc as never, a.config);
-    expect(rs.map((r) => r.address)).toEqual([r2, r1]);
+    expect(rs.map((r) => r.address)).toEqual([r2, r1, r4]);
     expect(rs[0]!.data.period).toBe(202_610);
   });
 });
