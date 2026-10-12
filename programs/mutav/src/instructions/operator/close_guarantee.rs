@@ -1,4 +1,4 @@
-//! `close_guarantee(id, reason)` (spec §5.2; ADR 0020). Not solvency-gated
+//! `close_guarantee(id, reason)` (spec §5.2; ADR 0020). Not coverage-gated
 //! and not paused: it only releases liability, and `reinstate_guarantee` (a
 //! later upgrade) can reverse it.
 
@@ -6,9 +6,9 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::*,
+    coverage::coverage_required_saturating,
     errors::MutavError,
     events::GuaranteeClosed,
-    solvency::coverage_required,
     state::{Guarantee, VaultConfig, VaultState},
 };
 
@@ -74,11 +74,12 @@ pub fn handle_close_guarantee(
         .remaining_cover_total
         .checked_sub(released)
         .ok_or(MutavError::MathOverflow)?;
-    state.coverage_required = coverage_required(
+    state.coverage_required = coverage_required_saturating(
         state.remaining_cover_total,
         ctx.accounts.config.coverage_ratio_bps,
         state.provisions,
-    )?;
+        ctx.accounts.config.caps.stress_buffer,
+    );
     state.active_guarantees = state
         .active_guarantees
         .checked_sub(1)
@@ -89,15 +90,18 @@ pub fn handle_close_guarantee(
     g.closed_at = now;
     g.close_reason = reason;
 
-    emit_cpi!(GuaranteeClosed {
-        config: ctx.accounts.config.key(),
-        ts: now,
-        id,
-        reason,
-        released_cover: released,
-        remaining_cover_total: state.remaining_cover_total,
-        coverage_required: state.coverage_required,
-        active_guarantees: state.active_guarantees,
-    });
+    emit_event!(
+        ctx,
+        GuaranteeClosed {
+            config: ctx.accounts.config.key(),
+            ts: now,
+            id,
+            reason,
+            released_cover: released,
+            remaining_cover_total: state.remaining_cover_total,
+            coverage_required: state.coverage_required,
+            active_guarantees: state.active_guarantees,
+        }
+    );
     Ok(())
 }

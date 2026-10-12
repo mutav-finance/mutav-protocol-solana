@@ -1,8 +1,15 @@
 //! `request_redeem(shares, min_assets_out, eligibility)` (spec §5.5;
 //! ADR 0023). Owner, never a delegate. `min_assets_out` is the owner's price
-//! limit (`0` = none). Holders still pass eligibility until the exit-open
-//! rule (ADR 0023, a later change) lets a holder redeem with an empty
-//! Merkle proof.
+//! limit (`0` = none).
+//!
+//! **Exit is open to holders** (ADR 0023, AV-6): a wallet that holds shares
+//! is not checked against the allowlist, so a de-listed holder can always
+//! leave; `eligibility` is read only from a wallet with no shares (which then
+//! has nothing to redeem). **An exit of the balance may be below
+//! `min_request`** (Q-1, NEW-B; ADR 0029): from the owner's canonical share
+//! associated token account, leaving less than `min_request` behind, and
+//! worth at least the sub-minimum floor. Never 0 BRS; never above
+//! `max_request`.
 
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -14,9 +21,9 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::RedeemRequested,
-    instructions::capital::{require_eligible, require_request_size, Eligibility},
-    instructions::operator::solvency_snapshot,
-    math::assets_for,
+    instructions::capital::{owner_ata, require_eligible, Eligibility},
+    instructions::operator::coverage_snapshot,
+    math::{assets_for, redeem_size_error},
     state::{RedeemRequest, VaultConfig, VaultState},
 };
 
@@ -79,17 +86,43 @@ pub fn handle_request_redeem(
     let config = &ctx.accounts.config;
     let owner = ctx.accounts.owner.key();
     require!(!config.paused, MutavError::Paused);
-    require_eligible(config, &owner, &eligibility)?;
-    // The share account's owner is the signer (account constraint).
+    // The share account's owner is the signer (account constraint). Entry is
+    // gated, exit is not: a holder skips the allowlist (ADR 0023).
+    let owner_shares = &ctx.accounts.owner_shares;
+    if owner_shares.amount == 0 {
+        require_eligible(config, &owner, &eligibility)?;
+    }
     require!(shares > 0, MutavError::InvalidParameter);
     // Size in BRS at the current NAV; later NAV drift is ignored.
-    let sol = solvency_snapshot(config, &ctx.accounts.state)?;
+    let sol = coverage_snapshot(config, &ctx.accounts.state)?;
     let value = assets_for(
         shares,
         ctx.accounts.state.shares_outstanding,
         sol.net_assets,
     )?;
-    require_request_size(config, value)?;
+    // Below `min_request`, only an exit of the balance of the canonical
+    // share account, above a floor (ADR 0029, `math::redeem_size_error`): a
+    // balance cannot be split across token accounts into sub-minimum
+    // requests, and a share sent into the account does not block the exit.
+    let canonical = owner_ata(
+        &owner,
+        &config.share_mint,
+        &ctx.accounts.share_token_program.key(),
+    );
+    let remainder = assets_for(
+        owner_shares.amount.saturating_sub(shares),
+        ctx.accounts.state.shares_outstanding,
+        sol.net_assets,
+    )?;
+    if let Some(e) = redeem_size_error(
+        value,
+        remainder,
+        owner_shares.key() == canonical,
+        config.caps.min_request,
+        config.caps.max_request,
+    ) {
+        return Err(e.into());
+    }
 
     // Escrow with the owner as authority, never a delegate.
     transfer_checked(
@@ -125,13 +158,16 @@ pub fn handle_request_redeem(
     r.min_assets_out = min_assets_out;
     r.status = REDEEM_PENDING;
 
-    emit_cpi!(RedeemRequested {
-        config: ctx.accounts.config.key(),
-        ts: now,
-        owner,
-        seq,
-        shares,
-        min_assets_out,
-    });
+    emit_event!(
+        ctx,
+        RedeemRequested {
+            config: ctx.accounts.config.key(),
+            ts: now,
+            owner,
+            seq,
+            shares,
+            min_assets_out,
+        }
+    );
     Ok(())
 }

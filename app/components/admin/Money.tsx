@@ -12,15 +12,17 @@ import { Section } from "@/components/Section";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { RoleLine, RoleTag } from "@/components/RoleTag";
-import { Grid, TextField, useLive } from "@/components/demo/shared";
-import { AdminAction, Cards, DataTable, ExternalTag, Facts, PLANNED, Sub, WhatThis, type Mode } from "@/components/admin/shared";
+import { Action, Grid, Note, TextField, useLive } from "@/components/demo/shared";
+import { AdminAction, Cards, CrankAction, DataTable, ExternalTag, Facts, Sub, WhatThis, type Mode } from "@/components/admin/shared";
 import { ConfigCard, bpsField, brsField } from "@/components/admin/ConfigCard";
 import { capsError, MAX_FEE_TAKE_BPS } from "@/lib/admin";
-import { fmtBrs, fmtShares, fmtTime, parseBrs } from "@/lib/format";
-import { claimCap } from "@/lib/operator";
+import { conversionNav, navBoundsAround } from "@mutav-finance/mutav-protocol-solana";
+import { fmtBrs, fmtNav, fmtShares, fmtTime, parseBrs } from "@/lib/format";
+import { deadSeqsAtHead, depositHead, redeemHead, type HeadStatus } from "@/lib/queue";
+import { claimCap, claimCapRefusal } from "@/lib/operator";
 import { incomeSummary } from "@/lib/reserve-assets";
 import type { Role } from "@/lib/roles";
-import { capitalQueue, fmtPeriod } from "@/lib/view";
+import { capitalQueue, CLAIM_STAGE_LABEL, claimsTimeline, fmtPeriod } from "@/lib/view";
 
 const m = (x: ReactNode) => <Mono style={{ fontSize: 12 }}>{x}</Mono>;
 
@@ -38,6 +40,69 @@ function Context({ who, children, figure, href, linkLabel }: { who: Role | "exte
 
 const Contexts = ({ children }: { children: ReactNode }) => <div style={{ borderBottom: "1px solid var(--color-border)" }}>{children}</div>;
 
+/**
+ * The NAV range a fill proposal accepts (ADR 0023): the conversion NAV now ±
+ * the tolerance. A proposal that executes after a larger move (the time lock
+ * runs in between) is refused with NavOutOfBounds instead of filling at a
+ * price the approvers never saw.
+ */
+function useNavBounds(id: string) {
+  const { reserve } = useLive();
+  const [tol, setTol] = useState("100");
+  const bps = Number(tol);
+  const ok = Number.isInteger(bps) && bps >= 0 && bps <= 10_000;
+  const nav = conversionNav(reserve.state.sharesOutstanding, reserve.coverage.netAssets);
+  const bounds = ok ? navBoundsAround(nav, bps) : null;
+  const field = (
+    <TextField
+      id={id}
+      label="NAV tolerance (bps)"
+      value={tol}
+      onChange={setTol}
+      numeric
+      hint={bounds ? `fills only at NAV ${fmtNav(bounds.min)} – ${fmtNav(bounds.max)} (now ${fmtNav(nav)})` : "0–10000 bps"}
+    />
+  );
+  return { bounds, field };
+}
+
+/** Why the head of a queue would not fill now, or that it would (PREVIEW). */
+function HeadNote({ head }: { head: HeadStatus | null }) {
+  if (!head) return <Note>Queue empty.</Note>;
+  if (head.stuck.length === 0) return <Note tone="ok">Head seq {head.seq.toString()} would fill now (PREVIEW at NAV now; the program decides at execution).</Note>;
+  return (
+    <Note tone="warn">
+      Head seq {head.seq.toString()} would not fill now (PREVIEW): {head.stuck.join("; ")}. Fills are whole and FIFO, so every request behind it waits.
+    </Note>
+  );
+}
+
+/**
+ * The admin's park of the head request (ADR 0030: its cancel parks, nothing
+ * moves) and the permissionless crank that then moves the head over it.
+ */
+function ParkAndAdvance({ side, mode, head }: { side: "deposit" | "redeem"; mode: Mode; head: HeadStatus | null }) {
+  const { reserve, ledger } = useLive();
+  const dead = deadSeqsAtHead(reserve.state, ledger, side);
+  const escrow = side === "deposit" ? "BRS" : "shares";
+  const collect = side === "deposit" ? "cancel_deposit" : "cancel_redeem";
+  return (
+    <>
+      <AdminAction title="Park the head request" label={`park_${side}`} mode={mode} request={head ? { kind: side === "deposit" ? "park_deposit" : "park_redeem", seq: head.seq } : null}>
+        <Facts
+          now={m(head ? `head seq ${head.seq} · owner ${head.owner.slice(0, 8)}…` : "queue empty")}
+          bound={m("pending requests only · moves nothing")}
+          does={`${collect} signed by the admin parks the request (ADR 0030): it leaves the queue, its ${escrow} stay in escrow, owed to the owner, who alone collects them with ${collect}. For a head that cannot fill (a price limit, a de-listed owner).`}
+        />
+      </AdminAction>
+      <CrankAction title="Advance the queue head" note={`advance_queue_head moves the ${side} head over parked, filled or closed requests, up to the first pending one. Anyone may send it; it moves no funds.`}>
+        {m(`${dead} dead seq${dead === 1n ? "" : "s"} at the head (seq ${side === "deposit" ? reserve.state.depositHead : reserve.state.redeemHead})`)}
+        <Action label="advance_queue_head" variant="outline" request={dead > 0n ? { kind: "advance_queue_head", queue: side } : null} />
+      </CrankAction>
+    </>
+  );
+}
+
 // ── In ──────────────────────────────────────────────────────────────────────
 
 function Deposits({ mode }: { mode: Mode }) {
@@ -45,22 +110,30 @@ function Deposits({ mode }: { mode: Mode }) {
   const q = capitalQueue(reserve.state, ledger);
   const c = reserve.config;
   const [count, setCount] = useState("8");
+  const nb = useNavBounds("adm-dep-nav");
+  const head = depositHead(c, reserve.state, reserve.coverage, ledger, null);
   return (
     <Sub id="money-deposits" title="Capital deposits" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
-        <Context who="investor" figure={m(`${q.deposits.length} waiting · ${fmtBrs(reserve.state.pendingDepositsTotal, 0)}`)} href="/investor">
-          request_deposit escrows BRS in the FIFO queue (allowlisted wallets; in the pilot, MUTAV&apos;s capital wallet).
+        <Context who="investor" figure={m(`${q.deposits.length} waiting · ${fmtBrs(reserve.state.pendingDepositsTotal, 0)}`)} href="/capital">
+          request_deposit escrows BRS in the FIFO queue (allowlisted wallets).
         </Context>
       </Contexts>
       <Cards>
-        <AdminAction title="Fulfil deposits" label="fulfil_deposits" mode={mode} request={{ kind: "fulfil_deposits", count: Math.max(1, Number(count) || 1) }}>
+        <AdminAction title="Fulfil deposits" label="fulfil_deposits" mode={mode} request={nb.bounds ? { kind: "fulfil_deposits", count: Math.min(8, Math.max(1, Number(count) || 1)), navBounds: nb.bounds } : null}>
           <Facts
             now={m(`${q.deposits.length} waiting · head seq ${reserve.state.depositHead}`)}
             bound={m(`max reserve ${fmtBrs(c.caps.maxTvl, 0)} · up to 8 per call`)}
             does="Moves escrowed BRS into the reserve in FIFO order and mints shares at NAV. Allowed in under-coverage; refused while paused or while fulfilment is halted."
           />
-          <Grid><TextField id="adm-dep" label="Count" value={count} onChange={setCount} numeric /></Grid>
+          <Grid>
+            <TextField id="adm-dep" label="Count" value={count} onChange={setCount} numeric />
+            {nb.field}
+          </Grid>
+          <HeadNote head={head} />
+          <Note>The server fills only up to the first request whose owner is off the current allowlist, and refuses when that request is the head: park it first.</Note>
         </AdminAction>
+        <ParkAndAdvance side="deposit" mode={mode} head={head} />
         <ConfigCard
           title="Request sizes"
           mode={mode}
@@ -141,41 +214,48 @@ function Redemptions({ mode }: { mode: Mode }) {
   const q = capitalQueue(reserve.state, ledger);
   const [count, setCount] = useState("8");
   const [maxAssets, setMaxAssets] = useState("");
+  const nb = useNavBounds("adm-red-nav");
+  const max = parseBrs(maxAssets);
+  const head = redeemHead(reserve.config, reserve.state, reserve.coverage, ledger, max);
   return (
     <Sub id="money-redemptions" title="Redemptions" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
-        <Context who="investor" figure={m(`${q.redeems.length} waiting · ${fmtShares(reserve.state.pendingRedeemShares)} shares`)} href="/investor">
+        <Context who="investor" figure={m(`${q.redeems.length} waiting · ${fmtShares(reserve.state.pendingRedeemShares)} shares`)} href="/capital">
           request_redeem escrows shares in the FIFO queue; the owner later claims the BRS with claim_assets.
         </Context>
       </Contexts>
       <Cards>
-        <AdminAction title="Fulfil redemptions" label="fulfil_redeems" mode={mode} request={{ kind: "fulfil_redeems", count: Math.max(1, Number(count) || 1), maxAssets: parseBrs(maxAssets) ?? (1n << 64n) - 1n }}>
+        <AdminAction title="Fulfil redemptions" label="fulfil_redeems" mode={mode} request={nb.bounds ? { kind: "fulfil_redeems", count: Math.min(8, Math.max(1, Number(count) || 1)), maxAssets: max ?? (1n << 64n) - 1n, navBounds: nb.bounds } : null}>
           <Facts
-            now={m(`${q.redeems.length} waiting · free capital ${fmtBrs(reserve.solvency.freeCapital, 0)}`)}
+            now={m(`${q.redeems.length} waiting · free capital ${fmtBrs(reserve.coverage.freeCapital, 0)}`)}
             bound={m("each fill ≤ free capital · whole requests only · up to 8 per call")}
             does="Pays redemptions in FIFO order at NAV, from free capital only (the coverage gate). Frozen in under-coverage and while paused or halted; a head that does not fit stops the batch."
           />
           <Grid>
             <TextField id="adm-red" label="Count" value={count} onChange={setCount} numeric />
             <TextField id="adm-max" label="Max BRS (blank = no limit)" value={maxAssets} onChange={setMaxAssets} numeric />
+            {nb.field}
           </Grid>
+          <HeadNote head={head} />
         </AdminAction>
+        <ParkAndAdvance side="redeem" mode={mode} head={head} />
       </Cards>
     </Sub>
   );
 }
 
 function Claims({ mode }: { mode: Mode }) {
-  const { reserve } = useLive();
+  const { reserve, ledger } = useLive();
   const c = reserve.config;
   const cap = claimCap(c, reserve.state, reserve.now);
+  const overCap = claimsTimeline(ledger, c.caps.maxClaimPerCall).filter((x) => x.stage === "needs_approval" || x.stage === "approved");
   return (
     <Sub id="money-claims" title="Claim payments" badge={<RoleTag role="operator" prefix="paid by the" />}>
       <Contexts>
         <Context who="operator" figure={m(`−${fmtBrs(reserve.state.claimsPaidTotal, 0)} · ${fmtBrs(cap.paid, 0)} this window`)} href="/operator">
           pay_claim sends BRS to the payments account within the claim caps (claims_paid_total); never blocked by required coverage or pause.
         </Context>
-        <Context who="anyone" href="/reserve#claims" linkLabel="/reserve">
+        <Context who="anyone" href="/reserve/claims" linkLabel="/reserve/claims">
           The claims timeline (filed → paid → settled) is public.
         </Context>
       </Contexts>
@@ -190,17 +270,35 @@ function Claims({ mode }: { mode: Mode }) {
             return { kind: "set_config", caps };
           }}
           bound="BRS amounts"
-          does="Bound what the operator key can pay: per pay_claim and over any 31 days (a sliding window, ADR 0019). They bound a compromised key, not MUTAV's liability; a payment above them is the admin path below. The payout SLA lives in the operator platform, not in the program."
+          does="Bound what the operator key can pay: per pay_claim and over any 31 days (a sliding window, ADR 0019). They bound a compromised key, not MUTAV's liability; a payment above the per-call one needs the admin's approve_claim below. The payout SLA lives in the operator platform, not in the program."
         />
       </Cards>
-      <DataTable label="Planned claim path" head={["Instruction", "Signer", "What it will do", "Status"]}>
-        <tr aria-disabled="true" style={{ opacity: 0.6 }}>
-          <td>{m("pay_claim_admin")}</td>
-          <td><RoleTag role="admin" /></td>
-          <td style={{ whiteSpace: "normal" }}><span className="font-body" style={{ fontSize: 12 }}>Pays a claim above the operator&apos;s caps through a time-locked proposal (ADR 0012). Until it ships, MUTAV advances such a payment from its own funds.</span></td>
-          <td>{PLANNED}</td>
-        </tr>
-      </DataTable>
+      {overCap.length === 0 ? (
+        <Note>No filed claim above the operator&apos;s limit per payment ({fmtBrs(c.caps.maxClaimPerCall, 0)}).</Note>
+      ) : (
+        <Cards>
+          {overCap.map((x) => {
+            const refusal = claimCapRefusal(cap, x.provision, x.provision);
+            return (
+              <AdminAction
+                key={x.filing}
+                title={`Approve claim ${x.guaranteeId.slice(0, 8)}… · ${x.leg}`}
+                label="approve_claim"
+                mode={mode}
+                request={x.stage === "needs_approval" ? { kind: "approve_claim", guarantee: x.guarantee, filing: x.filing } : null}
+              >
+                <Facts
+                  now={m(`${CLAIM_STAGE_LABEL[x.stage]} · provision ${fmtBrs(x.provision)} · filed ${fmtTime(x.filedAt)}`)}
+                  bound={m(`amount = the provision · its revision · ${fmtBrs(cap.remaining, 0)} left of ${fmtBrs(cap.perPeriod, 0)} in the last 31 days`)}
+                  does="Approves the exact amount this claim pays above the operator's limit per payment (ADR 0021); the operator then sends pay_claim. The admin approves the amount, not the merits. Approved payments still count toward the 31-day cap."
+                />
+                {refusal && <Note tone="warn">The 31-day cap has {fmtBrs(cap.remaining)} left: pay_claim stays refused ({refusal}) until room frees up.</Note>}
+                <Note><Explorer value={x.filing} /></Note>
+              </AdminAction>
+            );
+          })}
+        </Cards>
+      )}
     </Sub>
   );
 }
@@ -219,7 +317,7 @@ export function Money({ mode }: { mode: Mode }) {
       title="Money in & out"
       roles={<RoleLine items={[{ role: "admin", prefix: "queue filled and settings set by the" }, { role: "operator", prefix: "fees, income and claims by the" }, { role: "investor", prefix: "requests by the" }]} />}
     >
-      <WhatThis>Each flow into and out of the reserve, with the settings that govern it. Steps signed by the Operator or an Investor are context, linked to where they happen; full charts are on <Link href="/reserve#flows" className="ext-link">/reserve</Link>.</WhatThis>
+      <WhatThis>Each flow into and out of the reserve, with the settings that govern it. Steps signed by the Operator or an Investor are context, linked to where they happen; full charts are on <Link href="/reserve/capital" className="ext-link">/reserve/capital</Link>.</WhatThis>
       <Divider>In</Divider>
       <Deposits mode={mode} />
       <Fees mode={mode} />

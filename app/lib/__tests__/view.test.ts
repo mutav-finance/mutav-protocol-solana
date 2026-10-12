@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ClaimFiling, DepositRequest, IncomeReceipt, Guarantee, RedeemRequest } from "@mutav-finance/mutav-protocol-solana";
-import { activeRemainingCover, agencyRows, capitalQueue, claimsTimeline, coverageRows, investorRequests, moneyFlows, type Row } from "../view";
+import { assetsFor } from "@mutav-finance/mutav-protocol-solana";
+import { activeRemainingCover, agencyRows, capitalQueue, claimStage, claimsTimeline, coverageRows, investorRequests, isUnpaid, moneyFlows, redeemSizeCheck, type Row } from "../view";
 import { BRL } from "./fixtures";
 
 const b32 = (n: number) => new Uint8Array(32).fill(n);
@@ -43,7 +44,7 @@ describe("claims timeline", () => {
     address,
     data: {
       guarantee: "G1", leg: 1, noticeRefHash: b32(hash), provision: 1_000n * BRL, filedAt, status: 0,
-      paidAmount: 0n, paidAt: 0n, pixE2eHash: b32(0), settledAt: 0n, ...over,
+      paidAmount: 0n, paidAt: 0n, pixE2eHash: b32(0), settledAt: 0n, approvedAmount: 0n, revision: 0, ...over,
     } as unknown as ClaimFiling,
   });
 
@@ -63,6 +64,53 @@ describe("claims timeline", () => {
     expect(f1).toMatchObject({ stage: "settled", fileToPay: 600n, payToSettle: 3_600n });
     expect(f1!.pixE2eHash).toBe("07".repeat(32));
     expect(f1!.guaranteeId).toBe("01".repeat(32));
+  });
+
+  it("tells the filings above max_claim_per_call that need the admin's approval, and the approved ones (ADR 0021)", () => {
+    const cap = 15_000n * BRL;
+    const rows = claimsTimeline(
+      {
+        guarantees: [guarantee("G1", {})],
+        filings: [
+          filing("UNDER", 1, 100n, { provision: cap }),
+          filing("OVER", 2, 200n, { provision: cap + 1n }),
+          filing("APPROVED", 3, 300n, { provision: 20_000n * BRL, approvedAmount: 20_000n * BRL }),
+          filing("PAID", 4, 400n, { provision: 20_000n * BRL, approvedAmount: 20_000n * BRL, status: 1, paidAmount: 20_000n * BRL, paidAt: 500n }),
+        ],
+      },
+      cap,
+    );
+    const by = Object.fromEntries(rows.map((r) => [r.filing, r.stage]));
+    expect(by).toEqual({ UNDER: "filed", OVER: "needs_approval", APPROVED: "approved", PAID: "paid" });
+    expect(rows.filter((r) => isUnpaid(r.stage)).map((r) => r.filing).sort()).toEqual(["APPROVED", "OVER", "UNDER"]);
+    // Without the cap, an unapproved filing reads as filed; a stale approval (≠ provision) is not an approval.
+    expect(claimStage({ status: 0, provision: cap + 1n, approvedAmount: 0n })).toBe("filed");
+    expect(claimStage({ status: 0, provision: cap + 1n, approvedAmount: cap }, cap)).toBe("needs_approval");
+  });
+});
+
+describe("request_redeem size rule (ADR 0029)", () => {
+  const caps = { minRequest: 1_000n * BRL, maxRequest: 30_000n * BRL };
+  // NAV 1: 1 share (6 decimals) = 1 BRS base unit, near enough for the bounds below.
+  const so = 100_000n * BRL;
+  const net = 100_000n * BRL;
+  it("accepts a sub-minimum exit of the whole balance above the floor, refuses a partial one", () => {
+    const balance = 500n * BRL;
+    expect(assetsFor(balance, so, net)).toBeLessThan(caps.minRequest);
+    expect(redeemSizeCheck(balance, balance, so, net, caps)).toBeNull();
+    // Leaving less than min_request behind is still an exit.
+    expect(redeemSizeCheck(400n * BRL, balance, so, net, caps)).toBeNull();
+    // A sub-minimum request leaving ≥ min_request behind is too small.
+    expect(redeemSizeCheck(500n * BRL, 2_000n * BRL, so, net, caps)).toBe("RequestTooSmall");
+    // Below the floor (min_request / 10), even a full exit is too small.
+    expect(redeemSizeCheck(50n * BRL, 50n * BRL, so, net, caps)).toBe("RequestTooSmall");
+    // Not the canonical share account: no sub-minimum exit.
+    expect(redeemSizeCheck(balance, balance, so, net, caps, false)).toBe("RequestTooSmall");
+  });
+  it("keeps the plain bounds", () => {
+    expect(redeemSizeCheck(0n, 1n, so, net, caps)).toBe("RequestTooSmall");
+    expect(redeemSizeCheck(2_000n * BRL, 5_000n * BRL, so, net, caps)).toBeNull();
+    expect(redeemSizeCheck(31_000n * BRL, 40_000n * BRL, so, net, caps)).toBe("RequestTooLarge");
   });
 });
 
@@ -121,6 +169,17 @@ describe("investor requests", () => {
     expect(by.D2).toMatchObject({ status: "fulfilled", position: null, claimable: 5_000n * BRL, actions: ["claim_shares"] });
     expect(by.R0).toMatchObject({ status: "pending", position: 1, waiting: 3n, actions: ["cancel_redeem"] });
     expect(by.R1).toMatchObject({ status: "filled", position: null, claimable: 4n, actions: ["claim_assets"] });
+  });
+
+  it("offers the owner's cancel on a request the admin parked (ADR 0030)", () => {
+    const rows = investorRequests(
+      "ME",
+      { depositHead: 1n, redeemHead: 1n } as never,
+      { deposits: [dep("D0", "ME", 0n, 2)], redeems: [red("R0", "ME", 0n, { status: 2 })] },
+    );
+    const by = Object.fromEntries(rows.map((r) => [r.address, r]));
+    expect(by.D0).toMatchObject({ status: "parked", position: null, waiting: 5_000n * BRL, claimable: 0n, actions: ["cancel_deposit"] });
+    expect(by.R0).toMatchObject({ status: "parked", position: null, waiting: 3n, claimable: 0n, actions: ["cancel_redeem"] });
   });
 
   it("is empty without a wallet", () => {

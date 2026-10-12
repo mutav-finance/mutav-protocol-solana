@@ -1,16 +1,20 @@
-import { readReserve } from "@/lib/server/chain";
-import { serverEnv } from "@/lib/server/env";
+import { guardedEnv, readReserve } from "@/lib/server/chain";
 import { readInvestor } from "@/lib/server/investor";
-import { errorResponse } from "@/lib/server/respond";
+import { errorResponse, readResponse } from "@/lib/server/respond";
+import { cachedInvestorRead, isFresh } from "@/lib/server/read-cache";
 import { jsonResponse } from "@/lib/serde";
+import { parseOwner } from "@/lib/server/owner";
+import { mockEnabled, mockInvestor } from "@/lib/server/mock";
 
 /** `?owner=<wallet>`: that wallet's allowlist status, and balances. Without it, the allowlist facts only. */
 export async function GET(req: Request) {
   try {
-    const env = serverEnv();
-    const owner = new URL(req.url).searchParams.get("owner");
-    const reserve = await readReserve(env);
-    return jsonResponse(await readInvestor(env, reserve, owner && owner.trim() ? owner.trim() : null));
+    // Validate before any RPC call or cache write (A2): junk owners cost nothing.
+    const owner = parseOwner(new URL(req.url).searchParams.get("owner"));
+    if (owner === undefined) return jsonResponse({ error: "owner must be a wallet address" }, { status: 400 });
+    if (mockEnabled()) return jsonResponse(await mockInvestor(owner));
+    const env = await guardedEnv();
+    return readResponse(await cachedInvestorRead(owner, async () => readInvestor(env, await readReserve(env), owner), { fresh: isFresh(req) }));
   } catch (e) {
     return errorResponse(e);
   }

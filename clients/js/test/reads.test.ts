@@ -29,6 +29,14 @@ import {
   getClaimFilingSize,
   CLAIM_FILING_DISCRIMINATOR,
   getRedeemQueuePosition,
+  DEPOSIT_CANCELLED,
+  DEPOSIT_FULFILLED,
+  DEPOSIT_PENDING,
+  REDEEM_CANCELLED,
+  REDEEM_FILLED,
+  REDEEM_PENDING,
+  isParked,
+  isQueued,
   getRedeemRequestDecoder,
   getRedeemRequestEncoder,
   getRedeemRequestSize,
@@ -68,14 +76,14 @@ async function setup() {
 }
 
 describe('fetchReserve', () => {
-  test('decodes config and state and derives the solvency snapshot', async () => {
+  test('decodes config and state and derives the coverage snapshot', async () => {
     const { rpc, a } = await setup();
     const r = await fetchReserve(rpc as never, MINT);
     expect(r.addresses.config).toBe(a.config);
     expect(r.config.data.reserveMint).toBe(MINT);
     expect(r.state.data.brsBalance).toBe(10_000n);
-    expect(r.solvency.surplus).toBe(6_000n);
-    expect(r.solvency.freeCapital).toBe(6_000n);
+    expect(r.coverage.surplus).toBe(6_000n);
+    expect(r.coverage.freeCapital).toBe(6_000n);
   });
 
   test('throws when the reserve is not initialized', async () => {
@@ -152,6 +160,25 @@ describe('queue positions', () => {
     const h = await getRedeemQueuePosition(rpc as never, a.config, 0n);
     expect(h.isHead).toBe(true);
     expect(h.requestsAhead).toBe(0);
+  });
+
+  test('redeem: a request parked by the admin is dead for the queue (ADR 0030)', async () => {
+    const { rpc, a } = await setup();
+    await putRedeem(rpc, a.config, 0n, 100n, REDEEM_CANCELLED); // parked: dead
+    await putRedeem(rpc, a.config, 1n, 50n, REDEEM_PENDING); // ours
+    const p = await getRedeemQueuePosition(rpc as never, a.config, 1n);
+    expect(p).toEqual({ seq: 1n, head: 0n, isHead: true, requestsAhead: 0, amountAhead: 0n, open: true });
+    const parked = await getRedeemQueuePosition(rpc as never, a.config, 0n);
+    expect(parked.open).toBe(false);
+  });
+
+  test('request status helpers', () => {
+    expect([DEPOSIT_PENDING, DEPOSIT_FULFILLED, DEPOSIT_CANCELLED]).toEqual([0, 1, 2]);
+    expect([REDEEM_PENDING, REDEEM_FILLED, REDEEM_CANCELLED]).toEqual([0, 1, 2]);
+    expect(isQueued({ status: REDEEM_PENDING })).toBe(true);
+    expect(isQueued({ status: REDEEM_CANCELLED })).toBe(false);
+    expect(isParked({ status: DEPOSIT_CANCELLED })).toBe(true);
+    expect(isParked({ status: DEPOSIT_FULFILLED })).toBe(false);
   });
 
   test('redeem: a seq past the queue end is not open', async () => {

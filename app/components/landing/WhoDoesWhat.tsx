@@ -1,7 +1,7 @@
 /**
  * "Who does what": the three roles, each with the instructions the program
  * accepts its signature for (from lib/roles, which mirrors the program's
- * signer checks). Same tags as on /reserve, /investor, /demo and /admin.
+ * signer checks). Same tags as on /reserve, /capital, /demo and /admin.
  */
 import Link from "next/link";
 import { RoleMarker, RoleTag } from "@/components/RoleTag";
@@ -10,13 +10,13 @@ import { instructionsBy, PAUSER_OR_ADMIN, ROLE_META, type Role } from "@/lib/rol
 const NOTE: Partial<Record<Role, string>> = {
   admin: "Every change goes through a time-locked Squads proposal. Only pause is instant, and a separate pauser key can also send it.",
   operator: "The only writer for guarantees, guarantee fees and claims. It cannot change config or fulfil the queue. Today MUTAV's team signs by hand; later mutav-app's backend sends these with a KMS-held key.",
-  investor: "The pilot runs on MUTAV's own capital and is not open to public investment. Requests are gated by an allowlist (KYC off-chain, Merkle proof on-chain); in the pilot the allowlisted capital provider is MUTAV's capital wallet.",
+  investor: "Deposits are gated by an allowlist (KYC off-chain, Merkle proof on-chain); holders can always redeem.",
 };
 
 const PAGE: Partial<Record<Role, [string, string]>> = {
   admin: ["/admin", "Admin console"],
   operator: ["/operator", "Operator console"],
-  investor: ["/investor", "Investor view"],
+  investor: ["/capital", "Capital queue"],
 };
 
 export function WhoDoesWhat() {

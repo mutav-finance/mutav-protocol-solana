@@ -24,12 +24,14 @@ import {
   getRefreshInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
+  getSetGuardiansInstruction,
   type VaultConfig,
 } from '../../../clients/js/src';
 
 /** Role ids of `propose_role` / `accept_role` (ADR 0020). */
 export const ROLE_OPERATOR = 1;
 export const ROLE_PAUSER = 2;
+export const ROLE_ADMIN = 3;
 import type { DeployConfig } from './config';
 
 export const BPF_LOADER_UPGRADEABLE = address('BPFLoaderUpgradeab1e11111111111111111111111');
@@ -113,34 +115,101 @@ export async function composeInitialize(
 const DEFAULT_ADDRESS = address('11111111111111111111111111111111');
 
 /**
- * `propose_role` for each role whose key differs from the file, as one
- * proposal (ADR 0020). A handover already pending for the requested key is
- * refused ("awaiting accept_role": the key signs `accept_role`, nothing to
- * propose). Another unexpired pending key gets `cancel_pending(role)` first,
- * in the same proposal, since `propose_role` refuses while one waits.
+ * The role proposal that brings the chain to the file, as one proposal
+ * (ADR 0020):
+ *
+ * - `propose_role` for each of operator and pauser whose key differs from
+ *   the file. A handover already pending for the requested key is refused
+ *   ("awaiting accept_role": the key signs `accept_role`, nothing to
+ *   propose). Another unexpired pending key gets `cancel_pending(role)`
+ *   first, since `propose_role` refuses while one waits.
+ * - When the key already matches, any pending handover of that role (live
+ *   or expired) is one the file does not ask for: `cancel_pending(role)`.
+ * - A pending admin handover the file does not name as `nextAdmin` is never
+ *   cancelled silently: it is refused unless `cancelAdmin` (roles.ts
+ *   `--cancel-admin`) is set, then `cancel_pending(ROLE_ADMIN)`. A chain
+ *   admin other than the file's is refused: the admin moves only by
+ *   `propose_admin` / `accept_admin`.
+ *
+ * `cancelled` names every role a `cancel_pending` is emitted for.
  */
-export async function composeProposeRoles(
+export type RoleCancel = 'operator' | 'pauser' | 'admin';
+
+export async function composeRoleChanges(
   cfg: DeployConfig,
   current: VaultConfig,
   admin: TransactionSigner,
   nowSecs: bigint = BigInt(Math.floor(Date.now() / 1000)),
-): Promise<Instruction[]> {
+  o: { cancelAdmin?: boolean } = {},
+): Promise<{ instructions: Instruction[]; cancelled: RoleCancel[] }> {
+  if (current.admin !== cfg.admin) {
+    throw new Error(`the chain admin is ${current.admin}, the config says ${cfg.admin}; the admin moves only through propose_admin / accept_admin`);
+  }
   const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
   const base = { admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId };
   const out: Instruction[] = [];
+  const cancelled: RoleCancel[] = [];
+  const cancel = (role: number, name: RoleCancel) => {
+    cancelled.push(name);
+    return getCancelPendingInstruction({ ...base, role }, opts(cfg));
+  };
   for (const [role, name, key, now, pending, expiresAt] of [
     [ROLE_OPERATOR, 'operator', cfg.operator, current.operator, current.pendingOperator, current.pendingOperatorExpiresAt],
     [ROLE_PAUSER, 'pauser', cfg.pauser, current.pauser, current.pendingPauser, current.pendingPauserExpiresAt],
   ] as const) {
-    if (key === now) continue;
+    if (key === now) {
+      if (pending !== DEFAULT_ADDRESS) out.push(cancel(role, name));
+      continue;
+    }
     const live = pending !== DEFAULT_ADDRESS && nowSecs <= expiresAt;
     if (live && pending === key) {
       throw new Error(`${name} ${key} is already proposed, awaiting accept_role (expires at ${expiresAt})`);
     }
-    if (live) out.push(getCancelPendingInstruction({ ...base, role }, opts(cfg)));
+    if (live) out.push(cancel(role, name));
     out.push(getProposeRoleInstruction({ ...base, role, key }, opts(cfg)));
   }
-  return out;
+  if (current.pendingAdmin !== DEFAULT_ADDRESS && current.pendingAdmin !== cfg.nextAdmin) {
+    if (!o.cancelAdmin) {
+      const state = nowSecs <= current.pendingAdminExpiresAt ? `in flight until ${current.pendingAdminExpiresAt}` : 'expired';
+      throw new Error(
+        `an admin handover to ${current.pendingAdmin} is pending (${state}) and the config names no nextAdmin: ` +
+          'set nextAdmin to keep it, or pass --cancel-admin to cancel it in this proposal',
+      );
+    }
+    out.push(cancel(ROLE_ADMIN, 'admin'));
+  }
+  return { instructions: out, cancelled };
+}
+
+/** The instructions of `composeRoleChanges`. */
+export async function composeProposeRoles(
+  cfg: DeployConfig,
+  current: VaultConfig,
+  admin: TransactionSigner,
+  nowSecs?: bigint,
+  o: { cancelAdmin?: boolean } = {},
+): Promise<Instruction[]> {
+  return (await composeRoleChanges(cfg, current, admin, nowSecs, o)).instructions;
+}
+
+/** The three guardian slots the config asks for, padded with the default key. */
+export function guardianSlots(cfg: Pick<DeployConfig, 'guardians'>): Address[] {
+  const g = cfg.guardians ?? [];
+  return [0, 1, 2].map((i) => g[i] ?? DEFAULT_ADDRESS);
+}
+
+/** Guardian sets as sorted lists without default slots, for comparison. */
+export const guardianSet = (xs: readonly Address[]) => xs.filter((x) => x !== DEFAULT_ADDRESS).sort();
+
+/**
+ * `set_guardians` with the config's guardians (all three slots in one step),
+ * or nothing when the chain already holds the same set. Admin.
+ */
+export async function composeSetGuardians(cfg: DeployConfig, current: VaultConfig, admin: TransactionSigner): Promise<Instruction[]> {
+  const want = guardianSlots(cfg);
+  if (JSON.stringify(guardianSet(want)) === JSON.stringify(guardianSet(current.guardians))) return [];
+  const a = await findReserveAddresses(cfg.reserveMint, opts(cfg));
+  return [getSetGuardiansInstruction({ admin, config: a.config, eventAuthority: a.eventAuthority, program: cfg.programId, guardians: want }, opts(cfg))];
 }
 
 /** `accept_role(role)`, signed by the proposed key. */
@@ -168,8 +237,11 @@ export async function composeAcceptRole(
 
 /**
  * `set_config` with only the fields where the file's caps, coverage ratio
- * and take rate differ from the chain (`current`), sparse (ADR 0026), with
- * `refresh` first when a change needs it. `feature_flags` and the capital
+ * and take rate differ from the chain (`current`), sparse (ADR 0026). When a
+ * change needs it (`configParamsNeedRefresh`) the proposal is
+ * `refresh, set_config, refresh`, as the app composes it: the first makes
+ * `set_config` pass its same-slot check, the trailing one applies the new
+ * values to the reserve mode at once. `feature_flags` and the capital
  * wallet are never set here; a stress buffer, queue wait or reinstate age
  * missing from the file keeps the chain's value. Empty when nothing differs.
  */
@@ -220,7 +292,7 @@ export async function composeSetCaps(
     },
     opts(cfg),
   );
-  return [refresh, setConfig];
+  return [refresh, setConfig, refresh];
 }
 
 /** `set_allowlist_root(root)`. Admin. */

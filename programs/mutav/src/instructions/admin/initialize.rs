@@ -21,7 +21,7 @@
 
 use anchor_lang::{prelude::*, solana_program::bpf_loader_upgradeable};
 use anchor_spl::{
-    associated_token::{self, get_associated_token_address_with_program_id, AssociatedToken},
+    associated_token::{get_associated_token_address_with_program_id, AssociatedToken},
     token::Token,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
@@ -30,7 +30,10 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::{ConfigChanges, VaultInitialized},
-    instructions::admin::{validate_config, validate_money_accounts, validate_roles, Installing},
+    instructions::{
+        admin::{validate_config, validate_money_accounts, validate_roles, Installing, Money},
+        capital::create_owner_ata,
+    },
     state::{CapsInput, VaultConfig, VaultState},
     token_guard,
 };
@@ -57,14 +60,16 @@ pub struct Initialize<'info> {
     /// initialization.
     pub upgrade_authority: Signer<'info>,
 
+    // One-line CHECK so the IDL keeps no docs for this account.
+    /// CHECK: this program's `ProgramData` (seeds); owner and bytes checked by `upgrade_authority_of`.
     #[account(
         seeds = [crate::ID.as_ref()],
         bump,
         seeds::program = bpf_loader_upgradeable::ID,
-        constraint = program_data.upgrade_authority_address == Some(upgrade_authority.key())
+        constraint = upgrade_authority_of(&program_data)? == Some(upgrade_authority.key())
             @ MutavError::Unauthorized,
     )]
-    pub program_data: Box<Account<'info, ProgramData>>,
+    pub program_data: UncheckedAccount<'info>,
 
     #[account(
         mint::token_program = reserve_token_program,
@@ -186,8 +191,8 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
     validate_roles(&args.admin, &args.operator, &args.pauser)?;
     validate_money_accounts(
         &ctx.accounts.reserve_mint.key(),
-        &ctx.accounts.treasury_account,
-        &ctx.accounts.payments_account,
+        Money::of(&ctx.accounts.treasury_account),
+        Money::of(&ctx.accounts.payments_account),
         &args.mutav_capital_wallet,
         &ctx.accounts.vault_authority.key(),
         &args.operator,
@@ -231,16 +236,55 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
     state.bump = ctx.bumps.state;
     // Empty accounting: mode Normal (0), every total and queue seq 0.
 
-    emit_cpi!(VaultInitialized {
-        config: config_key,
-        ts: Clock::get()?.unix_timestamp,
-        admin: args.admin,
-        operator: args.operator,
-        pauser: args.pauser,
-        reserve_mint: ctx.accounts.reserve_mint.key(),
-        share_mint,
-    });
+    emit_event!(
+        ctx,
+        VaultInitialized {
+            config: config_key,
+            ts: Clock::get()?.unix_timestamp,
+            admin: args.admin,
+            operator: args.operator,
+            pauser: args.pauser,
+            reserve_mint: ctx.accounts.reserve_mint.key(),
+            share_mint,
+        }
+    );
     Ok(())
+}
+
+/// The upgrade authority recorded in a `ProgramData` account, read straight
+/// from its bytes so that `initialize` does not link bincode and serde.
+///
+/// Same accept/reject rules and errors as Anchor's `Account<ProgramData>` load:
+/// a missing account is `AccountNotInitialized`; an owner other than the
+/// upgradeable loader is `AccountOwnedByWrongProgram`; another loader state is
+/// `AccountNotProgramData`; bytes bincode would refuse are
+/// `InvalidAccountData`. Layout (bincode `UpgradeableLoaderState::ProgramData`):
+/// `u32` tag 3 at 0..4, `u64` slot at 4..12, option byte at 12 (0 `None`,
+/// 1 `Some`), authority at 13..45.
+fn upgrade_authority_of(info: &AccountInfo) -> Result<Option<Pubkey>> {
+    if info.owner == &system_program::ID && info.lamports() == 0 {
+        return Err(ErrorCode::AccountNotInitialized.into());
+    }
+    if info.owner != &bpf_loader_upgradeable::ID {
+        return Err(Error::from(ErrorCode::AccountOwnedByWrongProgram)
+            .with_pubkeys((*info.owner, bpf_loader_upgradeable::ID)));
+    }
+    let data = info.try_borrow_data()?;
+    let invalid = || Error::from(ProgramError::InvalidAccountData);
+    let tag = data.get(..4).ok_or_else(invalid)?;
+    match u32::from_le_bytes([tag[0], tag[1], tag[2], tag[3]]) {
+        3 => {}
+        0..=2 => return Err(ErrorCode::AccountNotProgramData.into()),
+        _ => return Err(invalid()),
+    }
+    match data.get(12) {
+        Some(0) => Ok(None),
+        Some(1) => {
+            let key = data.get(13..45).ok_or_else(invalid)?;
+            Ok(Some(Pubkey::try_from(key).map_err(|_| invalid())?))
+        }
+        _ => Err(invalid()),
+    }
 }
 
 /// Creates the income inbox (ADR 0017) with an idempotent associated token
@@ -259,15 +303,13 @@ fn create_income_inbox(ctx: &Context<Initialize>) -> Result<()> {
         expected,
         MutavError::InvalidIncomeSource
     );
-    associated_token::create_idempotent(CpiContext::new(
+    create_owner_ata(
+        a.payer.to_account_info(),
+        a.income_inbox.to_account_info(),
+        a.vault_authority.to_account_info(),
+        a.reserve_mint.to_account_info(),
+        a.system_program.to_account_info(),
+        a.reserve_token_program.to_account_info(),
         a.associated_token_program.key(),
-        associated_token::Create {
-            payer: a.payer.to_account_info(),
-            associated_token: a.income_inbox.to_account_info(),
-            authority: a.vault_authority.to_account_info(),
-            mint: a.reserve_mint.to_account_info(),
-            system_program: a.system_program.to_account_info(),
-            token_program: a.reserve_token_program.to_account_info(),
-        },
-    ))
+    )
 }

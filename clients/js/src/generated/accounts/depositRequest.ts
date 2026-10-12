@@ -66,7 +66,10 @@ export type DepositRequest = {
   navAtFulfil: bigint;
   requestedAt: bigint;
   fulfilledAt: bigint;
-  /** `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED`. */
+  /**
+   * `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED` / `DEPOSIT_CANCELLED`
+   * (ADR 0030).
+   */
   status: number;
   /**
    * The owner's price limit: the fewest shares this request accepts
@@ -93,7 +96,10 @@ export type DepositRequestArgs = {
   navAtFulfil: number | bigint;
   requestedAt: number | bigint;
   fulfilledAt: number | bigint;
-  /** `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED`. */
+  /**
+   * `DEPOSIT_PENDING` / `DEPOSIT_FULFILLED` / `DEPOSIT_CANCELLED`
+   * (ADR 0030).
+   */
   status: number;
   /**
    * The owner's price limit: the fewest shares this request accepts

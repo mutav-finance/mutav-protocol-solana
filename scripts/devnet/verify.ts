@@ -1,9 +1,14 @@
 /**
  * Task 12, post-deploy checks (read-only):
  *
+ * - the deployed bytecode is the verified build: the ProgramData program
+ *   bytes hash to `--expected-hash` (`solana-verify get-executable-hash` of
+ *   the verified `.so`; computed like `solana-verify get-program-hash`);
  * - upgrade authority == the config's `upgradeAuthority`;
  * - `feature_flags == 0`;
- * - admin, operator, pauser and the allowlist root as configured;
+ * - admin, operator, pauser and the allowlist root as configured, with no
+ *   pending operator, pauser or admin handover; the guardians are exactly
+ *   the config's `guardians` (none when absent);
  * - every other `VaultConfig` field equals the config file (c, fee take,
  *   every cap including the NAV-move guard, decimals 6, mint, token program, money accounts, capital wallet);
  * - on devnet, the locked devnet values (lib/compare.ts `DEVNET_LOCKED`);
@@ -14,11 +19,12 @@
  *   program, `config_authority == Pubkey::default()`, exactly the configured
  *   members (each able to vote) and threshold, `time_lock >=` the floor.
  *
- *   bun scripts/devnet/verify.ts --config <deploy.json> --url <rpc> [--confirm-cluster devnet]
+ *   bun scripts/devnet/verify.ts --config <deploy.json> --url <rpc> [--confirm-cluster devnet] --expected-hash <sha256>
  */
 import { buildAllowlist, fetchReserve } from '../../clients/js/src';
 import { assertConfigCluster, guardCluster, opt, parseArgs, req, type Args } from './lib/cli';
-import { checkReserveMint, postDeployChecks } from './lib/checks';
+import { checkProgramHash, checkReserveMint, postDeployChecks } from './lib/checks';
+import { parseExpectedHash } from './lib/hash';
 import { programDataAddress } from './lib/compose';
 import { checkDevnetLocked, checkMoneyAccounts, compareConfig } from './lib/compare';
 import { loadConfig, type DeployConfig } from './lib/config';
@@ -41,6 +47,7 @@ export async function multisigChecks(rpc: ReadRpc, cfg: DeployConfig): Promise<s
 
 export async function main(args: Args) {
   const cfg = loadConfig(req(args, 'config'));
+  const expectedHash = parseExpectedHash(opt(args, 'expected-hash'));
   const guarded = await guardCluster(opt(args, 'url'), opt(args, 'confirm-cluster'));
   assertConfigCluster(guarded, cfg.cluster);
   const { url } = guarded;
@@ -54,7 +61,9 @@ export async function main(args: Args) {
     operator: cfg.operator,
     pauser: cfg.pauser,
     allowlistRoot: (await buildAllowlist(cfg.allowlist)).root,
+    guardians: cfg.guardians ?? [],
   });
+  failures.push(...checkProgramHash(pd, expectedHash));
   failures.push(...checkReserveMint(await accountInfo(rpc, cfg.reserveMint), cfg));
   failures.push(...compareConfig(r.config.data, cfg));
   if (cfg.cluster === 'devnet') failures.push(...checkDevnetLocked(r.config.data));

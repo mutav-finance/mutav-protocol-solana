@@ -1,6 +1,6 @@
 # 0021 — Claims: approval, amendment and exact payment
 
-- **Status:** Accepted (2026-10-10), decided by the founders. Supersedes, for the pilot, the `pay_claim_admin` path of ADR 0012 decision 3 and the separate `Payout` account of spec §3.7. Amends ADR 0014 (the payment amount is now the provision; amendment replaces payment above the provision). Builds on ADR 0020 (operator/admin separation). The layout carves are in ADR 0019.
+- **Status:** Accepted (2026-10-10), decided by the founders. Supersedes, for the pilot, the `pay_claim_admin` path of ADR 0012 decision 3 and the separate `Payout` account of spec §3.7. Amends ADR 0014 (the payment amount is now the provision; amendment replaces payment above the provision). Builds on ADR 0020 (operator/admin separation). The layout carves are in ADR 0019. Exact payment, the approval check and the 31-day window are in the devnet binary (ADR 0029 decision 7). `approve_claim` shipped as the first Wave 2 upgrade (decision 8, 2026-10-11); `amend_claim` and `refile_claim` follow as upgrades.
 
 ## Context
 
@@ -49,10 +49,10 @@ New fields on `ClaimFiling`: `approved_amount`, `payments_account`, `paid_at`, `
   - Lower: releases the difference from `provisions`.
   - Higher: books more, up to the leg's unprovisioned cover (`leg_cover − leg_paid − leg_provision`).
   - `new_amount = 0`: sets the status to `WITHDRAWN`, releases the whole provision and emits `ClaimWithdrawn`.
-  - Any amendment resets `approved_amount` to 0.
+  - Any amendment resets `approved_amount` to 0 and increments `revision` (decision 8).
   - Refused on `PAID` and `SETTLED`.
   - Emits `ClaimAmended { old, new }`.
-- **`refile_claim`**, operator, with the same arguments as `file_claim`. Accepts only a `WITHDRAWN` filing. It returns it to `FILED` and resets `approved_amount`, `provision` and `filed_at`. An old approval is never reused.
+- **`refile_claim`**, operator, with the same arguments as `file_claim`. Accepts only a `WITHDRAWN` filing. It returns it to `FILED` and resets `approved_amount`, `provision` and `filed_at`, and increments `revision` (decision 8). An old approval is never reused.
 - These replace the admin `withdraw_claim` and the re-file-in-place designs discussed earlier.
 
 ### 5. A strict sliding window of 31 daily buckets
@@ -75,6 +75,21 @@ New fields on `ClaimFiling`: `approved_amount`, `payments_account`, `paid_at`, `
 - Removed: `payout_sla_secs` (`VaultConfig`), `late` (`Payout`), `late_payouts` (`VaultState`), the late logic in `settle_payout` and the late scan in `refresh`.
 - The service level (review, information requests, approval, execution, the contractual term plus a 48-hour target) lives in the operator platform, mutav-app.
 - The reserve's only on-chain promise: **within the caps, `pay_claim` is never refused** for solvency or pause.
+
+### 8. `approve_claim` as built (2026-10-11)
+
+The first Wave 2 upgrade. A new instruction, the `ClaimFiling.revision` carve and one appended error. No account size or offset changes and no existing instruction's arguments or accounts change, so it fits the idl-compat rules.
+
+- **Signer:** `config.admin`. The operator, the pauser and the guardians are refused (`Unauthorized`). The operator never approves its own claim (ADR 0020).
+- **Accounts:** `config`, `guarantee`, `claim_filing` (writable). It moves no funds.
+- **Bounds.** The filing is `FILED`; `amount > 0`; and `amount == filing.provision`. Decision 2 says the admin approves "the exact amount", and decision 3 makes the provision the only amount `pay_claim` pays, so an approval of any other amount could never be used. Refusing it at approval makes a stale proposal fail loudly when it executes instead of recording an inert value. The provision is already bounded by the leg's remaining cover (ADR 0014), so no cover check is repeated.
+- **Revision binding.** `ClaimFiling` gains `revision: u16`, carved from the front of `_reserved` (190 bytes remain; v1 filings read `0`). `file_claim` writes `0`, which is a real revision, the filing's first version, not "unset". `approve_claim(notice_ref_hash, amount, expected_revision)` refuses `expected_revision != filing.revision` with the appended `ClaimRevisionMismatch`. The amount check alone cannot tell an amendment X → Y → X from no change, so an approval proposed for the first X could otherwise execute after the time lock on a filing the admin never saw. **`amend_claim` and `refile_claim` (Wave 2) must each increment `revision` (checked) and reset `approved_amount` to 0.**
+- **No cap is read at approval.** The period cap is checked by `pay_claim`, where the window is current; an approval may precede a bundled `set_config` raise in the same proposal. An approval at or below `max_claim_per_call` is accepted and has no effect at payment, which keeps a proposal valid if the admin later lowers the per-call cap.
+- **Withdrawn filings.** `ClaimFiling::is_supported` still refuses `WITHDRAWN` (ADR 0019), so no approval attaches to a withdrawn filing. `refile_claim` will reset `approved_amount` when it ships (decision 4).
+- **Re-approval** of the same amount is accepted and idempotent.
+- **Gates:** never paused, never coverage-gated, no mode check; it works with the operator revoked (ADR 0020 recovery).
+- **Event:** `ClaimApproved { config, ts, guarantee_id, leg, notice_ref_hash, amount, revision, previous_amount, max_claim_per_call }`, appended.
+- **Tests:** happy path on both legs; every refusal (signer, missing, paid, settled, withdrawn, unknown layouts, zero, any amount but the provision, a stale revision including X → Y → X, a filing or guarantee that is not this reserve's); the boundary at the per-call cap; the period cap still binding an approved claim; a bundled period-cap raise; padding; and a property test that an approved claim above the per-call cap is never refused for coverage, under-coverage or the pause.
 
 ## Alternatives considered
 

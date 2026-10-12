@@ -58,8 +58,9 @@ describe("role map", () => {
   });
 
   it("agrees with the signer the UI warns about for every composable kind", () => {
-    const kinds: TxKind[] = ["register_guarantee", "contribute_fees", "sweep_income", "file_claim", "pay_claim", "settle_payout", "close_guarantee", "fulfil_deposits", "fulfil_redeems", "set_config", "set_allowlist_root", "set_roles", "set_payments_account", "revoke_operator", "unpause", "clear_fulfil_halt", "pause", "request_deposit", "cancel_deposit", "claim_shares", "request_redeem", "cancel_redeem", "claim_assets", "refresh"];
-    const map = { operator: "operator", admin: "admin", "pauser-or-admin": "admin", investor: "investor", anyone: "anyone" } as const;
+    const kinds: TxKind[] = ["register_guarantee", "contribute_fees", "sweep_income", "file_claim", "pay_claim", "settle_payout", "close_guarantee", "fulfil_deposits", "fulfil_redeems", "set_config", "set_allowlist_root", "set_roles", "set_payments_account", "revoke_operator", "unpause", "clear_fulfil_halt", "pause", "request_deposit", "cancel_deposit", "claim_shares", "request_redeem", "cancel_redeem", "claim_assets", "refresh", "accept_role", "cancel_pending", "approve_claim", "park_deposit", "park_redeem", "advance_queue_head"];
+    // The proposed key counts on the admin side (ADR 0020).
+    const map = { operator: "operator", admin: "admin", "pauser-or-admin": "admin", investor: "investor", anyone: "anyone", "proposed key": "admin" } as const;
     for (const k of kinds) expect([k, roleOf(k)]).toEqual([k, map[expectedSigner(k)]]);
   });
 

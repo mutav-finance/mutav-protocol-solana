@@ -23,6 +23,8 @@ import {
   getI64Encoder,
   getStructDecoder,
   getStructEncoder,
+  getU16Decoder,
+  getU16Encoder,
   getU64Decoder,
   getU64Encoder,
   getU8Decoder,
@@ -80,10 +82,20 @@ export type ClaimFiling = {
   settledAt: bigint;
   /**
    * The exact amount the reserve admin approved for a claim above
-   * `max_claim_per_call` (`approve_claim`, a later upgrade). `0` = not
-   * approved. Written zero and not read by this binary.
+   * `max_claim_per_call` (`approve_claim`, ADR 0021). `0` = not approved.
+   * Written by `approve_claim` (always the provision); read by
+   * `pay_claim` above the per-call cap.
    */
   approvedAmount: bigint;
+  /**
+   * Carved from `_reserved` (ADR 0021 decision 8). `0` for a filing as
+   * `file_claim` creates it; every amendment or re-file (`amend_claim`,
+   * `refile_claim`, later upgrades) increments it and resets
+   * `approved_amount`. `approve_claim` must name it, so a proposal composed
+   * against an earlier version of the filing is refused even when the
+   * amount is the same again.
+   */
+  revision: number;
   /**
    * Zeroed. Never read or written by logic. Holds the ADR 0012 claim and
    * settlement fields (114 bytes) with room to spare after the freeze,
@@ -120,10 +132,20 @@ export type ClaimFilingArgs = {
   settledAt: number | bigint;
   /**
    * The exact amount the reserve admin approved for a claim above
-   * `max_claim_per_call` (`approve_claim`, a later upgrade). `0` = not
-   * approved. Written zero and not read by this binary.
+   * `max_claim_per_call` (`approve_claim`, ADR 0021). `0` = not approved.
+   * Written by `approve_claim` (always the provision); read by
+   * `pay_claim` above the per-call cap.
    */
   approvedAmount: number | bigint;
+  /**
+   * Carved from `_reserved` (ADR 0021 decision 8). `0` for a filing as
+   * `file_claim` creates it; every amendment or re-file (`amend_claim`,
+   * `refile_claim`, later upgrades) increments it and resets
+   * `approved_amount`. `approve_claim` must name it, so a proposal composed
+   * against an earlier version of the filing is refused even when the
+   * amount is the same again.
+   */
+  revision: number;
   /**
    * Zeroed. Never read or written by logic. Holds the ADR 0012 claim and
    * settlement fields (114 bytes) with room to spare after the freeze,
@@ -151,7 +173,8 @@ export function getClaimFilingEncoder(): FixedSizeEncoder<ClaimFilingArgs> {
       ["pixE2eHash", fixEncoderSize(getBytesEncoder(), 32)],
       ["settledAt", getI64Encoder()],
       ["approvedAmount", getU64Encoder()],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 192)],
+      ["revision", getU16Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 190)],
     ]),
     (value) => ({ ...value, discriminator: CLAIM_FILING_DISCRIMINATOR }),
   );
@@ -175,7 +198,8 @@ export function getClaimFilingDecoder(): FixedSizeDecoder<ClaimFiling> {
     ["pixE2eHash", fixDecoderSize(getBytesDecoder(), 32)],
     ["settledAt", getI64Decoder()],
     ["approvedAmount", getU64Decoder()],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 192)],
+    ["revision", getU16Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 190)],
   ]);
 }
 

@@ -41,3 +41,14 @@ The pilot must ship first, and the reserve will be live when phase 2 is ready. P
 - **Slightly larger accounts and IDL in the pilot,** for a few hundredths of a SOL in rent. The pilot also gains `FeatureNotSupported`, new events and stricter liquidity rules for fills and allocations.
 - **Operational load.** Phase 2 needs a buffer crank, a claim-notice discipline in mutav-app, and an upgrade runbook (spec §14.5) with verified builds and bundled Squads proposals.
 - **Open:** the haircut parameters, the earmark form, one multisig or two (the Squads time lock covers every admin action, including `fulfil_redeems`), and the notice SLA. See spec §12 Q15 and Q24–Q31.
+
+## To evaluate before outside capital (2026-10-11)
+
+Notes from the pilot-model session, for the founders to evaluate. **Nothing here changes the decision above.** Each item needs its own ADR if adopted.
+
+1. **Claim notices: provision instead of blocking the queues.** The claim-notice gate (5a) is not in the devnet binary (ADR 0019); the spec builds it "before outside capital". With MUTAV's own capital only, there is nobody to time against, so the pilot does not need it. Before outside capital, weigh its liveness cost:
+   - At 2.5% delinquency, a 60-lease book raises about one default notice a month, each open up to ~15 days before `file_claim`, so both queues could be closed about half the time.
+   - At 170 leases (~3 notices a month) they would be closed almost continuously.
+   - **Alternative to evaluate:** book an expected-loss provision when a notice opens (e.g. one rent, or the claim's estimated amount) and release it if the claim comes in lower. NAV then reflects the known loss at once, entries and exits are fair, and the queues stay open.
+2. **Exit buffer, after OnRe's model.** OnRe sets a redemption-vault target as basis points of TVL (`vault_target_bps`). Deposits refill it with `min(deficit, net inflow)` until it reaches `TVL × bps`, and instant exits are priced against `min(actual balance, TVL × bps)`, never the full liquid balance, with a haircut that rises with utilization. **Evaluate** this for the phase-2 earmark (decision 1) and the haircut parameters still open above: an exit buffer as a share of TVL, refilled from deposits, with exits priced against the target. Source: `.claude/notes/onre-function-comparison/redemptions-liquidity.md` §2.6.
+3. **Pilot exit policy, recorded for context.** In the pilot, MUTAV redeems only above coverage required × 1.25 (ADR 0028), a business policy the program does not enforce. The program gate stays `free_capital`, plus the R$19k stress buffer once it is live (ADR 0022). The obligations-based liquidity floor for `allocate` is tracked separately in issue #30.

@@ -2,8 +2,21 @@
  * Post-deploy checks (plan Task 12): read-only, pure over decoded data, so
  * they run the same against a local validator, a fork or devnet.
  */
-import { getAddressDecoder, type Address } from '@solana/kit';
+import { address, getAddressDecoder, type Address } from '@solana/kit';
 import type { VaultConfig, VaultState } from '../../../clients/js/src';
+import { programDataHash } from './hash';
+
+const DEFAULT_ADDRESS = address('11111111111111111111111111111111');
+
+/**
+ * The deployed bytecode is the verified build: the ProgramData program
+ * bytes (header stripped, trailing zeros trimmed, as `solana-verify
+ * get-program-hash` computes them) hash to `expected`.
+ */
+export function checkProgramHash(programData: Uint8Array, expected: string): string[] {
+  const got = programDataHash(programData);
+  return got === expected ? [] : [`program hash is ${got}, expected ${expected} (solana-verify get-program-hash)`];
+}
 
 /**
  * Upgrade authority from a BPF Loader Upgradeable `ProgramData` account:
@@ -67,6 +80,8 @@ export type Expected = {
   operator?: Address;
   pauser?: Address;
   allowlistRoot?: Uint8Array;
+  /** The guardians the config names (none when empty); the on-chain set must match. */
+  guardians?: Address[];
 };
 
 /** Returns the failed checks; empty means all pass. */
@@ -87,6 +102,22 @@ export function postDeployChecks(
     const got = Buffer.from(config.investorAllowlistRoot as Uint8Array).toString('hex');
     const want = Buffer.from(e.allowlistRoot).toString('hex');
     if (got !== want) out.push(`allowlist root is ${got}, expected ${want}`);
+  }
+  // A pending handover could hand a role over after the checks pass.
+  for (const [role, key] of [
+    ['operator', config.pendingOperator],
+    ['pauser', config.pendingPauser],
+    ['admin', config.pendingAdmin],
+  ] as const) {
+    if (key !== DEFAULT_ADDRESS) out.push(`pending ${role} handover to ${key}: accept or cancel_pending it first`);
+  }
+  if (e.guardians) {
+    const set = (xs: readonly Address[]) => xs.filter((x) => x !== DEFAULT_ADDRESS).sort();
+    const got = set(config.guardians);
+    const want = set(e.guardians);
+    if (JSON.stringify(got) !== JSON.stringify(want)) {
+      out.push(`guardians are [${got.join(', ')}], expected [${want.join(', ')}]`);
+    }
   }
   if (config.paused) out.push('reserve is paused');
   return out;

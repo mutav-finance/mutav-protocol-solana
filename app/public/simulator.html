@@ -155,6 +155,8 @@ pre{font-family:var(--mono);font-size:12px;background:var(--surface);border:1px 
 .inp input::-webkit-inner-spin-button,.inp input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 .inp input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .inp .u{font:400 10.5px var(--mono);color:var(--ink-3);padding:0 var(--sp2) 0 2px;white-space:nowrap}
+.sl{display:block;width:100%;margin:6px 0 2px;height:18px;accent-color:var(--accent);cursor:pointer;background:transparent}
+.sl:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .tg{display:flex;align-items:center;justify-content:space-between;gap:var(--sp3);font-size:var(--fs-label);color:var(--ink);cursor:pointer;min-height:32px}
 .tg input{appearance:none;-webkit-appearance:none;width:32px;height:16px;background:var(--surface-3);border:1px solid var(--line-input);position:relative;cursor:pointer;flex:none;margin:0}
 .tg input::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;background:var(--ink-2);transition:transform .15s ease-out}
@@ -348,9 +350,12 @@ h3:first-child{margin-top:0}
   .f{grid-template-columns:minmax(0,1fr) 148px}
 }
 @media print{ .bar .tbtn,.tabs,.footbar,.htip{display:none} .panel{position:static;max-height:none} .pane[hidden]{display:block} body{background:#fff;padding:0} .grp > .body{display:grid} }
+.demo-banner{background:var(--bg);border-bottom:1px solid var(--accent);color:var(--ink);font-family:var(--sans);font-size:12px;line-height:1.5;padding:8px 16px;text-align:center}
+.demo-banner b{font-family:var(--mono);font-weight:400;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-right:8px}
 </style>
 </head>
 <body>
+<div class="demo-banner" role="note" aria-label="Pilot demo"><b>Pilot demo</b>Not open to public investment. Capital participation will open only through a regulated vehicle, to eligible investors.</div>
 
 <div class="bar"><div class="in">
   <div class="ttl"><span class="brand" translate="no">MUTAV</span><h1>Reserve simulator</h1></div>
@@ -482,7 +487,8 @@ capital_in(m)        = min(starting_capital [m = 1] + monthly_raise [from ≤ m 
 // coverage (on-chain)
 cover_per_lease      = rent × (default_leg + exit_leg)              // default_cover + exit_cover
 remaining_cover(m)   = Σ over active leases (cover_per_lease − claims paid on that lease)
-coverage_required(m) = max(ceil(c × remaining_cover(m) / 10_000), provisions)   // c in bps, c ≥ 1_000
+coverage_required(m) = max(ceil(c × remaining_cover(m) / 10_000),              // c in bps, c ≥ 1_000
+                           provisions + min(stress_buffer, remaining_cover(m) − provisions))   // ADR 0022
                        provisions ≈ 0 here: claims are paid in the month they arise
 free_capital(m)      = max(0, stable_assets − coverage_required)
 
@@ -545,17 +551,17 @@ bad_year_net_gain    = net fees − leases × bad_year_claims + stable × (brs_s
 
       <h3>Sources and defaults</h3>
       <ul>
-        <li><strong>Pilot parameters:</strong> <code>mutav/docs/operation/02-parameters.md</code> on <code>origin/main</code> (reviewed 2026-09-19, the single source of business numbers): rent R$2.200, guarantee fee 10% (modelled value inside 9–15% by score), default-leg cover 12× rent (working value, under legal review), exit-leg cover 6× as a separate sublimit, capitalized reserve R$300.000, ~6-month pilot, ~28 new contracts/month to a 170-lease book. The pilot scenarios use the founders' pilot parameters instead (ADR 0028, 2026-10-11): guarantee fee 12%, R$100.000 start plus R$100.000 a month from month 1, 10 new leases a month to 60, c = 0,25, issuer income 70% of CDI (≈ 9,6% a year, planning assumption), redemptions above a 25% buffer. 02's “reserve ~80% TESOURO once an adapter exists” is superseded: the pilot reserve is BRS-only (2026-10-07), with TESOURO as the first adapter candidate once Etherfuse has a BRS leg. Fee charged 12× a year: agencies are billed one boleto a month.</li>
+        <li><strong>Pilot parameters:</strong> <code>mutav/docs/operation/02-parameters.md</code> on <code>origin/main</code> (reviewed 2026-09-19, the single source of business numbers): rent R$2.200, guarantee fee 10% (modelled value inside 9–15% by score), default-leg cover 12× rent (working value, under legal review), exit-leg cover 6× as a separate sublimit, capitalized reserve R$300.000, ~6-month pilot, ~28 new contracts/month to a 170-lease book. The pilot scenarios use the founders' pilot parameters instead (ADR 0028, amended 2026-10-12, the path to R$1M): guarantee fee 12%, R$120.000 start plus R$170.000 a month from month 2, 17 new leases a month (97 by month 6, at the R$1M max_tvl), c = 0,25, issuer income 70% of CDI (≈ 9,6% a year, planning assumption), redemptions above a 25% buffer. 02's “reserve ~80% TESOURO once an adapter exists” is superseded: the pilot reserve is BRS-only (2026-10-07), with TESOURO as the first adapter candidate once Etherfuse has a BRS leg. Fee charged 12× a year: agencies are billed one boleto a month.</li>
         <li><strong>Coverage ratio (c):</strong> ADR 0016 and <code>40-reserve.md</code> 9w. The program holds <code>coverage_required = max(ceil(c × remaining cover), provisions)</code> with <code>c ≥ 0,10</code> (<code>MIN_COVERAGE_RATIO_BPS = 1_000</code>); devnet and the pilot run at 0,25 (ADR 0028). Filed claims stay fully covered at any c. At R$39.600 of cover per lease, R$100.000 backs 10 leases at c = 0,25 and 2 at c = 1,0; R$300.000 backs 30 at c = 0,25; 170 leases need R$1.683.000 at c = 0,25.</li>
         <li><strong>Caps (devnet config):</strong> <code>coverage_ratio_bps</code> 2.500; <code>max_tvl</code> R$1M; <code>max_cover_per_guarantee</code> R$120k; <code>stress_buffer</code> R$19k (ADR 0028); <code>max_cover_per_agency</code> R$10M in the simulator only (no program cap since ADR 0019; well above max_tvl ÷ 0,25 plus fee growth, so it never binds: one reserve may serve a single agency); <code>max_claim_per_call</code> / <code>max_claim_per_period</code> R$15k / R$20k per 31 days (a 6×-rent eviction, R$13.200, fits the per-call cap); <code>min_settlement_bps</code> 100% (claims and redemptions pay out in BRS, the settlement token; the pilot holds BRS only, so adapter income is a what-if until the floor is lowered); fee take ≤ 30% (<code>MAX_FEE_TAKE_BPS</code>). Request limits (R$1k–R$100k, R$500 minimum fill) do not affect this model.</li>
         <li><strong>Bad-year check:</strong> <code>40-reserve.md</code> 9w asks the reserve to grow to 2,0 bad years of claims and never hold fewer than 1,0. It is not enforced on-chain yet (a later ADR), so it is shown as an off-chain planning signal next to the coverage figures.</li>
-        <li><strong>Delinquency:</strong> base 2,01% of annual rent = Superlógica IIL, RS apartments, average of the three latest prints (abr/jun/jul 2026), verified at source 2026-09-08. Stress 2,87% (IIL RS aggregate). Tail 5,93% (Loft IIA RS, 15-day threshold). Applied as an annual rate on annual rent: <code>12 × rate × rent</code>.</li>
+        <li><strong>Delinquency:</strong> base 2,5% of annual rent, the founders' working figure for the starting region (2026-10-11): a round number set above the measured anchors for the pilot's segment. Measured: Superlógica IIL, RS apartments, average of the three latest prints (abr/jun/jul 2026), 2,01%, verified at source 2026-09-08; South region 2,67%. Stress 2,87% (IIL RS aggregate). Tail 5,93% (Loft IIA RS, 15-day threshold). Applied as an annual rate on annual rent: <code>12 × rate × rent</code>.</li>
         <li><strong>Evictions:</strong> <code>12-eviction-cost-south.md</code>. While the fiança is live the art. 59 §1º IX liminar is unavailable, so a forced exit costs about 6× rent (capped at the exit leg). If the fiança extinguishes once the default leg is exhausted, the liminar becomes arguable: base 5,5×, low 2,5×. <strong>Eviction rate</strong>: <code>12-eviction-rate-south.md</code>, measured filings, adjusted (not MUTAV data). CNJ DataJud first-instance despejo filings (all 27 state courts, own query 2026-10-02) ÷ IBGE PNAD rented households give 0,5–0,7% of South leases facing a suit per year; about a third end in a court-ordered exit. Adjusted for an underwritten, agency-managed book: <strong>low 0,10% / base 0,25% / high 0,60%</strong> per year.</li>
         <li><strong>Other exit debts:</strong> <code>12-exit-costs-non-eviction.md</code> §9, base case per lease-year: damage incl. painting 0,056×; accessory charges 0,024×; early-termination penalty 0,077×; abandonment 0,020×; alterations 0,010×; total ≈ 0,19×. All [inference].</li>
         <li><strong>Bad-year multiplier 2,33:</strong> calibrated to <code>40-reserve</code>: R$1.894 per lease per year in scope B (R$321,9k / 170) against R$813 of expected claims.</li>
         <li><strong>Debts covered:</strong> A = all tenant debts incl. the termination penalty; B = excluding the penalty (default); C = evictions and abandonment only. In C, abandonment is handled through the eviction event (despejo / imissão, art. 66).</li>
         <li><strong>Take rate 20%:</strong> simulator default (the config placeholder; the value is still open, 06-business-model). <strong>Lease term 30 months:</strong> typical lease (06, PY:109). <strong>Issuer income (Nora), % of TVL a year:</strong> BRS itself pays no yield. Nora pays the reserve issuer partnership revenue as an annual rate on the reserve's TVL, in BRS, to the reserve's income inbox; the operator's <code>sweep_income</code> moves it into <code>reserve</code> and books it on-chain (ADR 0017), all of it to NAV since the income take is 0, so it counts in stable assets and NAV from then on. It is CDI-linked and tiered on the whole balance: each month the TVL selects the tier whose threshold it is strictly above, and income = TVL × (tier % × CDI) / 12. Public default: CDI 13,65% (Selic − 0,10 pp) and one tier at 70% of CDI (≈ 9,6% a year), a planning assumption until the agreement is signed; whole-balance vs marginal tiers and holding-period rules are to be confirmed with the issuer. A flat <code>brsYieldPct</code> in an older link overrides the tiers. <strong>Selic 13,75%.</strong> <strong>TESOURO 11,58%</strong> (adapter what-if only): Etherfuse on-chain accrual, unconfirmed.</li>
-        <li><strong>Changed vs earlier versions:</strong> 2026-10-11 (latest): the founders' pilot parameters (ADR 0028). Default follows the new devnet config: c = 0,25, <code>max_tvl</code> R$1M, R$120k per guarantee, per-call claim cap R$15k (was R$10k, so a 6×-rent eviction fits it), R$20k per 31 days unchanged. Pilot · recommended: R$100k start plus R$100k a month from month 1, 10 leases a month to 60, 12% guarantee fee, redemptions above a 25% buffer; Pilot · conservative is the same at c = 0,50 and 5 leases a month. The “BRS yield” input is renamed “Issuer income (Nora), % of TVL a year” and is now CDI-linked and tiered on the whole balance (CDI plus up to 4 tiers, link keys <code>issuerCdiPct</code>, <code>tier1Min</code>/<code>tier1Pct</code> … <code>tier4Min</code>/<code>tier4Pct</code>); the public default is one tier at 70% of CDI (≈ 9,6% a year), replacing the flat 12,75%. An older link's <code>brsYieldPct</code> still works as a flat override. Old links that relied on the earlier defaults (c = 0,10, <code>max_tvl</code> R$300k) now load the new defaults (c = 0,25, R$1M). The yield vs Selic view shows the effective annual rate. Saved inputs from earlier versions are not reused. 2026-10-07: the pilot reserve is BRS-only. BRS yield defaults to 12,75% (Selic − 1 pp), the adapter share wanted to 0; the TESOURO-specific share cap became the minimum held in the settlement token (<code>min_settlement_bps</code>, 100% BRS), and one generic adapter asset (e.g. TESOURO) is the what-if; those scenarios moved to “Expansion (adapters, what-if)”. Saved inputs from earlier versions are not reused. 2026-10-07 (later): BRS income added (BRS yield, default 0) and a Reserve yield tab holding the BRS yield, the BRS / TESOURO split, the TESOURO yield and Selic. 2026-10-07: the simulator now computes what the program enforces. Coverage required is <code>ceil(c × remaining cover)</code>, and paid claims reduce remaining cover; the gate and the caps (<code>max_tvl</code>, per guarantee, per agency, asset split, fee take, claim caps) are inputs, enforced as on-chain; the bad-year floor became an off-chain check; the sizing-rule switch became “Compare c”; labels use the program's terms. Saved inputs from earlier versions are not reused. Earlier: delinquency 2,46% → 2,01%, rent R$2.000 → R$2.200, fee 12% → 10% per 30-day period, cover 3+6 → 12+6, eviction rate 2% prior → 0,25% measured-adjusted, single loss ratio → event-level claims.</li>
+        <li><strong>Changed vs earlier versions:</strong> 2026-10-12 (latest): the path to R$1M is the pilot plan (founders): Pilot · path to R$1M is 17 leases and R$170k a month from month 2; the earlier 10-a-month plan is kept as a scenario; the conservative variant keeps R$100k a month. Old links that relied on the earlier defaults now load the new plan. 2026-10-11: every numeric input has a slider beside its box, over a range meant for exploring scenarios; the box still takes any value. 2026-10-11: new “Path to R$1M · 6 months” scenario (17 leases and R$170k a month). 2026-10-11: pilot capital R$100k start + R$100k a month from month 1 → R$120k start + R$100k a month from month 2 (founders), so no capital comes in and goes back out in month 1; R$620k by month 6. 2026-10-11: base delinquency 2,01% → 2,5% (founders' working figure for the starting region; the stress scenario doubles it to 5,0%). Old links that relied on the 2,01% default now load 2,5%. 2026-10-11: the founders' pilot parameters (ADR 0028). Default follows the new devnet config: c = 0,25, <code>max_tvl</code> R$1M, R$120k per guarantee, per-call claim cap R$15k (was R$10k, so a 6×-rent eviction fits it), R$20k per 31 days unchanged. Pilot · recommended: R$100k start plus R$100k a month from month 1, 10 leases a month to 60, 12% guarantee fee, redemptions above a 25% buffer; Pilot · conservative is the same at c = 0,50 and 5 leases a month. The “BRS yield” input is renamed “Issuer income (Nora), % of TVL a year” and is now CDI-linked and tiered on the whole balance (CDI plus up to 4 tiers, link keys <code>issuerCdiPct</code>, <code>tier1Min</code>/<code>tier1Pct</code> … <code>tier4Min</code>/<code>tier4Pct</code>); the public default is one tier at 70% of CDI (≈ 9,6% a year), replacing the flat 12,75%. An older link's <code>brsYieldPct</code> still works as a flat override. Old links that relied on the earlier defaults (c = 0,10, <code>max_tvl</code> R$300k) now load the new defaults (c = 0,25, R$1M). The yield vs Selic view shows the effective annual rate. Saved inputs from earlier versions are not reused. 2026-10-07: the pilot reserve is BRS-only. BRS yield defaults to 12,75% (Selic − 1 pp), the adapter share wanted to 0; the TESOURO-specific share cap became the minimum held in the settlement token (<code>min_settlement_bps</code>, 100% BRS), and one generic adapter asset (e.g. TESOURO) is the what-if; those scenarios moved to “Expansion (adapters, what-if)”. Saved inputs from earlier versions are not reused. 2026-10-07 (later): BRS income added (BRS yield, default 0) and a Reserve yield tab holding the BRS yield, the BRS / TESOURO split, the TESOURO yield and Selic. 2026-10-07: the simulator now computes what the program enforces. Coverage required is <code>ceil(c × remaining cover)</code>, and paid claims reduce remaining cover; the gate and the caps (<code>max_tvl</code>, per guarantee, per agency, asset split, fee take, claim caps) are inputs, enforced as on-chain; the bad-year floor became an off-chain check; the sizing-rule switch became “Compare c”; labels use the program's terms. Saved inputs from earlier versions are not reused. Earlier: delinquency 2,46% → 2,01%, rent R$2.000 → R$2.200, fee 12% → 10% per 30-day period, cover 3+6 → 12+6, eviction rate 2% prior → 0,25% measured-adjusted, single loss ratio → event-level claims.</li>
       </ul>
       <h3>Simplifications</h3>
       <ul>
@@ -588,12 +594,12 @@ bad_year_net_gain    = net fees − leases × bad_year_claims + stable × (brs_s
 var MUTAV_DEFAULTS = {
   months: 6, perMonth: 28, leaseTerm: 30,
   rent: 2200, feePct: 10, periods: 12, defaultCover: 12, exitCover: 6,
-  scope: 'B', rhoPct: 2.01, evictRatePct: 0.25, evictMult: 6,
+  scope: 'B', rhoPct: 2.5, evictRatePct: 0.25, evictMult: 6,
   nonEvictX: 0.19, penaltyX: 0.077, ramp: true, stressOn: false, stressMonth: 3,
   startCapital: 300000, monthlyRaise: 0, raiseFrom: 2, raiseUntil: 0,
   coverageRatio: 0.25, tailMult: 2.33,
   maxTvl: 1000000, maxCoverPerGuarantee: 120000, maxCoverPerAgency: 10000000,
-  maxClaimPerCall: 15000, maxClaimPerPeriod: 20000, maxTesouroSharePct: 0,
+  maxClaimPerCall: 15000, maxClaimPerPeriod: 20000, stressBuffer: 19000, maxTesouroSharePct: 0,
   tesouroSharePct: 0, tesouroPct: 11.58, selicPct: 13.75,
   /* issuer income (Nora): CDI-linked tiers on the whole balance; public planning default one tier at 70% of CDI.
      brsYieldPct: a flat % of TVL a year from older links; null = use the tiers. */
@@ -607,29 +613,33 @@ var MUTAV_PROTOCOL = { BPS: 10000, MIN_COVERAGE_RATIO_BPS: 1000, MAX_FEE_TAKE_BP
 
 /* ---- on-chain coverage maths, in base units (BRS, 6 decimals). Inputs are integers (Number or BigInt); outputs are Numbers. ---- */
 function mutavBig(x){ return typeof x === 'bigint' ? x : BigInt(Math.round(x)); }
-/* coverage_required = max(ceil(c × remaining_cover_total / 10_000), provisions)  (spec §4, ADR 0016) */
-function mutavCoverageRequired(remainingCover, coverageRatioBps, provisions) {
-  var prod = mutavBig(remainingCover) * mutavBig(coverageRatioBps), d = BigInt(MUTAV_PROTOCOL.BPS);
+/* coverage_required = max(ceil(c × remaining_cover_total / 10_000),
+                           provisions + min(stress_buffer, remaining_cover_total − provisions))  (spec §4, ADR 0016, ADR 0022).
+   stressBuffer in base units; omitted = 0 (ADR 0016's formula). */
+function mutavCoverageRequired(remainingCover, coverageRatioBps, provisions, stressBuffer) {
+  var rem = mutavBig(remainingCover), prod = rem * mutavBig(coverageRatioBps), d = BigInt(MUTAV_PROTOCOL.BPS);
   var q = prod / d; if (prod % d !== BigInt(0)) q = q + BigInt(1);
-  var pv = mutavBig(provisions || 0);
-  return Number(q > pv ? q : pv);
+  var pv = mutavBig(provisions || 0), sb = mutavBig(stressBuffer || 0);
+  var unprov = rem > pv ? rem - pv : BigInt(0);
+  var st = pv + (sb < unprov ? sb : unprov);
+  return Number(q > st ? q : st);
 }
 /* free_capital = max(0, stable_assets − coverage_required)  (pilot: earmark_eff = 0) */
-function mutavFreeCapital(stableAssets, remainingCover, coverageRatioBps, provisions) {
-  return Math.max(0, Number(mutavBig(stableAssets) - mutavBig(mutavCoverageRequired(remainingCover, coverageRatioBps, provisions))));
+function mutavFreeCapital(stableAssets, remainingCover, coverageRatioBps, provisions, stressBuffer) {
+  return Math.max(0, Number(mutavBig(stableAssets) - mutavBig(mutavCoverageRequired(remainingCover, coverageRatioBps, provisions, stressBuffer))));
 }
 /* register_guarantee rule 5: coverage_required_after + earmark_eff_before ≤ stable_assets */
-function mutavGateAdmits(stableAssets, remainingCover, newCover, coverageRatioBps, provisions) {
-  var after = mutavCoverageRequired(mutavBig(remainingCover) + mutavBig(newCover), coverageRatioBps, provisions);
+function mutavGateAdmits(stableAssets, remainingCover, newCover, coverageRatioBps, provisions, stressBuffer) {
+  var after = mutavCoverageRequired(mutavBig(remainingCover) + mutavBig(newCover), coverageRatioBps, provisions, stressBuffer);
   return mutavBig(after) <= mutavBig(stableAssets);
 }
 /* How many identical guarantees of `cover` (base units) the gate admits one after another, at most `max`. */
-function mutavGateCount(stableAssets, remainingCover, cover, coverageRatioBps, provisions, max) {
+function mutavGateCount(stableAssets, remainingCover, cover, coverageRatioBps, provisions, max, stressBuffer) {
   if (!(cover > 0) || !(max > 0)) return 0;
   var est = Math.floor((stableAssets - remainingCover * coverageRatioBps / MUTAV_PROTOCOL.BPS) / (cover * coverageRatioBps / MUTAV_PROTOCOL.BPS));
   var k = Math.max(0, Math.min(max, isFinite(est) ? est : 0));
-  while (k > 0 && !mutavGateAdmits(stableAssets, remainingCover, k * cover, coverageRatioBps, provisions)) k--;
-  while (k < max && mutavGateAdmits(stableAssets, remainingCover, (k + 1) * cover, coverageRatioBps, provisions)) k++;
+  while (k > 0 && !mutavGateAdmits(stableAssets, remainingCover, k * cover, coverageRatioBps, provisions, stressBuffer)) k--;
+  while (k < max && mutavGateAdmits(stableAssets, remainingCover, (k + 1) * cover, coverageRatioBps, provisions, stressBuffer)) k++;
   return k;
 }
 function mutavUnits(brl){ return Math.round(brl * MUTAV_PROTOCOL.UNITS_PER_BRL); }
@@ -692,6 +702,7 @@ function mutavCompute(p) {
      It accrues on the BRS share of the stable assets, i.e. what the effective TESOURO share leaves. */
   var bShare = 1 - tShare, issuer = mutavIssuerRate(p, 0), bRate = 0;
   var pay = mutavPayouts(p), req = mutavRequirement(p, pay), cBps = req.cBps, cover = req.cover, coverU = mutavUnits(cover);
+  var sbU = mutavUnits(Math.max(0, p.stressBuffer || 0));   /* caps.stress_buffer (ADR 0022) */
   var until = p.raiseUntil > 0 ? p.raiseUntil : N;
   var cohorts = [], remPer = [], rows = [], balance = 0, capital = 0, cum = 0, cumW = 0, cumTake = 0, tvlRefused = 0;
   var minHead = Infinity, minHeadMonth = 0, blocked = 0, firstBlocked = 0, below = 0, firstBelow = 0, selfFundMonth = 0;
@@ -713,12 +724,12 @@ function mutavCompute(p) {
     var allowed = planned, refusal = null;
     if (planned > 0) {
       var openU = mutavUnits(opening), remU = mutavUnits(remBefore);
-      if (mutavCoverageRequired(remU, cBps, 0) > openU) { allowed = 0; refusal = 'under-covered'; }
+      if (mutavCoverageRequired(remU, cBps, 0, sbU) > openU) { allowed = 0; refusal = 'under-covered'; }
       else if (req.overGuaranteeCap) { allowed = 0; refusal = 'guarantee-cap'; }
       else {
         var byAgency = cover > 0 ? Math.max(0, Math.floor((p.maxCoverPerAgency - remBefore) / cover + 1e-9)) : planned;
         if (byAgency < allowed) { allowed = byAgency; refusal = 'agency-cap'; }
-        var byGate = mutavGateCount(openU, remU, coverU, cBps, 0, allowed);
+        var byGate = mutavGateCount(openU, remU, coverU, cBps, 0, allowed, sbU);
         if (byGate < allowed) { allowed = byGate; refusal = 'free-capital'; }
       }
     }
@@ -751,7 +762,7 @@ function mutavCompute(p) {
     var uw = netFees - claimsPaid, selicOpp = Math.max(0, opening) * selic / 12;
     sumOpening += Math.max(0, opening); sumUW += uw; cumSelic += selicOpp;
     var pre = opening + gain;
-    var required = mutavBrl(mutavCoverageRequired(mutavUnits(remAfter), cBps, 0));
+    var required = mutavBrl(mutavCoverageRequired(mutavUnits(remAfter), cBps, 0, sbU));
     var surplus = Math.max(0, pre - required);
     /* redemptions are paid only out of free capital */
     var w = 0;
@@ -920,6 +931,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       { k: 'maxCoverPerAgency', l: 'Max cover per agency', code: 'max_cover_per_agency', u: 'R$', step: 100000, min: 0, src: 'protocol', i: 'Outstanding cover one agency may hold. The simulator assumes a single agency, so every lease counts. Not a program cap since ADR 0019; the simulator keeps R$10M, well above max_tvl ÷ 0,25 (R$4M) plus fee growth, so it never binds.' },
       { k: 'maxClaimPerCall', l: 'Max claim per call', code: 'max_claim_per_call', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'Largest operator claim payment in one call. Above it, pay_claim_admin. Devnet: R$15k (ADR 0028), so a 6×-rent eviction fits.' },
       { k: 'maxClaimPerPeriod', l: 'Max claims per 31 days', code: 'max_claim_per_period', u: 'R$/31 d', step: 1000, min: 0, src: 'protocol', i: 'Operator claim payments per 31 days (the simulator checks each month). A month above it needs pay_claim_admin for the excess. Devnet: R$20k.' },
+      { k: 'stressBuffer', l: 'Stress buffer', code: 'stress_buffer', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'caps.stress_buffer: claims that could be filed next, held on top of open provisions (ADR 0022). Coverage required = max(c × remaining cover, provisions + min(stress buffer, unprovisioned cover)), so on a small book the buffer binds. Devnet: R$19k (ADR 0028).' },
       { k: 'maxTesouroSharePct', inv: 100, l: 'Min held in settlement token (BRS)', code: 'min_settlement_bps', u: '%', step: 5, min: 0, max: 100, src: 'protocol', i: 'Claims and redemptions pay out in BRS, so the reserve keeps at least this share in BRS; adapters can use the rest. 100% in the pilot.' }
     ]},
     { id: 'contracts', t: 'Guarantee contracts', s: 'Contracts', sm: 'the leases you write', f: [
@@ -938,7 +950,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     ]},
     { id: 'capital', t: 'Capital', s: 'Capital', sm: 'what goes into the reserve', f: [
       { sub: 'Deposits' },
-      { k: 'startCapital', l: 'Starting capital', u: 'R$', step: 10000, min: 0, src: 'canonical', i: 'Deposited into the reserve in month 1. 02: R$300.000 capitalized reserve. Pilot (ADR 0028): R$100.000, plus R$100.000 a month from month 1.' },
+      { k: 'startCapital', l: 'Starting capital', u: 'R$', step: 10000, min: 0, src: 'canonical', i: 'Deposited into the reserve in month 1. 02: R$300.000 capitalized reserve. Pilot (ADR 0028, amended): R$120.000, plus R$170.000 a month from month 2.' },
       { k: 'monthlyRaise', l: 'Monthly raise', u: 'R$/mo', step: 5000, min: 0, i: 'New capital added to the reserve every month in the window below. 0 = no raise.' },
       { k: 'raiseFrom', l: 'Raise from month', u: 'month', step: 1, min: 1, when: showRaise },
       { k: 'raiseUntil', l: 'Raise until month', u: '0 = last', step: 1, min: 0, when: showRaise },
@@ -972,7 +984,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     ]},
     { id: 'assume', t: 'Assumptions', s: 'Assumptions', sm: 'claims, bad year and costs', f: [
       { sub: 'Claims' },
-      { k: 'rhoPct', l: 'Rent arrears (delinquency)', u: '%/yr', step: 0.01, min: 0, src: 'research', i: 'Share of annual rent that goes unpaid. Superlógica IIL RS apartments, 3-print avg 2,01%; stress 2,87%; tail 5,93%.' },
+      { k: 'rhoPct', l: 'Rent arrears (delinquency)', u: '%/yr', step: 0.01, min: 0, src: 'research', i: 'Share of annual rent that goes unpaid. Base 2,5% (founders, starting region). Measured: Superlógica IIL RS apartments, 3-print avg 2,01%; RS aggregate 2,87%; tail 5,93%.' },
       { k: 'evictRatePct', l: 'Eviction rate', u: '%/yr', step: 0.05, min: 0, src: 'research', i: 'CNJ DataJud despejo filings ÷ IBGE PNAD rented households, adjusted for outcomes and an underwritten book. Low 0,10% / base 0,25% / high 0,60%.' },
       { k: 'evictMult', l: 'Eviction cost paid', u: '× rent', step: 0.5, min: 0, src: 'research', i: 'Per eviction, capped at the exit leg. Fiança live: ~6× (no liminar). If the fiança extinguishes at the default-leg limit: 5,5×. Low case 2,5×.' },
       { k: 'nonEvictX', l: 'Other exit debts', u: '× rent/yr', step: 0.01, min: 0, src: 'estimate', i: 'Damage, charges, penalty, abandonment, alterations. Base ≈ 0,19× rent per lease-year [inference].' },
@@ -991,20 +1003,21 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   GROUPS.forEach(function(g){ g.f.forEach(function(f){ if (f.k) FIELDS.push(f); }); });
   function fieldBy(k){ return FIELDS.filter(function(x){ return x.k === k; })[0]; }
 
-  var PILOT = { months: 6, perMonth: 10, rent: 2200, feePct: 12, periods: 12, takePct: 20, defaultCover: 12, exitCover: 6, scope: 'B',
-    evictRatePct: 0.25, coverageRatio: 0.25, startCapital: 100000, monthlyRaise: 100000, raiseFrom: 1, raiseUntil: 0, growthTarget: 60,
-    maxTvl: 1000000, maxCoverPerGuarantee: 120000, maxClaimPerCall: 15000, maxClaimPerPeriod: 20000,
+  var PILOT = { months: 6, perMonth: 17, rent: 2200, feePct: 12, periods: 12, takePct: 20, defaultCover: 12, exitCover: 6, scope: 'B',
+    evictRatePct: 0.25, coverageRatio: 0.25, startCapital: 120000, monthlyRaise: 170000, raiseFrom: 2, raiseUntil: 0, growthTarget: 102,
+    maxTvl: 1000000, maxCoverPerGuarantee: 120000, maxClaimPerCall: 15000, maxClaimPerPeriod: 20000, stressBuffer: 19000,
     withdraw: 'buffer', tesouroSharePct: 0, maxTesouroSharePct: 0, tesouroPct: 11.58, selicPct: 13.75 };
   var SCEN = [
     { id: 'default', g: '', l: 'Default (02 parameters)', d: '02 inputs on the devnet config: 28 new leases a month for 6 months, R$300k start, no raise, c = 0,25, BRS only (issuer income 70% of CDI, ≈ 9,6% a year). R$300k backs 30 leases; the book stalls at 33 (insufficient free capital). max_tvl (R$1M) would back about 101 leases at c = 0,25.', o: {} },
-    { id: 'pilotRec', g: 'Pilot', l: 'Pilot · recommended', d: '60 leases (10 a month × 6, growth target 60), R$2.200 rent, 12% guarantee fee, R$100k start plus R$100k a month from month 1 (R$700k by month 6), c = 0,25, debts B, redemptions above a 25% buffer, BRS only (settlement floor 100%), issuer income 70% of CDI (≈ 9,6% a year, planning assumption). Every lease is admitted: 60 leases need R$594.000 of coverage required.', o: PILOT },
-    { id: 'pilotCons', g: 'Pilot', l: 'Pilot · conservative', d: 'As recommended at c = 0,50, with 30 leases (5 a month × 6): R$19.800 of coverage required per lease, R$594.000 for the 30. Every lease is admitted.', o: ext(PILOT, { coverageRatio: 0.5, perMonth: 5 }) },
-    { id: 'scale170', g: 'Growth', l: 'Scale to 170', d: 'Pilot inputs at 28 a month toward 170. The R$100k start backs 10 leases and each R$100k raise about 10 more, so the book stalls at 75 by month 6. 170 leases need R$1.683.000 of coverage required at c = 0,25, above max_tvl (R$1M backs about 101), so max_tvl must rise too.', o: ext(PILOT, { perMonth: 28, growthTarget: 170 }) },
-    { id: 'fullBacking', g: 'What-if', l: 'Full backing (c = 1,0)', d: 'Pilot recommended at c = 1,0: every lease’s full cover held in stable assets. R$100k backs 2 leases; with the monthly raises the book reaches 18 by month 6.', o: ext(PILOT, { coverageRatio: 1 }) },
+    { id: 'pilotRec', g: 'Pilot', l: 'Pilot · path to R$1M', d: 'The pilot plan (ADR 0028, amended 2026-10-12): 17 new leases a month (growth target 102), R$2.200 rent, 12% guarantee fee, R$120k start plus R$170k a month from month 2, c = 0,25, debts B, redemptions above a 25% buffer, BRS only (settlement floor 100%), issuer income 70% of CDI (≈ 9,6% a year, planning assumption). Month 1 is capital-bound (the start backs 12 of the 17); the reserve reaches the R$1M max_tvl in month 6 with 97 leases and about R$3,8M of cover (R$22k of the last raise is refused at the cap). About R$948k of MUTAV capital, none of it redeemed.', o: PILOT },
+    { id: 'pilotCons', g: 'Pilot', l: 'Pilot · conservative', d: 'The founders’ conservative variant, unchanged: c = 0,50, 5 leases a month and R$100k a month from month 2, to 30 leases. R$19.800 of coverage required per lease, R$594.000 for the 30. Every lease is admitted.', o: ext(PILOT, { coverageRatio: 0.5, perMonth: 5, growthTarget: 30, monthlyRaise: 100000 }) },
+    { id: 'scale170', g: 'Growth', l: 'Scale to 170', d: 'Pilot inputs at 28 a month toward 170. The R$120k start backs 12 leases and each R$170k raise about 17 more, so the book stalls at 101 by month 6, at the R$1M max_tvl. 170 leases need R$1.683.000 of coverage required at c = 0,25, so max_tvl must rise too.', o: ext(PILOT, { perMonth: 28, growthTarget: 170 }) },
+    { id: 'pilot10', g: 'Pilot', l: 'Pilot · 10 a month (earlier plan)', d: 'The plan before 2026-10-12: 10 leases a month and R$100k a month from month 2, to 60 leases. R$620k of MUTAV capital; the reserve ends month 6 at about R$668k and reaches R$1M in month 9.', o: ext(PILOT, { perMonth: 10, growthTarget: 60, monthlyRaise: 100000 }) },
+    { id: 'fullBacking', g: 'What-if', l: 'Full backing (c = 1,0)', d: 'Pilot recommended at c = 1,0: every lease’s full cover held in stable assets. R$120k backs 3 leases; with the monthly raises the book reaches 25 by month 6.', o: ext(PILOT, { coverageRatio: 1 }) },
     { id: 'broad', g: 'What-if', l: 'Debts A (all debts)', d: 'Pilot recommended, fiança covers all tenant debts incl. the termination penalty.', o: ext(PILOT, { scope: 'A' }) },
     { id: 'extreme', g: 'What-if', l: 'Debts C (evictions only)', d: 'Pilot recommended, fiança covers arrears, evictions and abandonment only.', o: ext(PILOT, { scope: 'C' }) },
     { id: 'lean', g: 'What-if', l: 'Lean cover (3+3)', d: 'Pilot recommended with a 3× rent default leg and a 3× exit leg.', o: ext(PILOT, { defaultCover: 3, exitCover: 3 }) },
-    { id: 'stress', g: 'Stress', l: 'Stress', d: 'Pilot recommended with delinquency at 2× base (4,02%), evictions 0,60% a year at 6× rent, and a bad year from month 3.', o: ext(PILOT, { rhoPct: 4.02, evictRatePct: 0.6, evictMult: 6, stressOn: true, stressMonth: 3 }) },
+    { id: 'stress', g: 'Stress', l: 'Stress', d: 'Pilot recommended with delinquency at 2× base (5,0%), evictions 0,60% a year at 6× rent, and a bad year from month 3.', o: ext(PILOT, { rhoPct: 5, evictRatePct: 0.6, evictMult: 6, stressOn: true, stressMonth: 3 }) },
     { id: 'tesouroCap', g: 'Expansion (adapters, what-if)', l: 'Adapter asset · 50%', d: 'What-if: needs an adapter for an asset such as TESOURO, which the pilot does not have (TESOURO is the first candidate once Etherfuse has a BRS leg). Pilot recommended with 50% of the stable assets wanted in the adapter asset and the settlement-token floor lowered to 50% BRS.', o: ext(PILOT, { tesouroSharePct: 50, maxTesouroSharePct: 50 }) },
     { id: 'tesouro', g: 'Expansion (adapters, what-if)', l: 'Adapter asset · 100%', d: 'What-if: needs an adapter for an asset such as TESOURO, which the pilot does not have. Pilot recommended with the whole reserve in the adapter asset and no settlement-token floor (0% BRS): no Issuer income, an extreme case since claims pay out in BRS.', o: ext(PILOT, { tesouroSharePct: 100, maxTesouroSharePct: 100 }) }
   ];
@@ -1157,6 +1170,20 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   sel.addEventListener('change', function(){ if (sel.value !== 'custom') applyScen(sel.value); });
 
   /* build inputs */
+  /* slider ranges, in displayed units: wide enough to explore scenarios, the box beside each still takes any value */
+  var SLIDE = {
+    coverageRatio: [0.1, 1, 0.05], takePct: [0, 30, 1], maxTvl: [0, 5000000, 50000], maxCoverPerGuarantee: [0, 200000, 5000],
+    maxCoverPerAgency: [0, 20000000, 500000], maxClaimPerCall: [0, 100000, 1000], maxClaimPerPeriod: [0, 200000, 1000], maxTesouroSharePct: [0, 100, 5],
+    perMonth: [0, 50, 1], months: [1, 36, 1], leaseTerm: [6, 60, 1], rent: [500, 10000, 100], feePct: [5, 20, 0.5],
+    defaultCover: [0, 30, 0.5], exitCover: [0, 12, 0.5],
+    startCapital: [0, 2000000, 10000], monthlyRaise: [0, 500000, 5000], raiseFrom: [1, 36, 1], raiseUntil: [0, 36, 1], growthTarget: [0, 500, 10],
+    mutavSharePct: [0, 100, 5], bufferPct: [0, 200, 5], sharePct: [0, 100, 5],
+    issuerCdiPct: [0, 25, 0.05], tier1Min: [0, 2000000, 10000], tier1Pct: [0, 120, 1], tier2Min: [0, 2000000, 10000], tier2Pct: [0, 120, 1],
+    tier3Min: [0, 2000000, 10000], tier3Pct: [0, 120, 1], tier4Min: [0, 2000000, 10000], tier4Pct: [0, 120, 1], brsYieldPct: [0, 25, 0.05],
+    selicPct: [0, 25, 0.05], tesouroSharePct: [0, 100, 5], tesouroPct: [0, 25, 0.05],
+    rhoPct: [0, 15, 0.05], evictRatePct: [0, 3, 0.05], evictMult: [0, 12, 0.5], nonEvictX: [0, 1.5, 0.01], penaltyX: [0, 0.5, 0.005],
+    tailMult: [1, 5, 0.01], stressMonth: [1, 36, 1], opCostPerLease: [0, 200, 1], opCostFixed: [0, 100000, 500]
+  };
   var gh = '', mobile = false;
   try { mobile = window.matchMedia('(max-width: 900px)').matches; } catch (e) {}
   gh += '<div class="tabs ctabs" role="tablist" aria-label="Controls">' + GROUPS.map(function(g, i){ return '<button type="button" role="tab" id="ctab_' + g.id + '" data-ctab="' + g.id + '" aria-controls="grp_' + g.id + '" aria-selected="' + (i === 0 ? 'true' : 'false') + '"' + (i === 0 ? '' : ' tabindex="-1"') + ' title="' + esc(g.t) + '">' + esc(g.s) + '</button>'; }).join('') + '</div>';
@@ -1180,6 +1207,8 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
         gh += '<div class="f"><label for="in_' + f.k + '">' + lab + '</label><div class="inp">' + (pre ? '<span class="u pre" aria-hidden="true">' + pre + '</span>' : '') +
           '<input id="in_' + f.k + '" name="' + f.k + '" autocomplete="off" type="text" inputmode="decimal" spellcheck="false" aria-describedby="u_' + f.k + '"' +
           ' data-k="' + f.k + '"><span class="' + (suf ? 'u' : 'vh') + '" id="u_' + f.k + '">' + (pre ? '<span class="vh">R$ </span>' : '') + esc(suf) + '</span></div></div>';
+        var SL = SLIDE[f.k];
+        if (SL) gh += '<input type="range" class="sl" id="sl_' + f.k + '" data-k="' + f.k + '" data-sl="1" min="' + SL[0] + '" max="' + SL[1] + '" step="' + SL[2] + '" aria-label="' + esc(f.l) + ' (slider)">';
       }
       gh += '</div>';
     });
@@ -1229,8 +1258,9 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   function disp(f, v){ return f && f.inv != null ? f.inv - v : v; }
   function clampF(f, v){ if (f.min != null) v = Math.max(f.min, v); if (f.max != null) v = Math.min(f.max, v); return v; }
   function syncVisibility(){ FIELDS.forEach(function(f){ if (f.when) document.getElementById('row_' + f.k).hidden = !f.when(state); }); }
+  function syncSlider(f){ var sl = document.getElementById('sl_' + f.k); if (sl) sl.value = isFinite(state[f.k]) && state[f.k] !== null ? disp(f, state[f.k]) : sl.min; }
   function syncInputs(){
-    FIELDS.forEach(function(f){ var el = document.getElementById('in_' + f.k); if (f.toggle) el.checked = !!state[f.k]; else { el.value = fmtIn(disp(f, state[f.k])); el.removeAttribute('aria-invalid'); } });
+    FIELDS.forEach(function(f){ var el = document.getElementById('in_' + f.k); if (f.toggle) el.checked = !!state[f.k]; else { el.value = fmtIn(disp(f, state[f.k])); el.removeAttribute('aria-invalid'); syncSlider(f); } });
     Object.keys(SEGS).forEach(function(k){
       Array.prototype.forEach.call(document.querySelectorAll('[data-segk="' + k + '"]'), function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-v') === state[k] ? 'true' : 'false'); });
       document.getElementById('hint_' + k).textContent = SEGS[k].h[state[k]];
@@ -1241,6 +1271,12 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   groupsEl.addEventListener('input', function(e){
     var el = e.target, k = el.dataset && el.dataset.k; if (!k) return;
     var f = fieldBy(k);
+    if (el.dataset.sl) {
+      var sv = Math.round(Number(el.value) * 1e6) / 1e6; if (!isFinite(sv)) return;
+      state[k] = disp(f, clampF(f, sv));
+      var box = document.getElementById('in_' + k); box.value = fmtIn(sv); box.removeAttribute('aria-invalid');
+      slideEdit(); return;
+    }
     if (f.toggle) state[k] = el.checked;
     else {
       var v = parseIn(el.value);
@@ -1248,23 +1284,27 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       if (!isFinite(v)) { if (el.value.trim()) el.setAttribute('aria-invalid', 'true'); return; }
       el.removeAttribute('aria-invalid');
       state[k] = disp(f, clampF(f, v));
+      syncSlider(f);
     }
     edited();
   });
+  /* a dragged slider fires many input events: recompute once per frame */
+  var slidePending = false;
+  function slideEdit(){ if (slidePending) return; slidePending = true; requestAnimationFrame(function(){ slidePending = false; edited(); }); }
   /* on leaving a field, show the value the model uses (clamped, formatted); arrow keys step by the field's step */
   groupsEl.addEventListener('focusout', function(e){
-    var el = e.target, k = el.dataset && el.dataset.k, f = k && fieldBy(k); if (!f || f.toggle) return;
+    var el = e.target, k = el.dataset && el.dataset.k, f = k && fieldBy(k); if (!f || f.toggle || el.dataset.sl) return;
     el.value = fmtIn(disp(f, state[k])); el.removeAttribute('aria-invalid');
   });
   groupsEl.addEventListener('keydown', function(e){
-    var el = e.target, k = el.dataset && el.dataset.k, f = k && fieldBy(k); if (!f || f.toggle) return;
+    var el = e.target, k = el.dataset && el.dataset.k, f = k && fieldBy(k); if (!f || f.toggle || el.dataset.sl) return;
     if (e.key === 'Enter') { el.value = fmtIn(disp(f, state[k])); el.removeAttribute('aria-invalid'); return; }
     var d = e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : 0; if (!d) return;
     e.preventDefault();
     var cur = parseIn(el.value); if (!isFinite(cur)) cur = disp(f, state[k]);
     var st = f.step || 1, v = clampF(f, Math.round((cur + d * st) / st) * st);
     v = Math.round(v * 1e6) / 1e6;
-    state[k] = disp(f, v); el.value = fmtIn(v); el.removeAttribute('aria-invalid'); edited();
+    state[k] = disp(f, v); el.value = fmtIn(v); el.removeAttribute('aria-invalid'); syncSlider(f); edited();
   });
   groupsEl.addEventListener('click', function(e){
     var b = e.target.closest && e.target.closest('[data-segk]'); if (!b) return;
@@ -1843,7 +1883,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     try {
       var head = ['month','planned_new','guarantees_registered','registrations_refused','refusal','active_guarantees','capital_in','capital_refused_max_tvl','opening_stable_assets','remaining_cover_total','coverage_required','stable_assets','free_capital','stable_minus_coverage_required','guarantee_fees','fee_take','net_fees_to_reserve','claims_paid','claims_over_period_cap','adapter_yield','brs_income','net_gain','redemptions','cumulative_net_gain','cumulative_redemptions','cumulative_fee_take','operating_cost','net_fees_minus_claims','yield_annualized','selic_on_capital','cumulative_selic'];
       var lines = ['# coverage_ratio_bps=' + last.req.cBps + ' starting_capital=' + state.startCapital + ' monthly_raise=' + state.monthlyRaise + ' raise_from=' + state.raiseFrom + ' raise_until=' + (state.raiseUntil > 0 ? state.raiseUntil : last.months) +
-        ' max_tvl=' + state.maxTvl + ' max_cover_per_guarantee=' + state.maxCoverPerGuarantee + ' max_cover_per_agency=' + state.maxCoverPerAgency + ' max_claim_per_call=' + state.maxClaimPerCall + ' max_claim_per_period=' + state.maxClaimPerPeriod + ' min_settlement_bps=' + Math.round((100 - state.maxTesouroSharePct) * 100) + ' adapter_share_wanted_pct=' + state.tesouroSharePct + ' adapter_yield_pct=' + state.tesouroPct + ' issuer_income_pct_tvl=' + (last.brsRate * 100).toFixed(4) + ' issuer_tier=' + last.issuer.tier + (last.issuer.flat ? ' issuer_flat=1' : '') + ' issuer_cdi_pct=' + state.issuerCdiPct + ' fee_take_bps=' + Math.round(last.take * 10000), head.join(',')];
+        ' max_tvl=' + state.maxTvl + ' max_cover_per_guarantee=' + state.maxCoverPerGuarantee + ' max_cover_per_agency=' + state.maxCoverPerAgency + ' max_claim_per_call=' + state.maxClaimPerCall + ' max_claim_per_period=' + state.maxClaimPerPeriod + ' stress_buffer=' + state.stressBuffer + ' min_settlement_bps=' + Math.round((100 - state.maxTesouroSharePct) * 100) + ' adapter_share_wanted_pct=' + state.tesouroSharePct + ' adapter_yield_pct=' + state.tesouroPct + ' issuer_income_pct_tvl=' + (last.brsRate * 100).toFixed(4) + ' issuer_tier=' + last.issuer.tier + (last.issuer.flat ? ' issuer_flat=1' : '') + ' issuer_cdi_pct=' + state.issuerCdiPct + ' fee_take_bps=' + Math.round(last.take * 10000), head.join(',')];
       function num(v){ return (Math.round(v * 10000) / 10000).toString(); }
       last.rows.forEach(function(x){
         lines.push([num(x.month), num(x.planned), num(x.newLeases), x.blocked ? 1 : 0, x.refusal || '', num(x.active), num(x.deposit), num(x.depositRefused), num(x.opening), num(x.remaining), num(x.required), num(x.balance), num(x.surplus), num(x.headroom), num(x.gross), num(x.take), num(x.netFees), num(x.claims), x.overClaimCap ? 1 : 0, num(x.tesouro), num(x.brsIncome), num(x.gain), num(x.withdrawal), num(x.cumGain), num(x.cumW), num(x.cumTake), num(x.opCost), num(x.uw), num(x.yieldAnn), num(x.selicOpp), num(x.cumSelic)].join(','));

@@ -25,6 +25,48 @@ export function fmtUnits(base: bigint, decimals: number, places = 2): string {
 /** BRS amount as reais: `R$ 12,345.67`. */
 export const fmtBrs = (base: bigint, places = 2) => `R$ ${fmtUnits(base, BRS_DECIMALS, places)}`;
 
+/** Scale of an FX rate: BRL per 1 USD × 1e6 (`5_400_000n` = R$5.40 per US$1). */
+export const FX_SCALE = 1_000_000n;
+
+/** BRS base units (at par to BRL) as USD base units (6 decimals), truncated: never shown above its value. */
+export const brsToUsd = (base: bigint, usdBrl: bigint) => (base * FX_SCALE) / usdBrl;
+
+/** A BRS amount in US dollars at `usdBrl`: `US$ 2,285.18`. Display only; the chain holds BRS. */
+export const fmtUsd = (base: bigint, usdBrl: bigint, places = 2) => `US$ ${fmtUnits(brsToUsd(base, usdBrl), BRS_DECIMALS, places)}`;
+
+/**
+ * A rate as BRL per US$1 × FX_SCALE, always a bigint: a scaled bigint passes
+ * through; a plain number or decimal string (`4.9892`) is scaled by 1e6 and
+ * rounded. Null for anything unusable (non-finite, ≤ 0), so a hint is never
+ * computed from a bad rate and bigint math never meets a `number`.
+ */
+export function toScaledRate(rate: unknown): bigint | null {
+  if (typeof rate === "bigint") return rate > 0n ? rate : null;
+  const n = typeof rate === "number" ? rate : typeof rate === "string" ? Number(rate) : NaN;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const scaled = BigInt(Math.round(n * Number(FX_SCALE)));
+  return scaled > 0n ? scaled : null;
+}
+
+/** The small hint after a BRS figure: `≈ US$ 2,285.18`, or `≈ −US$ 4.00` with a sign. Empty without a usable rate. Display only. */
+export function fmtUsdHint(base: bigint, rate: unknown, sign = ""): string {
+  const r = toScaledRate(rate);
+  if (r === null || typeof base !== "bigint") return "";
+  return `≈ ${sign || (base < 0n ? "−" : "")}${fmtUsd(base < 0n ? -base : base, r)}`;
+}
+
+/** An FX `asOf` (ISO, `2026-10-09T13:07:30-03:00`) as the quote's own date, `09/10/2026`. */
+export function fmtFxDate(asOf: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(asOf);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : asOf;
+}
+
+/** The one source line wherever US$ hints show. */
+export function fxSourceLine(fx: { source: string; asOf: string }): string {
+  const src = fx.source === "PTAX/BCB" ? "PTAX (Banco Central do Brasil)" : fx.source;
+  return `US$ at ${src}, ${fmtFxDate(fx.asOf)}. Display only; the reserve holds BRS.`;
+}
+
 /** Reserve shares: `12,345.678901`. */
 export const fmtShares = (base: bigint) => fmtUnits(base, SHARE_DECIMALS, 6);
 
@@ -32,6 +74,12 @@ export const fmtShares = (base: bigint) => fmtUnits(base, SHARE_DECIMALS, 6);
 export function fmtNav(nav: bigint): string {
   if (nav === 0n) return "—";
   return fmtUnits(nav, Number(NAV_SCALE.toString().length - 1), 6);
+}
+
+/** Share price for investor screens: NAV per share with 4 places and its unit, `1.3240 BRS`. `0` (no shares) shows as an em dash. */
+export function fmtSharePrice(nav: bigint): string {
+  if (nav === 0n) return "—";
+  return `${fmtUnits(nav, Number(NAV_SCALE.toString().length - 1), 4)} BRS`;
 }
 
 /** Basis points as a percentage: `2000` → `20.00%`. */
@@ -82,6 +130,31 @@ export function parseBrs(input: string, decimals = BRS_DECIMALS): bigint | null 
   if (f.length > decimals) return null;
   const v = BigInt(w || "0") * 10n ** BigInt(decimals) + BigInt(f.padEnd(decimals, "0") || "0");
   return v > 0n ? v : null;
+}
+
+/**
+ * A cover multiple ("3", "1.15") as hundredths, exactly, with no float (A8:
+ * `Number("1.15") * 100` is 114.999…). Null for invalid or over-precise input.
+ */
+export function parseHundredths(input: string): bigint | null {
+  const t = input.trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  const [w = "0", f = ""] = t.split(".");
+  return BigInt(w) * 100n + BigInt(f.padEnd(2, "0"));
+}
+
+/** Base units as an exact input string (`"1234.5"`): no grouping, trailing zeros trimmed; parseBrs reads it back. */
+export function toInput(base: bigint, decimals = BRS_DECIMALS): string {
+  const scale = 10n ** BigInt(decimals);
+  const f = (base % scale).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return f ? `${base / scale}.${f}` : `${base / scale}`;
+}
+
+/** Like parseBrs, but "0" is a valid amount (price limits: 0 = none). */
+export function parseUnitsOrZero(input: string, decimals = BRS_DECIMALS): bigint | null {
+  const t = input.trim().replace(/,/g, "");
+  if (/^0*\.?0*$/.test(t) && t !== "" && t !== ".") return 0n;
+  return parseBrs(input, decimals);
 }
 
 /** Ratio `a / b` as a percentage with one decimal; `—` when `b` is 0. */

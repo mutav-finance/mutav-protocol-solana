@@ -103,6 +103,10 @@ fn fulfil_deposits_works_in_under_coverage() {
 #[test]
 fn pause_blocks_capital_flows_and_new_guarantees_only() {
     let mut f = Fixture::new();
+    // The claim payment below moves NAV by more than the test bound of 1%;
+    // this test is about pause scope, so the guard takes the devnet value.
+    f.set_config(vec![mutav::ConfigParam::MaxNavMoveBps(10_000)])
+        .unwrap();
     let a = f.investor(40_000 * BRL);
     let list = f.allowlist(&[a.pubkey()]);
     f.deposit(&a, &list, 30_000 * BRL);

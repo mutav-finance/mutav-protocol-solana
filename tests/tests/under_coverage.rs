@@ -8,19 +8,20 @@
 
 use mutav::{
     constants::*,
+    coverage::{nav_per_share, Coverage, CoverageInputs},
     errors::MutavError,
     events::{FulfilHaltCleared, ModeChanged, StateRefreshed},
-    solvency::{nav_per_share, Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
 };
 use mutav_tests::helpers::*;
 
-fn solvency(c: &VaultConfig, s: &VaultState) -> Solvency {
-    Solvency::compute(&SolvencyInputs {
+fn coverage(c: &VaultConfig, s: &VaultState) -> Coverage {
+    Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: c.coverage_ratio_bps,
         provisions: s.provisions,
+        stress_buffer: c.caps.stress_buffer,
     })
     .unwrap()
 }
@@ -81,6 +82,10 @@ fn a_shortfall_switches_mode_and_freezes_the_gated_instructions() {
         redeem,
         ..
     } = book();
+    // The filing below moves NAV by 10%; this test is about the mode, so the
+    // NAV-move guard takes the devnet value before it.
+    f.set_config(vec![mutav::ConfigParam::MaxNavMoveBps(10_000)])
+        .unwrap();
     let c = Claim::on(&g, 3_000 * BRL);
     f.file_claim(c).unwrap();
     // c = 1.6: coverage 32,000 > 30,000.
@@ -134,7 +139,7 @@ fn below_one_a_claim_payment_tips_into_under_coverage_and_is_not_refused() {
             .unwrap();
     }
     // R$90k of cover at c = 0.10: coverage R$9k, free capital R$1k.
-    let sol = solvency(&f.config(), &f.state());
+    let sol = coverage(&f.config(), &f.state());
     assert_eq!(
         (sol.coverage_required, sol.free_capital),
         (9_000 * BRL, 1_000 * BRL)
@@ -144,7 +149,7 @@ fn below_one_a_claim_payment_tips_into_under_coverage_and_is_not_refused() {
     f.file_claim(c).unwrap();
     let meta = f
         .pay_claim(c)
-        .expect("pay_claim is never refused for solvency");
+        .expect("pay_claim is never refused by the coverage gate");
     assert!(
         events::<ModeChanged>(&meta).is_empty(),
         "pay_claim does not switch mode"
@@ -153,7 +158,7 @@ fn below_one_a_claim_payment_tips_into_under_coverage_and_is_not_refused() {
     let s = f.state();
     assert_eq!(s.coverage_required, 8_500 * BRL);
     assert_eq!(s.mode, MODE_NORMAL, "not refreshed yet");
-    assert!(solvency(&f.config(), &s).under_covered());
+    assert!(coverage(&f.config(), &s).under_covered());
 
     let meta = f.refresh().unwrap();
     assert_eq!(f.state().mode, MODE_UNDER_COVERED);
@@ -227,7 +232,7 @@ fn refresh_publishes_the_math_modules_values() {
     set_time(&mut f.svm, 1_760_000_500);
     let meta = f.refresh().expect("any signer");
     let (c, s) = (f.config(), f.state());
-    let sol = solvency(&c, &s);
+    let sol = coverage(&c, &s);
     let nav = nav_per_share(sol.net_assets, s.shares_outstanding).unwrap();
     assert_eq!(s.coverage_required, sol.coverage_required);
     assert_eq!(s.nav_per_share, nav);
@@ -383,11 +388,12 @@ fn admin_clears_the_halt_and_resets_the_baseline() {
     s.provisions += 50 * BRL;
     f.write_state(&s);
     let s = f.state();
-    let sol = Solvency::compute(&SolvencyInputs {
+    let sol = Coverage::compute(&CoverageInputs {
         brs_balance: s.brs_balance,
         remaining_cover_total: s.remaining_cover_total,
         coverage_ratio_bps: f.config().coverage_ratio_bps,
         provisions: s.provisions,
+        stress_buffer: f.config().caps.stress_buffer,
     })
     .unwrap();
     let nav = mutav::pricing::published_nav(sol.net_assets, s.shares_outstanding).unwrap();
@@ -568,11 +574,11 @@ fn a_real_shock_after_an_inflow_and_a_fill_still_halts() {
 }
 
 #[test]
-fn an_inflow_with_no_shares_outstanding_adds_nothing_and_fails_closed() {
-    // Every share redeemed, then a fee: there is no NAV per share to net out,
-    // so the counter stays 0. The next depositor receives the fee (few share
-    // units at a high NAV), and the next refresh measures that NAV in full
-    // against the 1.0 baseline: it halts.
+fn an_inflow_with_no_shares_outstanding_is_refused_and_the_next_supply_starts_clean() {
+    // Every share redeemed: the guard's baseline is cleared with the supply,
+    // a fee is refused until shares exist again (ADR 0023), and the next
+    // first deposit seeds a fresh baseline instead of being measured against
+    // the old holders' NAV.
     let mut f = Fixture::new();
     set_time(&mut f.svm, 1_760_000_000);
     let a = f.investor(1_000 * BRL);
@@ -584,10 +590,18 @@ fn an_inflow_with_no_shares_outstanding_adds_nothing_and_fails_closed() {
     let (r, redeem) = f.request_redeem(&a, &list, 1_000 * BRL);
     r.unwrap();
     f.fulfil_redeems(1, u64::MAX, &[redeem]).expect("fill");
-    assert_eq!(f.state().shares_outstanding, 0);
-    f.contribute(500 * BRL).0.unwrap();
-    assert_eq!(f.state().inflow_nav, 0);
+    let s = f.state();
+    assert_eq!(
+        (s.shares_outstanding, s.nav_per_share, s.inflow_nav),
+        (0, 0, 0)
+    );
+    assert_mutav_err(f.contribute(500 * BRL).0, MutavError::NoSharesOutstanding);
     f.deposit(&b, &list, 1_000 * BRL);
+    assert_eq!(
+        f.state().nav_per_share,
+        NAV_SCALE,
+        "seeded by the new supply"
+    );
     f.refresh().unwrap();
-    assert!(f.state().fulfil_halted, "fails closed");
+    assert!(!f.state().fulfil_halted);
 }

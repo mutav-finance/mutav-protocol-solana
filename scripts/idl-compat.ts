@@ -7,9 +7,15 @@
  *   carved from a trailing `_reserved` with the total size unchanged
  *   (recursively, for nested structs such as `Caps`);
  * - an existing event changed;
- * - an error renumbered, renamed or removed.
+ * - an enum variant reordered, renamed, retyped or removed, wherever the
+ *   enum appears (instruction args such as `ConfigParam` and `Eligibility`,
+ *   account fields, event fields): Borsh encodes a variant by its index, so
+ *   variants are append-only (ADR 0026);
+ * - an error renumbered, renamed or removed, or a new error inserted below
+ *   the last released code.
  *
- * Appending instructions, account types, events and errors is allowed.
+ * Appending instructions, account types, events, errors and enum variants is
+ * allowed (an appended variant inside account data must not change its size).
  *
  *   bun scripts/idl-compat.ts <released-idl.json> <new-idl.json>
  *
@@ -18,7 +24,10 @@
 
 type IdlType = string | { array: [IdlType, number] } | { defined: { name: string } } | { vec: IdlType } | { option: IdlType };
 type Field = { name: string; type: IdlType; docs?: string[] };
-type TypeDef = { name: string; type: { kind: string; fields?: Field[] }; docs?: string[] };
+/** Struct and variant fields are named (`{ name, type }`) or a tuple (`IdlType[]`). */
+type Fields = (Field | IdlType)[];
+type Variant = { name: string; fields?: Fields };
+type TypeDef = { name: string; type: { kind: string; fields?: Fields; variants?: Variant[] }; docs?: string[] };
 type IxAccount = { name: string; writable?: boolean; signer?: boolean; optional?: boolean; [k: string]: unknown };
 
 export type Idl = {
@@ -37,13 +46,45 @@ const PRIMITIVE_SIZE: Record<string, number> = {
 
 const isReserved = (f: Field | undefined) => !!f && f.name.startsWith('_reserved');
 
+/**
+ * A type definition, failing closed on anything this check does not model:
+ * a kind other than struct or enum (e.g. a `type` alias) and generic types.
+ */
 function lookup(idl: Idl, name: string): TypeDef {
   const t = idl.types.find((x) => x.name === name);
   if (!t) throw new Error(`type ${name} missing from IDL`);
+  if (t.type.kind !== 'struct' && t.type.kind !== 'enum') {
+    throw new Error(`type ${name}: kind '${t.type.kind}' is not supported by idl-compat (struct or enum only); extend the check before using it`);
+  }
+  if ('generics' in t && (t as { generics?: unknown[] }).generics?.length) {
+    throw new Error(`type ${name}: generic types are not supported by idl-compat; extend the check before using them`);
+  }
   return t;
 }
 
+/** Refuses type forms the check does not model (`generic`, `coption`, generic `defined` refs, generic array lengths). */
+function assertSupported(t: IdlType) {
+  if (typeof t === 'string') return;
+  const o = t as Record<string, unknown>;
+  if ('generic' in o) throw new Error(`type ${JSON.stringify(t)}: generic parameters are not supported by idl-compat`);
+  if ('coption' in o) throw new Error(`type ${JSON.stringify(t)}: coption is not supported by idl-compat`);
+  if ('defined' in o && (o.defined as { generics?: unknown[] }).generics?.length) {
+    throw new Error(`type ${JSON.stringify(t)}: generic arguments are not supported by idl-compat`);
+  }
+  if ('array' in o && typeof (o.array as unknown[])[1] !== 'number') {
+    throw new Error(`type ${JSON.stringify(t)}: array length must be a number for idl-compat`);
+  }
+  if (!('array' in o) && !('vec' in o) && !('option' in o) && !('defined' in o)) {
+    throw new Error(`type ${JSON.stringify(t)}: not supported by idl-compat`);
+  }
+}
+
+const isNamed = (f: Field | IdlType): f is Field => typeof f === 'object' && 'name' in f && 'type' in f;
+const fieldType = (f: Field | IdlType): IdlType => (isNamed(f) ? f.type : f);
+const fieldsSize = (idl: Idl, fs: Fields | undefined) => (fs ?? []).reduce((n: number, f) => n + sizeOf(idl, fieldType(f)), 0);
+
 function sizeOf(idl: Idl, t: IdlType): number {
+  assertSupported(t);
   if (typeof t === 'string') {
     const s = PRIMITIVE_SIZE[t];
     if (s === undefined) throw new Error(`no fixed size for ${t}`);
@@ -51,23 +92,77 @@ function sizeOf(idl: Idl, t: IdlType): number {
   }
   if ('array' in t) return sizeOf(idl, t.array[0]) * t.array[1];
   if ('defined' in t) {
-    const fields = lookup(idl, t.defined.name).type.fields ?? [];
-    return fields.reduce((n, f) => n + sizeOf(idl, f.type), 0);
+    const d = lookup(idl, t.defined.name).type;
+    // Borsh enum: a u8 variant index, then the largest variant (Anchor InitSpace).
+    if (d.kind === 'enum') return 1 + Math.max(0, ...(d.variants ?? []).map((v) => fieldsSize(idl, v.fields)));
+    return fieldsSize(idl, d.fields);
   }
   throw new Error(`no fixed size for ${JSON.stringify(t)}`);
 }
 
-/** A type with every `defined` reference inlined (docs dropped), for exact comparison. */
+const resolveFields = (idl: Idl, fs: Fields | undefined) =>
+  (fs ?? []).map((f) => (isNamed(f) ? [f.name, resolve(idl, f.type)] : resolve(idl, f)));
+
+/**
+ * A type with every `defined` reference inlined (docs dropped), for exact
+ * comparison. An enum keeps its variants in order, each with its fields.
+ */
 function resolve(idl: Idl, t: IdlType): unknown {
+  assertSupported(t);
   if (typeof t === 'string') return t;
   if ('array' in t) return { array: [resolve(idl, t.array[0]), t.array[1]] };
   if ('vec' in t) return { vec: resolve(idl, t.vec) };
   if ('option' in t) return { option: resolve(idl, t.option) };
   if ('defined' in t) {
     const d = lookup(idl, t.defined.name).type;
-    return { [d.kind]: t.defined.name, fields: (d.fields ?? []).map((f) => [f.name, resolve(idl, f.type)]) };
+    if (d.kind === 'enum') {
+      return { enum: t.defined.name, variants: (d.variants ?? []).map((v) => ({ name: v.name, fields: resolveFields(idl, v.fields) })) };
+    }
+    return { struct: t.defined.name, fields: resolveFields(idl, d.fields) };
   }
-  return t;
+  throw new Error(`type ${JSON.stringify(t)}: not supported by idl-compat`);
+}
+
+type ResolvedEnum = { enum: string; variants: { name: string; fields: unknown[] }[] };
+const isEnum = (x: unknown): x is ResolvedEnum => typeof x === 'object' && x !== null && 'enum' in x && 'variants' in x;
+const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null;
+
+/**
+ * The first incompatibility between two resolved types, or `null`. Exact
+ * equality, except that an enum may gain variants at the end: the released
+ * variants must be a prefix of the new ones, in order, with the same fields.
+ */
+function incompatibility(a: unknown, b: unknown, path: string): string | null {
+  if (isEnum(a) && isEnum(b)) {
+    if (a.enum !== b.enum) return `${path}: enum ${a.enum} -> ${b.enum}`;
+    for (let i = 0; i < a.variants.length; i++) {
+      const va = a.variants[i]!;
+      const vb = b.variants[i];
+      if (!vb) return `${a.enum}::${va.name}: variant ${i} removed (variants are append-only)`;
+      if (va.name !== vb.name) return `${a.enum}: variant ${i} ${va.name} -> ${vb.name} (variants are append-only: never reorder, rename or remove)`;
+      const d = incompatibility(va.fields, vb.fields, `${a.enum}::${va.name}`);
+      if (d) return `${d} (variants are append-only: never retype)`;
+    }
+    return null;
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return `${path}: ${JSON.stringify(a)} -> ${JSON.stringify(b)}`;
+    for (let i = 0; i < a.length; i++) {
+      const d = incompatibility(a[i], b[i], path);
+      if (d) return d;
+    }
+    return null;
+  }
+  if (isObj(a) && isObj(b) && !Array.isArray(a) && !Array.isArray(b)) {
+    const ka = Object.keys(a);
+    if (!same(ka, Object.keys(b))) return `${path}: ${JSON.stringify(a)} -> ${JSON.stringify(b)}`;
+    for (const k of ka) {
+      const d = incompatibility(a[k], b[k], path);
+      if (d) return d;
+    }
+    return null;
+  }
+  return a === b ? null : `${path}: ${JSON.stringify(a)} -> ${JSON.stringify(b)}`;
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -80,19 +175,30 @@ function checkLayout(a: Idl, b: Idl, path: string, ta: IdlType, tb: IdlType, out
       else checkLayout(a, b, `${path}[]`, ta.array[0], tb.array[0], out);
       return;
     }
-    if (!same(resolve(a, ta), resolve(b, tb))) out.push(`${path}: type ${JSON.stringify(ta)} -> ${JSON.stringify(tb)}`);
+    const d = incompatibility(resolve(a, ta), resolve(b, tb), path);
+    if (d) out.push(`${path}: type changed: ${d}`);
     return;
   }
-  if (!('defined' in ta) || !('defined' in tb)) {
-    if (!same(resolve(a, ta), resolve(b, tb))) out.push(`${path}: type changed`);
+  const struct = (idl: Idl, t: IdlType) => typeof t === 'object' && 'defined' in t && lookup(idl, t.defined.name).type.kind === 'struct';
+  if (!('defined' in ta) || !('defined' in tb) || !struct(a, ta) || !struct(b, tb)) {
+    // Enums (append-only variants), vecs, options. A variant appended to an
+    // enum stored in account data is still refused if it grows the account
+    // (the size check of the enclosing struct).
+    const d = incompatibility(resolve(a, ta), resolve(b, tb), path);
+    if (d) out.push(`${path}: type changed: ${d}`);
     return;
   }
   checkStruct(a, b, ta.defined.name, tb.defined.name, out);
 }
 
 function checkStruct(a: Idl, b: Idl, nameA: string, nameB: string, out: string[]) {
-  const fa = lookup(a, nameA).type.fields ?? [];
-  const fb = lookup(b, nameB).type.fields ?? [];
+  const named = (idl: Idl, name: string): Field[] => {
+    const fs = lookup(idl, name).type.fields ?? [];
+    if (!fs.every(isNamed)) throw new Error(`${name}: account structs must have named fields`);
+    return fs;
+  };
+  const fa = named(a, nameA);
+  const fb = named(b, nameB);
   const sa = sizeOf(a, { defined: { name: nameA } });
   const sb = sizeOf(b, { defined: { name: nameB } });
   if (sa !== sb) out.push(`${nameA}: size ${sa} -> ${sb}`);
@@ -113,8 +219,18 @@ function checkStruct(a: Idl, b: Idl, nameA: string, nameB: string, out: string[]
   }
 }
 
-const accountsShape = (xs: IxAccount[]) =>
-  xs.map((x) => ({ name: x.name, writable: !!x.writable, signer: !!x.signer, optional: !!x.optional }));
+/** Account metas, PDA seeds and fixed addresses included: changing either breaks callers. */
+function accountsShape(xs: IxAccount[]): unknown[] {
+  return xs.map((x) => ({
+    name: x.name,
+    writable: !!x.writable,
+    signer: !!x.signer,
+    optional: !!x.optional,
+    address: x.address ?? null,
+    pda: x.pda ?? null,
+    accounts: Array.isArray(x.accounts) ? accountsShape(x.accounts as IxAccount[]) : null,
+  }));
+}
 
 export function compareIdl(prev: Idl, next: Idl): string[] {
   const out: string[] = [];
@@ -129,7 +245,8 @@ export function compareIdl(prev: Idl, next: Idl): string[] {
     if (!same(ix.discriminator, n.discriminator)) out.push(`instruction ${ix.name}: discriminator changed`);
     const argsA = ix.args.map((f) => [f.name, resolve(prev, f.type)]);
     const argsB = n.args.map((f) => [f.name, resolve(next, f.type)]);
-    if (!same(argsA, argsB)) out.push(`instruction ${ix.name}: args changed (add a _v2 instruction)`);
+    const d = incompatibility(argsA, argsB, `${ix.name} args`);
+    if (d) out.push(`instruction ${ix.name}: args changed (add a _v2 instruction): ${d}`);
     if (!same(accountsShape(ix.accounts), accountsShape(n.accounts))) {
       out.push(`instruction ${ix.name}: accounts changed (add a _v2 instruction)`);
     }
@@ -152,14 +269,20 @@ export function compareIdl(prev: Idl, next: Idl): string[] {
       continue;
     }
     if (!same(ev.discriminator, n.discriminator)) out.push(`event ${ev.name}: discriminator changed`);
-    if (!same(resolve(prev, { defined: { name: ev.name } }), resolve(next, { defined: { name: n.name } }))) {
-      out.push(`event ${ev.name}: fields changed (add a new event)`);
-    }
+    const d = incompatibility(resolve(prev, { defined: { name: ev.name } }), resolve(next, { defined: { name: n.name } }), `event ${ev.name}`);
+    if (d) out.push(`event ${ev.name}: fields changed (add a new event): ${d}`);
   }
 
   for (const e of prev.errors) {
     const n = next.errors.find((x) => x.code === e.code);
     if (!n || n.name !== e.name) out.push(`error ${e.code} ${e.name}: renumbered, renamed or removed`);
+  }
+  // Append-only: a new code goes after the last released one, never into a gap.
+  const last = Math.max(-Infinity, ...prev.errors.map((e) => e.code));
+  for (const e of next.errors) {
+    if (!prev.errors.some((x) => x.code === e.code) && e.code < last) {
+      out.push(`error ${e.code} ${e.name}: inserted below the last released code ${last} (errors are append-only)`);
+    }
   }
   return out;
 }

@@ -4,12 +4,14 @@
  *
  *   bun scripts/devnet/deploy.ts --config <deploy.json> --url <rpc> [--confirm-cluster devnet] \
  *     --payer <deployer keypair path, outside the repo, chmod 600> \
- *     --upgrade-authority <upgrade multisig vault> \
+ *     --upgrade-authority <upgrade multisig vault> --expected-hash <sha256> \
  *     [--program-keypair target/deploy/mutav-keypair.json] [--so target/deploy/mutav.so]
  *
  * Before any CLI runs it checks:
  * - the cluster (genesis hash) matches the config's;
  * - the payer file has no group or other permission bits;
+ * - the `.so` is the verified build: its sha256 (trailing zeros trimmed,
+ *   like `solana-verify get-executable-hash`) equals `--expected-hash`;
  * - `--upgrade-authority` equals the config's `upgradeAuthority`, which
  *   equals the vault derived from `upgradeSquads.multisig` + `vaultIndex`
  *   (and `admin` the vault of `squads`), so a typo cannot hand the program
@@ -33,7 +35,7 @@
  * For the real devnet deploy, build with `solana-verify build` first (see
  * .github/workflows/release.yml) so the deployed hash is reproducible.
  */
-import { statSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { address, type Address } from '@solana/kit';
 import { MUTAV_PROGRAM_ADDRESS } from '../../clients/js/src';
@@ -41,6 +43,7 @@ import { assertOutsideRepo, opt, parseArgs, REPO_ROOT, req, type Args } from './
 import { assertConfigCluster, guardCluster, rpcGenesis, type GenesisSource } from './lib/cluster';
 import { programDataUpgradeAuthority } from './lib/checks';
 import { programDataAddress } from './lib/compose';
+import { executableHash, parseExpectedHash } from './lib/hash';
 import { loadConfig, type DeployConfig } from './lib/config';
 import { run } from './lib/exec';
 import { accountInfo, rpcFor, type ReadOptions } from './lib/rpc';
@@ -51,9 +54,11 @@ export type DeployDeps = {
   genesis: GenesisSource;
   account: (url: string, a: Address, o?: ReadOptions) => Promise<{ owner: Address; data: Uint8Array } | null>;
   sleep: (ms: number) => Promise<void>;
+  readSo: (path: string) => Uint8Array;
 };
 
 const defaultDeps: DeployDeps = {
+  readSo: (p) => readFileSync(p),
   run,
   genesis: rpcGenesis,
   account: (url, a, o) => accountInfo(rpcFor(url), a, o),
@@ -74,6 +79,11 @@ export type DeployOptions = {
   programKeypair?: string;
   so?: string;
   upgradeAuthority: string;
+  /**
+   * `solana-verify get-executable-hash` of the verified build; the `.so` must
+   * match it. Required unless `localStandIn`.
+   */
+  expectedHash?: string;
   cfg: DeployConfig;
   /**
    * Local only (dry run, fork test): the config's vaults are throwaway
@@ -115,6 +125,12 @@ export async function deploy(o: DeployOptions, deps: DeployDeps = defaultDeps): 
   assertOwnerOnly(payer, '--payer');
   const programKeypair = assertOutsideRepo(o.programKeypair ?? join(REPO_ROOT, 'target', 'deploy', 'mutav-keypair.json'), '--program-keypair');
   const so = o.so ?? join(REPO_ROOT, 'target', 'deploy', 'mutav.so');
+  if (o.expectedHash === undefined && !o.localStandIn) throw new Error('--expected-hash is required: deploy only the verified build');
+  if (o.expectedHash !== undefined) {
+    const want = parseExpectedHash(o.expectedHash);
+    const got = executableHash(deps.readSo(so));
+    if (got !== want) throw new Error(`refusing to deploy ${so}: its executable hash is ${got}, expected ${want} (solana-verify get-executable-hash)`);
+  }
 
   const authority = address(o.upgradeAuthority);
   if (authority !== cfg.upgradeAuthority) {
@@ -198,6 +214,7 @@ export async function main(args: Args) {
     programKeypair: opt(args, 'program-keypair'),
     so: opt(args, 'so'),
     upgradeAuthority: req(args, 'upgrade-authority'),
+    expectedHash: parseExpectedHash(opt(args, 'expected-hash')),
     cfg: loadConfig(req(args, 'config')),
   });
 }

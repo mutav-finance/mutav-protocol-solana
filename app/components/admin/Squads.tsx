@@ -1,8 +1,10 @@
 "use client";
 
 /**
- * The Squads v4 multisig behind the Reserve Admin: its status, time lock and
- * recent proposals, with approve and execute from the member's own wallet.
+ * The Squads v4 multisig behind the Reserve Admin: its status, time lock,
+ * every live proposal and the last finished ones, with approve, reject,
+ * cancel and execute from the member's own wallet (A3). Execute refuses a
+ * set_config built against values that have moved since (stale carry).
  */
 import { useEffect, useState } from "react";
 import { ReadError } from "@/components/Section";
@@ -16,7 +18,7 @@ import { Note } from "@/components/demo/shared";
 import { postJson } from "@/lib/client/api";
 import { useTx } from "@/lib/client/use-tx";
 import { fmtDuration, fmtTime } from "@/lib/format";
-import type { ConfigChange } from "@/lib/config-diff";
+import { SQUADS_CONFIG_CHANGE, type DecodedInstruction } from "@/lib/proposal-decode";
 
 export type ProposalView = {
   index: bigint;
@@ -26,11 +28,15 @@ export type ProposalView = {
   statusAt: bigint | null;
   approvals: string[];
   rejections: string[];
+  cancellations: string[];
+  stale: boolean;
   executable: boolean;
   executableAt: bigint | null;
   instructions: string[];
-  /** For a set_config inside: the fields it changes against on-chain config now. */
-  changes?: ConfigChange[];
+  /** Every instruction decoded: arguments, checks against the chain now, red flags. */
+  decoded: DecodedInstruction[];
+  /** Program ids of foreign (non-MUTAV, non-Compute Budget) instructions. */
+  foreign: string[];
 };
 export type SquadsResp =
   | { configured: false; admin: string; cluster: string }
@@ -51,39 +57,87 @@ function useNow(serverNow: bigint | null) {
   return now;
 }
 
+type Act = "approve" | "reject" | "cancel" | "execute";
+
+const isConfigChange = (p: ProposalView) => p.decoded.some((d) => d.name === SQUADS_CONFIG_CHANGE);
+
+/** What the vault transaction will do: each instruction, its decoded arguments and red flags (A3). */
+function ProposalInstructions({ p }: { p: ProposalView }) {
+  if (p.decoded.length === 0) return <Mono style={{ fontSize: 12 }}>{p.instructions.join(", ") || "—"}</Mono>;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {p.foreign.length > 0 && <StatusBadge bordered color="var(--color-error)" label={isConfigChange(p) ? "SQUADS CONFIG CHANGE" : "FOREIGN INSTRUCTION"} />}
+      <ol aria-label={`instructions in proposal ${p.index}`} style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
+        {p.decoded.map((d, k) => (
+          <li key={k}>
+            {d.program === "foreign" ? (
+              <Mono style={{ fontSize: 12, color: "var(--color-error)" }}>{d.name} · program {d.programId}</Mono>
+            ) : (
+              <Mono style={{ fontSize: 12 }}>{d.name}</Mono>
+            )}
+            {d.details.length > 0 && (
+              <ul className="font-mono" style={{ margin: "2px 0 0", paddingLeft: 14, fontSize: 11, color: "var(--color-text-2)", listStyle: "square", overflowWrap: "anywhere" }}>
+                {d.details.map((x, j) => (
+                  <li key={j} style={x.warn ? { color: "var(--color-error)" } : undefined}>
+                    {x.label}: {x.value}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold: number; now: bigint; onDone: () => void }) {
   const { address } = useWallet();
-  const approve = useTx(onDone);
-  const execute = useTx(onDone);
+  const tx = useTx(onDone);
+  const [last, setLast] = useState<Act | null>(null);
   const left = p.executableAt !== null ? p.executableAt - now : null;
-  const status = p.status === "Approved" ? (left !== null && left <= 0n ? "Executable" : "Approved · time lock") : p.status;
-  const send = (action: "approve" | "execute", t: ReturnType<typeof useTx>) =>
-    t.runWith(() => postJson<{ tx: string }>("/api/squads", { action, index: p.index, member: address }));
+  const voted = !!address && (p.approvals.includes(address) || p.rejections.includes(address));
+  const status =
+    p.status === "Approved" ? (left !== null && left <= 0n ? "Executable" : "Approved · time lock") : p.stale && (p.status === "Active" || p.status === "Draft") ? `${p.status} · stale` : p.status;
+  const send = (action: Act) => {
+    setLast(action);
+    return tx.runWith(() => postJson<{ tx: string }>("/api/squads", { action, index: p.index, member: address }));
+  };
+  const busy = !["idle", "confirmed", "failed"].includes(tx.state.phase);
+  const canVote = p.status === "Active" && !p.stale && !!address && !voted;
+  const canCancel = p.status === "Approved" && !!address && !p.cancellations.includes(address);
+  const canExecute = p.status === "Approved" && left !== null && left <= 0n && !!address;
   return (
     <tr>
       <td className="num"><Mono>#{p.index.toString()}</Mono></td>
       <td style={{ whiteSpace: "normal" }}>
-        <Mono style={{ fontSize: 12 }}>{p.instructions.join(", ") || "—"}</Mono>
-        {p.changes && (
-          <ul aria-label={`set_config changes in proposal ${p.index}`} className="font-mono" style={{ margin: "4px 0 0", paddingLeft: 14, fontSize: 11, color: "var(--color-text-2)", listStyle: "square" }}>
-            {p.changes.length === 0 ? <li>no field differs from on-chain now</li> : p.changes.map((c) => <li key={c.field}>{c.field}: {c.from} → {c.to}</li>)}
-          </ul>
-        )}
+        <ProposalInstructions p={p} />
       </td>
       <td><Mono style={{ color: status === "Executed" ? "var(--color-success)" : status === "Executable" ? "var(--color-accent)" : "var(--color-text-2)" }}>{status}</Mono></td>
-      <td className="num"><Mono>{p.approvals.length}/{threshold}</Mono></td>
+      <td className="num">
+        <Mono>{p.approvals.length}/{threshold}</Mono>
+        {p.rejections.length > 0 && <Mono dim> · {p.rejections.length} rejected</Mono>}
+        {p.cancellations.length > 0 && <Mono dim> · {p.cancellations.length} to cancel</Mono>}
+      </td>
       <td><Mono dim>{left === null ? "—" : left > 0n ? `${fmtDuration(left)} left` : `since ${fmtTime(p.executableAt!)}`}</Mono></td>
       <td style={{ whiteSpace: "normal" }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          {p.status === "Active" && address && !p.approvals.includes(address) && (
-            <Button size="sm" variant="outline" onClick={() => send("approve", approve)}>Approve</Button>
-          )}
-          {p.status === "Approved" && left !== null && left <= 0n && address && (
-            <Button size="sm" onClick={() => send("execute", execute)}>Execute</Button>
-          )}
+        {(canVote || canExecute) && p.foreign.length > 0 && (
+          <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>
+            {isConfigChange(p)
+              ? "Squads config change: members/threshold — review in the Squads UI."
+              : `Foreign instruction (${p.foreign.join(", ")}): the vault would sign it. Approve only if you know what it does.`}
+          </Mono>
+        )}
+        {(canVote || canExecute) && p.foreign.length === 0 && p.decoded.some((d) => d.details.some((x) => x.warn)) && (
+          <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>Red flags above: read them before approving.</Mono>
+        )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("approve")}>Approve</Button>}
+          {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("reject")}>Reject</Button>}
+          {canExecute && <Button size="sm" disabled={busy} onClick={() => send("execute")}>Execute</Button>}
+          {canCancel && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("cancel")} title="Approved proposals: threshold cancel votes make it Cancelled">Cancel</Button>}
         </div>
-        <TxStatus state={approve.state} showAccounts={false} />
-        <TxStatus state={execute.state} showAccounts={false} />
+        {last && <TxStatus state={tx.state} showAccounts={false} />}
       </td>
       <td><Explorer value={p.proposal} /></td>
     </tr>
@@ -115,7 +169,7 @@ export function SquadsPanel({ sq, error, onDone }: { sq: SquadsResp | null; erro
         </Mono>
       </div>
       {ms.proposals.length === 0 ? (
-        <Note>No proposals yet.</Note>
+        <Note>No live proposal, and none finished recently.</Note>
       ) : (
         <div className="table-wrap">
           <table className="data-table" aria-label="Squads proposals">

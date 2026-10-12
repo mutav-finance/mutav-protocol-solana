@@ -37,9 +37,9 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from "@mutav-finance/mutav-protocol-solana";
 import { readReserve } from "../lib/server/chain";
-import { composeInstructions } from "../lib/server/compose";
+import { composeInstructions, withComputeUnitLimit } from "../lib/server/compose";
 import { serverEnv } from "../lib/server/env";
-import { REF } from "../lib/refs";
+import { randomRef, REF } from "../lib/refs";
 import { fromHex } from "../lib/serde";
 import type { TxRequest } from "../lib/tx-kinds";
 import { assertLocal, defaultKeysDir, localKeys, protocolLib, signAndSend, type Role } from "./lib/local";
@@ -56,6 +56,8 @@ export type SeedResult = {
   keysDir: string;
   keys: Record<Role, { path: string; address: string }>;
   operator: string;
+  /** What the operator keeps off-chain: agency label → opaque id, lease → refs_hash salt. */
+  operatorRefs: { agencyIds: Record<string, string>; refsSalts: Record<string, string> };
 };
 
 export function appEnv(url: string, config?: string, allowlist: string[] = []) {
@@ -72,7 +74,7 @@ export function appEnv(url: string, config?: string, allowlist: string[] = []) {
 async function act(url: string, config: string, allowlist: string[], signer: KeyPairSigner, req: TxRequest, label: string) {
   const env = appEnv(url, config, allowlist);
   const reserve = await readReserve(env);
-  const ixs = await composeInstructions(req, signer.address, { reserve, allowlist, env });
+  const ixs = withComputeUnitLimit(req, await composeInstructions(req, signer.address, { reserve, allowlist, env }));
   const sig = await signAndSend(createSolanaRpc(url), signer.address, [signer], ixs);
   log(`${label} (${sig.slice(0, 10)}…)`);
   return sig;
@@ -110,7 +112,10 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     programId: MUTAV_PROGRAM_ADDRESS,
     reserveMint: mint,
     reserveTokenProgram: p.TOKEN_PROGRAM,
-    squads: { multisig: s("deployer").address, vaultIndex: 0, timeLockFloorSecs: 0 },
+    // Localnet: one throwaway key stands in for both multisigs (the admin
+    // signs directly); the parser needs their members and threshold.
+    squads: { multisig: s("deployer").address, vaultIndex: 0, members: [s("admin").address], threshold: 1, timeLockFloorSecs: 0 },
+    upgradeSquads: { multisig: s("deployer").address, vaultIndex: 0, members: [s("admin").address], threshold: 1, timeLockFloorSecs: 0 },
     admin: s("admin").address,
     upgradeAuthority: s("admin").address,
     operator: s("operator").address,
@@ -133,7 +138,10 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     },
     allowlist,
   });
-  await p.send(rpc, s("admin"), [await p.composeInitialize(cfg, { upgradeAuthority: s("admin"), payer: s("admin") })]);
+  await p.send(rpc, s("admin"), [
+    p.setComputeUnitLimitInstruction(p.INITIALIZE_COMPUTE_UNIT_LIMIT),
+    await p.composeInitialize(cfg, { upgradeAuthority: s("admin"), payer: s("admin") }),
+  ]);
   const tree = await buildAllowlist(allowlist);
   await p.send(rpc, s("admin"), [await p.composeSetAllowlistRoot(cfg, tree.root, s("admin"))]);
   const config = (await findReserveAddresses(mint)).config;
@@ -146,14 +154,21 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   await go("capital", { kind: "claim_shares", seq: 0n }, "claim_shares");
 
   console.log("\n== seed: three guarantees");
+  // Opaque random agency ids, held by the operator (here, this run).
+  // Opaque agency ids and refs-hash salts, kept by the operator (here, for
+  // this run, returned in the seed result) so each refs_hash can be re-checked.
+  const agencyIds = new Map<string, string>();
+  const agencyId = (agency: string) => agencyIds.get(agency) ?? (agencyIds.set(agency, randomRef()), agencyIds.get(agency)!);
+  const refsSalts = new Map<string, string>();
+  const refsSalt = (lease: string) => refsSalts.get(lease) ?? (refsSalts.set(lease, randomRef()), refsSalts.get(lease)!);
   const lease = async (leaseLabel: string, agency: string, rent: bigint) =>
     go(
       "operator",
       {
         kind: "register_guarantee",
         id: await REF.guaranteeId(leaseLabel),
-        agencyId: await REF.agencyId(agency),
-        refsHash: await REF.refsHash(leaseLabel),
+        agencyId: agencyId(agency),
+        refsHash: await REF.refsHash(leaseLabel, refsSalt(leaseLabel)),
         defaultCover: 3n * rent * BRL,
         exitCover: rent * BRL,
       },
@@ -202,7 +217,7 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
   await go("pauser", { kind: "refresh" }, "refresh (publish NAV, coverage and mode)");
 
   const keys = Object.fromEntries(Object.entries(k).map(([r, v]) => [r, { path: v.path, address: v.signer.address }])) as unknown as SeedResult["keys"];
-  return { url, programId: MUTAV_PROGRAM_ADDRESS, config, reserveMint: mint, allowlist, keysDir, keys, operator };
+  return { url, programId: MUTAV_PROGRAM_ADDRESS, config, reserveMint: mint, allowlist, keysDir, keys, operator, operatorRefs: { agencyIds: Object.fromEntries(agencyIds), refsSalts: Object.fromEntries(refsSalts) } };
 }
 
 /**

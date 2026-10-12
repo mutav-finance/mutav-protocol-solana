@@ -6,12 +6,12 @@
  * wallet; later mutav-app's backend sends the same instructions with a
  * KMS-held key. Anyone can read the page; actions are enabled only when the
  * connected wallet is VaultConfig.operator. The wallet signs; nothing here
- * holds a key (compose → wallet → /api/tx/send, as everywhere in the app).
+ * holds a key (compose → the wallet signs and sends, as everywhere in the app).
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Page, ReadError, Section } from "@/components/Section";
-import { ClaimCapChart, ClaimSpeedChart, SolvencyChart } from "@/components/charts/Charts";
+import { ClaimCapChart, ClaimSpeedChart, CoverageChart } from "@/components/charts/Charts";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { RefreshButton } from "@/components/RefreshButton";
@@ -25,7 +25,7 @@ import { usePoll } from "@/lib/client/use-poll";
 import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
 import { claimCap, claimCapRefusal, claimWork, DUTIES } from "@/lib/operator";
 import type { OperatorHistory } from "@/lib/server/operator";
-import { claimsTimeline, type Ledger, type ReserveView } from "@/lib/view";
+import { claimsTimeline, isUnpaid, type Ledger, type ReserveView } from "@/lib/view";
 
 const REVOKED = "11111111111111111111111111111111";
 
@@ -78,7 +78,7 @@ function Who({ r, history }: { r: ReserveView; history: OperatorHistory | null }
 
 function Bound({ children }: { children: ReactNode }) {
   return (
-    <div style={{ border: "1px dashed var(--color-border-input)", padding: "10px 12px", margin: "12px 0 4px", display: "flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ border: "1px solid var(--color-border-input)", padding: "10px 12px", margin: "12px 0 4px", display: "flex", flexDirection: "column", gap: 4 }}>
       <span className="font-mono" style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-3)" }}>Bound before you sign · on-chain</span>
       <div className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)", lineHeight: 1.6 }}>{children}</div>
     </div>
@@ -95,14 +95,14 @@ const kv = (k: string, v: ReactNode) => (
 function PayBound() {
   const { reserve, ledger } = useLive();
   const cap = claimCap(reserve.config, reserve.state, reserve.now);
-  const filed = claimsTimeline(ledger).filter((c) => c.stage === "filed");
+  const filed = claimsTimeline(ledger).filter((c) => isUnpaid(c.stage));
   return (
     <Bound>
       {kv("Max per call", fmtBrs(cap.perCall))}
       {kv("Left in the last 31 days", `${fmtBrs(cap.remaining)} of ${fmtBrs(cap.perPeriod)}`)}
       {kv("Liquid BRS in the reserve", fmtBrs(reserve.state.brsBalance))}
       {filed.map((c) => {
-        const refusal = claimCapRefusal(cap, c.provision);
+        const refusal = claimCapRefusal(cap, c.provision, c.approvedAmount);
         return kv(`PREVIEW · ${c.guaranteeId.slice(0, 8)}… ${fmtBrs(c.provision, 0)}`, <span style={{ color: refusal ? "var(--color-error)" : "var(--color-success)" }}>{refusal ? `refused: ${refusal}` : "within the caps"}</span>);
       })}
       <span>Never gated by required coverage: under-coverage does not stop a claim payment. The destination is fixed to the payments account.</span>
@@ -127,7 +127,7 @@ function RegisterBound() {
   const c = reserve.config.caps;
   return (
     <Bound>
-      {kv("Free capital (new cover must fit)", fmtBrs(reserve.solvency.freeCapital))}
+      {kv("Free capital (new cover must fit)", fmtBrs(reserve.coverage.freeCapital))}
       {kv("Max cover per guarantee", fmtBrs(c.maxCoverPerGuarantee, 0))}
       {kv("Coverage ratio", fmtBps(reserve.config.coverageRatioBps))}
       <span>Refused while paused or under-covered. The gate preview below replays the rules with the client&apos;s math mirror.</span>
@@ -204,7 +204,7 @@ function Console({ locked }: { locked: boolean }) {
 // ── Live limits, duties, activity, safety ───────────────────────────────────
 
 function Limits({ r, l }: { r: ReserveView; l: Ledger }) {
-  const rows = claimsTimeline(l);
+  const rows = claimsTimeline(l, r.config.caps.maxClaimPerCall);
   const work = claimWork(rows);
   const open = rows.filter((c) => c.stage !== "settled");
   return (
@@ -216,10 +216,10 @@ function Limits({ r, l }: { r: ReserveView; l: Ledger }) {
         <ClaimCapChart cap={claimCap(r.config, r.state, r.now)} />
         <div style={{ border: "1px solid var(--color-border)", background: "var(--color-surface)", padding: "14px 16px" }}>
           <p className="font-body" style={{ fontSize: 13, fontWeight: 600, margin: "0 0 12px" }}>Room for new guarantees</p>
-          <SolvencyChart s={r.solvency} ratioBps={r.config.coverageRatioBps} compact />
+          <CoverageChart s={r.coverage} ratioBps={r.config.coverageRatioBps} compact />
         </div>
       </div>
-      {open.length > 0 ? <ClaimSpeedChart rows={open} now={r.now} /> : <Note>No claim is waiting for the operator. Settled claims are on <Link href="/reserve#claims" className="ext-link">/reserve</Link>.</Note>}
+      {open.length > 0 ? <ClaimSpeedChart rows={open} now={r.now} /> : <Note>No claim is waiting for the operator. Settled claims are on <Link href="/reserve/claims" className="ext-link">/reserve/claims</Link>.</Note>}
     </div>
   );
 }
@@ -330,6 +330,11 @@ export function OperatorPage() {
           </Section>
           <Section id="console" title="Console" kicker={locked ? "Read-only" : "Operator wallet connected"} roles={<RoleLine items={[{ role: "operator", prefix: "every action signed by" }]}>The program checks the signer; the wallet signs; the app holds no key.</RoleLine>}>
             {locked && <Note tone="warn">Read-only: connect the operator wallet to act. The forms stay visible so anyone can see what the operator can do.</Note>}
+            {d && address && address === d.reserve.config.pendingOperator && (
+              <Note tone="ok">
+                This wallet is the proposed operator key: take the role with accept_role on <Link href="/admin#general-handovers" className="ext-link">/admin → Pending handovers</Link> (ADR 0020).
+              </Note>
+            )}
             <Console locked={locked} />
             <Note>
               For the six-step story with the gate refusal, see the <Link href="/demo" className="ext-link">guided demo</Link>.

@@ -97,4 +97,10 @@ pub enum MutavError {
     RefreshRequired,
     #[msg("The head request's price limit is not met")]
     PriceLimitNotMet,
+    #[msg("NAV per share is below the smallest published unit while shares are outstanding")]
+    ReserveUnderwater,
+    #[msg("No shares are outstanding")]
+    NoSharesOutstanding,
+    #[msg("The claim filing changed since the approval was proposed")]
+    ClaimRevisionMismatch,
 }

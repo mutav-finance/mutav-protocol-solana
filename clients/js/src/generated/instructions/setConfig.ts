@@ -147,11 +147,16 @@ export type SetConfigAsyncInput<
 > = {
   admin: TAccountAdmin;
   config: TAccountConfig;
-  /** Its cached `coverage_required` follows a change of `c`. */
+  /**
+   * Its cached `coverage_required` follows a change of `c` or
+   * `stress_buffer`.
+   */
   state?: TAccountState;
   /**
    * The current treasury token account, to check the money flows of the
-   * resulting config (spec §2.1).
+   * resulting config (spec §2.1). Read leniently in the handler
+   * (`load_money_account`): a closed account is skipped, so it never
+   * blocks a config change.
    */
   treasuryAccount: TAccountTreasuryAccount;
   /** The current payments token account, likewise. */
@@ -328,11 +333,16 @@ export type SetConfigInput<
 > = {
   admin: TAccountAdmin;
   config: TAccountConfig;
-  /** Its cached `coverage_required` follows a change of `c`. */
+  /**
+   * Its cached `coverage_required` follows a change of `c` or
+   * `stress_buffer`.
+   */
   state: TAccountState;
   /**
    * The current treasury token account, to check the money flows of the
-   * resulting config (spec §2.1).
+   * resulting config (spec §2.1). Read leniently in the handler
+   * (`load_money_account`): a closed account is skipped, so it never
+   * blocks a config change.
    */
   treasuryAccount: TAccountTreasuryAccount;
   /** The current payments token account, likewise. */
@@ -488,11 +498,16 @@ export type ParsedSetConfigInstruction<
   accounts: {
     admin: TAccountMetas[0];
     config: TAccountMetas[1];
-    /** Its cached `coverage_required` follows a change of `c`. */
+    /**
+     * Its cached `coverage_required` follows a change of `c` or
+     * `stress_buffer`.
+     */
     state: TAccountMetas[2];
     /**
      * The current treasury token account, to check the money flows of the
-     * resulting config (spec §2.1).
+     * resulting config (spec §2.1). Read leniently in the handler
+     * (`load_money_account`): a closed account is skipped, so it never
+     * blocks a config change.
      */
     treasuryAccount: TAccountMetas[3];
     /** The current payments token account, likewise. */

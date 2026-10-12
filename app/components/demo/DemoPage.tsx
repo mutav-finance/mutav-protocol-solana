@@ -57,11 +57,11 @@ function Ticker({ r }: { r: ReserveView }) {
   const s = r.state;
   return (
     <div className="grid-metrics" data-testid="demo-ticker">
-      <MetricCard dense label="Stable assets" value={fmtBrs(r.solvency.stableAssets)} />
-      <MetricCard dense label="Coverage required" value={fmtBrs(r.solvency.coverageRequired)} />
-      <MetricCard dense label="Free capital" value={fmtBrs(r.solvency.freeCapital)} />
+      <MetricCard dense label="Stable assets" value={fmtBrs(r.coverage.stableAssets)} />
+      <MetricCard dense label="Coverage required" value={fmtBrs(r.coverage.coverageRequired)} />
+      <MetricCard dense label="Free capital" value={fmtBrs(r.coverage.freeCapital)} />
       <MetricCard dense label="Provisions" value={fmtBrs(s.provisions)} />
-      <MetricCard dense label="NAV (from accounts)" value={fmtNav(navPerShare(r.solvency.netAssets, s.sharesOutstanding))} />
+      <MetricCard dense label="NAV (from accounts)" value={fmtNav(navPerShare(r.coverage.netAssets, s.sharesOutstanding))} />
       <MetricCard dense label="Mode" value={MODE_LABEL(s.mode)} />
     </div>
   );
@@ -110,7 +110,7 @@ export function DemoPage() {
 
           <Section id="guided" title="Guided demo" kicker="Six steps" roles={<RoleLegend />}>
             <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <Step n={1} title="Capital in" instruction="request_deposit → fulfil_deposits → claim_shares" roles={["investor", "admin"]} why={<>The Investor (in this pilot, MUTAV&apos;s allowlisted capital wallet) requests a deposit. It waits in the FIFO queue until the Reserve Admin multisig fulfils it at the NAV of that moment; then the Investor claims its shares. MUTAV&apos;s capital takes the same path as any allowlisted investor: no special door.</>}>
+              <Step n={1} title="Capital in" instruction="request_deposit → fulfil_deposits → claim_shares" roles={["investor", "admin"]} why={<>The Investor (an allowlisted capital wallet) requests a deposit. It waits in the FIFO queue until the Reserve Admin multisig fulfils it at the NAV of that moment; then the Investor claims its shares. MUTAV&apos;s capital takes the same path as any allowlisted capital provider: no special door.</>}>
                 <Sub title="a. Request" role="investor"><DepositForm /></Sub>
                 <Sub title="b. Fulfil" role="admin">
                   <PendingDeposits />
@@ -147,7 +147,7 @@ export function DemoPage() {
 
               <Step n={6} title="Settle by PIX" instruction="settle_payout" roles={["operator"]} why={<>MUTAV offramps the BRS and pays the agency by PIX, then records the hash of the PIX end-to-end id on-chain. The claims timeline on /reserve now shows filed → paid → settled, each with its on-chain timestamp, and flags any settlement past the SLA.</>}>
                 <SettleList />
-                <Note><Link href="/reserve#claims" className="ext-link">Open the claims timeline →</Link></Note>
+                <Note><Link href="/reserve/claims" className="ext-link">Open the claims timeline →</Link></Note>
               </Step>
             </div>
           </Section>
@@ -160,7 +160,7 @@ export function DemoPage() {
 
           <Section id="investor" title="Investor actions" kicker="Elsewhere" roles={<RoleTag role="investor" bordered />}>
             <Note>
-              Deposits, redemptions, cancels and claims, with the wallet&apos;s allowlist status and position, are on <Link href="/investor" className="ext-link">/investor</Link>. Requests need an allowlisted wallet; in the pilot, MUTAV&apos;s capital wallet.
+              Deposits, redemptions, cancels and claims are on <Link href="/capital" className="ext-link">/capital</Link>. Deposits need an allowlisted wallet; holders can always redeem.
             </Note>
           </Section>
 

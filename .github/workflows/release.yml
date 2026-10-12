@@ -46,6 +46,12 @@ env:
   SOLANA_VERSION: "4.1.2"
   ANCHOR_VERSION: "1.2.0"
   SOLANA_VERIFY_VERSION: "0.5.2"
+  # Verified-build image for SOLANA_VERSION, pinned by digest (the same digest
+  # solana-verify 0.5.2 maps to 4.1.2). Without --base-image, solana-verify
+  # picks the image from the solana-program crate in Cargo.lock (3.0.x), whose
+  # Cargo predates edition 2024 and cannot parse cpufeatures 0.3.1 (#66).
+  # Anyone reproducing the hash must pass the same --base-image.
+  VERIFY_BASE_IMAGE: "solanafoundation/solana-verifiable-build:4.1.2@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f"
   PROGRAM_ID: "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9"
   NO_DNA: "1"
 
@@ -75,12 +81,17 @@ jobs:
 
       # 1. Verified build (Docker) and executable hash.
       - name: solana-verify build
-        run: solana-verify build --library-name mutav
+        # The container writes target/ as root; hand it back to the runner
+        # user so the IDL build below can write target/debug.
+        run: |
+          solana-verify build --library-name mutav --base-image "${VERIFY_BASE_IMAGE}"
+          sudo chown -R "$(id -u):$(id -g)" target
 
       - name: Executable hash
         id: hash
         run: |
           hash="$(solana-verify get-executable-hash target/deploy/mutav.so)"
+          echo "Executable hash: ${hash}"
           echo "hash=${hash}" >> "$GITHUB_OUTPUT"
           echo "${hash}" > mutav.hash
           printf '### Executable hash\n`%s` (ref `%s`, commit `%s`)\n' "${hash}" "${{ inputs.ref }}" "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
@@ -207,7 +218,7 @@ jobs:
           bun scripts/release/upgrade-proposal.ts --url "$RELEASE_RPC" --confirm-cluster "${{ inputs.cluster }}" \
             --program "$PROGRAM_ID" --buffer "${{ steps.buffer.outputs.buffer }}" \
             --multisig "$MULTISIG" --vault-index "$VAULT_INDEX" \
-            --so release/mutav.so --out upgrade-proposal.json
+            --expected-hash "${{ needs.build.outputs.hash }}" --out upgrade-proposal.json
 
       # 5. Verify-PDA write, exported for the same vault transaction.
       - name: Verify-PDA transaction
@@ -215,7 +226,8 @@ jobs:
         run: |
           solana-verify export-pda-tx "https://github.com/${{ github.repository }}" \
             --program-id "$PROGRAM_ID" --uploader "${{ steps.vault.outputs.vault }}" \
-            --library-name mutav --commit-hash "$(git rev-parse HEAD)" --encoding base58 \
+            --library-name mutav --base-image "${VERIFY_BASE_IMAGE}" \
+            --commit-hash "$(git rev-parse HEAD)" --encoding base58 \
             --url "$RELEASE_RPC" > verify-pda-tx.b58
 
       - name: Remove the payer key

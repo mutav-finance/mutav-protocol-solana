@@ -6,29 +6,29 @@
 //! `max_claim_per_period ≥ max_claim_per_call` holds whichever fields a
 //! proposal touches. A refusal reverts every param of the call.
 //!
-//! A change of a field that moves the solvency figures or the NAV-move
+//! A change of a field that moves the coverage figures or the NAV-move
 //! guard (`coverage_ratio_bps`, `max_nav_move_bps`, `stress_buffer`) needs a
 //! `refresh` in the same slot first (`RefreshRequired`): `/admin` puts the
 //! `refresh` in the same transaction, so the change applies to the state
 //! the admin saw and the guard's baseline is current.
 //!
-//! Also recomputes the cached `VaultState.coverage_required` when the
-//! coverage ratio `c` changes (#29), so readers of the cache see the new `c`
-//! at once. `mode` stays `refresh`'s: it needs the bounded price and emits
+//! Also recomputes the cached `VaultState.coverage_required` with the
+//! resulting `c` and `stress_buffer` (#29, ADR 0022), so readers of the cache
+//! see the new values at once. `mode` stays `refresh`'s: it needs the bounded price and emits
 //! `ModeChanged`. Every gate recomputes both, so neither cache is a safety
 //! input.
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
     constants::{field, CONFIG_SEED, MAX_CONFIG_PARAMS, STATE_SEED},
+    coverage::coverage_required,
     errors::MutavError,
     events::{emit_config_changes, ConfigChanges},
     instructions::admin::{
-        validate_config, validate_money_accounts, vault_authority_key, Installing,
+        load_money_account, validate_config, validate_money_accounts, vault_authority_key,
+        Installing, Money,
     },
-    solvency::coverage_required,
     state::{VaultConfig, VaultState},
 };
 
@@ -121,7 +121,8 @@ pub struct SetConfig<'info> {
     )]
     pub config: Box<Account<'info, VaultConfig>>,
 
-    /// Its cached `coverage_required` follows a change of `c`.
+    /// Its cached `coverage_required` follows a change of `c` or
+    /// `stress_buffer`.
     #[account(
         mut,
         seeds = [STATE_SEED, config.key().as_ref()],
@@ -131,13 +132,17 @@ pub struct SetConfig<'info> {
     pub state: Box<Account<'info, VaultState>>,
 
     /// The current treasury token account, to check the money flows of the
-    /// resulting config (spec §2.1).
+    /// resulting config (spec §2.1). Read leniently in the handler
+    /// (`load_money_account`): a closed account is skipped, so it never
+    /// blocks a config change.
+    /// CHECK: address-bound to `config.treasury_account`; decoded in the handler.
     #[account(address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
-    pub treasury_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub treasury_account: UncheckedAccount<'info>,
 
     /// The current payments token account, likewise.
+    /// CHECK: address-bound to `config.payments_account`; decoded in the handler.
     #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
-    pub payments_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub payments_account: UncheckedAccount<'info>,
 }
 
 /// Fields whose change needs a `refresh` in the same slot.
@@ -175,10 +180,20 @@ pub fn handle_set_config(ctx: Context<SetConfig>, params: Vec<ConfigParam>) -> R
         );
     }
     let vault_authority = vault_authority_key(&config.key(), config.authority_bump)?;
+    let treasury = load_money_account(
+        &ctx.accounts.treasury_account,
+        &config.reserve_token_program,
+        MutavError::InvalidTreasuryAccount,
+    )?;
+    let payments = load_money_account(
+        &ctx.accounts.payments_account,
+        &config.reserve_token_program,
+        MutavError::InvalidPaymentsAccount,
+    )?;
     validate_money_accounts(
         &config.reserve_mint,
-        &ctx.accounts.treasury_account,
-        &ctx.accounts.payments_account,
+        Money::loaded(ctx.accounts.treasury_account.key(), &treasury),
+        Money::loaded(ctx.accounts.payments_account.key(), &payments),
         &config.mutav_capital_wallet,
         &vault_authority,
         &config.operator,
@@ -187,12 +202,18 @@ pub fn handle_set_config(ctx: Context<SetConfig>, params: Vec<ConfigParam>) -> R
     // `VaultState.fulfil_halted` is cleared by `clear_fulfil_halt`, not here
     // (ADR 0015).
 
-    // The cached `coverage_required` (spec §3.2) with the new `c`, as
-    // `register_guarantee`, `file_claim`, `pay_claim` and `close_guarantee`
-    // keep it. `mode` is left to `refresh` (see the module doc).
-    let c = config.coverage_ratio_bps;
+    // The cached `coverage_required` (spec §3.2) with the new `c` and
+    // `stress_buffer` (ADR 0022), as `register_guarantee`, `file_claim`,
+    // `pay_claim` and `close_guarantee` keep it. `mode` is left to `refresh`
+    // (see the module doc).
+    let (c, stress_buffer) = (config.coverage_ratio_bps, config.caps.stress_buffer);
     let state = &mut ctx.accounts.state;
-    state.coverage_required = coverage_required(state.remaining_cover_total, c, state.provisions)?;
+    state.coverage_required = coverage_required(
+        state.remaining_cover_total,
+        c,
+        state.provisions,
+        stress_buffer,
+    )?;
 
     let config_key = ctx.accounts.config.key();
     let ts = Clock::get()?.unix_timestamp;

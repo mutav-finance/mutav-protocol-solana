@@ -329,6 +329,8 @@ fn set_payments_account_rules() {
 #[test]
 fn set_treasury_account_rules() {
     let mut f = Fixture::new();
+    // Fees need shares outstanding (ADR 0023).
+    f.inject_shares(1_000 * BRL);
     let admin = f.admin.insecure_clone();
     let a = admin.pubkey();
     let payments = f.payments;
@@ -419,7 +421,7 @@ fn a_new_coverage_ratio_recomputes_the_cached_coverage_required() {
 
 #[test]
 fn a_change_to_c_the_nav_bound_or_the_stress_buffer_needs_a_refresh_first() {
-    // These fields move the solvency figures or the NAV-move guard: the
+    // These fields move the coverage figures or the NAV-move guard: the
     // admin bundles `refresh` before `set_config` in the same transaction.
     let mut f = Fixture::new();
     // Away from slot 0, where a never-refreshed state would look current.
@@ -456,5 +458,149 @@ fn a_change_to_c_the_nav_bound_or_the_stress_buffer_needs_a_refresh_first() {
     assert_mutav_err(
         f.set_config_alone(vec![CoverageRatioBps(6_000)]),
         MutavError::RefreshRequired,
+    );
+}
+
+// ===========================================================================
+// A closed money account never blocks recovery
+// ===========================================================================
+
+/// Closes `addr` as the token program would: no data, owned by the system
+/// program. `lamports` may stay non-zero (anyone can send lamports to a
+/// closed address).
+fn close(f: &mut Fixture, addr: &Pubkey, lamports: u64) {
+    let mut acc = f.svm.get_account(addr).expect("account");
+    acc.data = vec![];
+    acc.owner = anchor_lang::solana_program::system_program::ID;
+    acc.lamports = lamports;
+    f.svm.set_account(*addr, acc).expect("set_account");
+}
+
+#[test]
+fn closed_money_accounts_block_neither_config_nor_roles_nor_replacement() {
+    let mut f = Fixture::new();
+    let admin = f.admin.insecure_clone();
+    let a = admin.pubkey();
+    let (treasury, payments) = (f.treasury, f.payments);
+    close(&mut f, &treasury, 0);
+    close(&mut f, &payments, 1_000_000);
+
+    // set_config still works.
+    let min = f.config().caps.min_request + 1;
+    f.set_config(vec![MinRequest(min)])
+        .expect("set_config with both money accounts closed");
+    assert_eq!(f.config().caps.min_request, min);
+
+    // A new operator and a new pauser still accept their roles.
+    let op = solana_keypair::Keypair::new();
+    f.svm.airdrop(&op.pubkey(), 1_000_000_000).unwrap();
+    f.handover(ROLE_OPERATOR, &op).expect("operator handover");
+    assert_eq!(f.config().operator, op.pubkey());
+    let pauser = solana_keypair::Keypair::new();
+    f.svm.airdrop(&pauser.pubkey(), 1_000_000_000).unwrap();
+    f.handover(ROLE_PAUSER, &pauser).expect("pauser handover");
+
+    // The treasury is replaced while the payments account is closed...
+    let t2 = f.token_account(&Pubkey::new_unique());
+    let ix = f.set_treasury_account_ix(&a, &t2);
+    f.send(ix, &admin).expect("replace the treasury");
+    assert_eq!(f.config().treasury_account, t2);
+    // ...the new treasury's rules still hold (not the operator's account)...
+    let owned = f.token_account(&op.pubkey());
+    let ix = f.set_treasury_account_ix(&a, &owned);
+    assert_mutav_err(f.send(ix, &admin), MutavError::InvalidTreasuryAccount);
+    // ...and the payments account is replaced while the treasury is closed.
+    close(&mut f, &t2, 0);
+    let p2_owner = Pubkey::new_unique();
+    let p2 = f.token_account(&p2_owner);
+    let ix = f.set_payments_account_ix(&a, &p2, &t2);
+    f.send(ix, &admin).expect("replace the payments account");
+    assert_eq!(f.config().payments_account, p2);
+    let t3 = f.token_account(&Pubkey::new_unique());
+    let ix = f.set_treasury_account_ix(&a, &t3);
+    f.send(ix, &admin).expect("replace the treasury again");
+
+    // Open again: an open current account keeps its rules (the capital
+    // wallet owns no money account).
+    assert_mutav_err(
+        f.set_config(vec![MutavCapitalWallet(p2_owner)]),
+        MutavError::InvalidParameter,
+    );
+}
+
+#[test]
+fn an_open_operator_owned_money_account_still_blocks_the_operator() {
+    // Only a closed account is skipped: an open one owned by the proposed
+    // operator is still refused at acceptance (ADR 0020).
+    let mut f = Fixture::new();
+    let admin = f.admin.insecure_clone();
+    let op = solana_keypair::Keypair::new();
+    f.svm.airdrop(&op.pubkey(), 1_000_000_000).unwrap();
+    let owned = f.token_account(&op.pubkey());
+    let ix = f.set_payments_account_ix(&admin.pubkey(), &owned, &f.treasury.clone());
+    f.send(ix, &admin).expect("payments owned by a future key");
+    let treasury = f.treasury;
+    close(&mut f, &treasury, 0);
+    assert_mutav_err(
+        f.handover(ROLE_OPERATOR, &op),
+        MutavError::InvalidPaymentsAccount,
+    );
+}
+
+#[test]
+fn only_a_token_account_or_a_closed_account_passes_at_a_money_address() {
+    // Only a system-owned account with no data counts as closed; anything
+    // else at the address must decode as a token account of the reserve
+    // mint.
+    let refused = |edit: &dyn Fn(&mut Fixture, &Pubkey), err: MutavError| {
+        let mut f = Fixture::new();
+        let treasury = f.treasury;
+        edit(&mut f, &treasury);
+        let min = f.config().caps.min_request + 1;
+        assert_mutav_err(f.set_config(vec![MinRequest(min)]), err);
+    };
+    // Data owned by the system program.
+    refused(
+        &|f, t| {
+            let mut acc = f.svm.get_account(t).unwrap();
+            acc.owner = anchor_lang::solana_program::system_program::ID;
+            f.svm.set_account(*t, acc).unwrap();
+        },
+        MutavError::InvalidTreasuryAccount,
+    );
+    // An empty account owned by another program is not "closed".
+    refused(
+        &|f, t| {
+            let mut acc = f.svm.get_account(t).unwrap();
+            acc.data = vec![];
+            acc.owner = mutav::ID;
+            f.svm.set_account(*t, acc).unwrap();
+        },
+        MutavError::InvalidTreasuryAccount,
+    );
+    // A mint of the token program at the address.
+    refused(
+        &|f, t| {
+            let mint = f.svm.get_account(&f.reserve_mint).unwrap();
+            f.svm.set_account(*t, mint).unwrap();
+        },
+        MutavError::InvalidTreasuryAccount,
+    );
+    // A token account of another mint.
+    refused(
+        &|f, t| {
+            let payer = f.payer.insecure_clone();
+            let other_mint = create_brs_mint(&mut f.svm, &payer, &Pubkey::new_unique());
+            let other = create_token_account(
+                &mut f.svm,
+                &payer,
+                &other_mint,
+                &Pubkey::new_unique(),
+                &TOKEN_PROGRAM,
+            );
+            let acc = f.svm.get_account(&other).unwrap();
+            f.svm.set_account(*t, acc).unwrap();
+        },
+        MutavError::InvalidMint,
     );
 }

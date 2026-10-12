@@ -68,6 +68,9 @@ fn capital_discriminators_are_frozen() {
 
 #[test]
 fn request_statuses_are_pinned() {
-    assert_eq!((DEPOSIT_PENDING, DEPOSIT_FULFILLED), (0, 1));
-    assert_eq!((REDEEM_PENDING, REDEEM_FILLED), (0, 1));
+    assert_eq!(
+        (DEPOSIT_PENDING, DEPOSIT_FULFILLED, DEPOSIT_CANCELLED),
+        (0, 1, 2)
+    );
+    assert_eq!((REDEEM_PENDING, REDEEM_FILLED, REDEEM_CANCELLED), (0, 1, 2));
 }

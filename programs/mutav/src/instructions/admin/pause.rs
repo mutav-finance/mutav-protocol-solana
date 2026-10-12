@@ -54,11 +54,14 @@ pub fn handle_pause(ctx: Context<Pause>) -> Result<()> {
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(Paused {
-        config: config_key,
-        ts,
-        by,
-    });
+    emit_event!(
+        ctx,
+        Paused {
+            config: config_key,
+            ts,
+            by,
+        }
+    );
     Ok(())
 }
 
@@ -71,10 +74,13 @@ pub fn handle_unpause(ctx: Context<Unpause>) -> Result<()> {
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(Unpaused {
-        config: config_key,
-        ts,
-        by,
-    });
+    emit_event!(
+        ctx,
+        Unpaused {
+            config: config_key,
+            ts,
+            by,
+        }
+    );
     Ok(())
 }

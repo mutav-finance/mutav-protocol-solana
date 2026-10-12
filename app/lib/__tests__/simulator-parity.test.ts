@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
-import { computeSolvency, coverageRequired } from "@mutav-finance/mutav-protocol-solana";
+import { computeCoverage, coverageRequired } from "@mutav-finance/mutav-protocol-solana";
 
 type Row = { refusal: string | null; newLeases: number; remaining: number; required: number; balance: number; active: number; opening: number; gain: number; brsIncome: number };
 type Result = {
@@ -25,6 +25,7 @@ type Result = {
   endBalance: number;
   tesouroShare: number;
   tvlRefused: number;
+  cumWithdrawals: number;
   capitalRaised: number;
   claimCapMonths: number;
   take: number;
@@ -33,10 +34,10 @@ type Result = {
 };
 type Params = Record<string, number | string | boolean>;
 type Sim = {
-  mutavCoverageRequired: (remaining: number, bps: number, provisions: number) => number;
-  mutavFreeCapital: (stable: number, remaining: number, bps: number, provisions: number) => number;
-  mutavGateAdmits: (stable: number, remaining: number, newCover: number, bps: number, provisions: number) => boolean;
-  mutavGateCount: (stable: number, remaining: number, cover: number, bps: number, provisions: number, max: number) => number;
+  mutavCoverageRequired: (remaining: number, bps: number, provisions: number, stressBuffer?: number) => number;
+  mutavFreeCapital: (stable: number, remaining: number, bps: number, provisions: number, stressBuffer?: number) => number;
+  mutavGateAdmits: (stable: number, remaining: number, newCover: number, bps: number, provisions: number, stressBuffer?: number) => boolean;
+  mutavGateCount: (stable: number, remaining: number, cover: number, bps: number, provisions: number, max: number, stressBuffer?: number) => number;
   mutavCoverageBps: (c: number) => number;
   mutavLeasesBacked: (stableBrl: number, coverBrl: number, bps: number) => number;
   mutavIssuerRate: (p: Params, tvl: number) => { rate: number; tier: number; flat: boolean; pctOfCdi: number };
@@ -58,8 +59,12 @@ const sim = loadSimulator();
 /** BRS base units per real (6 decimals). */
 const BRL_UNITS = 1_000_000;
 
-/** Expected `coverage_required` under ADR 0016, straight from the client: `max(ceil(c × remaining / 10_000), provisions)`. */
-const expectedRequired = (remaining: bigint, bps: number, provisions: bigint) => coverageRequired(remaining, bps, provisions);
+/**
+ * Expected `coverage_required` (ADR 0016, ADR 0022), straight from the client:
+ * `max(ceil(c × remaining / 10_000), provisions + min(stress_buffer, remaining − provisions))`.
+ */
+const expectedRequired = (remaining: bigint, bps: number, provisions: bigint, stress = 0n) =>
+  coverageRequired(remaining, bps, provisions, stress);
 
 /** Deterministic PRNG (mulberry32), so a failure is reproducible. */
 function rng(seed: number) {
@@ -77,15 +82,24 @@ const int = (max: number) => Math.floor(R() * max);
 /** Base units (6 dp) up to R$1bn, with small values over-represented. */
 const amount = () => (R() < 0.2 ? int(1_000) : Math.floor(10 ** (R() * 15)));
 const bps = () => (R() < 0.15 ? [1_000, 2_500, 10_000, 20_000][int(4)] : 1_000 + int(19_001));
+/** A stress buffer: off, the devnet R$19k, or any amount. */
+const stressOf = () => (R() < 0.3 ? 0 : R() < 0.5 ? 19_000 * 1_000_000 : amount());
 
 describe("simulator ↔ client coverage maths", () => {
-  it("coverage required matches max(ceil(c × remaining), provisions) on random vectors", () => {
+  it("coverage required matches the client's formula, stress buffer included, on random vectors", () => {
     for (let i = 0; i < 2_000; i++) {
-      const remaining = amount(), c = bps();
+      const remaining = amount(), c = bps(), stress = stressOf();
       const provisions = R() < 0.5 ? 0 : R() < 0.5 ? amount() : Math.ceil((remaining * c) / 10_000);
-      const want = expectedRequired(BigInt(remaining), c, BigInt(provisions));
-      expect(BigInt(sim.mutavCoverageRequired(remaining, c, provisions)), `rem=${remaining} c=${c} prov=${provisions}`).toBe(want);
+      const want = expectedRequired(BigInt(remaining), c, BigInt(provisions), BigInt(stress));
+      expect(BigInt(sim.mutavCoverageRequired(remaining, c, provisions, stress)), `rem=${remaining} c=${c} prov=${provisions} sb=${stress}`).toBe(want);
     }
+  });
+
+  it("the stress buffer binds on a small book and never exceeds the unprovisioned cover (ADR 0022)", () => {
+    const u = 1_000_000;
+    expect(sim.mutavCoverageRequired(100_000 * u, 1_000, 4_000 * u, 19_000 * u)).toBe(23_000 * u);
+    expect(sim.mutavCoverageRequired(10_000 * u, 1_000, 4_000 * u, 19_000 * u)).toBe(10_000 * u);
+    expect(sim.mutavCoverageRequired(1_000_000 * u, 1_000, 4_000 * u, 19_000 * u)).toBe(100_000 * u);
   });
 
   it("rounds up like the program at the edges", () => {
@@ -97,34 +111,37 @@ describe("simulator ↔ client coverage maths", () => {
     expect(sim.mutavCoverageRequired(100, 1_000, 11)).toBe(11);
   });
 
-  it("free capital matches the client's computeSolvency (no provisions, no TESOURO, no earmark)", () => {
+  it("free capital matches the client's computeCoverage (no provisions, no TESOURO, no earmark)", () => {
     for (let i = 0; i < 1_000; i++) {
-      const remaining = amount(), c = bps(), stable = amount();
-      const sol = computeSolvency({
+      const remaining = amount(), c = bps(), stable = amount(), stress = stressOf();
+      const sol = computeCoverage({
         brsBalance: BigInt(stable), remainingCoverTotal: BigInt(remaining), coverageRatioBps: c, provisions: 0n,
+        stressBuffer: BigInt(stress),
       });
-      expect(BigInt(sim.mutavFreeCapital(stable, remaining, c, 0))).toBe(sol.freeCapital);
+      expect(BigInt(sim.mutavFreeCapital(stable, remaining, c, 0, stress))).toBe(sol.freeCapital);
     }
   });
 
   it("the register_guarantee gate (rule 5) matches the expected formula, provisions included", () => {
     for (let i = 0; i < 2_000; i++) {
-      const remaining = amount(), newCover = amount(), c = bps();
+      const remaining = amount(), newCover = amount(), c = bps(), stress = stressOf();
       const provisions = R() < 0.6 ? 0 : amount();
       // Put stable assets near the boundary half the time, so both outcomes are exercised.
-      const boundary = Number(expectedRequired(BigInt(remaining + newCover), c, BigInt(provisions)));
+      const required = expectedRequired(BigInt(remaining + newCover), c, BigInt(provisions), BigInt(stress));
+      const boundary = Number(required);
       const stable = R() < 0.5 ? Math.max(0, boundary + int(3) - 1) : amount();
-      const want = expectedRequired(BigInt(remaining + newCover), c, BigInt(provisions)) <= BigInt(stable);
-      expect(sim.mutavGateAdmits(stable, remaining, newCover, c, provisions), `stable=${stable} rem=${remaining} new=${newCover} c=${c} prov=${provisions}`).toBe(want);
+      const want = required <= BigInt(stable);
+      expect(sim.mutavGateAdmits(stable, remaining, newCover, c, provisions, stress), `stable=${stable} rem=${remaining} new=${newCover} c=${c} prov=${provisions} sb=${stress}`).toBe(want);
     }
   });
 
   it("counts identical registrations exactly as repeated gate calls", () => {
     for (let i = 0; i < 300; i++) {
       const c = bps(), cover = 1 + int(50_000_000_000), remaining = int(10) * cover, stable = int(400_000_000_000), max = int(120);
+      const stress = R() < 0.5 ? 0 : int(60_000_000_000);
       let k = 0;
-      while (k < max && expectedRequired(BigInt(remaining + (k + 1) * cover), c, 0n) <= BigInt(stable)) k++;
-      expect(sim.mutavGateCount(stable, remaining, cover, c, 0, max)).toBe(k);
+      while (k < max && expectedRequired(BigInt(remaining + (k + 1) * cover), c, 0n, BigInt(stress)) <= BigInt(stable)) k++;
+      expect(sim.mutavGateCount(stable, remaining, cover, c, 0, max, stress)).toBe(k);
     }
   });
 
@@ -148,6 +165,7 @@ describe("simulator defaults = the devnet config", () => {
       maxCoverPerGuarantee: Number(cfg.caps.maxCoverPerGuarantee),
       maxClaimPerCall: Number(cfg.caps.maxClaimPerCall),
       maxClaimPerPeriod: Number(cfg.caps.maxClaimPerPeriod),
+      stressBuffer: Number(cfg.caps.stressBuffer),
     },
     feeTakeBpsMax: 3_000,
   };
@@ -159,6 +177,7 @@ describe("simulator defaults = the devnet config", () => {
     expect((d.maxCoverPerGuarantee as number) * BRL).toBe(devnet.caps.maxCoverPerGuarantee);
     expect((d.maxClaimPerCall as number) * BRL).toBe(devnet.caps.maxClaimPerCall);
     expect((d.maxClaimPerPeriod as number) * BRL).toBe(devnet.caps.maxClaimPerPeriod);
+    expect((d.stressBuffer as number) * BRL).toBe(devnet.caps.stressBuffer);
     // TODO(PR 3): the simulator still models a per-agency cap and a settlement floor; the program has
     // neither since ADR 0019 (the pilot holds BRS only, so the floor is 100%).
     expect(Math.round((100 - (d.maxTesouroSharePct as number)) * 100)).toBe(10_000);
@@ -189,40 +208,50 @@ describe("simulator on the pilot", () => {
   const PILOT = runInNewContext(`(${preset[1]})`) as Params;
   const pilot = (o: Params = {}) => sim.mutavCompute({ ...sim.MUTAV_DEFAULTS, ...PILOT, ...o });
 
-  it("the pilot preset holds the founders' parameters (ADR 0028)", () => {
+  it("the pilot preset holds the founders' parameters (ADR 0028, the path to R$1M)", () => {
     expect(PILOT).toMatchObject({
-      perMonth: 10, months: 6, growthTarget: 60, feePct: 12, rent: 2200, defaultCover: 12, exitCover: 6,
-      coverageRatio: 0.25, startCapital: 100_000, monthlyRaise: 100_000, raiseFrom: 1,
+      perMonth: 17, months: 6, growthTarget: 102, feePct: 12, rent: 2200, defaultCover: 12, exitCover: 6,
+      coverageRatio: 0.25, startCapital: 120_000, monthlyRaise: 170_000, raiseFrom: 2,
       maxTvl: 1_000_000, maxCoverPerGuarantee: 120_000, maxClaimPerCall: 15_000, maxClaimPerPeriod: 20_000,
       maxTesouroSharePct: 0, withdraw: "buffer",
     });
   });
 
-  it("backs 10 leases on the R$100k start at c = 0.25 and runs the 60-lease and conservative 30-lease pilots", () => {
+  it("reaches the R$1M cap in month 6 on the path (97 leases) and runs the conservative 30-lease variant", () => {
     const rec = pilot();
-    expect(rec.capacityAtStart).toBe(10);
-    expect(rec.capitalRaised).toBe(700_000);
-    expect(rec.finalActive).toBe(60);
-    expect(rec.blockedMonths).toBe(0);
+    expect(rec.capacityAtStart).toBe(12);
+    expect(rec.rows[0].active).toBe(12); // month 1 is capital-bound: the start backs 12 of the 17
+    expect(rec.rows[4].balance).toBeLessThan(1_000_000);
+    expect(rec.rows[5].balance).toBeGreaterThanOrEqual(1_000_000);
+    expect(rec.finalActive).toBe(97);
+    expect(rec.tvlRefused).toBeGreaterThan(0); // the last raise is refused at max_tvl
+    expect(rec.cumWithdrawals).toBe(0);
     expect(rec.claimCapMonths).toBe(0);
-    const cons = pilot({ coverageRatio: 0.5, perMonth: 5 });
-    expect(cons.capacityAtStart).toBe(5);
+    const cons = pilot({ coverageRatio: 0.5, perMonth: 5, growthTarget: 30, monthlyRaise: 100_000 });
+    expect(cons.capacityAtStart).toBe(6);
     expect(cons.finalActive).toBe(30);
     expect(cons.blockedMonths).toBe(0);
   });
 
-  it("drops to 2 leases at full backing (c = 1.0); the raises take it to 18", () => {
+  it("drops to 3 leases at full backing (c = 1.0); the raises take it to 25", () => {
     const full = pilot({ coverageRatio: 1 });
-    expect(full.capacityAtStart).toBe(2);
-    expect(full.finalActive).toBe(18);
+    expect(full.capacityAtStart).toBe(3);
+    expect(full.finalActive).toBe(25);
     expect(full.firstRefusal).toBe("free-capital");
   });
 
-  it("stalls at 75 leases at 28 a month (Scale to 170)", () => {
+  it("stalls at 101 leases at 28 a month (Scale to 170)", () => {
     const r = pilot({ perMonth: 28 });
-    expect(r.finalActive).toBe(75);
+    expect(r.finalActive).toBe(101);
     expect(r.firstRefusal).toBe("free-capital");
     expect(sim.mutavCoverageRequired(170 * 39_600 * BRL_UNITS, 2_500, 0) / BRL_UNITS).toBe(1_683_000);
+  });
+
+  it("the earlier plan (10 a month, R$100k a month) admits all 60 leases on R$620k", () => {
+    const r = pilot({ perMonth: 10, growthTarget: 60, monthlyRaise: 100_000 });
+    expect(r.finalActive).toBe(60);
+    expect(r.capitalRaised).toBe(620_000);
+    expect(r.blockedMonths).toBe(0);
   });
 
   it("refuses every lease above the per-guarantee cap", () => {
@@ -236,7 +265,8 @@ describe("simulator on the pilot", () => {
     const rec = pilot();
     expect(rec.endRemaining).toBeLessThan(rec.finalActive * rec.req.cover);
     for (const row of rec.rows) {
-      const want = Number(expectedRequired(BigInt(Math.round(row.remaining * BRL_UNITS)), rec.req.cBps, 0n)) / BRL_UNITS;
+      const want =
+        Number(expectedRequired(BigInt(Math.round(row.remaining * BRL_UNITS)), rec.req.cBps, 0n, BigInt((PILOT.stressBuffer as number) * BRL_UNITS))) / BRL_UNITS;
       expect(row.required).toBeCloseTo(want, 6);
     }
   });

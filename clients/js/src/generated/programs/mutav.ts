@@ -61,6 +61,7 @@ import {
   getAcceptAdminInstruction,
   getAcceptRoleInstruction,
   getAdvanceQueueHeadInstructionAsync,
+  getApproveClaimInstructionAsync,
   getCancelDepositInstructionAsync,
   getCancelPendingInstruction,
   getCancelRedeemInstructionAsync,
@@ -94,6 +95,7 @@ import {
   parseAcceptAdminInstruction,
   parseAcceptRoleInstruction,
   parseAdvanceQueueHeadInstruction,
+  parseApproveClaimInstruction,
   parseCancelDepositInstruction,
   parseCancelPendingInstruction,
   parseCancelRedeemInstruction,
@@ -127,6 +129,7 @@ import {
   type AcceptAdminInput,
   type AcceptRoleInput,
   type AdvanceQueueHeadAsyncInput,
+  type ApproveClaimAsyncInput,
   type CancelDepositAsyncInput,
   type CancelPendingInput,
   type CancelRedeemAsyncInput,
@@ -142,6 +145,7 @@ import {
   type ParsedAcceptAdminInstruction,
   type ParsedAcceptRoleInstruction,
   type ParsedAdvanceQueueHeadInstruction,
+  type ParsedApproveClaimInstruction,
   type ParsedCancelDepositInstruction,
   type ParsedCancelPendingInstruction,
   type ParsedCancelRedeemInstruction,
@@ -310,11 +314,13 @@ export function identifyMutavAccount(
 export enum MutavEvent {
   AllowlistRootUpdated,
   AssetsClaimed,
+  ClaimApproved,
   ClaimFiled,
   ClaimPaid,
   ConfigUpdated,
   DepositCancelled,
   DepositFilled,
+  DepositParked,
   DepositRequested,
   DepositsFulfilled,
   FeesContributed,
@@ -334,6 +340,7 @@ export enum MutavEvent {
   QueueHeadsAdvanced,
   RedeemCancelled,
   RedeemFilled,
+  RedeemParked,
   RedeemRequested,
   RedeemsFulfilled,
   ReserveFrozenDetected,
@@ -371,6 +378,17 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.AssetsClaimed;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([145, 132, 254, 121, 138, 95, 135, 51]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.ClaimApproved;
   }
   if (
     containsBytes(
@@ -426,6 +444,17 @@ export function identifyMutavEvent(
     )
   ) {
     return MutavEvent.DepositFilled;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([94, 67, 14, 73, 111, 71, 167, 58]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.DepositParked;
   }
   if (
     containsBytes(
@@ -640,6 +669,17 @@ export function identifyMutavEvent(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([105, 228, 211, 176, 218, 13, 48, 93]),
+      ),
+      0,
+    )
+  ) {
+    return MutavEvent.RedeemParked;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([5, 130, 67, 249, 243, 168, 11, 88]),
       ),
       0,
@@ -755,6 +795,7 @@ export enum MutavInstruction {
   AcceptAdmin,
   AcceptRole,
   AdvanceQueueHead,
+  ApproveClaim,
   CancelDeposit,
   CancelPending,
   CancelRedeem,
@@ -823,6 +864,17 @@ export function identifyMutavInstruction(
     )
   ) {
     return MutavInstruction.AdvanceQueueHead;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([74, 228, 211, 63, 140, 255, 69, 210]),
+      ),
+      0,
+    )
+  ) {
+    return MutavInstruction.ApproveClaim;
   }
   if (
     containsBytes(
@@ -1173,6 +1225,9 @@ export type ParsedMutavInstruction<
       instructionType: MutavInstruction.AdvanceQueueHead;
     } & ParsedAdvanceQueueHeadInstruction<TProgram>)
   | ({
+      instructionType: MutavInstruction.ApproveClaim;
+    } & ParsedApproveClaimInstruction<TProgram>)
+  | ({
       instructionType: MutavInstruction.CancelDeposit;
     } & ParsedCancelDepositInstruction<TProgram>)
   | ({
@@ -1287,6 +1342,13 @@ export function parseMutavInstruction<TProgram extends string>(
       return {
         instructionType: MutavInstruction.AdvanceQueueHead,
         ...parseAdvanceQueueHeadInstruction(instruction),
+      };
+    }
+    case MutavInstruction.ApproveClaim: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: MutavInstruction.ApproveClaim,
+        ...parseApproveClaimInstruction(instruction),
       };
     }
     case MutavInstruction.CancelDeposit: {
@@ -1544,6 +1606,10 @@ export type MutavPluginInstructions = {
     input: AdvanceQueueHeadAsyncInput,
   ) => ReturnType<typeof getAdvanceQueueHeadInstructionAsync> &
     SelfPlanAndSendFunctions;
+  approveClaim: (
+    input: ApproveClaimAsyncInput,
+  ) => ReturnType<typeof getApproveClaimInstructionAsync> &
+    SelfPlanAndSendFunctions;
   cancelDeposit: (
     input: CancelDepositAsyncInput,
   ) => ReturnType<typeof getCancelDepositInstructionAsync> &
@@ -1661,6 +1727,7 @@ export type MutavPluginInstructions = {
 
 export type MutavPluginPdas = {
   state: typeof findStatePda;
+  claimFiling: typeof findClaimFilingPda;
   config: typeof findConfigPda;
   pendingDeposits: typeof findPendingDepositsPda;
   vaultAuthority: typeof findVaultAuthorityPda;
@@ -1669,7 +1736,6 @@ export type MutavPluginPdas = {
   reserve: typeof findReservePda;
   guarantee: typeof findGuaranteePda;
   feeReceipt: typeof findFeeReceiptPda;
-  claimFiling: typeof findClaimFilingPda;
   shareMint: typeof findShareMintPda;
   unsolicited: typeof findUnsolicitedPda;
   incomeReceipt: typeof findIncomeReceiptPda;
@@ -1715,6 +1781,11 @@ export function mutavProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getAdvanceQueueHeadInstructionAsync(input),
+            ),
+          approveClaim: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getApproveClaimInstructionAsync(input),
             ),
           cancelDeposit: (input) =>
             addSelfPlanAndSendFunctions(
@@ -1878,6 +1949,7 @@ export function mutavProgram() {
         },
         pdas: {
           state: findStatePda,
+          claimFiling: findClaimFilingPda,
           config: findConfigPda,
           pendingDeposits: findPendingDepositsPda,
           vaultAuthority: findVaultAuthorityPda,
@@ -1886,7 +1958,6 @@ export function mutavProgram() {
           reserve: findReservePda,
           guarantee: findGuaranteePda,
           feeReceipt: findFeeReceiptPda,
-          claimFiling: findClaimFilingPda,
           shareMint: findShareMintPda,
           unsolicited: findUnsolicitedPda,
           incomeReceipt: findIncomeReceiptPda,

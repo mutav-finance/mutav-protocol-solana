@@ -9,9 +9,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
-    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     errors::MutavError,
@@ -92,11 +93,17 @@ pub fn handle_sweep_income(
     period: u32,
     amount: u64,
 ) -> Result<()> {
-    // Not paused, never solvency-gated, no mode check, not gated by claim
+    // Not paused, never coverage-gated, no mode check, not gated by claim
     // notices: money coming in is always accepted, as with `contribute_fees`
     // (ADR 0017).
     require!(amount > 0, MutavError::InvalidParameter);
     require!(is_valid_period(period), MutavError::InvalidParameter);
+    // Inflows wait for the first shares (ADR 0023): the income stays in the
+    // inbox until the first deposit is filled.
+    require!(
+        ctx.accounts.state.shares_outstanding > 0,
+        MutavError::NoSharesOutstanding
+    );
 
     let a = &ctx.accounts;
     let inbox = get_associated_token_address_with_program_id(
@@ -116,11 +123,21 @@ pub fn handle_sweep_income(
     require!(!a.income_inbox.is_frozen(), MutavError::InvalidIncomeSource);
     require!(!a.reserve.is_frozen(), MutavError::ReserveFrozen);
 
-    // All issuer income builds the reserve: there is no take (ADR 0019).
-    let net = amount;
+    // All issuer income builds the reserve: there is no take (ADR 0019), so
+    // the receipt's `net` is the whole `amount`.
     let reserve_before = a.reserve.amount;
     let inbox_before = a.income_inbox.amount;
-    transfer_from_inbox(a, a.reserve.to_account_info(), net)?;
+    vault_transfer(
+        a.token_program.key(),
+        a.income_inbox.to_account_info(),
+        a.reserve_mint.to_account_info(),
+        a.reserve.to_account_info(),
+        a.vault_authority.to_account_info(),
+        &a.config.key(),
+        a.config.authority_bump,
+        amount,
+        a.reserve_mint.decimals,
+    )?;
 
     // Post-CPI check: `reserve` rose and the inbox fell by exactly `amount`.
     ctx.accounts.reserve.reload()?;
@@ -128,7 +145,7 @@ pub fn handle_sweep_income(
     let reserve_after = ctx.accounts.reserve.amount;
     let inbox_after = ctx.accounts.income_inbox.amount;
     require!(
-        reserve_before.checked_add(net) == Some(reserve_after)
+        reserve_before.checked_add(amount) == Some(reserve_after)
             && inbox_before.checked_sub(amount) == Some(inbox_after),
         MutavError::PostCpiCheckFailed
     );
@@ -136,18 +153,18 @@ pub fn handle_sweep_income(
     let state = &mut ctx.accounts.state;
     state.brs_balance = state
         .brs_balance
-        .checked_add(net)
+        .checked_add(amount)
         .ok_or(MutavError::MathOverflow)?;
     state.income_total = state
         .income_total
-        .checked_add(net)
+        .checked_add(amount)
         .ok_or(MutavError::MathOverflow)?;
     // A verified inflow: the NAV-move guard measures net of the NAV per
     // share it adds (ADR 0017). Saturating, so an inflow is never refused;
     // a saturated counter reads as a fall and halts (fail closed).
     state.inflow_nav = state
         .inflow_nav
-        .saturating_add(inflow_nav(net, state.shares_outstanding));
+        .saturating_add(inflow_nav(amount, state.shares_outstanding));
 
     let clock = Clock::get()?;
     let r = &mut ctx.accounts.income_receipt;
@@ -157,49 +174,23 @@ pub fn handle_sweep_income(
     r.ref_hash = income_ref_hash;
     r.period = period;
     r.gross = amount;
-    r.net = net;
+    r.net = amount;
     r.slot = clock.slot;
 
-    emit_cpi!(IncomeSwept {
-        config: ctx.accounts.config.key(),
-        ts: clock.unix_timestamp,
-        income_ref_hash,
-        period,
-        amount,
-        inbox_after,
-        income_total: ctx.accounts.state.income_total,
-        brs_balance: ctx.accounts.state.brs_balance,
-    });
+    emit_event!(
+        ctx,
+        IncomeSwept {
+            config: ctx.accounts.config.key(),
+            ts: clock.unix_timestamp,
+            income_ref_hash,
+            period,
+            amount,
+            inbox_after,
+            income_total: ctx.accounts.state.income_total,
+            brs_balance: ctx.accounts.state.brs_balance,
+        }
+    );
     Ok(())
-}
-
-/// `transfer_checked` of `amount` BRS out of the income inbox, signed by the
-/// vault authority.
-fn transfer_from_inbox<'info>(
-    a: &SweepIncome<'info>,
-    to: AccountInfo<'info>,
-    amount: u64,
-) -> Result<()> {
-    let config_key = a.config.key();
-    let authority_seeds: &[&[u8]] = &[
-        AUTHORITY_SEED,
-        config_key.as_ref(),
-        &[a.config.authority_bump],
-    ];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            a.token_program.key(),
-            TransferChecked {
-                from: a.income_inbox.to_account_info(),
-                mint: a.reserve_mint.to_account_info(),
-                to,
-                authority: a.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
-        amount,
-        a.reserve_mint.decimals,
-    )
 }
 
 #[cfg(test)]

@@ -105,12 +105,15 @@ pub fn handle_claim_shares(ctx: Context<ClaimShares>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
 
     // The request closes on exit (`close = owner`), rent to the owner.
-    emit_cpi!(SharesClaimed {
-        config: config_key,
-        ts: now,
-        owner,
-        seq,
-        shares,
-    });
+    emit_event!(
+        ctx,
+        SharesClaimed {
+            config: config_key,
+            ts: now,
+            owner,
+            seq,
+            shares,
+        }
+    );
     Ok(())
 }

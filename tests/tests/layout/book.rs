@@ -53,8 +53,20 @@ fn claim_filing_layout_is_frozen() {
         claim_filing_fields!(ClaimFilingV1),
         CLAIM_FILING_V1.to_vec()
     );
-    assert_eq!(claim_filing_fields!(ClaimFiling), CLAIM_FILING_V1.to_vec());
+    // `revision` is carved from the front of the v1 `_reserved` (ADR 0021
+    // decision 8): every v1 field keeps its offset, live v1 filings read
+    // `revision = 0`, and the size is unchanged.
+    let mut current = CLAIM_FILING_V1.to_vec();
+    let (name, at, n) = current.pop().unwrap();
+    assert_eq!(name, "_reserved");
+    current.push(("revision", at, 2));
+    current.push(("_reserved", at + 2, n - 2));
+    assert_eq!(claim_filing_current_fields!(ClaimFiling), current);
     v1_round_trip::<ClaimFilingV1, ClaimFiling>(CLAIM_FILING_SIZE);
+    let mut v1_bytes = ClaimFiling::DISCRIMINATOR.to_vec();
+    v1_bytes.extend(ser(&zeroed::<ClaimFilingV1>()));
+    let x = ClaimFiling::try_deserialize(&mut v1_bytes.as_slice()).unwrap();
+    assert_eq!(x.revision, 0);
     assert_eq!(
         ClaimFiling::DISCRIMINATOR,
         &[177, 42, 215, 113, 249, 140, 198, 201]

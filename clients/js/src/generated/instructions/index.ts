@@ -9,6 +9,7 @@
 export * from "./acceptAdmin";
 export * from "./acceptRole";
 export * from "./advanceQueueHead";
+export * from "./approveClaim";
 export * from "./cancelDeposit";
 export * from "./cancelPending";
 export * from "./cancelRedeem";

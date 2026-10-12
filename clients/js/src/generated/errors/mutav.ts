@@ -102,12 +102,19 @@ export const MUTAV_ERROR__HANDOVER_PENDING = 0x1799; // 6041
 export const MUTAV_ERROR__REFRESH_REQUIRED = 0x179a; // 6042
 /** PriceLimitNotMet: The head request's price limit is not met */
 export const MUTAV_ERROR__PRICE_LIMIT_NOT_MET = 0x179b; // 6043
+/** ReserveUnderwater: NAV per share is below the smallest published unit while shares are outstanding */
+export const MUTAV_ERROR__RESERVE_UNDERWATER = 0x179c; // 6044
+/** NoSharesOutstanding: No shares are outstanding */
+export const MUTAV_ERROR__NO_SHARES_OUTSTANDING = 0x179d; // 6045
+/** ClaimRevisionMismatch: The claim filing changed since the approval was proposed */
+export const MUTAV_ERROR__CLAIM_REVISION_MISMATCH = 0x179e; // 6046
 
 export type MutavError =
   | typeof MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED
   | typeof MUTAV_ERROR__CLAIM_NOT_FILED
   | typeof MUTAV_ERROR__CLAIM_NOT_PAID
   | typeof MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED
+  | typeof MUTAV_ERROR__CLAIM_REVISION_MISMATCH
   | typeof MUTAV_ERROR__DUPLICATE_PARAM
   | typeof MUTAV_ERROR__EXCEEDS_REMAINING_COVER
   | typeof MUTAV_ERROR__EXPECTED_AMOUNT_MISMATCH
@@ -131,6 +138,7 @@ export type MutavError =
   | typeof MUTAV_ERROR__MATH_OVERFLOW
   | typeof MUTAV_ERROR__NAV_OUT_OF_BOUNDS
   | typeof MUTAV_ERROR__NO_PENDING_HANDOVER
+  | typeof MUTAV_ERROR__NO_SHARES_OUTSTANDING
   | typeof MUTAV_ERROR__NOT_ALLOWLISTED
   | typeof MUTAV_ERROR__OPEN_CLAIMS
   | typeof MUTAV_ERROR__PAUSED
@@ -142,6 +150,7 @@ export type MutavError =
   | typeof MUTAV_ERROR__REQUEST_TOO_LARGE
   | typeof MUTAV_ERROR__REQUEST_TOO_SMALL
   | typeof MUTAV_ERROR__RESERVE_FROZEN
+  | typeof MUTAV_ERROR__RESERVE_UNDERWATER
   | typeof MUTAV_ERROR__ROLES_NOT_DISTINCT
   | typeof MUTAV_ERROR__TVL_CAP_EXCEEDED
   | typeof MUTAV_ERROR__UNAUTHORIZED
@@ -156,6 +165,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [MUTAV_ERROR__CLAIM_NOT_FILED]: `Claim has not been filed`,
     [MUTAV_ERROR__CLAIM_NOT_PAID]: `Claim has not been paid`,
     [MUTAV_ERROR__CLAIM_PERIOD_CAP_EXCEEDED]: `Per-period claim payment cap exceeded`,
+    [MUTAV_ERROR__CLAIM_REVISION_MISMATCH]: `The claim filing changed since the approval was proposed`,
     [MUTAV_ERROR__DUPLICATE_PARAM]: `A config parameter appears more than once`,
     [MUTAV_ERROR__EXCEEDS_REMAINING_COVER]: `Amount exceeds the remaining cover`,
     [MUTAV_ERROR__EXPECTED_AMOUNT_MISMATCH]: `Expected amount does not match the claim's provision`,
@@ -179,6 +189,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [MUTAV_ERROR__MATH_OVERFLOW]: `Math overflow`,
     [MUTAV_ERROR__NAV_OUT_OF_BOUNDS]: `NAV per share is outside the given bounds`,
     [MUTAV_ERROR__NO_PENDING_HANDOVER]: `No handover is pending for this role`,
+    [MUTAV_ERROR__NO_SHARES_OUTSTANDING]: `No shares are outstanding`,
     [MUTAV_ERROR__NOT_ALLOWLISTED]: `Wallet is not allowlisted`,
     [MUTAV_ERROR__OPEN_CLAIMS]: `Guarantee has open claims`,
     [MUTAV_ERROR__PAUSED]: `The reserve is paused`,
@@ -190,6 +201,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [MUTAV_ERROR__REQUEST_TOO_LARGE]: `Request is above the maximum`,
     [MUTAV_ERROR__REQUEST_TOO_SMALL]: `Request is below the minimum`,
     [MUTAV_ERROR__RESERVE_FROZEN]: `A reserve token account is frozen`,
+    [MUTAV_ERROR__RESERVE_UNDERWATER]: `NAV per share is below the smallest published unit while shares are outstanding`,
     [MUTAV_ERROR__ROLES_NOT_DISTINCT]: `Roles must be distinct keys`,
     [MUTAV_ERROR__TVL_CAP_EXCEEDED]: `TVL cap exceeded`,
     [MUTAV_ERROR__UNAUTHORIZED]: `Signer is not authorized for this instruction`,

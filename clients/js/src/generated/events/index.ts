@@ -8,11 +8,13 @@
 
 export * from "./allowlistRootUpdated";
 export * from "./assetsClaimed";
+export * from "./claimApproved";
 export * from "./claimFiled";
 export * from "./claimPaid";
 export * from "./configUpdated";
 export * from "./depositCancelled";
 export * from "./depositFilled";
+export * from "./depositParked";
 export * from "./depositRequested";
 export * from "./depositsFulfilled";
 export * from "./feesContributed";
@@ -32,6 +34,7 @@ export * from "./payoutSettled";
 export * from "./queueHeadsAdvanced";
 export * from "./redeemCancelled";
 export * from "./redeemFilled";
+export * from "./redeemParked";
 export * from "./redeemRequested";
 export * from "./redeemsFulfilled";
 export * from "./reserveFrozenDetected";

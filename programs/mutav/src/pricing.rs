@@ -13,8 +13,8 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::{BPS_DENOMINATOR, NAV_SCALE},
+    coverage::nav_per_share,
     math::{mul_div_u128, Rounding},
-    solvency::nav_per_share,
 };
 
 /// The NAV per share `refresh` publishes and the guard compares (spec §7):

@@ -1,23 +1,22 @@
 //! `pay_claim(notice_ref_hash, expected_amount)` (spec §5.4; ADR 0021): pays
 //! a filed claim's provision, exactly, to the whitelisted payments account.
-//! **Never solvency-gated, no mode check, not paused** (spec §1 principle 4).
+//! **Never coverage-gated, no mode check, not paused** (spec §1 principle 4).
 //!
 //! Above `max_claim_per_call` the filing needs the reserve admin's approval
-//! of that exact amount (`ClaimFiling.approved_amount`, written by
-//! `approve_claim`, a later upgrade). Until `approve_claim` ships, such a
-//! claim is paid bank-first by MUTAV and stays filed; the reserve reimburses
-//! `payments_account` once the approval exists (ADR 0021).
+//! of that exact amount (`ClaimFiling.approved_amount`, written by the admin's
+//! `approve_claim`). MUTAV may still pay such a claim bank-first while the
+//! approval waits for the admin time lock; the reserve then reimburses
+//! `payments_account` (ADR 0021).
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{
-    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
-};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
+    coverage::coverage_required_saturating,
     errors::MutavError,
     events::ClaimPaid,
-    solvency::coverage_required,
     state::{ClaimFiling, Guarantee, VaultConfig, VaultState},
 };
 
@@ -154,25 +153,17 @@ pub fn handle_pay_claim(
         MutavError::InsufficientLiquidBalance
     );
     require!(!ctx.accounts.reserve.is_frozen(), MutavError::ReserveFrozen);
-    // Rule 8: no solvency check, no mode check, no pause check.
+    // Rule 8: no coverage check, no mode check, no pause check.
 
     let config_key = ctx.accounts.config.key();
-    let authority_seeds: &[&[u8]] = &[
-        AUTHORITY_SEED,
-        config_key.as_ref(),
-        &[ctx.accounts.config.authority_bump],
-    ];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.reserve.to_account_info(),
-                mint: ctx.accounts.reserve_mint.to_account_info(),
-                to: ctx.accounts.payments_account.to_account_info(),
-                authority: ctx.accounts.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
+    vault_transfer(
+        ctx.accounts.token_program.key(),
+        ctx.accounts.reserve.to_account_info(),
+        ctx.accounts.reserve_mint.to_account_info(),
+        ctx.accounts.payments_account.to_account_info(),
+        ctx.accounts.vault_authority.to_account_info(),
+        &config_key,
+        ctx.accounts.config.authority_bump,
         amount,
         ctx.accounts.reserve_mint.decimals,
     )?;
@@ -208,11 +199,14 @@ pub fn handle_pay_claim(
         .remaining_cover_total
         .checked_sub(amount)
         .ok_or(MutavError::MathOverflow)?;
-    state.coverage_required = coverage_required(
+    // The cached value saturates: a claim payment is never refused for it
+    // (ADR 0022 decision 3).
+    state.coverage_required = coverage_required_saturating(
         state.remaining_cover_total,
         ctx.accounts.config.coverage_ratio_bps,
         state.provisions,
-    )?;
+        ctx.accounts.config.caps.stress_buffer,
+    );
     let bucket = state.claim_bucket_mut(day);
     *bucket = bucket.checked_add(amount).ok_or(MutavError::MathOverflow)?;
     state.claims_paid_total = state
@@ -228,19 +222,22 @@ pub fn handle_pay_claim(
         state.claims_paid_total,
     );
     let payments_account = ctx.accounts.payments_account.key();
-    emit_cpi!(ClaimPaid {
-        config: config_key,
-        ts: now,
-        guarantee_id: ctx.accounts.guarantee.id,
-        leg,
-        amount,
-        notice_ref_hash,
-        payments_account,
-        provisions_after,
-        coverage_required_after,
-        window_paid,
-        brs_balance_after,
-        claims_paid_total,
-    });
+    emit_event!(
+        ctx,
+        ClaimPaid {
+            config: config_key,
+            ts: now,
+            guarantee_id: ctx.accounts.guarantee.id,
+            leg,
+            amount,
+            notice_ref_hash,
+            payments_account,
+            provisions_after,
+            coverage_required_after,
+            window_paid,
+            brs_balance_after,
+            claims_paid_total,
+        }
+    );
     Ok(())
 }

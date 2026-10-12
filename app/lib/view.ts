@@ -3,16 +3,18 @@
  * accounts to rows the screens render. No numbers are invented here; each row
  * is a projection or a sum of account fields.
  */
+import { assetsFor, redeemSizeError } from "@mutav-finance/mutav-protocol-solana";
 import type {
   ClaimFiling,
   DepositRequest,
   Guarantee,
   IncomeReceipt,
   RedeemRequest,
-  Solvency,
+  Coverage,
   VaultConfig,
   VaultState,
 } from "@mutav-finance/mutav-protocol-solana";
+import { isParked, isQueued } from "@mutav-finance/mutav-protocol-solana";
 import { bytesToHex } from "./serde";
 import { fmtShares } from "./format";
 
@@ -75,7 +77,7 @@ export type ReserveView = {
   config: VaultConfig;
   state: VaultState;
   /** The §4 quantities recomputed from these accounts with the client's math mirror. */
-  solvency: Solvency;
+  coverage: Coverage;
   /** Cluster time (unix seconds) and slot of the read. */
   now: bigint;
   slot: bigint;
@@ -86,7 +88,40 @@ export type ReserveView = {
    * never counts toward NAV.
    */
   incomeInbox: { address: string; exists: boolean; amount: bigint };
+  /** The payments token account's SPL facts, for the watcher alert (absent in older reads and tests). */
+  payments?: PaymentsFacts;
 };
+
+/** SPL facts of the payments token account (where pay_claim sends BRS). */
+export type PaymentsFacts = {
+  exists: boolean;
+  /** Token-account owner (the wallet that can move the BRS out). */
+  owner: string | null;
+  mint: string | null;
+  delegate: string | null;
+  closeAuthority: string | null;
+  frozen: boolean;
+  /** PAYMENTS_OWNER from the server env: the owner the admin expects, when set. */
+  expectedOwner: string | null;
+};
+
+/**
+ * Watcher alerts on the payments account (AV-3 follow-up): every claim
+ * payment lands there, so its owner changing, a delegate or close authority
+ * appearing, or the owner being the operator key, is worth a red flag.
+ */
+export function paymentsAlerts(p: PaymentsFacts | undefined, c: Pick<VaultConfig, "operator" | "reserveMint">): string[] {
+  if (!p) return [];
+  if (!p.exists) return ["the payments account does not exist"];
+  const out: string[] = [];
+  if (p.expectedOwner && p.owner !== p.expectedOwner) out.push(`its owner is ${p.owner}, not the expected ${p.expectedOwner} (PAYMENTS_OWNER): the owner changed`);
+  if (p.owner === c.operator) out.push("it is owned by the operator key: a compromised operator could pay claims to itself");
+  if (p.mint !== null && p.mint !== c.reserveMint) out.push("it is not a BRS account");
+  if (p.delegate) out.push(`it has a delegate (${p.delegate}) who can move its BRS`);
+  if (p.closeAuthority) out.push(`it has a close authority (${p.closeAuthority})`);
+  if (p.frozen) out.push("it is frozen: pay_claim into it fails");
+  return out;
+}
 
 /** `ClaimFiling.leg` ids (LEG_DEFAULT = 1, LEG_EXIT = 2; 0 names no leg). */
 export const LEG = { default: 1, exit: 2 } as const;
@@ -96,7 +131,6 @@ export const GUARANTEE_ACTIVE = 0;
 export const CLAIM_FILED = 0;
 export const CLAIM_PAID = 1;
 export const CLAIM_SETTLED = 3;
-export const DEPOSIT_PENDING = 0;
 export const DEPOSIT_FULFILLED = 1;
 
 export const MODE_LABEL = (mode: number) => (mode === 0 ? "Normal" : "UnderCovered");
@@ -153,7 +187,6 @@ export type AgencyRow = {
  * Per-agency figures derived from the guarantee accounts: the program keeps
  * no per-agency account or cap (ADR 0019).
  */
-// TODO(PR 5): the agency view's final shape (no cap to compare against now).
 export function agencyRows(guarantees: Row<Guarantee>[]): AgencyRow[] {
   const by = new Map<string, AgencyRow>();
   for (const { data: g } of guarantees) {
@@ -173,7 +206,37 @@ export function agencyRows(guarantees: Row<Guarantee>[]): AgencyRow[] {
 
 // ── Claims timeline ─────────────────────────────────────────────────────────
 
-export type ClaimStage = "filed" | "paid" | "settled";
+/**
+ * - `filed`: within the operator's limit per payment; pay_claim pays it.
+ * - `needs_approval`: its provision is above `max_claim_per_call` and the
+ *   Reserve Admin has not approved it (ADR 0021).
+ * - `approved`: the admin approved exactly its provision; pay_claim pays it.
+ */
+export type ClaimStage = "filed" | "needs_approval" | "approved" | "paid" | "settled";
+
+export const CLAIM_STAGE_LABEL: Record<ClaimStage, string> = {
+  filed: "filed",
+  needs_approval: "needs approval",
+  approved: "approved",
+  paid: "paid",
+  settled: "settled",
+};
+
+/** Filed and not paid yet, whatever its approval. */
+export const isUnpaid = (s: ClaimStage) => s === "filed" || s === "needs_approval" || s === "approved";
+
+/**
+ * The stage of a filing. `maxClaimPerCall` unknown: an unapproved filing
+ * reads as `filed`.
+ */
+export function claimStage(f: Pick<ClaimFiling, "status" | "provision" | "approvedAmount">, maxClaimPerCall?: bigint): ClaimStage {
+  if (f.status === CLAIM_SETTLED) return "settled";
+  if (f.status === CLAIM_PAID) return "paid";
+  // pay_claim checks `approved_amount == amount` above the cap, and the amount is the provision.
+  if (f.approvedAmount > 0n && f.approvedAmount === f.provision) return "approved";
+  if (maxClaimPerCall !== undefined && f.provision > maxClaimPerCall) return "needs_approval";
+  return "filed";
+}
 
 export type ClaimRow = {
   filing: string;
@@ -182,6 +245,8 @@ export type ClaimRow = {
   leg: "default" | "exit";
   noticeRefHash: string;
   provision: bigint;
+  /** `approve_claim`'s amount (ADR 0021); 0 = not approved. */
+  approvedAmount: bigint;
   amount: bigint | null;
   filedAt: bigint;
   paidAt: bigint | null;
@@ -196,9 +261,10 @@ export type ClaimRow = {
 /**
  * One row per claim filing. The filing records its payment and settlement
  * (ADR 0019); the program sets no settlement deadline (the payout SLA is the
- * operator platform's).
+ * operator platform's). Pass `max_claim_per_call` to tell the filings that
+ * need the Reserve Admin's approval (ADR 0021).
  */
-export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">): ClaimRow[] {
+export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">, maxClaimPerCall?: bigint): ClaimRow[] {
   const ids = new Map(ledger.guarantees.map((g) => [g.address, bytesToHex(new Uint8Array(g.data.id))]));
   return ledger.filings
     .map(({ address, data: f }): ClaimRow => {
@@ -212,12 +278,13 @@ export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">): 
         leg: legName(f.leg),
         noticeRefHash: bytesToHex(new Uint8Array(f.noticeRefHash)),
         provision: f.provision,
+        approvedAmount: f.approvedAmount,
         amount: paid ? f.paidAmount : null,
         filedAt: f.filedAt,
         paidAt: paid ? f.paidAt : null,
         settledAt: settled ? f.settledAt : null,
         pixE2eHash: !zeroHash ? bytesToHex(new Uint8Array(f.pixE2eHash)) : null,
-        stage: settled ? "settled" : paid ? "paid" : "filed",
+        stage: claimStage(f, maxClaimPerCall),
         fileToPay: paid ? f.paidAt - f.filedAt : null,
         payToSettle: settled ? f.settledAt - f.paidAt : null,
       };
@@ -228,6 +295,9 @@ export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">): 
 // ── Money flows ─────────────────────────────────────────────────────────────
 
 export type FlowKind = "fee" | "income" | "claim" | "deposit" | "redemption";
+
+/** A movement's name in the reserve's activity list and balance history. */
+export const FLOW_KIND_LABEL: Record<FlowKind, string> = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" };
 
 export type FlowRow = {
   kind: FlowKind;
@@ -323,7 +393,7 @@ export function capitalQueue(
   ledger: Pick<Ledger, "deposits" | "redeems">,
 ): { deposits: QueueRow[]; redeems: QueueRow[] } {
   const deposits = ledger.deposits
-    .filter((d) => d.data.status === DEPOSIT_PENDING && d.data.seq >= state.depositHead)
+    .filter((d) => isQueued(d.data) && d.data.seq >= state.depositHead)
     .sort((a, b) => Number(a.data.seq - b.data.seq))
     .map((d, i): QueueRow => ({
       side: "deposit",
@@ -335,7 +405,7 @@ export function capitalQueue(
       position: i + 1,
     }));
   const redeems = ledger.redeems
-    .filter((r) => r.data.status === REDEEM_PENDING && r.data.seq >= state.redeemHead)
+    .filter((r) => isQueued(r.data) && r.data.seq >= state.redeemHead)
     .sort((a, b) => Number(a.data.seq - b.data.seq))
     .map((r, i): QueueRow => ({
       side: "redeem",
@@ -367,9 +437,6 @@ export function configSummary(c: VaultConfig) {
 
 // ── Investor ────────────────────────────────────────────────────────────────
 
-export const REDEEM_PENDING = 0;
-export const REDEEM_STATUS = ["pending", "filled"] as const;
-
 /** One of the connected investor's queue entries, with the actions the program would accept now. */
 export type InvestorRequest = {
   side: "deposit" | "redeem";
@@ -387,6 +454,27 @@ export type InvestorRequest = {
   actions: ("cancel_deposit" | "claim_shares" | "cancel_redeem" | "claim_assets")[];
 };
 
+/**
+ * The `request_redeem` size rule (ADR 0029) as the program applies it, at
+ * NAV now (a PREVIEW): `value` and the `remainder` left in the share account
+ * are priced with `assetsFor`. Below `min_request` only a full exit of the
+ * canonical share associated token account passes (the app always debits
+ * that account, so `canonical` defaults to true). `balance` null: unknown,
+ * read as no balance left behind.
+ */
+export function redeemSizeCheck(
+  shares: bigint,
+  balance: bigint | null,
+  sharesOutstanding: bigint,
+  netAssets: bigint,
+  caps: Pick<VaultConfig["caps"], "minRequest" | "maxRequest">,
+  canonical = true,
+): "RequestTooSmall" | "RequestTooLarge" | null {
+  const value = assetsFor(shares, sharesOutstanding, netAssets);
+  const left = balance !== null && balance > shares ? balance - shares : 0n;
+  return redeemSizeError(value, assetsFor(left, sharesOutstanding, netAssets), canonical, caps.minRequest, caps.maxRequest);
+}
+
 export function investorRequests(
   owner: string | null,
   state: Pick<VaultState, "depositHead" | "redeemHead">,
@@ -399,34 +487,37 @@ export function investorRequests(
   const deposits = ledger.deposits
     .filter((d) => d.data.owner === owner)
     .map((d): InvestorRequest => {
-      const pending = d.data.status === DEPOSIT_PENDING;
+      const pending = isQueued(d.data);
+      const parked = isParked(d.data);
       return {
         side: "deposit",
         address: d.address,
         seq: d.data.seq,
-        status: pending ? "pending" : "fulfilled",
+        status: pending ? "pending" : parked ? "parked" : "fulfilled",
         requestedAt: d.data.requestedAt,
-        waiting: pending ? d.data.assets : 0n,
-        claimable: pending ? 0n : d.data.sharesOut,
+        waiting: pending || parked ? d.data.assets : 0n,
+        claimable: pending || parked ? 0n : d.data.sharesOut,
         position: depPos.get(d.address) ?? null,
-        actions: pending ? ["cancel_deposit"] : ["claim_shares"],
+        actions: pending || parked ? ["cancel_deposit"] : ["claim_shares"],
       };
     });
   const redeems = ledger.redeems
     .filter((r) => r.data.owner === owner)
     .map((r): InvestorRequest => {
       const actions: InvestorRequest["actions"] = [];
-      const pending = r.data.status === REDEEM_PENDING;
-      if (pending) actions.push("cancel_redeem");
+      const pending = isQueued(r.data);
+      // A parked request (ADR 0030) is out of the queue; its owner collects the shares.
+      const parked = isParked(r.data);
+      if (pending || parked) actions.push("cancel_redeem");
       else actions.push("claim_assets");
       return {
         side: "redeem",
         address: r.address,
         seq: r.data.seq,
-        status: REDEEM_STATUS[r.data.status] ?? `status ${r.data.status}`,
+        status: pending ? "pending" : parked ? "parked" : "filled",
         requestedAt: r.data.requestedAt,
-        waiting: pending ? r.data.shares : 0n,
-        claimable: pending ? 0n : r.data.assetsOut,
+        waiting: pending || parked ? r.data.shares : 0n,
+        claimable: pending || parked ? 0n : r.data.assetsOut,
         position: redPos.get(r.address) ?? null,
         actions,
       };

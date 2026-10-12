@@ -1,21 +1,25 @@
 //! `fulfil_deposits(count, nav_bounds)` (spec §5.5; ADR 0023). Admin. Strict FIFO from
 //! `deposit_head`, priced at the NAV at fulfil. Allowed in under-coverage: it
-//! is the recapitalization path (ADR 0008).
+//! is the recapitalization path (ADR 0008). Refused while the reserve is
+//! underwater (`ReserveUnderwater`, ADR 0022) and across a NAV move the guard
+//! would halt (inline guard, ADR 0023). The first shares seed the guard's
+//! baseline.
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{
-    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
-};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     errors::MutavError,
     events::{DepositFilled, DepositsFulfilled},
     instructions::capital::{
-        deposit_request_address, load_slot, split_adapter_accounts, store, NavBounds, Slot,
+        deposit_request_address, load_slot, require_nav_within_guard, require_not_underwater,
+        split_adapter_accounts, store, NavBounds, Slot,
     },
-    instructions::operator::solvency_snapshot,
+    instructions::operator::coverage_snapshot,
     math::{conversion_nav, shares_for},
+    pricing::published_nav,
     state::{DepositRequest, VaultConfig, VaultState},
 };
 
@@ -75,7 +79,9 @@ pub fn handle_fulfil_deposits(
     // Rules, in the spec's order. Under-coverage is allowed (ADR 0008).
     require!(!config.paused, MutavError::Paused);
     require!(!state.fulfil_halted, MutavError::FulfilHalted);
-    let before = solvency_snapshot(config, state)?;
+    let before = coverage_snapshot(config, state)?;
+    require_not_underwater(state.shares_outstanding, before.net_assets)?;
+    require_nav_within_guard(state, before.net_assets, config.caps.max_nav_move_bps)?;
 
     let config_key = config.key();
     let now = Clock::get()?.unix_timestamp;
@@ -150,7 +156,8 @@ pub fn handle_fulfil_deposits(
                     net_assets_after: net_assets,
                 });
             }
-            // A fulfilled (unclaimed) request is dead for the queue.
+            // A fulfilled (unclaimed) or parked (ADR 0030) request is dead
+            // for the queue: skipped, never filled.
         }
         // A closed seq passes the skip proof.
         seq += 1;
@@ -177,28 +184,28 @@ pub fn handle_fulfil_deposits(
             !ctx.accounts.pending_deposits.is_frozen() && !ctx.accounts.reserve.is_frozen(),
             MutavError::ReserveFrozen
         );
-        let authority_seeds: &[&[u8]] = &[
-            AUTHORITY_SEED,
-            config_key.as_ref(),
-            &[config.authority_bump],
-        ];
-        transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.key(),
-                TransferChecked {
-                    from: ctx.accounts.pending_deposits.to_account_info(),
-                    mint: ctx.accounts.reserve_mint.to_account_info(),
-                    to: ctx.accounts.reserve.to_account_info(),
-                    authority: ctx.accounts.vault_authority.to_account_info(),
-                },
-                &[authority_seeds],
-            ),
+        vault_transfer(
+            ctx.accounts.token_program.key(),
+            ctx.accounts.pending_deposits.to_account_info(),
+            ctx.accounts.reserve_mint.to_account_info(),
+            ctx.accounts.reserve.to_account_info(),
+            ctx.accounts.vault_authority.to_account_info(),
+            &config_key,
+            config.authority_bump,
             total_assets,
             ctx.accounts.reserve_mint.decimals,
         )?;
     }
 
     let state = &mut ctx.accounts.state;
+    // The first shares seed the NAV-move guard's baseline (ADR 0023), so the
+    // window up to the next `refresh` is measured from the NAV the first
+    // depositors received. Inflows are refused at zero supply, so there is
+    // nothing to net out.
+    if state.shares_outstanding == 0 && shares_outstanding > 0 {
+        state.nav_per_share = published_nav(net_assets, shares_outstanding)?;
+        state.inflow_nav = 0;
+    }
     state.brs_balance = state
         .brs_balance
         .checked_add(total_assets)
@@ -221,20 +228,23 @@ pub fn handle_fulfil_deposits(
         (state.deposited_assets_total, state.minted_shares_total);
 
     for e in filled {
-        emit_cpi!(e);
+        emit_event!(ctx, e);
     }
     if fills > 0 {
-        emit_cpi!(DepositsFulfilled {
-            config: config_key,
-            ts: now,
-            from_seq,
-            to_seq,
-            assets: total_assets,
-            shares: total_shares,
-            nav: batch_nav,
-            deposited_assets_total,
-            minted_shares_total,
-        });
+        emit_event!(
+            ctx,
+            DepositsFulfilled {
+                config: config_key,
+                ts: now,
+                from_seq,
+                to_seq,
+                assets: total_assets,
+                shares: total_shares,
+                nav: batch_nav,
+                deposited_assets_total,
+                minted_shares_total,
+            }
+        );
     }
     Ok(())
 }

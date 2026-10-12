@@ -3,12 +3,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
 
-use crate::constants::CONFIG_SEED;
 use crate::{
-    constants::field,
+    constants::CONFIG_SEED,
     errors::MutavError,
-    events::{emit_config_changes, ConfigChanges, PaymentsAccountUpdated},
-    instructions::admin::{validate_money_accounts, vault_authority_key, Installing},
+    events::PaymentsAccountUpdated,
+    instructions::admin::{install_money_account, Installing},
     state::VaultConfig,
 };
 
@@ -31,40 +30,31 @@ pub struct SetPaymentsAccount<'info> {
     /// not be owned by the operator (ADR 0020).
     pub payments_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// The current treasury token account, to compare (spec §2.1).
+    /// The current treasury token account, to compare (spec §2.1). Read
+    /// leniently in the handler (`load_money_account`): a closed account is
+    /// skipped, so it never blocks replacing the payments account.
+    /// CHECK: address-bound to `config.treasury_account`; decoded in the handler.
     #[account(address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
-    pub treasury_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub treasury_account: UncheckedAccount<'info>,
 }
 
 pub fn handle_set_payments_account(ctx: Context<SetPaymentsAccount>) -> Result<()> {
-    let vault_authority = vault_authority_key(
-        &ctx.accounts.config.key(),
-        ctx.accounts.config.authority_bump,
-    )?;
-    validate_money_accounts(
-        &ctx.accounts.config.reserve_mint,
-        &ctx.accounts.treasury_account,
-        &ctx.accounts.payments_account,
-        &ctx.accounts.config.mutav_capital_wallet,
-        &vault_authority,
-        &ctx.accounts.config.operator,
+    let a = &mut *ctx.accounts;
+    let (old, new, ts) = install_money_account(
+        &mut a.config,
+        &a.payments_account,
+        &a.treasury_account,
         Installing::Payments,
+        &a.event_authority,
     )?;
-
-    let new = ctx.accounts.payments_account.key();
-    let config = &mut ctx.accounts.config;
-    let old = config.payments_account;
-    let mut ch = ConfigChanges::default();
-    ch.set(field::PAYMENTS_ACCOUNT, &mut config.payments_account, new);
-
-    let config_key = config.key();
-    let ts = Clock::get()?.unix_timestamp;
-    emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(PaymentsAccountUpdated {
-        config: config_key,
-        ts,
-        old,
-        new,
-    });
+    emit_event!(
+        ctx,
+        PaymentsAccountUpdated {
+            config: ctx.accounts.config.key(),
+            ts,
+            old,
+            new,
+        }
+    );
     Ok(())
 }

@@ -14,7 +14,6 @@
 //! None of them is pause-gated (ADR 0020).
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::TokenAccount;
 
 use crate::constants::CONFIG_SEED;
 use crate::{
@@ -24,7 +23,7 @@ use crate::{
         emit_config_changes, ConfigChanges, GuardiansUpdated, HandoverCancelled, RoleAccepted,
         RoleProposed,
     },
-    instructions::admin::{require_not_operator_owned, validate_role_key},
+    instructions::admin::{load_money_account, require_not_operator_owned, validate_role_key},
     state::VaultConfig,
 };
 
@@ -137,13 +136,16 @@ fn emit_proposal(ctx: Context<AdminRoleUpdate>, role: u8, key: Pubkey) -> Result
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(RoleProposed {
-        config: config_key,
-        ts,
-        role,
-        key,
-        expires_at,
-    });
+    emit_event!(
+        ctx,
+        RoleProposed {
+            config: config_key,
+            ts,
+            role,
+            key,
+            expires_at,
+        }
+    );
     Ok(())
 }
 
@@ -161,12 +163,15 @@ pub fn handle_cancel_pending(ctx: Context<AdminRoleUpdate>, role: u8) -> Result<
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(HandoverCancelled {
-        config: config_key,
-        ts,
-        role,
-        key,
-    });
+    emit_event!(
+        ctx,
+        HandoverCancelled {
+            config: config_key,
+            ts,
+            role,
+            key,
+        }
+    );
     Ok(())
 }
 
@@ -196,11 +201,14 @@ pub fn handle_set_guardians(ctx: Context<AdminRoleUpdate>, guardians: [Pubkey; 3
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(GuardiansUpdated {
-        config: config_key,
-        ts,
-        guardians,
-    });
+    emit_event!(
+        ctx,
+        GuardiansUpdated {
+            config: config_key,
+            ts,
+            guardians,
+        }
+    );
     Ok(())
 }
 
@@ -224,12 +232,15 @@ pub struct AcceptRole<'info> {
 
     /// The money accounts, to check a new operator owns neither (ADR 0020).
     /// Required for `ROLE_OPERATOR`; omitted for `ROLE_PAUSER`, so a pauser
-    /// handover never depends on the money accounts' state.
+    /// handover never depends on the money accounts' state. Read leniently
+    /// in the handler (`load_money_account`): a closed account is skipped.
+    /// CHECK: address-bound to `config.treasury_account`; decoded in the handler.
     #[account(address = config.treasury_account @ MutavError::InvalidTreasuryAccount)]
-    pub treasury_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
+    pub treasury_account: Option<UncheckedAccount<'info>>,
 
+    /// CHECK: address-bound to `config.payments_account`; decoded in the handler.
     #[account(address = config.payments_account @ MutavError::InvalidPaymentsAccount)]
-    pub payments_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
+    pub payments_account: Option<UncheckedAccount<'info>>,
 }
 
 /// The pending operator or pauser takes its role.
@@ -249,7 +260,12 @@ pub fn handle_accept_role(ctx: Context<AcceptRole>, role: u8) -> Result<()> {
         ) else {
             return err!(MutavError::InvalidParameter);
         };
-        require_not_operator_owned(treasury, payments, &key)?;
+        let token_program = config.reserve_token_program;
+        let treasury =
+            load_money_account(treasury, &token_program, MutavError::InvalidTreasuryAccount)?;
+        let payments =
+            load_money_account(payments, &token_program, MutavError::InvalidPaymentsAccount)?;
+        require_not_operator_owned(treasury.as_ref(), payments.as_ref(), &key)?;
         let old = config.operator;
         ch.set(field::OPERATOR, &mut config.operator, key);
         old
@@ -261,13 +277,16 @@ pub fn handle_accept_role(ctx: Context<AcceptRole>, role: u8) -> Result<()> {
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(RoleAccepted {
-        config: config_key,
-        ts,
-        role,
-        old,
-        new: key,
-    });
+    emit_event!(
+        ctx,
+        RoleAccepted {
+            config: config_key,
+            ts,
+            role,
+            old,
+            new: key,
+        }
+    );
     Ok(())
 }
 
@@ -315,12 +334,15 @@ pub fn handle_accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(RoleAccepted {
-        config: config_key,
-        ts,
-        role: ROLE_ADMIN,
-        old,
-        new: key,
-    });
+    emit_event!(
+        ctx,
+        RoleAccepted {
+            config: config_key,
+            ts,
+            role: ROLE_ADMIN,
+            old,
+            new: key,
+        }
+    );
     Ok(())
 }

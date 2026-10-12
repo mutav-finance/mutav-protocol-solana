@@ -1,23 +1,31 @@
-//! `cancel_redeem()` (spec §5.5; ADR 0010, ADR 0023). The request's owner
-//! or the admin. Never pausable.
+//! `cancel_redeem()` (spec §5.5; ADR 0010, ADR 0023, ADR 0030). The
+//! request's owner or the admin. Never pausable.
 //!
-//! The admin path removes a head that cannot fill (for example a
-//! `min_assets_out` no fill can meet) so the queue behind it moves. The
-//! shares and the request's rent go back to the owner, never to the signer.
-//! The shares land in the owner's associated token account for the share
-//! mint, created here if needed with the signer paying its rent.
+//! - **The owner** cancels a pending request, or collects a parked one: the
+//!   shares go back into the owner's associated token account for the share
+//!   mint, created here if needed with the owner paying its rent, and the
+//!   request closes (rent to the owner).
+//! - **The admin** removes a head that cannot fill (for example a
+//!   `min_assets_out` no fill can meet) by **parking** it (ADR 0030):
+//!   `status = REDEEM_CANCELLED`, nothing moves. The shares stay in
+//!   `pending_redemptions`, still counted in `pending_redeem_shares` and
+//!   `shares_outstanding`, owed to the owner, who alone collects them later.
+//!   The admin path touches no account the owner controls, so the owner
+//!   cannot make it fail (a share account reassigned with `SetAuthority`),
+//!   and the queue behind it moves.
 
 use anchor_lang::{prelude::*, AccountsClose};
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::Token,
-    token_interface::{transfer_checked, Mint, TokenAccount, TransferChecked},
+    token_interface::{Mint, TokenAccount},
 };
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     errors::MutavError,
-    events::RedeemCancelled,
+    events::{RedeemCancelled, RedeemParked},
     instructions::capital::{create_owner_ata, owner_ata},
     state::{RedeemRequest, VaultConfig, VaultState},
 };
@@ -25,8 +33,9 @@ use crate::{
 #[event_cpi]
 #[derive(Accounts)]
 pub struct CancelRedeem<'info> {
-    /// The request's owner or the admin. Pays the rent of the owner's share
-    /// token account if it has to be created.
+    /// The request's owner or the admin. The owner pays the rent of its
+    /// share token account if it has to be created; the admin only parks
+    /// (ADR 0030).
     #[account(
         mut,
         constraint = signer.key() == redeem_request.owner || signer.key() == config.admin
@@ -64,7 +73,8 @@ pub struct CancelRedeem<'info> {
     pub redeem_request: Box<Account<'info, RedeemRequest>>,
 
     /// The owner's associated token account for the share mint; created
-    /// idempotently in the handler, the signer paying its rent (ADR 0023).
+    /// idempotently in the handler on the owner's path (ADR 0023). Not
+    /// touched by the admin's.
     /// CHECK: address-bound to the owner's associated token account.
     #[account(
         mut,
@@ -92,8 +102,36 @@ pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
     // Never paused. Only this request changes; `redeem_head` is not moved
     // here.
     let r = &ctx.accounts.redeem_request;
-    require!(r.status == REDEEM_PENDING, MutavError::InvalidRequestStatus);
-    let (seq, returned, owner) = (r.seq, r.shares, r.owner);
+    let (seq, shares, owner, status) = (r.seq, r.shares, r.owner, r.status);
+    let by = ctx.accounts.signer.key();
+    let config_key = ctx.accounts.config.key();
+    let ts = Clock::get()?.unix_timestamp;
+
+    // The signer is the owner or the admin (account constraint).
+    if by != owner {
+        // The admin parks a pending request (ADR 0030): no transfer, no
+        // account creation, no close. The shares stay owed to the owner.
+        require!(status == REDEEM_PENDING, MutavError::InvalidRequestStatus);
+        ctx.accounts.redeem_request.status = REDEEM_CANCELLED;
+        emit_event!(
+            ctx,
+            RedeemParked {
+                config: config_key,
+                ts,
+                owner,
+                seq,
+                shares,
+                by,
+            }
+        );
+        return Ok(());
+    }
+
+    // The owner: a pending or a parked request is returned and closed.
+    require!(
+        status == REDEEM_PENDING || status == REDEEM_CANCELLED,
+        MutavError::InvalidRequestStatus
+    );
     let a = &ctx.accounts;
     create_owner_ata(
         a.signer.to_account_info(),
@@ -105,44 +143,37 @@ pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
         a.associated_token_program.key(),
     )?;
 
-    let config_key = ctx.accounts.config.key();
-    let authority_seeds: &[&[u8]] = &[
-        AUTHORITY_SEED,
-        config_key.as_ref(),
-        &[ctx.accounts.config.authority_bump],
-    ];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.share_token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.pending_redemptions.to_account_info(),
-                mint: ctx.accounts.share_mint.to_account_info(),
-                to: ctx.accounts.owner_shares.to_account_info(),
-                authority: ctx.accounts.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
-        returned,
-        ctx.accounts.share_mint.decimals,
+    vault_transfer(
+        a.share_token_program.key(),
+        a.pending_redemptions.to_account_info(),
+        a.share_mint.to_account_info(),
+        a.owner_shares.to_account_info(),
+        a.vault_authority.to_account_info(),
+        &config_key,
+        a.config.authority_bump,
+        shares,
+        a.share_mint.decimals,
     )?;
 
-    let by = ctx.accounts.signer.key();
     let state = &mut ctx.accounts.state;
     state.pending_redeem_shares = state
         .pending_redeem_shares
-        .checked_sub(returned)
+        .checked_sub(shares)
         .ok_or(MutavError::MathOverflow)?;
 
-    emit_cpi!(RedeemCancelled {
-        config: config_key,
-        ts: Clock::get()?.unix_timestamp,
-        owner,
-        seq,
-        shares_returned: returned,
-        by,
-    });
+    emit_event!(
+        ctx,
+        RedeemCancelled {
+            config: config_key,
+            ts,
+            owner,
+            seq,
+            shares_returned: shares,
+            by,
+        }
+    );
 
-    // A pending request has nothing claimable: the account closes now.
+    // Nothing is left on the request: it closes, rent to the owner.
     ctx.accounts
         .redeem_request
         .close(ctx.accounts.owner.to_account_info())?;

@@ -19,7 +19,7 @@ function view({ brs, inbox = 0n }: { brs: bigint; inbox?: bigint }) {
   return {
     config: config() as never,
     state: state({ brsBalance: brs }),
-    solvency: { stableAssets: brs } as never,
+    coverage: { stableAssets: brs } as never,
     incomeInbox: { address: ADAPTER, exists: true, amount: inbox },
   };
 }
@@ -83,9 +83,9 @@ function specRole(role: string): string[] {
 const binary = () => [...readFileSync(join(REPO, "programs/mutav/src/lib.rs"), "utf8").matchAll(/pub fn (\w+)\s*\(\s*ctx: Context</g)].map((x) => x[1]!);
 
 describe("planned reserve-allocation instructions", () => {
-  it("are the spec's admin instructions that lib.rs does not have (besides approve_claim, Wave 2)", () => {
+  it("are the spec's admin instructions that lib.rs does not have", () => {
     const missing = specRole("Admin").filter((ix) => !binary().includes(ix));
-    expect(missing.sort()).toEqual([...PLANNED_RESERVE_INSTRUCTIONS.map((p) => p.ix), "approve_claim"].sort());
+    expect(missing.sort()).toEqual(PLANNED_RESERVE_INSTRUCTIONS.map((p) => p.ix).sort());
   });
 
   it("are signed by the admin and none is offered as an action", () => {

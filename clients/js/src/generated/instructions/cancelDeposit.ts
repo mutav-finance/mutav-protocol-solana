@@ -182,8 +182,8 @@ export type CancelDepositAsyncInput<
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   /**
-   * The request's owner or the admin. Pays the rent of the owner's token
-   * account if it has to be created.
+   * The request's owner or the admin. The owner pays the rent of its token
+   * account if it has to be created; the admin only parks (ADR 0030).
    */
   signer: TAccountSigner;
   /**
@@ -193,10 +193,15 @@ export type CancelDepositAsyncInput<
   owner: TAccountOwner;
   config?: TAccountConfig;
   state?: TAccountState;
+  /**
+   * Closed by the owner's cancel (rent to the owner); parked, not closed,
+   * by the admin's (ADR 0030).
+   */
   depositRequest: TAccountDepositRequest;
   /**
    * The owner's associated token account for the reserve mint; created
-   * idempotently in the handler.
+   * idempotently in the handler on the owner's path. Not touched by the
+   * admin's.
    */
   destination: TAccountDestination;
   pendingDeposits?: TAccountPendingDeposits;
@@ -534,8 +539,8 @@ export type CancelDepositInput<
   TAccountProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
   /**
-   * The request's owner or the admin. Pays the rent of the owner's token
-   * account if it has to be created.
+   * The request's owner or the admin. The owner pays the rent of its token
+   * account if it has to be created; the admin only parks (ADR 0030).
    */
   signer: TAccountSigner;
   /**
@@ -545,10 +550,15 @@ export type CancelDepositInput<
   owner: TAccountOwner;
   config: TAccountConfig;
   state: TAccountState;
+  /**
+   * Closed by the owner's cancel (rent to the owner); parked, not closed,
+   * by the admin's (ADR 0030).
+   */
   depositRequest: TAccountDepositRequest;
   /**
    * The owner's associated token account for the reserve mint; created
-   * idempotently in the handler.
+   * idempotently in the handler on the owner's path. Not touched by the
+   * admin's.
    */
   destination: TAccountDestination;
   pendingDeposits: TAccountPendingDeposits;
@@ -823,8 +833,8 @@ export type ParsedCancelDepositInstruction<
   programAddress: Address<TProgram>;
   accounts: {
     /**
-     * The request's owner or the admin. Pays the rent of the owner's token
-     * account if it has to be created.
+     * The request's owner or the admin. The owner pays the rent of its token
+     * account if it has to be created; the admin only parks (ADR 0030).
      */
     signer: TAccountMetas[0];
     /**
@@ -834,10 +844,15 @@ export type ParsedCancelDepositInstruction<
     owner: TAccountMetas[1];
     config: TAccountMetas[2];
     state: TAccountMetas[3];
+    /**
+     * Closed by the owner's cancel (rent to the owner); parked, not closed,
+     * by the admin's (ADR 0030).
+     */
     depositRequest: TAccountMetas[4];
     /**
      * The owner's associated token account for the reserve mint; created
-     * idempotently in the handler.
+     * idempotently in the handler on the owner's path. Not touched by the
+     * admin's.
      */
     destination: TAccountMetas[5];
     pendingDeposits: TAccountMetas[6];

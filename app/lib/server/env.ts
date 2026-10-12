@@ -16,6 +16,8 @@ export type ServerEnv = {
   squadsMultisig: Address | null;
   /** Allowlisted owners (public addresses), for request_deposit proofs. */
   allowlist: Address[];
+  /** The owner the payments token account should have (public address), for the watcher alert. */
+  paymentsOwner: Address | null;
 };
 
 const opt = (v: string | undefined) => (v && v.trim() ? v.trim() : null);
@@ -32,6 +34,7 @@ export function serverEnv(env: Record<string, string | undefined> = process.env)
     programId: address(opt(env.PROGRAM_ID) ?? MUTAV_PROGRAM_ADDRESS),
     configAddress: config ? address(config) : null,
     squadsMultisig: squads ? address(squads) : null,
+    paymentsOwner: opt(env.PAYMENTS_OWNER) ? address(opt(env.PAYMENTS_OWNER)!) : null,
     allowlist: (opt(env.ALLOWLIST) ?? "").split(",").map((x) => x.trim()).filter(Boolean).map((x) => address(x)),
   };
 }

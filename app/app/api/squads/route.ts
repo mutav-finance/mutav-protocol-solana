@@ -1,36 +1,46 @@
 import { address } from "@solana/kit";
-import { readReserve } from "@/lib/server/chain";
-import { serverEnv } from "@/lib/server/env";
-import { errorResponse } from "@/lib/server/respond";
-import { composeProposalApprove, composeProposalExecute, readMultisig, vaultAddress } from "@/lib/server/squads";
+import { guardedEnv, readReserve } from "@/lib/server/chain";
+import { ComposeError } from "@/lib/server/compose";
+import { errorResponse, readResponse } from "@/lib/server/respond";
+import { cachedRead, isFresh } from "@/lib/server/read-cache";
+import { boundedBody } from "@/lib/server/relay";
+import { composeProposalAction, readMultisig, vaultAddress, type ProposalAction } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
+import { MockChainError, mockEnabled, mockSquads } from "@/lib/server/mock";
 
 /** The admin multisig and its recent proposals, or why there is none. */
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const env = serverEnv();
-    const reserve = await readReserve(env);
-    if (!env.squadsMultisig) {
-      return jsonResponse({ configured: false, admin: reserve.config.admin, cluster: env.cluster });
-    }
-    const vault = vaultAddress(env.squadsMultisig);
-    const ms = await readMultisig(env, reserve.now, 10, reserve.config);
-    return jsonResponse({ configured: true, adminIsVault: reserve.config.admin === vault, multisig: ms, now: reserve.now });
+    if (mockEnabled()) return jsonResponse(await mockSquads());
+    const env = await guardedEnv();
+    return readResponse(
+      await cachedRead("squads", async () => {
+        const reserve = await readReserve(env);
+        if (!env.squadsMultisig) return { configured: false, admin: reserve.config.admin, cluster: env.cluster };
+        const vault = vaultAddress(env.squadsMultisig);
+        const ms = await readMultisig(env, reserve.now, reserve);
+        return { configured: true, adminIsVault: reserve.config.admin === vault, multisig: ms, now: reserve.now };
+      }, { fresh: isFresh(req) }),
+    );
   } catch (e) {
     return errorResponse(e);
   }
 }
 
-/** Compose an unsigned approve or execute transaction for a member's wallet. */
+const ACTIONS: readonly ProposalAction[] = ["approve", "reject", "cancel", "execute"];
+
+/** Compose an unsigned approve, reject, cancel or execute transaction for a member's wallet. */
 export async function POST(req: Request) {
   try {
-    const body = decode<{ action: "approve" | "execute"; index: bigint; member: string }>(await req.text());
-    const env = serverEnv();
+    if (mockEnabled()) throw new MockChainError();
+    const body = decode<{ action: ProposalAction; index: bigint; member: string }>(await boundedBody(req));
+    if (!ACTIONS.includes(body.action)) throw new ComposeError(`unknown action ${String(body.action)}`);
+    if (typeof body.index !== "bigint" || body.index < 1n) throw new ComposeError("index must be a proposal index");
+    const env = await guardedEnv();
     const member = address(body.member);
-    const tx =
-      body.action === "approve"
-        ? await composeProposalApprove(env, member, body.index)
-        : await composeProposalExecute(env, member, body.index);
+    // Execute re-reads the config for the stale-carry check (A3).
+    const config = body.action === "execute" ? (await readReserve(env)).config : undefined;
+    const tx = await composeProposalAction(env, member, body.index, body.action, config);
     return jsonResponse({ tx });
   } catch (e) {
     return errorResponse(e);

@@ -79,13 +79,13 @@ const n = (id: string, x: number, y: number, data: BoxData): Node<BoxData> => ({
 
 const NODES: Node<BoxData>[] = [
   n("operator", 0, 20, { title: "OPERATOR", sub: "MUTAV platform key\nregisters · fees · claims", w: 190, h: 74, role: "operator" }),
-  n("gate", 300, 26, { title: "SOLVENCY GATE", sub: "new cover must fit\nin free capital", w: 170, h: 62, gate: true }),
+  n("gate", 300, 26, { title: "COVERAGE GATE", sub: "new cover must fit\nin free capital", w: 170, h: 62, gate: true }),
   n("admin", 840, 20, { title: "RESERVE ADMIN", sub: "Squads M-of-N multisig\ntime-locked proposals", w: 200, h: 74, role: "admin" }),
   n("reserve", 380, 170, { title: "RESERVE", sub: "BRS held by the program\nNAV · coverage · free capital\nshares minted at NAV", w: 260, h: 130, accent: true }),
   n("escrows", 820, 186, { title: "ESCROWS", sub: "pending deposits\npending redemptions\nclaims (filled redemptions)", w: 220, h: 98 }),
   n("nora", 0, 200, { title: "NORA · BRS", sub: "issues the BRL stablecoin\nholds its freeze authority", w: 200, h: 70 }),
   n("treasury", 120, 390, { title: "TREASURY", sub: "MUTAV's fee take\n(operating revenue)", w: 190, h: 64 }),
-  n("investor", 840, 390, { title: "INVESTOR", sub: "allowlisted capital wallet\n(pilot: MUTAV's own)", w: 200, h: 64, role: "investor" }),
+  n("investor", 840, 390, { title: "INVESTOR", sub: "allowlisted capital wallet\n(KYC off-chain)", w: 200, h: 64, role: "investor" }),
   n("payments", 560, 390, { title: "PAYMENTS ACCOUNT", sub: "claim payments out\n→ PIX to the agency", w: 220, h: 64 }),
 ];
 
@@ -120,7 +120,7 @@ const MOBILE: [string, string, Role?][] = [
   ["Operator", "Registers guarantees, contributes guarantee fees, files, pays and settles claims.", "operator"],
   ["Coverage gate", "A new guarantee is accepted only if its cover fits in free capital. Redemptions pass the same gate."],
   ["Reserve", "BRS held by the program. Publishes NAV, coverage required and free capital."],
-  ["Investor", "Requests deposits and redemptions, then claims shares or assets. Allowlist-gated; in the pilot, MUTAV's capital wallet.", "investor"],
+  ["Investor", "Requests deposits and redemptions, then claims shares or assets. Deposits are allowlist-gated; holders can always redeem. In the pilot, MUTAV's capital wallet.", "investor"],
   ["Escrows", "Deposits and redemptions wait in FIFO escrows until the Reserve Admin fulfils them."],
   ["Reserve Admin (Squads)", "M-of-N multisig with a time lock. Fulfils the queues, sets config and caps, pauses.", "admin"],
   ["Treasury", "Receives MUTAV's take of each guarantee fee, outside the reserve."],

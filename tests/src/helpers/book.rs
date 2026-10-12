@@ -232,7 +232,7 @@ impl Fixture {
     /// NAV per share (`NAV_SCALE`) computed from the current state with the
     /// spec §4 formulas, as `refresh` (Task 10) publishes it.
     pub fn nav(&self) -> u64 {
-        use mutav::solvency::{nav_per_share, net_assets};
+        use mutav::coverage::{nav_per_share, net_assets};
         let s = self.state();
         nav_per_share(
             net_assets(s.brs_balance, s.provisions),
@@ -430,6 +430,48 @@ impl Fixture {
         )
     }
 
+    /// `approve_claim` of `c.notice` for `amount` at revision 0 (ADR 0021).
+    pub fn approve_claim_ix(&self, signer: &Pubkey, c: Claim, amount: u64) -> Instruction {
+        self.approve_claim_rev_ix(signer, c, amount, 0)
+    }
+
+    /// `approve_claim` of `c.notice` for `amount` at `expected_revision`.
+    pub fn approve_claim_rev_ix(
+        &self,
+        signer: &Pubkey,
+        c: Claim,
+        amount: u64,
+        expected_revision: u16,
+    ) -> Instruction {
+        let config = self.pdas.config;
+        let guarantee = guarantee_pda(&config, &c.id);
+        Instruction::new_with_bytes(
+            mutav::ID,
+            &mutav::instruction::ApproveClaim {
+                notice_ref_hash: c.notice,
+                amount,
+                expected_revision,
+            }
+            .data(),
+            mutav::accounts::ApproveClaim {
+                admin: *signer,
+                config,
+                guarantee,
+                claim_filing: claim_pda(&guarantee, &c.notice),
+                event_authority: self.pdas.event_authority,
+                program: mutav::ID,
+            }
+            .to_account_metas(None),
+        )
+    }
+
+    /// `approve_claim` of `c` for `c.amount`, signed by the admin.
+    pub fn approve_claim(&mut self, c: Claim) -> TransactionResult {
+        let admin = self.admin.insecure_clone();
+        let ix = self.approve_claim_ix(&admin.pubkey(), c, c.amount);
+        self.send(ix, &admin)
+    }
+
     /// `file_claim` signed by the operator.
     pub fn file_claim(&mut self, c: Claim) -> TransactionResult {
         let op = self.operator.insecure_clone();
@@ -485,6 +527,9 @@ impl Fixture {
         let op = self.operator.insecure_clone();
         let cover = 10_000 * BRL;
         self.fund_reserve(cover);
+        // Inflows wait for the first shares (ADR 0023): the list runs on a
+        // reserve with holders.
+        self.inject_shares(cover);
         let args = guarantee_args(unique_hash(), cover, 0);
         let id = args.id;
         let source = self.operator_brs(1_000 * BRL);
@@ -502,6 +547,11 @@ impl Fixture {
                 "file_claim",
                 self.file_claim_ix(&op.pubkey(), claim),
                 op.insecure_clone(),
+            ),
+            (
+                "approve_claim",
+                self.approve_claim_ix(&self.admin.pubkey(), claim, claim.amount),
+                self.admin.insecure_clone(),
             ),
             (
                 "pay_claim",

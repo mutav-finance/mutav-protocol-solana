@@ -7,10 +7,10 @@ use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
     constants::*,
+    coverage::{Coverage, CoverageInputs},
     errors::MutavError,
     events::{FulfilHaltRaised, ModeChanged, ReserveFrozenDetected, StateRefreshed},
     pricing::{guard_nav, nav_move_exceeds, published_nav},
-    solvency::{Solvency, SolvencyInputs},
     state::{VaultConfig, VaultState},
 };
 
@@ -63,21 +63,25 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
     ] {
         if account.is_frozen() {
             reserve_frozen |= counts;
-            emit_cpi!(ReserveFrozenDetected {
-                config: config_key,
-                ts: now,
-                token_account: account.key(),
-            });
+            emit_event!(
+                ctx,
+                ReserveFrozenDetected {
+                    config: config_key,
+                    ts: now,
+                    token_account: account.key(),
+                }
+            );
         }
     }
 
     // 2. The spec §4 quantities.
     let state = &ctx.accounts.state;
-    let sol = Solvency::compute(&SolvencyInputs {
+    let sol = Coverage::compute(&CoverageInputs {
         brs_balance: if reserve_frozen { 0 } else { state.brs_balance },
         remaining_cover_total: state.remaining_cover_total,
         coverage_ratio_bps: config.coverage_ratio_bps,
         provisions: state.provisions,
+        stress_buffer: config.caps.stress_buffer,
     })?;
     let nav = published_nav(sol.net_assets, state.shares_outstanding)?;
 
@@ -116,41 +120,50 @@ pub fn handle_refresh(ctx: Context<Refresh>) -> Result<()> {
         state.fulfil_halted,
     );
     if raised {
-        emit_cpi!(FulfilHaltRaised {
-            config: config_key,
-            ts: now,
-            prev_nav_per_share: prev_nav,
-            guard_nav: moved_nav,
-            inflow_nav: inflow,
-            max_nav_move_bps,
-            source: HALT_SOURCE_REFRESH,
-        });
+        emit_event!(
+            ctx,
+            FulfilHaltRaised {
+                config: config_key,
+                ts: now,
+                prev_nav_per_share: prev_nav,
+                guard_nav: moved_nav,
+                inflow_nav: inflow,
+                max_nav_move_bps,
+                source: HALT_SOURCE_REFRESH,
+            }
+        );
     }
 
     if from != to {
-        emit_cpi!(ModeChanged {
+        emit_event!(
+            ctx,
+            ModeChanged {
+                config: config_key,
+                ts: now,
+                from,
+                to,
+                deficit: sol.deficit(),
+            }
+        );
+    }
+    emit_event!(
+        ctx,
+        StateRefreshed {
             config: config_key,
             ts: now,
-            from,
-            to,
-            deficit: sol.deficit(),
-        });
-    }
-    emit_cpi!(StateRefreshed {
-        config: config_key,
-        ts: now,
-        stable_assets: sol.stable_assets,
-        coverage_required: sol.coverage_required,
-        surplus: sol.surplus,
-        provisions,
-        nav_per_share: nav,
-        mode: to,
-        prev_nav_per_share: prev_nav,
-        inflow_nav: inflow,
-        guard_nav: moved_nav,
-        shares_outstanding,
-        net_assets: sol.net_assets,
-        fulfil_halted,
-    });
+            stable_assets: sol.stable_assets,
+            coverage_required: sol.coverage_required,
+            surplus: sol.surplus,
+            provisions,
+            nav_per_share: nav,
+            mode: to,
+            prev_nav_per_share: prev_nav,
+            inflow_nav: inflow,
+            guard_nav: moved_nav,
+            shares_outstanding,
+            net_assets: sol.net_assets,
+            fulfil_halted,
+        }
+    );
     Ok(())
 }

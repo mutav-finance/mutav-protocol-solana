@@ -137,6 +137,13 @@ pub const SECONDS_PER_DAY: i64 = 86_400;
 // of whole fills fits the default 200k CU in LiteSVM.
 pub const MAX_FULFIL_BATCH: u8 = 8;
 
+/// A redemption below `caps.min_request` (an exit of the balance, ADR 0029)
+/// must still be worth at least `min_request / SUB_MINIMUM_EXIT_FLOOR_DIVISOR`
+/// (at least 1 base unit): R$100 at the devnet R$1,000 minimum. A floor in
+/// the manner of the SF vault's `MinRedemption` threshold; the value is
+/// MUTAV's, the references are silent on it (ADR 0029).
+pub const SUB_MINIMUM_EXIT_FLOOR_DIVISOR: u64 = 10;
+
 /// Deepest allowlist Merkle proof accepted (2^32 leaves).
 pub const MAX_ALLOWLIST_PROOF_LEN: usize = 32;
 
@@ -212,10 +219,18 @@ pub const INCOME_KIND_BACKSTOP: u8 = 3;
 /// `DepositRequest.status` (spec §3.8).
 pub const DEPOSIT_PENDING: u8 = 0;
 pub const DEPOSIT_FULFILLED: u8 = 1;
+/// Removed from the queue by the admin (ADR 0030): the BRS stays in
+/// `pending_deposits`, owed to the owner, who alone collects it with
+/// `cancel_deposit`. Dead for the queue; never filled or claimed.
+pub const DEPOSIT_CANCELLED: u8 = 2;
 
 /// `RedeemRequest.status` (spec §3.8).
 pub const REDEEM_PENDING: u8 = 0;
 pub const REDEEM_FILLED: u8 = 1;
+/// Removed from the queue by the admin (ADR 0030): the shares stay in
+/// `pending_redemptions`, owed to the owner, who alone collects them with
+/// `cancel_redeem`. Dead for the queue; never filled or claimed.
+pub const REDEEM_CANCELLED: u8 = 2;
 
 // ---------------------------------------------------------------------------
 // Pinned account sizes, discriminator included (spec §14.2 R7). Asserted

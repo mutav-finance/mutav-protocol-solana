@@ -262,6 +262,9 @@ fn padding_holds_every_planned_carve() {
     const ADR_0012_CLAIM: usize = (1 + 8 + 8 + 32) + (1 + 32 + 32);
     assert_eq!(ADR_0012_CLAIM, 114);
     assert!(padding_of(CLAIM_FILING_V1) >= ADR_0012_CLAIM + 64);
+    // After the `revision` carve (2 bytes, ADR 0021 decision 8) the
+    // ADR 0012 fields and the 64 spare bytes still fit.
+    assert!(padding_of(CLAIM_FILING_V1) - 2 >= ADR_0012_CLAIM + 64);
     // The rest of the ADR 0010 partial fills: `assets_claimed`, `fill_count`,
     // `last_fill_at`. `shares_filled` is already a v1 field; the remainder
     // (`shares − shares_filled`) and the claimable amount are derived.
@@ -280,9 +283,10 @@ fn padding_holds_every_planned_carve() {
         zeroed::<Guarantee>()._reserved.len(),
         padding_of(GUARANTEE_V1)
     );
+    // Less the `revision` carve (ADR 0021 decision 8).
     assert_eq!(
         zeroed::<ClaimFiling>()._reserved.len(),
-        padding_of(CLAIM_FILING_V1)
+        padding_of(CLAIM_FILING_V1) - 2
     );
     assert_eq!(
         zeroed::<RedeemRequest>()._reserved.len(),

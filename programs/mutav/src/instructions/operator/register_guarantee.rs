@@ -1,14 +1,14 @@
-//! `register_guarantee` (spec §5.2): solvency-gated and capped.
+//! `register_guarantee` (spec §5.2): coverage-gated and capped.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
     constants::*,
+    coverage::coverage_required,
     errors::MutavError,
     events::GuaranteeRegistered,
-    instructions::operator::solvency_snapshot,
-    solvency::coverage_required,
+    instructions::operator::coverage_snapshot,
     state::{Guarantee, VaultConfig, VaultState},
 };
 
@@ -73,9 +73,9 @@ pub fn handle_register_guarantee(
     // Rule 1: not paused, normal mode (stored, and checked inline, spec §6).
     require!(!config.paused, MutavError::Paused);
     require!(state.mode == MODE_NORMAL, MutavError::UnderCovered);
-    // A frozen reserve counts as 0 BRS: refused before any solvency figure.
+    // A frozen reserve counts as 0 BRS: refused before any coverage figure.
     require!(!ctx.accounts.reserve.is_frozen(), MutavError::ReserveFrozen);
-    let before = solvency_snapshot(config, state)?;
+    let before = coverage_snapshot(config, state)?;
     require!(!before.under_covered(), MutavError::UnderCovered);
 
     // Rule 2: parameters.
@@ -91,7 +91,7 @@ pub fn handle_register_guarantee(
         MutavError::GuaranteeCapExceeded
     );
 
-    // Rule 4: solvency post-condition.
+    // Rule 4: coverage post-condition.
     let cover_total_after = state
         .remaining_cover_total
         .checked_add(new_cover)
@@ -100,6 +100,7 @@ pub fn handle_register_guarantee(
         cover_total_after,
         config.coverage_ratio_bps,
         state.provisions,
+        config.caps.stress_buffer,
     )?;
     require!(
         coverage_after <= before.stable_assets,
@@ -126,17 +127,20 @@ pub fn handle_register_guarantee(
         .checked_add(1)
         .ok_or(MutavError::MathOverflow)?;
 
-    emit_cpi!(GuaranteeRegistered {
-        config: config.key(),
-        ts: now,
-        id: args.id,
-        agency_id: args.agency_id,
-        refs_hash: args.refs_hash,
-        default_cover: args.default_cover,
-        exit_cover: args.exit_cover,
-        remaining_cover_total: state.remaining_cover_total,
-        coverage_required: state.coverage_required,
-        active_guarantees: state.active_guarantees,
-    });
+    emit_event!(
+        ctx,
+        GuaranteeRegistered {
+            config: config.key(),
+            ts: now,
+            id: args.id,
+            agency_id: args.agency_id,
+            refs_hash: args.refs_hash,
+            default_cover: args.default_cover,
+            exit_cover: args.exit_cover,
+            remaining_cover_total: state.remaining_cover_total,
+            coverage_required: state.coverage_required,
+            active_guarantees: state.active_guarantees,
+        }
+    );
     Ok(())
 }

@@ -3,7 +3,7 @@ import {
   NAV_SCALE,
   previewDepositFulfil,
   previewRedeemFulfil,
-  solvencyFromAccounts,
+  coverageFromAccounts,
 } from '../src';
 import { blankConfig, blankState } from './fakes';
 
@@ -15,14 +15,14 @@ function reserve(over: Partial<ReturnType<typeof blankState>> = {}) {
   return { config, state };
 }
 
-describe('solvencyFromAccounts', () => {
+describe('coverageFromAccounts', () => {
   test('reads the snapshot the program reads (BRS only)', () => {
     const { config, state } = reserve({
       brsBalance: 100_000n * BRL,
       remainingCoverTotal: 60_000n * BRL,
       provisions: 5_000n * BRL,
     });
-    const s = solvencyFromAccounts(config, state);
+    const s = coverageFromAccounts(config, state);
     expect(s.surplus).toBe(40_000n * BRL);
     expect(s.stableAssets).toBe(100_000n * BRL);
     expect(s.freeCapital).toBe(s.surplus);
@@ -36,13 +36,25 @@ describe('solvencyFromAccounts', () => {
       remainingCoverTotal: 60_000n * BRL,
       provisions: 9_000n * BRL,
     });
-    const s = solvencyFromAccounts({ ...config, coverageRatioBps: 1_000 }, state);
+    const s = coverageFromAccounts({ ...config, coverageRatioBps: 1_000 }, state);
     expect(s.coverageRequired).toBe(9_000n * BRL);
     expect(s.freeCapital).toBe(1_000n * BRL);
     expect(s.liquidBudget).toBe(1_000n * BRL);
-    const low = solvencyFromAccounts({ ...config, coverageRatioBps: 1_000 }, { ...state, provisions: 0n });
+    const low = coverageFromAccounts({ ...config, coverageRatioBps: 1_000 }, { ...state, provisions: 0n });
     expect(low.coverageRequired).toBe(6_000n * BRL);
     expect(low.freeCapital).toBe(4_000n * BRL);
+  });
+
+  test("the config's stress buffer enters coverage required (ADR 0022)", () => {
+    const { config, state } = reserve({
+      brsBalance: 30_000n * BRL,
+      remainingCoverTotal: 100_000n * BRL,
+      provisions: 4_000n * BRL,
+    });
+    const c = { ...config, coverageRatioBps: 1_000, caps: { ...config.caps, stressBuffer: 19_000n * BRL } };
+    const s = coverageFromAccounts(c, state);
+    expect(s.coverageRequired).toBe(23_000n * BRL);
+    expect(s.freeCapital).toBe(7_000n * BRL);
   });
 
 });
@@ -50,7 +62,8 @@ describe('solvencyFromAccounts', () => {
 describe('previewDepositFulfil', () => {
   test('first deposit at 1.0, later ones at the running NAV', () => {
     const { config, state } = reserve();
-    const fills = previewDepositFulfil(config, state, [5_000n * BRL, 1_000n * BRL]);
+    const { fills, stoppedBy } = previewDepositFulfil(config, state, [5_000n * BRL, 1_000n * BRL]);
+    expect(stoppedBy).toBeNull();
     expect(fills[0]).toEqual({ assets: 5_000n * BRL, shares: 5_000n * BRL, nav: NAV_SCALE });
     // (5e9 + 1) / (5e9 + 1) = 1.0 exactly.
     expect(fills[1]).toEqual({ assets: 1_000n * BRL, shares: 1_000n * BRL, nav: NAV_SCALE });
@@ -58,9 +71,19 @@ describe('previewDepositFulfil', () => {
 
   test('fees raise the price', () => {
     const { config, state } = reserve({ brsBalance: 2_000n, sharesOutstanding: 1_000n });
-    const [f] = previewDepositFulfil(config, state, [1_000n]);
+    const [f] = previewDepositFulfil(config, state, [1_000n]).fills;
     // floor(1000 × 1001 / 2001) = 500.
     expect(f!.shares).toBe(500n);
+  });
+
+  test('stops where the program stops: underwater, zero shares, price limit (ADR 0029)', () => {
+    const under = reserve({ brsBalance: 6n, provisions: 5n, sharesOutstanding: 10_000_000_000n });
+    expect(previewDepositFulfil(under.config, under.state, [1_000n]).stoppedBy).toBe('ReserveUnderwater');
+    const { config, state } = reserve({ brsBalance: 2_000n, sharesOutstanding: 1_000n });
+    expect(previewDepositFulfil(config, state, [1n]).stoppedBy).toBe('RequestTooSmall');
+    const r = previewDepositFulfil(config, state, [1_000n, { assets: 1_000n, minSharesOut: 1_000n }]);
+    expect(r.fills.length).toBe(1);
+    expect(r.stoppedBy).toBe('PriceLimitNotMet');
   });
 });
 
@@ -97,10 +120,32 @@ describe('previewRedeemFulfil (whole fills only)', () => {
     expect(r.stoppedBy).toBe('InsufficientFreeCapital');
   });
 
-  test('a request worth nothing stops the batch', () => {
-    const { config, state } = reserve({ brsBalance: 1n, sharesOutstanding: 1_000_000n });
-    const r = previewRedeemFulfil(config, state, [{ seq: 0n, shares: 1n }]);
+  test('a request worth nothing stops the batch (ADR 0029)', () => {
+    const { config, state } = reserve({ brsBalance: 1_000n, sharesOutstanding: 1_000_000n });
+    const r = previewRedeemFulfil(config, state, [
+      { seq: 0n, shares: 1n },
+      { seq: 1n, shares: 999_999n },
+    ]);
+    expect(r.fills).toEqual([]);
     expect(r.stoppedBy).toBe('RequestTooSmall');
+  });
+
+  test('honours the price limit', () => {
+    const { config, state } = base();
+    const r = previewRedeemFulfil(config, state, [
+      { seq: 0n, shares: 1_000n },
+      { seq: 1n, shares: 1_000n, minAssetsOut: 1_001n },
+    ]);
+    expect(r.fills.map((f) => f.seq)).toEqual([0n]);
+    expect(r.stoppedBy).toBe('PriceLimitNotMet');
+  });
+
+  test('an underwater reserve refuses, near zero too (ADR 0029)', () => {
+    const zero = reserve({ brsBalance: 5n, provisions: 5n, remainingCoverTotal: 5n, sharesOutstanding: 10n });
+    expect(previewRedeemFulfil(zero.config, zero.state, [{ seq: 0n, shares: 1n }]).stoppedBy).toBe('ReserveUnderwater');
+    // BRS = provisions + 1 behind 10¹⁰ shares: NAV below 10⁻⁹.
+    const near = reserve({ brsBalance: 6n, provisions: 5n, remainingCoverTotal: 6n, sharesOutstanding: 10_000_000_000n });
+    expect(previewRedeemFulfil(near.config, near.state, [{ seq: 0n, shares: 1n }]).stoppedBy).toBe('ReserveUnderwater');
   });
 
   test('stops at count', () => {
@@ -128,7 +173,7 @@ describe('previewRedeemFulfil (whole fills only)', () => {
       sharesOutstanding: 1_200n,
     });
     const c = { ...config, coverageRatioBps: 1_000 };
-    const sol = solvencyFromAccounts(c, state);
+    const sol = coverageFromAccounts(c, state);
     expect([sol.coverageRequired, sol.freeCapital, sol.liquidBudget]).toEqual([9_000n, 1_000n, 1_000n]);
     const reqs = [0n, 1n].map((seq) => ({ seq, shares: 600n }));
     const r = previewRedeemFulfil(c, state, reqs);

@@ -8,7 +8,7 @@
  * the spec does not document a trigger it says so instead of inventing one.
  */
 import { CLAIM_WINDOW_DAYS, claimWindowPaid, type VaultConfig, type VaultState } from "@mutav-finance/mutav-protocol-solana";
-import type { ClaimRow } from "./view";
+import { isUnpaid, type ClaimRow } from "./view";
 
 export type OperatorInstruction = "register_guarantee" | "close_guarantee" | "contribute_fees" | "sweep_income" | "file_claim" | "pay_claim" | "settle_payout";
 
@@ -27,13 +27,13 @@ export const DUTIES: Duty[] = [
     ix: "register_guarantee",
     today: "Register the lease an agency signed up in the platform, with its default and exit cover.",
     later: "Triggered by the MUTAV platform when a lease is registered.",
-    bound: "Not paused, mode Normal; cover ≤ max per guarantee; agency total ≤ max per agency; the new cover must fit in free capital (solvency gate).",
+    bound: "Not paused, mode Normal; cover ≤ max per guarantee; the new cover must fit in free capital (gated by required coverage).",
   },
   {
     ix: "close_guarantee",
     today: "Close a guarantee that has ended, releasing its remaining cover.",
     later: "Triggered by the MUTAV platform.",
-    bound: "Guarantee active and no open claims. Not solvency-gated: it only releases liability.",
+    bound: "Guarantee active and no open claims; reason RELEASED, or VOID only if nothing was ever paid. Not gated by required coverage: it only releases liability.",
   },
   {
     ix: "contribute_fees",
@@ -57,7 +57,7 @@ export const DUTIES: Duty[] = [
     ix: "pay_claim",
     today: "Pay a filed claim from the reserve to the payments account.",
     later: "Triggered by the MUTAV platform after the filing.",
-    bound: "≤ max per call; ≤ what is left of the cap over the last 31 days; ≤ the filing's provision plus the leg's unprovisioned cover; liquid BRS only; destination fixed to the payments account. Never solvency-gated.",
+    bound: "≤ max per call; ≤ what is left of the cap over the last 31 days; ≤ the filing's provision plus the leg's unprovisioned cover; liquid BRS only; destination fixed to the payments account. Never gated by required coverage.",
   },
   {
     ix: "settle_payout",
@@ -99,9 +99,14 @@ export function claimCap(
   };
 }
 
-/** Why a pay_claim of `amount` would be refused by the caps, or null if they allow it. */
-export function claimCapRefusal(cap: ClaimCap, amount: bigint): "ClaimCallCapExceeded" | "ClaimPeriodCapExceeded" | null {
-  if (amount > cap.perCall) return "ClaimCallCapExceeded";
+/**
+ * Why a pay_claim of `amount` would be refused by the caps, or null if they
+ * allow it. Above the per-call cap only the exact amount the Reserve Admin
+ * approved passes (`approved`, ADR 0021); approved payments still count toward
+ * the period cap.
+ */
+export function claimCapRefusal(cap: ClaimCap, amount: bigint, approved = 0n): "ClaimCallCapExceeded" | "ClaimPeriodCapExceeded" | null {
+  if (amount > cap.perCall && approved !== amount) return "ClaimCallCapExceeded";
   if (amount > cap.remaining) return "ClaimPeriodCapExceeded";
   return null;
 }
@@ -109,7 +114,7 @@ export function claimCapRefusal(cap: ClaimCap, amount: bigint): "ClaimCallCapExc
 /** Claims the operator still has to act on: filed and unpaid, paid and unsettled. */
 export function claimWork(rows: ClaimRow[]) {
   return {
-    toPay: rows.filter((c) => c.stage === "filed").length,
+    toPay: rows.filter((c) => isUnpaid(c.stage)).length,
     toSettle: rows.filter((c) => c.stage === "paid").length,
   };
 }
@@ -128,4 +133,57 @@ export type OperatorActivity = {
 export function instructionName(data: Uint8Array, table: readonly (readonly [string, ArrayLike<number>])[]): string {
   for (const [name, d] of table) if (d.length <= data.length && Array.from(d).every((x, i) => data[i] === x)) return name;
   return "unknown";
+}
+
+// ── Operator activity, last 24 h (early detection of a misused key) ─────────
+
+export type OperatorDay = {
+  since: bigint;
+  registered: { count: number; cover: bigint };
+  closed: { count: number };
+  filed: { count: number; amount: bigint };
+  paid: { count: number; amount: bigint };
+  fees: { count: number; amount: bigint };
+};
+
+type DayLedger = {
+  guarantees: { data: { registeredAt: bigint; closedAt: bigint; defaultCover: bigint; exitCover: bigint } }[];
+  filings: { data: { filedAt: bigint; provision: bigint; paidAt: bigint; paidAmount: bigint; status: number } }[];
+  fees: { data: { gross?: bigint; net: bigint; take: bigint }; blockTime: bigint | null }[];
+};
+
+/**
+ * What the operator key did in the last `window` seconds, from the accounts'
+ * own timestamps: registrations, closes, claim filings, claim payments and
+ * fee bookings. A burst here is the first sign of a compromised key; the
+ * pauser can revoke it at once.
+ */
+export function operatorDay(ledger: DayLedger, now: bigint, window = 86_400n): OperatorDay {
+  const since = now - window;
+  const inWin = (t: bigint | null) => t !== null && t > 0n && t >= since;
+  const out: OperatorDay = { since, registered: { count: 0, cover: 0n }, closed: { count: 0 }, filed: { count: 0, amount: 0n }, paid: { count: 0, amount: 0n }, fees: { count: 0, amount: 0n } };
+  for (const { data: g } of ledger.guarantees) {
+    if (inWin(g.registeredAt)) {
+      out.registered.count++;
+      out.registered.cover += g.defaultCover + g.exitCover;
+    }
+    if (inWin(g.closedAt)) out.closed.count++;
+  }
+  for (const { data: f } of ledger.filings) {
+    if (inWin(f.filedAt)) {
+      out.filed.count++;
+      out.filed.amount += f.provision;
+    }
+    if (inWin(f.paidAt) && f.paidAmount > 0n) {
+      out.paid.count++;
+      out.paid.amount += f.paidAmount;
+    }
+  }
+  for (const f of ledger.fees) {
+    if (inWin(f.blockTime)) {
+      out.fees.count++;
+      out.fees.amount += f.data.net + f.data.take;
+    }
+  }
+  return out;
 }

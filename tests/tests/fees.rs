@@ -8,6 +8,14 @@ use mutav_tests::helpers::*;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
+/// A fresh reserve with holders: inflows wait for the first shares
+/// (ADR 0023), so every fee test starts after them.
+fn reserve() -> Fixture {
+    let mut f = Fixture::new();
+    f.inject_shares(1_000 * BRL);
+    f
+}
+
 fn set_take(f: &mut Fixture, bps: u16) {
     f.set_config(vec![mutav::ConfigParam::FeeTakeBps(bps)])
         .unwrap();
@@ -16,7 +24,7 @@ fn set_take(f: &mut Fixture, bps: u16) {
 #[test]
 fn contribute_splits_take_to_treasury_and_net_to_reserve() {
     // Test config: fee_take_bps = 2_000 (20%).
-    let mut f = Fixture::new();
+    let mut f = reserve();
     set_time(&mut f.svm, 1_750_000_000);
     let source = f.operator_brs(10_000 * BRL);
     let treasury = f.config().treasury_account;
@@ -82,7 +90,7 @@ fn demo_fee_raises_nav() {
 #[test]
 fn take_rounds_down_in_the_reserves_favour() {
     // 7 base units × 20% = 1.4 → take 1, net 6.
-    let mut f = Fixture::new();
+    let mut f = reserve();
     let (res, invoice) = f.contribute(7);
     res.unwrap();
     let r = f.fee_receipt(&invoice);
@@ -98,7 +106,7 @@ fn take_rounds_down_in_the_reserves_favour() {
 
 #[test]
 fn zero_take_sends_everything_to_the_reserve() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     set_take(&mut f, 0);
     let treasury = f.config().treasury_account;
     let (res, invoice) = f.contribute(5_000 * BRL);
@@ -111,7 +119,7 @@ fn zero_take_sends_everything_to_the_reserve() {
 
 #[test]
 fn maximum_take_is_thirty_percent() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     set_take(&mut f, MAX_FEE_TAKE_BPS);
     let treasury = f.config().treasury_account;
     let (res, invoice) = f.contribute(10_000 * BRL);
@@ -124,7 +132,7 @@ fn maximum_take_is_thirty_percent() {
 
 #[test]
 fn the_take_never_touches_stable_assets() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     f.fund_reserve(50_000 * BRL);
     let (res, _) = f.contribute(1_000 * BRL);
     res.unwrap();
@@ -145,7 +153,7 @@ fn the_take_never_touches_stable_assets() {
 
 #[test]
 fn the_same_invoice_counts_once() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     let source = f.operator_brs(2_000 * BRL);
     let invoice = unique_hash();
     let op = f.operator.insecure_clone();
@@ -166,15 +174,30 @@ fn the_same_invoice_counts_once() {
 }
 
 #[test]
-fn zero_amount_is_invalid() {
+fn fees_wait_for_the_first_shares() {
+    // ADR 0023: with no shares a fee would be priced into the first deposit.
     let mut f = Fixture::new();
+    let source = f.operator_brs(1_000 * BRL);
+    let ix = f.contribute_fees_ix(f.fee_accounts(source), unique_hash(), 1_000 * BRL);
+    let op = f.operator.insecure_clone();
+    assert_mutav_err(f.send(ix, &op), MutavError::NoSharesOutstanding);
+    assert_eq!(
+        f.balance(&source),
+        1_000 * BRL,
+        "the fee stays with the operator"
+    );
+}
+
+#[test]
+fn zero_amount_is_invalid() {
+    let mut f = reserve();
     let (res, _) = f.contribute(0);
     assert_mutav_err(res, MutavError::InvalidParameter);
 }
 
 #[test]
 fn a_treasury_other_than_the_whitelisted_one_is_rejected() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     let source = f.operator_brs(1_000 * BRL);
     let mut a = f.fee_accounts(source);
     for other in [f.payments, f.token_account(&Pubkey::new_unique())] {
@@ -188,7 +211,7 @@ fn a_treasury_other_than_the_whitelisted_one_is_rejected() {
 
 #[test]
 fn wrong_mint_or_token_program_is_rejected() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     let op = f.operator.insecure_clone();
 
     // A source holding another token.
@@ -229,7 +252,7 @@ fn wrong_mint_or_token_program_is_rejected() {
 fn a_source_not_owned_by_the_operator_is_rejected_even_as_delegate() {
     // Spec §5.3: the operator pays from "its own BRS token account". A
     // third party's account with the operator as delegate is refused.
-    let mut f = Fixture::new();
+    let mut f = reserve();
     let op = f.operator.insecure_clone();
     let other = Keypair::new();
     let source = f.token_account(&other.pubkey());
@@ -249,7 +272,7 @@ fn a_source_not_owned_by_the_operator_is_rejected_even_as_delegate() {
 
 #[test]
 fn only_the_reserve_receives_the_net() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     let source = f.operator_brs(1_000 * BRL);
     let mut a = f.fee_accounts(source);
     a.reserve = f.pdas.claims; // another reserve token account
@@ -262,7 +285,7 @@ fn only_the_reserve_receives_the_net() {
 
 #[test]
 fn contribute_rejects_a_non_operator() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     for k in [
         f.admin.insecure_clone(),
         f.pauser.insecure_clone(),
@@ -280,7 +303,7 @@ fn contribute_rejects_a_non_operator() {
 
 #[test]
 fn revoked_operator_cannot_contribute() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     let source = f.operator_brs(1_000 * BRL);
     let pauser = f.pauser.insecure_clone();
     f.send(f.revoke_operator_ix(&pauser.pubkey()), &pauser)
@@ -292,8 +315,8 @@ fn revoked_operator_cannot_contribute() {
 
 #[test]
 fn contribute_works_while_paused_and_in_under_coverage() {
-    // Never paused, never solvency-gated (ADR 0009).
-    let mut f = Fixture::new();
+    // Never paused, never coverage-gated (ADR 0009).
+    let mut f = reserve();
     let pauser = f.pauser.insecure_clone();
     f.send(f.pause_ix(&pauser.pubkey()), &pauser).unwrap();
     f.contribute(1_000 * BRL).0.expect("paused");
@@ -311,7 +334,7 @@ fn contribute_works_while_paused_and_in_under_coverage() {
 
 #[test]
 fn a_newer_vault_state_is_refused() {
-    let mut f = Fixture::new();
+    let mut f = reserve();
     let mut s = f.state();
     s.version = PROGRAM_LAYOUT_VERSION + 1;
     f.write_state(&s);

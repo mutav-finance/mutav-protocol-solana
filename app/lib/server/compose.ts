@@ -11,6 +11,7 @@ import {
   compileTransaction,
   createNoopSigner,
   createTransactionMessage,
+  fetchEncodedAccount,
   getAddressEncoder,
   getBase64EncodedWireTransaction,
   getProgramDerivedAddress,
@@ -27,11 +28,19 @@ import {
   configParamsDiff,
   configParamsNeedRefresh,
   conversionNav,
+  getAcceptRoleInstruction,
+  getAdvanceQueueHeadInstruction,
+  getApproveClaimInstruction,
+  fetchClaimFiling,
+  fetchDepositRequest,
+  fetchRedeemRequest,
+  isQueued,
+  type ClaimFiling,
   getCancelPendingInstruction,
   getProposeRoleInstruction,
   publishedNav,
   navBoundsAround,
-  solvencyFromAccounts,
+  coverageFromAccounts,
   type NavBounds,
   fetchGuarantee,
   getCancelDepositInstruction,
@@ -70,6 +79,7 @@ import {
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
 import { ALLOWLIST_TEXT, checkAllowlist } from "../allowlist";
+import { allowlistedFillCount } from "../queue";
 import { capsError, generalConfigError, rolesError } from "../admin";
 import { pendingSetConfig, pendingSetConfigText, setConfigChanges, type ConfigChange } from "../config-diff";
 import { fromHex } from "../serde";
@@ -78,10 +88,19 @@ import { ADMIN_KINDS } from "../tx-kinds";
 import type { Ledger, ReserveView } from "../view";
 import { READ, rpcFor } from "./chain";
 import { serverEnv, type ServerEnv } from "./env";
+import { COMPUTE_BUDGET_PROGRAM } from "./relay";
 
 export const SYSTEM_PROGRAM = address("11111111111111111111111111111111");
 export const TOKEN_PROGRAM = address("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 export const ASSOCIATED_TOKEN_PROGRAM = address("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+
+/** `ClaimFiling.status` FILED: the only status `approve_claim` accepts. */
+const CLAIM_FILED = 0;
+/** `advance_queue_head` queue ids (`QUEUE_DEPOSIT`, `QUEUE_REDEEM`). */
+export const QUEUE_ID = { deposit: 1, redeem: 2 } as const;
+/** Request accounts an `advance_queue_head` reads by default, and at most. */
+export const ADVANCE_DEFAULT_MAX = 16;
+export const ADVANCE_MAX = 24;
 
 /** `close_guarantee` reason RELEASED and the role ids of `propose_role` (ADR 0020). */
 const CLOSE_RELEASED = 1;
@@ -97,6 +116,14 @@ export async function associatedTokenAddress(owner: Address, mint: Address, toke
     seeds: [e.encode(owner), e.encode(tokenProgram), e.encode(mint)],
   });
   return ata;
+}
+
+/** SPL token account `amount`: u64 LE at [64..72); null when the account does not exist. */
+export async function tokenAmount(env: ServerEnv, account: Address): Promise<bigint | null> {
+  const a = await fetchEncodedAccount(rpcFor(env), account, READ);
+  if (!a.exists || (a.data as Uint8Array).length < 72) return null;
+  const d = a.data as Uint8Array;
+  return new DataView(d.buffer, d.byteOffset, d.byteLength).getBigUint64(64, true);
 }
 
 /** Associated Token Account program `CreateIdempotent` (instruction 1). */
@@ -128,10 +155,20 @@ const withRemaining = (ix: Instruction, accounts: { address: Address; role: Acco
 
 export type ComposeContext = {
   reserve: ReserveView;
-  /** The guarantees, for the operator instructions that address one by account. */
-  ledger?: Pick<Ledger, "guarantees">;
+  /**
+   * The pending deposit queue (fills check head owners). Requests and filings
+   * found here are used instead of a chain read (`park_*`, `approve_claim`);
+   * the build route passes only the deposit queue, so those re-read the chain.
+   */
+  ledger?: Partial<Pick<Ledger, "deposits" | "redeems" | "filings">>;
   /** Allowlisted owners, to build the Merkle proof for `request_deposit` / `request_redeem`. */
   allowlist?: string[];
+  /**
+   * `request_redeem` only: the balance of the signer's share associated token
+   * account (null = no account). Left out, compose reads that same account
+   * (the one the instruction passes as `owner_shares`); tests inject it.
+   */
+  ownerShares?: bigint | null;
   /** Server env for re-reads (defaults to process.env). */
   env?: ServerEnv;
 };
@@ -177,7 +214,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       if (draft.min > draft.max) throw new ComposeError("NAV bounds: min must be ≤ max");
       return draft;
     }
-    const sol = solvencyFromAccounts(r.config, r.state);
+    const sol = coverageFromAccounts(r.config, r.state);
     const nav = published ? publishedNav(sol.netAssets, r.state.sharesOutstanding) : conversionNav(r.state.sharesOutstanding, sol.netAssets);
     return navBoundsAround(nav, DEFAULT_NAV_TOLERANCE_BPS);
   };
@@ -187,6 +224,20 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     case "refresh": {
       // `refresh` takes no remaining accounts (no payout SLA, ADR 0019).
       return [refreshIx()];
+    }
+    case "advance_queue_head": {
+      // Permissionless (spec §5.8): no signer. The request PDAs from the head,
+      // read-only, in seq order; the program stops at the first live one.
+      const max = req.max ?? ADVANCE_DEFAULT_MAX;
+      if (!Number.isInteger(max) || max < 1 || max > ADVANCE_MAX) throw new ComposeError(`max must be an integer in [1, ${ADVANCE_MAX}]`);
+      const deposit = req.queue === "deposit";
+      if (!deposit && req.queue !== "redeem") throw new ComposeError("queue must be deposit or redeem");
+      const [head, next] = deposit ? [r.state.depositHead, r.state.nextDepositSeq] : [r.state.redeemHead, r.state.nextRedeemSeq];
+      const seqs = queueSeqs(head, next, max);
+      if (seqs.length === 0) throw new ComposeError(`the ${req.queue} queue is empty: its head is already at the tail`);
+      const pdas = await Promise.all(seqs.map(async (seq) => (deposit ? await findDepositRequestPda({ config, seq }, o) : await findRedeemRequestPda({ config, seq }, o))[0]));
+      const ix = getAdvanceQueueHeadInstruction({ config, state: a.state, eventAuthority: a.eventAuthority, program: programAddress, queue: QUEUE_ID[req.queue], max: seqs.length }, o);
+      return [withRemaining(ix, pdas.map((p) => ({ address: p, role: AccountRole.READONLY })))];
     }
 
     // ── operator ────────────────────────────────────────────────────────────
@@ -334,7 +385,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             tokenProgram,
             systemProgram: SYSTEM_PROGRAM,
             assets: req.assets,
-            minSharesOut: 0n,
+            minSharesOut: priceLimit(req.minSharesOut),
             eligibility: { __kind: "Merkle", proof },
           },
           o,
@@ -361,7 +412,13 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       ];
     }
     case "request_redeem": {
-      const proof = await allowlistProof(ctx, signerAddress);
+      // Entry is gated, exit is not (ADR 0023): the program checks eligibility
+      // only when the owner's share account is empty (request_redeem.rs), so
+      // a holder sends an empty proof, listed or not. The balance is read from
+      // the same account the instruction passes as `owner_shares`.
+      const ownerShares = await associatedTokenAddress(signerAddress, a.shareMint);
+      const held = ctx.ownerShares !== undefined ? ctx.ownerShares : await tokenAmount(ctx.env ?? serverEnv(), ownerShares);
+      const proof = (held ?? 0n) > 0n ? [] : await allowlistProof(ctx, signerAddress);
       const seq = r.state.nextRedeemSeq;
       return [
         getRequestRedeemInstruction(
@@ -370,13 +427,13 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             owner: signer,
             state: a.state,
             redeemRequest: (await findRedeemRequestPda({ config, seq }, o))[0],
-            ownerShares: await associatedTokenAddress(signerAddress, a.shareMint),
+            ownerShares,
             pendingRedemptions: a.pendingRedemptions,
             shareMint: a.shareMint,
             shareTokenProgram: TOKEN_PROGRAM,
             systemProgram: SYSTEM_PROGRAM,
             shares: req.shares,
-            minAssetsOut: 0n,
+            minAssetsOut: priceLimit(req.minAssetsOut),
             eligibility: { __kind: "Merkle", proof },
           },
           o,
@@ -388,7 +445,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
         getCancelRedeemInstruction(
           {
             ...common,
-            // The investor cancels its own request (the program also lets the admin).
+            // The investor cancels its own request (the admin parks it instead: park_redeem).
             signer,
             owner: signerAddress,
             state: a.state,
@@ -441,9 +498,13 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
 
     // ── admin (direct on localnet, or inside a Squads proposal) ─────────────
     case "fulfil_deposits": {
-      const seqs = queueSeqs(r.state.depositHead, r.state.nextDepositSeq, req.count);
+      // Head owners must still be on the current allowlist (the admin cancels
+      // a de-listed owner's deposit instead of filling it): fill up to the
+      // first one that is not.
+      const { count, end } = await allowlistedDepositFill(ctx, req.count);
+      const seqs = queueSeqs(r.state.depositHead, end, count === 0 ? 0 : req.count);
       const ix = getFulfilDepositsInstruction(
-        { ...common, admin: signer, state: a.state, pendingDeposits: a.pendingDeposits, reserve: a.reserve, vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram, count: req.count, navBounds: navBounds(req.navBounds) },
+        { ...common, admin: signer, state: a.state, pendingDeposits: a.pendingDeposits, reserve: a.reserve, vaultAuthority: a.vaultAuthority, reserveMint: mint, tokenProgram, count, navBounds: navBounds(req.navBounds) },
         o,
       );
       const pdas = await Promise.all(seqs.map(async (seq) => (await findDepositRequestPda({ config, seq }, o))[0]));
@@ -506,6 +567,75 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
     }
     case "unpause":
       return [getUnpauseInstruction({ ...common, admin: signer }, o)];
+    case "approve_claim": {
+      // ADR 0021: the admin approves the exact amount (the filing's
+      // provision) of the revision it read. Both come from the chain, not the
+      // browser; `noticeRefHash` is the filing's own, re-derived to its PDA as
+      // pay_claim derives it.
+      const filing = await claimFilingAccount(ctx, req.filing);
+      const f = filing.data;
+      if (f.guarantee !== req.guarantee) throw new ComposeError(`filing ${req.filing} belongs to guarantee ${f.guarantee}, not ${req.guarantee}`);
+      const noticeRefHash = Uint8Array.from(f.noticeRefHash);
+      const [claimFiling] = await findClaimFilingPda({ guarantee: address(f.guarantee), noticeRefHash }, o);
+      if (claimFiling !== req.filing) throw new ComposeError(`${req.filing} is not the claim filing PDA of its guarantee and notice`);
+      if (f.status !== CLAIM_FILED) throw new ComposeError("only a filed, unpaid claim takes an approval");
+      if (f.provision <= r.config.caps.maxClaimPerCall) throw new ComposeError("this claim is within the operator's limit per payment: pay_claim pays it without an approval");
+      if (f.approvedAmount === f.provision) throw new ComposeError("this claim is already approved for its provision");
+      return [
+        getApproveClaimInstruction(
+          { admin: signer, config, guarantee: address(f.guarantee), claimFiling, eventAuthority: a.eventAuthority, program: programAddress, noticeRefHash, amount: f.provision, expectedRevision: f.revision },
+          o,
+        ),
+      ];
+    }
+    case "park_deposit": {
+      // ADR 0030: the admin's cancel parks the request; `owner` is the
+      // request's owner (the program binds it), not the signer.
+      const [depositRequest] = await findDepositRequestPda({ config, seq: req.seq }, o);
+      const q = await requestAccount(ctx, "deposit", depositRequest);
+      if (!isQueued(q)) throw new ComposeError(`deposit seq ${req.seq} is not pending: only a pending request can be parked`);
+      const owner = address(q.owner);
+      return [
+        getCancelDepositInstruction(
+          {
+            ...common,
+            signer,
+            owner,
+            state: a.state,
+            depositRequest,
+            destination: await associatedTokenAddress(owner, mint, tokenProgram),
+            pendingDeposits: a.pendingDeposits,
+            vaultAuthority: a.vaultAuthority,
+            reserveMint: mint,
+            tokenProgram,
+          },
+          o,
+        ),
+      ];
+    }
+    case "park_redeem": {
+      const [redeemRequest] = await findRedeemRequestPda({ config, seq: req.seq }, o);
+      const q = await requestAccount(ctx, "redeem", redeemRequest);
+      if (!isQueued(q)) throw new ComposeError(`redeem seq ${req.seq} is not pending: only a pending request can be parked`);
+      const owner = address(q.owner);
+      return [
+        getCancelRedeemInstruction(
+          {
+            ...common,
+            signer,
+            owner,
+            state: a.state,
+            redeemRequest,
+            ownerShares: await associatedTokenAddress(owner, a.shareMint),
+            pendingRedemptions: a.pendingRedemptions,
+            vaultAuthority: a.vaultAuthority,
+            shareMint: a.shareMint,
+            shareTokenProgram: TOKEN_PROGRAM,
+          },
+          o,
+        ),
+      ];
+    }
     case "clear_fulfil_halt":
       return [getClearFulfilHaltInstruction({ ...common, admin: signer, state: a.state, reserve: a.reserve, navBounds: navBounds(req.navBounds, true) }, o)];
     case "set_config": {
@@ -533,8 +663,36 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       return configParamsNeedRefresh(params) ? [refreshIx(), setConfig, refreshIx()] : [setConfig];
     }
     case "set_allowlist_root": {
-      const tree = await buildAllowlist(req.owners.map((x) => address(x)));
+      // A9: the root comes from the server's ALLOWLIST, the same list the
+      // proofs are built from; a list sent by the browser must match it.
+      const listed = ctx.allowlist ?? [];
+      if (listed.length === 0) throw new ComposeError("ALLOWLIST is empty on the server: set it (public wallet addresses) and redeploy before proposing a root");
+      if (req.owners && !sameSet(req.owners, listed)) {
+        throw new ComposeError("the wallets sent differ from the server's ALLOWLIST: proofs are built from ALLOWLIST, so change ALLOWLIST and redeploy, then propose its root");
+      }
+      const tree = await buildAllowlist(listed.map((x) => address(x)));
       return [getSetAllowlistRootInstruction({ ...common, admin: signer, root: tree.root }, o)];
+    }
+    case "cancel_pending":
+      return [getCancelPendingInstruction({ ...common, admin: signer, role: req.role }, o)];
+    case "accept_role": {
+      const c = r.config;
+      const [pending, expiresAt, name] = req.role === ROLE_OPERATOR ? [c.pendingOperator, c.pendingOperatorExpiresAt, "operator"] : [c.pendingPauser, c.pendingPauserExpiresAt, "pauser"];
+      if (pending === SYSTEM_PROGRAM) throw new ComposeError(`no ${name} handover is pending`);
+      if (pending !== signerAddress) throw new ComposeError(`the connected wallet is not the proposed ${name} key ${pending}`);
+      if (r.now > expiresAt) throw new ComposeError(`the ${name} proposal expired; the admin proposes it again`);
+      return [
+        getAcceptRoleInstruction(
+          {
+            ...common,
+            newKey: signer,
+            // The operator check needs the money accounts (the new operator owns neither, ADR 0020).
+            ...(req.role === ROLE_OPERATOR ? { treasuryAccount: c.treasuryAccount, paymentsAccount: c.paymentsAccount } : {}),
+            role: req.role,
+          },
+          o,
+        ),
+      ];
     }
   }
 }
@@ -552,15 +710,120 @@ async function allowlistProof(ctx: ComposeContext, owner: Address): Promise<Uint
   return check.proof;
 }
 
+/** A price limit as the program stores it: 0 = none (ADR 0023). */
+function priceLimit(v: bigint | undefined): bigint {
+  if (v === undefined) return 0n;
+  if (v < 0n || v > 0xffff_ffff_ffff_ffffn) throw new ComposeError("price limit out of range");
+  return v;
+}
+
+const sameSet = (a: readonly string[], b: readonly string[]) => {
+  const x = new Set(a.map((s) => s.trim()));
+  const y = new Set(b);
+  return x.size === y.size && [...x].every((k) => y.has(k));
+};
+
+/**
+ * How many deposits to fill, and the seq to stop before: the pending
+ * requests from the head up to the first whose owner is not on the current
+ * allowlist (ALLOWLIST, verified against the on-chain root). Refuses when
+ * the head itself is de-listed: park it first.
+ */
+async function allowlistedDepositFill(ctx: ComposeContext, count: number): Promise<{ count: number; end: bigint }> {
+  const r = ctx.reserve;
+  const end = r.state.nextDepositSeq;
+  if (!ctx.ledger?.deposits) return { count, end };
+  const listed = ctx.allowlist ?? [];
+  const root = Uint8Array.from(r.config.investorAllowlistRoot);
+  if (listed.length > 0 && !root.every((x) => x === 0)) {
+    const tree = await buildAllowlist(listed.map((x) => address(x)));
+    if (!tree.root.every((x, i) => x === root[i])) throw new ComposeError(ALLOWLIST_TEXT["list-mismatch"]);
+  }
+  const fill = allowlistedFillCount(r.state, { deposits: ctx.ledger.deposits, redeems: [] }, listed, count);
+  if (!fill.blocked) return { count, end };
+  if (fill.count === 0) {
+    throw new ComposeError(`deposit seq ${fill.blocked.seq} at the head belongs to ${fill.blocked.owner}, who is not on the current allowlist: park it (park_deposit, the admin's cancel_deposit) before filling`);
+  }
+  return { count: fill.count, end: fill.blocked.seq };
+}
+
 /** Seqs from the head, skipping none, at most `count`. */
 export function queueSeqs(head: bigint, next: bigint, count: number): bigint[] {
   const n = Math.max(0, Math.min(count, Number(next - head)));
   return Array.from({ length: n }, (_, i) => head + BigInt(i));
 }
 
+/** The claim filing, from the context's ledger or re-read from the chain. */
+async function claimFilingAccount(ctx: ComposeContext, filing: string): Promise<{ address: string; data: ClaimFiling }> {
+  const known = ctx.ledger?.filings?.find((f) => f.address === filing);
+  if (known) return known;
+  if (!isAddress(filing)) throw new ComposeError("filing is not an address");
+  return fetchClaimFiling(rpcFor(ctx.env ?? serverEnv()), address(filing), READ);
+}
+
+/** A capital request's owner and status, from the context's ledger or re-read from the chain. */
+async function requestAccount(ctx: ComposeContext, side: "deposit" | "redeem", at: Address): Promise<{ owner: string; status: number }> {
+  const rows = side === "deposit" ? ctx.ledger?.deposits : ctx.ledger?.redeems;
+  const known = rows?.find((x) => x.address === at);
+  if (known) return known.data;
+  const rpc = rpcFor(ctx.env ?? serverEnv());
+  return (side === "deposit" ? await fetchDepositRequest(rpc, at, READ) : await fetchRedeemRequest(rpc, at, READ)).data;
+}
+
 /** Re-read the guarantee so its id and agency come from the chain, not from the browser. */
 async function guaranteeAccount(ctx: ComposeContext, guarantee: string) {
   return fetchGuarantee(rpcFor(ctx.env ?? serverEnv()), address(guarantee), READ);
+}
+
+// ── Compute-unit limits ─────────────────────────────────────────────────────
+//
+// The program is built with `opt-level = "z"`: a smaller ProgramData for
+// more compute units per instruction. A one-instruction transaction gets the
+// runtime's 200,000-CU default, so the calls that can come near it carry an
+// explicit `SetComputeUnitLimit`: about 1.5x the worst case measured in
+// LiteSVM (docs/technical-resources/compute-units.md). No priority fee is
+// set, so a limit costs nothing.
+
+export const MAX_COMPUTE_UNIT_LIMIT = 1_400_000;
+
+/** Per kind, for a transaction the connected wallet signs directly. */
+export const COMPUTE_UNIT_LIMITS: Partial<Record<TxRequest["kind"], number>> = {
+  // 8 whole fills: 148,402 CU.
+  fulfil_deposits: 225_000,
+  // 8 whole fills: 163,349 CU.
+  fulfil_redeems: 250_000,
+  // 49,753 CU.
+  refresh: 75_000,
+  // refresh + set_config (every field) + refresh: 181,665 CU.
+  set_config: 275_000,
+  // 60,779 CU. Twice the worst case, not 1.5x: running out of compute must
+  // never act as a refusal of a claim payment.
+  pay_claim: 120_000,
+};
+
+/**
+ * The transaction that sends Squads `vault_transaction_execute`, whatever
+ * the proposal holds: the worst admin call measured through Squads is
+ * 203,548 CU (refresh + set_config + refresh), `initialize` through the
+ * upgrade multisig 210,469.
+ */
+export const SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT = 320_000;
+
+/** Compute Budget `SetComputeUnitLimit` (instruction 2, `u32` units). */
+export function setComputeUnitLimitInstruction(units: number): Instruction {
+  if (!Number.isInteger(units) || units < 1 || units > MAX_COMPUTE_UNIT_LIMIT) {
+    throw new Error(`compute-unit limit must be an integer in [1, ${MAX_COMPUTE_UNIT_LIMIT}], got ${units}`);
+  }
+  const data = new Uint8Array(5);
+  data[0] = 2;
+  new DataView(data.buffer).setUint32(1, units, true);
+  return { programAddress: address(COMPUTE_BUDGET_PROGRAM), accounts: [], data };
+}
+
+/** `ixs` for a direct transaction, behind `SetComputeUnitLimit` when `req`'s kind has a limit. */
+export function withComputeUnitLimit(req: TxRequest, ixs: Instruction[]): Instruction[] {
+  const units = COMPUTE_UNIT_LIMITS[req.kind];
+  return units === undefined ? ixs : [setComputeUnitLimitInstruction(units), ...ixs];
 }
 
 /** Is this kind an admin action (so it may be wrapped in a Squads proposal)? */

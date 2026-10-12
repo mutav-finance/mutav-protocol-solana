@@ -53,7 +53,7 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   },
   investor: {
     label: "Investor",
-    holder: "An allowlisted capital wallet; in the pilot, MUTAV's own",
+    holder: "An allowlisted capital wallet",
     duty: "Requests deposits and redemptions, then claims its shares or assets.",
     color: "var(--color-role-investor)",
     marker: "triangle",
@@ -85,6 +85,8 @@ export const INSTRUCTION_ROLE = {
   set_treasury_account: "admin",
   set_allowlist_root: "admin",
   clear_fulfil_halt: "admin",
+  // Approves the exact amount of a claim above the per-call cap (ADR 0021).
+  approve_claim: "admin",
   unpause: "admin",
   fulfil_deposits: "admin",
   fulfil_redeems: "admin",
@@ -116,8 +118,13 @@ export type Instruction = keyof typeof INSTRUCTION_ROLE;
 /** Instructions signed only by the pauser key or the admin (no time lock). */
 export const PAUSER_OR_ADMIN: ReadonlySet<Instruction> = new Set(["pause", "revoke_operator"]);
 
-/** `set_roles` composes `propose_role` for each changed key (ADR 0020). */
-export const roleOf = (ix: Instruction | TxKind): Role => (ix === "set_roles" ? "admin" : INSTRUCTION_ROLE[ix as Instruction]);
+/**
+ * `set_roles` composes `propose_role` for each changed key (ADR 0020);
+ * `park_deposit` / `park_redeem` are the admin's `cancel_deposit` /
+ * `cancel_redeem` (ADR 0030).
+ */
+export const roleOf = (ix: Instruction | TxKind): Role =>
+  ix === "set_roles" || ix === "park_deposit" || ix === "park_redeem" ? "admin" : INSTRUCTION_ROLE[ix as Instruction];
 
 /** The instructions each role may sign, in the order above. */
 export function instructionsBy(role: Role): Instruction[] {
