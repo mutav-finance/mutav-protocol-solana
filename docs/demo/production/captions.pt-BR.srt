@@ -94,17 +94,17 @@ até quatro de cobertura
 
 21
 00:01:44,900 --> 00:01:46,600
-e recebe as taxas de garantia.
+e as taxas de garantia voltam à reserva.
 
 22
 00:01:47,200 --> 00:01:51,400
 Mesmo depois do pedido da Ana,
-cada cota vale mais.
+a reserva segue coberta.
 
 23
 00:01:52,000 --> 00:01:57,400
-A mesma reserva que protege
-o proprietário paga quem a financia.
+Durante o piloto, a reserva não está
+aberta a investimento público.
 
 24
 00:01:58,400 --> 00:02:00,800
@@ -114,7 +114,7 @@ e programável,
 25
 00:02:00,800 --> 00:02:03,600
 pedidos liquidados em minutos,
-capital que trabalha.
+cobertura eficiente em capital.
 
 26
 00:02:04,200 --> 00:02:06,400

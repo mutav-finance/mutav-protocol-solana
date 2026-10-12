@@ -2,7 +2,7 @@
 
 Companion to the storyboard (`storyboard.html`); the two match.
 
-- **Runtime:** 2:08. **Voiceover:** 199 words, verbatim below. Three chapters, one per pitch pillar; five live clicks.
+- **Runtime:** 2:08. **Voiceover:** 197 words, verbatim below. Three chapters, one per pitch pillar; five live clicks.
 - **Recorded**, not live: silent clips (injected test wallet, no pop-ups), a rough cut with titles, timer and cards, then the VO recorded to the cut. Frames are tagged MAIN / FLASH / END STATE.
 - **Numbers:** v4 Plan B, unchanged (c = 0.25, 6× + 6× cover). Ana, agency names and lease references are fictional.
 - **Labels:** the #59 banner is the persistent badge and disclaimer; at most one more honesty label per shot.
@@ -28,9 +28,9 @@ Companion to the storyboard (`storyboard.html`); the two match.
 >
 > **0:58 · 2 · Settled in minutes** Now say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the agency is recorded on-chain. On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days.
 >
-> **1:36 · 3 · Capital efficiency** Because the reserve keeps a quarter of what it guarantees, every real of capital can back up to four in cover and earn its fees. Even after Ana's claim, each share is worth more. The same reserve that protects the landlord pays the people who fund it.
+> **1:36 · 3 · Capital efficiency** Because the reserve keeps a quarter of what it guarantees, every real of capital can back up to four in cover, and guarantee fees flow back in. Even after Ana's claim, the reserve stays covered. During the pilot the reserve is not open to public investment.
 >
-> **1:58 · Close** MUTAV: a transparent, programmable reserve, claims settled in minutes, capital that works. Brazil's onchain rent guarantee.
+> **1:58 · Close** MUTAV: a transparent, programmable reserve, claims settled in minutes, capital-efficient cover. Brazil's onchain rent guarantee.
 >
 
 [N] comes from the real on-chain timestamps (settled_at − filed_at on the ClaimFiling PDA); fill it in before recording the VO. Say "seconds" if it is under 2 minutes and "minutes" otherwise, and round down, never up. The line describes this on-chain run only; it does not claim real-world claims settle in seconds, since the operator checks each claim first (the pitch covers that).
@@ -120,34 +120,34 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 **F10 · FLASH · 3 · Capital efficiency · 1:41 – 1:44 · /reserve/capital (fee receipt)**: Guarantee fees land
 - **On screen:** The fee receipt row: R$3,060 gross, R$2,448 to the reserve, R$612 to MUTAV.
-- **VO:** "and earn its fees."
+- **VO:** "and guarantee fees flow back in."
 - **Caption:** Two months of fees, one step for the demo
 - **Honesty label:** Two months of fees, one step for the demo
 - **Proof:** A FeeReceipt PDA (staged off camera).
 - **Edit:** Flash, hard cuts.
 - **Retake:** Read-only.
 
-**F11 · END STATE · 3 · Capital efficiency · 1:44 – 1:51 · /reserve (Overview)**: Each share is worth more
-- **On screen:** /reserve after the off-camera fees, redemption and refresh: value per share 0.612927; overlay "0.600 → 0.613". Hold 2 s.
-- **VO:** "Even after Ana's claim, each share is worth more."
-- **Caption:** Share value 0.600 → 0.613, even after the claim
+**F11 · END STATE · 3 · Capital efficiency · 1:44 – 1:51 · /reserve (Overview)**: Still covered after the claim
+- **On screen:** /reserve after the off-camera fees, redemption and refresh: mode Normal, coverage required R$40,125 against R$40,861.82 held. Hold 2 s. No share-value callout (legal floor: no return shown to capital).
+- **VO:** "Even after Ana's claim, the reserve stays covered."
+- **Caption:** Still covered after the claim
 - **Honesty label:** none (banner only)
 - **Proof:** VaultState after refresh.
 - **Edit:** End state; zoom from the hold still.
 - **Retake:** Read-only.
 
-**F12 · END STATE · 3 · Capital efficiency · 1:51 – 1:58 · /capital**: Capital out, above what went in
-- **On screen:** /capital as capital wallet B after the off-camera redemption: deposited R$4,000.00, claimed R$4,086.18. Hold 3 s. The banner carries the disclaimer.
-- **VO:** "The same reserve that protects the landlord pays the people who fund it."
-- **Caption:** R$4,000 in → R$4,086 out
+**F12 · END STATE · 3 · Capital efficiency · 1:51 – 1:58 · /capital**: Not open to public investment
+- **On screen:** /capital (the capital queue) with its lead line: not open to public investment; pilot capital is MUTAV's own wallet. Hold 3 s on that line and the banner. No in → out figure.
+- **VO:** "During the pilot the reserve is not open to public investment."
+- **Caption:** Not open to public investment · regulated vehicle only
 - **Honesty label:** none (banner only)
-- **Proof:** The claim_assets transaction (staged off camera).
-- **Edit:** Reais only; no rate. If the page cannot show in → out yet, overlay it from the two transaction amounts.
+- **Proof:** The banner and the page's own notice.
+- **Edit:** Reais only; no rate, no in → out overlay (it reads as a return to capital).
 - **Retake:** Read-only end state.
 
 **F13 · END STATE · Close · 1:58 – 2:08 · card (made in the editor)**: Close
 - **On screen:** The three pillars, one line each, then the tagline, the repo and the live app.
-- **VO:** "MUTAV: a transparent, programmable reserve, claims settled in minutes, capital that works. Brazil's onchain rent guarantee."
+- **VO:** "MUTAV: a transparent, programmable reserve, claims settled in minutes, capital-efficient cover. Brazil's onchain rent guarantee."
 - **Caption:** reserve.mutav.finance · open source (MIT)
 - **Honesty label:** none (banner only)
 - **Proof:** —
@@ -186,7 +186,7 @@ Two months of fees: one month beats a one-month-rent claim only with more than 1
 
 ## 5. Route map
 
-| Route | Today (main) | After PR #45 | Used in |
+| Route | Before #45 | On main (#45 merged) | Used in |
 |---|---|---|---|
 | / | Landing | Landing (restyled) | — |
 | /reserve | Transparency, one long page | Overview + sub-routes | F1, F9 plate, F11 |
@@ -195,7 +195,7 @@ Two months of fees: one month beats a one-month-rent claim only with more than 1
 | /reserve/capital | — (#flows, #queue) | Capital tab (flows + queue) | F10 |
 | /reserve/risks | — (#disclosures) | Risks tab | — |
 | /reserve/verify | — (#accounts) | Verify tab | — |
-| /capital | — (/investor) | Swap-style card + queue entries | F12 |
+| /capital | — (/investor) | Capital queue (`/investment`, `/investor` redirect) | F12 |
 | /operator | Operator console | Same, restyled | F3, F6, F7 |
 | /admin | Squads proposals | Same, restyled | off camera (fills) |
 | /demo | Guided six steps | Same; a cleaned version is the optional alternative surface | alternative |
@@ -212,7 +212,7 @@ Two months of fees: one month beats a one-month-rent claim only with more than 1
 | 5 | 00-setup: register 8 leases (rent 1500, 6× + 6×, refs MTV-PF-0001…0008, agencies Imobiliária Planalto (Ana's), Casa Gaúcha Imóveis, Rio Grande Lar (fictional)). Check: R$44,000 held, R$36,000 required, R$8,000 free, 8 active, 0.600000 | Operator | — |
 | 6 | Capture the cold open → chapter 2 live: F1, F2, register Ana (F3), Explorer end state (F4), F5, the refusal (F6), the F9 /reserve plate, then the claim live (F7) and /reserve/claims (F8). Log tx timestamps for the timer | Operator; anyone | — |
 | 7 | 05-offcamera: contribute_fees R$3,060; B request_redeem of all 6,666.67 shares → fulfil_redeems (count 1) → B claim_assets (R$4,086.18); refresh | Operator; B; Admin Squads 2-of-2; anyone | 60 s time lock |
-| 8 | Capture the chapter 3 end states: fee receipt (F10), /reserve share value (F11), /capital in → out (F12) | — | — |
+| 8 | Capture the chapter 3 end states: fee receipt (F10), /reserve still covered (F11), /capital notice (F12) | — | — |
 | 9 | Edit: chapter titles, the timer, the cards. Judge-ready check: mode Normal, covered (free R$736.82) | — | — |
 
 No restore is needed: the reserve stays covered (free capital R$736.82 at the end, mode Normal).

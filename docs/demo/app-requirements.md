@@ -10,12 +10,12 @@ The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with 
 
 | # | Requirement | Why |
 |---|---|---|
-| M1 | **Reais on `/reserve` (all tabs) and `/capital`**: amounts shown as `R$` (e.g. `R$44,948.00`), not USD at a display rate. A config switch or env flag is enough; the chain amount is BRS 1:1 BRL. **Status (#45):** met by leaving the FX rate unconfigured on the recording deployment; `useMoney` then falls back to reais. Check that `/api/fx` returns no rate before capture. | The story is in reais. |
+| M1 | **Reais on `/reserve` (all tabs) and `/capital`**: amounts shown as `R$` (e.g. `R$44,948.00`), not USD at a display rate. A config switch or env flag is enough; the chain amount is BRS 1:1 BRL. **Status (main):** met. Amounts always show in BRS (`fmtBrs`); on `/`, `/reserve/*` and `/capital` the main figures add a small muted `≈ US$` hint from BCB PTAX (`/api/fx`), display only. The hint may stay in frame; the VO and captions use reais. | The story is in reais. |
 | M2 | **A clean refusal message** with the raw error collapsed: a human line (e.g. "Refused by the program: not enough free capital for this cover") with the program error name and the encoded Solana detail behind a disclosure. Today it is "InsufficientFreeCapital —" followed by about 8 lines of encoded text. | Pillar 1's climax (F6). |
 | M3 | **The register form holds its "Confirmed" result**, with no red preview after it. Today it resets to the next reference at once and shows a red "Send anyway" preview under the result. | F3 holds on the confirmation. |
 | M4 | **`pay_claim` and `settle_payout` keep a visible confirmation after sending**: the status, the signature and the before/after. Today the row disappears once sent and takes all three with it. | The claim runs live in pillar 2 (F7). |
-| M5 | **`/reserve/claims` shows the filed, paid and settled timestamps** (to the second) and the filed → settled duration. | F8 and the [N] minutes. |
-| M6 | **An in → out position in reais on `/capital`** for the connected wallet: deposited and claimed (e.g. "Deposited R$4,000.00 · Claimed R$4,086.18"). No annual rate, APY or projection. Fallback if not built: an edit overlay from the two transaction amounts. | Pillar 3's end state (F12). |
+| M5 | **`/reserve/claims` shows each claim's stage (needs approval → approved → paid → settled) and the filed, paid and settled timestamps** (to the second) and the filed → settled duration. Ana's R$1,500 claim is under the R$15k per-call cap, so it skips `approve_claim`. | F8 and the [N] minutes. |
+| M6 | **Dropped (legal floor):** no in → out position on `/capital` in the video; a gain to a capital wallet reads as a return. F12 holds on the page's own notice: not open to public investment; pilot capital is MUTAV's own wallet. | Pillar 3's end state (F12). |
 
 ## Covered by #59 (merged)
 
@@ -52,7 +52,7 @@ The harness on `feat/demo-capture` (routes and locators in `app/e2e/demo/pages.t
 
 1. **`00-setup` (off camera):** the ADR 0028 seed via `DEMO_PARAMS` (c = 0.25): deposits A R$40,000 and B R$4,000 with the Squads fill; 8 leases at rent 1500, 6× + 6×.
 2. **The 5 live actions, on camera:** register Ana (`MTV-PF-0009`), the refused send (`MTV-PF-0010`), `file_claim` R$1,500 (`NTC-PF-0001`), `pay_claim`, `settle_payout`. **Log each transaction's signature and on-chain block time** to a file, for the elapsed-timer overlay and [N].
-3. **Plates and end-state captures:** the F9 `/reserve` plate right after the refusal; Explorer on Ana's Guarantee PDA; and, after `05-offcamera`, the fee receipt (`/reserve/capital`), `/reserve` share value, and `/capital` in → out.
+3. **Plates and end-state captures:** the F9 `/reserve` plate right after the refusal; Explorer on Ana's Guarantee PDA; and, after `05-offcamera`, the fee receipt (`/reserve/capital`), `/reserve` still covered, and the `/capital` notice.
 4. **`05-offcamera`:** `contribute_fees` R$3,060; B's `request_redeem` of all 6,666.67 shares → the admin `fulfil_redeems` fill → B's `claim_assets` (expected R$4,086.18); `refresh`.
 5. **The agency stub** for F2, or a hand capture.
 6. **The #45 routes:** `/reserve/coverage`, `/reserve/claims`, `/reserve/capital`, `/capital`, with locators for the restyled components.

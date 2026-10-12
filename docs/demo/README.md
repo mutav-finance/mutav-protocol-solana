@@ -2,7 +2,7 @@
 
 Material for MUTAV's ≤3-minute product demo video for the Colosseum Crypto World's Fair.
 
-**Status:** v5 cut (≈ 2:08, 199 words): three chapters, one per pitch pillar: 1 · programmable, transparent reserve (Ana's lease on-chain, the next one refused); 2 · settled in minutes (the claim runs live against an elapsed timer); 3 · capital efficiency (end states: capacity, fees, share value, R$4,000 in → R$4,086 out). Numbers unchanged from v4, checked against ADR 0028. A scripted capture harness is on the branch `feat/demo-capture`; [`app-requirements.md`](app-requirements.md) lists what it and the app must change for v5.
+**Status:** v5 cut (≈ 2:08, 197 words): three chapters, one per pitch pillar: 1 · programmable, transparent reserve (Ana's lease on-chain, the next one refused); 2 · settled in minutes (the claim runs live against an elapsed timer); 3 · capital efficiency (end states: capacity, fees, still covered after the claim, and the /capital notice: not open to public investment). Numbers unchanged from v4, checked against ADR 0028. A scripted capture harness is on the branch `feat/demo-capture`; [`app-requirements.md`](app-requirements.md) lists what it and the app must change for v5.
 
 Honesty labels used throughout: the agency platform predates the hackathon, the PIX transfer is simulated on devnet (only its settlement record is on-chain), and everything runs on devnet. Ana, the agency names and the lease references are fictional.
 

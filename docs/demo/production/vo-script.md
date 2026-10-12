@@ -1,12 +1,12 @@
 # Voiceover: final read (v5)
 
-**199 words · about 1:22 of speech · 2:08 runtime.** Timings are program time (the finished cut), in seconds. Record to the rough cut so each line lands on its picture. The captions (`captions.en.srt`) use the same timings.
+**197 words · about 1:22 of speech · 2:08 runtime.** Timings are program time (the finished cut), in seconds. Record to the rough cut so each line lands on its picture. The captions (`captions.en.srt`) use the same timings.
 
 ## Direction
 
 - **Tone:** warm, plain, confident. A person explaining something they built, not an announcer. No hype, no upspeak.
 - **Pace:** about 145 wpm. The cold open runs a touch quicker (about 150) to fit 10 s; chapter 3 can breathe.
-- **Smile on the payoff line:** "The same reserve that protects the landlord pays the people who fund it." Let the smile carry into the close.
+- **Line 19 is the legal floor:** "During the pilot the reserve is not open to public investment." Say it plainly, not as a teaser. Smile on the close instead.
 - **The refusal:** "Refused." is short and flat, not dramatic. Then the line after it, then **3 s of silence**: no voice and no music, only room tone.
 - **Numbers** are said as words, exactly as written. Don't add "about" or round anything.
 - **[N]** comes from the real on-chain timestamps (settled_at − filed_at on the ClaimFiling PDA). Say "seconds" if it is under 2 minutes and "minutes" otherwise; round down, never up. The line describes this on-chain run only. Don't ad-lib that real-world claims settle in seconds: in operation the operator checks each claim first (the pitch covers that).
@@ -55,10 +55,10 @@ Start and End are program seconds. `‖` = a breath pause (about 0.3 s). `(pause
 | 15 | 81.0 | 84.4 | F8 | On-chain, filed to settled in [N] seconds. |
 | 16 | 84.8 | 88.2 | F8 | Seguro-fiança allows up to thirty days. |
 | — | 88.2 | 96.4 | F8 → F9 | *(pause: hold on the timestamps; chapter 3 title)* |
-| 17 | 96.4 | 106.6 | F9–F10 | Because the reserve keeps a quarter of what it guarantees, ‖ every real of capital can back up to four in cover ‖ and earn its fees. |
-| 18 | 107.2 | 111.4 | F11 | Even after Ana's claim, each share is worth more. |
-| 19 | 112.0 | 117.4 | F12 | **(smile)** The same reserve that protects the landlord pays the people who fund it. |
-| 20 | 118.4 | 123.6 | F13 | MUTAV: ‖ a transparent, programmable reserve, ‖ claims settled in minutes, ‖ capital that works. |
+| 17 | 96.4 | 106.6 | F9–F10 | Because the reserve keeps a quarter of what it guarantees, ‖ every real of capital can back up to four in cover, ‖ and guarantee fees flow back in. |
+| 18 | 107.2 | 111.4 | F11 | Even after Ana's claim, the reserve stays covered. |
+| 19 | 112.0 | 117.4 | F12 | During the pilot the reserve is not open to public investment. |
+| 20 | 118.4 | 123.6 | F13 | MUTAV: ‖ a transparent, programmable reserve, ‖ claims settled in minutes, ‖ capital-efficient cover. |
 | 21 | 124.2 | 126.4 | F13 | Brazil's onchain rent guarantee. |
 | — | 126.4 | 128.0 | F13 | *(hold; music out)* |
 
@@ -72,6 +72,6 @@ If [N] is 2 minutes or more, line 15 reads "On-chain, filed to settled in [N] mi
 | Agency | 0:10–0:15 | 12 | 5.0 s (4.8 s at 150) |
 | 1 · Programmable, transparent reserve | 0:15–0:58 | 60 | 24.8 s |
 | 2 · Settled in minutes | 0:58–1:36 | 40 | 16.6 s |
-| 3 · Capital efficiency | 1:36–1:58 | 47 | 19.4 s |
-| Close | 1:58–2:08 | 16 | 6.6 s |
-| **Total** | **2:08** | **199** | **1:22** |
+| 3 · Capital efficiency | 1:36–1:58 | 46 | 19.0 s |
+| Close | 1:58–2:08 | 15 | 6.2 s |
+| **Total** | **2:08** | **197** | **1:22** |

@@ -4,13 +4,13 @@ Paste-ready text. Keep both in step with what the video actually shows: if the i
 
 ## Colosseum submission form (≤150 words)
 
-> **Built during the hackathon:** the MUTAV Solana program (Anchor), the reserve app at reserve.mutav.finance (public reserve pages, operator console, admin console, investment page), the Codama-generated TypeScript client, and the devnet scripts.
+> **Built during the hackathon:** the MUTAV Solana program (Anchor), the reserve app at reserve.mutav.finance (public reserve pages, operator console, admin console, capital queue), the Codama-generated TypeScript client, and the devnet scripts.
 >
 > **Pre-existing:** the agency platform shown briefly at the start. It is not yet connected on-chain.
 >
 > **Simulated on devnet:** the PIX transfer to the agency (the settlement record is real and on-chain); the issuer revenue, where shown; and the guarantee fees, contributed in one step as two months' worth for the demo.
 >
-> Everything runs on Solana devnet. The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
+> Everything runs on Solana devnet. During the pilot the reserve is not open to public investment. Ana, the agencies and the lease references are fictional.
 >
 > Repo: https://github.com/mutav-finance/mutav-protocol-solana
 > Live app: https://reserve.mutav.finance
@@ -29,10 +29,10 @@ Paste-ready text. Keep both in step with what the video actually shows: if the i
 > 1:58 Close
 >
 > What you are seeing
-> • Built during the hackathon: the Solana program, the reserve app (public reserve pages, operator, admin and investment), the Codama TypeScript client and the devnet scripts.
+> • Built during the hackathon: the Solana program, the reserve app (public reserve pages, operator, admin and capital queue), the Codama TypeScript client and the devnet scripts.
 > • Pre-existing: the agency platform (not yet connected on-chain).
 > • Simulated on devnet: the PIX transfer to the agency (its settlement record is on-chain); the issuer revenue, where shown; and two months of guarantee fees contributed in one step.
-> • Everything runs on Solana devnet. The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
+> • Everything runs on Solana devnet. During the pilot the reserve is not open to public investment. Ana, the agencies and the lease references are fictional.
 > • The claim timer shows the on-chain run from filed to settled. In operation, the operator checks each claim before filing.
 >
 > The 30-day figure for seguro-fiança: SUSEP Circular 621/2021, art. 43.
