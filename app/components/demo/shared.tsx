@@ -151,6 +151,8 @@ export function Action({
   via,
   variant = "default",
   onDone,
+  onConfirmed,
+  next,
 }: {
   label: string;
   request: TxRequest | null | (() => Promise<TxRequest | null>);
@@ -158,6 +160,10 @@ export function Action({
   via?: "squads" | "direct";
   variant?: "default" | "outline" | "destructive";
   onDone?: () => void;
+  /** Called as soon as the transaction confirms, before the post-confirmation read. */
+  onConfirmed?: () => void;
+  /** Shown in place of the send button once confirmed: the result holds until the user starts the next one. */
+  next?: ReactNode;
 }) {
   const live = useLive();
   const gate = useContext(GateCtx);
@@ -167,6 +173,7 @@ export function Action({
   const [tick, setTick] = useState(0);
   const handled = useRef(0);
   const { state, run } = useTx(async () => {
+    onConfirmed?.();
     await live.refresh();
     setTick((t) => t + 1);
     onDone?.();
@@ -183,6 +190,7 @@ export function Action({
   const kind = typeof request === "function" ? null : request?.kind;
   return (
     <div>
+      {state.phase === "confirmed" && next ? next : (
       <Button
         variant={variant}
         disabled={disabled || gate?.locked || busy || request === null}
@@ -197,6 +205,7 @@ export function Action({
       >
         {busy ? "Working…" : label}
       </Button>
+      )}
       <TxStatus state={state} />
       {state.phase === "confirmed" && before && after && <Moves before={before} after={after} />}
     </div>

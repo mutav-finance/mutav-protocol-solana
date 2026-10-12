@@ -10,12 +10,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { isValidIncomePeriod, previewRedeemFulfil, takeSplit } from "@mutav-finance/mutav-protocol-solana";
 import { Mono } from "@/components/Mono";
+import { Button } from "@/components/ui/button";
 import { Explorer } from "@/components/Explorer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { previewRegisterGuarantee, REFUSAL_TEXT } from "@/lib/gate";
 import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, parseHundredths } from "@/lib/format";
 import { agencyIdFor, refsSaltFor } from "@/lib/client/operator-refs";
-import { REF } from "@/lib/refs";
+import { nextRef, REF } from "@/lib/refs";
 import { bytesToHex } from "@/lib/serde";
 import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE } from "@/lib/view";
 import { Action, Field, Grid, Note, RoleWarning, TextField, useLive } from "./shared";
@@ -112,6 +113,19 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
   const [rent, setRent] = useState("1500");
   const [defMult, setDefMult] = useState("3");
   const [exitMult, setExitMult] = useState("1");
+  // After a confirmed send the result holds (no preview against the new state)
+  // until the user edits a field or asks for the next entry; `entry` remounts
+  // the Action so its result clears.
+  const [held, setHeld] = useState(false);
+  const [entry, setEntry] = useState(0);
+  const startNext = () => {
+    setHeld(false);
+    setEntry((e) => e + 1);
+  };
+  const edit = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    if (held) startNext();
+  };
 
   const rentBase = parseBrs(rent);
   // Multiples parsed once to exact hundredths (A8): no float math.
@@ -142,13 +156,13 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
   return (
     <div>
       <Grid>
-        <TextField id={`${p}reg-lease`} label="Lease reference" value={lease} onChange={setLease} hint="hashed to the guarantee id" />
-        <TextField id={`${p}reg-agency`} label="Agency" value={agency} onChange={setAgency} hint="mapped to an opaque random id, kept off-chain" />
-        <TextField id={`${p}reg-rent`} label="Monthly rent (BRS)" value={rent} onChange={setRent} numeric />
-        <TextField id={`${p}reg-def`} label="Default cover (× rent)" value={defMult} onChange={setDefMult} numeric hint={fmtBrs(defaultCover, 0)} />
-        <TextField id={`${p}reg-exit`} label="Exit cover (× rent)" value={exitMult} onChange={setExitMult} numeric hint={fmtBrs(exitCover, 0)} />
+        <TextField id={`${p}reg-lease`} label="Lease reference" value={lease} onChange={edit(setLease)} hint="hashed to the guarantee id" />
+        <TextField id={`${p}reg-agency`} label="Agency" value={agency} onChange={edit(setAgency)} hint="mapped to an opaque random id, kept off-chain" />
+        <TextField id={`${p}reg-rent`} label="Monthly rent (BRS)" value={rent} onChange={edit(setRent)} numeric />
+        <TextField id={`${p}reg-def`} label="Default cover (× rent)" value={defMult} onChange={edit(setDefMult)} numeric hint={fmtBrs(defaultCover, 0)} />
+        <TextField id={`${p}reg-exit`} label="Exit cover (× rent)" value={exitMult} onChange={edit(setExitMult)} numeric hint={fmtBrs(exitCover, 0)} />
       </Grid>
-      {preview && (
+      {preview && !held && (
         <PreviewBox ok={preview.fits} title={preview.fits ? "Fits: the program should accept it" : `Would be refused: ${preview.refusal}`}>
           {!preview.fits && preview.refusal && <Note tone="error">{REFUSAL_TEXT[preview.refusal]}</Note>}
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
@@ -162,7 +176,25 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
       )}
       <RoleWarning need="operator" />
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
-        <Action label={preview && !preview.fits ? "Send anyway: watch the program refuse it" : "register_guarantee"} variant={preview && !preview.fits ? "outline" : "default"} request={build} disabled={!rentBase || !multOk} onDone={() => setLease(`lease-demo-${String(n + 1).padStart(3, "0")}`)} />
+        <Action
+          key={entry}
+          label={preview && !preview.fits ? "Send anyway: watch the program refuse it" : "register_guarantee"}
+          variant={preview && !preview.fits ? "outline" : "default"}
+          request={build}
+          disabled={!rentBase || !multOk}
+          onConfirmed={() => setHeld(true)}
+          next={
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLease(nextRef(lease, n));
+                startNext();
+              }}
+            >
+              Register another
+            </Button>
+          }
+        />
       </div>
     </div>
   );
