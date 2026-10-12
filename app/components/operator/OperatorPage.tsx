@@ -338,7 +338,6 @@ export function OperatorPage() {
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh: async () => { await Promise.all([poll.refresh(), history.refresh()]); } }}>
           <ReserveStats r={d.reserve} sticky badges={<Who r={d.reserve} />} />
           <Section id="console" title="Console" kicker={locked ? "Read-only" : "Operator wallet connected"} action={<RoleLine items={[{ role: "operator", prefix: "every action signed by" }]}>The program checks the signer; the wallet signs; the app holds no key.</RoleLine>}>
-            {locked && <Note>Read-only: connect the operator wallet to act. The forms stay visible so anyone can see what the operator can do.</Note>}
             {d && address && address === d.reserve.config.pendingOperator && (
               <Note tone="ok">
                 This wallet is the proposed operator key: take the role with accept_role on <Link href="/admin#general-handovers" className="ext-link">/admin → Pending handovers</Link> (ADR 0020).

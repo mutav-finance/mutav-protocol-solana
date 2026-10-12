@@ -14,9 +14,11 @@ const buttonVariants = cva(
       variant: {
         // amber fill (scarce, primary intent)
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        // token border + transparent; hover fills amber (preserves .connect-cta intent)
+        // token border + transparent; hover fills amber (preserves .connect-cta intent).
+        // border-(…) rather than [border-color:…]: tailwind-merge then drops the base
+        // border-transparent, which otherwise wins and hides the border.
         outline:
-          "[border-color:var(--color-border)] bg-transparent text-foreground hover:bg-primary hover:text-primary-foreground hover:[border-color:var(--color-accent)]",
+          "border-(--color-border) bg-transparent text-foreground hover:bg-primary hover:text-primary-foreground hover:border-(--color-accent)",
         // neutral surface-2 fill
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -28,7 +30,7 @@ const buttonVariants = cva(
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         // error border + text, transparent; hover fills error (stop switches)
         "destructive-outline":
-          "[border-color:var(--color-error)] bg-transparent text-(--color-error) hover:bg-destructive hover:text-destructive-foreground",
+          "border-(--color-error) bg-transparent text-(--color-error) hover:bg-destructive hover:text-destructive-foreground",
         // amber text link
         link: "border-transparent bg-transparent text-primary underline-offset-4 hover:underline",
       },
