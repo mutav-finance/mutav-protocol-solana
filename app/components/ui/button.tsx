@@ -26,6 +26,9 @@ const buttonVariants = cva(
         // error fill
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // error border + text, transparent; hover fills error (stop switches)
+        "destructive-outline":
+          "[border-color:var(--color-error)] bg-transparent text-(--color-error) hover:bg-destructive hover:text-destructive-foreground",
         // amber text link
         link: "border-transparent bg-transparent text-primary underline-offset-4 hover:underline",
       },
