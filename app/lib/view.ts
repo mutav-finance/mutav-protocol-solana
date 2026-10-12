@@ -16,7 +16,7 @@ import type {
 } from "@mutav-finance/mutav-protocol-solana";
 import { isParked, isQueued } from "@mutav-finance/mutav-protocol-solana";
 import { bytesToHex } from "./serde";
-import { fmtShares } from "./format";
+import { fmtUnits, SHARE_DECIMALS } from "./format";
 
 export type Row<T> = { address: string; data: T };
 
@@ -271,8 +271,7 @@ export type ClaimRow = {
 
 /**
  * One row per claim filing. The filing records its payment and settlement
- * (ADR 0019); the program sets no settlement deadline (the payout SLA is the
- * operator platform's). Pass `max_claim_per_call` to tell the filings that
+ * (ADR 0019); the program sets no settlement deadline. Pass `max_claim_per_call` to tell the filings that
  * need the Reserve Admin's approval (ADR 0021).
  */
 export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">, maxClaimPerCall?: bigint): ClaimRow[] {
@@ -355,7 +354,8 @@ export function moneyFlows(
   let depositsIn = 0n;
   let redemptionsOut = 0n;
   for (const e of ledger.capitalEvents) {
-    const seqs = e.fromSeq === e.toSeq ? `seq ${e.fromSeq}` : `seqs ${e.fromSeq}–${e.toSeq}`;
+    const n = e.toSeq - e.fromSeq + 1n;
+    const requests = `${n} request${n === 1n ? "" : "s"}`;
     if (e.side === "deposit") depositsIn += e.assets;
     else redemptionsOut += e.assets;
     rows.push({
@@ -365,7 +365,7 @@ export function moneyFlows(
       at: e.ts,
       reserveDelta: e.side === "deposit" ? e.assets : -e.assets,
       treasury: 0n,
-      detail: `${seqs} · ${e.side === "deposit" ? "minted" : "burned"} ${fmtShares(e.shares)} shares`,
+      detail: `${requests} · ${fmtUnits(e.shares, SHARE_DECIMALS, 2)} shares`,
     });
   }
   rows.sort((a, b) => Number((b.at ?? 0n) - (a.at ?? 0n)));
