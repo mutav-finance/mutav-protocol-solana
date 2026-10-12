@@ -5,7 +5,8 @@
  * reserve, and what limits each risk?" Three blocks, top to bottom:
  *   1. The live freeze state of the reserve's BRS token account.
  *   2. Claim payments: bounded by the two caps.
- *   3. Who provides capital (the allowlist; not open to public investment).
+ *   3. Admin caps: every limit the Reserve Admin sets, apart from the coverage ceiling.
+ *   4. Who provides capital (the allowlist; not open to public investment).
  * The BRS freeze authority is shown on the Verify tab's mint card.
  * Renders on-chain values from /api/ledger; nothing is computed here.
  */
@@ -16,7 +17,7 @@ import { Money } from "@/components/MoneyProvider";
 import { type ReserveView } from "@/lib/view";
 
 import { Section } from "@/components/Section";
-import { BlockHead, Lead } from "@/components/reserve/sections/shared";
+import { BlockHead, Lead, Table } from "@/components/reserve/sections/shared";
 import type { Data } from "@/components/reserve/sections/shared";
 
 const LABEL = { letterSpacing: "0.01em" } as const;
@@ -77,7 +78,45 @@ function ClaimLimits({ r }: { r: ReserveView }) {
   );
 }
 
-/** Block 3 · who provides capital. Text only, no figures. */
+/**
+ * Block 3 · the caps the Reserve Admin sets, kept apart from the coverage
+ * ceiling: the ceiling moves with the reserve, these move only when the admin
+ * changes them.
+ */
+function AdminCaps({ r }: { r: ReserveView }) {
+  const caps = r.config.caps;
+  const rows: [string, bigint, string][] = [
+    ["Max TVL", caps.maxTvl, "Deposits are filled only up to this reserve size."],
+    ["Max cover per guarantee", caps.maxCoverPerGuarantee, "The largest cover one new guarantee may carry."],
+    ["Operator limit per payment", caps.maxClaimPerCall, "Above it, the Reserve Admin approves the exact amount."],
+    ["Max in any 31 days", caps.maxClaimPerPeriod, "All claim payments together."],
+  ];
+  return (
+    <section aria-labelledby="risk-caps-h" className="flex flex-col gap-4">
+      <BlockHead
+        id="risk-caps-h"
+        title="Admin caps"
+        note={<Lead lead="Set by the Reserve Admin, separate from the coverage ceiling." className="text-sm">The ceiling follows the reserve; these change only when the admin sets them.</Lead>}
+        aside={<HeadLink href="/reserve/coverage">See the ceiling</HeadLink>}
+      />
+      <Table label="Admin caps" head={["Cap", ["Value", "num"], "What it limits"]}>
+        {rows.map(([k, v, what]) => (
+          <tr key={k}>
+            <td>{k}</td>
+            <td className="num">
+              <Mono>
+                <Money brs={v} />
+              </Mono>
+            </td>
+            <td>{what}</td>
+          </tr>
+        ))}
+      </Table>
+    </section>
+  );
+}
+
+/** Block 4 · who provides capital. Text only, no figures. */
 function CapitalTerms() {
   return (
     <section aria-labelledby="risk-capital-h" className="flex flex-col gap-4">
@@ -106,6 +145,7 @@ export function Disclosures({ r }: { r: ReserveView }) {
     <div className="flex flex-col gap-10 md:gap-12">
       <FreezeStatus r={r} />
       <ClaimLimits r={r} />
+      <AdminCaps r={r} />
       <CapitalTerms />
     </div>
   );

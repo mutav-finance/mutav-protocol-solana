@@ -53,6 +53,93 @@ export function coverageMeter(s: Pick<Coverage, "stableAssets" | "coverageRequir
   };
 }
 
+// ── The coverage ceiling ────────────────────────────────────────────────────
+
+/** Why no new guarantee fits right now, in the order `register_guarantee` checks it. */
+export type CeilingBlock = "paused" | "under-covered" | "frozen" | "provisions";
+
+export type CoverageCeilingInput = {
+  /** `stable_assets` (= `brs_balance`). */
+  stableAssets: bigint;
+  coverageRatioBps: number | bigint;
+  provisions: bigint;
+  stressBuffer: bigint;
+  /** Remaining cover of every active guarantee (`remaining_cover_total`). */
+  remainingCoverTotal: bigint;
+  mode: number;
+  paused: boolean;
+  frozen: boolean;
+};
+
+export type CoverageCeiling = {
+  /** The most remaining cover the reserve can carry: the largest X with `coverage_required(X) ≤ stable_assets`. */
+  ceiling: bigint;
+  /** Remaining cover today. */
+  inUse: bigint;
+  /** Cover a new guarantee may add now (0 while blocked or at/over the ceiling). */
+  headroom: bigint;
+  /** Which term sets the ceiling, or `blocked` when no new guarantee fits whatever its size. */
+  binding: "ratio" | "stress" | "blocked";
+  blockedBy: CeilingBlock | null;
+};
+
+const U64_MAX = (1n << 64n) - 1n;
+
+/**
+ * The inverse of the `register_guarantee` gate (programs/mutav/src/instructions/operator/register_guarantee.rs:95-107):
+ * a lease is accepted while `coverage_required(X + new, c, P, B) ≤ stable_assets`, with
+ * `coverage_required = max(ceil(c·X / 10_000), P + min(B, max(0, X − P)))` (coverage.rs; client `coverageRequired`).
+ *
+ * Solving for the largest X:
+ * - ratio leg: `ceil(c·X / 10_000) ≤ S` ⇔ `X ≤ floor(S·10_000 / c)`;
+ * - stress leg: never holds when `S < P`; always holds when `P + B ≤ S`; otherwise holds ⇔ `X ≤ S`.
+ *
+ * Paused, a frozen reserve account, a non-NORMAL mode or `S < P` stop every new guarantee: headroom 0.
+ */
+export function coverageCeiling(i: CoverageCeilingInput): CoverageCeiling {
+  const S = i.stableAssets;
+  const P = i.provisions;
+  const X = i.remainingCoverTotal;
+  const c = BigInt(i.coverageRatioBps);
+  const byRatio = c > 0n ? (S * 10_000n) / c : U64_MAX;
+  const ratioMax = byRatio > U64_MAX ? U64_MAX : byRatio;
+
+  let ceiling: bigint;
+  let binding: "ratio" | "stress";
+  if (S < P) {
+    ceiling = X;
+    binding = "stress";
+  } else if (P + i.stressBuffer <= S || ratioMax <= S) {
+    ceiling = ratioMax;
+    binding = "ratio";
+  } else {
+    ceiling = S;
+    binding = "stress";
+  }
+
+  const blockedBy: CeilingBlock | null = i.paused ? "paused" : i.mode !== 0 ? "under-covered" : i.frozen ? "frozen" : S < P ? "provisions" : null;
+  return {
+    ceiling,
+    inUse: X,
+    headroom: blockedBy || ceiling <= X ? 0n : ceiling - X,
+    binding: blockedBy ? "blocked" : binding,
+    blockedBy,
+  };
+}
+
+/** {@link coverageCeiling} from the accounts the /reserve views read. */
+export const coverageCeilingOf = (r: { config: { coverageRatioBps: number; paused: boolean; caps: { stressBuffer: bigint } }; state: { mode: number; provisions: bigint; remainingCoverTotal: bigint }; coverage: Pick<Coverage, "stableAssets">; token: { reserveFrozen: boolean } }) =>
+  coverageCeiling({
+    stableAssets: r.coverage.stableAssets,
+    coverageRatioBps: r.config.coverageRatioBps,
+    provisions: r.state.provisions,
+    stressBuffer: r.config.caps.stressBuffer,
+    remainingCoverTotal: r.state.remainingCoverTotal,
+    mode: r.state.mode,
+    paused: r.config.paused,
+    frozen: r.token.reserveFrozen,
+  });
+
 /** What NAV is computed on: stable assets split into net assets and open claim provisions. */
 export type NavBasis = { stableAssets: bigint; netAssets: bigint; provisions: bigint };
 

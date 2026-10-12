@@ -4,7 +4,8 @@
 import type { ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { InfoTooltip } from "@/components/InfoTooltip";
-import { UsdHint } from "@/components/MoneyProvider";
+import { Money, UsdHint } from "@/components/MoneyProvider";
+import type { CeilingBlock, CoverageCeiling } from "@/lib/charts";
 import type { Ledger, ReserveView } from "@/lib/view";
 
 /** What /api/ledger returns. */
@@ -172,3 +173,33 @@ export function PlusMark({ open }: { open?: boolean }) {
   );
 }
 
+
+/** Why no new guarantee fits right now, in plain words. */
+export const CEILING_BLOCK: Record<CeilingBlock, string> = {
+  paused: "the program is paused",
+  "under-covered": "the reserve is under-covered",
+  frozen: "the reserve token account is frozen",
+  provisions: "claims set aside exceed the reserve",
+};
+
+/** "Can back up to R$ X of guarantees · R$ Y in use · R$ Z headroom", from {@link CoverageCeiling}. */
+export function CapacityLine({ k }: { k: CoverageCeiling }) {
+  const fig = { fontVariantNumeric: "tabular-nums", color: "var(--color-text)" } as const;
+  return (
+    <span className="font-body text-(--color-text-2) leading-relaxed text-pretty">
+      Can back up to{" "}
+      <Mono style={fig}>
+        <Money brs={k.ceiling} />
+      </Mono>{" "}
+      of guarantees ·{" "}
+      <Mono style={fig}>
+        <Money brs={k.inUse} />
+      </Mono>{" "}
+      in use ·{" "}
+      <Mono style={fig}>
+        <Money brs={k.headroom} />
+      </Mono>{" "}
+      headroom{k.blockedBy ? ` while ${CEILING_BLOCK[k.blockedBy]}` : ""}.
+    </span>
+  );
+}

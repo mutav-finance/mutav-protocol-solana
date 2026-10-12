@@ -9,7 +9,8 @@
  * Layout (shared visual reference): [B+C] one hero tile (remaining cover, the
  * split bar between unpaid rent and move-out debts, and a 2-cell strip), [E]
  * the guarantee table with per-row detail on expand, [E] the agency table with
- * share meters (the program sets no per-agency cap, ADR 0019), [F] the totals that close the sums. What is set aside for filed
+ * share meters (the program sets no per-agency cap, ADR 0019), [F] the totals that close the sums, [G] how the
+ * coverage ceiling follows from the reserve (the inverse of the register_guarantee gate). What is set aside for filed
  * claims lives on the Claims tab.
  */
 import { useState, type ReactNode } from "react";
@@ -18,13 +19,13 @@ import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
 import { fmtBps, fmtBrs, fmtPct, fmtTime } from "@/lib/format";
 import { Money } from "@/components/MoneyProvider";
-import { frac } from "@/lib/charts";
+import { coverageCeilingOf, frac, type CoverageCeiling } from "@/lib/charts";
 import { activeRemainingCover, agencyRows, coverageRows, type AgencyRow, type CoverageRow, type Ledger, type ReserveView } from "@/lib/view";
-import { C } from "@/components/charts/Charts";
+import { C, ChartFrame, Legend, Row, RowLabel, Swatch as ChartSwatch, Track } from "@/components/charts/Charts";
 import { coverageRequired, stressTerm } from "@mutav-finance/mutav-protocol-solana";
 import { TotalsStrip, type TotalsTerm } from "@/components/reserve/sections/Flows";
 
-import { BlockHead, Empty, HeroAmount, MotionStyle, Num, PlusMark, Table, plural, short } from "@/components/reserve/sections/shared";
+import { BlockHead, CEILING_BLOCK, CapacityLine, Empty, HeroAmount, Lead, MotionStyle, Num, PlusMark, Table, plural, short } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -180,6 +181,86 @@ function Detail({ term, children }: { term: string; children: ReactNode }) {
   );
 }
 
+/** [G] How the ceiling works: the reserve, the ratio or stress floor, and the most cover that fits. Every figure from the accounts. */
+function HowTheCeilingWorks({ r, k, byRatio, floor }: { r: ReserveView; k: CoverageCeiling; byRatio: bigint; floor: bigint }) {
+  const c = fmtPct(r.config.coverageRatioBps);
+  const s = r.coverage;
+  const fig = { color: "var(--color-text)" } as const;
+  const steps: [string, ReactNode][] = [
+    [`Reserve: ${fmtBrs(s.stableAssets)}.`, "The BRS held in the reserve token account."],
+    [
+      `${c} ratio, or the stress floor.`,
+      <>
+        Each unit of remaining cover needs {c} of it in reserve. While the book is small, the floor applies instead: claims set aside (<Money brs={r.state.provisions} />) plus the stress buffer (<Money brs={r.config.caps.stressBuffer} />).
+      </>,
+    ],
+    [
+      `Maximum cover: ${fmtBrs(k.ceiling)}.`,
+      k.blockedBy
+        ? `No new guarantee fits while ${CEILING_BLOCK[k.blockedBy]}.`
+        : `The reserve divided by ${c}${k.binding === "stress" ? ", capped at the reserve itself while the stress floor binds" : ""}. A new lease is accepted while remaining cover stays within it.`,
+    ],
+  ];
+  const axis = k.inUse > k.ceiling ? k.inUse : k.ceiling;
+  const used = k.inUse < k.ceiling ? k.inUse : k.ceiling;
+  const over = k.inUse > k.ceiling ? k.inUse - k.ceiling : 0n;
+  const binds =
+    k.binding === "stress"
+      ? "The stress floor sets the ceiling while the book is small."
+      : k.binding === "ratio"
+        ? `The ${c} ratio sets the ceiling.`
+        : `No new guarantees fit now: ${CEILING_BLOCK[k.blockedBy!]}.`;
+  return (
+    <section aria-labelledby="ceiling-h" className="flex flex-col gap-4">
+      <BlockHead
+        id="ceiling-h"
+        title="How the ceiling works"
+        note={
+          <Lead lead={`${fmtBrs(r.state.remainingCoverTotal)} of rent guaranteed across ${plural(r.state.activeGuarantees, "lease")}:`} className="text-sm">
+            the most MUTAV could ever owe if every lease defaulted at its limit. The reserve must hold {c} of that
+            {floor > byRatio ? ", or the stress floor when higher" : ""} (<span style={fig}><Money brs={s.coverageRequired} /></span>) and holds{" "}
+            <span style={fig}><Money brs={s.stableAssets} /></span>.
+          </Lead>
+        }
+      />
+      <ol className="m-0 grid gap-4 p-0" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))" }}>
+        {steps.map(([lead, note], i) => (
+          <li key={i} className="bg-(--color-surface) flex list-none flex-col gap-2 border p-6">
+            <Mono style={{ fontVariantNumeric: "tabular-nums", fontSize: 12, color: "var(--color-text-3)" }}>{String(i + 1).padStart(2, "0")}</Mono>
+            <Lead lead={lead} className="text-sm">
+              {note}
+            </Lead>
+          </li>
+        ))}
+      </ol>
+      <ChartFrame
+        title="Remaining cover against the ceiling"
+        legend={
+          <Legend>
+            <ChartSwatch color={C.ink} label="in use" />
+            <ChartSwatch color={C.good} label="headroom" />
+            {over > 0n && <ChartSwatch color={C.bad} label="above the ceiling" />}
+          </Legend>
+        }
+        caption={<CapacityLine k={k} />}
+      >
+        <Row
+          label={<RowLabel>Remaining cover</RowLabel>}
+          value={fmtBrs(k.ceiling, 0)}
+          summary={`Remaining cover ${fmtBrs(k.inUse)} of a ${fmtBrs(k.ceiling)} ceiling; headroom ${fmtBrs(k.headroom)}.`}
+        >
+          <Track segs={[{ f: frac(used, axis), color: C.ink }, { f: frac(k.headroom, axis), color: C.good }, { f: frac(over, axis), color: C.bad }]} />
+        </Row>
+      </ChartFrame>
+      <p className="m-0">
+        <Lead lead={binds} className="text-sm">
+          Guarantee fees and the BRS issuer&apos;s income add to the reserve and raise the ceiling, so more leases fit.
+        </Lead>
+      </p>
+    </section>
+  );
+}
+
 export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   const rows = byRemaining(coverageRows(l.guarantees));
   const agencies = agencyRows(l.guarantees);
@@ -325,6 +406,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
         groups={totals}
         note="Coverage required is the higher of the coverage ratio times remaining cover (rounded up) and the floor: what is set aside for claims plus the stress buffer (capped at the cover not yet set aside)."
       />
+
+      <HowTheCeilingWorks r={r} k={coverageCeilingOf(r)} byRatio={byRatio} floor={floor} />
     </div>
   );
 }
