@@ -136,8 +136,8 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Edit:** End state; zoom from the hold still.
 - **Retake:** Read-only.
 
-**F12 · END STATE · 3 · Capital efficiency · 1:51 – 1:58 · /investment**: Capital out, above what went in
-- **On screen:** /investment as capital wallet B after the off-camera redemption: deposited R$4,000.00, claimed R$4,086.18. Hold 3 s. The banner carries the disclaimer.
+**F12 · END STATE · 3 · Capital efficiency · 1:51 – 1:58 · /capital**: Capital out, above what went in
+- **On screen:** /capital as capital wallet B after the off-camera redemption: deposited R$4,000.00, claimed R$4,086.18. Hold 3 s. The banner carries the disclaimer.
 - **VO:** "The same reserve that protects the landlord pays the people who fund it."
 - **Caption:** R$4,000 in → R$4,086 out
 - **Honesty label:** none (banner only)
@@ -193,7 +193,7 @@ Two months of fees: one month beats a one-month-rent claim only with more than 1
 | /reserve/capital | — (#flows, #queue) | Capital tab (flows + queue) | F10 |
 | /reserve/risks | — (#disclosures) | Risks tab | — |
 | /reserve/verify | — (#accounts) | Verify tab | — |
-| /investment | — (/investor) | Swap-style card + queue entries | F12 |
+| /capital | — (/investor) | Swap-style card + queue entries | F12 |
 | /operator | Operator console | Same, restyled | F3, F6, F7 |
 | /admin | Squads proposals | Same, restyled | off camera (fills) |
 | /demo | Guided six steps | Same; a cleaned version is the optional alternative surface | alternative |
@@ -210,7 +210,7 @@ Two months of fees: one month beats a one-month-rent claim only with more than 1
 | 5 | 00-setup: register 8 leases (rent 1500, 6× + 6×, refs MTV-PF-0001…0008, fictional agencies). Check: R$44,000 held, R$36,000 required, R$8,000 free, 8 active, 1.000000 | Operator | — |
 | 6 | Capture the cold open → chapter 2 live: F1, F2, register Ana (F3), Explorer end state (F4), F5, the refusal (F6), the F9 /reserve plate, then the claim live (F7) and /reserve/claims (F8). Log tx timestamps for the timer | Operator; anyone | — |
 | 7 | 05-offcamera: contribute_fees R$3,060; B request_redeem 4,000 shares → fulfil_redeems (count 1) → B claim_assets (R$4,086.18); refresh | Operator; B; Admin Squads 2-of-2; anyone | 5 min lock |
-| 8 | Capture the chapter 3 end states: fee receipt (F10), /reserve share value (F11), /investment in → out (F12) | — | — |
+| 8 | Capture the chapter 3 end states: fee receipt (F10), /reserve share value (F11), /capital in → out (F12) | — | — |
 | 9 | Edit: chapter titles, the timer, the cards. Judge-ready check: mode Normal, covered (free R$736.82) | — | — |
 
 No restore is needed: the reserve stays covered (free capital R$736.82 at the end, mode Normal).

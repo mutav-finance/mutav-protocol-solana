@@ -10,12 +10,12 @@ The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with 
 
 | # | Requirement | Why |
 |---|---|---|
-| M1 | **Reais on `/reserve` (all tabs) and `/investment`**: amounts shown as `R$` (e.g. `R$44,948.00`), not USD at a display rate. A config switch or env flag is enough; the chain amount is BRS 1:1 BRL. | The story is in reais. |
+| M1 | **Reais on `/reserve` (all tabs) and `/capital`**: amounts shown as `R$` (e.g. `R$44,948.00`), not USD at a display rate. A config switch or env flag is enough; the chain amount is BRS 1:1 BRL. | The story is in reais. |
 | M2 | **A clean refusal message** with the raw error collapsed: a human line (e.g. "Refused by the program: not enough free capital for this cover") with the program error name and the encoded Solana detail behind a disclosure. Today it is "InsufficientFreeCapital —" followed by about 8 lines of encoded text. | Pillar 1's climax (F6). |
 | M3 | **The register form holds its "Confirmed" result**, with no red preview after it. Today it resets to the next reference at once and shows a red "Send anyway" preview under the result. | F3 holds on the confirmation. |
 | M4 | **`pay_claim` and `settle_payout` keep a visible confirmation after sending**: the status, the signature and the before/after. Today the row disappears once sent and takes all three with it. | The claim runs live in pillar 2 (F7). |
 | M5 | **`/reserve/claims` shows the filed, paid and settled timestamps** (to the second) and the filed → settled duration. | F8 and the [N] minutes. |
-| M6 | **An in → out position in reais on `/investment`** for the connected wallet: deposited and claimed (e.g. "Deposited R$4,000.00 · Claimed R$4,086.18"). No annual rate, APY or projection. Fallback if not built: an edit overlay from the two transaction amounts. | Pillar 3's end state (F12). |
+| M6 | **An in → out position in reais on `/capital`** for the connected wallet: deposited and claimed (e.g. "Deposited R$4,000.00 · Claimed R$4,086.18"). No annual rate, APY or projection. Fallback if not built: an edit overlay from the two transaction amounts. | Pillar 3's end state (F12). |
 
 ## Covered by #59 (merged)
 
@@ -43,7 +43,7 @@ The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with 
 | Agency | F2 | `app.mutav.finance` | A demo agency account with Ana's fictional lease (rent R$1,500), or the harness's agency stub |
 | 1 · Programmable, transparent reserve | F3–F6 | `/operator`, Explorer, `/reserve/coverage` | M2, M3; rent 1500, 6× + 6× in the register form |
 | 2 · Settled in minutes | F7–F8 | `/operator`, `/reserve/claims` | M4, M5; the pay tab shows the R$15,000 per-call cap |
-| 3 · Capital efficiency | F9–F12 | `/reserve`, `/reserve/capital`, `/investment` | M1, M6, S2, S3 |
+| 3 · Capital efficiency | F9–F12 | `/reserve`, `/reserve/capital`, `/capital` | M1, M6, S2, S3 |
 | Close | F13 | card | none |
 
 ## Capture harness → v5
@@ -52,10 +52,10 @@ The harness on `feat/demo-capture` (routes and locators in `app/e2e/demo/pages.t
 
 1. **`00-setup` (off camera):** the ADR 0028 seed via `DEMO_PARAMS` (c = 0.25): deposits A R$40,000 and B R$4,000 with the Squads fill; 8 leases at rent 1500, 6× + 6×.
 2. **The 5 live actions, on camera:** register Ana (`MTV-PF-0009`), the refused send (`MTV-PF-0010`), `file_claim` R$1,500 (`NTC-PF-0001`), `pay_claim`, `settle_payout`. **Log each transaction's signature and on-chain block time** to a file, for the elapsed-timer overlay and [N].
-3. **Plates and end-state captures:** the F9 `/reserve` plate right after the refusal; Explorer on Ana's Guarantee PDA; and, after `05-offcamera`, the fee receipt (`/reserve/capital`), `/reserve` share value, and `/investment` in → out.
+3. **Plates and end-state captures:** the F9 `/reserve` plate right after the refusal; Explorer on Ana's Guarantee PDA; and, after `05-offcamera`, the fee receipt (`/reserve/capital`), `/reserve` share value, and `/capital` in → out.
 4. **`05-offcamera`:** `contribute_fees` R$3,060; B's `request_redeem` of 4,000 shares → the admin `fulfil_redeems` fill → B's `claim_assets` (expected R$4,086.18); `refresh`.
 5. **The agency stub** for F2, or a hand capture.
-6. **The #45 routes:** `/reserve/coverage`, `/reserve/claims`, `/reserve/capital`, `/investment`, with locators for the restyled components.
+6. **The #45 routes:** `/reserve/coverage`, `/reserve/claims`, `/reserve/capital`, `/capital`, with locators for the restyled components.
 
 Capture spec as built: Chromium's screencast delivers 1080p at 30 fps, and 2× stills are saved on holds only. Zooms over motion stay at or below 1.3×; zooms on holds can reach 2× using the stills.
 
