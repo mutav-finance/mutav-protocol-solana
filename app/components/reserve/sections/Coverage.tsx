@@ -26,7 +26,7 @@ import { C } from "@/components/charts/Charts";
 import { coverageRequired, stressTerm } from "@mutav-finance/mutav-protocol-solana";
 import { TotalsStrip, type TotalsTerm } from "@/components/reserve/sections/Flows";
 
-import { BlockHead, CEILING_BLOCK, Empty, HeroPercent, Lead, MotionStyle, Num, PlusMark, Table, plural, short } from "@/components/reserve/sections/shared";
+import { BlockHead, CEILING_BLOCK, Empty, HeroAmount, HeroPercent, Lead, MotionStyle, Num, PlusMark, Table, plural, short } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -300,18 +300,33 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
     <div className="flex flex-col gap-8">
       <MotionStyle />
       <div className="bg-(--color-surface) flex flex-col gap-6 border p-6">
-        <HeroPercent phrase="Capacity left" value={capacityLeft(k)}>
+        <div className="grid gap-8 md:grid-cols-2">
+        <HeroAmount phrase="Allocated to coverage" value={fmtBrs(s.coverageRequired)}>
           <span className="font-body text-(--color-text-2) flex flex-col gap-1 leading-relaxed">
-            {k.blockedBy && <span style={{ color: "var(--color-error)" }}>{`No new lease fits while ${CEILING_BLOCK[k.blockedBy]}.`}</span>}
             <span>
-              <span className="whitespace-nowrap"><Money brs={k.headroom} places={0} /></span> of the <span className="whitespace-nowrap"><Money brs={k.ceiling} places={0} /></span> ceiling free for new leases.
+              {`Held to back the guarantees: ${(frac(s.coverageRequired, s.stableAssets) * 100).toFixed(1)}% of the `}
+              <span className="whitespace-nowrap"><Money brs={s.stableAssets} places={0} /></span> reserve.
             </span>
             <span>
-              <span className="whitespace-nowrap"><Money brs={k.inUse} places={0} /></span>
-              {` in use on ${plural(active.length, "active guarantee", "active guarantees")} at ${plural(agenciesActive, "agency", "agencies")}, after claims paid.`}
+              {s.coverageRequired > coverageRequired(r.state.remainingCoverTotal, r.config.coverageRatioBps, 0n, 0n)
+                ? "Set by the stress floor (claims set aside plus the stress buffer) while the book is small."
+                : `${fmtPct(r.config.coverageRatioBps)} of the cover still guaranteed, as the program requires.`}
             </span>
           </span>
-        </HeroPercent>
+        </HeroAmount>
+          <HeroPercent phrase="Capacity left" value={capacityLeft(k)}>
+            <span className="font-body text-(--color-text-2) flex flex-col gap-1 leading-relaxed">
+              {k.blockedBy && <span style={{ color: "var(--color-error)" }}>{`No new lease fits while ${CEILING_BLOCK[k.blockedBy]}.`}</span>}
+              <span>
+                <span className="whitespace-nowrap"><Money brs={k.headroom} places={0} /></span> of the <span className="whitespace-nowrap"><Money brs={k.ceiling} places={0} /></span> ceiling free for new leases.
+              </span>
+              <span>
+                <span className="whitespace-nowrap"><Money brs={k.inUse} places={0} /></span>
+                {` in use on ${plural(active.length, "active guarantee", "active guarantees")} at ${plural(agenciesActive, "agency", "agencies")}, after claims paid.`}
+              </span>
+            </span>
+          </HeroPercent>
+        </div>
         {/* [D] One bar, matching the hero: cover in use against the capacity left up to the ceiling (and any cover above it). */}
         <div className="flex flex-col gap-3">
           <div
