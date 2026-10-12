@@ -244,6 +244,15 @@ describe("simulator on the pilot", () => {
     expect(sim.mutavCoverageRequired(170 * 39_600 * BRL_UNITS, 2_500, 0) / BRL_UNITS).toBe(1_683_000);
   });
 
+  it("Path to R$1M: 17 a month and R$170k a month from month 2 reach the R$1M cap in month 6", () => {
+    const r = pilot({ perMonth: 17, growthTarget: 102, monthlyRaise: 170_000 });
+    expect(r.rows[5].balance).toBeGreaterThanOrEqual(1_000_000);
+    expect(r.rows[4].balance).toBeLessThan(1_000_000);
+    expect(r.finalActive).toBe(97);
+    expect(r.rows[0].active).toBe(12);
+    expect(r.tvlRefused).toBeGreaterThan(0);
+  });
+
   it("refuses every lease above the per-guarantee cap", () => {
     const capped = pilot({ maxCoverPerGuarantee: 30_000 });
     expect(capped.req.overGuaranteeCap).toBe(true);
