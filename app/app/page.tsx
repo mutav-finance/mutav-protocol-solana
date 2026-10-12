@@ -94,7 +94,7 @@ export default function Landing() {
             Check it yourself
           </h2>
           <p className="font-body" style={{ fontSize: 14, color: "var(--color-text-2)", margin: "0 0 24px", maxWidth: 720, lineHeight: 1.6 }}>
-            Capital requests are gated by an on-chain allowlist (KYC off-chain). What is open to everyone is the evidence: every account, every claim and every payment, on Solana.
+            New capital is gated by an on-chain allowlist (KYC off-chain); holders can always redeem. What is open to everyone is the evidence: every account, every claim and every payment, on Solana.
           </p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Link href="/reserve" className="font-body cta-fill" style={{ background: "var(--color-accent)", color: "var(--color-canvas)", fontSize: 15, fontWeight: 600, padding: "12px 20px", textDecoration: "none" }}>

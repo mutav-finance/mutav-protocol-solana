@@ -5,7 +5,8 @@
  * and settled timestamps (UTC, to the second, from the ClaimFiling account)
  * and the filed → settled time, plus a chevron; the whole row opens its
  * detail (the two partial durations and explorer links).
- * Open claims (awaiting payment, then awaiting PIX) sort first, then newest filing.
+ * Open claims (needs approval, approved, awaiting payment, then awaiting PIX)
+ * sort first, then newest filing.
  * The program sets no settlement deadline (ADR 0019): the payout SLA is the
  * operator platform's, so no row is marked late.
  */
@@ -13,15 +14,14 @@ import { Fragment, useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
-import { elapsed, fmtDuration, fmtStamp, fmtTime } from "@/lib/format";
-import { useFmt } from "@/components/MoneyProvider";
-import type { ClaimRow } from "@/lib/view";
+import { elapsed, fmtBrs, fmtDuration, fmtStamp, fmtTime } from "@/lib/format";
+import { CLAIM_STAGE_LABEL, type ClaimRow } from "@/lib/view";
 import { Num, Table, short } from "@/components/reserve/sections/shared";
 
 const PAGE = 10;
 
 const TIPS = {
-  Status: "Filed, paid from the reserve, or received by the landlord (PIX), from the claim filing on-chain.",
+  Status: "Needs the Reserve Admin's approval, approved, awaiting payment, paid from the reserve, or received by the landlord (PIX), from the claim filing on-chain.",
   "Filed (UTC)": "When file_claim was recorded on-chain (ClaimFiling filed_at).",
   "Paid (UTC)": "When pay_claim moved the claim payment out of the reserve (ClaimFiling paid_at).",
   "Settled (UTC)": "When settle_payout recorded the landlord's PIX receipt (ClaimFiling settled_at).",
@@ -30,11 +30,26 @@ const TIPS = {
 
 type Status = { label: string; color: string; title?: string; rank: number };
 
-/** Stage of one claim from its filing account: awaiting payment, paid (PIX pending), or settled. */
+/**
+ * Stage of one claim from its filing account (`CLAIM_STAGE_LABEL`; an
+ * unapproved filing within the operator's per-call limit reads as awaiting
+ * payment). Ranks order the table: needs approval, approved, awaiting
+ * payment, paid (PIX pending), settled.
+ */
 export function claimStatus(c: ClaimRow): Status {
-  if (c.stage === "filed") return { label: "awaiting payment", color: "var(--color-text-3)", title: "Filed, not paid yet.", rank: 0 };
-  if (c.stage === "paid") return { label: "paid", color: "var(--color-text-3)", title: "Paid from the reserve; the landlord has not received it by PIX yet.", rank: 1 };
-  return { label: "settled", color: "var(--color-text-3)", rank: 2 };
+  const s = (label: string, rank: number, title?: string): Status => ({ label, color: "var(--color-text-3)", title, rank });
+  switch (c.stage) {
+    case "needs_approval":
+      return s(CLAIM_STAGE_LABEL.needs_approval, 0, "Above the operator's limit per payment: the Reserve Admin must approve it before it is paid (ADR 0021).");
+    case "approved":
+      return s(CLAIM_STAGE_LABEL.approved, 1, "Approved by the Reserve Admin, not paid yet.");
+    case "filed":
+      return s("awaiting payment", 2, "Filed, not paid yet.");
+    case "paid":
+      return s(CLAIM_STAGE_LABEL.paid, 3, "Paid from the reserve; the landlord has not received it by PIX yet.");
+    default:
+      return s(CLAIM_STAGE_LABEL.settled, 4);
+  }
 }
 
 /** 6px square badge with a mono label (brand status mark, no fill behind the text). */
@@ -57,7 +72,6 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
-  const fmtBrs = useFmt();
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [all, setAll] = useState(false);
   // Stable sort: exceptions first, newest filing within each group (claimsTimeline returns newest first).

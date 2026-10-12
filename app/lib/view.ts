@@ -3,6 +3,7 @@
  * accounts to rows the screens render. No numbers are invented here; each row
  * is a projection or a sum of account fields.
  */
+import { assetsFor, redeemSizeError } from "@mutav-finance/mutav-protocol-solana";
 import type {
   ClaimFiling,
   DepositRequest,
@@ -130,10 +131,7 @@ export const GUARANTEE_ACTIVE = 0;
 export const CLAIM_FILED = 0;
 export const CLAIM_PAID = 1;
 export const CLAIM_SETTLED = 3;
-export const DEPOSIT_PENDING = 0;
 export const DEPOSIT_FULFILLED = 1;
-/** Parked by the admin's cancel (ADR 0030): the escrow is still the owner's to collect with `cancel_deposit`. */
-export const DEPOSIT_CANCELLED = 2;
 
 export const MODE_LABEL = (mode: number) => (mode === 0 ? "Normal" : "UnderCovered");
 
@@ -208,7 +206,37 @@ export function agencyRows(guarantees: Row<Guarantee>[]): AgencyRow[] {
 
 // ── Claims timeline ─────────────────────────────────────────────────────────
 
-export type ClaimStage = "filed" | "paid" | "settled";
+/**
+ * - `filed`: within the operator's limit per payment; pay_claim pays it.
+ * - `needs_approval`: its provision is above `max_claim_per_call` and the
+ *   Reserve Admin has not approved it (ADR 0021).
+ * - `approved`: the admin approved exactly its provision; pay_claim pays it.
+ */
+export type ClaimStage = "filed" | "needs_approval" | "approved" | "paid" | "settled";
+
+export const CLAIM_STAGE_LABEL: Record<ClaimStage, string> = {
+  filed: "filed",
+  needs_approval: "needs approval",
+  approved: "approved",
+  paid: "paid",
+  settled: "settled",
+};
+
+/** Filed and not paid yet, whatever its approval. */
+export const isUnpaid = (s: ClaimStage) => s === "filed" || s === "needs_approval" || s === "approved";
+
+/**
+ * The stage of a filing. `maxClaimPerCall` unknown: an unapproved filing
+ * reads as `filed`.
+ */
+export function claimStage(f: Pick<ClaimFiling, "status" | "provision" | "approvedAmount">, maxClaimPerCall?: bigint): ClaimStage {
+  if (f.status === CLAIM_SETTLED) return "settled";
+  if (f.status === CLAIM_PAID) return "paid";
+  // pay_claim checks `approved_amount == amount` above the cap, and the amount is the provision.
+  if (f.approvedAmount > 0n && f.approvedAmount === f.provision) return "approved";
+  if (maxClaimPerCall !== undefined && f.provision > maxClaimPerCall) return "needs_approval";
+  return "filed";
+}
 
 export type ClaimRow = {
   filing: string;
@@ -217,6 +245,8 @@ export type ClaimRow = {
   leg: "default" | "exit";
   noticeRefHash: string;
   provision: bigint;
+  /** `approve_claim`'s amount (ADR 0021); 0 = not approved. */
+  approvedAmount: bigint;
   amount: bigint | null;
   filedAt: bigint;
   paidAt: bigint | null;
@@ -231,9 +261,10 @@ export type ClaimRow = {
 /**
  * One row per claim filing. The filing records its payment and settlement
  * (ADR 0019); the program sets no settlement deadline (the payout SLA is the
- * operator platform's).
+ * operator platform's). Pass `max_claim_per_call` to tell the filings that
+ * need the Reserve Admin's approval (ADR 0021).
  */
-export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">): ClaimRow[] {
+export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">, maxClaimPerCall?: bigint): ClaimRow[] {
   const ids = new Map(ledger.guarantees.map((g) => [g.address, bytesToHex(new Uint8Array(g.data.id))]));
   return ledger.filings
     .map(({ address, data: f }): ClaimRow => {
@@ -247,12 +278,13 @@ export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">): 
         leg: legName(f.leg),
         noticeRefHash: bytesToHex(new Uint8Array(f.noticeRefHash)),
         provision: f.provision,
+        approvedAmount: f.approvedAmount,
         amount: paid ? f.paidAmount : null,
         filedAt: f.filedAt,
         paidAt: paid ? f.paidAt : null,
         settledAt: settled ? f.settledAt : null,
         pixE2eHash: !zeroHash ? bytesToHex(new Uint8Array(f.pixE2eHash)) : null,
-        stage: settled ? "settled" : paid ? "paid" : "filed",
+        stage: claimStage(f, maxClaimPerCall),
         fileToPay: paid ? f.paidAt - f.filedAt : null,
         payToSettle: settled ? f.settledAt - f.paidAt : null,
       };
@@ -263,6 +295,9 @@ export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">): 
 // ── Money flows ─────────────────────────────────────────────────────────────
 
 export type FlowKind = "fee" | "income" | "claim" | "deposit" | "redemption";
+
+/** A movement's name in the reserve's activity list and balance history. */
+export const FLOW_KIND_LABEL: Record<FlowKind, string> = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" };
 
 export type FlowRow = {
   kind: FlowKind;
@@ -418,6 +453,27 @@ export type InvestorRequest = {
   /** Instructions whose rules the request meets (spec §5.5); the program still decides. */
   actions: ("cancel_deposit" | "claim_shares" | "cancel_redeem" | "claim_assets")[];
 };
+
+/**
+ * The `request_redeem` size rule (ADR 0029) as the program applies it, at
+ * NAV now (a PREVIEW): `value` and the `remainder` left in the share account
+ * are priced with `assetsFor`. Below `min_request` only a full exit of the
+ * canonical share associated token account passes (the app always debits
+ * that account, so `canonical` defaults to true). `balance` null: unknown,
+ * read as no balance left behind.
+ */
+export function redeemSizeCheck(
+  shares: bigint,
+  balance: bigint | null,
+  sharesOutstanding: bigint,
+  netAssets: bigint,
+  caps: Pick<VaultConfig["caps"], "minRequest" | "maxRequest">,
+  canonical = true,
+): "RequestTooSmall" | "RequestTooLarge" | null {
+  const value = assetsFor(shares, sharesOutstanding, netAssets);
+  const left = balance !== null && balance > shares ? balance - shares : 0n;
+  return redeemSizeError(value, assetsFor(left, sharesOutstanding, netAssets), canonical, caps.minRequest, caps.maxRequest);
+}
 
 export function investorRequests(
   owner: string | null,

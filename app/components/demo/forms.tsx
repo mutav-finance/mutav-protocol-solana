@@ -19,7 +19,7 @@ import { agencyIdFor, refsSaltFor } from "@/lib/client/operator-refs";
 import { nextRef, REF } from "@/lib/refs";
 import { claimCap } from "@/lib/operator";
 import { bytesToHex } from "@/lib/serde";
-import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE } from "@/lib/view";
+import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE, isUnpaid } from "@/lib/view";
 import { Action, Field, Grid, LastAction, Note, RoleWarning, TextField, useLastAction, useLive } from "./shared";
 
 const hex = (b: ArrayLike<number>) => bytesToHex(Uint8Array.from(b));
@@ -372,7 +372,7 @@ export function FileClaimForm({ p = "" }: { p?: string }) {
 export function PayClaimList() {
   const { ledger, reserve } = useLive();
   const cap = claimCap(reserve.config, reserve.state, reserve.now);
-  const open = claimsTimeline(ledger).filter((c) => c.stage === "filed");
+  const open = claimsTimeline(ledger).filter((c) => isUnpaid(c.stage));
   const last = useLastAction();
   if (open.length === 0) {
     return (

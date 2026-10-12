@@ -11,8 +11,8 @@
 import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { fmtDuration } from "@/lib/format";
-import { useFmt } from "@/components/MoneyProvider";
-import { claimsTimeline, type ClaimRow, type Ledger, type ReserveView } from "@/lib/view";
+import { Money } from "@/components/MoneyProvider";
+import { claimsTimeline, isUnpaid, type ClaimRow, type Ledger, type ReserveView } from "@/lib/view";
 import { claimSpeed, frac } from "@/lib/charts";
 import { C, ChartFrame, Legend, Row, RowLabel, Swatch, Track, type Seg } from "@/components/charts/Charts";
 
@@ -57,19 +57,18 @@ function Cell({ label, value, sub, color, first }: { label: string; value: strin
 
 /** Block 1: hero (claim payments in the period) over a 3-cell support strip, with the period picker. */
 function Summary({ rows, total, period, onPeriod }: { rows: ClaimRow[]; total: number; period: Period; onPeriod: (p: Period) => void }) {
-  const fmtBrs = useFmt();
   const paidRows = rows.filter((c) => c.paidAt !== null);
   const paidSum = paidRows.reduce((s, c) => s + (c.amount ?? 0n), 0n);
   const settled = rows.filter((c) => c.settledAt !== null).length;
   const pay = slowest(rows.map((c) => c.fileToPay));
   const settle = slowest(rows.map((c) => c.payToSettle));
-  const awaiting = rows.filter((c) => c.stage === "filed").length;
+  const awaiting = rows.filter((c) => isUnpaid(c.stage)).length;
   return (
     <div className="bg-(--color-surface) border">
       <div className="flex flex-wrap items-start justify-between gap-6 p-6">
         <div className="flex flex-col gap-2">
           <Label>Claims paid · {PERIOD_NAME[period]}</Label>
-          <Mono style={{ fontSize: "clamp(36px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{fmtBrs(paidSum)}</Mono>
+          <Mono style={{ fontSize: "clamp(36px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}><Money brs={paidSum} block /></Mono>
           <span className="font-body text-(--color-text-2) text-sm">
             {paidRows.length} of {rows.length} {rows.length === 1 ? "claim" : "claims"} paid · {settled} received by landlord (PIX)
             {rows.length !== total && <span className="text-(--color-text-3)"> · {total} on record</span>}
@@ -133,7 +132,7 @@ function SpeedChart({ rows, now }: { rows: ClaimRow[]; now: bigint }) {
 }
 
 export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
-  const rows = claimsTimeline(l);
+  const rows = claimsTimeline(l, r.config.caps.maxClaimPerCall);
   if (rows.length === 0)
     return (
       <div className="flex flex-col gap-6">

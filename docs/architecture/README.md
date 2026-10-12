@@ -100,7 +100,7 @@ Rules:
 | Item | Value |
 |---|---|
 | Cluster | Solana devnet. Every script and the app refuse any other cluster, checked by genesis hash |
-| Program ID | `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9` (declared in `lib.rs`) |
+| Program ID | [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet): the pilot demo reserve on devnet, a test deploy of layout v1 under its own ID. The ID declared in `lib.rs` is kept for the verified release build. Addresses: [README](../../README.md#devnet-addresses) |
 | Reserve mint | Nora's devnet BRS, `BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4`. Classic SPL Token, 6 decimals |
 | Admin multisig | Squads v4, 2-of-2. Two devnet wallets stand in for the founders' keys. Time lock 5 minutes |
 | Upgrade multisig | Same members. Time lock 1 hour |

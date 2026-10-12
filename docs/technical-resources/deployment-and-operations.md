@@ -1,6 +1,6 @@
 # Deployment and operations
 
-How the `mutav` program is deployed to devnet, how the deployment is verified, how it is upgraded, and how the reserve is run day to day. The devnet deploy is pending; this page describes the planned flow and its guards.
+How the `mutav` program is deployed to devnet, how the deployment is verified, how it is upgraded, and how the reserve is run day to day. The program is live on devnet as [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet), a test deploy of layout v1 that runs the pilot demo reserve; this page describes the flow and its guards.
 
 ## Environments
 
@@ -104,7 +104,7 @@ The `idl-compat` CI job stays inactive until a `v*` tag exists. Once it is activ
 
 1. Tag the exact commit you deploy as `v1.0.0-devnet` and push the tag. Create its release: `gh release create v1.0.0-devnet --verify-tag --prerelease --notes "devnet deploy"`.
 2. Run `release.yml` with `ref: v1.0.0-devnet`, `cluster: devnet` and `attach_to_release` on. The release then carries `mutav.json`, `mutav.so` and `mutav.hash` from the verified build. Deploy that `mutav.so`, and pass the contents of `mutav.hash` as `--expected-hash` to `deploy.ts` and `verify.ts`.
-3. Confirm that `mutav.hash` equals `solana-verify get-program-hash 8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9 --url <rpc>`. `verify.ts` checks the same thing.
+3. Confirm that `mutav.hash` equals `solana-verify get-program-hash <program ID> --url <rpc>`. `verify.ts` checks the same thing.
 
 From then on, every PR's IDL is compared against that release. Enum variants, error codes and instruction accounts (including PDA seeds and fixed addresses) are append-only or frozen. Type forms the check does not model make it fail closed.
 

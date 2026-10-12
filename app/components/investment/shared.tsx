@@ -5,8 +5,7 @@
 import type { ReactNode } from "react";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { StatusBadge } from "@/components/StatusBadge";
-import { fmtShares } from "@/lib/format";
-import type { Money } from "@/lib/client/use-money";
+import { fmtBrs, fmtShares } from "@/lib/format";
 import type { InvestorRequest } from "@/lib/view";
 
 /** Dev only: with the mock chain and no wallet, preview MUTAV's capital wallet. */
@@ -26,8 +25,8 @@ export const LABEL = "font-body text-(--color-text-2) text-xs font-medium upperc
 export const TRACKING = { letterSpacing: "0.01em" };
 
 export const sideName = (x: InvestorRequest) => (x.side === "deposit" ? "Deposit" : "Redemption");
-export const waitingOf = (x: InvestorRequest, m: Money) => (x.waiting === 0n ? "—" : x.side === "deposit" ? m.fmt(x.waiting) : `${fmtShares(x.waiting)} sh`);
-export const claimOf = (x: InvestorRequest, m: Money) => (x.claimable === 0n ? "—" : x.side === "deposit" ? `${fmtShares(x.claimable)} sh` : m.fmt(x.claimable));
+export const waitingOf = (x: InvestorRequest) => (x.waiting === 0n ? "—" : x.side === "deposit" ? fmtBrs(x.waiting) : `${fmtShares(x.waiting)} sh`);
+export const claimOf = (x: InvestorRequest) => (x.claimable === 0n ? "—" : x.side === "deposit" ? `${fmtShares(x.claimable)} sh` : fmtBrs(x.claimable));
 export const lineOf = (x: InvestorRequest) => (x.position === null ? "—" : ordinal(x.position));
 
 /** 1 → "1st", 2 → "2nd", 11 → "11th", 23 → "23rd". */

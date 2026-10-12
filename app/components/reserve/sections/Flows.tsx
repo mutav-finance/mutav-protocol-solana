@@ -15,12 +15,12 @@ import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { C, Legend, Row, RowLabel, Swatch, Track } from "@/components/charts/Charts";
 import { frac } from "@/lib/charts";
-import { fmtPct, fmtTime } from "@/lib/format";
-import { useFmt } from "@/components/MoneyProvider";
+import { fmtBrs, fmtPct, fmtTime } from "@/lib/format";
+import { Money } from "@/components/MoneyProvider";
 import { moneyFlows, type FlowRow, type Ledger, type ReserveView } from "@/lib/view";
 import { Button } from "@/components/ui/button";
 
-import { BlockHead, Empty, MotionStyle, Num, PlusMark, Table } from "@/components/reserve/sections/shared";
+import { BlockHead, Empty, MotionStyle, Num, PlusMark, Table, signed } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -74,9 +74,6 @@ const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Clai
 
 /** Ledger rows shown before "Show all". */
 const LEDGER_ROWS = 10;
-
-const abs = (v: bigint) => (v < 0n ? -v : v);
-const signed = (v: bigint, fmt: (b: bigint) => string) => `${v >= 0n ? "+" : "−"}${fmt(abs(v))}`;
 
 /** Inter Medium 12px caps label (brand card label). */
 const Label = ({ children }: { children: ReactNode }) => (
@@ -135,7 +132,6 @@ type Bar = { label: string; sub?: string; amount: bigint; dir: "in" | "out" };
 
 /** One side of the money (earnings or capital): its net in the head, then diverging bars on the group's own axis. */
 function FlowGroup({ title, note, net, bars }: { title: string; note: string; net: bigint; bars: Bar[] }) {
-  const fmtBrs = useFmt();
   const axis = bars.reduce((m, b) => (b.amount > m ? b.amount : m), 0n);
   return (
     <div className="bg-(--color-surface) flex min-w-0 flex-col gap-6 p-6">
@@ -146,7 +142,7 @@ function FlowGroup({ title, note, net, bars }: { title: string; note: string; ne
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className="font-mono text-(--color-text-3) text-2xs uppercase">net</span>
-          <Mono style={{ fontSize: 20, fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}>{signed(net, fmtBrs)}</Mono>
+          <Mono style={{ fontSize: 20, fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}><Money brs={net < 0n ? -net : net} sign={net >= 0n ? "+" : "−"} block /></Mono>
         </div>
       </div>
       <div className="mv-grow-bars flex flex-col gap-4">
@@ -178,7 +174,6 @@ function FlowGroup({ title, note, net, bars }: { title: string; note: string; ne
 
 /** Ledger row: the flow and its detail stacked in one cell, so the table stays at five columns. */
 function LedgerRow({ f }: { f: FlowRow }) {
-  const fmtBrs = useFmt();
   // A bare "slot N" says nothing to a reader; the slot stays in the hover title.
   const slotOnly = /^slot \d+$/.test(f.detail);
   return (
@@ -200,7 +195,6 @@ function LedgerRow({ f }: { f: FlowRow }) {
 // ── The tab ─────────────────────────────────────────────────────────────────
 
 export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
-  const fmtBrs = useFmt();
   const { totals, rows: all } = moneyFlows(r.state, l);
   const [period, setPeriod] = useState<Period>("All");
   const [showAll, setShowAll] = useState(false);

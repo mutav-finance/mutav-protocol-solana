@@ -43,6 +43,8 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 
 Read-only, no wallet needed.
 
+Money: BRS primary; US$ hint from PTAX/BCB, display only. Every amount shows in BRS; the main figures here, on `/capital` and on the landing strip carry a small muted `≈ US$ X` at the latest Banco Central PTAX selling rate (BRS = BRL 1:1), with one source line ("US$ at PTAX (Banco Central do Brasil), dd/mm/yyyy. Display only; the reserve holds BRS."). Without a rate the hints and the line are hidden. Nothing about the rate feeds a transaction.
+
 - **Health:** `stable_assets`, `coverage_required`, surplus, `free_capital`, NAV per share, shares outstanding, `mode` (Normal / UnderCovered), `fulfil_halted`, paused, last refresh.
 - **Coverage:** remaining cover by guarantee (default and exit legs), active guarantee count, per-agency exposure.
 - **Claims timeline:** each claim with on-chain timestamps for filed → paid → settled, and the PIX settlement hash. This is the "proven speed" view (the payout SLA is the operator platform's, ADR 0019).
@@ -70,7 +72,7 @@ Read by anyone; actions gated on the allowlist.
 - **Allowlist status** of the connected wallet: its Merkle proof (client `buildAllowlist` over `ALLOWLIST`) checked with `verifyAllowlistProof` against `VaultConfig.investor_allowlist_root`. States: allowlisted, not listed (KYC is done off-chain), root unset, list mismatch.
 - **Position:** reserve shares, value at NAV now (math mirror, labelled preview), BRS in the wallet, waiting deposits and redemptions.
 - **Queue entries** of the wallet, with `cancel_deposit`, `claim_shares`, `cancel_redeem`, `claim_assets` where the request's state allows them (owner only, no proof).
-- **New requests:** `request_deposit`, `request_redeem`, the proof built by the server, each with an optional price limit (`min_shares_out`, `min_assets_out`; 0 = none; a "preview − 1%" shortcut) and "Redeem all". A request that heads its queue and would not fill now says why (preview). Without an allowlisted wallet the view stays visible, read-only.
+- **New requests:** `request_deposit`, `request_redeem`, the proof built by the server, each with an optional price limit (`min_shares_out`, `min_assets_out`; 0 = none; a "preview − 1%" shortcut) and "Redeem all". A request that heads its queue and would not fill now says why (preview). Demo: the request form is visible to every visitor; on-chain actions stay allowlist-gated (holders can always redeem, ADR 0023). Before launch, set `CAPITAL_FORMS_PUBLIC` (`lib/flags.ts`, env `NEXT_PUBLIC_CAPITAL_FORMS_PUBLIC=false`) false to show the form only to allowlisted wallets (holders get redeem only).
 
 ### `/demo` Guided demo (operator cockpit)
 
@@ -98,7 +100,7 @@ For Squads members. A sticky in-page nav (General controls · Money in & out · 
 - **Money in & out** (`#money`): each flow with its settings. Operator and Investor steps are one-line context rows (role tag, live total, link to `/operator`, `/investor` or `/reserve`); charts stay on `/reserve`.
   - Fill proposals carry `nav_bounds` from a tolerance field (default ±1% around the conversion NAV) and show why each queue head would not fill now (needed vs available, price limit, under-coverage, TVL, halt, pause; preview). Deposit fills stop before the first request whose owner is off the current allowlist.
   - In: **deposits** (`fulfil_deposits`; `min_request`, `max_request`), **guarantee fees** (`fee_take_bps`), **BRS issuer income** (Nora → inbox → `sweep_income`; inbox balance, swept total, last statements; `income_take_bps`, fail-closed cap 0 until spec §12 Q47).
-  - Out: **redemptions** (`fulfil_redeems`, gated by free capital; whole fills), **claim payments** (`max_claim_per_call`, `max_claim_per_period` over 31 days; `pay_claim_admin` shown as planned).
+  - Out: **redemptions** (`fulfil_redeems`, gated by free capital; whole fills), **claim payments** (`max_claim_per_call`, `max_claim_per_period` over 31 days; above the per-call cap only the amount the admin approved with `approve_claim`, ADR 0021). The admin parks a stuck queue head (`cancel_deposit` / `cancel_redeem` as admin, ADR 0030); anyone sends `advance_queue_head`.
 - **Allocation** (`#allocation`, alias `#reserve-assets`): "BRS today, more assets through adapters" (ADR 0018). Composition shows BRS plus the income inbox kept apart, "100% BRS (pilot)", with the settlement floor as a marker ("Min in BRS (settlement token): 100%"). **Expand with adapters** explains how a new asset is added (upgrade with the adapter instructions; whitelist an adapter with its cap, share limit and own price feed; lower the settlement floor; allocate and deallocate within the gates), lists TESOURO as the first candidate with its blocker (no Etherfuse BRS path), and shows the per-adapter table (`VaultConfig.adapters`: cap, share limit, price feed, allocated) and the planned instructions. Controls: "Min held in the settlement token" (composed as `caps.min_settlement_bps`; the program stores its complement `caps.max_allocated_bps`, read through the client's `minSettlementBps`), and the per-adapter price feed and share limit (`AdapterEntry.max_share_bps`, reserved before the freeze) shown as planned.
 
 ## Hardening

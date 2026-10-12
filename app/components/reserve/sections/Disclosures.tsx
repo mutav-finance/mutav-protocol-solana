@@ -12,7 +12,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
-import { useFmt } from "@/components/MoneyProvider";
+import { Money } from "@/components/MoneyProvider";
 import { type ReserveView } from "@/lib/view";
 
 import { Section } from "@/components/Section";
@@ -53,9 +53,8 @@ function FreezeStatus({ r }: { r: ReserveView }) {
 
 /** Block 2 · claim payments: two caps in one strip. */
 function ClaimLimits({ r }: { r: ReserveView }) {
-  const fmtBrs = useFmt();
   const caps = r.config.caps;
-  const cell = (k: string, v: string, sub: ReactNode) => (
+  const cell = (k: string, v: ReactNode, sub: ReactNode) => (
     <div className="bg-(--color-surface) flex min-w-0 flex-col gap-2 px-6 py-4">
       <Label>{k}</Label>
       <Mono style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap" }}>{v}</Mono>
@@ -71,8 +70,8 @@ function ClaimLimits({ r }: { r: ReserveView }) {
         aside={<HeadLink href="/reserve/claims">See claims</HeadLink>}
       />
       <div className="grid grid-cols-1 gap-px border sm:grid-cols-2" style={{ background: "var(--color-border)" }}>
-        {cell("Operator limit per payment", fmtBrs(caps.maxClaimPerCall), "above it, the Reserve Admin approves the exact amount")}
-        {cell("Max in any 31 days", fmtBrs(caps.maxClaimPerPeriod), "all claim payments together")}
+        {cell("Operator limit per payment", <Money brs={caps.maxClaimPerCall} block />, "above it, the Reserve Admin approves the exact amount")}
+        {cell("Max in any 31 days", <Money brs={caps.maxClaimPerPeriod} block />, "all claim payments together")}
       </div>
     </section>
   );

@@ -10,13 +10,12 @@
  */
 import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Mono } from "@/components/Mono";
-import { useFmt } from "@/components/MoneyProvider";
+import { UsdHint } from "@/components/MoneyProvider";
 import { PERIODS, PeriodPicker, inPeriod, type Period } from "@/components/reserve/sections/Flows";
+import { signed } from "@/components/reserve/sections/shared";
 import { historyWindow, pointAt, stableAssetsHistory, yTicks } from "@/lib/history";
-import { fmtTime } from "@/lib/format";
-import type { FlowRow } from "@/lib/view";
-
-const KIND_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" } as const;
+import { fmtBrs, fmtTime } from "@/lib/format";
+import { FLOW_KIND_LABEL, type FlowRow } from "@/lib/view";
 
 const W = 1000;
 const H = 180;
@@ -26,7 +25,6 @@ const NUM = { fontVariantNumeric: "tabular-nums" } as const;
 const day = (ts: bigint) => new Date(Number(ts) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; stableAssets: bigint; now: bigint }) {
-  const fmtBrs = useFmt();
   const [period, setPeriod] = useState<Period>("90D");
   const [active, setActive] = useState<number | null>(null);
   const plot = useRef<HTMLDivElement>(null);
@@ -35,6 +33,7 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
   const w = useMemo(() => historyWindow(history, PERIODS[period]), [history, period]);
   const moves = rows.filter((r) => r.at !== null && inPeriod(r.at, now, period)).length;
 
+  // Round BRS steps.
   const ticks = yTicks(w.min, w.max);
   const lo = Number(ticks[0]!);
   const hi = Number(ticks.at(-1)!);
@@ -139,11 +138,13 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
                 style={{ left: pctX(a.at), transform: right ? "translateX(calc(-100% - 8px))" : "translateX(8px)", minWidth: 150 }}
               >
                 <Mono style={{ ...NUM, fontSize: 10, color: "var(--color-text-3)", whiteSpace: "nowrap" }}>{a.step ? fmtTime(a.at) : `${day(a.at)} · period start`}</Mono>
-                <Mono style={{ ...NUM, fontSize: 13, fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap" }}>{fmtBrs(a.value)}</Mono>
+                <Mono style={{ ...NUM, fontSize: 13, fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap" }}>
+                  {fmtBrs(a.value)}
+                  <UsdHint brs={a.value} block />
+                </Mono>
                 {a.step && (
                   <span className="font-body text-(--color-text-2) text-[11px] whitespace-nowrap">
-                    {KIND_LABEL[a.step.kind]} {a.step.delta >= 0n ? "+" : "−"}
-                    {fmtBrs(a.step.delta < 0n ? -a.step.delta : a.step.delta)}
+                    {FLOW_KIND_LABEL[a.step.kind]} {signed(a.step.delta, fmtBrs)}
                   </span>
                 )}
               </div>
@@ -177,7 +178,7 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
             {pts.map((p, i) => (
               <tr key={i}>
                 <td>{fmtTime(p.at)}</td>
-                <td>{p.step ? `${KIND_LABEL[p.step.kind]} ${p.step.delta >= 0n ? "+" : "−"}${fmtBrs(p.step.delta < 0n ? -p.step.delta : p.step.delta)}` : "Period start"}</td>
+                <td>{p.step ? `${FLOW_KIND_LABEL[p.step.kind]} ${signed(p.step.delta, fmtBrs)}` : "Period start"}</td>
                 <td>{fmtBrs(p.value)}</td>
               </tr>
             ))}

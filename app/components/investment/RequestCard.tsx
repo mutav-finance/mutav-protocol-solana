@@ -8,11 +8,13 @@
  * at the share price of the fill. The server composes the unsigned
  * transaction (with the Merkle proof); the connected wallet signs.
  *
- * The legal floor: the deposit form (amounts, preview, limits) renders only
- * for a connected wallet on the on-chain allowlist. Entry is gated, exit is
- * not (ADR 0023): a connected wallet holding shares also gets the Redeem tab,
- * listed or not. Everyone else sees a static card that says requests are
- * limited to allowlisted wallets and that this is not an offer.
+ * Demo (`CAPITAL_FORMS_PUBLIC`, lib/flags.ts): every visitor sees the form;
+ * the on-chain actions stay gated. Deposit needs a connected, allowlisted
+ * wallet; Redeem needs one that is allowlisted or holds shares (entry is
+ * gated, exit is not: ADR 0023). Otherwise the buttons are disabled with the
+ * reason. With the switch off (launch), the form renders only for an
+ * allowlisted wallet, a holder outside the allowlist gets Redeem only, and
+ * everyone else sees a static card: allowlisted wallets only, not an offer.
  */
 import { useState, type ReactNode } from "react";
 import { assetsFor, sharesFor } from "@mutav-finance/mutav-protocol-solana";
@@ -22,10 +24,12 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Action, Note, useLive } from "@/components/demo/shared";
 import { LABEL, TRACKING } from "./shared";
-import { BRS_DECIMALS, SHARE_DECIMALS, fmtShares, fmtUnits, parseBrs, parseUnitsOrZero, toInput } from "@/lib/format";
+import { CAPITAL_FORMS_PUBLIC } from "@/lib/flags";
+import { BRS_DECIMALS, SHARE_DECIMALS, fmtBrs, fmtShares, fmtUnits, fmtUsdHint, parseBrs, parseUnitsOrZero, toInput } from "@/lib/format";
 import { limitWithSlippage } from "@/lib/queue";
-import type { Money } from "@/lib/client/use-money";
+import { useDisplayFx } from "@/components/MoneyProvider";
 import type { InvestorView } from "@/lib/server/investor";
+import { redeemSizeCheck } from "@/lib/view";
 
 type Side = "deposit" | "redeem";
 
@@ -57,13 +61,13 @@ function Field({ id, title, unit, value, onChange, foot, readOnly }: { id: strin
   );
 }
 
-/** What a wallet that is not allowlisted (or no wallet) sees: no form, no amounts, no offer. */
+const LIMITED = "Capital requests are limited to allowlisted wallets during the pilot. This is not an offer.";
+
+/** Launch (`CAPITAL_FORMS_PUBLIC` off): what a wallet that is not allowlisted (or no wallet) sees: no form, no amounts, no offer. */
 function GatedCard({ connected, checking }: { connected: boolean; checking: boolean }) {
   return (
     <section aria-label="Capital requests" className="bg-(--color-surface) flex w-full flex-col gap-4 border px-6 py-5">
-      <p className="font-body text-(--color-text) m-0 text-sm leading-relaxed">
-        Capital requests are limited to allowlisted wallets during the pilot. This is not an offer.
-      </p>
+      <p className="font-body text-(--color-text) m-0 text-sm leading-relaxed">{LIMITED}</p>
       {!connected && (
         <div className="self-start">
           <ConnectButton />
@@ -74,7 +78,14 @@ function GatedCard({ connected, checking }: { connected: boolean; checking: bool
   );
 }
 
-export function RequestCard({ inv, connected, money }: { inv: InvestorView | null; connected: boolean; money: Money }) {
+/**
+ * `loading`: the connected wallet's /api/investor read is in flight (its
+ * allowlist state is not known yet). On a read error it is false: the page
+ * shows the error with a retry, not "Checking access…".
+ */
+export function RequestCard({ inv, loading, connected }: { inv: InvestorView | null; loading: boolean; connected: boolean }) {
+  const fx = useDisplayFx();
+  const usdHint = (v: bigint | null) => (v !== null && fx ? fmtUsdHint(v, fx.rate) : "");
   const { reserve } = useLive();
   const caps = reserve.config.caps;
   const { sharesOutstanding } = reserve.state;
@@ -84,10 +95,12 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
   const listed = connected && state === "allowlisted";
   // The program skips the allowlist for an owner whose share account holds shares (request_redeem.rs).
   const holder = connected && (inv?.shares.amount ?? 0n) > 0n;
+  const checking = connected && loading;
+  // Demo: everyone gets both tabs. Launch: a holder outside the allowlist can only redeem.
+  const depositTab = CAPITAL_FORMS_PUBLIC || listed;
 
   const [chosen, setSide] = useState<Side>("deposit");
-  // A holder outside the allowlist can only redeem.
-  const side: Side = listed ? chosen : "redeem";
+  const side: Side = depositTab ? chosen : "redeem";
   const [input, setInput] = useState("");
   // Price limit (min shares out / min BRS out). Blank = no limit (0 on-chain).
   const [limit, setLimit] = useState("");
@@ -97,9 +110,11 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
   // What the request is worth in BRS, for the per-request limits.
   const value = amount ? (deposit ? amount : preview) : null;
   const canRequest = !paused && (deposit ? listed : listed || holder);
-  const outside = value !== null && (value < caps.minRequest || value > caps.maxRequest);
-
   const balance = deposit ? (inv?.brs.amount ?? null) : (inv?.shares.amount ?? null);
+  // Redeem: below the minimum only a full exit of the share account passes (ADR 0029).
+  const outside = deposit
+    ? value !== null && (value < caps.minRequest || value > caps.maxRequest)
+    : amount !== null && redeemSizeCheck(amount, balance, sharesOutstanding, netAssets, caps) !== null;
   const decimals = deposit ? BRS_DECIMALS : SHARE_DECIMALS;
   const overBalance = !deposit && amount !== null && balance !== null && amount > balance;
   const outDecimals = deposit ? SHARE_DECIMALS : BRS_DECIMALS;
@@ -109,14 +124,16 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
     setInput("");
     setLimit("");
   };
-  if (!listed && !holder) return <GatedCard connected={connected} checking={state === null} />;
+  if (!CAPITAL_FORMS_PUBLIC && !listed && !holder) return <GatedCard connected={connected} checking={checking} />;
+  // Per-request limits in BRS, the deposit field's unit; on Redeem also as shares at today's share price.
+  const capShares = (v: bigint) => (deposit ? "" : ` (≈ ${fmtShares(sharesFor(v, sharesOutstanding, netAssets))} shares)`);
 
   return (
     <section aria-label={deposit ? "Deposit request" : "Redemption request"} className="bg-(--color-surface) flex w-full flex-col border">
       <div className="flex flex-col gap-4 px-6 py-5">
         <Tabs value={side} onValueChange={(v) => switchTo(v as Side)}>
           <TabsList className="w-full">
-            {listed && (
+            {depositTab && (
               <TabsTrigger value="deposit" className="flex-1">
                 Deposit
               </TabsTrigger>
@@ -153,7 +170,7 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
             unit={deposit ? "shares" : "BRS"}
             value={preview === null ? "" : deposit ? fmtShares(preview) : fmtUnits(preview, BRS_DECIMALS)}
             readOnly
-            foot={<span>{value !== null && money.fx ? `≈ ${money.fmt(value)} · ` : ""}At today&apos;s share price. The fill price sets the final amount.</span>}
+            foot={<span>{usdHint(value) && `${usdHint(value)} · `}At today&apos;s share price. The fill price sets the final amount.</span>}
           />
           <Field
             id="inv-limit"
@@ -175,7 +192,9 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
         </div>
 
         <p className="font-mono text-(--color-text-3) m-0 text-2xs">
-          Min {money.fmt(caps.minRequest, 0)} · max {money.fmt(caps.maxRequest, 0)} per request
+          Min {fmtBrs(caps.minRequest, 0)}
+          {capShares(caps.minRequest)} · max {fmtBrs(caps.maxRequest, 0)}
+          {capShares(caps.maxRequest)} per request
         </p>
         <div className="[&>div>button]:h-11 [&>div>button]:w-full [&>div>button:disabled]:bg-(--color-surface-3) [&>div>button:disabled]:text-(--color-text-3) [&>div>button:disabled]:opacity-100">
           {deposit ? (
@@ -184,7 +203,18 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
             <Action label="Request redemption" disabled={!canRequest} request={amount && minOut !== null ? { kind: "request_redeem", shares: amount, minAssetsOut: minOut } : null} />
           )}
         </div>
-        {!listed && <Note>The allowlist gates new capital; existing holders can always redeem.</Note>}
+        {!connected ? (
+          <>
+            <Note>{LIMITED}</Note>
+            <div className="self-start">
+              <ConnectButton />
+            </div>
+          </>
+        ) : checking ? (
+          <Note>Checking access…</Note>
+        ) : (
+          !listed && <Note>{holder ? "The allowlist gates new capital; existing holders can always redeem." : LIMITED}</Note>
+        )}
         {paused && <Note tone="warn">Requests are paused by the Reserve Admin. Cancel and collect stay open.</Note>}
         {outside && <Note tone="warn">Outside the per-request limits: the program will refuse it.</Note>}
         {overBalance && <Note tone="warn">More than this wallet holds ({fmtShares(balance!)}): the program will refuse it.</Note>}

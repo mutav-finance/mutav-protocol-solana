@@ -19,11 +19,11 @@ import { InfoTooltip } from "@/components/InfoTooltip";
 import { useReserve } from "@/components/reserve/ReserveShell";
 import { HistoryChart } from "@/components/reserve/HistoryChart";
 import { FlowDiagram } from "@/components/reserve/FlowDiagram";
-import { HeroAmount, Lead, fmtAgo } from "@/components/reserve/sections/shared";
+import { HeroAmount, Lead, abs, fmtAgo, plural } from "@/components/reserve/sections/shared";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
-import { fmtBps, fmtRatio, fmtSharePrice, fmtTime } from "@/lib/format";
-import { useFmt } from "@/components/MoneyProvider";
-import { capitalQueue, claimsTimeline, coverageRows, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
+import { fmtBps, fmtBrs, fmtRatio, fmtSharePrice, fmtTime } from "@/lib/format";
+import { Money } from "@/components/MoneyProvider";
+import { FLOW_KIND_LABEL, capitalQueue, claimsTimeline, coverageRows, isUnpaid, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
 
 /** The two promises the spec makes, each linked to the view that shows them. */
 const PROMISES: [string, string, string, string][] = [
@@ -31,14 +31,11 @@ const PROMISES: [string, string, string, string][] = [
   ["New capital needs an approved wallet.", "The allowlist gates new capital; existing holders can always redeem (KYC off-chain). Every request waits in the same line.", "/reserve/capital#queue", "See the capital queue"],
 ];
 
-const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" } as const;
 /** Movements shown in the side column, and the window the count covers. */
 const ACTIVITY_ROWS = 5;
 const ACTIVITY_DAYS = 60n;
 
 const NUM = { fontVariantNumeric: "tabular-nums" } as const;
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const abs = (v: bigint) => (v < 0n ? -v : v);
 const share = (part: bigint, whole: bigint) => (whole === 0n ? "—" : fmtBps(Number((part * 10_000n) / whole)));
 
 /** `a` as a multiple of `b`, one decimal, rounded down: 23.6×. */
@@ -128,7 +125,6 @@ function programLine(r: ReserveView): { text: string; fine: boolean } {
 }
 
 function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
-  const fmtBrs = useFmt();
   const s = r.state;
   const sol = r.coverage;
   const covered = sol.stableAssets >= sol.coverageRequired;
@@ -152,18 +148,18 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
 
   const active = coverageRows(l.guarantees).filter((g) => g.active);
   const agencies = new Set(active.map((g) => g.agencyId)).size;
-  const awaiting = claimsTimeline(l).filter((c) => c.stage === "filed").length;
+  const awaiting = claimsTimeline(l).filter((c) => isUnpaid(c.stage)).length;
 
-  const kpis: { label: string; value: string; def: string; href?: string }[] = [
-    { label: "Free capital", value: fmtBrs(sol.freeCapital), def: "Free for new guarantees and redemptions." },
+  const kpis: { label: string; value: ReactNode; def: string; href?: string }[] = [
+    { label: "Free capital", value: <Money brs={sol.freeCapital} block />, def: "Free for new guarantees and redemptions." },
     { label: `Share price (published at last refresh · ${fmtTime(s.lastRefreshTs)})`, value: fmtSharePrice(s.navPerShare), def: "What each share is worth, after claims are set aside." },
     {
       label: "Remaining cover",
-      value: fmtBrs(s.remainingCoverTotal),
+      value: <Money brs={s.remainingCoverTotal} block />,
       def: `Still guaranteed on ${plural(active.length, "active guarantee")} at ${plural(agencies, "agency", "agencies")}.`,
       href: "/reserve/coverage",
     },
-    { label: "Set aside for claims", value: fmtBrs(s.provisions), def: `For ${plural(awaiting, "claim")} filed, not yet paid.`, href: "/reserve/claims" },
+    { label: "Set aside for claims", value: <Money brs={s.provisions} block />, def: `For ${plural(awaiting, "claim")} filed, not yet paid.`, href: "/reserve/claims" },
   ];
 
   const program = programLine(r);
@@ -176,6 +172,7 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
           phrase="Reserve balance"
           tip="BRS in the reserve token account. Deposits waiting in line and BRS owed to filled redemptions are not counted."
           value={fmtBrs(sol.stableAssets)}
+          usd={sol.stableAssets}
           color="var(--color-accent)"
           size="clamp(44px, 6.5vw, 72px)"
         >
@@ -272,10 +269,9 @@ function splitRows(c: CapitalSplit, filed: number): SplitRow[] {
 }
 
 function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
-  const fmtBrs = useFmt();
   const c = capitalSplit(r.coverage, r.state.provisions);
   const under = c.shortfall > 0n;
-  const filed = claimsTimeline(l).filter((x) => x.stage === "filed").length;
+  const filed = claimsTimeline(l).filter((x) => isUnpaid(x.stage)).length;
   const rows = splitRows(c, filed);
   const committed = c.provisions + c.restRequired;
 
@@ -285,13 +281,13 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
   const head = under
     ? {
         label: "Shortfall",
-        value: `−${fmtBrs(c.shortfall)}`,
+        value: <Money brs={c.shortfall} sign="−" block />,
         color: SHORT,
         note: "Every BRS held is committed. New guarantees and redemptions are stopped until the reserve holds what it must; claim payments are not.",
       }
     : {
         label: "Free capital",
-        value: fmtBrs(c.freeCapital),
+        value: <Money brs={c.freeCapital} block />,
         color: "var(--color-text)",
         note:
           committed === 0n
@@ -403,7 +399,6 @@ function RecentActivity({ r, rows }: { r: ReserveView; rows: FlowRow[] }) {
 }
 
 function ActivityRow({ x, now, rpc, last }: { x: FlowRow; now: bigint; rpc: string; last: boolean }) {
-  const fmtBrs = useFmt();
   const into = x.reserveDelta >= 0n;
   // A bare "slot N" says nothing to a reader; the slot stays in the hover title (as in the ledger).
   const slotOnly = /^slot \d+$/.test(x.detail);
@@ -413,7 +408,7 @@ function ActivityRow({ x, now, rpc, last }: { x: FlowRow; now: bigint; rpc: stri
         <Mono style={{ fontSize: 14, color: "var(--color-text-2)" }}>{into ? "↓" : "↑"}</Mono>
       </span>
       <span className="flex min-w-0 flex-col gap-0.5" title={slotOnly ? x.detail : undefined}>
-        <span className="font-body text-(--color-text) text-[13px]">{FLOW_LABEL[x.kind]}</span>
+        <span className="font-body text-(--color-text) text-[13px]">{FLOW_KIND_LABEL[x.kind]}</span>
         {!slotOnly && <Mono style={{ ...NUM, fontSize: 11, color: "var(--color-text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.detail}</Mono>}
       </span>
       <span className="flex flex-col items-end gap-0.5">

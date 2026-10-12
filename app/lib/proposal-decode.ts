@@ -8,6 +8,7 @@
 import { getAddressDecoder } from "@solana/kit";
 import {
   getAdvanceQueueHeadInstructionDataDecoder,
+  getApproveClaimInstructionDataDecoder,
   getCancelPendingInstructionDataDecoder,
   getClearFulfilHaltInstructionDataDecoder,
   getFulfilDepositsInstructionDataDecoder,
@@ -98,7 +99,8 @@ const COMPUTE_BUDGET_NAMES = ["RequestUnits", "RequestHeapFrame", "SetComputeUni
 
 /**
  * The MUTAV instructions the admin vault signs, with the index of their
- * `config` account (1, or 0 for advance_queue_head). Any other MUTAV
+ * `config` account (1; 2 for the admin's park, cancel_deposit /
+ * cancel_redeem, ADR 0030; 0 for advance_queue_head). Any other MUTAV
  * instruction in a proposal is flagged.
  */
 const CONFIG_AT = new Map<MutavInstruction, number>([
@@ -118,6 +120,9 @@ const CONFIG_AT = new Map<MutavInstruction, number>([
   [MutavInstruction.Unpause, 1],
   [MutavInstruction.RevokeOperator, 1],
   [MutavInstruction.RevokePauser, 1],
+  [MutavInstruction.ApproveClaim, 1],
+  [MutavInstruction.CancelDeposit, 2],
+  [MutavInstruction.CancelRedeem, 2],
   [MutavInstruction.AdvanceQueueHead, 0],
 ]);
 
@@ -223,6 +228,24 @@ function mutavDetails(kind: MutavInstruction, ix: RawInstruction, ctx: DecodeCon
     }
     case MutavInstruction.SetGuardians:
       return [{ label: "guardians", value: getSetGuardiansInstructionDataDecoder().decode(d).guardians.join(", ") || "none" }];
+    case MutavInstruction.ApproveClaim: {
+      const a = getApproveClaimInstructionDataDecoder().decode(d);
+      return [
+        { label: "claim filing", value: ix.accounts[3] ?? "not resolvable", warn: !ix.accounts[3] },
+        { label: "notice ref hash", value: bytesToHex(Uint8Array.from(a.noticeRefHash)) },
+        { label: "amount", value: `${fmtBrs(a.amount)} (must equal the filing's provision)` },
+        { label: "expected revision", value: String(a.expectedRevision) },
+      ];
+    }
+    case MutavInstruction.CancelDeposit:
+    case MutavInstruction.CancelRedeem: {
+      // The vault signs as admin, so the program parks the request (ADR 0030).
+      return [
+        { label: "request", value: ix.accounts[4] ?? "not resolvable", warn: !ix.accounts[4] },
+        { label: "owner", value: ix.accounts[1] ?? "not resolvable", warn: !ix.accounts[1] },
+        { label: "effect", value: "parks the request: nothing moves; only the owner collects the escrow" },
+      ];
+    }
     case MutavInstruction.AdvanceQueueHead: {
       const a = getAdvanceQueueHeadInstructionDataDecoder().decode(d);
       return [
