@@ -47,7 +47,7 @@ function CompositionNow({ c }: { c: Composition }) {
       <CompositionChart c={c} />
       <div className="grid-metrics" style={{ alignContent: "start" }}>
         <MetricCard dense label="BRS in reserve" value={fmtBrs(c.brs)} unit={c.brsOnly ? "brs_balance · 100% BRS (pilot)" : `brs_balance · ${share(c.brsShareBps)} of the reserve balance`} />
-        <MetricCard dense label="Min in BRS (settlement token)" value={fmtPct(c.floorBps)} unit={c.floorBps === BPS_MAX ? "the pilot floor: nothing may be allocated" : `${fmtBrs(c.floorValue, 0)} now · ${fmtBrs(c.roomAboveFloor, 0)} above it`} />
+        <MetricCard dense label="Min in BRS (settlement token)" value={fmtPct(c.floorBps)} unit={c.floorBps === BPS_MAX ? "the pilot floor: nothing may be allocated" : `${fmtBrs(c.floorValue)} now · ${fmtBrs(c.roomAboveFloor)} above it`} />
         <MetricCard dense label="Income inbox" value={fmtBrs(c.inbox)} unit="not yet counted: swept by the Operator" />
         <MetricCard dense label="Adapters" value={`${used} of ${ADAPTER_SLOTS}`} unit={used === 0 ? "none whitelisted: no other asset can be held" : "whitelisted in VaultConfig.adapters"} />
         {!c.brsOnly && <MetricCard dense label="Through adapters" value={fmtBrs(c.adapterValue)} unit={`at the bounded price · ${share(c.adapterShareBps)}`} />}
@@ -110,10 +110,10 @@ function Adapters({ c }: { c: Composition }) {
             <td className="num">{m(a.slot)}</td>
             <td><Explorer value={a.programId} /></td>
             <td><Explorer value={a.assetMint} /></td>
-            <td className="num">{m(fmtBrs(a.cap, 0))}</td>
+            <td className="num">{m(fmtBrs(a.cap))}</td>
             <td>{m("with the upgrade")}</td>
             <td>{m("per adapter, with the upgrade")}</td>
-            <td className="num">{m(fmtBrs(a.allocated, 0))}</td>
+            <td className="num">{m(fmtBrs(a.allocated))}</td>
             <td>{m(a.enabled ? "yes" : "no")}</td>
           </tr>
         ))
@@ -159,7 +159,7 @@ function FloorControl({ mode, c }: { mode: Mode; c: Composition }) {
         does="The minimum share of the reserve balance held in BRS, the token guarantee fees come in and claim payments go out in. 100% in the pilot: the program holds BRS only and has no floor field yet (ADR 0018, ADR 0019); it returns with the first adapter."
       />
       <Grid>
-        <TextField id="adm-settlement-floor" label="New floor (bps)" value={floor} onChange={setFloor} numeric hint={v === null ? `now ${fmtPct(c.floorBps)} · 0 – ${BPS_MAX} bps` : v === c.floorBps ? "unchanged: nothing to propose" : `${fmtPct(v)} · preview: at least ${fmtBrs(preview!, 0)} in BRS at today's stable assets`} />
+        <TextField id="adm-settlement-floor" label="New floor (bps)" value={floor} onChange={setFloor} numeric hint={v === null ? `now ${fmtPct(c.floorBps)} · 0 – ${BPS_MAX} bps` : v === c.floorBps ? "unchanged: nothing to propose" : `${fmtPct(v)} · preview: at least ${fmtBrs(preview!)} in BRS at today's stable assets`} />
       </Grid>
     </AdminAction>
   );

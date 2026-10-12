@@ -47,7 +47,7 @@ describe("<Money>", () => {
 
   it("writes one source line with a rate", () => {
     expect(text(renderToStaticMarkup(<FxProvider value={fx}><UsdSource /></FxProvider>))).toBe(
-      "US$ at PTAX (Banco Central do Brasil), 09/10/2026. Display only; the reserve holds BRS.",
+      "US$ at PTAX (Banco Central do Brasil), 2026-10-09. Display only; the reserve holds BRS.",
     );
   });
 });

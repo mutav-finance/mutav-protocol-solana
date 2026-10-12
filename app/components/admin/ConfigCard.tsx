@@ -25,7 +25,7 @@ export type Field = {
 const I64_MAX = (1n << 63n) - 1n;
 
 /** BRS amount (6 decimals). */
-export const brsField = (key: string, label: string, now: bigint): Field => ({ key, label, now: fmtBrs(now, 0), parse: (s) => parseBrs(s), bound: "BRS amount" });
+export const brsField = (key: string, label: string, now: bigint): Field => ({ key, label, now: fmtBrs(now), parse: (s) => parseBrs(s), bound: "BRS amount" });
 
 /** The field's name without its input unit, for the on-chain value line: "Coverage ratio c: 25%", not "(bps): 25.00%". */
 const bare = (label: string) => label.replace(/\s*\((bps|BRS)\)$/, "");

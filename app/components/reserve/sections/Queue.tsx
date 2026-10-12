@@ -70,7 +70,7 @@ function Summary({ deposits, redeems, capital, owed, now }: { deposits: QueueRow
       </div>
       <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:col-span-7">
         <Cell label="Shares to redeem" value={fmtShares(sum(redeems))} sub={`Shares capital providers asked to turn back into BRS, in ${plural(redeems.length, "request", "requests")}.`} />
-        <Cell label="Oldest request" value={oldest ? fmtAgo(now, oldest.requestedAt) : "none"} sub={oldest ? `The ${oldest.side === "deposit" ? "deposit" : "redemption"} waiting longest; it fills next on its side.` : "Nothing is waiting in either line."} />
+        <Cell label="Oldest request" value={oldest ? fmtAgo(now, oldest.requestedAt) : "None"} sub={oldest ? `The ${oldest.side === "deposit" ? "deposit" : "redemption"} waiting longest; it fills next on its side.` : "Nothing is waiting in either line."} />
         <Cell label="Ready to collect" value={<Money brs={owed} block />} sub="Redeemed BRS not yet withdrawn." />
         <Cell label="MUTAV capital" value={`${ours} of ${all.length}`} sub="Requests from the MUTAV capital wallet. They wait in the same line, with no priority." />
       </div>

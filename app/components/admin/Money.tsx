@@ -116,7 +116,7 @@ function Deposits({ mode }: { mode: Mode }) {
   return (
     <Sub id="money-deposits" title="Capital deposits" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
-        <Context who="investor" figure={m(`${q.deposits.length} waiting · ${fmtBrs(reserve.state.pendingDepositsTotal, 0)}`)} href="/capital">
+        <Context who="investor" figure={m(`${q.deposits.length} waiting · ${fmtBrs(reserve.state.pendingDepositsTotal)}`)} href="/capital">
           request_deposit escrows BRS in the FIFO queue (allowlisted wallets).
         </Context>
       </Contexts>
@@ -124,7 +124,7 @@ function Deposits({ mode }: { mode: Mode }) {
         <AdminAction title="Fulfil deposits" label="fulfil_deposits" mode={mode} request={nb.bounds ? { kind: "fulfil_deposits", count: Math.min(8, Math.max(1, Number(count) || 1)), navBounds: nb.bounds } : null}>
           <Facts
             now={m(`${q.deposits.length} waiting · head seq ${reserve.state.depositHead}`)}
-            bound={m(`max reserve ${fmtBrs(c.caps.maxTvl, 0)} · up to 8 per call`)}
+            bound={m(`max reserve ${fmtBrs(c.caps.maxTvl)} · up to 8 per call`)}
             does="Moves escrowed BRS into the reserve in FIFO order and mints shares at the share price. Allowed in under-coverage; refused while paused or while fulfilment is halted."
           />
           <Grid>
@@ -159,7 +159,7 @@ function Fees({ mode }: { mode: Mode }) {
   return (
     <Sub id="money-fees" title="Guarantee fees" badge={<RoleTag role="operator" prefix="booked by the" />}>
       <Contexts>
-        <Context who="operator" figure={m(`+${fmtBrs(s.feesInTotal, 0)} · take ${fmtBrs(s.feeTakeTotal, 0)}`)} href="/operator">
+        <Context who="operator" figure={m(`+${fmtBrs(s.feesInTotal)} · take ${fmtBrs(s.feeTakeTotal)}`)} href="/operator">
           contribute_fees books each fee invoice: the take goes to the treasury, the rest to the reserve, which raises the coverage ceiling (fees_in_total, fee_take_total).
         </Context>
       </Contexts>
@@ -186,7 +186,7 @@ function Income() {
         <Context who="external" figure={m(`${fmtBrs(s.inbox, 2)} in the inbox`)}>
           Nora pays the monthly revenue share in BRS to the income inbox <Explorer value={s.inboxAddress} />. Not yet counted: it counts toward nothing until swept.
         </Context>
-        <Context who="operator" figure={m(`+${fmtBrs(s.sweptNet, 0)} · take ${fmtBrs(s.sweptTake, 0)}`)} href="/operator">
+        <Context who="operator" figure={m(`+${fmtBrs(s.sweptNet)} · take ${fmtBrs(s.sweptTake)}`)} href="/operator">
           sweep_income moves each statement from the inbox into the reserve, once per reference (income_total, income_take_total).
         </Context>
       </Contexts>
@@ -228,7 +228,7 @@ function Redemptions({ mode }: { mode: Mode }) {
       <Cards>
         <AdminAction title="Fulfil redemptions" label="fulfil_redeems" mode={mode} request={nb.bounds ? { kind: "fulfil_redeems", count: Math.min(8, Math.max(1, Number(count) || 1)), maxAssets: max ?? (1n << 64n) - 1n, navBounds: nb.bounds } : null}>
           <Facts
-            now={m(`${q.redeems.length} waiting · free capital ${fmtBrs(reserve.coverage.freeCapital, 0)}`)}
+            now={m(`${q.redeems.length} waiting · free capital ${fmtBrs(reserve.coverage.freeCapital)}`)}
             bound={m("each fill ≤ free capital · whole requests only · up to 8 per call")}
             does="Pays redemptions in FIFO order at the share price, from free capital only (the coverage gate). Frozen in under-coverage and while paused or halted; a head that does not fit stops the batch."
           />
@@ -253,7 +253,7 @@ function Claims({ mode }: { mode: Mode }) {
   return (
     <Sub id="money-claims" title="Claim payments" badge={<RoleTag role="operator" prefix="paid by the" />}>
       <Contexts>
-        <Context who="operator" figure={m(`−${fmtBrs(reserve.state.claimsPaidTotal, 0)} · ${fmtBrs(cap.paid, 0)} this window`)} href="/operator">
+        <Context who="operator" figure={m(`−${fmtBrs(reserve.state.claimsPaidTotal)} · ${fmtBrs(cap.paid)} this window`)} href="/operator">
           pay_claim sends BRS to the payments account within the claim caps (claims_paid_total); never blocked by required coverage or pause.
         </Context>
         <Context who="anyone" href="/reserve/claims" linkLabel="/reserve/claims">
@@ -275,7 +275,7 @@ function Claims({ mode }: { mode: Mode }) {
         />
       </Cards>
       {overCap.length === 0 ? (
-        <Note>No filed claim above the operator&apos;s limit per payment ({fmtBrs(c.caps.maxClaimPerCall, 0)}).</Note>
+        <Note>No filed claim above the operator&apos;s limit per payment ({fmtBrs(c.caps.maxClaimPerCall)}).</Note>
       ) : (
         <Cards>
           {overCap.map((x) => {
@@ -290,7 +290,7 @@ function Claims({ mode }: { mode: Mode }) {
               >
                 <Facts
                   now={m(`${CLAIM_STAGE_LABEL[x.stage]} · provision ${fmtBrs(x.provision)} · filed ${fmtTime(x.filedAt)}`)}
-                  bound={m(`amount = the provision · its revision · ${fmtBrs(cap.remaining, 0)} left of ${fmtBrs(cap.perPeriod, 0)} in the last 31 days`)}
+                  bound={m(`amount = the provision · its revision · ${fmtBrs(cap.remaining)} left of ${fmtBrs(cap.perPeriod)} in the last 31 days`)}
                   does="Approves the exact amount this claim pays above the operator's limit per payment (ADR 0021); the operator then sends pay_claim. The admin approves the amount, not the merits. Approved payments still count toward the 31-day cap."
                 />
                 {refusal && <Note tone="warn">The 31-day cap has {fmtBrs(cap.remaining)} left: pay_claim stays refused ({refusal}) until room frees up.</Note>}

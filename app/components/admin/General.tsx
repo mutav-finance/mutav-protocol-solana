@@ -102,11 +102,11 @@ function Watch() {
       <div className="grid-2">
         <KV
           rows={[
-            [<Meaning key="r" label="Guarantees registered">register_guarantee by the operator key</Meaning>, m(`${day.registered.count} · ${fmtBrs(day.registered.cover, 0)} cover`)],
+            [<Meaning key="r" label="Guarantees registered">register_guarantee by the operator key</Meaning>, m(`${day.registered.count} · ${fmtBrs(day.registered.cover)} cover`)],
             [<Meaning key="c" label="Guarantees closed">close_guarantee</Meaning>, m(String(day.closed.count))],
-            [<Meaning key="f" label="Claims filed">file_claim (provisions)</Meaning>, m(`${day.filed.count} · ${fmtBrs(day.filed.amount, 0)}`)],
-            [<Meaning key="p" label="Claims paid">pay_claim, bounded by the claim caps</Meaning>, m(`${day.paid.count} · ${fmtBrs(day.paid.amount, 0)} of ${fmtBrs(reserve.config.caps.maxClaimPerPeriod, 0)} per 31 days`)],
-            [<Meaning key="g" label="Guarantee fees booked">contribute_fees</Meaning>, m(`${day.fees.count} · ${fmtBrs(day.fees.amount, 0)}`)],
+            [<Meaning key="f" label="Claims filed">file_claim (provisions)</Meaning>, m(`${day.filed.count} · ${fmtBrs(day.filed.amount)}`)],
+            [<Meaning key="p" label="Claims paid">pay_claim, bounded by the claim caps</Meaning>, m(`${day.paid.count} · ${fmtBrs(day.paid.amount)} of ${fmtBrs(reserve.config.caps.maxClaimPerPeriod)} per 31 days`)],
+            [<Meaning key="g" label="Guarantee fees booked">contribute_fees</Meaning>, m(`${day.fees.count} · ${fmtBrs(day.fees.amount)}`)],
           ]}
         />
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -173,8 +173,8 @@ function CoverageTable() {
     <KV
       rows={[
         [<Meaning key="c" label="Coverage ratio c">Share of remaining cover the reserve must hold in stable assets (≥ 10%, ADR 0016).</Meaning>, m(fmtPct(c.coverageRatioBps))],
-        [<Meaning key="t" label="Max reserve (TVL)">fulfil_deposits stops at this size.</Meaning>, m(fmtBrs(c.caps.maxTvl, 0))],
-        [<Meaning key="g" label="Max cover per guarantee">register_guarantee refuses a larger lease.</Meaning>, m(fmtBrs(c.caps.maxCoverPerGuarantee, 0))],
+        [<Meaning key="t" label="Max reserve (TVL)">fulfil_deposits stops at this size.</Meaning>, m(fmtBrs(c.caps.maxTvl))],
+        [<Meaning key="g" label="Max cover per guarantee">register_guarantee refuses a larger lease.</Meaning>, m(fmtBrs(c.caps.maxCoverPerGuarantee))],
         ["Feature flags", m(`0x${c.featureFlags.toString(16)}${c.featureFlags === 0n ? " (none: pilot)" : ""}`)],
       ]}
     />

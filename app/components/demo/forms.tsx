@@ -175,8 +175,8 @@ export function RegisterForm({ onRefusedPreview, p = "", aside }: { onRefusedPre
             />
             <TextField id={`${p}reg-agency`} label="Agency" value={agency} onChange={edit(setAgency)} hint="opaque id, kept off-chain" />
             <TextField id={`${p}reg-rent`} label="Monthly rent (BRS)" value={rent} onChange={edit(setRent)} numeric />
-            <TextField id={`${p}reg-def`} label="Default cover (× rent)" value={defMult} onChange={edit(setDefMult)} numeric hint={fmtBrs(defaultCover, 0)} />
-            <TextField id={`${p}reg-exit`} label="Exit cover (× rent)" value={exitMult} onChange={edit(setExitMult)} numeric hint={fmtBrs(exitCover, 0)} />
+            <TextField id={`${p}reg-def`} label="Default cover (× rent)" value={defMult} onChange={edit(setDefMult)} numeric hint={fmtBrs(defaultCover)} />
+            <TextField id={`${p}reg-exit`} label="Exit cover (× rent)" value={exitMult} onChange={edit(setExitMult)} numeric hint={fmtBrs(exitCover)} />
           </Grid>
           <RoleWarning need="operator" />
           <div style={{ marginTop: 8 }}>
@@ -246,7 +246,7 @@ function GuaranteeSelect({ id, value, onChange, filter }: { id: string; value: s
             return (
               <SelectItem key={g.address} value={g.address} className="font-mono">
                 {refOf(refs.lease, hex(d.id))}
-                {agency ? ` · ${agency}` : ""} · {fmtBrs(left, 0)} left
+                {agency ? ` · ${agency}` : ""} · {fmtBrs(left)} left
               </SelectItem>
             );
           })}
@@ -483,7 +483,7 @@ export function PayClaimList() {
             {refOf(refs.lease, c.guaranteeId)} · {c.leg} leg · {fmtBrs(c.provision)} · filed {fmtTime(c.filedAt)}
           </Mono>
           <Action
-            label={`Pay claim ${fmtBrs(c.provision, 0)}`}
+            label={`Pay claim ${fmtBrs(c.provision)}`}
             ix="pay_claim"
             request={{ kind: "pay_claim", guarantee: c.guarantee, leg: c.leg === "exit" ? 2 : 1, amount: c.provision, noticeRefHash: c.noticeRefHash }}
             refusal={{ claim: { amount: c.provision, perCall: cap.perCall, remaining: cap.remaining } }}

@@ -106,7 +106,7 @@ const PLAIN: Record<string, string> = {
 export function refusalLine(name: string, ctx: RefusalContext = {}): string {
   const { gate, claim } = ctx;
   if (name === "InsufficientFreeCapital" && gate) {
-    return `Refused by the coverage gate: needs ${fmtBrs(gate.needed)} of required coverage, the reserve holds ${fmtBrs(gate.stableAssets)}.`;
+    return `Refused by the coverage gate: needs ${fmtBrs(gate.needed)} of required coverage; the reserve holds ${fmtBrs(gate.stableAssets)}.`;
   }
   if (name === "UnderCovered") return `Refused by the coverage gate: ${PLAIN.UnderCovered}`;
   if (name === "GuaranteeCapExceeded" && gate) {

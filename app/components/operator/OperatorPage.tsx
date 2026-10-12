@@ -101,7 +101,7 @@ function PayBound() {
       {kv("Reserve balance (liquid BRS)", fmtBrs(reserve.state.brsBalance))}
       {filed.map((c) => {
         const refusal = claimCapRefusal(cap, c.provision, c.approvedAmount);
-        return kv(`Preview · ${c.guaranteeId.slice(0, 8)}… ${fmtBrs(c.provision, 0)}`, <span style={{ color: refusal ? "var(--color-error)" : "var(--color-success)" }}>{refusal ? `refused: ${refusal}` : "within the caps"}</span>);
+        return kv(`Preview · ${c.guaranteeId.slice(0, 8)}… ${fmtBrs(c.provision)}`, <span style={{ color: refusal ? "var(--color-error)" : "var(--color-success)" }}>{refusal ? `refused: ${refusal}` : "within the caps"}</span>);
       })}
       <span>Never gated by required coverage: under-coverage does not stop a claim payment. The destination is fixed to the payments account.</span>
     </Bound>
@@ -113,7 +113,7 @@ function SettleBound() {
   const paid = claimsTimeline(ledger).filter((c) => c.stage === "paid");
   return (
     <Bound>
-      {paid.map((p) => kv(`${p.guaranteeId.slice(0, 8)}… ${p.leg} · ${fmtBrs(p.amount ?? 0n, 0)}`, <span>paid {p.paidAt !== null ? fmtTime(p.paidAt) : "—"}</span>))}
+      {paid.map((p) => kv(`${p.guaranteeId.slice(0, 8)}… ${p.leg} · ${fmtBrs(p.amount ?? 0n)}`, <span>paid {p.paidAt !== null ? fmtTime(p.paidAt) : "—"}</span>))}
       <span>Records the PIX that paid the landlord: only the hash of its end-to-end id goes on-chain. The program sets no settlement deadline (ADR 0019).</span>
     </Bound>
   );
@@ -125,7 +125,7 @@ function RegisterBound() {
   return (
     <Bound>
       {kv("Free capital (new cover must fit)", fmtBrs(reserve.coverage.freeCapital))}
-      {kv("Max cover per guarantee", fmtBrs(c.maxCoverPerGuarantee, 0))}
+      {kv("Max cover per guarantee", fmtBrs(c.maxCoverPerGuarantee))}
       {kv("Coverage ratio", fmtPct(reserve.config.coverageRatioBps))}
       <span>Refused while paused or under-covered. The preview replays the program&apos;s rules on the last read.</span>
     </Bound>
@@ -301,7 +301,7 @@ function Safety({ r }: { r: ReserveView }) {
   return (
     <ul style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 18, maxWidth: 860 }}>
       {item("Issuer income only moves into the reserve", <>The operator key can move income-inbox BRS only into the reserve (there is no take on issuer income). At worst a stolen key books a stray transfer as income. No instruction lets anyone take BRS out of the inbox elsewhere.</>)}
-      {item("Caps bound every outflow", <>A stolen operator key can pay claims only to the fixed payments account, at most {fmtBrs(c.maxClaimPerCall, 0)} per call and {fmtBrs(c.maxClaimPerPeriod, 0)} in any 31 days, and only against filed claims within remaining cover. New guarantees stay inside the per-guarantee cap and the coverage gate.</>)}
+      {item("Caps bound every outflow", <>A stolen operator key can pay claims only to the fixed payments account, at most {fmtBrs(c.maxClaimPerCall)} per call and {fmtBrs(c.maxClaimPerPeriod)} in any 31 days, and only against filed claims within remaining cover. New guarantees stay inside the per-guarantee cap and the coverage gate.</>)}
       {item("The operator cannot touch config or capital", <>Config, caps, roles, the allowlist and the capital queue are Reserve Admin instructions (a time-locked Squads multisig). The operator never signs them.</>)}
       {item("The pauser can revoke it at once", <><Mono>revoke_operator</Mono>, signed by the pauser key or the admin with no time lock, clears the operator key. Every operator instruction then fails, claim payments included, until the Reserve Admin proposes a new key with <Mono>propose_role</Mono> and that key takes the role with <Mono>accept_role</Mono>. The pilot binary has no admin-only claim-payment path.</>)}
       {item("Everything it does is public", <>Every guarantee, fee, claim, payment and settlement is an account on <Link href="/reserve" className="ext-link">/reserve</Link>, with its on-chain timestamps.</>)}
