@@ -63,6 +63,12 @@ export function fmtTime(ts: bigint): string {
   return new Date(Number(ts) * 1000).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
 }
 
+/** Unix seconds as `2026-10-06 23:19:04`: UTC without the suffix, for table cells under a "UTC" heading. */
+export const fmtStamp = (ts: bigint) => fmtTime(ts).replace(/ UTC$/, "");
+
+/** Seconds from `from` to `to`, or null while `to` is unset. */
+export const elapsed = (from: bigint, to: bigint | null): bigint | null => (to === null ? null : to - from);
+
 /** A duration in seconds: `2d 03h`, `4h 12m`, `38s`. */
 export function fmtDuration(secs: bigint): string {
   const s = secs < 0n ? 0n : secs;

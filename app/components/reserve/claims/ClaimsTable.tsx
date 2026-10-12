@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * /reserve · Claims detail table: five reading columns plus a chevron; the
- * whole row opens its detail.
- * Timestamps, explorer links and the leg live in the expand row (progressive
- * disclosure), so the main row reads as status → guarantee → amount → speed.
+ * /reserve · Claims detail table: status, guarantee, amount, the filed, paid
+ * and settled timestamps (UTC, to the second, from the ClaimFiling account)
+ * and the filed → settled time, plus a chevron; the whole row opens its
+ * detail (the two partial durations and explorer links).
  * Open claims (awaiting payment, then awaiting PIX) sort first, then newest filing.
  * The program sets no settlement deadline (ADR 0019): the payout SLA is the
  * operator platform's, so no row is marked late.
@@ -13,7 +13,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
-import { fmtDuration, fmtTime } from "@/lib/format";
+import { elapsed, fmtDuration, fmtStamp, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import type { ClaimRow } from "@/lib/view";
 import { Num, Table, short } from "@/components/reserve/sections/shared";
@@ -22,8 +22,10 @@ const PAGE = 10;
 
 const TIPS = {
   Status: "Filed, paid from the reserve, or received by the landlord (PIX), from the claim filing on-chain.",
-  "Filed → paid": "From when the claim was filed to when it was paid.",
-  "Paid → settled": "From payment to the landlord receiving it by PIX.",
+  "Filed (UTC)": "When file_claim was recorded on-chain (ClaimFiling filed_at).",
+  "Paid (UTC)": "When pay_claim moved the claim payment out of the reserve (ClaimFiling paid_at).",
+  "Settled (UTC)": "When settle_payout recorded the landlord's PIX receipt (ClaimFiling settled_at).",
+  "Filed → settled": "From filing to the landlord receiving it by PIX.",
 };
 
 type Status = { label: string; color: string; title?: string; rank: number };
@@ -71,10 +73,11 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Table label="Claims timeline" head={["Status", "Guarantee", ["Amount", "num"], ["Filed → paid", "num"], ["Paid → settled", "num"], ["Details", "num"]]} tips={TIPS}>
+      <Table label="Claims timeline" head={["Status", "Guarantee", ["Amount", "num"], ["Filed (UTC)", "num"], ["Paid (UTC)", "num"], ["Settled (UTC)", "num"], ["Filed → settled", "num"], ["Details", "num"]]} tips={TIPS}>
         {visible.map((c) => {
           const isOpen = open.has(c.filing);
           const detailId = `claim-${c.filing}`;
+          const settled = elapsed(c.filedAt, c.settledAt);
           return (
             <Fragment key={c.filing}>
               <tr
@@ -93,8 +96,10 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                   </span>
                 </td>
                 <Num>{fmtBrs(c.amount ?? c.provision)}</Num>
-                <Num>{c.fileToPay !== null ? fmtDuration(c.fileToPay) : "—"}</Num>
-                <Num>{c.payToSettle !== null ? fmtDuration(c.payToSettle) : c.paidAt !== null ? "pending" : "—"}</Num>
+                <Num>{fmtStamp(c.filedAt)}</Num>
+                <Num>{c.paidAt !== null ? fmtStamp(c.paidAt) : "—"}</Num>
+                <Num>{c.settledAt !== null ? fmtStamp(c.settledAt) : c.paidAt !== null ? "pending" : "—"}</Num>
+                <Num>{settled !== null ? fmtDuration(settled) : "—"}</Num>
                 <td className="num">
                   <Button
                     type="button"
@@ -114,7 +119,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
               </tr>
               {isOpen && (
                 <tr id={detailId}>
-                  <td colSpan={6} className="bg-(--color-surface)">
+                  <td colSpan={8} className="bg-(--color-surface)">
                     <div className="grid grid-cols-1 gap-4 py-2 sm:grid-cols-2 lg:grid-cols-4">
                       <Detail label="Filed">
                         <Explorer value={c.filing} label={fmtTime(c.filedAt)} />
@@ -125,6 +130,12 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                       </Detail>
                       <Detail label="Guarantee">
                         <Explorer value={c.guarantee} />
+                      </Detail>
+                      <Detail label="Filed → paid">
+                        <Mono style={{ fontSize: 12 }}>{c.fileToPay !== null ? fmtDuration(c.fileToPay) : "—"}</Mono>
+                      </Detail>
+                      <Detail label="Paid → settled">
+                        <Mono style={{ fontSize: 12 }}>{c.payToSettle !== null ? fmtDuration(c.payToSettle) : c.paidAt !== null ? "pending" : "—"}</Mono>
                       </Detail>
                     </div>
                   </td>
