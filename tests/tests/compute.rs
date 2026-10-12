@@ -189,7 +189,10 @@ fn initialize() -> u64 {
     let mut f = Fixture::uninitialized();
     let ix = initialize_ix(&f.init_accounts(), f.init_args());
     let payer = f.payer.insecure_clone();
-    cu(&send_ix(&mut f.svm, ix, &[&payer]).expect("initialize"))
+    // The same explicit limit the deploy scripts send: some fresh fixtures'
+    // bump searches push initialize past the 200k default.
+    let limit = set_compute_unit_limit(INITIALIZE_COMPUTE_UNIT_LIMIT);
+    cu(&send_ixs(&mut f.svm, &[limit, ix], &[&payer]).expect("initialize"))
 }
 
 fn fill_deposits() -> u64 {
