@@ -17,6 +17,7 @@ import { previewRegisterGuarantee, REFUSAL_TEXT } from "@/lib/gate";
 import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, parseHundredths } from "@/lib/format";
 import { agencyIdFor, refsSaltFor } from "@/lib/client/operator-refs";
 import { nextRef, REF } from "@/lib/refs";
+import { claimCap } from "@/lib/operator";
 import { bytesToHex } from "@/lib/serde";
 import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE } from "@/lib/view";
 import { Action, Field, Grid, Note, RoleWarning, TextField, useLive } from "./shared";
@@ -183,6 +184,7 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
           request={build}
           disabled={!rentBase || !multOk}
           onConfirmed={() => setHeld(true)}
+          refusal={preview ? { gate: { needed: preview.needed, stableAssets: preview.stableAssets, newCover: preview.newCover, maxCover: reserve.config.caps.maxCoverPerGuarantee } } : undefined}
           next={
             <Button
               variant="outline"
@@ -368,7 +370,8 @@ export function FileClaimForm({ p = "" }: { p?: string }) {
 
 /** Filed, unpaid claims, each with a Pay button (`pay_claim` for the filed provision). */
 export function PayClaimList() {
-  const { ledger } = useLive();
+  const { ledger, reserve } = useLive();
+  const cap = claimCap(reserve.config, reserve.state, reserve.now);
   const open = claimsTimeline(ledger).filter((c) => c.stage === "filed");
   if (open.length === 0) return <Note>No filed claim waiting for payment. File one first.</Note>;
   return (
@@ -379,7 +382,7 @@ export function PayClaimList() {
           <Mono style={{ fontSize: 12, minWidth: 280 }}>
             {c.guaranteeId.slice(0, 8)}… · {c.leg} leg · {fmtBrs(c.provision)} · filed {fmtTime(c.filedAt)}
           </Mono>
-          <Action label={`pay_claim ${fmtBrs(c.provision, 0)}`} request={{ kind: "pay_claim", guarantee: c.guarantee, leg: c.leg === "exit" ? 2 : 1, amount: c.provision, noticeRefHash: c.noticeRefHash }} />
+          <Action label={`pay_claim ${fmtBrs(c.provision, 0)}`} request={{ kind: "pay_claim", guarantee: c.guarantee, leg: c.leg === "exit" ? 2 : 1, amount: c.provision, noticeRefHash: c.noticeRefHash }} refusal={{ claim: { amount: c.provision, perCall: cap.perCall, remaining: cap.remaining } }} />
         </div>
       ))}
     </div>

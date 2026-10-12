@@ -15,6 +15,7 @@ import { TxStatus } from "@/components/TxStatus";
 import { useWallet } from "@/components/WalletProvider";
 import { useTx } from "@/lib/client/use-tx";
 import { fmtBrs, fmtNav, fmtShares } from "@/lib/format";
+import type { RefusalContext } from "@/lib/tx-error";
 import { expectedSigner, type TxRequest } from "@/lib/tx-kinds";
 import { MODE_LABEL, type Ledger, type ReserveView } from "@/lib/view";
 
@@ -153,6 +154,7 @@ export function Action({
   onDone,
   onConfirmed,
   next,
+  refusal,
 }: {
   label: string;
   request: TxRequest | null | (() => Promise<TxRequest | null>);
@@ -164,6 +166,8 @@ export function Action({
   onConfirmed?: () => void;
   /** Shown in place of the send button once confirmed: the result holds until the user starts the next one. */
   next?: ReactNode;
+  /** Preview numbers for the plain-English refusal line. */
+  refusal?: RefusalContext;
 }) {
   const live = useLive();
   const gate = useContext(GateCtx);
@@ -206,7 +210,7 @@ export function Action({
         {busy ? "Working…" : label}
       </Button>
       )}
-      <TxStatus state={state} />
+      <TxStatus state={state} refusal={refusal} />
       {state.phase === "confirmed" && before && after && <Moves before={before} after={after} />}
     </div>
   );
