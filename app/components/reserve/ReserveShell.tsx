@@ -64,6 +64,7 @@ export function ReserveShell({ children }: { children: ReactNode }) {
     "This page reads the chain every 10 seconds.",
     poll.updatedAt ? `Last read ${new Date(poll.updatedAt).toISOString().slice(11, 19)} UTC.` : "",
     published ? `NAV, coverage and mode were last published on-chain at ${fmtTime(published)}.` : "",
+    poll.busy ? "The RPC is busy: showing the last good read and retrying." : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -106,6 +107,7 @@ export function ReserveShell({ children }: { children: ReactNode }) {
                 <span title={liveTitle} className="inline-flex cursor-default items-center gap-2 whitespace-nowrap">
                   <span className="live-dot" aria-hidden="true" />
                   Live · {published ? `updated on-chain ${fmtDuration(d.reserve.now - published)} ago` : "not yet updated on-chain"}
+                  {poll.busy ? " · chain busy, retrying" : ""}
                 </span>
               )}
               <Button

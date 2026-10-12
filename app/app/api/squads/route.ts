@@ -1,5 +1,5 @@
 import { address } from "@solana/kit";
-import { guardedEnv, readReserve } from "@/lib/server/chain";
+import { guardedEnv, readReserve, readReserveShared } from "@/lib/server/chain";
 import { ComposeError } from "@/lib/server/compose";
 import { errorResponse, readResponse } from "@/lib/server/respond";
 import { cachedRead, isFresh } from "@/lib/server/read-cache";
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     const env = await guardedEnv();
     return readResponse(
       await cachedRead("squads", async () => {
-        const reserve = await readReserve(env);
+        const reserve = await readReserveShared(env, { fresh: isFresh(req) });
         if (!env.squadsMultisig) return { configured: false, admin: reserve.config.admin, cluster: env.cluster };
         const vault = vaultAddress(env.squadsMultisig);
         const ms = await readMultisig(env, reserve.now, reserve);

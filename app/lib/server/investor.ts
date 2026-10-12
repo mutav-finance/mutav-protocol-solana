@@ -3,12 +3,13 @@
  * token accounts (associated token accounts) and its allowlist status against
  * the on-chain root. Read-only.
  */
-import { address } from "@solana/kit";
+import { address, fetchEncodedAccounts, type MaybeEncodedAccount } from "@solana/kit";
 import { buildAllowlist } from "@mutav-finance/mutav-protocol-solana";
 import { checkAllowlist, type AllowlistState } from "../allowlist";
 import { bytesToHex } from "../serde";
 import type { ReserveView } from "../view";
-import { associatedTokenAddress, TOKEN_PROGRAM, tokenAmount } from "./compose";
+import { READ, rpcFor } from "./chain";
+import { associatedTokenAddress, TOKEN_PROGRAM } from "./compose";
 import type { ServerEnv } from "./env";
 
 export type InvestorView = {
@@ -30,6 +31,13 @@ export type InvestorView = {
   shares: { account: string; amount: bigint | null };
 };
 
+/** SPL token account `amount`: u64 LE at [64..72). */
+function encodedTokenAmount(a: MaybeEncodedAccount): bigint | null {
+  if (!a.exists || (a.data as Uint8Array).length < 72) return null;
+  const d = a.data as Uint8Array;
+  return new DataView(d.buffer, d.byteOffset, d.byteLength).getBigUint64(64, true);
+}
+
 export async function readInvestor(env: ServerEnv, r: ReserveView, ownerParam: string | null): Promise<InvestorView> {
   const root = bytesToHex(Uint8Array.from(r.config.investorAllowlistRoot));
   const listRoot = env.allowlist.length ? bytesToHex((await buildAllowlist(env.allowlist)).root) : null;
@@ -42,11 +50,13 @@ export async function readInvestor(env: ServerEnv, r: ReserveView, ownerParam: s
     associatedTokenAddress(owner, r.config.reserveMint, r.config.reserveTokenProgram),
     associatedTokenAddress(owner, address(r.addresses.shareMint), TOKEN_PROGRAM),
   ]);
-  const [check, brs, shares] = await Promise.all([
+  const [check, [brsAcc, shareAcc]] = await Promise.all([
     checkAllowlist(r.config.investorAllowlistRoot, env.allowlist, owner),
-    tokenAmount(env, brsAta),
-    tokenAmount(env, shareAta),
+    // Both token accounts in one getMultipleAccounts.
+    fetchEncodedAccounts(rpcFor(env), [brsAta, shareAta], READ),
   ]);
+  const brs = encodedTokenAmount(brsAcc!);
+  const shares = encodedTokenAmount(shareAcc!);
   return {
     owner,
     allowlist: { state: check.state, ...base },
