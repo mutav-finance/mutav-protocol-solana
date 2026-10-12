@@ -120,3 +120,8 @@ export function refusalLine(name: string, ctx: RefusalContext = {}): string {
   }
   return `Refused by the program: ${PLAIN[name] ?? `${name}.`}`;
 }
+
+/** The plain-English reason alone (no "Refused by…" prefix), for previews: "the cover is above the per-guarantee cap". */
+export function refusalReason(name: string): string {
+  return (PLAIN[name] ?? `${name}.`).replace(/\.$/, "");
+}

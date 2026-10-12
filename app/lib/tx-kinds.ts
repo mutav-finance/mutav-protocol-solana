@@ -139,3 +139,36 @@ export function expectedSigner(kind: TxKind): "operator" | "admin" | "pauser-or-
   if (kind === "refresh" || kind === "advance_queue_head") return "anyone";
   return "investor";
 }
+
+/**
+ * Sentence-case names for the instructions the consoles send, shown on tabs
+ * and buttons with the instruction name as a small mono sub-label.
+ */
+export const IX_LABEL: Record<string, string> = {
+  register_guarantee: "Register guarantee",
+  contribute_fees: "Guarantee fee",
+  sweep_income: "Issuer income",
+  file_claim: "File claim",
+  pay_claim: "Pay claim",
+  settle_payout: "Settle payout",
+  close_guarantee: "Close guarantee",
+  pause: "Pause",
+  unpause: "Unpause",
+  revoke_operator: "Revoke operator",
+  clear_fulfil_halt: "Reopen queue fills",
+  set_config: "Change settings",
+  propose_role: "Propose keys",
+  accept_role: "Accept role",
+  cancel_pending: "Cancel handover",
+  set_payments_account: "Set payments account",
+  set_allowlist_root: "Set allowlist root",
+  fulfil_deposits: "Fill deposits",
+  fulfil_redeems: "Fill redemptions",
+  park_deposit: "Set aside request",
+  park_redeem: "Set aside request",
+  advance_queue_head: "Advance queue head",
+  approve_claim: "Approve claim",
+};
+
+/** The human label for an instruction name, or the name itself. */
+export const ixLabel = (ix: string) => IX_LABEL[ix] ?? ix;

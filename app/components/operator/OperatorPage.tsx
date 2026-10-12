@@ -22,10 +22,11 @@ import { ReserveStats } from "@/components/ReserveStats";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWallet } from "@/components/WalletProvider";
-import { ActionGate, LiveProvider, Note, useLive } from "@/components/demo/shared";
+import { ActionGate, IxText, LiveProvider, Note, useLive } from "@/components/demo/shared";
 import { CloseGuaranteeForm, FeeForm, FileClaimForm, IncomeForm, PayClaimList, RegisterForm, SettleList } from "@/components/demo/forms";
 import { usePoll } from "@/lib/client/use-poll";
-import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
+import { fmtBrs, fmtPct, fmtTime } from "@/lib/format";
+import { ixLabel } from "@/lib/tx-kinds";
 import { CLUSTER } from "@/lib/client/env";
 import { claimCap, claimCapRefusal, claimWork, DUTIES } from "@/lib/operator";
 import type { OperatorHistory } from "@/lib/server/operator";
@@ -42,7 +43,7 @@ function Who({ r }: { r: ReserveView }) {
     ? { color: "var(--color-error)", label: "OPERATOR REVOKED · ACTIONS DISABLED" }
     : isOperator
       ? { color: "var(--color-success)", label: "CONNECTED AS OPERATOR · ACTIONS ENABLED" }
-      : { color: "var(--color-copper)", label: address ? "READ-ONLY · THIS WALLET IS NOT THE OPERATOR" : "READ-ONLY · NO WALLET CONNECTED" };
+      : { color: "var(--color-text-3)", label: address ? "READ-ONLY · THIS WALLET IS NOT THE OPERATOR" : "READ-ONLY · NO WALLET CONNECTED" };
   return (
     <>
       <StatusBadge bordered color={badge.color} label={badge.label} />
@@ -75,15 +76,15 @@ function KeyDetails({ r, history }: { r: ReserveView; history: OperatorHistory |
 
 function Bound({ children }: { children: ReactNode }) {
   return (
-    <div style={{ border: "1px solid var(--color-border-input)", padding: "10px 12px", margin: "12px 0 4px", display: "flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ border: "1px solid var(--color-border-input)", padding: "10px 12px", margin: "12px 0 16px", display: "flex", flexDirection: "column", gap: 4 }}>
       <span className="font-mono" style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-3)" }}>Bound before you sign · on-chain</span>
-      <div className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)", lineHeight: 1.6 }}>{children}</div>
+      <div className="font-body" style={{ fontSize: 12, color: "var(--color-text-2)", lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 4 }}>{children}</div>
     </div>
   );
 }
 
 const kv = (k: string, v: ReactNode) => (
-  <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+  <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", maxWidth: 640 }}>
     <span>{k}</span>
     <Mono style={{ fontSize: 12 }}>{v}</Mono>
   </div>
@@ -97,10 +98,10 @@ function PayBound() {
     <Bound>
       {kv("Max per call", fmtBrs(cap.perCall))}
       {kv("Left in the last 31 days", `${fmtBrs(cap.remaining)} of ${fmtBrs(cap.perPeriod)}`)}
-      {kv("Liquid BRS in the reserve", fmtBrs(reserve.state.brsBalance))}
+      {kv("Reserve balance (liquid BRS)", fmtBrs(reserve.state.brsBalance))}
       {filed.map((c) => {
         const refusal = claimCapRefusal(cap, c.provision, c.approvedAmount);
-        return kv(`PREVIEW · ${c.guaranteeId.slice(0, 8)}… ${fmtBrs(c.provision, 0)}`, <span style={{ color: refusal ? "var(--color-error)" : "var(--color-success)" }}>{refusal ? `refused: ${refusal}` : "within the caps"}</span>);
+        return kv(`Preview · ${c.guaranteeId.slice(0, 8)}… ${fmtBrs(c.provision, 0)}`, <span style={{ color: refusal ? "var(--color-error)" : "var(--color-success)" }}>{refusal ? `refused: ${refusal}` : "within the caps"}</span>);
       })}
       <span>Never gated by required coverage: under-coverage does not stop a claim payment. The destination is fixed to the payments account.</span>
     </Bound>
@@ -112,9 +113,8 @@ function SettleBound() {
   const paid = claimsTimeline(ledger).filter((c) => c.stage === "paid");
   return (
     <Bound>
-      {paid.length === 0 && <span>No paid claim waiting for settlement. </span>}
       {paid.map((p) => kv(`${p.guaranteeId.slice(0, 8)}… ${p.leg} · ${fmtBrs(p.amount ?? 0n, 0)}`, <span>paid {p.paidAt !== null ? fmtTime(p.paidAt) : "—"}</span>))}
-      <span>The program sets no settlement deadline: the payout SLA is the operator platform&apos;s (ADR 0019).</span>
+      <span>Records the PIX that paid the landlord: only the hash of its end-to-end id goes on-chain. The program sets no settlement deadline (ADR 0019).</span>
     </Bound>
   );
 }
@@ -126,8 +126,8 @@ function RegisterBound() {
     <Bound>
       {kv("Free capital (new cover must fit)", fmtBrs(reserve.coverage.freeCapital))}
       {kv("Max cover per guarantee", fmtBrs(c.maxCoverPerGuarantee, 0))}
-      {kv("Coverage ratio", fmtBps(reserve.config.coverageRatioBps))}
-      <span>Refused while paused or under-covered. The gate preview below replays the rules with the client&apos;s math mirror.</span>
+      {kv("Coverage ratio", fmtPct(reserve.config.coverageRatioBps))}
+      <span>Refused while paused or under-covered. The preview replays the program&apos;s rules on the last read.</span>
     </Bound>
   );
 }
@@ -138,34 +138,42 @@ function IncomeBound() {
     <Bound>
       {kv("Income inbox (paid, not swept)", fmtBrs(reserve.incomeInbox.amount))}
       <span>
-        Nora pays the monthly revenue share into the income inbox (<Explorer value={reserve.incomeInbox.address} />), the vault authority&apos;s BRS account. It counts toward nothing until swept. Sweep exactly the amount on the statement: at most the inbox balance, each statement reference once. The vault authority moves it into the reserve; NAV rises for every holder and no shares are minted. Never paused, never gated.
+        Nora pays the monthly revenue share into the income inbox (<Explorer value={reserve.incomeInbox.address} />), the vault authority&apos;s BRS account. It counts toward nothing until swept. Sweep exactly the amount on the statement: at most the inbox balance, each statement reference once. The vault authority moves all of it into the reserve, which raises the coverage ceiling; no shares are minted. Never paused, never gated.
       </span>
     </Bound>
   );
 }
+
+/** The console tabs: a sentence-case name with the instruction as a mono sub-label. */
+const TABS = [
+  ["register", "register_guarantee"],
+  ["fee", "contribute_fees"],
+  ["income", "sweep_income"],
+  ["file", "file_claim"],
+  ["pay", "pay_claim"],
+  ["settle", "settle_payout"],
+  ["close", "close_guarantee"],
+] as const;
 
 function Console({ locked }: { locked: boolean }) {
   const { reserve } = useLive();
   return (
     <ActionGate value={{ locked }}>
       <Tabs defaultValue="register">
-        <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="register">register_guarantee</TabsTrigger>
-          <TabsTrigger value="fee">contribute_fees</TabsTrigger>
-          <TabsTrigger value="income">sweep_income</TabsTrigger>
-          <TabsTrigger value="file">file_claim</TabsTrigger>
-          <TabsTrigger value="pay">pay_claim</TabsTrigger>
-          <TabsTrigger value="settle">settle_payout</TabsTrigger>
-          <TabsTrigger value="close">close_guarantee</TabsTrigger>
+        <TabsList className="h-auto flex-wrap">
+          {TABS.map(([v, ix]) => (
+            <TabsTrigger key={v} value={v} className="items-start">
+              <IxText label={ixLabel(ix)} ix={ix} stacked />
+            </TabsTrigger>
+          ))}
         </TabsList>
         <TabsContent value="register">
-          <RegisterBound />
-          <RegisterForm p="op-" />
+          <RegisterForm p="op-" aside={<RegisterBound />} />
         </TabsContent>
         <TabsContent value="fee">
           <Bound>
-            {kv("Fee take to the treasury", fmtBps(reserve.config.feeTakeBps))}
-            <span>Each invoice reference is recorded once (FeeReceipt). Fees are never paused or gated. The BRS comes from the operator wallet&apos;s own BRS account.</span>
+            {kv("MUTAV take to the treasury", fmtPct(reserve.config.feeTakeBps))}
+            <span>MUTAV&apos;s share of each guarantee fee; the rest goes to the reserve. Issuer income goes 100% to the reserve. Each invoice reference is recorded once (FeeReceipt). Fees are never paused or gated. The BRS comes from the operator wallet&apos;s own BRS account.</span>
           </Bound>
           <FeeForm p="op-" />
         </TabsContent>
@@ -175,7 +183,7 @@ function Console({ locked }: { locked: boolean }) {
         </TabsContent>
         <TabsContent value="file">
           <Bound>
-            <span>The amount may not exceed the leg&apos;s cover not yet paid or provisioned (shown as &quot;left&quot; for each guarantee). Filing lowers NAV at once. Not gated by required coverage.</span>
+            <span>The amount may not exceed the leg&apos;s cover not yet paid or provisioned (shown as &quot;left&quot; for each guarantee). Filing lowers the share price at once. Not gated by required coverage.</span>
           </Bound>
           <FileClaimForm p="op-" />
         </TabsContent>
@@ -213,8 +221,8 @@ function Limits({ r, l }: { r: ReserveView; l: Ledger }) {
       </div>
       <div className="grid-2">
         <ClaimCapChart cap={claimCap(r.config, r.state, r.now)} />
-        <div style={{ border: "1px solid var(--color-border)", background: "var(--color-surface)", padding: "14px 16px" }}>
-          <p className="font-body" style={{ fontSize: 13, fontWeight: 600, margin: "0 0 12px" }}>Room for new guarantees</p>
+        <div style={{ border: "1px solid var(--color-border)", background: "var(--color-surface)", padding: 24 }}>
+          <p className="font-body" style={{ fontSize: 12, fontWeight: 500, letterSpacing: "0.01em", textTransform: "uppercase", color: "var(--color-text-2)", margin: "0 0 16px", lineHeight: 1.4 }}>Room for new guarantees</p>
           <CoverageChart s={r.coverage} ratioBps={r.config.coverageRatioBps} compact />
         </div>
       </div>
@@ -295,7 +303,7 @@ function Safety({ r }: { r: ReserveView }) {
       {item("Issuer income only moves into the reserve", <>The operator key can move income-inbox BRS only into the reserve (there is no take on issuer income). At worst a stolen key books a stray transfer as income. No instruction lets anyone take BRS out of the inbox elsewhere.</>)}
       {item("Caps bound every outflow", <>A stolen operator key can pay claims only to the fixed payments account, at most {fmtBrs(c.maxClaimPerCall, 0)} per call and {fmtBrs(c.maxClaimPerPeriod, 0)} in any 31 days, and only against filed claims within remaining cover. New guarantees stay inside the per-guarantee cap and the coverage gate.</>)}
       {item("The operator cannot touch config or capital", <>Config, caps, roles, the allowlist and the capital queue are Reserve Admin instructions (a time-locked Squads multisig). The operator never signs them.</>)}
-      {item("The pauser can revoke it at once", <><Mono>revoke_operator</Mono>, signed by the pauser key or the admin with no time lock, sets the operator to the default key. Every operator instruction then fails, claim payments included, until the Reserve Admin proposes a new key with <Mono>propose_role</Mono> and that key takes the role with <Mono>accept_role</Mono>. The pilot binary has no admin-only claim-payment path.</>)}
+      {item("The pauser can revoke it at once", <><Mono>revoke_operator</Mono>, signed by the pauser key or the admin with no time lock, clears the operator key. Every operator instruction then fails, claim payments included, until the Reserve Admin proposes a new key with <Mono>propose_role</Mono> and that key takes the role with <Mono>accept_role</Mono>. The pilot binary has no admin-only claim-payment path.</>)}
       {item("Everything it does is public", <>Every guarantee, fee, claim, payment and settlement is an account on <Link href="/reserve" className="ext-link">/reserve</Link>, with its on-chain timestamps.</>)}
     </ul>
   );
@@ -314,7 +322,7 @@ export function OperatorPage() {
       title="Operator"
       lede={
         <>
-          Today, during the launch and the hackathon, MUTAV&apos;s team operates the reserve by hand from this page: the operator wallet signs each instruction. Later, mutav-app&apos;s backend sends the same instructions with a KMS-held operator key.
+          MUTAV&apos;s team runs the reserve by hand from this page; the operator wallet signs each step. Later, a backend signs with a key held in a secure key service (KMS).
         </>
       }
       aside={
@@ -329,8 +337,8 @@ export function OperatorPage() {
       {d && (
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh: async () => { await Promise.all([poll.refresh(), history.refresh()]); } }}>
           <ReserveStats r={d.reserve} sticky badges={<Who r={d.reserve} />} />
-          <Section id="console" title="Console" kicker={locked ? "Read-only" : "Operator wallet connected"} roles={<RoleLine items={[{ role: "operator", prefix: "every action signed by" }]}>The program checks the signer; the wallet signs; the app holds no key.</RoleLine>}>
-            {locked && <Note tone="warn">Read-only: connect the operator wallet to act. The forms stay visible so anyone can see what the operator can do.</Note>}
+          <Section id="console" title="Console" kicker={locked ? "Read-only" : "Operator wallet connected"} action={<RoleLine items={[{ role: "operator", prefix: "every action signed by" }]}>The program checks the signer; the wallet signs; the app holds no key.</RoleLine>}>
+            {locked && <Note>Read-only: connect the operator wallet to act. The forms stay visible so anyone can see what the operator can do.</Note>}
             {d && address && address === d.reserve.config.pendingOperator && (
               <Note tone="ok">
                 This wallet is the proposed operator key: take the role with accept_role on <Link href="/admin#general-handovers" className="ext-link">/admin → Pending handovers</Link> (ADR 0020).
@@ -338,7 +346,7 @@ export function OperatorPage() {
             )}
             <Console locked={locked} />
           </Section>
-          <Section id="limits" title="Limits now" kicker="Live from the chain" roles={<RoleLine items={[{ role: "admin", prefix: "caps and SLA set by" }]} />}>
+          <Section id="limits" title="Limits now" kicker="Live from the chain" roles={<RoleLine items={[{ role: "admin", prefix: "caps set by" }]} />}>
             <Limits r={d.reserve} l={d.ledger} />
           </Section>
           <Section id="duties" title="Responsibilities" kicker="Today → later">
