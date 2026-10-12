@@ -139,17 +139,20 @@ pub fn handle_contribute_fees(
     r.net = net;
     r.slot = clock.slot;
 
-    emit_cpi!(FeesContributed {
-        config: ctx.accounts.config.key(),
-        ts: clock.unix_timestamp,
-        invoice_ref_hash,
-        gross: amount,
-        take,
-        net,
-        fees_in_total: ctx.accounts.state.fees_in_total,
-        fee_take_total: ctx.accounts.state.fee_take_total,
-        brs_balance: ctx.accounts.state.brs_balance,
-    });
+    emit_event!(
+        ctx,
+        FeesContributed {
+            config: ctx.accounts.config.key(),
+            ts: clock.unix_timestamp,
+            invoice_ref_hash,
+            gross: amount,
+            take,
+            net,
+            fees_in_total: ctx.accounts.state.fees_in_total,
+            fee_take_total: ctx.accounts.state.fee_take_total,
+            brs_balance: ctx.accounts.state.brs_balance,
+        }
+    );
     Ok(())
 }
 

@@ -127,17 +127,20 @@ pub fn handle_register_guarantee(
         .checked_add(1)
         .ok_or(MutavError::MathOverflow)?;
 
-    emit_cpi!(GuaranteeRegistered {
-        config: config.key(),
-        ts: now,
-        id: args.id,
-        agency_id: args.agency_id,
-        refs_hash: args.refs_hash,
-        default_cover: args.default_cover,
-        exit_cover: args.exit_cover,
-        remaining_cover_total: state.remaining_cover_total,
-        coverage_required: state.coverage_required,
-        active_guarantees: state.active_guarantees,
-    });
+    emit_event!(
+        ctx,
+        GuaranteeRegistered {
+            config: config.key(),
+            ts: now,
+            id: args.id,
+            agency_id: args.agency_id,
+            refs_hash: args.refs_hash,
+            default_cover: args.default_cover,
+            exit_cover: args.exit_cover,
+            remaining_cover_total: state.remaining_cover_total,
+            coverage_required: state.coverage_required,
+            active_guarantees: state.active_guarantees,
+        }
+    );
     Ok(())
 }

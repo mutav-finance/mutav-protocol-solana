@@ -136,13 +136,16 @@ fn emit_proposal(ctx: Context<AdminRoleUpdate>, role: u8, key: Pubkey) -> Result
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(RoleProposed {
-        config: config_key,
-        ts,
-        role,
-        key,
-        expires_at,
-    });
+    emit_event!(
+        ctx,
+        RoleProposed {
+            config: config_key,
+            ts,
+            role,
+            key,
+            expires_at,
+        }
+    );
     Ok(())
 }
 
@@ -160,12 +163,15 @@ pub fn handle_cancel_pending(ctx: Context<AdminRoleUpdate>, role: u8) -> Result<
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(HandoverCancelled {
-        config: config_key,
-        ts,
-        role,
-        key,
-    });
+    emit_event!(
+        ctx,
+        HandoverCancelled {
+            config: config_key,
+            ts,
+            role,
+            key,
+        }
+    );
     Ok(())
 }
 
@@ -195,11 +201,14 @@ pub fn handle_set_guardians(ctx: Context<AdminRoleUpdate>, guardians: [Pubkey; 3
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(GuardiansUpdated {
-        config: config_key,
-        ts,
-        guardians,
-    });
+    emit_event!(
+        ctx,
+        GuardiansUpdated {
+            config: config_key,
+            ts,
+            guardians,
+        }
+    );
     Ok(())
 }
 
@@ -268,13 +277,16 @@ pub fn handle_accept_role(ctx: Context<AcceptRole>, role: u8) -> Result<()> {
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(RoleAccepted {
-        config: config_key,
-        ts,
-        role,
-        old,
-        new: key,
-    });
+    emit_event!(
+        ctx,
+        RoleAccepted {
+            config: config_key,
+            ts,
+            role,
+            old,
+            new: key,
+        }
+    );
     Ok(())
 }
 
@@ -322,12 +334,15 @@ pub fn handle_accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(RoleAccepted {
-        config: config_key,
-        ts,
-        role: ROLE_ADMIN,
-        old,
-        new: key,
-    });
+    emit_event!(
+        ctx,
+        RoleAccepted {
+            config: config_key,
+            ts,
+            role: ROLE_ADMIN,
+            old,
+            new: key,
+        }
+    );
     Ok(())
 }

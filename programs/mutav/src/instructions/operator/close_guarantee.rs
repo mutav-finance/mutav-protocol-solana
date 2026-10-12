@@ -90,15 +90,18 @@ pub fn handle_close_guarantee(
     g.closed_at = now;
     g.close_reason = reason;
 
-    emit_cpi!(GuaranteeClosed {
-        config: ctx.accounts.config.key(),
-        ts: now,
-        id,
-        reason,
-        released_cover: released,
-        remaining_cover_total: state.remaining_cover_total,
-        coverage_required: state.coverage_required,
-        active_guarantees: state.active_guarantees,
-    });
+    emit_event!(
+        ctx,
+        GuaranteeClosed {
+            config: ctx.accounts.config.key(),
+            ts: now,
+            id,
+            reason,
+            released_cover: released,
+            remaining_cover_total: state.remaining_cover_total,
+            coverage_required: state.coverage_required,
+            active_guarantees: state.active_guarantees,
+        }
+    );
     Ok(())
 }

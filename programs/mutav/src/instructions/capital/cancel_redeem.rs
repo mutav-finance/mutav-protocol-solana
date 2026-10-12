@@ -18,9 +18,10 @@ use anchor_lang::{prelude::*, AccountsClose};
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::Token,
-    token_interface::{transfer_checked, Mint, TokenAccount, TransferChecked},
+    token_interface::{Mint, TokenAccount},
 };
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     errors::MutavError,
@@ -112,14 +113,17 @@ pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
         // account creation, no close. The shares stay owed to the owner.
         require!(status == REDEEM_PENDING, MutavError::InvalidRequestStatus);
         ctx.accounts.redeem_request.status = REDEEM_CANCELLED;
-        emit_cpi!(RedeemParked {
-            config: config_key,
-            ts,
-            owner,
-            seq,
-            shares,
-            by,
-        });
+        emit_event!(
+            ctx,
+            RedeemParked {
+                config: config_key,
+                ts,
+                owner,
+                seq,
+                shares,
+                by,
+            }
+        );
         return Ok(());
     }
 
@@ -139,22 +143,14 @@ pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
         a.associated_token_program.key(),
     )?;
 
-    let authority_seeds: &[&[u8]] = &[
-        AUTHORITY_SEED,
-        config_key.as_ref(),
-        &[a.config.authority_bump],
-    ];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            a.share_token_program.key(),
-            TransferChecked {
-                from: a.pending_redemptions.to_account_info(),
-                mint: a.share_mint.to_account_info(),
-                to: a.owner_shares.to_account_info(),
-                authority: a.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
+    vault_transfer(
+        a.share_token_program.key(),
+        a.pending_redemptions.to_account_info(),
+        a.share_mint.to_account_info(),
+        a.owner_shares.to_account_info(),
+        a.vault_authority.to_account_info(),
+        &config_key,
+        a.config.authority_bump,
         shares,
         a.share_mint.decimals,
     )?;
@@ -165,14 +161,17 @@ pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
         .checked_sub(shares)
         .ok_or(MutavError::MathOverflow)?;
 
-    emit_cpi!(RedeemCancelled {
-        config: config_key,
-        ts,
-        owner,
-        seq,
-        shares_returned: shares,
-        by,
-    });
+    emit_event!(
+        ctx,
+        RedeemCancelled {
+            config: config_key,
+            ts,
+            owner,
+            seq,
+            shares_returned: shares,
+            by,
+        }
+    );
 
     // Nothing is left on the request: it closes, rent to the owner.
     ctx.accounts

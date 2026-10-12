@@ -3,14 +3,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::TokenAccount;
 
-use crate::constants::CONFIG_SEED;
 use crate::{
-    constants::field,
+    constants::CONFIG_SEED,
     errors::MutavError,
-    events::{emit_config_changes, ConfigChanges, PaymentsAccountUpdated},
-    instructions::admin::{
-        load_money_account, validate_money_accounts, vault_authority_key, Installing, Money,
-    },
+    events::PaymentsAccountUpdated,
+    instructions::admin::{install_money_account, Installing},
     state::VaultConfig,
 };
 
@@ -42,39 +39,22 @@ pub struct SetPaymentsAccount<'info> {
 }
 
 pub fn handle_set_payments_account(ctx: Context<SetPaymentsAccount>) -> Result<()> {
-    let vault_authority = vault_authority_key(
-        &ctx.accounts.config.key(),
-        ctx.accounts.config.authority_bump,
-    )?;
-    let treasury = load_money_account(
-        &ctx.accounts.treasury_account,
-        &ctx.accounts.config.reserve_token_program,
-        MutavError::InvalidTreasuryAccount,
-    )?;
-    validate_money_accounts(
-        &ctx.accounts.config.reserve_mint,
-        Money::loaded(ctx.accounts.treasury_account.key(), &treasury),
-        Money::of(&ctx.accounts.payments_account),
-        &ctx.accounts.config.mutav_capital_wallet,
-        &vault_authority,
-        &ctx.accounts.config.operator,
+    let a = &mut *ctx.accounts;
+    let (old, new, ts) = install_money_account(
+        &mut a.config,
+        &a.payments_account,
+        &a.treasury_account,
         Installing::Payments,
+        &a.event_authority,
     )?;
-
-    let new = ctx.accounts.payments_account.key();
-    let config = &mut ctx.accounts.config;
-    let old = config.payments_account;
-    let mut ch = ConfigChanges::default();
-    ch.set(field::PAYMENTS_ACCOUNT, &mut config.payments_account, new);
-
-    let config_key = config.key();
-    let ts = Clock::get()?.unix_timestamp;
-    emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(PaymentsAccountUpdated {
-        config: config_key,
-        ts,
-        old,
-        new,
-    });
+    emit_event!(
+        ctx,
+        PaymentsAccountUpdated {
+            config: ctx.accounts.config.key(),
+            ts,
+            old,
+            new,
+        }
+    );
     Ok(())
 }

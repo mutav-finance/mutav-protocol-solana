@@ -9,10 +9,9 @@
 //! `payments_account` (ADR 0021).
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{
-    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
-};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     coverage::coverage_required_saturating,
@@ -157,22 +156,14 @@ pub fn handle_pay_claim(
     // Rule 8: no coverage check, no mode check, no pause check.
 
     let config_key = ctx.accounts.config.key();
-    let authority_seeds: &[&[u8]] = &[
-        AUTHORITY_SEED,
-        config_key.as_ref(),
-        &[ctx.accounts.config.authority_bump],
-    ];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.reserve.to_account_info(),
-                mint: ctx.accounts.reserve_mint.to_account_info(),
-                to: ctx.accounts.payments_account.to_account_info(),
-                authority: ctx.accounts.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
+    vault_transfer(
+        ctx.accounts.token_program.key(),
+        ctx.accounts.reserve.to_account_info(),
+        ctx.accounts.reserve_mint.to_account_info(),
+        ctx.accounts.payments_account.to_account_info(),
+        ctx.accounts.vault_authority.to_account_info(),
+        &config_key,
+        ctx.accounts.config.authority_bump,
         amount,
         ctx.accounts.reserve_mint.decimals,
     )?;
@@ -231,19 +222,22 @@ pub fn handle_pay_claim(
         state.claims_paid_total,
     );
     let payments_account = ctx.accounts.payments_account.key();
-    emit_cpi!(ClaimPaid {
-        config: config_key,
-        ts: now,
-        guarantee_id: ctx.accounts.guarantee.id,
-        leg,
-        amount,
-        notice_ref_hash,
-        payments_account,
-        provisions_after,
-        coverage_required_after,
-        window_paid,
-        brs_balance_after,
-        claims_paid_total,
-    });
+    emit_event!(
+        ctx,
+        ClaimPaid {
+            config: config_key,
+            ts: now,
+            guarantee_id: ctx.accounts.guarantee.id,
+            leg,
+            amount,
+            notice_ref_hash,
+            payments_account,
+            provisions_after,
+            coverage_required_after,
+            window_paid,
+            brs_balance_after,
+            claims_paid_total,
+        }
+    );
     Ok(())
 }

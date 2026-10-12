@@ -71,10 +71,13 @@ pub fn handle_clear_fulfil_halt(
     // `refresh` must not subtract them again (ADR 0017).
     state.inflow_nav = 0;
 
-    emit_cpi!(FulfilHaltCleared {
-        config: ctx.accounts.config.key(),
-        ts: Clock::get()?.unix_timestamp,
-        nav_per_share: nav,
-    });
+    emit_event!(
+        ctx,
+        FulfilHaltCleared {
+            config: ctx.accounts.config.key(),
+            ts: Clock::get()?.unix_timestamp,
+            nav_per_share: nav,
+        }
+    );
     Ok(())
 }
