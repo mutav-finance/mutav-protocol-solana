@@ -1,171 +1,157 @@
-# MUTAV: product demo script (v4)
+# MUTAV: product demo script (v5)
 
 Companion to the storyboard (`storyboard.html`); the two match.
 
-- **Runtime:** 2:45. **Voiceover:** 235 words, verbatim below; three spoken amounts in reais.
-- **Recorded**, not live: silent clips per beat (injected test wallet, no pop-ups), a rough cut with overlays, then the VO recorded to the cut.
-- **Numbers:** ADR 0028 (c = 0.25), Plan B with 6× + 6× cover. Ana, agency names and lease references are fictional.
-- **Overlays (edit):** devnet badge always; coverage meter; corner mini-map with the active component (legend once, F3); "Signed by …" chips; "Coverage gate · refused" chip; at most one honesty label per shot.
+- **Runtime:** 2:08. **Voiceover:** 201 words, verbatim below. Three chapters, one per pitch pillar; five live clicks.
+- **Recorded**, not live: silent clips (injected test wallet, no pop-ups), a rough cut with titles, timer and cards, then the VO recorded to the cut. Frames are tagged MAIN / FLASH / END STATE.
+- **Numbers:** v4 Plan B, unchanged (c = 0.25, 6× + 6× cover). Ana, agency names and lease references are fictional.
+- **Labels:** the #59 banner is the persistent badge and disclaimer; at most one more honesty label per shot.
 
 ## 1. Beats
 
 | Time | Beat | Frames |
 |---|---|---|
-| 0:00 (11 s) | The stakes | F1 |
-| 0:11 (7 s) | Agency side | F2 |
-| 0:18 (30 s) | Ana's lease on-chain | F3–F5 |
-| 0:48 (24 s) | The refusal | F6–F7 |
-| 1:12 (38 s) | Rent goes unpaid | F8–F10 |
-| 1:50 (40 s) | Capital payoff | F11–F13 |
-| 2:30 (15 s) | Close | F14 |
+| 0:00 (10 s) | Cold open | F1 |
+| 0:10 (5 s) | Agency | F2 |
+| 0:15 (43 s) | 1 · Programmable, transparent reserve | F3–F6 |
+| 0:58 (38 s) | 2 · Settled in minutes | F7–F8 |
+| 1:36 (22 s) | 3 · Capital efficiency | F9–F12 |
+| 1:58 (10 s) | Close | F13 |
 
 ## 2. Voiceover (verbatim)
 
-> **0:00** Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and every real it promises is backed on Solana.
+> **0:00 · Cold open** Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and its reserve runs on Solana.
 >
-> **0:11** Her agency works in MUTAV's platform. Every lease it signs becomes an account on Solana.
+> **0:10 · Agency** Her agency works in MUTAV's platform. Every lease it signs becomes an account on Solana.
 >
-> **0:18** Our operator puts the lease on-chain: eighteen thousand reais of cover, one account per lease, with an opaque ID. No name, no CPF.
+> **0:15 · 1 · Programmable, transparent reserve** Our operator puts Ana's lease on-chain: eighteen thousand reais of cover, an opaque ID, no personal data. Anyone can watch the reserve: what it holds in BRS, Nora's Brazilian real stablecoin, and what it must hold. The rule is code. One more lease would need forty-five thousand; the reserve holds forty-four. (click) Refused. MUTAV can't promise what its reserve can't back.
 >
-> **0:37** The public reserve updates at once. It holds BRS, Nora's Brazilian real stablecoin, and must keep a quarter of everything it guarantees.
+> **0:58 · 2 · Settled in minutes** Now say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the agency is recorded on-chain. Filed to settled in [N] minutes. Seguro-fiança allows up to thirty days.
 >
-> **0:48** So what if we try to sign one more lease? It needs forty-five thousand. The reserve holds forty-four. (click) The program refuses. Nothing moves. MUTAV can't promise what its reserve can't back. (3 s silence)
+> **1:36 · 3 · Capital efficiency** Because the reserve keeps a quarter of what it guarantees, every real of capital can back up to four in cover and earn its fees. Even after Ana's claim, each share is worth more. The same reserve that protects the landlord pays the people who fund it.
 >
-> **1:12** Now say Ana misses a month. The claim is filed, the money is set aside, and the reserve pays MUTAV's payments account, within a cap set by the admin multisig. The PIX to the agency is recorded on-chain: filed to settled in [N] minutes. Seguro-fiança allows up to thirty days.
->
-> **1:50** Meanwhile, guarantee fees from every lease flow into the reserve. Even after paying Ana's claim, each share is worth more than before. A capital provider takes out more than they put in, only from capital above what the guarantees require, and only after claims. The same reserve that protects the landlord pays the people who fund it.
->
-> **2:30** MUTAV. Brazil's onchain rent guarantee. Open source, live on devnet.
+> **1:58 · Close** MUTAV: a transparent, programmable reserve, claims settled in minutes, capital that works. Brazil's onchain rent guarantee.
 >
 
 [N] = whole minutes from filed_at to settled_at in the real capture; fill in before recording the VO.
 
 ## 3. Shot list
 
-**F1 · 0:00 – 0:11 · /reserve (Overview)**: The stakes: Ana needs a guarantor
-- **On screen:** Open on the public reserve page, already loaded: Overview, devnet badge, coverage meter (required R$36,000 / held R$44,000). No wallet. The mini-map sits in the corner with "BRS reserve" active.
-- **VO:** "Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and every real it promises is backed on Solana."
+**F1 · END STATE · Open · 0:00 – 0:10 · /reserve (Overview)**: Cold open: Ana needs a guarantor
+- **On screen:** Product on screen from frame 1: the public reserve Overview after staging (R$44,000 held, R$36,000 required, 8 leases). No wallet. The #59 banner is visible.
+- **VO:** "Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and its reserve runs on Solana."
 - **Caption:** Built during the hackathon: Solana program + reserve app
 - **Honesty label:** Built during the hackathon: Solana program + reserve app
 - **Proof:** Live figures read from the devnet program accounts.
-- **Edit:** Product on screen from frame 1; the stakes are in the voice. Slow push-in ≤ 1.3× (motion).
+- **Edit:** Slow push-in ≤ 1.3× (motion). No title card before it.
 - **Retake:** Read-only: repeat freely.
 
-**F2 · 0:11 – 0:18 · app.mutav.finance (agency view)**: The agency side
-- **On screen:** The agency's view in MUTAV's platform (mutav-app) with Ana's fictional lease. Mini-map: "Agency platform" active.
+**F2 · FLASH · Open · 0:10 – 0:15 · app.mutav.finance (agency view)**: Agency
+- **On screen:** Ana's fictional lease in the agency platform (mutav-app). Hard cuts in and out.
 - **VO:** "Her agency works in MUTAV's platform. Every lease it signs becomes an account on Solana."
-- **Caption:** Agency platform · pre-hackathon · not yet on-chain
-- **Honesty label:** Agency platform · pre-hackathon · not yet on-chain
+- **Caption:** Agency platform · pre-hackathon · not on-chain yet
+- **Honesty label:** Agency platform · pre-hackathon · not on-chain yet
 - **Proof:** None: off-chain, labelled as such.
-- **Edit:** Hard cut in and out. This label is the shot's one honesty label.
+- **Edit:** Flash: hard cuts, no zoom.
 - **Retake:** Read-only: repeat freely.
 
-**F3 · 0:18 – 0:28 · /operator · register_guarantee**: Ana's lease: register
-- **On screen:** Register tab. Opaque reference MTV-PF-0009, a fictional agency, rent 1500, default 6×, exit 6×. The preview is green: R$18,000 cover, R$3,500 headroom left. The mini-map shows its legend here, once.
-- **VO:** "Our operator puts the lease on-chain: eighteen thousand reais of cover,"
+**F3 · MAIN · 1 · Programmable, transparent reserve · 0:15 – 0:25 · /operator · register_guarantee**: Ana's lease goes on-chain
+- **On screen:** Chapter title (lower third, 2 s). Register tab: opaque reference MTV-PF-0009, rent 1500, 6× + 6×; green preview; click register_guarantee; "Confirmed" chip with the short signature. Hold 1.5 s.
+- **VO:** "Our operator puts Ana's lease on-chain: eighteen thousand reais of cover, an opaque ID, no personal data."
 - **Caption:** Rent R$1,500 · cover 6× + 6× = R$18,000
-- **Honesty label:** Mini-map legend (first appearance)
-- **Proof:** The bound box reads free capital R$8,000 from VaultState.
-- **Edit:** Jump-cut the typing. The legend fades out after 3 s and never returns.
-- **Retake:** Read-only until you click: repeat freely.
+- **Honesty label:** none (banner only)
+- **Proof:** A confirmed devnet transaction.
+- **Edit:** Main action at real speed; typing jump-cut; one zoom on the chip; cut before the form resets.
+- **Retake:** Consumes R$4,500 of free capital and the reference. Reset: close_guarantee VOID, then register as MTV-PF-0009b (the VOID lease stays visible as "closed").
 
-**F4 · 0:28 – 0:37 · /operator → Solana Explorer**: Signed: the one Explorer shot
-- **On screen:** Click register_guarantee. The injected test wallet signs, with no pop-up: hold on the "Signed by operator" chip with the short signature. Then cut to Explorer on the new Guarantee PDA: owner, opaque id, the two cover legs.
-- **VO:** "one account per lease, with an opaque ID. No name, no CPF."
-- **Caption:** Signed by operator · 4kQm…x9Tz
-- **Honesty label:** none (devnet badge only)
-- **Proof:** The single Explorer shot: the Guarantee PDA on devnet. It must be checked on devnet (it can't be tested on localnet).
-- **Edit:** Cut on the confirmation before the form resets (known app behaviour: it pre-fills the next reference with a red preview). Optional: splice a hand-recorded real Phantom approval (≤ 1 s) before the chip, in this shot only.
-- **Retake:** Consumes R$4,500 of free capital and the reference. Reset: close_guarantee VOID (operator, instant), then register as MTV-PF-0009b. The VOID lease stays on /reserve/coverage as "closed".
-
-**F5 · 0:37 – 0:48 · /reserve/coverage**: The public reserve, and its rule
-- **On screen:** /reserve/coverage, no wallet. Coverage required rises to R$40,500; the new row sits at the bottom. BRS, Nora and the 25% rule are introduced here, not in the climax.
-- **VO:** "The public reserve updates at once. It holds BRS, Nora's Brazilian real stablecoin, and must keep a quarter of everything it guarantees."
-- **Caption:** Keep 25% of all cover · R$40,500 required of R$44,000
-- **Honesty label:** none (devnet badge only)
-- **Proof:** The same numbers, read independently by a public page.
-- **Edit:** Highlight the new row, then the meter (40,500 / 44,000).
+**F4 · FLASH · 1 · Programmable, transparent reserve · 0:25 – 0:27 · Solana Explorer (devnet)**: Explorer: one account per lease
+- **On screen:** The new Guarantee PDA on Explorer: owner, opaque id, cover legs. Captured as an end state; check it on devnet.
+- **VO:** (the F3 line continues)
+- **Caption:** Guarantee PDA · owner: MUTAV program
+- **Honesty label:** none (banner only)
+- **Proof:** The one Explorer shot.
+- **Edit:** Flash ≤ 2 s, hard cuts.
 - **Retake:** Read-only: repeat freely.
 
-**F6 · 0:48 – 0:58 · /operator · register_guarantee**: The question
-- **On screen:** The next reference, MTV-PF-0010, with the same amounts. The preview is red: R$45,000 required against R$44,000 held.
-- **VO:** "So what if we try to sign one more lease? It needs forty-five thousand. The reserve holds forty-four."
-- **Caption:** Next lease needs R$45,000 · reserve holds R$44,000
-- **Honesty label:** none (devnet badge only)
-- **Proof:** VaultConfig (c = 0.25) and VaultState, through the client's mirror of the program rule.
-- **Edit:** Zoom onto the red box on a hold (up to 2× from the hold still).
-- **Retake:** Read-only preview: repeat freely.
-
-**F7 · 0:58 – 1:12 · /operator · register_guarantee**: Refused. Nothing moves.
-- **On screen:** Click. The status turns red with the program's error name (on screen only), the "Coverage gate · refused" chip appears, and the meter does not move. Hold 3 s in silence.
-- **VO:** "The program refuses. Nothing moves. MUTAV can't promise what its reserve can't back."
-- **Caption:** Coverage gate · refused · InsufficientFreeCapital
-- **Honesty label:** none (devnet badge only)
-- **Proof:** The program's own error from its simulation logs. No Explorer link: a refused transaction never lands.
-- **Edit:** Crop to the first line of the error (known app behaviour: ~8 lines of encoded detail follow it). Freeze 3 s on the error and the unchanged meter; no music.
-- **Retake:** Repeatable without limit: nothing lands, nothing changes.
-
-**F8 · 1:12 – 1:22 · /operator · file_claim**: Later: Ana misses a month
-- **On screen:** One "later" wipe, then the file_claim tab: Ana's guarantee, default leg, R$1,500 (one month), notice NTC-PF-0001. Click; "Signed by operator".
-- **VO:** "Now say Ana misses a month. The claim is filed, the money is set aside,"
-- **Caption:** Claim filed · R$1,500 set aside
-- **Honesty label:** none (devnet badge only)
-- **Proof:** A confirmed tx and a new ClaimFiling PDA.
-- **Edit:** The video's only time-jump wipe (0.5 s) opens this shot.
-- **Retake:** Consumes the notice and R$1,500 of Ana's default leg (R$7,500 left). If only the capture was bad, continue on the same claim. A full redo files NTC-PF-0002, uses R$1,500 more of the R$20,000 per-31-day cap and adds a timeline row.
-
-**F9 · 1:22 – 1:32 · /operator · pay_claim**: Paid, within the cap
-- **On screen:** pay_claim tab: the bound box shows the R$15,000 per-call cap. Click pay_claim R$1,500; "Signed by operator". The meter moves to 40,125 / 42,500: still covered.
-- **VO:** "and the reserve pays MUTAV's payments account, within a cap set by the admin multisig."
-- **Caption:** Paid R$1,500 · cap R$15,000/call · still covered
-- **Honesty label:** none (devnet badge only)
-- **Proof:** A confirmed tx; BRS from the reserve PDA to the whitelisted payments account.
-- **Edit:** Grab the confirmation immediately (known app behaviour: the paid row, its status and its before/after vanish once sent). The meter carries the "after".
-- **Retake:** One payment per filing; a redo needs a fresh claim (see F8).
-
-**F10 · 1:32 – 1:50 · /operator · settle_payout → /reserve/claims**: The landlord's moment
-- **On screen:** settle_payout with the prefilled PIX end-to-end id (only its hash goes on-chain); "Signed by operator". Cut to /reserve/claims: filed → paid → settled with timestamps.
-- **VO:** "The PIX to the agency is recorded on-chain: filed to settled in [N] minutes. Seguro-fiança allows up to thirty days."
-- **Caption:** PIX simulated on devnet · settlement recorded on-chain
-- **Honesty label:** PIX simulated on devnet · settlement recorded on-chain
-- **Proof:** Three on-chain timestamps on one ClaimFiling PDA. [N] = settled_at − filed_at from the real capture, in whole minutes; fill in the VO and caption after capture.
-- **Edit:** Hold the row on a still; zoom on the duration. Cite SUSEP Circ. 621/2021 art. 43 in the video description, not on screen.
-- **Retake:** settle_payout runs once per paid claim; /reserve/claims is read-only.
-
-**F11 · 1:50 – 1:58 · /operator · contribute_fees**: Guarantee fees flow in
-- **On screen:** contribute_fees R$3,060: two months of 12% fees on the book's R$1,500 rents (17 lease-months; Ana's missed month excluded). Split: R$612 to MUTAV's treasury, R$2,448 to the reserve.
-- **VO:** "Meanwhile, guarantee fees from every lease flow into the reserve."
-- **Caption:** Two months of fees in one step for the demo: R$3,060
-- **Honesty label:** Two months of fees in one step for the demo
-- **Proof:** A confirmed tx and a FeeReceipt PDA.
-- **Edit:** The caption carries the time compression; no second wipe.
-- **Retake:** Each invoice reference is recorded once; a redo adds the fees again. Prefer re-capturing the screen only.
-
-**F12 · 1:58 – 2:07 · /reserve (Overview)**: Each share is worth more
-- **On screen:** /reserve Overview after a refresh: stable assets R$44,948; value per share 1.021545 (1.000000 at deposit, 0.965909 after the claim).
-- **VO:** "Even after paying Ana's claim, each share is worth more than before."
-- **Caption:** Value per share 1.000000 → 1.021545
-- **Honesty label:** none (devnet badge only)
-- **Proof:** Read from VaultState (send refresh first so the published NAV is current).
-- **Edit:** Zoom on the value per share from a hold still (up to 2×).
+**F5 · END STATE · 1 · Programmable, transparent reserve · 0:27 – 0:37 · /reserve/coverage**: Anyone can watch the reserve
+- **On screen:** /reserve/coverage with no wallet: held vs required, R$36,000 → R$40,500 (zoom). Ana's row at the bottom.
+- **VO:** "Anyone can watch the reserve: what it holds in BRS, Nora's Brazilian real stablecoin, and what it must hold. The rule is code."
+- **Caption:** Held R$44,000 · required R$36,000 → R$40,500
+- **Honesty label:** none (banner only)
+- **Proof:** The same state read independently by a public page.
+- **Edit:** One zoom on held vs required.
 - **Retake:** Read-only: repeat freely.
 
-**F13 · 2:07 – 2:30 · /investment**: Capital out, above what went in
-- **On screen:** /investment as capital wallet B: redeem 4,000 shares ("You receive R$4,086.18") → Request redemption ("Signed by capital wallet") → [cut: admin multisig fills the queue, 5-min lock] → claim_assets → deposited R$4,000.00, claimed R$4,086.18. The amounts appear on screen only.
-- **VO:** "A capital provider takes out more than they put in, only from capital above what the guarantees require, and only after claims. The same reserve that protects the landlord pays the people who fund it."
-- **Caption:** R$4,000 in → R$4,086.18 out
-- **Honesty label:** Pilot capital is MUTAV's own; not open to outside investors
-- **Proof:** The claim_assets tx and the wallet's BRS balance change.
-- **Edit:** Reais only; no rate, no APY. The fill wait is a hard cut. The disclaimer is this shot's one honesty label.
-- **Retake:** One redemption; if the capture is bad, re-capture the screen. A redo needs another deposit (another Squads round).
+**F6 · MAIN · 1 · Programmable, transparent reserve · 0:37 – 0:58 · /operator · register_guarantee**: The refusal
+- **On screen:** Next reference MTV-PF-0010, same amounts: red preview (R$45,000 needed, R$44,000 held). Click send: the clean refusal message, the "Coverage gate · refused" overlay; the meter does not move. 3 s of silence.
+- **VO:** "One more lease would need forty-five thousand; the reserve holds forty-four. (click) Refused. MUTAV can't promise what its reserve can't back."
+- **Caption:** Needs R$45,000 · holds R$44,000 · refused
+- **Honesty label:** none (banner only)
+- **Proof:** The program's own error (InsufficientFreeCapital, raw details collapsed). No Explorer link: a refused transaction never lands.
+- **Edit:** Main action. Zoom on the preview, then the refusal; music out; 3 s silence on the unchanged meter.
+- **Retake:** Repeatable without limit: nothing lands.
 
-**F14 · 2:30 – 2:45 · card (made in the editor)**: Close
-- **On screen:** The tagline, the repo and the live app URL on the brand grid. The mini-map is hidden. Hold to the end.
-- **VO:** "MUTAV. Brazil's onchain rent guarantee. Open source, live on devnet."
-- **Caption:** Open source (MIT) · live on Solana devnet
-- **Honesty label:** none (devnet badge only)
-- **Proof:** Program id in small mono (optional).
-- **Edit:** The VO ends about 2:36; hold the card in silence to 2:45.
+**F7 · MAIN · 2 · Settled in minutes · 0:58 – 1:20 · /operator · file_claim → pay_claim → settle_payout**: The claim, live
+- **On screen:** "Later" wipe and chapter title. Live: file_claim (R$1,500, NTC-PF-0001) → pay_claim (zoom on the R$15,000 cap) → settle_payout; each click 2–3 s, the elapsed timer running from "filed".
+- **VO:** "Now say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the agency is recorded on-chain."
+- **Caption:** Claim R$1,500 · cap R$15,000 per call
+- **Honesty label:** PIX transfer simulated on devnet · settlement recorded on-chain
+- **Proof:** Three confirmed transactions on one ClaimFiling PDA.
+- **Edit:** Timer overlay driven by the logged on-chain timestamps (it jumps honestly across cuts). Cut confirmation waits.
+- **Retake:** Consumes the notice and R$1,500 of the leg and the R$20,000 period cap; a redo files NTC-PF-0002 and adds a timeline row.
+
+**F8 · END STATE · 2 · Settled in minutes · 1:20 – 1:36 · /reserve/claims**: Filed → paid → settled
+- **On screen:** /reserve/claims: filed → paid → settled with on-chain timestamps; the timer stops at settled. Hold 3 s. Still covered: R$42,500 held, R$40,125 required.
+- **VO:** "Filed to settled in [N] minutes. Seguro-fiança allows up to thirty days."
+- **Caption:** Filed → settled: [N] · seguro-fiança: up to 30 days
+- **Honesty label:** PIX transfer simulated on devnet · settlement recorded on-chain
+- **Proof:** Timestamps from the ClaimFiling PDA. [N] = settled_at − filed_at; if under two minutes, say "under [N] minutes" or the seconds.
+- **Edit:** SUSEP Circ. 621/2021 art. 43 goes in the video description.
+- **Retake:** Read-only: repeat freely.
+
+**F9 · END STATE · 3 · Capital efficiency · 1:36 – 1:41 · /reserve (plate) + card overlay**: Capacity: every real backs up to four
+- **On screen:** Card overlay "R$44k held · R$162k of cover" (2 s) over a /reserve plate captured right after the refusal (before the claim), so the figures under it match.
+- **VO:** "Because the reserve keeps a quarter of what it guarantees, every real of capital can back up to four in cover"
+- **Caption:** R$44k held · R$162k of cover (≈ 3.7×; max 4× at 25%)
+- **Honesty label:** none (banner only)
+- **Proof:** The plate is read from devnet at the post-refusal state.
+- **Edit:** End state; capture the plate in chapter 1.
+- **Retake:** Read-only plate.
+
+**F10 · FLASH · 3 · Capital efficiency · 1:41 – 1:44 · /reserve/capital (fee receipt)**: Guarantee fees land
+- **On screen:** The fee receipt row: R$3,060 gross, R$2,448 to the reserve, R$612 to MUTAV.
+- **VO:** "and earn its fees."
+- **Caption:** Two months of fees, one step for the demo
+- **Honesty label:** Two months of fees, one step for the demo
+- **Proof:** A FeeReceipt PDA (staged off camera).
+- **Edit:** Flash, hard cuts.
+- **Retake:** Read-only.
+
+**F11 · END STATE · 3 · Capital efficiency · 1:44 – 1:51 · /reserve (Overview)**: Each share is worth more
+- **On screen:** /reserve after the off-camera fees, redemption and refresh: value per share 1.021545; overlay "1.000 → 1.022". Hold 2 s.
+- **VO:** "Even after Ana's claim, each share is worth more."
+- **Caption:** Share value 1.000 → 1.022, after the claim
+- **Honesty label:** none (banner only)
+- **Proof:** VaultState after refresh.
+- **Edit:** End state; zoom from the hold still.
+- **Retake:** Read-only.
+
+**F12 · END STATE · 3 · Capital efficiency · 1:51 – 1:58 · /investment**: Capital out, above what went in
+- **On screen:** /investment as capital wallet B after the off-camera redemption: deposited R$4,000.00, claimed R$4,086.18. Hold 3 s. The banner carries the disclaimer.
+- **VO:** "The same reserve that protects the landlord pays the people who fund it."
+- **Caption:** R$4,000 in → R$4,086 out
+- **Honesty label:** none (banner only)
+- **Proof:** The claim_assets transaction (staged off camera).
+- **Edit:** Reais only; no rate. If the page cannot show in → out yet, overlay it from the two transaction amounts.
+- **Retake:** Read-only end state.
+
+**F13 · END STATE · Close · 1:58 – 2:08 · card (made in the editor)**: Close
+- **On screen:** The three pillars, one line each, then the tagline, the repo and the live app.
+- **VO:** "MUTAV: a transparent, programmable reserve, claims settled in minutes, capital that works. Brazil's onchain rent guarantee."
+- **Caption:** reserve.mutav.finance · open source (MIT)
+- **Honesty label:** none (banner only)
+- **Proof:** —
+- **Edit:** Hold to 2:08.
 - **Retake:** Made in the editor.
 
 ## 4. Numbers (Plan B, chosen)
@@ -175,6 +161,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 | 0 | Deposits filled at 1.000000: wallet A R$40,000, wallet B R$4,000 (capital wallets; Squads fill) | R$44,000 | — | — | 1.000000 | requests within R$1k–R$100k; TVL ≪ R$1M |
 | 1 | Book: 8 leases × rent R$1,500 × (6 + 6) = R$18,000 cover each = R$144,000 (operator) | R$44,000 | R$36,000 | R$8,000 | 1.000000 | R$18k ≤ R$120k per guarantee |
 | 2 | Ana: + R$18,000 cover (operator) | R$44,000 | R$40,500 | R$3,500 | 1.000000 | (a) fits: needs R$4,500 of R$8,000 |
+| 2a | Capacity at this point: R$162,000 of cover on R$44,000 held (≈ 3.7×; at most 1/c = 4× at c = 0.25) | R$44,000 | R$40,500 | R$3,500 | 1.000000 | F9 card "R$44k held · R$162k of cover"; "up to four" = 1/c |
 | 3 | Next equal lease: would need R$45,000 (operator) | R$44,000 | R$40,500 | R$3,500 | 1.000000 | (a) refused: R$1,000 short; nothing changes |
 | 4 | file_claim R$1,500 on Ana, default leg (operator) | R$44,000 | R$40,500 | R$3,500 | 0.965909 | set aside; required = max(25% × cover, provisions) |
 | 5 | pay_claim R$1,500 (operator) | R$42,500 | R$40,125 | R$2,375 | 0.965909 | (b) still covered; (e) ≤ R$15k/call, ≤ R$20k/31 days |
@@ -200,17 +187,16 @@ Two months of fees: one month beats a one-month-rent claim only with more than 1
 | Route | Today (main) | After PR #45 | Used in |
 |---|---|---|---|
 | / | Landing | Landing (restyled) | — |
-| /reserve | Transparency, one long page | Overview + sub-routes | F1, F12 |
+| /reserve | Transparency, one long page | Overview + sub-routes | F1, F9 plate, F11 |
 | /reserve/coverage | — (section) | Coverage tab | F5 |
-| /reserve/claims | — (section #claims) | Claims tab | F10 |
-| /reserve/capital | — (#flows, #queue) | Capital tab; /reserve/flows and /reserve/queue redirect here | optional |
-| /reserve/risks | — (#disclosures) | Risks tab; /reserve/disclosures redirects here | — |
-| /reserve/verify | — (#accounts) | Verify tab; /reserve/accounts redirects here | — |
-| /investment | — (/investor) | Swap-style card + queue entries; /investor, /dashboard redirect here | F13 |
-| /operator | Operator console | Same, restyled | F3–F4, F6–F11 |
-| /admin | Squads proposals | Same, restyled | off-camera (fills) |
+| /reserve/claims | — (section #claims) | Claims tab | F8 |
+| /reserve/capital | — (#flows, #queue) | Capital tab (flows + queue) | F10 |
+| /reserve/risks | — (#disclosures) | Risks tab | — |
+| /reserve/verify | — (#accounts) | Verify tab | — |
+| /investment | — (/investor) | Swap-style card + queue entries | F12 |
+| /operator | Operator console | Same, restyled | F3, F6, F7 |
+| /admin | Squads proposals | Same, restyled | off camera (fills) |
 | /demo | Guided six steps | Same; a cleaned version is the optional alternative surface | alternative |
-| /simulator | Reserve simulator | Same | not used |
 | app.mutav.finance | Agency platform (mutav-app, pre-existing) | — | F2 |
 
 ## 6. Devnet staging
@@ -218,39 +204,37 @@ Two months of fees: one month beats a one-month-rent claim only with more than 1
 | # | Step | Who signs | Wait |
 |---|---|---|---|
 | 1 | Deploy, initialize, verify.ts green (ADR 0028: c = 0.25, R$1M TVL, R$120k per guarantee, R$15k / R$20k claim caps) | Upgrade Squads 2-of-2 | 1 h lock |
-| 2 | App deployed for devnet with reais on /reserve and /investment and the disclaimer line | App owner | — |
+| 2 | App deployed for devnet with the must-haves (app-requirements) and the #59 banner | App owner | — |
 | 3 | Fund: capital wallet A R$40,000 BRS, capital wallet B R$4,000, operator R$3,060 (+R$358 for the optional sweep); SOL for each | BRS holder | — |
-| 4 | set_allowlist_root with A and B (skip if set at initialize) | Admin Squads 2-of-2 | 5 min lock |
-| 5 | request_deposit: A 40,000; B 4,000 | Capital wallets A, B | — |
-| 6 | fulfil_deposits (count 2), then claim_shares from A and B | Admin Squads 2-of-2; A, B | 5 min lock |
-| 7 | Register 8 leases: rent 1500, default 6×, exit 6×, refs MTV-PF-0001…0008, 2–3 fictional agency names | Operator | — |
-| 8 | Check: stable R$44,000 · required R$36,000 · free R$8,000 · 8 active · value per share 1.000000 | Anyone | — |
-| 9 | Capture F1–F12 (Ana MTV-PF-0009, refused MTV-PF-0010, claim NTC-PF-0001, pay, settle, fees R$3,060, refresh before F12) | Operator; anyone for refresh | — |
-| 10 | F13: B request_redeem 4,000 shares → fulfil_redeems (count 1) → B claim_assets (R$4,086.18) | B; Admin Squads 2-of-2 | 5 min lock |
-| 11 | Judge-ready check: mode Normal, covered (free R$736.82), timeline reads correctly. No restore needed | Anyone | — |
+| 4 | 00-setup: set_allowlist_root with A and B (if not set at initialize); request_deposit A 40,000, B 4,000; fulfil_deposits (count 2); claim_shares | Admin Squads 2-of-2; A, B | 5 min lock per round |
+| 5 | 00-setup: register 8 leases (rent 1500, 6× + 6×, refs MTV-PF-0001…0008, fictional agencies). Check: R$44,000 held, R$36,000 required, R$8,000 free, 8 active, 1.000000 | Operator | — |
+| 6 | Capture the cold open → chapter 2 live: F1, F2, register Ana (F3), Explorer end state (F4), F5, the refusal (F6), the F9 /reserve plate, then the claim live (F7) and /reserve/claims (F8). Log tx timestamps for the timer | Operator; anyone | — |
+| 7 | 05-offcamera: contribute_fees R$3,060; B request_redeem 4,000 shares → fulfil_redeems (count 1) → B claim_assets (R$4,086.18); refresh | Operator; B; Admin Squads 2-of-2; anyone | 5 min lock |
+| 8 | Capture the chapter 3 end states: fee receipt (F10), /reserve share value (F11), /investment in → out (F12) | — | — |
+| 9 | Edit: chapter titles, the timer, the cards. Judge-ready check: mode Normal, covered (free R$736.82) | — | — |
 
 No restore is needed: the reserve stays covered (free capital R$736.82 at the end, mode Normal).
 
 ## 7. Capture, voice, captions
 
+- Five live clicks (register, refused send, file, pay, settle); log on-chain times for the timer. End states after off-camera staging; the F9 plate right after the refusal.
 - Harness screencast: 1080p at 30 fps; 2× stills on holds only. Zooms over motion ≤ 1.3×, on holds up to 2×.
-- Injected disposable test wallet: no pop-ups; signatures shown as "Signed by …" chips. Optional real-wallet approval clip in F4 only.
 - English VO, English burned-in captions + SRT; optional PT-BR SRT for the Superteam Brazil jury. SUSEP Circ. 621/2021 art. 43 in the description.
 
 ## 8. Run sheet (BRT)
 
 | When | What |
 |---|---|
-| Before Oct 12 | Deploy and verify. App must-haves deployed (reais, disclaimer). Harness updated to v4 (see app-requirements). Staging steps 3–8. Time a VO read-through. |
-| Oct 12 · by 10:00 | Staging complete and checked. If devnet or the app is not ready by 12:00, record on a seeded localnet with the same numbers. |
-| 10:00–12:00 | Capture F1–F12 as silent clips, one per beat (F2 from app.mutav.finance). Note [N] from the claim timestamps. |
-| 12:00–12:30 | F13: B requests the redemption; Squads fill (5-min lock); capture claim_assets. |
-| 12:30–14:30 | Rough cut with the overlays (badge, meter, mini-map, chips, labels); record the VO to the cut with [N] filled in. |
-| 14:30–17:30 | Fine-tune; English burned-in captions + SRT; optional PT-BR SRT; close card. |
-| 17:30 | Review muted and with sound: ≤ 2:45, one honesty label per shot, terminology. |
-| 18:30 | Export, upload unlisted, test the link in a private window. |
-| 19:30 | Judge-ready check of reserve.mutav.finance/reserve and /investment in a private window. |
-| 20:00 | Submit (Colosseum + Superteam BR track). |
+| Before Oct 12 | Deploy and verify; app must-haves deployed; harness updated to v5; staging 00-setup. Time a VO read-through. |
+| Oct 12 · by 10:00 | Staging checked. If devnet or the app is not ready by 12:00, record on a seeded localnet with the same numbers. |
+| 10:00–11:30 | Capture F1–F8 and the F9 plate (5 live clicks). Read [N] from the claim timestamps. |
+| 11:30–12:00 | 05-offcamera (one Squads round), then capture F10–F12. |
+| 12:00–14:00 | Rough cut with titles, timer and cards; record the VO to the cut with [N] filled in. |
+| 14:00–17:00 | Fine-tune; English burned-in captions + SRT; optional PT-BR SRT. |
+| 17:00 | Review muted and with sound: ≤ 2:10, one honesty label per shot. |
+| 18:00 | Export, upload unlisted, test in a private window. |
+| 19:00 | Judge-ready check of reserve.mutav.finance in a private window. |
+| 19:30 | Submit (Colosseum + Superteam BR track). |
 | 23:00 | Hard stop; the rest is buffer. |
 
 ## 9. Risks
@@ -259,11 +243,12 @@ No restore is needed: the reserve stays covered (free capital R$736.82 at the en
 |---|---|---|
 | Not enough devnet BRS | staging | These numbers need ≈ R$47,060. With more sandbox BRS, Plan A (pilot product) is better. |
 | State drifted (stray lease or fee) | F6 | Free capital before Ana must be in [R$4,500, R$9,000) so Ana fits and the next equal lease does not. Close strays with close_guarantee VOID. |
-| Known app behaviours (harness, localnet) | F4, F7, F9, F10 | Register resets to a red preview; the refusal error carries ~8 lines of encoded text; paid and settled rows vanish with their confirmation. Workarounds per shot; fixes listed in app-requirements. |
+| Known app behaviours (harness, localnet) | F3, F6, F7 | Register resets to a red preview; the refusal error carries ~8 lines of encoded text; paid and settled rows vanish with their confirmation. Workarounds per shot; fixes listed in app-requirements. |
 | Explorer shot untested | F4 | It can only be checked on devnet: open the Guarantee PDA right after deploy staging. |
-| NAV not published | F12 | Send refresh (permissionless) before capturing. |
-| Withdrawal not filled | F13 | Check mode Normal, not paused, no fulfil halt, free ≥ R$4,086.18 before the fill. A frozen redemption shows "pending" with an amber note. |
-| Over 2:45 | edit | Trim the F14 hold and F13 (−3 s each); never trim the F7 silence. |
+| NAV not published | F11 | Send refresh (permissionless) before capturing. |
+| Withdrawal not filled | off camera | Check mode Normal, not paused, no fulfil halt, free ≥ R$4,086.18 before the fill. A frozen redemption shows "pending" with an amber note. |
+| Over 2:10 | edit | Trim F5 and F8 (−2 s each); never trim the F6 silence. |
+| Claim under two minutes | F8 | If settled_at − filed_at < 2 min, say "in under [N] minutes" or the seconds; never round up a promise. |
 
 ## 10. What judges will see afterwards
 
@@ -280,5 +265,4 @@ No restore is needed: the reserve stays covered (free capital R$736.82 at the en
 1. Plan B (fits the devnet BRS in hand) or Plan A (pilot product; needs more sandbox BRS and a 12× form).
 2. Recording surface: the real pages (default) or a cleaned /demo.
 3. Whether to include the optional simulated issuer-revenue sweep.
-4. Whether to splice the optional real-wallet approval clip into F4.
-5. Narrator, pronunciation of "MUTAV", face cam or not.
+4. Narrator, pronunciation of "MUTAV", face cam or not.
