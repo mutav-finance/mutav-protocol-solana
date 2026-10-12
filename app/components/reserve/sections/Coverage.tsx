@@ -305,7 +305,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
           <span className="font-body text-(--color-text-2) flex flex-col gap-1 leading-relaxed">
             <span>
               {`Held to back the guarantees: ${(frac(s.coverageRequired, s.stableAssets) * 100).toFixed(1)}% of the `}
-              <span className="whitespace-nowrap"><Money brs={s.stableAssets} places={0} /></span> reserve.
+              <span className="whitespace-nowrap">{fmtBrs(s.stableAssets, 0)}</span> reserve.
             </span>
             <span>
               {s.coverageRequired > coverageRequired(r.state.remainingCoverTotal, r.config.coverageRatioBps, 0n, 0n)
@@ -318,10 +318,10 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
             <span className="font-body text-(--color-text-2) flex flex-col gap-1 leading-relaxed">
               {k.blockedBy && <span style={{ color: "var(--color-error)" }}>{`No new lease fits while ${CEILING_BLOCK[k.blockedBy]}.`}</span>}
               <span>
-                <span className="whitespace-nowrap"><Money brs={k.headroom} places={0} /></span> of the <span className="whitespace-nowrap"><Money brs={k.ceiling} places={0} /></span> ceiling free for new leases.
+                <span className="whitespace-nowrap">{fmtBrs(k.headroom, 0)}</span> of the <span className="whitespace-nowrap">{fmtBrs(k.ceiling, 0)}</span> ceiling free for new leases.
               </span>
               <span>
-                <span className="whitespace-nowrap"><Money brs={k.inUse} places={0} /></span>
+                <span className="whitespace-nowrap">{fmtBrs(k.inUse, 0)}</span>
                 {` in use on ${plural(active.length, "active guarantee", "active guarantees")} at ${plural(agenciesActive, "agency", "agencies")}, after claims paid.`}
               </span>
             </span>
