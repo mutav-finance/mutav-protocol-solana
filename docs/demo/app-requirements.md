@@ -10,7 +10,7 @@ The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with 
 
 | # | Requirement | Why |
 |---|---|---|
-| M1 | **Reais on `/reserve` (all tabs) and `/capital`**: amounts shown as `R$` (e.g. `R$44,948.00`), not USD at a display rate. A config switch or env flag is enough; the chain amount is BRS 1:1 BRL. | The story is in reais. |
+| M1 | **Reais on `/reserve` (all tabs) and `/capital`**: amounts shown as `R$` (e.g. `R$44,948.00`), not USD at a display rate. A config switch or env flag is enough; the chain amount is BRS 1:1 BRL. **Status (#45):** met by leaving the FX rate unconfigured on the recording deployment; `useMoney` then falls back to reais. Check that `/api/fx` returns no rate before capture. | The story is in reais. |
 | M2 | **A clean refusal message** with the raw error collapsed: a human line (e.g. "Refused by the program: not enough free capital for this cover") with the program error name and the encoded Solana detail behind a disclosure. Today it is "InsufficientFreeCapital —" followed by about 8 lines of encoded text. | Pillar 1's climax (F6). |
 | M3 | **The register form holds its "Confirmed" result**, with no red preview after it. Today it resets to the next reference at once and shows a red "Send anyway" preview under the result. | F3 holds on the confirmation. |
 | M4 | **`pay_claim` and `settle_payout` keep a visible confirmation after sending**: the status, the signature and the before/after. Today the row disappears once sent and takes all three with it. | The claim runs live in pillar 2 (F7). |
