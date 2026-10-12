@@ -3,8 +3,9 @@
  * Renders the production kit's HTML cards and overlays to PNG with headless Chromium (Playwright).
  * One browser, one page, no server: files are opened with file:// URLs. Run from anywhere:
  *
- *   node docs/demo/production/tools/render.cjs stills
- *       All the committed PNGs (cards/*.png, overlays/*.png). Transparent where the HTML is.
+ *   node docs/demo/production/tools/render.cjs stills [filter ...]
+ *       All the committed PNGs (cards/*.png, overlays/*.png), or only those whose path contains a filter.
+ *       Transparent where the HTML is.
  *   node docs/demo/production/tools/render.cjs timer --start <ms> --end <ms> [--fps 30] [--tail 4] [--every-frame] --out <dir>
  *       The elapsed timer as a PNG sequence plus an ffmpeg concat list; prints the encode command.
  *   node docs/demo/production/tools/render.cjs captions <file.srt> --out <dir>
@@ -49,6 +50,8 @@ const STILLS = [
   ["overlays/minimap.html", "static&active=4", "overlays/minimap-4-reserve.png"],
   ["overlays/minimap.html", "static&active=5", "overlays/minimap-5-pix.png"],
   ["overlays/minimap.html", "static&legend", "overlays/minimap-legend.png"],
+  ["overlays/minimap.html", "static&roadmap", "overlays/minimap-roadmap.png"],
+  ["overlays/safeguards-card.html", "static", "overlays/safeguards-card.png"],
   ["overlays/honesty-label.html", "static&id=built", "overlays/honesty-built.png"],
   ["overlays/honesty-label.html", "static&id=agency", "overlays/honesty-agency.png"],
   ["overlays/honesty-label.html", "static&id=pix", "overlays/honesty-pix.png"],
@@ -80,7 +83,9 @@ function parseSrt(text) {
   const shot = async (file) => { fs.mkdirSync(path.dirname(file), { recursive: true }); await page.screenshot({ path: file, omitBackground: true }); };
   try {
     if (cmd === "stills") {
+      const filters = args.slice(1).filter((a) => !a.startsWith("--"));
       for (const [html, q, png] of STILLS) {
+        if (filters.length && !filters.some((f) => png.includes(f))) continue;
         await page.goto(url(html, q));
         await page.evaluate(() => document.fonts.ready);
         await shot(path.join(KIT, png));

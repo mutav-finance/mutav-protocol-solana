@@ -13,115 +13,135 @@ A MUTAV é esse fiador,
 e a reserva dela roda na Solana.
 
 4
-00:00:10,100 --> 00:00:14,900
-A imobiliária usa a plataforma da MUTAV;
-cada contrato vira uma conta on-chain.
+00:00:10,100 --> 00:00:13,300
+19 imobiliárias assinaram cartas
+de intenção com a MUTAV.
 
 5
-00:00:17,000 --> 00:00:20,600
+00:00:13,500 --> 00:00:16,900
+A Solana traz uma reserva transparente
+e pagamentos programáveis.
+
+6
+00:00:19,000 --> 00:00:22,600
 Nosso operador leva o contrato da Ana
 on-chain: R$ 18 mil de cobertura,
 
-6
-00:00:20,600 --> 00:00:24,500
+7
+00:00:22,600 --> 00:00:26,500
 um ID opaco, nenhum dado pessoal.
 
-7
-00:00:27,300 --> 00:00:31,200
+8
+00:00:29,300 --> 00:00:33,200
 Qualquer pessoa acompanha a reserva:
 quanto ela tem em BRS,
 
-8
-00:00:31,200 --> 00:00:35,000
+9
+00:00:33,200 --> 00:00:37,000
 a stablecoin de real da Nora,
 e quanto ela precisa ter.
 
-9
-00:00:35,400 --> 00:00:36,900
+10
+00:00:37,400 --> 00:00:38,900
 A regra é código.
 
-10
-00:00:38,000 --> 00:00:43,000
+11
+00:00:40,000 --> 00:00:45,000
 Mais um contrato exigiria R$ 45 mil;
 a reserva tem R$ 44 mil.
 
-11
-00:00:45,600 --> 00:00:46,400
+12
+00:00:47,600 --> 00:00:48,400
 Recusado.
 
-12
-00:00:46,800 --> 00:00:50,000
+13
+00:00:48,800 --> 00:00:52,000
 A MUTAV não promete o que
 a reserva não consegue lastrear.
 
-13
-00:00:59,400 --> 00:01:01,800
-Agora, digamos que a Ana atrase um mês.
-
 14
+00:00:59,400 --> 00:01:01,200
+Digamos que a Ana atrase um mês.
+
+15
 00:01:02,400 --> 00:01:04,600
 O operador registra o pedido,
 
-15
+16
 00:01:06,400 --> 00:01:09,600
 a reserva paga dentro
 do limite definido pelo admin,
 
-16
+17
 00:01:11,400 --> 00:01:15,600
 e o PIX para a imobiliária
 fica registrado on-chain.
 
-17
+18
 00:01:21,000 --> 00:01:24,400
 On-chain, do pedido à liquidação
 em [N] segundos.
 
-18
+19
 00:01:24,800 --> 00:01:28,200
 O seguro-fiança permite
 até trinta dias.
 
-19
+20
+00:01:31,300 --> 00:01:34,300
+Hoje, o console do operador
+assina essas etapas.
+
+21
+00:01:34,700 --> 00:01:37,600
+Depois, a plataforma da imobiliária
+as executa automaticamente:
+
+22
 00:01:37,600 --> 00:01:41,600
+cadastro, pedidos e pagamentos, dentro
+das salvaguardas que o programa já aplica.
+
+23
+00:01:43,600 --> 00:01:47,600
 Aqui estão seis meses disso,
 simulados localmente em relógio acelerado.
 
-20
-00:01:41,800 --> 00:01:46,200
+24
+00:01:47,800 --> 00:01:52,200
 Taxas de garantia e receita do emissor
 entram na reserva.
 
-21
-00:01:46,600 --> 00:01:50,200
+25
+00:01:52,600 --> 00:01:56,200
 Os pedidos são pagos,
 os grandes aprovados pelo admin.
 
-22
-00:01:50,600 --> 00:01:55,000
+26
+00:01:56,500 --> 00:02:00,800
 A reserva sustenta mais contratos,
 cada cota vale mais,
 
-23
-00:01:55,400 --> 00:01:59,800
+27
+00:02:01,000 --> 00:02:05,400
 e quem aporta capital
 retira mais do que colocou.
 
-24
-00:02:00,200 --> 00:02:05,400
+28
+00:02:05,600 --> 00:02:10,800
 A mesma reserva que protege o proprietário
 remunera quem a financia.
 
-25
-00:02:06,000 --> 00:02:08,600
+29
+00:02:11,300 --> 00:02:13,900
 MUTAV: uma reserva transparente
 e programável,
 
-26
-00:02:08,600 --> 00:02:11,600
+30
+00:02:13,900 --> 00:02:16,900
 pedidos liquidados em minutos,
 capital que trabalha.
 
-27
-00:02:12,200 --> 00:02:14,400
+31
+00:02:17,200 --> 00:02:19,200
 A garantia de aluguel onchain do Brasil.
