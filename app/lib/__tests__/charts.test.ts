@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { coverageRequired, stressTerm } from "@mutav-finance/mutav-protocol-solana";
-import { capitalSplit, claimSpeed, coverBars, coverageCeiling, flowBars, frac, navBasis, coverageMeter, type CoverageCeilingInput } from "../charts";
+import { capacityLeft, capitalSplit, claimSpeed, coverBars, coverageCeiling, flowBars, frac, navBasis, coverageMeter, type CoverageCeilingInput } from "../charts";
 import type { ClaimRow, CoverageRow } from "../view";
 import { BRL } from "./fixtures";
 
@@ -213,5 +213,30 @@ describe("coverage ceiling (inverse of the register_guarantee gate)", () => {
     const c = coverageCeiling({ ...base, stableAssets: 140_491_590_000n, remainingCoverTotal: 0n });
     expect(c.ceiling).toBe(561_966_360_000n);
     expect(c.binding).toBe("ratio");
+  });
+});
+
+describe("capacityLeft", () => {
+  const k = (ceiling: bigint, headroom: bigint, blockedBy: "paused" | "under-covered" | "frozen" | "provisions" | null = null) => ({ ceiling, headroom, blockedBy });
+
+  it("devnet today: R$32k of a R$176k ceiling is 18.2%", () => {
+    expect(capacityLeft(k(176_000n * BRL, 32_000n * BRL))).toBe("18.2%");
+  });
+
+  it("rounds half up to one decimal", () => {
+    expect(capacityLeft(k(1_000n, 1n))).toBe("0.1%"); // 0.10%
+    expect(capacityLeft(k(2_000n, 1n))).toBe("0.1%"); // 0.05% rounds up
+    expect(capacityLeft(k(10_000n, 4n))).toBe("0.0%"); // 0.04% rounds down
+    expect(capacityLeft(k(3n, 1n))).toBe("33.3%");
+    expect(capacityLeft(k(3n, 2n))).toBe("66.7%");
+    expect(capacityLeft(k(10_000n, 9_996n))).toBe("100.0%");
+    expect(capacityLeft(k(176_000n * BRL, 176_000n * BRL))).toBe("100.0%");
+  });
+
+  it("0.0% while blocked, at the ceiling, or with a zero ceiling", () => {
+    for (const why of ["paused", "under-covered", "frozen", "provisions"] as const) expect(capacityLeft(k(176_000n * BRL, 32_000n * BRL, why))).toBe("0.0%");
+    expect(capacityLeft(k(176_000n * BRL, 0n))).toBe("0.0%");
+    expect(capacityLeft(k(0n, 0n))).toBe("0.0%");
+    expect(capacityLeft(k(0n, 5n))).toBe("0.0%");
   });
 });

@@ -156,6 +156,16 @@ export const coverageCeilingOf = (r: Pick<ReserveView, "config" | "state" | "cov
     frozen: r.token.reserveFrozen,
   });
 
+/**
+ * Capacity left: headroom ÷ ceiling as a percentage with one decimal, rounded half up ("18.2%").
+ * Display only. "0.0%" while blocked (no new guarantee fits whatever its size) or when the ceiling is 0.
+ */
+export function capacityLeft(k: Pick<CoverageCeiling, "ceiling" | "headroom" | "blockedBy">): string {
+  if (k.blockedBy || k.ceiling <= 0n || k.headroom <= 0n) return "0.0%";
+  const tenths = (k.headroom * 2_000n + k.ceiling) / (2n * k.ceiling);
+  return `${tenths / 10n}.${tenths % 10n}%`;
+}
+
 /** What NAV is computed on: stable assets split into net assets and open claim provisions. */
 export type NavBasis = { stableAssets: bigint; netAssets: bigint; provisions: bigint };
 
