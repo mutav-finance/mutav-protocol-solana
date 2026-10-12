@@ -39,11 +39,11 @@ import {
   getRedeemsFulfilledEventDecoder,
 } from "@mutav-finance/mutav-protocol-solana";
 import { getAddressDecoder, type MaybeEncodedAccount } from "@solana/kit";
-import type { CapitalEvent, Ledger, PaymentsFacts, ReserveView, Row, TokenFacts } from "../view";
+import type { CapitalEvent, Ledger, LedgerAccounts, LedgerHistory, PaymentsFacts, ReserveView, Row, TokenFacts } from "../view";
 import { assertGenesis } from "../cluster";
 import { serverEnv, type ServerEnv } from "./env";
-import { cachedRead } from "./read-cache";
-import { retryingTransport, schedulerFor } from "./rpc-retry";
+import { cachedRead, HEAVY_TTL_MS } from "./read-cache";
+import { isUpstreamError, retryingTransport, schedulerFor } from "./rpc-retry";
 
 export class NotConfiguredError extends Error {
   override name = "NotConfiguredError";
@@ -260,28 +260,67 @@ export async function readDepositQueue(env: ServerEnv, reserve: ReserveView, cou
   return out;
 }
 
-export async function readLedger(env = serverEnv(), reserve?: ReserveView): Promise<Ledger> {
+/**
+ * The ledger's account reads: guarantees and claim filings (two program-account
+ * scans) and the queue's request PDAs (getMultipleAccounts). What the coverage,
+ * claims and queue views need; no transactions, no block times.
+ */
+export async function readLedgerAccounts(env = serverEnv(), reserve?: ReserveView): Promise<LedgerAccounts> {
   const r = reserve ?? (await readReserve(env));
   const rpc = rpcFor(env);
   const o = { programAddress: env.programId };
   const config = r.addresses.config as Address;
 
-  const [guaranteesAll, filingsAll, receiptsAll] = await Promise.all([
+  const [guaranteesAll, filingsAll] = await Promise.all([
     scan(env, GUARANTEE_DISCRIMINATOR, (b) => getGuaranteeDecoder().decode(b)),
     scan(env, CLAIM_FILING_DISCRIMINATOR, (b) => getClaimFilingDecoder().decode(b)),
-    scan(env, INCOME_RECEIPT_DISCRIMINATOR, (b) => getIncomeReceiptDecoder().decode(b)),
   ]);
-  // Guarantee fees and issuer income share one receipt type, told apart by
-  // `kind` (ADR 0019): 1 = FEE under the "fee" seed, 0 = ISSUER_STATEMENT.
-  const feesAll = receiptsAll.filter((r) => r.data.kind === 1);
-  const incomeAll = receiptsAll.filter((r) => r.data.kind === 0);
-
-  // Keep only accounts of this reserve: filings by guarantee, the rest by
+  // Keep only accounts of this reserve: filings by guarantee, guarantees by
   // re-deriving their PDA under this config.
   const guaranteeOk = await Promise.all(guaranteesAll.map(async (g) => (await findGuaranteePda({ config, id: g.data.id }, o))[0] === g.address));
   const guarantees = guaranteesAll.filter((_, i) => guaranteeOk[i]);
   const mine = new Set(guarantees.map((g) => g.address as string));
   const filings = filingsAll.filter((f) => mine.has(f.data.guarantee));
+
+  const depSeqs = seqRange(r.state.nextDepositSeq);
+  const redSeqs = seqRange(r.state.nextRedeemSeq);
+  const [depAddrs, redAddrs] = await Promise.all([
+    Promise.all(depSeqs.map(async (seq) => (await findDepositRequestPda({ config, seq }, o))[0])),
+    Promise.all(redSeqs.map(async (seq) => (await findRedeemRequestPda({ config, seq }, o))[0])),
+  ]);
+  // getMultipleAccounts takes at most ACCOUNT_BATCH addresses per call.
+  const chunks = <A>(xs: A[]) => Array.from({ length: Math.ceil(xs.length / ACCOUNT_BATCH) }, (_, k) => xs.slice(k * ACCOUNT_BATCH, (k + 1) * ACCOUNT_BATCH));
+  const [depAccs, redAccs] = await Promise.all([
+    Promise.all(chunks(depAddrs).map((c) => fetchAllMaybeDepositRequest(rpc, c, READ))).then((x) => x.flat()),
+    Promise.all(chunks(redAddrs).map((c) => fetchAllMaybeRedeemRequest(rpc, c, READ))).then((x) => x.flat()),
+  ]);
+
+  return {
+    guarantees: guarantees.map((g) => ({ address: g.address, data: g.data })),
+    filings,
+    deposits: depAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),
+    redeems: redAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),
+  };
+}
+
+/**
+ * The ledger's history: fee and income receipts with their block times (one
+ * scan plus a getBlockTime per new slot) and the capital queue's fills (two
+ * signature lists plus a getTransaction per new signature). The heavy read:
+ * only the history charts, activity feeds and receipt lists wait on it.
+ */
+export async function readLedgerHistory(env = serverEnv(), reserve?: ReserveView): Promise<LedgerHistory> {
+  const r = reserve ?? (await readReserve(env));
+  const rpc = rpcFor(env);
+  const o = { programAddress: env.programId };
+  const config = r.addresses.config as Address;
+
+  const receiptsAll = await scan(env, INCOME_RECEIPT_DISCRIMINATOR, (b) => getIncomeReceiptDecoder().decode(b));
+  // Guarantee fees and issuer income share one receipt type, told apart by
+  // `kind` (ADR 0019): 1 = FEE under the "fee" seed, 0 = ISSUER_STATEMENT.
+  const feesAll = receiptsAll.filter((r) => r.data.kind === 1);
+  const incomeAll = receiptsAll.filter((r) => r.data.kind === 0);
+  // Keep only receipts of this reserve, by re-deriving their PDA under this config.
   const feeOk = await Promise.all(
     feesAll.map(async (f) => (await findFeeReceiptPda({ config, invoiceRefHash: f.data.refHash }, o))[0] === f.address),
   );
@@ -305,30 +344,28 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
   const fees = await mapLimit(feesAll.filter((_, i) => feeOk[i]), async (f) => ({ ...f, blockTime: await blockTimeOf(f.data.slot) }));
   const income = await mapLimit(incomeAll.filter((_, i) => incomeOk[i]), async (r) => ({ ...r, blockTime: await blockTimeOf(r.data.slot) }));
 
-  const depSeqs = seqRange(r.state.nextDepositSeq);
-  const redSeqs = seqRange(r.state.nextRedeemSeq);
-  const [depAddrs, redAddrs] = await Promise.all([
-    Promise.all(depSeqs.map(async (seq) => (await findDepositRequestPda({ config, seq }, o))[0])),
-    Promise.all(redSeqs.map(async (seq) => (await findRedeemRequestPda({ config, seq }, o))[0])),
-  ]);
-  // getMultipleAccounts takes at most ACCOUNT_BATCH addresses per call.
-  const chunks = <A>(xs: A[]) => Array.from({ length: Math.ceil(xs.length / ACCOUNT_BATCH) }, (_, k) => xs.slice(k * ACCOUNT_BATCH, (k + 1) * ACCOUNT_BATCH));
-  const [depAccs, redAccs] = await Promise.all([
-    Promise.all(chunks(depAddrs).map((c) => fetchAllMaybeDepositRequest(rpc, c, READ))).then((x) => x.flat()),
-    Promise.all(chunks(redAddrs).map((c) => fetchAllMaybeRedeemRequest(rpc, c, READ))).then((x) => x.flat()),
-  ]);
+  const fills = await readCapitalEvents(env, r);
+  return fills.missing > 0 ? { capitalEvents: fills.events, fees, income, fillsMissing: fills.missing } : { capitalEvents: fills.events, fees, income };
+}
 
-  const capitalEvents = await readCapitalEvents(env, r);
+/** The whole ledger: its account reads and its history (the operator, admin and demo consoles). */
+export async function readLedger(env = serverEnv(), reserve?: ReserveView): Promise<Ledger> {
+  const r = reserve ?? (await readReserve(env));
+  const [accounts, history] = await Promise.all([readLedgerAccounts(env, r), readLedgerHistory(env, r)]);
+  return { ...accounts, ...history };
+}
 
-  return {
-    capitalEvents,
-    guarantees: guarantees.map((g) => ({ address: g.address, data: g.data })),
-    filings,
-    fees,
-    income,
-    deposits: depAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),
-    redeems: redAccs.flatMap((a) => (a.exists ? [{ address: a.address, data: a.data }] : [])),
-  };
+/**
+ * The two halves of the ledger through the read cache ('accounts' and
+ * 'history', each a heavy read with its own TTL), so /api/ledger and the
+ * split routes share one read of each. `allowStale` false when composed into
+ * /api/ledger, which then answers with its own last good value.
+ */
+export function readAccountsCached(env: ServerEnv, opts: { fresh?: boolean; allowStale?: boolean } = {}) {
+  return cachedRead("accounts", async () => readLedgerAccounts(env, await readReserveShared(env, { fresh: opts.fresh })), { ...opts, ttlMs: HEAVY_TTL_MS });
+}
+export function readHistoryCached(env: ServerEnv, opts: { fresh?: boolean; allowStale?: boolean } = {}) {
+  return cachedRead("history", async () => readLedgerHistory(env, await readReserveShared(env, { fresh: opts.fresh })), { ...opts, ttlMs: HEAVY_TTL_MS });
 }
 
 // ── Capital events (deposit / redemption fills) ─────────────────────────────
@@ -378,15 +415,41 @@ async function eventsOf(env: ServerEnv, signature: string, config: string): Prom
   return out;
 }
 
-/** Fills from the last 100 transactions on each escrow. */
-export async function readCapitalEvents(env: ServerEnv, r: ReserveView): Promise<CapitalEvent[]> {
+/** Time a history read spends decoding uncached transactions before it answers with what it has. */
+export const FILLS_BUDGET_MS = 5_000;
+
+/**
+ * Fills from the last 100 transactions on each escrow. The public devnet
+ * allows 10 getTransaction calls per 10 s, so a cold instance cannot decode
+ * 200 transactions in one request: past FILLS_BUDGET_MS, or when the RPC is
+ * busy, the rest are left for the next read (decoded transactions are
+ * cached) and counted in `missing`. Any other failure is not masked.
+ */
+export async function readCapitalEvents(env: ServerEnv, r: ReserveView, opts: { budgetMs?: number; now?: () => number } = {}): Promise<{ events: CapitalEvent[]; missing: number }> {
   const rpc = rpcFor(env);
+  const now = opts.now ?? Date.now;
   const sigs = new Set<string>();
   for (const a of [r.addresses.pendingDeposits, r.addresses.pendingRedemptions]) {
     const rows = await rpc.getSignaturesForAddress(a as Address, { ...READ, limit: 100 }).send();
     for (const row of rows) if (!row.err) sigs.add(row.signature);
   }
+  const deadline = now() + (opts.budgetMs ?? FILLS_BUDGET_MS);
+  let missing = 0;
   // A cold instance decodes up to 200 transactions: a few at a time, not one burst.
-  const all = (await mapLimit([...sigs], (s) => eventsOf(env, s, r.addresses.config))).flat();
-  return all.sort((a, b) => Number(b.ts - a.ts));
+  const all = (
+    await mapLimit([...sigs], async (s) => {
+      if (!eventCache.has(s) && now() > deadline) {
+        missing++;
+        return [];
+      }
+      try {
+        return await eventsOf(env, s, r.addresses.config);
+      } catch (e) {
+        if (!isUpstreamError(e)) throw e;
+        missing++;
+        return [];
+      }
+    })
+  ).flat();
+  return { events: all.sort((a, b) => Number(b.ts - a.ts)), missing };
 }
