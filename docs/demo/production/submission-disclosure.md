@@ -12,13 +12,13 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 >
 > **Local simulation:** chapter 3 runs the same program on a local validator with an accelerated clock and a mock BRS mint (six simulated months of fees, issuer revenue, claims and a withdrawal).
 >
-> During the pilot the reserve is not open to public investment. Ana, the agencies and the lease references are fictional.
+> The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
 >
 > Repo: https://github.com/mutav-finance/mutav-protocol-solana
 > Live app: https://reserve.mutav.finance
 > Program (devnet): GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, the pilot demo reserve; test activity is visible: https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 
-*(144 words)*
+*(141 words)*
 
 ## YouTube description (≤250 words)
 
@@ -35,7 +35,7 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 > • Pre-existing: the agency platform (not yet connected on-chain).
 > • Live on Solana devnet: the opening and chapters 1–2. The PIX transfer to the agency is simulated; its settlement record is on-chain.
 > • Chapter 3 is a local simulation on an accelerated clock with a mock BRS mint: six simulated months, not devnet activity.
-> During the pilot the reserve is not open to public investment. Ana, the agencies and the lease references are fictional.
+> • The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
 > • The claim timer shows the on-chain run from filed to settled. In operation, the operator checks each claim before filing.
 >
 > The 30-day figure for seguro-fiança: SUSEP Circular 621/2021, art. 43.
@@ -46,4 +46,4 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 >
 > Music: [track, artist, licence]
 
-*(220 words)*
+*(217 words)*

@@ -2,7 +2,7 @@
 
 Companion to the storyboard (`storyboard.html`); the two match.
 
-- **Runtime:** 2:15. **Voiceover:** 216 words, verbatim below. Hybrid: cold open, agency and chapters 1–2 live on devnet; chapter 3 a local simulation on an accelerated clock.
+- **Runtime:** 2:15. **Voiceover:** 217 words, verbatim below. Hybrid: cold open, agency and chapters 1–2 live on devnet; chapter 3 a local simulation on an accelerated clock.
 - **Recorded**, not live: silent clips (injected test wallet, no pop-ups), a rough cut with titles, timer and cards, then the VO recorded to the cut. Frames are tagged MAIN / FLASH / END STATE.
 - **Numbers:** devnet chapters on the staged reserve (c = 0.25); chapter 3 numbers are [X] placeholders until the localnet run. Ana, agency names and lease references are fictional.
 - **Labels:** the app banner names the environment ("Pilot demo · Solana devnet", or "Local simulation · accelerated clock" with `NEXT_PUBLIC_ACCELERATED_CLOCK=1`, PR #72); no corner badges; at most one more honesty label per shot.
@@ -30,7 +30,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 >
 > **1:36 · 3 · Capital efficiency** Here are six months of it, simulated locally on an accelerated clock. Guarantee fees and issuer revenue flow into the reserve. Claims are paid, large ones approved by the admin. The reserve can back more leases, each share is worth more, and a capital provider takes out more than they put in. The same reserve that protects the landlord pays the people who fund it.
 >
-> **2:05.5 · Close** MUTAV: a transparent, programmable reserve, claims settled in minutes, capital-efficient cover. Brazil's onchain rent guarantee.
+> **2:05.5 · Close** MUTAV: a transparent, programmable reserve, claims settled in minutes, capital that works. Brazil's onchain rent guarantee.
 >
 
 **Alternate (F7 retake only):** "Now say Ana falls behind on part of a month's rent." replaces "Now say Ana misses a month."; caption "Claim R$500 · cap R$15,000 per call".
@@ -158,7 +158,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 **F14 · END STATE · Close · 2:05.5 – 2:15 · card (made in the editor)**: Close
 - **On screen:** The three pillars, one line each, then the tagline, the repo and the live app.
-- **VO:** "MUTAV: a transparent, programmable reserve, claims settled in minutes, capital-efficient cover. Brazil's onchain rent guarantee."
+- **VO:** "MUTAV: a transparent, programmable reserve, claims settled in minutes, capital that works. Brazil's onchain rent guarantee."
 - **Caption:** reserve.mutav.finance · open source (MIT)
 - **Honesty label:** none (banner only)
 - **Proof:** —
