@@ -46,9 +46,9 @@ and what it must hold.
 The rule is code.
 
 11
-00:00:40,000 --> 00:00:45,000
+00:00:40,000 --> 00:00:45,800
 One more lease would need R$45,000;
-the reserve holds R$44,000.
+the reserve holds R$44,500.
 
 12
 00:00:47,600 --> 00:00:48,400

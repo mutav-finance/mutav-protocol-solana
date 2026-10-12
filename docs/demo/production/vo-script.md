@@ -1,6 +1,6 @@
 # Voiceover: final read (v8)
 
-**243 words · about 1:41 of speech · 2:19.5 runtime** (245 with the F7 retake alternate). Timings are program time (the finished cut), in seconds. Record to the rough cut so each line lands on its picture. The captions (`captions.en.srt`) use the same timings.
+**246 words · about 1:42 of speech · 2:19.5 runtime**. Timings are program time (the finished cut), in seconds. Record to the rough cut so each line lands on its picture. The captions (`captions.en.srt`) use the same timings.
 
 ## Direction
 
@@ -43,8 +43,8 @@ Start and End are program seconds. `‖` = a breath pause (about 0.3 s). `(pause
 | — | 26.5 | 29.3 | F4 | *(pause: register_guarantee on Explorer)* |
 | 6 | 29.3 | 37.0 | F5 | Anyone can watch the reserve: ‖ what it holds in BRS, Nora's Brazilian real stablecoin, ‖ and what it must hold. |
 | 7 | 37.4 | 38.9 | F5 | The rule is code. |
-| 8 | 40.0 | 45.0 | F6 | One more lease would need forty-five thousand; ‖ the reserve holds forty-four. |
-| — | 45.0 | 47.6 | F6 | *(pause: the click at 46.5, the refusal appears; music out at 46.3)* |
+| 8 | 40.0 | 45.8 | F6 | One more lease would need forty-five thousand; ‖ the reserve holds forty-four and a half. |
+| — | 45.8 | 47.6 | F6 | *(pause: the click at 46.5, the refusal appears; music out at 46.3)* |
 | 9 | 47.6 | 48.4 | F6 | Refused. |
 | 10 | 48.8 | 52.0 | F6 | MUTAV can't promise what its reserve can't back. |
 | — | **52.0** | **55.0** | F6 | ***(3 s silence: no VO, no music, room tone only, on the unchanged meter)*** |
@@ -74,7 +74,7 @@ Line 21 lands "more than they put in" on the finale card's in → out (it builds
 
 If [N] is 2 minutes or more, line 15 reads "On-chain, filed to settled in [N] minutes." (same length).
 
-**F7 retake:** only R$2,000 of room is left in the claim window, so Ana's R$1,500 fits once. The only retake, after a paid take, is a claim of R$500 or less: line 11 then reads "Say Ana misses part of the rent." (7 words: the read becomes 245) and its caption "Claim R$500 · cap R$15,000 per call".
+**F7 retakes:** the claim window on this demo deploy is R$50,000 per 31 days (R$32,000 left), so a retake re-runs the full R$1,500 claim with the same lines 11–14 and captions. After Ana's claim the window reads R$19,500 / R$50,000.
 
 ## Word count by beat
 
@@ -82,8 +82,8 @@ If [N] is 2 minutes or more, line 15 reads "On-chain, filed to settled in [N] mi
 |---|---|---|---|
 | Cold open | 0:00–0:10 | 24 | 9.9 s (read at ~150: 9.6 s) |
 | Agency | 0:10–0:17 | 17 | 7.0 s (6.8 s at 150) |
-| 1 · Programmable, transparent reserve | 0:17–0:57 | 60 | 24.8 s |
+| 1 · Programmable, transparent reserve | 0:17–0:57 | 63 | 26.1 s |
 | 2 · Programmable payments, settled in minutes | 0:57–1:38 | 63 | 26.1 s |
 | 3 · Capital efficiency (local simulation) | 1:38–2:08.4 | 59 | 24.4 s |
 | Close | 2:08.4–2:19.5 | 20 | 8.3 s |
-| **Total** | **2:19.5** | **243** | **1:41** |
+| **Total** | **2:19.5** | **246** | **1:42** |

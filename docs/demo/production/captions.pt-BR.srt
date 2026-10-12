@@ -46,9 +46,9 @@ e quanto ela precisa ter.
 A regra é código.
 
 11
-00:00:40,000 --> 00:00:45,000
-Mais um contrato exigiria R$ 45 mil;
-a reserva tem R$ 44 mil.
+00:00:40,000 --> 00:00:45,800
+Mais um contrato precisaria de R$ 45.000;
+a reserva tem R$ 44.500.
 
 12
 00:00:47,600 --> 00:00:48,400

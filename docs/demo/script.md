@@ -2,10 +2,11 @@
 
 Companion to the storyboard (`storyboard.html`); the two match.
 
-- **Runtime:** 2:19.5 (≤ 2:20). **Voiceover:** 243 words, verbatim below (245 with the F7 retake alternate). Hybrid: cold open and chapters 1–2 live on devnet; the agency beat is a browser mockup of the agency dashboard from a local copy with fictional data (off-chain); chapter 3 is a ledger-driven motion piece built from a local simulation on an accelerated clock.
+- **Runtime:** 2:19.5 (≤ 2:20). **Voiceover:** 246 words, verbatim below. Hybrid: cold open and chapters 1–2 live on devnet; the agency beat is a browser mockup of the agency dashboard from a local copy with fictional data (off-chain); chapter 3 is a ledger-driven motion piece built from a local simulation on an accelerated clock.
 - **Recorded**, not live: silent clips (injected test wallet, no pop-ups), a rough cut with titles, timer and cards, then the VO recorded to the cut. Frames are tagged MAIN / FLASH / END STATE.
-- **Numbers:** devnet chapters on the staged reserve (c = 0.25); chapter 3 numbers come from the v2 localnet ledger (accelerated clock, mock BRS mint; statement months Nov 2026 → Apr 2027). Ana, agency names and lease references are fictional.
-- **v8 changes:** the on-chain proof is made visible: short Explorer flashes on devnet (register_guarantee, the refused MTV-PF-0101 transaction landing as a failed transaction, pay_claim, settle_payout), a transaction receipt card after each on-chain action and a transaction rail through chapters 1–2 (§3a). Chapter 3 is rebuilt around the ledger-driven motion piece `ch3-flows` (27.4 s) with the v2 simulation numbers (three small claims, no admin approval; share value 1.000 → 1.144); app screenshots become optional cutaways. The close gains a 2 s cutaway to `/reserve/verify` under "Verify everything on Solana". The claim window has only R$2,000 of room on devnet: Ana's R$1,500 fits once, and the only retake is the ≤ R$500 alternate. The F7 line now says "the PIX to the landlord", as the app does. The flashes replace holds (F6 tail, F7 waits), so the runtime stays 2:19.5.
+- **Numbers:** devnet chapters on the staged reserve (c = 0.25; v8.1: R$44,500 held, R$36,000 required, R$8,500 free, value per share 0.6068); chapter 3 numbers come from the v2 localnet ledger (accelerated clock, mock BRS mint; statement months Nov 2026 → Apr 2027). Ana, agency names and lease references are fictional.
+- **v8 changes:** the on-chain proof is made visible: short Explorer flashes on devnet (register_guarantee, the refused MTV-PF-0101 transaction landing as a failed transaction, pay_claim, settle_payout), a transaction receipt card after each on-chain action and a transaction rail through chapters 1–2 (§3a). Chapter 3 is rebuilt around the ledger-driven motion piece `ch3-flows` (27.4 s) with the v2 simulation numbers (three small claims, no admin approval; share value 1.000 → 1.144); app screenshots become optional cutaways. The close gains a 2 s cutaway to `/reserve/verify` under "Verify everything on Solana". The F7 line now says "the PIX to the landlord", as the app does. The flashes replace holds (F6 tail, F7 waits), so the runtime stays 2:19.5.
+- **v8.1 (devnet numbers):** the staged reserve now holds R$44,500 (a guarantee-fee round is booked: R$625 gross over 3 invoices, R$500 net into the reserve), so the refusal is R$500 short and the rule line reads "the reserve holds forty-four and a half" (246 words). The claim window on this demo deploy was raised to R$50,000 per 31 days (disclosed in the repo README), so Ana's full R$1,500 claim fits and can be retaken; the R$500 alternate is gone.
 - **Labels:** the app banner names the environment ("Pilot demo · Solana devnet", or "Local simulation · accelerated clock" with `NEXT_PUBLIC_ACCELERATED_CLOCK=1`, PR #72); no corner badges; at most one more honesty label per shot. The chapter 3 motion piece carries its own "Local simulation · accelerated clock" and "Mock BRS mint · local validator" lines.
 
 ## 1. Beats
@@ -25,7 +26,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 >
 > **0:10 · Agency** Nineteen agencies signed letters of intent with MUTAV. Solana gives them a transparent reserve and programmable payments.
 >
-> **0:17 · 1 · Programmable, transparent reserve** Our operator puts Ana's lease on-chain: eighteen thousand reais of cover, an opaque ID, no personal data. Anyone can watch the reserve: what it holds in BRS, Nora's Brazilian real stablecoin, and what it must hold. The rule is code. One more lease would need forty-five thousand; the reserve holds forty-four. (click) Refused. MUTAV can't promise what its reserve can't back.
+> **0:17 · 1 · Programmable, transparent reserve** Our operator puts Ana's lease on-chain: eighteen thousand reais of cover, an opaque ID, no personal data. Anyone can watch the reserve: what it holds in BRS, Nora's Brazilian real stablecoin, and what it must hold. The rule is code. One more lease would need forty-five thousand; the reserve holds forty-four and a half. (click) Refused. MUTAV can't promise what its reserve can't back.
 >
 > **0:57 · 2 · Programmable payments, settled in minutes** Say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the landlord is recorded on-chain. On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days. Today our operator console signs these steps. Next, the agency platform drives them automatically, registry, claims and payments, inside safeguards the program already enforces.
 >
@@ -33,7 +34,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 >
 > **2:08 · Close** Verify everything on Solana. MUTAV: a transparent, programmable reserve, claims settled in minutes, capital that works. Brazil's onchain rent guarantee.
 
-**F7 claim window:** only R$2,000 of the R$20,000 per-31-day window is left on devnet (two earlier test claims, R$16,000 + R$2,000). Ana's R$1,500 fits **once**: there is no on-chain retake of the full claim. Rehearse F7 on localnet only. If the take must be redone after the R$1,500 has been paid, the only retake is a claim of R$500 or less (the R$500 still left), with the alternate line "Say Ana misses part of the rent." (2 words more: 245) and the caption "Claim R$500 · cap R$15,000 per call". If only the capture was bad, re-capture the screens, not the claim.
+**F7 claim window:** The claim window on this demo deploy is R$50,000 per 31 days (raised from the pilot's R$20,000 so the live claim can be retaken; disclosed in the repo README) and R$32,000 of it is left (two earlier test claims, R$16,000 + R$2,000). Ana's R$1,500 claim fits, and so do full R$1,500 retakes; after her claim the window reads R$19,500 / R$50,000. Rehearse F7 on localnet first. If only the capture was bad, re-capture the screens, not the claim.
 
 **F8b wording:** the safeguards are live on devnet today; the agency-platform integration is next (roadmap). Keep "Today … Next …" as written; don't say or caption that the agency platform drives the program now.
 
@@ -42,7 +43,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 ## 3. Shot list
 
 **F1 · END STATE · Open · 0:00 – 0:10 · /reserve (Overview)**: Cold open: Ana needs a guarantor
-- **On screen:** Product on screen from frame 1: the public reserve Overview after staging (R$44,000 held, R$36,000 required, 8 leases). No wallet. The #59 banner is visible.
+- **On screen:** Product on screen from frame 1: the public reserve Overview after staging (R$44,500 held, R$36,000 required, 8 leases). No wallet. The #59 banner is visible.
 - **VO:** "Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and its reserve runs on Solana."
 - **Caption:** Built during the hackathon: Solana program + reserve app
 - **Honesty label:** Built during the hackathon: Solana program + reserve app
@@ -78,18 +79,18 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Retake:** Read-only: repeat freely.
 
 **F5 · END STATE · 1 · Programmable, transparent reserve · 0:29 – 0:39 · /reserve/coverage + /reserve Overview**: Anyone can watch the reserve
-- **On screen:** /reserve/coverage with no wallet. After Ana's lease, the ceiling line reads R$162k of cover in use and R$14k free (of R$176k the reserve can back). The Coverage tab leads with "Allocated to coverage" and "Capacity left" (R$36,000 before Ana; read the live values after her lease). Where the VO is about held vs required, use the Overview line "Covered: holds 1.2× the R$36,000 it must hold" (before Ana; after Ana it reads against R$40,500: use the live line) plus the ceiling line. Guarantee rows are opaque hashes sorted by cover, so Ana's row position varies: point to it with an edit callout, don't rely on "the bottom row".
+- **On screen:** /reserve/coverage with no wallet. After Ana's lease, the ceiling line reads R$162k of cover in use and R$16k free (of R$178k the reserve can back). The Coverage tab leads with "Allocated to coverage" and "Capacity left" (R$36,000 and R$34k before Ana; R$40,500 and R$16k after her lease). Where the VO is about held vs required, use the Overview line "Covered: holds 1.2× the R$36,000 it must hold" (before Ana; after Ana it reads against R$40,500: use the live line) plus the ceiling line. Guarantee rows are opaque hashes sorted by cover, so Ana's row position varies: point to it with an edit callout, don't rely on "the bottom row".
 - **VO:** "Anyone can watch the reserve: what it holds in BRS, Nora's Brazilian real stablecoin, and what it must hold. The rule is code."
-- **Caption:** Held R$44,000 · required R$36,000 → R$40,500
+- **Caption:** Held R$44,500 · required R$36,000 → R$40,500
 - **Honesty label:** none (banner only)
 - **Proof:** The same state read independently by a public page.
-- **Edit:** One zoom on held vs required (the Overview line), then the ceiling line (R$162k in use, R$14k free). Edit callout on Ana's row. Start on the settled frame.
+- **Edit:** One zoom on held vs required (the Overview line), then the ceiling line (R$162k in use, R$16k free). Edit callout on Ana's row. Start on the settled frame.
 - **Retake:** Read-only: repeat freely.
 
 **F6 · MAIN · 1 · Programmable, transparent reserve · 0:39 – 0:55 · /operator · register_guarantee**: The refusal
-- **On screen:** The form has auto-advanced to the next reference, MTV-PF-0101, same amounts (no typing). The result line matches the VO: "needs R$45,000 … holds R$44,000". Click send: the program refuses; the clean refusal message; the failed-transaction receipt (✗, InsufficientFreeCapital) and the rail's second entry (✗). The meter does not move. 3 s of silence.
-- **VO:** "One more lease would need forty-five thousand; the reserve holds forty-four. (click) Refused. MUTAV can't promise what its reserve can't back."
-- **Caption:** Needs R$45,000 · holds R$44,000 · refused
+- **On screen:** The form has auto-advanced to the next reference, MTV-PF-0101, same amounts (no typing). The result line matches the VO: "needs R$45,000 … holds R$44,500". Click send: the program refuses; the clean refusal message; the failed-transaction receipt (✗, InsufficientFreeCapital) and the rail's second entry (✗). The meter does not move. 3 s of silence.
+- **VO:** "One more lease would need forty-five thousand; the reserve holds forty-four and a half. (click) Refused. MUTAV can't promise what its reserve can't back."
+- **Caption:** Needs R$45,000 · holds R$44,500 · refused
 - **Honesty label:** none (banner only)
 - **Proof:** The program's own error (InsufficientFreeCapital, raw details collapsed). The transaction is sent with skipPreflight, so the refusal lands on-chain as a failed transaction (F6b); no Guarantee account is created and nothing in the reserve changes.
 - **Edit:** Main action. Zoom on the preview, then the refusal; music out; 3 s silence on the unchanged meter. The 3 s v7 tail is gone: F6b takes its place. The ✗ receipt replaces the "Coverage gate · refused" chip (keep the chip as the fallback if the failed transaction can't be landed). *App change pending:* the preview headline is moving to required-vs-held too; capture whichever is live and keep the result line in frame.
@@ -111,10 +112,10 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Honesty label:** PIX transfer simulated on devnet · settlement recorded on-chain
 - **Proof:** Three confirmed transactions on one ClaimFiling PDA; two of them shown on Explorer.
 - **Edit:** Timer overlay driven by the logged on-chain timestamps (it jumps honestly across cuts and stays on screen over the flashes). The flashes replace the confirmation waits; they don't add time.
-- **Retake:** **One take only.** R$2,000 of room is left in the claim window, so Ana's R$1,500 fits once. Rehearse F7 on localnet only. If the paid take must be redone, the only retake is a claim ≤ R$500 with the alternate VO "Say Ana misses part of the rent." and caption "Claim R$500 · cap R$15,000 per call"; re-read the end-state figures for F8. If only the capture was bad, re-capture the screens, not the claim.
+- **Retake:** Retakes fit: R$32,000 of the R$50,000 per-31-day claim window is left on this demo deploy, so a paid take can be redone with the full R$1,500 claim (same VO and caption). Each retake adds one more claim and R$1,500 less held: re-read the end-state figures for F8. Rehearse on localnet first. If only the capture was bad, re-capture the screens, not the claim.
 
 **F8 · END STATE · 2 · Programmable payments, settled in minutes · 1:16.5 – 1:27 · /reserve/claims**: Filed → paid → settled
-- **On screen:** /reserve/claims: Ana's row is the newest, on top: filed → paid → settled with her on-chain timestamps; the timer stops at settled. Hold about 2.8 s after the VO. Still covered: R$42,500 held, R$40,125 required. The timeline also lists the two earlier test claims (R$16,000 and R$2,000), fine on a disclaimed demo reserve. The page's "slowest filed → paid 1m 44s" summary comes from those test claims: frame Ana's row and her own times, and take [N] from them. The page says "received by landlord (PIX)", as the VO now does.
+- **On screen:** /reserve/claims: Ana's row is the newest, on top: filed → paid → settled with her on-chain timestamps; the timer stops at settled. Hold about 2.8 s after the VO. Still covered: R$43,000 held, R$40,125 required. The timeline also lists the two earlier test claims (R$16,000 and R$2,000), fine on a disclaimed demo reserve. The page's "slowest filed → paid 1m 44s" summary comes from those test claims: frame Ana's row and her own times, and take [N] from them. The page says "received by landlord (PIX)", as the VO now does.
 - **VO:** "On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days."
 - **Caption:** Filed → settled on-chain: [N] s · seguro-fiança: 30 days
 - **Honesty label:** PIX transfer simulated on devnet · settlement recorded on-chain
@@ -210,17 +211,16 @@ This replaces v7's "one Explorer shot only" rule. Keep each flash short and on t
 
 ## 4. Numbers
 
-**Devnet chapters (staged reserve, program GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, c = 0.25).** R$2,000 of the R$20,000 per-31-day claim window is left (two earlier test claims, R$16,000 + R$2,000): Ana's R$1,500 fits once.
+**Devnet chapters (staged reserve, program GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, c = 0.25).** A guarantee-fee round is booked (R$625 gross over 3 invoices, R$500 net into the reserve). The claim window on this demo deploy is R$50,000 per 31 days (raised from the pilot's R$20,000 for retakes; disclosed in the repo README); R$32,000 is left (two earlier test claims, R$16,000 + R$2,000), so Ana's R$1,500 and full retakes fit.
 
 | Step | Action | Stable assets | Coverage required | Free capital | Value per share | Check |
 |---|---|---|---|---|---|---|
-| 0 | Staged devnet reserve (earlier test claims): R$44,000 held, 73,333.33 shares at 0.600000 | R$44,000 | — | — | 0.600000 | TVL ≪ R$1M |
-| 1 | Book: 8 leases MTV-PF-0001…0008, R$18,000 cover each = R$144,000 | R$44,000 | R$36,000 | R$8,000 | 0.600000 | R$18k ≤ R$120k per guarantee; can back R$176k |
-| 2 | Ana MTV-PF-0100: + R$18,000 cover (operator) | R$44,000 | R$40,500 | R$3,500 | 0.600000 | fits: needs R$4,500 of R$8,000; cover R$162k in use, R$14k free |
-| 3 | Next equal lease MTV-PF-0101: would need R$45,000 | R$44,000 | R$40,500 | R$3,500 | 0.600000 | refused: R$1,000 short; a failed transaction lands, nothing else changes |
-| 4 | file_claim R$1,500 on Ana, default leg | R$44,000 | R$40,500 | R$3,500 | 0.579545 | set aside; required = max(c × cover, provisions) |
-| 5 | pay_claim R$1,500 | R$42,500 | R$40,125 | R$2,375 | 0.579545 | still covered; ≤ R$15k/call; uses R$1,500 of the R$2,000 left in the period |
-| 5-alt | Retake only, after step 5: a second claim of R$500 | R$42,000 | R$40,000 | R$2,000 | 0.572727 | uses the last R$500 of the period |
+| 0 | Staged devnet reserve (earlier test claims, one guarantee-fee round): R$44,500 held, 73,333.33 shares at 0.606818 | R$44,500 | — | — | 0.606818 | TVL ≪ R$1M |
+| 1 | Book: 8 leases MTV-PF-0001…0008, R$18,000 cover each = R$144,000 | R$44,500 | R$36,000 | R$8,500 | 0.606818 | R$18k ≤ R$120k per guarantee; can back R$178k, capacity left R$34k |
+| 2 | Ana MTV-PF-0100: + R$18,000 cover (operator) | R$44,500 | R$40,500 | R$4,000 | 0.606818 | fits: needs R$4,500 of R$8,500; cover R$162k in use, capacity left R$16k |
+| 3 | Next equal lease MTV-PF-0101: would need R$45,000 | R$44,500 | R$40,500 | R$4,000 | 0.606818 | refused: R$500 short; a failed transaction lands, nothing else changes |
+| 4 | file_claim R$1,500 on Ana, default leg | R$44,500 | R$40,500 | R$4,000 | 0.586364 | set aside; required = max(c × cover, provisions) |
+| 5 | pay_claim R$1,500 | R$43,000 | R$40,125 | R$2,875 | 0.586364 | still covered; ≤ R$15k/call; the claim window reads R$19,500 / R$50,000 |
 
 **Chapter 3 · local simulation, v2 ledger** (local validator, accelerated clock, mock BRS mint; statement months Nov 2026 → Apr 2027; fees 12 × rent of the month, c = 0.25). Reais and share values only: no rate or APY. The /simulator projections are not in the video.
 
@@ -274,10 +274,10 @@ Captions read start → end: the ceiling peaks at R$637.8k at the end of month 5
 
 | # | Step | Who | Where |
 |---|---|---|---|
-| 1 | Devnet program GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV deployed and staged (done): R$44,000 held, R$36,000 required, R$8,000 free, 8 leases | — | done |
+| 1 | Devnet program GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV deployed and staged (done): R$44,500 held, R$36,000 required, R$8,500 free, 8 leases | — | done |
 | 2 | Load the operator's agency records in the recording browser. Set `localStorage` `mutav-transparency-intro-v1` = `1` (or click Skip on the intro) | Recorder | — |
-| 3 | Rehearse chapters 1–2 on localnet with the same numbers (F7 on localnet only: one devnet take) | Recorder | — |
-| 4 | Right before recording, press "Refresh on-chain" on /operator (it sends the permissionless `refresh`). Devnet capture: F1, F3 (Ana MTV-PF-0100, prefilled), F4, F5, F6 (auto-advanced to MTV-PF-0101, sent with skipPreflight), F6b, then the claim (F7, one take), F8, F8b (/reserve/risks), F14a (/reserve/verify). Start every clip on the settled frame (about 0.5 s of skeleton on load). Log each signature and block time; write `tx-receipts.json` from `getTransaction`. F2 is captured from the local agency copy (dashboard: KPI cards → "Where the book sits"; no domain in the address bar) | Operator; anyone | — |
+| 3 | Rehearse chapters 1–2 on localnet with the same numbers (F7 rehearsed there first; retakes fit on devnet) | Recorder | — |
+| 4 | Right before recording, press "Refresh on-chain" on /operator (it sends the permissionless `refresh`). Devnet capture: F1, F3 (Ana MTV-PF-0100, prefilled), F4, F5, F6 (auto-advanced to MTV-PF-0101, sent with skipPreflight), F6b, then the claim (F7), F8, F8b (/reserve/risks), F14a (/reserve/verify). Start every clip on the settled frame (about 0.5 s of skeleton on load). Log each signature and block time; write `tx-receipts.json` from `getTransaction`. F2 is captured from the local agency copy (dashboard: KPI cards → "Where the book sits"; no domain in the address bar) | Operator; anyone | — |
 | 5 | Explorer flashes on devnet: register_guarantee, the failed MTV-PF-0101, pay_claim, settle_payout (decoded once the IDL is on devnet) | Recorder | — |
 | 6 | Localnet simulation (done): six simulated months, Nov 2026 → Apr 2027, v2 ledger (fees, reserve yield, three small claims, a capital provider's withdrawal); figures in §4. The motion piece `ch3-flows` is rendered from the ledger (27.4 s) | Simulation script; editor | local |
 | 7 | Optional localnet cutaways for F10–F12 (Money tab, claims, Overview ceiling) with `NEXT_PUBLIC_ACCELERATED_CLOCK=1` (the banner reads "Local simulation · accelerated clock") | Recorder | — |
@@ -295,8 +295,8 @@ Captions read start → end: the ceiling peaks at R$637.8k at the end of month 5
 
 | When | What |
 |---|---|
-| Oct 12 · morning | Rehearse chapters 1–2 on localnet (F7 only there). The chapter 3 ledger and motion piece are done; figures in §4. |
-| by 12:00 | Set the intro key, press "Refresh on-chain" on /operator. Devnet capture of F1, F3–F8b and F14a (one claim take); the four Explorer flashes; F2 from the local agency copy. Read [N] from Ana's claim timestamps; write `tx-receipts.json`. |
+| Oct 12 · morning | Rehearse chapters 1–2 on localnet (F7 first there). The chapter 3 ledger and motion piece are done; figures in §4. |
+| by 12:00 | Staging is done (R$44,500 held, R$36,000 required, R$8,500 free, 8 leases, Normal). Set the intro key; press "Refresh on-chain" on /operator right before rolling. Devnet capture of F1, F3–F8b and F14a (claim retakes fit); the four Explorer flashes; F2 from the local agency copy. Read [N] from Ana's claim timestamps; write `tx-receipts.json`. |
 | 12:00–13:00 | Render the receipts and rail from `tx-receipts.json`; optional localnet cutaways for chapter 3. |
 | 13:00–15:00 | Rough cut; record the VO to the cut with [N] filled in. |
 | 15:00–18:00 | Fine-tune; English burned-in captions + SRT; optional PT-BR SRT. |
@@ -310,7 +310,7 @@ Captions read start → end: the ceiling peaks at R$637.8k at the end of month 5
 
 | Risk | Where | What to do |
 |---|---|---|
-| Claim take fails | F7 | Only R$2,000 of room: Ana's R$1,500 fits once. Rehearse on localnet. After a paid take, the only retake is a claim ≤ R$500 with the alternate VO and caption; re-read the end-state figures. If only the capture was bad, re-capture the screens. |
+| Claim take fails | F7 | R$32,000 of claim window is left (R$50,000 per 31 days on this demo deploy): retake with the full R$1,500 claim. Rehearse on localnet first; re-read the end-state figures after a retake. If only the capture was bad, re-capture the screens. |
 | Refusal doesn't land on-chain | F6b | Needs skipPreflight on the MTV-PF-0101 send (pending app/harness). Without it, drop F6b, keep the "Coverage gate · refused" chip in F6 and give the 2 s back to the F6 tail. |
 | Explorer shows raw bytes | F4, F6b, F7 | The IDL is not yet on devnet (pending the app team). Raw data is acceptable for 2 s; the receipt card names the instruction. |
 | State drifted | F6 | Free capital before Ana must be in [R$4,500, R$9,000). Close strays with close_guarantee VOID. |
@@ -326,9 +326,9 @@ Captions read start → end: the ceiling peaks at R$637.8k at the end of month 5
 
 | Artefact | How it reads |
 |---|---|
-| /reserve (devnet) | Covered, mode Normal: R$42,500 held, R$40,125 required, value per share 0.579545 (the payoff is in the local simulation, not on devnet) |
+| /reserve (devnet) | Covered, mode Normal: R$43,000 held, R$40,125 required, value per share 0.586364 (the payoff is in the local simulation, not on devnet) |
 | Ana's guarantee (MTV-PF-0100) | Active · default left R$7,500 · exit left R$9,000 · opaque id, no names |
-| /reserve/claims (devnet) | Three claims: the two earlier test claims (R$16,000 and R$2,000) and Ana's R$1,500, filed → paid → settled (four if the ≤ R$500 retake was needed) |
+| /reserve/claims (devnet) | Three claims: the two earlier test claims (R$16,000 and R$2,000) and Ana's R$1,500, filed → paid → settled (one more per claim retake) |
 | The refused lease | A failed register_guarantee transaction on Explorer (InsufficientFreeCapital); no Guarantee account, no change to the reserve |
 | /reserve/verify | Every reserve account with its Explorer link |
 
