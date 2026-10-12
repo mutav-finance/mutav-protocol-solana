@@ -1,6 +1,6 @@
 # Voiceover: final read (v6)
 
-**216 words · about 1:30 of speech · 2:15 runtime.** Timings are program time (the finished cut), in seconds. Record to the rough cut so each line lands on its picture. The captions (`captions.en.srt`) use the same timings.
+**217 words · about 1:30 of speech · 2:15 runtime.** Timings are program time (the finished cut), in seconds. Record to the rough cut so each line lands on its picture. The captions (`captions.en.srt`) use the same timings.
 
 ## Direction
 
@@ -60,7 +60,7 @@ Start and End are program seconds. `‖` = a breath pause (about 0.3 s). `(pause
 | 18 | 106.6 | 110.2 | F11 | Claims are paid, ‖ large ones approved by the admin. |
 | 19 | 110.6 | 115.0 | F12 | The reserve can back more leases, ‖ each share is worth more, |
 | 20 | 115.4 | 125.4 | F13 | and a capital provider takes out more than they put in. ‖ The same reserve that protects the landlord pays the people who fund it. |
-| 21 | 126.0 | 131.6 | F14 | MUTAV: ‖ a transparent, programmable reserve, ‖ claims settled in minutes, ‖ capital-efficient cover. |
+| 21 | 126.0 | 131.6 | F14 | MUTAV: ‖ a transparent, programmable reserve, ‖ claims settled in minutes, ‖ capital that works. |
 | 22 | 132.2 | 134.4 | F14 | Brazil's onchain rent guarantee. |
 | — | 134.4 | 135.0 | F14 | *(hold; music out)* |
 
@@ -77,5 +77,5 @@ If [N] is 2 minutes or more, line 15 reads "On-chain, filed to settled in [N] mi
 | 1 · Programmable, transparent reserve | 0:15–0:58 | 60 | 24.8 s |
 | 2 · Settled in minutes | 0:58–1:36 | 40 | 16.6 s |
 | 3 · Capital efficiency (local simulation) | 1:36–2:05.5 | 66 | 27.3 s (26.4 s at 150) |
-| Close | 2:05.5–2:15 | 15 | 6.2 s |
-| **Total** | **2:15** | **216** | **1:29** |
+| Close | 2:05.5–2:15 | 16 | 6.6 s |
+| **Total** | **2:15** | **217** | **1:30** |

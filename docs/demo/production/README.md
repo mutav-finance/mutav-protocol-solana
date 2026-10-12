@@ -10,7 +10,7 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 
 | Path | What it is |
 |---|---|
-| [`vo-script.md`](vo-script.md) | Final voiceover (216 words) with start and end seconds per line, pauses, the 3 s silence, pronunciation and direction. |
+| [`vo-script.md`](vo-script.md) | Final voiceover (217 words) with start and end seconds per line, pauses, the 3 s silence, pronunciation and direction. |
 | [`captions.en.srt`](captions.en.srt) · [`captions.pt-BR.srt`](captions.pt-BR.srt) | Captions on the same timings; ≤2 lines, ≤42 characters per line. `[N]` is a placeholder. |
 | [`edl.md`](edl.md) | Edit decision list per shot (source, in/out, overlays, zoom, transition, audio), music and loudness, and the ffmpeg recipes. |
 | [`submission-disclosure.md`](submission-disclosure.md) | Text for the Colosseum form and the YouTube description. |
@@ -21,7 +21,7 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 | `overlays/minimap.html` + `minimap-1-agency … minimap-5-pix.png`, `minimap-legend.png` | Flow minimap (agency platform → operator → program → BRS reserve → PIX record), one PNG per active step, plus the variant with the legend (built in the hackathon / pre-existing / simulated / next). `?active=1..5`, `?legend`. |
 | `overlays/honesty-label.html` + `honesty-built/agency/pix/fees.png` | The four honesty labels, one PNG each. `?id=built|agency|pix|fees`. |
 | `overlays/later-wipe.html` + `.png` | The "Later" wipe into chapter 2 (1.6 s); the PNG is the hold frame. |
-| `overlays/figure-callout.html` + `callout-share-value.png`, `callout-in-out.png` | **Not used** (legal floor): a share-value rise or an in → out gain reads as a return to capital. Kept for reference only. |
+| `overlays/figure-callout.html` + `callout-share-value.png`, `callout-in-out.png` | Share-value and in → out callouts (v5 devnet figures). Not used in v6 (see the note above); kept for reference. |
 | `overlays/timer.html` + `timer-sample-*.png` | Elapsed timer (mm:ss), driven by `?start=<ms>&end=<ms>&fps=30`. The samples show a 42 s run; render the real one from the logged timestamps. |
 | `overlays/caption.html` | Caption template, used to burn in captions when ffmpeg has no libass. |
 | `tools/render.cjs` | Headless-Chromium renderer: `stills` (all PNGs), `timer`, `captions`, `seq` (animated frames). Usage in its header and in `edl.md`. |
