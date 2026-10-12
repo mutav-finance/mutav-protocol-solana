@@ -16,7 +16,7 @@ export function ReservePage() {
       lede={
         <>
           Every number here is read from on-chain accounts of the MUTAV program and refreshed every 10 seconds. No wallet needed.{" "}
-          {poll.updatedAt && <span className="font-mono" style={{ fontSize: 12, color: "var(--color-text-3)" }}>Read at {new Date(poll.updatedAt).toLocaleTimeString()}{d ? ` · slot ${d.reserve.slot}` : ""}</span>}
+          {poll.updatedAt && <span className="font-mono" style={{ fontSize: 12, color: "var(--color-text-3)" }}>Read at {new Date(poll.updatedAt).toLocaleTimeString()}{d ? ` · slot ${d.reserve.slot}` : ""}{poll.busy ? " · chain busy, retrying" : ""}</span>}
         </>
       }
     >

@@ -45,7 +45,16 @@ export function Page({ children, title, lede }: { children: ReactNode; title: st
 }
 
 /** Shown when a read fails: the app never invents a number to fill the gap. */
-export function ReadError({ error }: { error: Error & { notConfigured?: boolean } }) {
+export function ReadError({ error }: { error: Error & { notConfigured?: boolean; busy?: boolean } }) {
+  // The RPC is rate limiting: the poll backs off and retries on its own.
+  if (error.busy)
+    return (
+      <div role="status" style={{ border: "1px solid var(--color-border)", padding: "14px 16px", background: "var(--color-surface)" }}>
+        <p className="font-mono" style={{ fontSize: 12, color: "var(--color-text-2)", margin: 0 }}>
+          Chain busy, retrying…
+        </p>
+      </div>
+    );
   if (error.notConfigured)
     return (
       <div role="status" style={{ border: "1px solid var(--color-border)", padding: "14px 16px", background: "var(--color-surface)" }}>
