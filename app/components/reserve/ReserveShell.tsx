@@ -69,79 +69,79 @@ export function ReserveShell({ children }: { children: ReactNode }) {
     .join(" ");
 
   return (
-    <div className="flex w-full flex-1 flex-col">
-      <header className="bg-(--color-canvas) relative overflow-hidden" style={PAD}>
-        {/* Decorative photo bleeding from the right, behind the title only (never behind numbers); hidden on phones. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/img/dashboard-header.jpg"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute top-0 right-0 hidden h-full w-[40%] border-l object-cover grayscale select-none md:block"
-          style={{ objectPosition: "50% 40%", opacity: 0.12 }}
-        />
-        <div className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pt-7 pb-5">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="font-mono text-(--color-accent) text-xs uppercase" style={{ letterSpacing: "0.12em" }}>
-              Reserve · Solana {d ? d.reserve.cluster : ""}
-            </span>
-            <h1 className="font-display text-(--color-text) m-0 leading-[1.05] uppercase" style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-0.02em" }}>
-              Transparency
-            </h1>
-            <p className="font-body text-(--color-text-2) m-0 max-w-[640px] text-sm text-pretty">
-              Every figure is read from the MUTAV program&apos;s on-chain accounts.
-              {!pathname.startsWith("/reserve/verify") && (
-                <>
-                  {" "}
-                  <Link href="/reserve/verify" className="ext-link arrow-link">
-                    Verify <span aria-hidden="true">→</span>
-                  </Link>
-                </>
-              )}
-            </p>
-          </div>
-          <div className="font-mono text-(--color-text-3) flex items-center gap-3 text-xs">
-            {d && (
-              <span title={liveTitle} className="inline-flex cursor-default items-center gap-2 whitespace-nowrap">
-                <span className="live-dot" aria-hidden="true" />
-                Live · {published ? `updated on-chain ${fmtDuration(d.reserve.now - published)} ago` : "not yet updated on-chain"}
+    <MoneyProvider>
+      <div className="flex w-full flex-1 flex-col">
+        <header className="bg-(--color-canvas) relative overflow-hidden" style={PAD}>
+          {/* Decorative photo bleeding from the right, behind the title only (never behind numbers); hidden on phones. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/img/dashboard-header.jpg"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 right-0 hidden h-full w-[40%] border-l object-cover grayscale select-none md:block"
+            style={{ objectPosition: "50% 40%", opacity: 0.12 }}
+          />
+          <div className="relative flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pt-7 pb-5">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className="font-mono text-(--color-accent) text-xs uppercase" style={{ letterSpacing: "0.12em" }}>
+                Reserve · Solana {d ? d.reserve.cluster : ""}
               </span>
-            )}
-            <Button
-              variant="secondary"
-              aria-label="How to read this page"
-              title="How to read this page"
-              disabled={!d}
-              onClick={() => setIntro(true)}
-              className="bg-(--color-surface-3) text-(--color-text-2) hover:text-(--color-text) size-6 border font-body text-xs [border-color:var(--color-border)]"
-            >
-              ?
-            </Button>
-          </div>
-        </div>
-      </header>
-      <div className="bg-(--color-canvas) sticky top-14 z-[90] border-b" style={PAD}>
-        <nav aria-label="Transparency views" className="scroll-dark scroll-fade-x -mb-px flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          {TABS.map(([href, label]) => {
-            const active = isActive(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={`font-body inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm whitespace-nowrap no-underline ${active ? "text-(--color-text) border-(--color-accent) font-medium" : "text-(--color-text-2) hover:text-(--color-text) border-transparent"}`}
+              <h1 className="font-display text-(--color-text) m-0 leading-[1.05] uppercase" style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-0.02em" }}>
+                Transparency
+              </h1>
+              <p className="font-body text-(--color-text-2) m-0 max-w-[640px] text-sm text-pretty">
+                Every figure is read from the MUTAV program&apos;s on-chain accounts.
+                {!pathname.startsWith("/reserve/verify") && (
+                  <>
+                    {" "}
+                    <Link href="/reserve/verify" className="ext-link arrow-link">
+                      Verify <span aria-hidden="true">→</span>
+                    </Link>
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="font-mono text-(--color-text-3) flex items-center gap-3 text-xs">
+              {d && (
+                <span title={liveTitle} className="inline-flex cursor-default items-center gap-2 whitespace-nowrap">
+                  <span className="live-dot" aria-hidden="true" />
+                  Live · {published ? `updated on-chain ${fmtDuration(d.reserve.now - published)} ago` : "not yet updated on-chain"}
+                </span>
+              )}
+              <Button
+                variant="secondary"
+                aria-label="How to read this page"
+                title="How to read this page"
+                disabled={!d}
+                onClick={() => setIntro(true)}
+                className="bg-(--color-surface-3) text-(--color-text-2) hover:text-(--color-text) size-6 border font-body text-xs [border-color:var(--color-border)]"
               >
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-      <main id="reserve-view" className="flex w-full flex-1 flex-col gap-14 pt-10 pb-20" style={PAD}>
-        {poll.error && !d && <ReadError error={poll.error} onRetry={poll.refresh} />}
-        {poll.loading && !d && <Skeleton />}
-        {d && (
-          <MoneyProvider>
+                ?
+              </Button>
+            </div>
+          </div>
+        </header>
+        <div className="bg-(--color-canvas) sticky top-14 z-[90] border-b" style={PAD}>
+          <nav aria-label="Transparency views" className="scroll-dark scroll-fade-x -mb-px flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {TABS.map(([href, label]) => {
+              const active = isActive(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={`font-body inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm whitespace-nowrap no-underline ${active ? "text-(--color-text) border-(--color-accent) font-medium" : "text-(--color-text-2) hover:text-(--color-text) border-transparent"}`}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+        <main id="reserve-view" className="flex w-full flex-1 flex-col gap-14 pt-10 pb-20" style={PAD}>
+          {poll.error && !d && <ReadError error={poll.error} onRetry={poll.refresh} />}
+          {poll.loading && !d && <Skeleton />}
+          {d && (
             <ReserveCtx.Provider value={{ d, refresh: poll.refresh }}>
               <div className="flex flex-col gap-4">
                 <ProvidedUsdNote />
@@ -151,14 +151,10 @@ export function ReserveShell({ children }: { children: ReactNode }) {
                 </div>
               </div>
             </ReserveCtx.Provider>
-          </MoneyProvider>
-        )}
-      </main>
-      {introOpen && (
-        <MoneyProvider>
-          <IntroDialog r={d.reserve} onClose={() => setIntro(false)} />
-        </MoneyProvider>
-      )}
-    </div>
+          )}
+        </main>
+        {introOpen && <IntroDialog r={d.reserve} onClose={() => setIntro(false)} />}
+      </div>
+    </MoneyProvider>
   );
 }

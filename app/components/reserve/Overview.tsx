@@ -19,11 +19,11 @@ import { InfoTooltip } from "@/components/InfoTooltip";
 import { useReserve } from "@/components/reserve/ReserveShell";
 import { HistoryChart } from "@/components/reserve/HistoryChart";
 import { FlowDiagram } from "@/components/reserve/FlowDiagram";
-import { HeroAmount, Lead, fmtAgo } from "@/components/reserve/sections/shared";
+import { HeroAmount, Lead, abs, fmtAgo, plural } from "@/components/reserve/sections/shared";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
 import { fmtBps, fmtRatio, fmtSharePrice, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
-import { capitalQueue, claimsTimeline, coverageRows, isUnpaid, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
+import { FLOW_KIND_LABEL, capitalQueue, claimsTimeline, coverageRows, isUnpaid, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
 
 /** The two promises the spec makes, each linked to the view that shows them. */
 const PROMISES: [string, string, string, string][] = [
@@ -31,14 +31,11 @@ const PROMISES: [string, string, string, string][] = [
   ["New capital needs an approved wallet.", "The allowlist gates new capital; existing holders can always redeem (KYC off-chain). Every request waits in the same line.", "/reserve/capital#queue", "See the capital queue"],
 ];
 
-const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" } as const;
 /** Movements shown in the side column, and the window the count covers. */
 const ACTIVITY_ROWS = 5;
 const ACTIVITY_DAYS = 60n;
 
 const NUM = { fontVariantNumeric: "tabular-nums" } as const;
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-const abs = (v: bigint) => (v < 0n ? -v : v);
 const share = (part: bigint, whole: bigint) => (whole === 0n ? "—" : fmtBps(Number((part * 10_000n) / whole)));
 
 /** `a` as a multiple of `b`, one decimal, rounded down: 23.6×. */
@@ -413,7 +410,7 @@ function ActivityRow({ x, now, rpc, last }: { x: FlowRow; now: bigint; rpc: stri
         <Mono style={{ fontSize: 14, color: "var(--color-text-2)" }}>{into ? "↓" : "↑"}</Mono>
       </span>
       <span className="flex min-w-0 flex-col gap-0.5" title={slotOnly ? x.detail : undefined}>
-        <span className="font-body text-(--color-text) text-[13px]">{FLOW_LABEL[x.kind]}</span>
+        <span className="font-body text-(--color-text) text-[13px]">{FLOW_KIND_LABEL[x.kind]}</span>
         {!slotOnly && <Mono style={{ ...NUM, fontSize: 11, color: "var(--color-text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.detail}</Mono>}
       </span>
       <span className="flex flex-col items-end gap-0.5">

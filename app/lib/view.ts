@@ -131,10 +131,7 @@ export const GUARANTEE_ACTIVE = 0;
 export const CLAIM_FILED = 0;
 export const CLAIM_PAID = 1;
 export const CLAIM_SETTLED = 3;
-export const DEPOSIT_PENDING = 0;
 export const DEPOSIT_FULFILLED = 1;
-/** Parked by the admin's cancel (ADR 0030): the escrow is still the owner's to collect with `cancel_deposit`. */
-export const DEPOSIT_CANCELLED = 2;
 
 export const MODE_LABEL = (mode: number) => (mode === 0 ? "Normal" : "UnderCovered");
 
@@ -298,6 +295,9 @@ export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">, m
 // ── Money flows ─────────────────────────────────────────────────────────────
 
 export type FlowKind = "fee" | "income" | "claim" | "deposit" | "redemption";
+
+/** A movement's name in the reserve's activity list and balance history. */
+export const FLOW_KIND_LABEL: Record<FlowKind, string> = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" };
 
 export type FlowRow = {
   kind: FlowKind;

@@ -20,7 +20,7 @@ import { useFmt } from "@/components/MoneyProvider";
 import { moneyFlows, type FlowRow, type Ledger, type ReserveView } from "@/lib/view";
 import { Button } from "@/components/ui/button";
 
-import { BlockHead, Empty, MotionStyle, Num, PlusMark, Table } from "@/components/reserve/sections/shared";
+import { BlockHead, Empty, MotionStyle, Num, PlusMark, Table, signed } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -74,9 +74,6 @@ const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Clai
 
 /** Ledger rows shown before "Show all". */
 const LEDGER_ROWS = 10;
-
-const abs = (v: bigint) => (v < 0n ? -v : v);
-const signed = (v: bigint, fmt: (b: bigint) => string) => `${v >= 0n ? "+" : "−"}${fmt(abs(v))}`;
 
 /** Inter Medium 12px caps label (brand card label). */
 const Label = ({ children }: { children: ReactNode }) => (

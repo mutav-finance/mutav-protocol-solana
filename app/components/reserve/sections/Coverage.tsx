@@ -24,7 +24,7 @@ import { C } from "@/components/charts/Charts";
 import { coverageRequired, stressTerm } from "@mutav-finance/mutav-protocol-solana";
 import { TotalsStrip, type TotalsTerm } from "@/components/reserve/sections/Flows";
 
-import { BlockHead, Empty, HeroAmount, MotionStyle, Num, PlusMark, Table, short } from "@/components/reserve/sections/shared";
+import { BlockHead, Empty, HeroAmount, MotionStyle, Num, PlusMark, Table, plural, short } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -229,7 +229,6 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       { op: "=", label: "Free capital", value: fmtBrs(s.freeCapital), result: true },
     ]);
   const agenciesActive = new Set(active.map((g) => g.agencyId)).size;
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
   return (
     <div className="flex flex-col gap-8">

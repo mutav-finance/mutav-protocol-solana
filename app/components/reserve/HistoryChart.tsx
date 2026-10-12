@@ -12,11 +12,10 @@ import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from
 import { Mono } from "@/components/Mono";
 import { useFmt } from "@/components/MoneyProvider";
 import { PERIODS, PeriodPicker, inPeriod, type Period } from "@/components/reserve/sections/Flows";
+import { signed } from "@/components/reserve/sections/shared";
 import { historyWindow, pointAt, stableAssetsHistory, yTicks } from "@/lib/history";
 import { fmtTime } from "@/lib/format";
-import type { FlowRow } from "@/lib/view";
-
-const KIND_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" } as const;
+import { FLOW_KIND_LABEL, type FlowRow } from "@/lib/view";
 
 const W = 1000;
 const H = 180;
@@ -142,8 +141,7 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
                 <Mono style={{ ...NUM, fontSize: 13, fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap" }}>{fmtBrs(a.value)}</Mono>
                 {a.step && (
                   <span className="font-body text-(--color-text-2) text-[11px] whitespace-nowrap">
-                    {KIND_LABEL[a.step.kind]} {a.step.delta >= 0n ? "+" : "−"}
-                    {fmtBrs(a.step.delta < 0n ? -a.step.delta : a.step.delta)}
+                    {FLOW_KIND_LABEL[a.step.kind]} {signed(a.step.delta, fmtBrs)}
                   </span>
                 )}
               </div>
@@ -177,7 +175,7 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
             {pts.map((p, i) => (
               <tr key={i}>
                 <td>{fmtTime(p.at)}</td>
-                <td>{p.step ? `${KIND_LABEL[p.step.kind]} ${p.step.delta >= 0n ? "+" : "−"}${fmtBrs(p.step.delta < 0n ? -p.step.delta : p.step.delta)}` : "Period start"}</td>
+                <td>{p.step ? `${FLOW_KIND_LABEL[p.step.kind]} ${signed(p.step.delta, fmtBrs)}` : "Period start"}</td>
                 <td>{fmtBrs(p.value)}</td>
               </tr>
             ))}

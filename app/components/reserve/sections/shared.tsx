@@ -11,6 +11,14 @@ export type Data = { reserve: ReserveView; ledger: Ledger };
 
 export const short = (hex: string) => `${hex.slice(0, 8)}…`;
 
+/** "1 claim", "3 claims"; pass `many` for irregular plurals. */
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+export const abs = (v: bigint) => (v < 0n ? -v : v);
+
+/** A movement with its sign: "+R$ 10.00", "−R$ 4.00". */
+export const signed = (v: bigint, fmt: (b: bigint) => string) => `${v >= 0n ? "+" : "−"}${fmt(abs(v))}`;
+
 export function Empty({ children }: { children: ReactNode }) {
   return (
     <p className="font-body" style={{ fontSize: 13, color: "var(--color-text-3)", margin: 0, padding: "14px 0" }}>

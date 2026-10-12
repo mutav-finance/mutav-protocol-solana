@@ -15,7 +15,7 @@ import { fmtShares, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, type Ledger, type QueueRow, type ReserveView } from "@/lib/view";
 
-import { BlockHead, Empty, Num, PlusMark, Table, fmtAgo } from "@/components/reserve/sections/shared";
+import { BlockHead, Empty, Num, PlusMark, Table, fmtAgo, plural } from "@/components/reserve/sections/shared";
 import { Section } from "@/components/Section";
 import type { Data } from "@/components/reserve/sections/shared";
 
@@ -23,7 +23,6 @@ import type { Data } from "@/components/reserve/sections/shared";
 const PAGE = 10;
 
 const sum = (rows: QueueRow[]) => rows.reduce((s, x) => s + x.waiting, 0n);
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 const Label = ({ children }: { children: ReactNode }) => (
   <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>

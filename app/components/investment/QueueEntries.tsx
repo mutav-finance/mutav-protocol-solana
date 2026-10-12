@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { Action, Note, useLive } from "@/components/demo/shared";
+import { fmtAgo } from "@/components/reserve/sections/shared";
 import { depositHead, redeemHead, type HeadStatus } from "@/lib/queue";
 import type { Money } from "@/lib/client/use-money";
 import type { InvestorView } from "@/lib/server/investor";
@@ -17,23 +18,6 @@ import type { InvestorRequest } from "@/lib/view";
 import { actionLabel, claimOf, lineOf, sideName, statusName, waitingOf } from "./shared";
 
 const NUM = { fontVariantNumeric: "tabular-nums" } as const;
-
-/** Seconds as a readable age: "just now", "5 minutes ago", "3 hours ago", "5 days ago". */
-function ago(secs: bigint): string {
-  const s = Number(secs < 0n ? 0n : secs);
-  const units: [number, string][] = [
-    [86_400 * 365, "year"],
-    [86_400 * 30, "month"],
-    [86_400, "day"],
-    [3_600, "hour"],
-    [60, "minute"],
-  ];
-  for (const [size, name] of units) {
-    const n = Math.floor(s / size);
-    if (n >= 1) return `${n} ${name}${n === 1 ? "" : "s"} ago`;
-  }
-  return "just now";
-}
 
 /** Ready first, then waiting in line (front of the line first), then the rest, newest first. */
 function sortRows(rows: InvestorRequest[]): InvestorRequest[] {
@@ -76,7 +60,7 @@ function Row({ x, now, connected, money, last }: { x: InvestorRequest; now: bigi
       </span>
       <span className="flex flex-col items-end gap-0.5">
         <Mono style={{ ...NUM, fontSize: 13, color: ready ? "var(--color-success)" : "var(--color-text)" }}>{amount}</Mono>
-        <Explorer value={x.address} label={x.requestedAt > 0n ? ago(now - x.requestedAt) : "account"} />
+        <Explorer value={x.address} label={x.requestedAt > 0n ? fmtAgo(now, x.requestedAt) : "account"} />
       </span>
       {connected && x.actions.length > 0 && <RowActions x={x} />}
     </li>
