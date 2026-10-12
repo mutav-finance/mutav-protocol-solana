@@ -59,14 +59,16 @@ pub struct Initialize<'info> {
     /// initialization.
     pub upgrade_authority: Signer<'info>,
 
+    // One-line CHECK so the IDL keeps no docs for this account.
+    /// CHECK: this program's `ProgramData` (seeds); owner and bytes checked by `upgrade_authority_of`.
     #[account(
         seeds = [crate::ID.as_ref()],
         bump,
         seeds::program = bpf_loader_upgradeable::ID,
-        constraint = program_data.upgrade_authority_address == Some(upgrade_authority.key())
+        constraint = upgrade_authority_of(&program_data)? == Some(upgrade_authority.key())
             @ MutavError::Unauthorized,
     )]
-    pub program_data: Box<Account<'info, ProgramData>>,
+    pub program_data: UncheckedAccount<'info>,
 
     #[account(
         mint::token_program = reserve_token_program,
@@ -243,6 +245,42 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
         share_mint,
     });
     Ok(())
+}
+
+/// The upgrade authority recorded in a `ProgramData` account, read straight
+/// from its bytes so that `initialize` does not link bincode and serde.
+///
+/// Same accept/reject rules and errors as Anchor's `Account<ProgramData>` load:
+/// a missing account is `AccountNotInitialized`; an owner other than the
+/// upgradeable loader is `AccountOwnedByWrongProgram`; another loader state is
+/// `AccountNotProgramData`; bytes bincode would refuse are
+/// `InvalidAccountData`. Layout (bincode `UpgradeableLoaderState::ProgramData`):
+/// `u32` tag 3 at 0..4, `u64` slot at 4..12, option byte at 12 (0 `None`,
+/// 1 `Some`), authority at 13..45.
+fn upgrade_authority_of(info: &AccountInfo) -> Result<Option<Pubkey>> {
+    if info.owner == &system_program::ID && info.lamports() == 0 {
+        return Err(ErrorCode::AccountNotInitialized.into());
+    }
+    if info.owner != &bpf_loader_upgradeable::ID {
+        return Err(Error::from(ErrorCode::AccountOwnedByWrongProgram)
+            .with_pubkeys((*info.owner, bpf_loader_upgradeable::ID)));
+    }
+    let data = info.try_borrow_data()?;
+    let invalid = || Error::from(ProgramError::InvalidAccountData);
+    let tag = data.get(..4).ok_or_else(invalid)?;
+    match u32::from_le_bytes([tag[0], tag[1], tag[2], tag[3]]) {
+        3 => {}
+        0..=2 => return Err(ErrorCode::AccountNotProgramData.into()),
+        _ => return Err(invalid()),
+    }
+    match data.get(12) {
+        Some(0) => Ok(None),
+        Some(1) => {
+            let key = data.get(13..45).ok_or_else(invalid)?;
+            Ok(Some(Pubkey::try_from(key).map_err(|_| invalid())?))
+        }
+        _ => Err(invalid()),
+    }
 }
 
 /// Creates the income inbox (ADR 0017) with an idempotent associated token

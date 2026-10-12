@@ -26,5 +26,6 @@ solana-transaction-error = "3"
 solana-instruction = "3"
 
 [dev-dependencies]
+solana-account = "4"
 proptest = { version = "1", default-features = false, features = ["std"] }
 serde_json = "1"

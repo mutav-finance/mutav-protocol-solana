@@ -1840,6 +1840,7 @@ dependencies = [
  "mutav",
  "proptest",
  "serde_json",
+ "solana-account",
  "solana-instruction",
  "solana-keypair",
  "solana-message",
