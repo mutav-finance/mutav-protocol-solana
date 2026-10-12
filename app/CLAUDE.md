@@ -12,7 +12,7 @@ Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto
 - **Cluster by env:** `NEXT_PUBLIC_CLUSTER` = `localnet` or `devnet`. Mainnet is refused (`lib/cluster.ts`): in the env parser, the RPC URL check, the tx relay and the scripts.
 - **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts via the client's read helpers (`@mutav-finance/mutav-protocol-solana`). Previews (the solvency gate) use the client's math mirror and are **labelled as previews**. Never hardcode or cache a number the chain owns.
 - **Language:** English. MUTAV's guarantee is a *fiança*: say "guarantee fee", "claim payment", "reserve". Never "premium", "insurance", "policy", "yield vault" (a unit test greps the UI for these).
-- **Allowlist, no disclaimers.** Investor actions are gated by the on-chain allowlist (KYC off-chain); say so only where the copy already covers access. No pilot, own-capital, not-investable, unaudited, testnet or estimate disclaimers (founder decision, 2026-10-11).
+- **Allowlist and demo banner.** Investor actions are gated by the on-chain allowlist (KYC off-chain). Beyond that, every page (and `public/simulator.html`) carries the demo banner (`components/DemoBanner.tsx`): pilot demo, **not open to public investment**, capital participation only through a regulated vehicle to eligible investors. That is the legal floor (founder decision, 2026-10-11); never remove or soften it until the regulated vehicle is live.
 - **Investor money in dollars.** On investor screens, BRS amounts show in USD at the `/api/fx` rate (display only; the chain holds BRS). Where the copy is about BRS itself (its peg, its value), use reais.
 
 ## Dependencies

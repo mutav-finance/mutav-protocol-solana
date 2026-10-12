@@ -24,7 +24,7 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 - **Cluster by env:** `NEXT_PUBLIC_CLUSTER` = `localnet` (Surfpool / local validator seeded by the protocol's dry-run scripts) or `devnet`. Mainnet is refused.
 - **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts via the client's read helpers. Previews (for example the solvency gate) use the client's math mirror and are labelled as previews.
 - **Language:** English for the hackathon. MUTAV's guarantee is a *fiança*: say "guarantee fee", "claim payment", "reserve". Never "premium", "insurance", "policy", "yield vault".
-- **Allowlist.** Capital requests are gated by the on-chain allowlist (KYC off-chain). Copy mentions it where it covers access; no pilot or not-investable disclaimers.
+- **Allowlist.** Capital requests are gated by the on-chain allowlist (KYC off-chain). Copy mentions it where it covers access. Separately, every page (and `public/simulator.html`) carries the demo banner (`components/DemoBanner.tsx`): pilot demo, **not open to public investment**, capital participation only through a regulated vehicle to eligible investors. That is the legal floor (founder decision, 2026-10-11); never remove or soften it until the regulated vehicle is live.
 - **Roles are explicit.** Every page tags each action and each number with the role that signs or owns it: Reserve Admin, Operator, Investor (or Anyone for cranks), one colour and one shape per role (`lib/roles.ts`, `components/RoleTag.tsx`).
 
 ## Routes
