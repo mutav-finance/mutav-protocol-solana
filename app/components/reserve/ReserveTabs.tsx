@@ -31,7 +31,7 @@ export function ClaimsTab() {
   );
 }
 /**
- * Money: where the money came from and went (flows, ledger), and the queue.
+ * Capital: where the money came from and went (flows, ledger), and the queue.
  * One wrapper, so the two sections sit on their own section padding instead
  * of the view's wide gap between top-level blocks.
  */

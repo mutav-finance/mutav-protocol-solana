@@ -297,7 +297,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
 /** The Flows section of /reserve: heading (the question) and body. */
 export function FlowsSection({ d }: { d: Data }) {
   return (
-    <Section id="flows" title="Money" kicker="Money in and out" subtitle="Where did the reserve's money come from, and where did it go?">
+    <Section id="flows" title="Capital" kicker="Money in and out" subtitle="Every movement in and out of the reserve, read from the chain.">
       <Flows r={d.reserve} l={d.ledger} />
     </Section>
   );

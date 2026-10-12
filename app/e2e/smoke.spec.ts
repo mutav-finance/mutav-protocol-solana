@@ -37,7 +37,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   test("/reserve — overview: hero, where the capital sits, promises, persistent tabs", async ({ page }) => {
     await page.goto("/reserve");
     const views = page.getByRole("navigation", { name: "Transparency views" });
-    for (const tab of ["Overview", "Coverage", "Claims", "Money", "Risks", "Verify"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
+    for (const tab of ["Overview", "Coverage", "Claims", "Capital", "Risks", "Verify"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
     await expect(views.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();
     // The hero splits the figure across spans (smaller decimals, US$ hint), so match the text content.
@@ -125,9 +125,11 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(flows).toContainText("Guarantee fee");
     await expect(flows).toContainText("Claim payment");
     await expect(flows).toContainText("Capital in");
-    // One name for the tab, the heading and the page title: Money.
-    await expect(page.getByRole("heading", { name: "Money", exact: true, level: 2 })).toBeVisible();
-    await expect(page).toHaveTitle(/^Money · Transparency/);
+    // One name for the tab, the heading and the page title: Capital.
+    await expect(page.getByRole("heading", { name: "Capital", exact: true, level: 2 })).toBeVisible();
+    await expect(page.getByText("Every movement in and out of the reserve, read from the chain.")).toBeVisible();
+    await expect(page).toHaveTitle("Capital · Transparency · MUTAV pilot");
+    await expect(page.getByRole("navigation", { name: "Transparency views" }).getByRole("link", { name: "Capital", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("heading", { name: "Capital queue" })).toBeVisible();
     await noBannedWords(page);
 
