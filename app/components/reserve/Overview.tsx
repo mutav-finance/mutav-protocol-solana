@@ -310,7 +310,8 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger | null }) {
             : `${fmtBrs(committed)} is committed to claims and cover. The rest is free for new guarantees and redemptions.`,
       };
 
-  const grid = "grid grid-cols-[minmax(0,1fr)_auto_72px] items-center gap-x-6 gap-y-1 border-t px-6 py-3.5 sm:px-8";
+  // Phones: the description drops under the row so the label keeps its width; sm+: it sits under the label.
+  const grid = "grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-4 gap-y-1 border-t px-6 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto_72px] sm:gap-x-6 sm:px-8";
   return (
     <section aria-labelledby="capital-h" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
@@ -334,17 +335,15 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger | null }) {
         </div>
         {rows.map((x) => (
           <div key={x.label} className={grid}>
-            <span className="flex min-w-0 items-center gap-3">
+            <span className="col-start-1 row-start-1 flex min-w-0 items-center gap-3">
               <span aria-hidden="true" className="size-2 shrink-0" style={{ background: x.outline ? "transparent" : x.color, border: `1px solid ${x.color}` }} />
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-body text-(--color-text) text-[13px]">{x.label}</span>
-                <span className="font-body text-(--color-text-3) text-xs">{x.sub}</span>
-              </span>
+              <span className="font-body text-(--color-text) text-[13px]">{x.label}</span>
             </span>
-            <Mono style={{ ...NUM, fontSize: 14, textAlign: "right", color: x.negative ? SHORT : x.value === 0n ? "var(--color-text-2)" : "var(--color-text)" }}>
+            <span className="font-body text-(--color-text-3) col-span-3 col-start-1 row-start-2 pl-5 text-xs sm:col-span-1">{x.sub}</span>
+            <Mono className="col-start-2 row-start-1 sm:row-span-2" style={{ ...NUM, fontSize: 14, textAlign: "right", color: x.negative ? SHORT : x.value === 0n ? "var(--color-text-2)" : "var(--color-text)" }}>
               {x.negative ? `−${fmtBrs(x.value)}` : fmtBrs(x.value)}
             </Mono>
-            <Mono style={{ ...NUM, fontSize: 12, textAlign: "right", color: "var(--color-text-2)" }}>{x.negative ? "—" : share(x.value, c.stableAssets)}</Mono>
+            <Mono className="col-start-3 row-start-1 sm:row-span-2" style={{ ...NUM, fontSize: 12, textAlign: "right", color: "var(--color-text-2)" }}>{x.negative ? "—" : share(x.value, c.stableAssets)}</Mono>
           </div>
         ))}
         <div className={`${grid} bg-(--color-surface-2) [border-color:#3A3D44]`}>

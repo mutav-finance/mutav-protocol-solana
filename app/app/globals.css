@@ -686,6 +686,67 @@ input[type="number"]::-webkit-outer-spin-button {
   font-variant-numeric: tabular-nums;
 }
 
+/* /reserve/claims on phones: each claim stacks as a block instead of scrolling
+   sideways. Stage | amount, guarantee | details, then filed | paid and
+   settled | filed → settled, each time under its column name (data-label). */
+@media (max-width: 600px) {
+  .claims-table,
+  .claims-table tbody {
+    display: block;
+    width: 100%;
+  }
+  .claims-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .claims-table tbody tr:not(.claims-detail) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .claims-table tbody tr:not(.claims-detail) > td {
+    padding: 0;
+    border: none;
+    text-align: left;
+    min-width: 0;
+  }
+  .claims-table tbody tr > td:nth-child(3),
+  .claims-table tbody tr > td:nth-child(8) {
+    text-align: right;
+  }
+  .claims-table tbody tr > td:nth-child(1) { grid-area: 1 / 1; }
+  .claims-table tbody tr > td:nth-child(3) { grid-area: 1 / 2; }
+  .claims-table tbody tr > td:nth-child(2) { grid-area: 2 / 1; }
+  .claims-table tbody tr > td:nth-child(8) { grid-area: 2 / 2; }
+  .claims-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-text-3);
+  }
+  .claims-table tbody tr.claims-detail,
+  .claims-table tbody tr.claims-detail > td {
+    display: block;
+    white-space: normal;
+  }
+  .claims-table tbody tr.claims-detail {
+    border-bottom: 1px solid var(--color-border);
+  }
+  .claims-table tbody tr:last-child {
+    border-bottom: none;
+  }
+}
+
 .ext-link {
   color: var(--color-text-2);
   text-decoration: none;

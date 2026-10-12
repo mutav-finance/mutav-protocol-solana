@@ -29,7 +29,7 @@ import {
 import type { ServerEnv } from "./env";
 import { SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT } from "./compose";
 import { baselineCovers, isLiveProposal, parseBaselineMemo, setConfigFields, staleCarry, staleCarryText } from "../config-diff";
-import { decodeInstruction, foreignPrograms, newMoneyAccount, squadsConfigChange, tokenAccountFacts, type DecodeContext, type DecodedInstruction, type RawInstruction } from "../proposal-decode";
+import { contextForProposal, decodeInstruction, foreignPrograms, newMoneyAccount, squadsConfigChange, tokenAccountFacts, type DecodeContext, type DecodedInstruction, type RawInstruction } from "../proposal-decode";
 import { bytesToHex } from "../serde";
 import type { ReserveView } from "../view";
 
@@ -135,7 +135,9 @@ async function decodeProposals<P extends Omit<ProposalView, "decoded" | "foreign
   if (flat.some(isRoot)) ctx.allowlistRoot = env.allowlist.length > 0 ? bytesToHex((await buildAllowlist(env.allowlist)).root) : null;
   return shown.map(({ raw, configActions, ...p }) => {
     // Not a vault transaction: a Squads config change (or unknown), flagged.
-    const decoded = raw ? raw.map((ix) => decodeInstruction(ix, ctx)) : [squadsConfigChange(SQUADS_PROGRAM, configActions)];
+    // Checks against the NAV now only for proposals that can still execute.
+    const pctx = contextForProposal(ctx, isLiveProposal(p));
+    const decoded = raw ? raw.map((ix) => decodeInstruction(ix, pctx)) : [squadsConfigChange(SQUADS_PROGRAM, configActions)];
     const instructions = decoded.map((d) => (d.program === "foreign" ? `${d.name} (${d.programId})` : d.name));
     return { ...p, instructions, decoded, foreign: foreignPrograms(decoded) };
   });

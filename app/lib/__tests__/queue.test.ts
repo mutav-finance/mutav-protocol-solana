@@ -17,7 +17,7 @@ describe("queue heads (Q-2 / F10 explanation)", () => {
   it("explains a redemption that needs more than free capital", () => {
     const h = redeemHead(config(), st, sol, L([], [red(0n, "A", 6_000n * BRL)]))!;
     expect(h.value).toBe(6_000n * BRL);
-    expect(h.stuck.join()).toMatch(/needs R\$ 6,000\.00 and only R\$ 5,000\.00 is available \(free capital\)/);
+    expect(h.stuck.join()).toMatch(/needs R\$\s6,000\.00 and only R\$\s5,000\.00 is available \(free capital\)/);
   });
   it("explains unmet price limits, under-coverage, the TVL cap and a de-listed owner", () => {
     expect(redeemHead(config(), st, sol, L([], [red(0n, "A", 1_000n * BRL, 2_000n * BRL)]))!.stuck.join()).toMatch(/price limit is not met/);

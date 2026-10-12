@@ -84,6 +84,22 @@ export function historyWindow(h: History, span: bigint | null): HistoryWindow {
   return { start, end, points, min, max };
 }
 
+/**
+ * The window to open the chart on: the smallest finite span (from `spans`,
+ * smallest first) that holds every dated movement, else the whole-history key
+ * (span null), so a six-month history shows in full without a click. With no
+ * dated movement, `empty` (the flat line looks the same in any window).
+ */
+export function coveringPeriod<K extends string>(h: History, spans: Record<K, bigint | null>, empty: K): K {
+  const first = h.steps[0];
+  if (!first) return empty;
+  const entries = Object.entries(spans) as [K, bigint | null][];
+  const finite = entries.filter((e): e is [K, bigint] => e[1] !== null).sort((x, y) => (x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0));
+  const fit = finite.find(([, span]) => first.at >= h.now - span);
+  if (fit) return fit[0];
+  return entries.find(([, span]) => span === null)?.[0] ?? finite.at(-1)?.[0] ?? empty;
+}
+
 /** The point in effect at time `t` (the last one at or before it). */
 export function pointAt(w: HistoryWindow, t: bigint): number {
   let i = 0;

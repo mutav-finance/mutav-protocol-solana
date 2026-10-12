@@ -29,8 +29,12 @@ export function Empty({ children }: { children: ReactNode }) {
   );
 }
 
-/** A data table. `tips` adds an ⓘ to the named column headers (what the column means, in one or two sentences). */
-export function Table({ head, children, label, tips = {} }: { head: (string | [string, "num"])[]; children: ReactNode; label: string; tips?: Record<string, string> }) {
+/**
+ * A data table. `tips` adds an ⓘ to the named column headers (what the column
+ * means, in one or two sentences). `className` goes on the <table> (e.g. a
+ * phone layout such as `claims-table`).
+ */
+export function Table({ head, children, label, tips = {}, className = "" }: { head: (string | [string, "num"])[]; children: ReactNode; label: string; tips?: Record<string, string>; className?: string }) {
   const cell = (name: string) =>
     tips[name] ? (
       <span className="inline-flex items-center gap-1.5">
@@ -42,7 +46,7 @@ export function Table({ head, children, label, tips = {} }: { head: (string | [s
     );
   return (
     <div className="table-wrap scroll-dark">
-      <table className="data-table" aria-label={label}>
+      <table className={`data-table ${className}`} aria-label={label}>
         <thead>
           <tr>
             {head.map((h) => (Array.isArray(h) ? <th key={h[0]} className="num">{cell(h[0])}</th> : <th key={h}>{cell(h)}</th>))}
@@ -54,8 +58,9 @@ export function Table({ head, children, label, tips = {} }: { head: (string | [s
   );
 }
 
-export const Num = ({ children, color }: { children: ReactNode; color?: string }) => (
-  <td className="num">
+/** A right-aligned figure cell; `label` names it where a phone layout drops the header row. */
+export const Num = ({ children, color, label }: { children: ReactNode; color?: string; label?: string }) => (
+  <td className="num" data-label={label}>
     <Mono style={color ? { color } : undefined}>{children}</Mono>
   </td>
 );
