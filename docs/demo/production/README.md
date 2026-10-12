@@ -19,7 +19,7 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 | `overlays/minimap.html` + `minimap-1-agency … minimap-5-pix.png`, `minimap-legend.png` | Flow minimap (agency platform → operator → program → BRS reserve → PIX record), one PNG per active step, plus the variant with the legend (built in the hackathon / pre-existing / simulated / next). `?active=1..5`, `?legend`. |
 | `overlays/honesty-label.html` + `honesty-built/agency/pix/fees.png` | The four honesty labels, one PNG each. `?id=built|agency|pix|fees`. |
 | `overlays/later-wipe.html` + `.png` | The "Later" wipe into chapter 2 (1.6 s); the PNG is the hold frame. |
-| `overlays/figure-callout.html` + `callout-share-value.png`, `callout-in-out.png` | F11 "1.000 → 1.022" and the F12 "R$4,000 in → R$4,086 out" fallback. |
+| `overlays/figure-callout.html` + `callout-share-value.png`, `callout-in-out.png` | F11 "0.600 → 0.613" and the F12 "R$4,000 in → R$4,086 out" fallback. |
 | `overlays/timer.html` + `timer-sample-*.png` | Elapsed timer (mm:ss), driven by `?start=<ms>&end=<ms>&fps=30`. The samples show a 42 s run; render the real one from the logged timestamps. |
 | `overlays/caption.html` | Caption template, used to burn in captions when ffmpeg has no libass. |
 | `tools/render.cjs` | Headless-Chromium renderer: `stills` (all PNGs), `timer`, `captions`, `seq` (animated frames). Usage in its header and in `edl.md`. |

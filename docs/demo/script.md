@@ -98,10 +98,10 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Honesty label:** PIX transfer simulated on devnet · settlement recorded on-chain
 - **Proof:** Three confirmed transactions on one ClaimFiling PDA.
 - **Edit:** Timer overlay driven by the logged on-chain timestamps (it jumps honestly across cuts). Cut confirmation waits.
-- **Retake:** Consumes the notice and R$1,500 of the leg and the R$20,000 period cap; a redo files NTC-PF-0002 and adds a timeline row.
+- **Retake:** One claim only. An earlier R$18,000 test claim already uses R$18,000 of the R$20,000 per-31-day cap, so exactly one R$1,500 claim can be paid. No on-chain retake unless the admin first raises max_claim_per_period with a Squads set_config (60 s time lock on this deploy). Rehearse on localnet first; if only the capture was bad, re-capture the screens, not the claim.
 
 **F8 · END STATE · 2 · Settled in minutes · 1:20 – 1:36 · /reserve/claims**: Filed → paid → settled
-- **On screen:** /reserve/claims: filed → paid → settled with on-chain timestamps; the timer stops at settled. Hold 3 s. Still covered: R$42,500 held, R$40,125 required.
+- **On screen:** /reserve/claims: filed → paid → settled with on-chain timestamps; the timer stops at settled. Hold 3 s. Still covered: R$42,500 held, R$40,125 required. The public timeline also shows an earlier R$18,000 test claim: fine to be visible on a disclaimed demo reserve. Frame the shot so Ana's row is the highlighted one.
 - **VO:** "On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days."
 - **Caption:** On-chain, filed → settled: [N] s · seguro-fiança: up to 30 days
 - **Honesty label:** PIX transfer simulated on devnet · settlement recorded on-chain
@@ -128,9 +128,9 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Retake:** Read-only.
 
 **F11 · END STATE · 3 · Capital efficiency · 1:44 – 1:51 · /reserve (Overview)**: Each share is worth more
-- **On screen:** /reserve after the off-camera fees, redemption and refresh: value per share 1.021545; overlay "1.000 → 1.022". Hold 2 s.
+- **On screen:** /reserve after the off-camera fees, redemption and refresh: value per share 0.612927; overlay "0.600 → 0.613". Hold 2 s.
 - **VO:** "Even after Ana's claim, each share is worth more."
-- **Caption:** Share value 1.000 → 1.022, after the claim
+- **Caption:** Share value 0.600 → 0.613, even after the claim
 - **Honesty label:** none (banner only)
 - **Proof:** VaultState after refresh.
 - **Edit:** End state; zoom from the hold still.
@@ -158,18 +158,20 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 | Step | Action (who) | Stable assets | Coverage required | Free capital | Value per share | Check |
 |---|---|---|---|---|---|---|
-| 0 | Deposits filled at 1.000000: wallet A R$40,000, wallet B R$4,000 (capital wallets; Squads fill) | R$44,000 | — | — | 1.000000 | requests within R$1k–R$100k; TVL ≪ R$1M |
-| 1 | Book: 8 leases × rent R$1,500 × (6 + 6) = R$18,000 cover each = R$144,000 (operator) | R$44,000 | R$36,000 | R$8,000 | 1.000000 | R$18k ≤ R$120k per guarantee |
-| 2 | Ana: + R$18,000 cover (operator) | R$44,000 | R$40,500 | R$3,500 | 1.000000 | (a) fits: needs R$4,500 of R$8,000 |
-| 2a | Capacity at this point: R$162,000 of cover on R$44,000 held (≈ 3.7×; at most 1/c = 4× at c = 0.25) | R$44,000 | R$40,500 | R$3,500 | 1.000000 | F9 card "R$44k held · R$162k of cover"; "up to four" = 1/c |
-| 3 | Next equal lease: would need R$45,000 (operator) | R$44,000 | R$40,500 | R$3,500 | 1.000000 | (a) refused: R$1,000 short; nothing changes |
-| 4 | file_claim R$1,500 on Ana, default leg (operator) | R$44,000 | R$40,500 | R$3,500 | 0.965909 | set aside; required = max(25% × cover, provisions) |
-| 5 | pay_claim R$1,500 (operator) | R$42,500 | R$40,125 | R$2,375 | 0.965909 | (b) still covered; (e) ≤ R$15k/call, ≤ R$20k/31 days |
-| 6 | contribute_fees R$3,060 gross = 17 lease-months × 12% × R$1,500; take R$612 → treasury, R$2,448 → reserve (operator) | R$44,948 | R$40,125 | R$4,823 | 1.021545 | (c) above the deposit value |
-| 7 | Wallet B redeems 4,000 shares → R$4,086.18 (Squads fill, then claim_assets) | R$40,861.82 | R$40,125 | R$736.82 | 1.021545 | (d) ≤ free R$4,823; ≥ R$1k; whole fill; still covered |
-| 6b (optional) | sweep_income R$357.90: one month of issuer revenue on R$44,948, simulated on devnet | R$45,305.90 | R$40,125 | R$5,180.90 | 1.029680 | B would receive R$4,118.72 |
+| 0 | Staged on devnet after earlier test claims: wallet A R$40,000, wallet B R$4,000; 73,333.33 shares (B holds 6,666.67) at 0.600000 | R$44,000 | — | — | 0.600000 | requests within R$1k–R$100k; TVL ≪ R$1M |
+| 1 | Book: 8 leases × rent R$1,500 × (6 + 6) = R$18,000 cover each = R$144,000 (operator) | R$44,000 | R$36,000 | R$8,000 | 0.600000 | R$18k ≤ R$120k per guarantee |
+| 2 | Ana: + R$18,000 cover (operator) | R$44,000 | R$40,500 | R$3,500 | 0.600000 | (a) fits: needs R$4,500 of R$8,000 |
+| 2a | Capacity at this point: R$162,000 of cover on R$44,000 held (≈ 3.7×; at most 1/c = 4× at c = 0.25) | R$44,000 | R$40,500 | R$3,500 | 0.600000 | F9 card "R$44k held · R$162k of cover"; "up to four" = 1/c |
+| 3 | Next equal lease: would need R$45,000 (operator) | R$44,000 | R$40,500 | R$3,500 | 0.600000 | (a) refused: R$1,000 short; nothing changes |
+| 4 | file_claim R$1,500 on Ana, default leg (operator) | R$44,000 | R$40,500 | R$3,500 | 0.579545 | set aside; required = max(25% × cover, provisions) |
+| 5 | pay_claim R$1,500 (operator) | R$42,500 | R$40,125 | R$2,375 | 0.579545 | (b) still covered; (e) ≤ R$15k/call, ≤ R$20k/31 days |
+| 6 | contribute_fees R$3,060 gross = 17 lease-months × 12% × R$1,500; take R$612 → treasury, R$2,448 → reserve (operator) | R$44,948 | R$40,125 | R$4,823 | 0.612927 | (c) above the deposit value |
+| 7 | Wallet B redeems its 6,666.67 shares → R$4,086.18 (Squads fill, then claim_assets) | R$40,861.82 | R$40,125 | R$736.82 | 0.612927 | (d) ≤ free R$4,823; ≥ R$1k; whole fill; still covered |
+| 6b (optional) | sweep_income R$357.90: one month of issuer revenue on R$44,948, simulated on devnet | R$45,305.90 | R$40,125 | R$5,180.90 | 0.617808 | B would receive R$4,118.72 |
 
 Two months of fees: one month beats a one-month-rent claim only with more than 10.4 leases (0.8 × 0.12 × N > 1), and the ≈ R$50k of devnet BRS in hand holds 9 at c = 0.25. Devnet BRS needed ≈ R$47,060.
+
+**Staged on devnet (2026-10-12):** program `GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`, the public test reserve (disclaimed as a demo). Earlier test claims leave the value per share at 0.600000 (73,333.33 shares; B holds 6,666.67); 0.579545 after Ana's claim is filed, 0.612927 after the fees; B's R$4,000 in → R$4,086.18 out is unchanged. An earlier R$18,000 test claim uses R$18,000 of the R$20,000 per-31-day cap: only one R$1,500 claim can be paid. Time locks on this deploy: 60 s (admin), 120 s (upgrade).
 
 **Plan A (pilot product; needs more sandbox BRS and a 12× form):**
 
@@ -203,13 +205,13 @@ Two months of fees: one month beats a one-month-rent claim only with more than 1
 
 | # | Step | Who signs | Wait |
 |---|---|---|---|
-| 1 | Deploy, initialize, verify.ts green (ADR 0028: c = 0.25, R$1M TVL, R$120k per guarantee, R$15k / R$20k claim caps) | Upgrade Squads 2-of-2 | 1 h lock |
+| 1 | Deploy, initialize, verify.ts green (ADR 0028: c = 0.25, R$1M TVL, R$120k per guarantee, R$15k / R$20k claim caps) | Upgrade Squads 2-of-2 | 120 s time lock (this deploy) |
 | 2 | App deployed for devnet with the must-haves (app-requirements) and the #59 banner | App owner | — |
 | 3 | Fund: capital wallet A R$40,000 BRS, capital wallet B R$4,000, operator R$3,060 (+R$358 for the optional sweep); SOL for each | BRS holder | — |
-| 4 | 00-setup: set_allowlist_root with A and B (if not set at initialize); request_deposit A 40,000, B 4,000; fulfil_deposits (count 2); claim_shares | Admin Squads 2-of-2; A, B | 5 min lock per round |
-| 5 | 00-setup: register 8 leases (rent 1500, 6× + 6×, refs MTV-PF-0001…0008, fictional agencies). Check: R$44,000 held, R$36,000 required, R$8,000 free, 8 active, 1.000000 | Operator | — |
+| 4 | 00-setup: set_allowlist_root with A and B (if not set at initialize); request_deposit A 40,000, B 4,000; fulfil_deposits (count 2); claim_shares | Admin Squads 2-of-2; A, B | 60 s time lock per round |
+| 5 | 00-setup: register 8 leases (rent 1500, 6× + 6×, refs MTV-PF-0001…0008, agencies Imobiliária Planalto (Ana's), Casa Gaúcha Imóveis, Rio Grande Lar (fictional)). Check: R$44,000 held, R$36,000 required, R$8,000 free, 8 active, 0.600000 | Operator | — |
 | 6 | Capture the cold open → chapter 2 live: F1, F2, register Ana (F3), Explorer end state (F4), F5, the refusal (F6), the F9 /reserve plate, then the claim live (F7) and /reserve/claims (F8). Log tx timestamps for the timer | Operator; anyone | — |
-| 7 | 05-offcamera: contribute_fees R$3,060; B request_redeem 4,000 shares → fulfil_redeems (count 1) → B claim_assets (R$4,086.18); refresh | Operator; B; Admin Squads 2-of-2; anyone | 5 min lock |
+| 7 | 05-offcamera: contribute_fees R$3,060; B request_redeem of all 6,666.67 shares → fulfil_redeems (count 1) → B claim_assets (R$4,086.18); refresh | Operator; B; Admin Squads 2-of-2; anyone | 60 s time lock |
 | 8 | Capture the chapter 3 end states: fee receipt (F10), /reserve share value (F11), /capital in → out (F12) | — | — |
 | 9 | Edit: chapter titles, the timer, the cards. Judge-ready check: mode Normal, covered (free R$736.82) | — | — |
 
@@ -217,6 +219,7 @@ No restore is needed: the reserve stays covered (free capital R$736.82 at the en
 
 ## 7. Capture, voice, captions
 
+- Before capture, load the operator's agency records into the recording browser.
 - Five live clicks (register, refused send, file, pay, settle); log on-chain times for the timer. End states after off-camera staging; the F9 plate right after the refusal.
 - Harness screencast: 1080p at 30 fps; 2× stills on holds only. Zooms over motion ≤ 1.3×, on holds up to 2×.
 - English VO, English burned-in captions + SRT; optional PT-BR SRT for the Superteam Brazil jury. SUSEP Circ. 621/2021 art. 43 in the description.
@@ -241,6 +244,7 @@ No restore is needed: the reserve stays covered (free capital R$736.82 at the en
 
 | Risk | Where | What to do |
 |---|---|---|
+| Claim cap nearly used | F7 | Only one R$1,500 claim fits the remaining R$2,000 of the period cap. For a second take, the admin raises max_claim_per_period with a Squads set_config (60 s time lock) first; rehearse on localnet. |
 | Not enough devnet BRS | staging | These numbers need ≈ R$47,060. With more sandbox BRS, Plan A (pilot product) is better. |
 | State drifted (stray lease or fee) | F6 | Free capital before Ana must be in [R$4,500, R$9,000) so Ana fits and the next equal lease does not. Close strays with close_guarantee VOID. |
 | Known app behaviours (harness, localnet) | F3, F6, F7 | Register resets to a red preview; the refusal error carries ~8 lines of encoded text; paid and settled rows vanish with their confirmation. Workarounds per shot; fixes listed in app-requirements. |
@@ -254,9 +258,9 @@ No restore is needed: the reserve stays covered (free capital R$736.82 at the en
 
 | Artefact | How it reads |
 |---|---|
-| /reserve | Covered, mode Normal: stable R$40,861.82, required R$40,125, value per share 1.021545 |
+| /reserve | Covered, mode Normal: stable R$40,861.82, required R$40,125, value per share 0.612927 |
 | Ana's guarantee 5e1f… | Active · default left R$7,500 · exit left R$9,000 · opaque id, no names |
-| /reserve/claims | One claim: R$1,500, filed → paid → settled, minutes apart |
+| /reserve/claims | Two claims: an earlier R$18,000 test claim and Ana's R$1,500, filed → paid → settled |
 | /reserve/capital | Deposits R$40,000 + R$4,000; one fee receipt (R$2,448 net, R$612 take); one claim; one redemption R$4,086.18 |
 | The refused lease | Nothing: it never landed |
 

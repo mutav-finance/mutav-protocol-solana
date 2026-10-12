@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Figure callout</title>
-<!-- F11/F12 callout, left side: ?id=share (1.000 -> 1.022) or ?id=inout (R$4,000 in -> R$4,086 out; fallback if /investment cannot show it).
+<!-- F11/F12 callout, left side: ?id=share (0.600 -> 0.613, the staged devnet reserve) or ?id=inout (R$4,000 in -> R$4,086 out; fallback if /investment cannot show it).
      1920x1080. Self-contained: inline CSS/JS, fonts as data: URIs (Geist, Inter, JetBrains Mono; SIL OFL).
      Query params: ?static (final state, no animation) · ?t=<ms> (freeze the in-animation at ms). -->
 <style>
@@ -67,7 +67,7 @@ body.opaque{background-color:var(--canvas);background-image:var(--grid);backgrou
 })();
 
 var F={
- share:['Value per share · after the claim','1.000','1.022'],
+ share:['Value per share · before the claim → now','0.600','0.613'],
  inout:['Capital wallet B · in → out','R$4,000 in','R$4,086 out']
 };
 var f=F[new URLSearchParams(location.search).get('id')]||F.share;
