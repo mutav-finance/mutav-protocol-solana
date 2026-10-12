@@ -11,8 +11,8 @@ import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
-import { fmtShares, fmtTime } from "@/lib/format";
-import { useFmt } from "@/components/MoneyProvider";
+import { fmtBrs, fmtShares, fmtTime } from "@/lib/format";
+import { Money } from "@/components/MoneyProvider";
 import { capitalQueue, type Ledger, type QueueRow, type ReserveView } from "@/lib/view";
 
 import { BlockHead, Empty, Num, PlusMark, Table, fmtAgo, plural } from "@/components/reserve/sections/shared";
@@ -46,7 +46,7 @@ const Badge = ({ mark, label }: { mark: string; label: string }) => (
 );
 
 /** One support cell: label, one value, one definition line. */
-function Cell({ label, value, sub }: { label: string; value: string; sub: string }) {
+function Cell({ label, value, sub }: { label: string; value: ReactNode; sub: string }) {
   return (
     <div className="bg-(--color-surface) flex min-w-0 flex-col gap-2 p-6">
       <Label>{label}</Label>
@@ -58,7 +58,6 @@ function Cell({ label, value, sub }: { label: string; value: string; sub: string
 
 /** [B + C] Hero (BRS waiting to deposit) and a three-cell support strip, sharing one border. */
 function Summary({ deposits, redeems, capital, owed, now }: { deposits: QueueRow[]; redeems: QueueRow[]; capital: string; owed: bigint; now: bigint }) {
-  const fmtBrs = useFmt();
   const all = [...deposits, ...redeems];
   const oldest = all.reduce<QueueRow | null>((m, x) => (m === null || x.requestedAt < m.requestedAt ? x : m), null);
   const ours = all.filter((x) => x.owner === capital).length;
@@ -66,13 +65,13 @@ function Summary({ deposits, redeems, capital, owed, now }: { deposits: QueueRow
     <div className="grid grid-cols-1 gap-px border lg:grid-cols-12" style={{ background: "var(--color-border)" }}>
       <div className="bg-(--color-surface) flex min-w-0 flex-col justify-center gap-2 p-6 lg:col-span-5">
         <Label>Waiting to deposit</Label>
-        <Mono style={{ fontSize: "clamp(36px, 5vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)", overflowWrap: "anywhere" }}>{fmtBrs(sum(deposits))}</Mono>
+        <Mono style={{ fontSize: "clamp(36px, 5vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)", overflowWrap: "anywhere" }}><Money brs={sum(deposits)} block /></Mono>
         <span className="font-body text-(--color-text-2) text-sm">{deposits.length === 0 ? "No deposit is waiting." : `${plural(deposits.length, "deposit", "deposits")} waiting. Filled in order.`}</span>
       </div>
       <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:col-span-7">
         <Cell label="Shares to redeem" value={fmtShares(sum(redeems))} sub={`Shares capital providers asked to turn back into BRS, in ${plural(redeems.length, "request", "requests")}.`} />
         <Cell label="Oldest request" value={oldest ? fmtAgo(now, oldest.requestedAt) : "none"} sub={oldest ? `The ${oldest.side === "deposit" ? "deposit" : "redemption"} waiting longest; it fills next on its side.` : "Nothing is waiting in either line."} />
-        <Cell label="Ready to collect" value={fmtBrs(owed)} sub="Redeemed BRS not yet withdrawn." />
+        <Cell label="Ready to collect" value={<Money brs={owed} block />} sub="Redeemed BRS not yet withdrawn." />
         <Cell label="MUTAV capital" value={`${ours} of ${all.length}`} sub="Requests from the MUTAV capital wallet. They wait in the same line, with no priority." />
       </div>
     </div>
@@ -136,7 +135,6 @@ function Line({ title, empty, rows, unitHead, unit, capital, now }: { title: str
 }
 
 export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
-  const fmtBrs = useFmt();
   const q = capitalQueue(r.state, l);
   const capital = r.config.mutavCapitalWallet;
   return (

@@ -1,47 +1,68 @@
 "use client";
 
 /**
- * The display currency for a page. Investor-facing pages (/capital,
- * /reserve) wrap themselves in it to show BRS amounts in dollars at the
- * /api/fx rate; outside it, amounts stay in BRS as reais (admin, operator).
+ * Money display: BRS is always the figure. Inside a MoneyProvider, with a
+ * USD/BRL rate from /api/fx (BCB PTAX), a small muted `≈ US$ X` hint follows
+ * it, plus one source line per page. Display only; the reserve holds BRS.
+ * Without a rate (or outside a provider: admin, operator) the hints render
+ * nothing and figures stay exactly as they were.
  */
 import { createContext, useContext, type ReactNode } from "react";
-import { fmtBrs } from "@/lib/format";
-import { useMoney } from "@/lib/client/use-money";
+import { fmtBrs, fmtUsdHint, fxSourceLine, toScaledRate } from "@/lib/format";
+import { useFx } from "@/lib/client/use-fx";
+import type { FxView } from "@/lib/server/fx";
 
-type Fmt = (base: bigint, places?: number) => string;
-const MoneyCtx = createContext<Fmt>(fmtBrs);
-/** The dollar rate in use (`US$1 = R$ 5.40`), or null when amounts show in BRS. */
-const RateCtx = createContext<string | null>(null);
-/** BRL per US$1 × FX_SCALE behind the dollar amounts, or null when amounts show in BRS. */
-const UsdBrlCtx = createContext<bigint | null>(null);
+const FxCtx = createContext<FxView | null>(null);
 
+/** Provides the display rate to the hints below it (reads /api/fx). */
 export function MoneyProvider({ children }: { children: ReactNode }) {
-  const { fmt, rate, fx } = useMoney();
+  return <FxCtx.Provider value={useFx()}>{children}</FxCtx.Provider>;
+}
+
+/** Test and preview hook: provide a fixed rate (or none). */
+export const FxProvider = FxCtx.Provider;
+
+/** The page's display rate, or null when there is none. */
+export const useDisplayFx = (): FxView | null => useContext(FxCtx);
+
+/**
+ * The small `≈ US$ X` after (or, with `block`, under) a BRS figure: mono,
+ * 2xs, regular weight, text-2. Renders nothing without a rate. `sign` is shown
+ * on both (pass the magnitude as `brs`).
+ */
+export function UsdHint({ brs, sign = "", block = false }: { brs: bigint; sign?: string; block?: boolean }) {
+  const fx = useContext(FxCtx);
+  const text = fx ? fmtUsdHint(brs, fx.rate, sign) : "";
+  if (!text) return null;
   return (
-    <MoneyCtx.Provider value={fmt}>
-      <RateCtx.Provider value={rate}>
-        <UsdBrlCtx.Provider value={fx?.usdBrl ?? null}>{children}</UsdBrlCtx.Provider>
-      </RateCtx.Provider>
-    </MoneyCtx.Provider>
+    <span
+      data-testid="usd-hint"
+      className={`font-mono text-(--color-text-2) text-2xs font-normal whitespace-nowrap ${block ? "mt-1 block" : "ml-2"}`}
+      style={{ fontVariantNumeric: "tabular-nums" }}
+    >
+      {text}
+    </span>
   );
 }
 
-/** One visible line wherever amounts show in dollars; nothing when there is no rate (amounts are then in BRS). */
-export function UsdNote({ rate }: { rate: string | null }) {
-  if (!rate) return null;
+/** A BRS figure (`fmtBrs`) with its US$ hint; drop it where `fmtBrs(x)` used to render. */
+export function Money({ brs, places = 2, sign = "", block = false }: { brs: bigint; places?: number; sign?: string; block?: boolean }) {
   return (
-    <p className="font-mono text-(--color-text-3) m-0 text-2xs" data-testid="usd-note">
-      Shown in US dollars at {rate}, for display only. The reserve holds BRS.
+    <>
+      {sign}
+      {fmtBrs(brs, places)}
+      <UsdHint brs={brs} sign={sign} block={block} />
+    </>
+  );
+}
+
+/** The one source line wherever US$ hints show; nothing without a rate. */
+export function UsdSource({ className = "" }: { className?: string }) {
+  const fx = useContext(FxCtx);
+  if (!fx || toScaledRate(fx.rate) === null) return null;
+  return (
+    <p className={`font-mono text-(--color-text-3) m-0 text-2xs ${className}`} data-testid="usd-source">
+      {fxSourceLine(fx)}
     </p>
   );
 }
-
-/** The dollar line for the page's MoneyProvider. */
-export const ProvidedUsdNote = () => <UsdNote rate={useContext(RateCtx)} />;
-
-/** Format a BRS amount in the page's display currency. */
-export const useFmt = (): Fmt => useContext(MoneyCtx);
-
-/** The page's USD/BRL rate (BRL per US$1 × FX_SCALE), or null when amounts show in BRS. */
-export const useUsdBrl = (): bigint | null => useContext(UsdBrlCtx);

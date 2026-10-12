@@ -6,7 +6,6 @@
  * known) cannot be placed on a time axis: their effect stays in the opening
  * balance. Pure; no number is invented beyond these differences.
  */
-import { brsToUsd, FX_SCALE } from "./format";
 import type { FlowKind, FlowRow } from "./view";
 
 export type HistoryStep = {
@@ -111,19 +110,4 @@ export function yTicks(min: bigint, max: bigint, count = 4): bigint[] {
     if (v >= max) break;
   }
   return ticks;
-}
-
-/**
- * `yTicks` in the display unit, returned in BRS base units for positioning.
- * With a USD rate (`usdBrl`, BRL per US$1 × FX_SCALE) the round steps are
- * taken in dollars, then mapped back to BRS rounded up, so `fmtUsd` of each
- * tick reads the round dollar value again (US$ 0 / 5,000 / 10,000…).
- * Without a rate this is `yTicks` in BRS.
- */
-export function displayTicks(min: bigint, max: bigint, usdBrl: bigint | null): bigint[] {
-  if (!usdBrl) return yTicks(min, max);
-  // Magnitude rounded up (`brsToUsd` truncates toward zero, so it lands back on the round value).
-  const up = (n: bigint) => (n + FX_SCALE - 1n) / FX_SCALE;
-  const toBrs = (usd: bigint) => (usd < 0n ? -up(-usd * usdBrl) : up(usd * usdBrl));
-  return yTicks(brsToUsd(min, usdBrl), brsToUsd(max, usdBrl)).map(toBrs);
 }

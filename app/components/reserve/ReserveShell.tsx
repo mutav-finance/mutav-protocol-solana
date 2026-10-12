@@ -9,7 +9,7 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MoneyProvider, ProvidedUsdNote } from "@/components/MoneyProvider";
+import { MoneyProvider, UsdSource } from "@/components/MoneyProvider";
 import { ReadError } from "@/components/Section";
 import { Button } from "@/components/ui/button";
 import { IntroDialog, introSeen } from "@/components/reserve/IntroDialog";
@@ -144,7 +144,7 @@ export function ReserveShell({ children }: { children: ReactNode }) {
           {d && (
             <ReserveCtx.Provider value={{ d, refresh: poll.refresh }}>
               <div className="flex flex-col gap-4">
-                <ProvidedUsdNote />
+                <UsdSource />
                 {/* Keyed by route so each view fades up on entry (globals.css: .mutav-view). */}
                 <div key={pathname} className="mutav-view flex flex-col gap-14">
                   {children}

@@ -1,13 +1,18 @@
 import { readFx, type FxResponse } from "@/lib/server/fx";
-import { errorResponse } from "@/lib/server/respond";
 import { jsonResponse } from "@/lib/serde";
 
-/** The USD/BRL display rate (lib/server/fx.ts); `{ fx: null }` when no source is configured. */
+/**
+ * The USD/BRL display rate (lib/server/fx.ts: BCB PTAX, cached ~1 h).
+ * Always 200: `{ fx: null }` when there is no rate, so pages just hide the
+ * US$ hints and never block on it.
+ */
 export async function GET() {
+  let fx: FxResponse["fx"] = null;
   try {
-    const body: FxResponse = { fx: await readFx() };
-    return jsonResponse(body);
-  } catch (e) {
-    return errorResponse(e);
+    fx = await readFx();
+  } catch {
+    fx = null;
   }
+  const body: FxResponse = { fx };
+  return jsonResponse(body);
 }

@@ -25,9 +25,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Action, Note, useLive } from "@/components/demo/shared";
 import { LABEL, TRACKING } from "./shared";
 import { CAPITAL_FORMS_PUBLIC } from "@/lib/flags";
-import { BRS_DECIMALS, SHARE_DECIMALS, fmtBrs, fmtShares, fmtUnits, parseBrs, parseUnitsOrZero, toInput } from "@/lib/format";
+import { BRS_DECIMALS, SHARE_DECIMALS, fmtBrs, fmtShares, fmtUnits, fmtUsdHint, parseBrs, parseUnitsOrZero, toInput } from "@/lib/format";
 import { limitWithSlippage } from "@/lib/queue";
-import type { Money } from "@/lib/client/use-money";
+import { useDisplayFx } from "@/components/MoneyProvider";
 import type { InvestorView } from "@/lib/server/investor";
 import { redeemSizeCheck } from "@/lib/view";
 
@@ -83,7 +83,9 @@ function GatedCard({ connected, checking }: { connected: boolean; checking: bool
  * allowlist state is not known yet). On a read error it is false: the page
  * shows the error with a retry, not "Checking access…".
  */
-export function RequestCard({ inv, loading, connected, money }: { inv: InvestorView | null; loading: boolean; connected: boolean; money: Money }) {
+export function RequestCard({ inv, loading, connected }: { inv: InvestorView | null; loading: boolean; connected: boolean }) {
+  const fx = useDisplayFx();
+  const usdHint = (v: bigint | null) => (v !== null && fx ? fmtUsdHint(v, fx.rate) : "");
   const { reserve } = useLive();
   const caps = reserve.config.caps;
   const { sharesOutstanding } = reserve.state;
@@ -168,7 +170,7 @@ export function RequestCard({ inv, loading, connected, money }: { inv: InvestorV
             unit={deposit ? "shares" : "BRS"}
             value={preview === null ? "" : deposit ? fmtShares(preview) : fmtUnits(preview, BRS_DECIMALS)}
             readOnly
-            foot={<span>{value !== null && money.fx ? `≈ ${money.fmt(value)} · ` : ""}At today&apos;s share price. The fill price sets the final amount.</span>}
+            foot={<span>{usdHint(value) && `${usdHint(value)} · `}At today&apos;s share price. The fill price sets the final amount.</span>}
           />
           <Field
             id="inv-limit"

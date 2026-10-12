@@ -21,8 +21,8 @@ import { HistoryChart } from "@/components/reserve/HistoryChart";
 import { FlowDiagram } from "@/components/reserve/FlowDiagram";
 import { HeroAmount, Lead, abs, fmtAgo, plural } from "@/components/reserve/sections/shared";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
-import { fmtBps, fmtRatio, fmtSharePrice, fmtTime } from "@/lib/format";
-import { useFmt } from "@/components/MoneyProvider";
+import { fmtBps, fmtBrs, fmtRatio, fmtSharePrice, fmtTime } from "@/lib/format";
+import { Money } from "@/components/MoneyProvider";
 import { FLOW_KIND_LABEL, capitalQueue, claimsTimeline, coverageRows, isUnpaid, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
 
 /** The two promises the spec makes, each linked to the view that shows them. */
@@ -125,7 +125,6 @@ function programLine(r: ReserveView): { text: string; fine: boolean } {
 }
 
 function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
-  const fmtBrs = useFmt();
   const s = r.state;
   const sol = r.coverage;
   const covered = sol.stableAssets >= sol.coverageRequired;
@@ -151,16 +150,16 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
   const agencies = new Set(active.map((g) => g.agencyId)).size;
   const awaiting = claimsTimeline(l).filter((c) => isUnpaid(c.stage)).length;
 
-  const kpis: { label: string; value: string; def: string; href?: string }[] = [
-    { label: "Free capital", value: fmtBrs(sol.freeCapital), def: "Free for new guarantees and redemptions." },
+  const kpis: { label: string; value: ReactNode; def: string; href?: string }[] = [
+    { label: "Free capital", value: <Money brs={sol.freeCapital} block />, def: "Free for new guarantees and redemptions." },
     { label: `Share price (published at last refresh · ${fmtTime(s.lastRefreshTs)})`, value: fmtSharePrice(s.navPerShare), def: "What each share is worth, after claims are set aside." },
     {
       label: "Remaining cover",
-      value: fmtBrs(s.remainingCoverTotal),
+      value: <Money brs={s.remainingCoverTotal} block />,
       def: `Still guaranteed on ${plural(active.length, "active guarantee")} at ${plural(agencies, "agency", "agencies")}.`,
       href: "/reserve/coverage",
     },
-    { label: "Set aside for claims", value: fmtBrs(s.provisions), def: `For ${plural(awaiting, "claim")} filed, not yet paid.`, href: "/reserve/claims" },
+    { label: "Set aside for claims", value: <Money brs={s.provisions} block />, def: `For ${plural(awaiting, "claim")} filed, not yet paid.`, href: "/reserve/claims" },
   ];
 
   const program = programLine(r);
@@ -173,6 +172,7 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
           phrase="Reserve balance"
           tip="BRS in the reserve token account. Deposits waiting in line and BRS owed to filled redemptions are not counted."
           value={fmtBrs(sol.stableAssets)}
+          usd={sol.stableAssets}
           color="var(--color-accent)"
           size="clamp(44px, 6.5vw, 72px)"
         >
@@ -269,7 +269,6 @@ function splitRows(c: CapitalSplit, filed: number): SplitRow[] {
 }
 
 function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
-  const fmtBrs = useFmt();
   const c = capitalSplit(r.coverage, r.state.provisions);
   const under = c.shortfall > 0n;
   const filed = claimsTimeline(l).filter((x) => isUnpaid(x.stage)).length;
@@ -282,13 +281,13 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
   const head = under
     ? {
         label: "Shortfall",
-        value: `−${fmtBrs(c.shortfall)}`,
+        value: <Money brs={c.shortfall} sign="−" block />,
         color: SHORT,
         note: "Every BRS held is committed. New guarantees and redemptions are stopped until the reserve holds what it must; claim payments are not.",
       }
     : {
         label: "Free capital",
-        value: fmtBrs(c.freeCapital),
+        value: <Money brs={c.freeCapital} block />,
         color: "var(--color-text)",
         note:
           committed === 0n
@@ -400,7 +399,6 @@ function RecentActivity({ r, rows }: { r: ReserveView; rows: FlowRow[] }) {
 }
 
 function ActivityRow({ x, now, rpc, last }: { x: FlowRow; now: bigint; rpc: string; last: boolean }) {
-  const fmtBrs = useFmt();
   const into = x.reserveDelta >= 0n;
   // A bare "slot N" says nothing to a reader; the slot stays in the hover title (as in the ledger).
   const slotOnly = /^slot \d+$/.test(x.detail);

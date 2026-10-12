@@ -14,8 +14,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
-import { fmtDuration, fmtTime } from "@/lib/format";
-import { useFmt } from "@/components/MoneyProvider";
+import { fmtBrs, fmtDuration, fmtTime } from "@/lib/format";
 import { CLAIM_STAGE_LABEL, type ClaimRow } from "@/lib/view";
 import { Num, Table, short } from "@/components/reserve/sections/shared";
 
@@ -71,7 +70,6 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
-  const fmtBrs = useFmt();
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [all, setAll] = useState(false);
   // Stable sort: exceptions first, newest filing within each group (claimsTimeline returns newest first).

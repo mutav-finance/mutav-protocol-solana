@@ -12,21 +12,21 @@
  * right (never behind numbers), one strip of three reserve figures, then the
  * request card on the left as the lead and the wallet's requests beside it.
  */
+import type { ReactNode } from "react";
 import { InfoTooltip } from "@/components/InfoTooltip";
-import { UsdNote } from "@/components/MoneyProvider";
+import { Money, MoneyProvider, UsdSource } from "@/components/MoneyProvider";
 import { Mono } from "@/components/Mono";
 import { ReadError } from "@/components/Section";
 import { LiveProvider } from "@/components/demo/shared";
 import { QueueEntries } from "./QueueEntries";
 import { useInvestor } from "./useInvestor";
 import { fmtSharePrice, fmtTime } from "@/lib/format";
-import { useMoney, type Money } from "@/lib/client/use-money";
 import type { ReserveView } from "@/lib/view";
 import { RequestCard } from "./RequestCard";
 
 /** NAV per share as a share price in BRS, 4 places: `1.3240 BRS`. */
 /** One figure of the strip: a caps label with its definition, and the value. */
-function Stat({ label, tip, value }: { label: string; tip: string; value: string }) {
+function Stat({ label, tip, value }: { label: string; tip: string; value: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="inline-flex items-center gap-1.5">
@@ -42,8 +42,7 @@ function Stat({ label, tip, value }: { label: string; tip: string; value: string
   );
 }
 
-function Stats({ r, money }: { r: ReserveView; money: Money }) {
-  const usd = money.rate ? ` Shown in US dollars at ${money.rate}.` : "";
+function Stats({ r }: { r: ReserveView }) {
   return (
     <div role="group" aria-label="Reserve figures" className="bg-(--color-surface-2) grid grid-cols-1 gap-x-6 gap-y-4 border px-5 py-4 sm:grid-cols-3">
       {/* The strip's labels do not wrap: the publication time goes in the definition. */}
@@ -52,8 +51,8 @@ function Stats({ r, money }: { r: ReserveView; money: Money }) {
         tip={`Published at last refresh · ${fmtTime(r.state.lastRefreshTs)}. Reserve value after claims set aside, per share.`}
         value={fmtSharePrice(r.state.navPerShare)}
       />
-      <Stat label="Reserve balance" tip={`BRS the reserve holds now.${usd}`} value={money.fmt(r.coverage.stableAssets)} />
-      <Stat label="Free capital" tip={`What the reserve can use for redemptions and new guarantees.${usd}`} value={money.fmt(r.coverage.freeCapital)} />
+      <Stat label="Reserve balance" tip="BRS the reserve holds now." value={<Money brs={r.coverage.stableAssets} block />} />
+      <Stat label="Free capital" tip="What the reserve can use for redemptions and new guarantees." value={<Money brs={r.coverage.freeCapital} block />} />
     </div>
   );
 }
@@ -108,9 +107,9 @@ function Header() {
 
 export function InvestmentPage() {
   const { connected, owner, poll, d, inv, invData, mine, refresh } = useInvestor();
-  const money = useMoney();
   const pad = { paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" };
   return (
+    <MoneyProvider>
     <main className="flex w-full flex-1 flex-col pb-8">
       <Header />
 
@@ -122,18 +121,19 @@ export function InvestmentPage() {
           <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh }}>
             <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6">
               <div className="flex flex-col gap-2">
-                <Stats r={d.reserve} money={money} />
-                <UsdNote rate={money.rate} />
+                <Stats r={d.reserve} />
+                <UsdSource />
               </div>
               {inv.error && !invData && <ReadError error={inv.error} onRetry={() => void inv.refresh()} />}
               <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
-                <RequestCard inv={invData} loading={inv.loading} connected={connected} money={money} />
-                <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} money={money} now={d.reserve.now} />
+                <RequestCard inv={invData} loading={inv.loading} connected={connected} />
+                <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} now={d.reserve.now} />
               </div>
             </div>
           </LiveProvider>
         )}
       </div>
     </main>
+    </MoneyProvider>
   );
 }

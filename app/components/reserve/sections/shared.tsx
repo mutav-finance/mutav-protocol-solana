@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { UsdHint } from "@/components/MoneyProvider";
 import type { Ledger, ReserveView } from "@/lib/view";
 
 /** What /api/ledger returns. */
@@ -69,9 +70,10 @@ export function moneyParts(s: string): [string, string, string] {
  * A tab's hero figure: an uppercase display phrase, the amount in the display
  * face at weight 800 (a deliberate exception to mono, for the hero only) with
  * the sign and decimals at 0.55em in text-2, then a context line after a 1px
- * rule. One amber hero per view; the others pass `color` text.
+ * rule. One amber hero per view; the others pass `color` text. `usd` (the
+ * BRS amount behind `value`) adds the small US$ hint under it when a rate is set.
  */
-export function HeroAmount({ phrase, tip, value, color = "var(--color-text)", size = "clamp(40px, 5vw, 60px)", children }: { phrase: string; tip?: ReactNode; value: string; color?: string; size?: string; children?: ReactNode }) {
+export function HeroAmount({ phrase, tip, value, usd, color = "var(--color-text)", size = "clamp(40px, 5vw, 60px)", children }: { phrase: string; tip?: ReactNode; value: string; usd?: bigint; color?: string; size?: string; children?: ReactNode }) {
   const [sign, whole, cents] = moneyParts(value);
   const small = { fontSize: "0.55em", color: "var(--color-text-2)", letterSpacing: 0 } as const;
   return (
@@ -90,6 +92,7 @@ export function HeroAmount({ phrase, tip, value, color = "var(--color-text)", si
         {sign && <span style={small}>{sign}</span>}
         {whole}
         {cents && <span style={small}>{cents}</span>}
+        {usd !== undefined && <UsdHint brs={usd} block />}
       </span>
       {children && <div className="flex max-w-[640px] items-baseline gap-2.5 border-t pt-3 text-sm">{children}</div>}
     </div>

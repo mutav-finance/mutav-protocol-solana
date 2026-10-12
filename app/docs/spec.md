@@ -43,6 +43,8 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 
 Read-only, no wallet needed.
 
+Money: BRS primary; US$ hint from PTAX/BCB, display only. Every amount shows in BRS; the main figures here, on `/capital` and on the landing strip carry a small muted `≈ US$ X` at the latest Banco Central PTAX selling rate (BRS = BRL 1:1), with one source line ("US$ at PTAX (Banco Central do Brasil), dd/mm/yyyy. Display only; the reserve holds BRS."). Without a rate the hints and the line are hidden. Nothing about the rate feeds a transaction.
+
 - **Health:** `stable_assets`, `coverage_required`, surplus, `free_capital`, NAV per share, shares outstanding, `mode` (Normal / UnderCovered), `fulfil_halted`, paused, last refresh.
 - **Coverage:** remaining cover by guarantee (default and exit legs), active guarantee count, per-agency exposure.
 - **Claims timeline:** each claim with on-chain timestamps for filed → paid → settled, and the PIX settlement hash. This is the "proven speed" view (the payout SLA is the operator platform's, ADR 0019).

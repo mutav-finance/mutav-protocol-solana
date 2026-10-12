@@ -16,8 +16,8 @@ import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
-import { fmtBps, fmtPct, fmtTime } from "@/lib/format";
-import { useFmt } from "@/components/MoneyProvider";
+import { fmtBps, fmtBrs, fmtPct, fmtTime } from "@/lib/format";
+import { Money } from "@/components/MoneyProvider";
 import { frac } from "@/lib/charts";
 import { activeRemainingCover, agencyRows, coverageRows, type AgencyRow, type CoverageRow, type Ledger, type ReserveView } from "@/lib/view";
 import { C } from "@/components/charts/Charts";
@@ -97,7 +97,7 @@ function ShareMeter({ a, total }: { a: AgencyRow; total: bigint }) {
 }
 
 /** One label/value pair in the hero strip; `sub` is a one-line plain-English definition. */
-function StripCell({ label, swatch, value, sub, color }: { label: string; swatch?: string; value: string; sub: ReactNode; color?: string }) {
+function StripCell({ label, swatch, value, sub, color }: { label: string; swatch?: string; value: ReactNode; sub: ReactNode; color?: string }) {
   return (
     <div className="bg-(--color-surface) flex min-w-0 flex-col gap-2 px-4 py-3">
       <p className={`${LABEL} inline-flex items-center gap-2`} style={LABEL_STYLE}>
@@ -112,7 +112,6 @@ function StripCell({ label, swatch, value, sub, color }: { label: string; swatch
 
 /** A guarantee row; its secondary fields open in a detail row under it (rendered only when open). */
 function GuaranteeRow({ g, axis, agency }: { g: CoverageRow; axis: bigint; agency: ReactNode }) {
-  const fmtBrs = useFmt();
   const [open, setOpen] = useState(false);
   const detailId = `g-${g.address}`;
   return (
@@ -182,7 +181,6 @@ function Detail({ term, children }: { term: string; children: ReactNode }) {
 }
 
 export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
-  const fmtBrs = useFmt();
   const rows = byRemaining(coverageRows(l.guarantees));
   const agencies = agencyRows(l.guarantees);
   const sum = activeRemainingCover(rows);
@@ -234,7 +232,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
     <div className="flex flex-col gap-8">
       <MotionStyle />
       <div className="bg-(--color-surface) flex flex-col gap-6 border p-6">
-        <HeroAmount phrase="Remaining cover" value={fmtBrs(sum)}>
+        <HeroAmount phrase="Remaining cover" value={fmtBrs(sum)} usd={sum}>
           <span className="font-body text-(--color-text-2)">
             {`Left on ${plural(active.length, "active guarantee", "active guarantees")} at ${plural(agenciesActive, "agency", "agencies")}, after claims paid.`}
           </span>
@@ -258,8 +256,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
           </span>
         </div>
         <div className="-mx-px grid grid-cols-1 gap-px border sm:grid-cols-2" style={{ background: "var(--color-border)" }}>
-          <StripCell label="Unpaid rent" swatch={LEG.default} value={fmtBrs(defaultLeft)} sub={`Rent and charges in arrears while leases run (the default leg); ${share(defaultLeft, sum)} of remaining.`} />
-          <StripCell label="Move-out debts" swatch={LEG.exit} value={fmtBrs(exitLeft)} sub={`Tenant debts up to and at the end of occupation (the exit leg); ${share(exitLeft, sum)} of remaining.`} />
+          <StripCell label="Unpaid rent" swatch={LEG.default} value={<Money brs={defaultLeft} block />} sub={`Rent and charges in arrears while leases run (the default leg); ${share(defaultLeft, sum)} of remaining.`} />
+          <StripCell label="Move-out debts" swatch={LEG.exit} value={<Money brs={exitLeft} block />} sub={`Tenant debts up to and at the end of occupation (the exit leg); ${share(exitLeft, sum)} of remaining.`} />
         </div>
       </div>
 
