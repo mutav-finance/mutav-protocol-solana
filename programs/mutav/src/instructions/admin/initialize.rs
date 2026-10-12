@@ -21,7 +21,7 @@
 
 use anchor_lang::{prelude::*, solana_program::bpf_loader_upgradeable};
 use anchor_spl::{
-    associated_token::{self, get_associated_token_address_with_program_id, AssociatedToken},
+    associated_token::{get_associated_token_address_with_program_id, AssociatedToken},
     token::Token,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
@@ -30,8 +30,9 @@ use crate::{
     constants::*,
     errors::MutavError,
     events::{ConfigChanges, VaultInitialized},
-    instructions::admin::{
-        validate_config, validate_money_accounts, validate_roles, Installing, Money,
+    instructions::{
+        admin::{validate_config, validate_money_accounts, validate_roles, Installing, Money},
+        capital::create_owner_ata,
     },
     state::{CapsInput, VaultConfig, VaultState},
     token_guard,
@@ -302,15 +303,13 @@ fn create_income_inbox(ctx: &Context<Initialize>) -> Result<()> {
         expected,
         MutavError::InvalidIncomeSource
     );
-    associated_token::create_idempotent(CpiContext::new(
+    create_owner_ata(
+        a.payer.to_account_info(),
+        a.income_inbox.to_account_info(),
+        a.vault_authority.to_account_info(),
+        a.reserve_mint.to_account_info(),
+        a.system_program.to_account_info(),
+        a.reserve_token_program.to_account_info(),
         a.associated_token_program.key(),
-        associated_token::Create {
-            payer: a.payer.to_account_info(),
-            associated_token: a.income_inbox.to_account_info(),
-            authority: a.vault_authority.to_account_info(),
-            mint: a.reserve_mint.to_account_info(),
-            system_program: a.system_program.to_account_info(),
-            token_program: a.reserve_token_program.to_account_info(),
-        },
-    ))
+    )
 }
