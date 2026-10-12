@@ -3,6 +3,7 @@ import { MainnetRefusedError, redactUrls } from "../cluster";
 import { NotConfiguredError } from "./chain";
 import { RelayRefusedError } from "./relay";
 import { ComposeError } from "./compose";
+import { MockChainError } from "./mock";
 import { ProposalRefusedError, StaleCarryError } from "./squads";
 
 /**
@@ -25,7 +26,7 @@ export function errorResponse(e: unknown): Response {
   const logs =
     rawLogs == null ? null : Array.isArray(rawLogs) ? rawLogs.map((l) => redactUrls(String(l))) : [redactUrls(typeof rawLogs === "string" ? rawLogs : JSON.stringify(rawLogs))];
   if (e instanceof NotConfiguredError) return jsonResponse({ error: message, notConfigured: true }, { status: 503 });
-  if (e instanceof MainnetRefusedError || e instanceof RelayRefusedError) return jsonResponse({ error: message }, { status: 403 });
+  if (e instanceof MainnetRefusedError || e instanceof RelayRefusedError || e instanceof MockChainError) return jsonResponse({ error: message }, { status: 403 });
   if (e instanceof ComposeError || e instanceof ProposalRefusedError) return jsonResponse({ error: message }, { status: 400 });
   if (e instanceof StaleCarryError) return jsonResponse({ error: message }, { status: 409 });
   return jsonResponse({ error: message, logs: logs ?? null }, { status: 502 });

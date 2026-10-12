@@ -6,6 +6,7 @@ import { boundedBody } from "@/lib/server/relay";
 import { assertMember, composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 import type { TxRequest } from "@/lib/tx-kinds";
+import { MockChainError, mockEnabled } from "@/lib/server/mock";
 import { baselineMemo, setConfigFields } from "@/lib/config-diff";
 import { identifyMutavInstruction, MutavInstruction } from "@mutav-finance/mutav-protocol-solana";
 
@@ -23,6 +24,7 @@ export type BuildBody = {
  */
 export async function POST(req: Request) {
   try {
+    if (mockEnabled()) throw new MockChainError();
     const body = decode<BuildBody>(await boundedBody(req));
     const env = await guardedEnv();
     const signer = address(body.signer);
@@ -42,6 +44,7 @@ export async function POST(req: Request) {
     // A proposal is built only for a multisig member (one account read, before the queue or proposal scans).
     if (vault) await assertMember(env, signer);
     const ledger = body.request.kind === "fulfil_deposits" ? { deposits: await readDepositQueue(env, reserve, body.request.count) } : undefined;
+    // A redemption's holder check (ADR 0023) reads the signer's share balance inside compose.
     const ctx = { reserve, ledger, allowlist: env.allowlist, env };
 
     if (vault) {

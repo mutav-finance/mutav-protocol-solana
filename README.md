@@ -11,7 +11,7 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 | [Landing](https://reserve.mutav.finance) | The story, who does what (■ Reserve Admin, ◆ Operator, ▲ Investor), the protocol diagram |
 | [`/reserve`](https://reserve.mutav.finance/reserve) | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Solana Explorer. No wallet needed |
 | [`/operator`](https://reserve.mutav.finance/operator) | Operator console. During the pilot MUTAV's team signs by hand with the operator wallet; later mutav-app's backend sends the same instructions with a KMS-held key |
-| [`/investor`](https://reserve.mutav.finance/investor) | Capital-provider view, gated by the on-chain allowlist. The pilot runs on MUTAV's own capital and is not open to public investment |
+| [`/investor`](https://reserve.mutav.finance/investor) | Capital-provider view. Demo: the request form is visible to every visitor; on-chain actions stay allowlist-gated (holders can always redeem, ADR 0023). Before launch, set `CAPITAL_FORMS_PUBLIC` false to show the form only to allowlisted wallets (holders get redeem only). The pilot runs on MUTAV's own capital and is not open to public investment |
 | [`/admin`](https://reserve.mutav.finance/admin) | Reserve Admin: Squads v4 proposals (create, approve, execute after the time lock) |
 | [`/demo`](https://reserve.mutav.finance/demo) | Guided six-step walkthrough, with the coverage-gate preview |
 | [`/simulator`](https://reserve.mutav.finance/simulator) | Reserve simulator: size the reserve, coverage, yield against Selic |

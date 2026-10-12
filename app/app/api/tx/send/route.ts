@@ -4,6 +4,7 @@ import { assertRelayable, boundedBody, RelayRefusedError } from "@/lib/server/re
 import { errorResponse } from "@/lib/server/respond";
 import { SQUADS_PROGRAM } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
+import { MockChainError, mockEnabled } from "@/lib/server/mock";
 
 /**
  * Relay a wallet-signed transaction: LOCALNET ONLY. On devnet the wallet sends
@@ -11,6 +12,7 @@ import { decode, jsonResponse } from "@/lib/serde";
  */
 export async function POST(req: Request) {
   try {
+    if (mockEnabled()) throw new MockChainError();
     const env = serverEnv();
     if (env.cluster !== "localnet") throw new RelayRefusedError("the relay is localnet-only: on devnet the wallet sends the transaction itself");
     await assertClusterGenesis(env);

@@ -14,6 +14,7 @@ import type {
   VaultConfig,
   VaultState,
 } from "@mutav-finance/mutav-protocol-solana";
+import { isParked, isQueued } from "@mutav-finance/mutav-protocol-solana";
 import { bytesToHex } from "./serde";
 import { fmtShares } from "./format";
 
@@ -130,10 +131,7 @@ export const GUARANTEE_ACTIVE = 0;
 export const CLAIM_FILED = 0;
 export const CLAIM_PAID = 1;
 export const CLAIM_SETTLED = 3;
-export const DEPOSIT_PENDING = 0;
 export const DEPOSIT_FULFILLED = 1;
-/** Parked by the admin's cancel (ADR 0030): the escrow is still the owner's to collect with `cancel_deposit`. */
-export const DEPOSIT_CANCELLED = 2;
 
 export const MODE_LABEL = (mode: number) => (mode === 0 ? "Normal" : "UnderCovered");
 
@@ -298,6 +296,9 @@ export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">, m
 
 export type FlowKind = "fee" | "income" | "claim" | "deposit" | "redemption";
 
+/** A movement's name in the reserve's activity list and balance history. */
+export const FLOW_KIND_LABEL: Record<FlowKind, string> = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" };
+
 export type FlowRow = {
   kind: FlowKind;
   /** The account (fees, claims) or the transaction signature (fills, `isTx`). */
@@ -392,7 +393,7 @@ export function capitalQueue(
   ledger: Pick<Ledger, "deposits" | "redeems">,
 ): { deposits: QueueRow[]; redeems: QueueRow[] } {
   const deposits = ledger.deposits
-    .filter((d) => d.data.status === DEPOSIT_PENDING && d.data.seq >= state.depositHead)
+    .filter((d) => isQueued(d.data) && d.data.seq >= state.depositHead)
     .sort((a, b) => Number(a.data.seq - b.data.seq))
     .map((d, i): QueueRow => ({
       side: "deposit",
@@ -404,7 +405,7 @@ export function capitalQueue(
       position: i + 1,
     }));
   const redeems = ledger.redeems
-    .filter((r) => r.data.status === REDEEM_PENDING && r.data.seq >= state.redeemHead)
+    .filter((r) => isQueued(r.data) && r.data.seq >= state.redeemHead)
     .sort((a, b) => Number(a.data.seq - b.data.seq))
     .map((r, i): QueueRow => ({
       side: "redeem",
@@ -435,10 +436,6 @@ export function configSummary(c: VaultConfig) {
 }
 
 // ── Investor ────────────────────────────────────────────────────────────────
-
-export const REDEEM_PENDING = 0;
-/** `REDEEM_CANCELLED = 2`: parked by the admin's cancel (ADR 0030); the owner collects with `cancel_redeem`. */
-export const REDEEM_STATUS = ["pending", "filled", "parked"] as const;
 
 /** One of the connected investor's queue entries, with the actions the program would accept now. */
 export type InvestorRequest = {
@@ -490,8 +487,8 @@ export function investorRequests(
   const deposits = ledger.deposits
     .filter((d) => d.data.owner === owner)
     .map((d): InvestorRequest => {
-      const pending = d.data.status === DEPOSIT_PENDING;
-      const parked = d.data.status === DEPOSIT_CANCELLED;
+      const pending = isQueued(d.data);
+      const parked = isParked(d.data);
       return {
         side: "deposit",
         address: d.address,
@@ -508,16 +505,16 @@ export function investorRequests(
     .filter((r) => r.data.owner === owner)
     .map((r): InvestorRequest => {
       const actions: InvestorRequest["actions"] = [];
-      const pending = r.data.status === REDEEM_PENDING;
+      const pending = isQueued(r.data);
       // A parked request (ADR 0030) is out of the queue; its owner collects the shares.
-      const parked = r.data.status === REDEEM_STATUS.indexOf("parked");
+      const parked = isParked(r.data);
       if (pending || parked) actions.push("cancel_redeem");
       else actions.push("claim_assets");
       return {
         side: "redeem",
         address: r.address,
         seq: r.data.seq,
-        status: REDEEM_STATUS[r.data.status] ?? `status ${r.data.status}`,
+        status: pending ? "pending" : parked ? "parked" : "filled",
         requestedAt: r.data.requestedAt,
         waiting: pending || parked ? r.data.shares : 0n,
         claimable: pending || parked ? 0n : r.data.assetsOut,

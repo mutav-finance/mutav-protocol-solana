@@ -1,8 +1,9 @@
 /**
  * Mono — shared Evidence-layer span (JetBrains Mono, tabular nums).
  *
- * Use for all on-chain numbers, addresses, hashes, and terminal data values.
- * Layer 3 of the MUTAV three-layer typography system.
+ * Use only for figures, addresses, hashes, timestamps and code identifiers.
+ * Prose, sub-notes, captions, labels, empty states and helper text use the
+ * body font (`font-body`). Layer 3 of the MUTAV three-layer typography system.
  */
 
 import React from "react";

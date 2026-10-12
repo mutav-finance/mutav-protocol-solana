@@ -70,10 +70,10 @@ export function RoleLine({ items, children }: { items: { role: Role; prefix?: st
 }
 
 /** A compact key of the three roles (plus "Anyone" when asked), for page headers. */
-export function RoleLegend({ withAnyone = false }: { withAnyone?: boolean }) {
+export function RoleLegend({ withAnyone = false, centered = false }: { withAnyone?: boolean; centered?: boolean }) {
   const roles: Role[] = withAnyone ? ["admin", "operator", "investor", "anyone"] : ["admin", "operator", "investor"];
   return (
-    <div role="list" aria-label="Roles" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+    <div role="list" aria-label="Roles" style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: centered ? "center" : undefined }}>
       {roles.map((r) => (
         <span role="listitem" key={r}>
           <RoleTag role={r} bordered />
