@@ -159,6 +159,7 @@ export function Action({
   onConfirmed,
   next,
   refusal,
+  predicted,
 }: {
   label: string;
   /** The instruction name, shown as a small mono sub-label on the button. */
@@ -176,6 +177,8 @@ export function Action({
   next?: ReactNode;
   /** Preview numbers for the plain-English refusal line. */
   refusal?: RefusalContext;
+  /** The refusal the preview predicts: shown when the wallet's simulation rejects the send without a decodable program error. */
+  predicted?: string | null;
 }) {
   const live = useLive();
   const gate = useContext(GateCtx);
@@ -226,7 +229,7 @@ export function Action({
           beforeRef.current = snapshot(live.reserve);
           setBefore(beforeRef.current);
           setAfter(null);
-          await run(req, via);
+          await run(req, via, predicted);
         }}
         title={kind ? `Signer the program checks: ${expectedSigner(kind)}` : undefined}
       >
