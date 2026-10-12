@@ -8,6 +8,7 @@
 import { BPS_DENOMINATOR, MODE_NORMAL, U64_MAX, type Coverage } from "@mutav-finance/mutav-protocol-solana";
 import type { AgencyRow, ClaimRow, CoverageRow, FlowTotals, ReserveView } from "./view";
 import { FLOW_ROLES, type Role } from "./roles";
+import { fmtPctOf } from "./format";
 
 /** `part / whole` as a layout fraction in [0, 1]. Zero when `whole` is zero. */
 export function frac(part: bigint, whole: bigint): number {
@@ -162,8 +163,7 @@ export const coverageCeilingOf = (r: Pick<ReserveView, "config" | "state" | "cov
  */
 export function capacityLeft(k: Pick<CoverageCeiling, "ceiling" | "headroom" | "blockedBy">): string {
   if (k.blockedBy || k.ceiling <= 0n || k.headroom <= 0n) return "0.0%";
-  const tenths = (k.headroom * 2_000n + k.ceiling) / (2n * k.ceiling);
-  return `${tenths / 10n}.${tenths % 10n}%`;
+  return fmtPctOf(k.headroom, k.ceiling);
 }
 
 /** What NAV is computed on: stable assets split into net assets and open claim provisions. */

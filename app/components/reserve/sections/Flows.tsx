@@ -5,7 +5,7 @@
  * from, and where did it go? Renders on-chain values from /api/ledger; nothing
  * is computed here beyond sums and differences of account fields.
  *
- * Layout (top to bottom): hero (earned net) beside the image tile → the two
+ * Layout (top to bottom): the two
  * sides of the money, earnings and capital, as diverging bars → the dated
  * ledger → how the figures are counted. Earnings and capital never mix: a
  * deposit is not income.
@@ -17,7 +17,7 @@ import { C, Legend, Row, RowLabel, Swatch, Track } from "@/components/charts/Cha
 import { frac } from "@/lib/charts";
 import { fmtBrs, fmtPct, fmtTime } from "@/lib/format";
 import { Money } from "@/components/MoneyProvider";
-import { moneyFlows, type FlowRow, type Ledger, type ReserveView } from "@/lib/view";
+import { FLOW_KIND_LABEL, moneyFlows, type FlowRow, type Ledger, type ReserveView } from "@/lib/view";
 import { Button } from "@/components/ui/button";
 
 import { BlockHead, Empty, MotionStyle, Num, PlusMark, Table, signed } from "@/components/reserve/sections/shared";
@@ -70,7 +70,8 @@ export function PeriodPicker({ value, onChange, label }: { value: Period; onChan
 
 // ── Building blocks ─────────────────────────────────────────────────────────
 
-const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit", redemption: "Redemption" } as const;
+/** Ledger names: lib/view's, so the Overview's activity list and this ledger read the same. */
+const FLOW_LABEL = FLOW_KIND_LABEL;
 
 /** Ledger rows shown before "Show all". */
 const LEDGER_ROWS = 10;
@@ -154,7 +155,7 @@ function FlowGroup({ title, note, net, bars }: { title: string; note: string; ne
               key={b.label}
               labelWidth={170}
               label={<RowLabel sub={b.sub ? <span className="font-body text-(--color-text-3) text-2xs">{b.sub}</span> : undefined}>{b.label}</RowLabel>}
-              value={`${sign}${fmtBrs(b.amount, 0)}`}
+              value={`${sign}${fmtBrs(b.amount)}`}
               summary={`${b.label}: ${sign}${fmtBrs(b.amount)} ${b.dir === "in" ? "into" : "out of"} the reserve.${b.sub ? ` ${b.sub}.` : ""}`}
             >
               {/* Zero axis in the middle: out grows left, in grows right. */}
@@ -209,7 +210,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
   };
 
   const earnings: Bar[] = [
-    { label: "Guarantee fees", sub: `after ${fmtBrs(totals.feeTakeToTreasury, 0)} MUTAV fee (${fmtPct(r.config.feeTakeBps)})`, amount: totals.feesNetToReserve, dir: "in" },
+    { label: "Guarantee fees", sub: `after ${fmtBrs(totals.feeTakeToTreasury)} MUTAV fee (${fmtPct(r.config.feeTakeBps)})`, amount: totals.feesNetToReserve, dir: "in" },
     {
       label: "Issuer income",
       // No take on issuer income (ADR 0019).
@@ -220,8 +221,8 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
     { label: "Claim payments", sub: "paid to landlords", amount: totals.claimsPaid, dir: "out" },
   ];
   const capitalBars: Bar[] = [
-    { label: "Deposits", amount: totals.depositsIn, dir: "in" },
-    { label: "Redemptions", amount: totals.redemptionsOut, dir: "out" },
+    { label: "Capital in", sub: "deposits filled", amount: totals.depositsIn, dir: "in" },
+    { label: "Capital out", sub: "redemptions filled", amount: totals.redemptionsOut, dir: "out" },
   ];
 
   return (
@@ -283,7 +284,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
           How these figures are counted
         </summary>
         <ul className="font-body text-(--color-text-2) m-0 mt-4 flex flex-col gap-2 pl-6 text-sm leading-relaxed">
-          <li>Earned net = guarantee fees net + issuer income net − claim payments. Capital net = deposits − redemptions. A deposit is not income.</li>
+          <li>Net from guarantees = guarantee fees net + issuer income net − claim payments. Capital net = capital in − capital out. A deposit is not income.</li>
           <li>Guarantee fees, issuer income, the MUTAV fee and claim payments are lifetime totals from the reserve&apos;s state account.</li>
           <li>Capital sums the fills in the last 100 transactions of each queue account (deposits waiting in line, redemptions waiting in line).</li>
           <li>Each side has its own scale. Totals are since launch; the period filter applies to the ledger only.</li>
@@ -296,7 +297,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
 /** The Flows section of /reserve: heading (the question) and body. */
 export function FlowsSection({ d }: { d: Data }) {
   return (
-    <Section id="flows" title="Money flows" subtitle="Where did the reserve's money come from, and where did it go?">
+    <Section id="flows" title="Money" kicker="Money in and out" subtitle="Where did the reserve's money come from, and where did it go?">
       <Flows r={d.reserve} l={d.ledger} />
     </Section>
   );

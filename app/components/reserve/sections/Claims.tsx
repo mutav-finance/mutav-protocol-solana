@@ -10,13 +10,12 @@
  */
 import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
-import { fmtDuration } from "@/lib/format";
-import { Money } from "@/components/MoneyProvider";
-import { claimsTimeline, isUnpaid, type ClaimRow, type Ledger, type ReserveView } from "@/lib/view";
+import { fmtBrs, fmtDuration } from "@/lib/format";
+import { LEG_LABEL, claimsTimeline, isUnpaid, type ClaimRow, type Ledger, type ReserveView } from "@/lib/view";
 import { claimSpeed, frac } from "@/lib/charts";
 import { C, ChartFrame, Legend, Row, RowLabel, Swatch, Track, type Seg } from "@/components/charts/Charts";
 
-import { Empty, MotionStyle, short } from "@/components/reserve/sections/shared";
+import { Empty, HeroAmount, MotionStyle, short } from "@/components/reserve/sections/shared";
 import { PeriodPicker, inPeriod, type Period } from "@/components/reserve/sections/Flows";
 import { Section } from "@/components/Section";
 import { ClaimsTable } from "@/components/reserve/claims/ClaimsTable";
@@ -44,13 +43,13 @@ function GuardBand() {
   );
 }
 
-/** One cell of the support strip: label, value, optional sub-line. */
-function Cell({ label, value, sub, color, first }: { label: string; value: string; sub?: string; color?: string; first?: boolean }) {
+/** One cell of the support strip: label, value and a one-line sub-line (every cell has one). */
+function Cell({ label, value, sub, color, first }: { label: string; value: string; sub: string; color?: string; first?: boolean }) {
   return (
     <div className={`flex min-w-0 flex-col gap-2 p-6 ${first ? "" : "border-t sm:border-t-0 sm:border-l"}`}>
       <Label>{label}</Label>
       <Mono style={{ fontSize: 24, fontWeight: 700, lineHeight: 1, color: color ?? "var(--color-text)" }}>{value}</Mono>
-      {sub && <span className="font-body text-(--color-text-3) text-xs">{sub}</span>}
+      <span className="font-body text-(--color-text-2) text-xs leading-snug">{sub}</span>
     </div>
   );
 }
@@ -66,20 +65,19 @@ function Summary({ rows, total, period, onPeriod }: { rows: ClaimRow[]; total: n
   return (
     <div className="bg-(--color-surface) border">
       <div className="flex flex-wrap items-start justify-between gap-6 p-6">
-        <div className="flex flex-col gap-2">
-          <Label>Claims paid · {PERIOD_NAME[period]}</Label>
-          <Mono style={{ fontSize: "clamp(36px, 4vw, 48px)", fontWeight: 700, lineHeight: 1, color: "var(--color-text)" }}><Money brs={paidSum} block /></Mono>
-          <span className="font-body text-(--color-text-2) text-sm">
-            {paidRows.length} of {rows.length} {rows.length === 1 ? "claim" : "claims"} paid · {settled} received by landlord (PIX)
+        {/* The same hero as the Overview; text colour, since the Overview's balance is the one amber figure. */}
+        <HeroAmount phrase={`Claims paid · ${PERIOD_NAME[period]}`} value={fmtBrs(paidSum)} usd={paidSum}>
+          <span className="font-body text-(--color-text-2)">
+            {paidRows.length} of {rows.length} {rows.length === 1 ? "claim" : "claims"} paid · {settled} received by the landlord (PIX)
             {rows.length !== total && <span className="text-(--color-text-3)"> · {total} on record</span>}
           </span>
-        </div>
+        </HeroAmount>
         <PeriodPicker value={period} onChange={onPeriod} label="Claims period" />
       </div>
       <div className="grid grid-cols-1 border-t sm:grid-cols-3">
-        <Cell first label="Slowest filed → paid" value={pay === null ? "—" : fmtDuration(pay)} sub={pay === null ? "None paid yet" : undefined} />
-        <Cell label="Slowest paid → settled" value={settle === null ? "—" : fmtDuration(settle)} sub={settle === null ? "None settled yet" : undefined} />
-        <Cell label="Awaiting payment" value={String(awaiting)} sub="Recorded on-chain" />
+        <Cell first label="Slowest filed → paid" value={pay === null ? "—" : fmtDuration(pay)} sub={pay === null ? "None paid yet." : "From filing to the claim payment."} />
+        <Cell label="Slowest paid → settled" value={settle === null ? "—" : fmtDuration(settle)} sub={settle === null ? "None received by the landlord yet." : "From payment to the landlord's PIX receipt."} />
+        <Cell label="Awaiting payment" value={String(awaiting)} sub="Filed on-chain, not yet paid." />
       </div>
     </div>
   );
@@ -97,7 +95,7 @@ function SpeedChart({ rows, now }: { rows: ClaimRow[]; now: bigint }) {
       {claims.map((c) => {
         const p = pick(c);
         return (
-          <Row key={c.filing} label={<RowLabel><Mono>{short(c.guaranteeId)}</Mono> · {c.leg}</RowLabel>} value={p.text} summary={`Claim on ${short(c.guaranteeId)}, ${c.leg} leg: ${title.toLowerCase()} ${p.text}.`} labelWidth={130}>
+          <Row key={c.filing} label={<RowLabel><Mono>{short(c.guaranteeId)}</Mono> · {LEG_LABEL[c.leg]}</RowLabel>} value={p.text} summary={`Claim on ${short(c.guaranteeId)}, ${LEG_LABEL[c.leg]}: ${title.toLowerCase()} ${p.text}.`} labelWidth={150}>
             <Track segs={p.seg ? [p.seg] : []} marker={marker} />
           </Row>
         );
@@ -173,6 +171,7 @@ export function ClaimsSection({ d }: { d: Data }) {
     <Section
       id="claims"
       title="Claims"
+      kicker="Claim payments"
       subtitle="Are claims paid on time?"
       info="Filed: the claim is booked and its amount set aside for claims, so the share price reflects it before any money leaves the reserve. Paid: the claim payment leaves the reserve. Settled: the landlord receives it by PIX."
     >

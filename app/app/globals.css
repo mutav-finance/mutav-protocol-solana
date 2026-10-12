@@ -367,6 +367,18 @@ input:disabled {
   border-color: var(--color-accent);
 }
 
+/* Tab-like controls (Radix tabs, the /reserve tab row): the ring sits inset so
+   it never covers the active underline, and a click shows none (the control is
+   marked `data-mouse-focus` by lib/client/mouse-focus.ts until it blurs).
+   Keyboard focus keeps the ring. */
+[data-slot="tabs-trigger"]:focus-visible,
+.tab-link:focus-visible {
+  outline-offset: -2px;
+}
+[data-mouse-focus]:focus-visible {
+  outline: none;
+}
+
 /* ── Skip-to-content link — off-screen until keyboard focus, then drops in ── */
 .skip-link {
   position: fixed;
@@ -444,7 +456,6 @@ input:disabled {
   font-weight: 500;
   color: var(--color-text-2);
   text-decoration: none;
-  text-transform: capitalize;
 }
 .nav-tab:hover {
   color: var(--color-text);

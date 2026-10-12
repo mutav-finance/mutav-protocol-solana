@@ -135,7 +135,7 @@ describe("money flows and queue", () => {
     expect(totals).toEqual({ feesNetToReserve: 800n, feeTakeToTreasury: 200n, incomeNetToReserve: 1_500n, claimsPaid: 0n, depositsIn: 5_000n, redemptionsOut: 300n });
     expect(rows.map((r) => [r.kind, r.reserveDelta])).toEqual([["income", 1_500n], ["fee", 800n], ["redemption", -300n], ["deposit", 5_000n]]);
     expect(rows[0]).toMatchObject({ account: "I", treasury: 0n, detail: "statement 2026-10" });
-    expect(rows[3]).toMatchObject({ isTx: true, account: "S20", detail: "seq 0 · minted 1.000000 shares" });
+    expect(rows[3]).toMatchObject({ isTx: true, account: "S20", detail: "seq 0 · minted 1.00 shares" });
   });
 
   it("lists open requests in FIFO order from the heads", () => {

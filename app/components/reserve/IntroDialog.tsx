@@ -32,7 +32,7 @@ function markSeen() {
 
 export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => void }) {
   const [step, setStep] = useState(0);
-  const next = useRef<HTMLButtonElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
   const covered = r.coverage.stableAssets >= r.coverage.coverageRequired;
   const steps: { title: string; body: string; evidence: ReactNode }[] = [
     {
@@ -41,7 +41,7 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
       evidence: `Program ${r.programId}`,
     },
     {
-      title: "One question: can the reserve cover every guarantee?",
+      title: "One question: does the reserve hold what the rules require?",
       body: "The reserve balance must stay above coverage required. If it falls below, the program stops new guarantees and redemptions, never claim payments.",
       evidence: `${fmtBrs(r.coverage.stableAssets)} held ${covered ? "≥" : "<"} ${fmtBrs(r.coverage.coverageRequired)} required`,
     },
@@ -63,7 +63,9 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
     onClose();
   };
 
-  useEffect(() => next.current?.focus(), [step]);
+  // Focus the dialog itself once, so the keyboard starts inside it without a
+  // ring on any button; Next keeps the focus a click or Enter gave it.
+  useEffect(() => dialog.current?.focus(), []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("keydown", onKey);
@@ -72,7 +74,7 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(14,15,17,.92)" }}>
-      <div role="dialog" aria-modal="true" aria-labelledby="intro-h" className="bg-(--color-surface) flex w-full max-w-[520px] flex-col border" style={{ borderTop: "3px solid var(--color-accent)" }}>
+      <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="intro-h" className="bg-(--color-surface) flex w-full max-w-[520px] flex-col border" style={{ borderColor: "var(--color-border)", borderTopColor: "var(--color-accent)", outline: "none" }}>
         <div className="flex flex-col gap-4 p-8">
           <span className="font-body text-(--color-text-3) text-[11px] uppercase tabular-nums" style={{ letterSpacing: "0.08em" }}>
             How to read this page · {step + 1} of {steps.length}
@@ -93,7 +95,7 @@ export function IntroDialog({ r, onClose }: { r: ReserveView; onClose: () => voi
             <Button variant="ghost" className="text-(--color-text-2) h-10" onClick={close}>
               Skip
             </Button>
-            <Button ref={next} className="h-10 px-5 font-semibold" onClick={() => (last ? close() : setStep(step + 1))}>
+            <Button className="h-10 px-5 font-semibold" onClick={() => (last ? close() : setStep(step + 1))}>
               {last ? "Start reading" : "Next →"}
             </Button>
           </span>
