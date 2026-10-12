@@ -88,6 +88,17 @@ export type DecodeContext = {
   paymentsOwner?: string | null;
 };
 
+/**
+ * The context to decode one proposal with. A proposal that can no longer
+ * execute (Executed, Cancelled, Rejected, stale) keeps its recorded NAV bounds
+ * but drops the NAV-now check: "execute fails with NavOutOfBounds" is
+ * meaningless for a fill that already ran.
+ */
+export function contextForProposal(ctx: DecodeContext, live: boolean): DecodeContext {
+  if (live || ctx.nav === undefined) return ctx;
+  return { ...ctx, nav: undefined };
+}
+
 const MUTAV_NAMES = Object.fromEntries(
   Object.entries(MutavInstruction).filter(([, v]) => typeof v === "number").map(([k, v]) => [v as number, k]),
 ) as Record<number, string>;
