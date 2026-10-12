@@ -2,6 +2,7 @@
 import { useCallback, useState } from "react";
 import { useWallet } from "@/components/WalletProvider";
 import type { TxRequest } from "../tx-kinds";
+import { decodeProgramError } from "../tx-error";
 import { ApiError, getJson, postJson } from "./api";
 import { CLUSTER } from "./env";
 import { NOT_SEEN_HINT_SECS, notSeenText, transportFor, walletSendError } from "./transport";
@@ -16,18 +17,14 @@ export type TxState = {
   phase: TxPhase;
   signature: string | null;
   error: string | null;
+  /** The program error's name when the failure is a program refusal (see lib/tx-error). */
+  errorName: string | null;
   logs: string[] | null;
   instructions: TxInstructionInfo[] | null;
   proposalIndex: bigint | null;
 };
 
-const IDLE: TxState = { phase: "idle", signature: null, error: null, logs: null, instructions: null, proposalIndex: null };
-
-/** Map a program error to its name when the logs carry one. */
-function programError(message: string, logs: string[] | null): string {
-  const named = logs?.map((l) => /Error Code: (\w+)/.exec(l)?.[1]).find(Boolean);
-  return named ? `${named} — ${message}` : message;
-}
+const IDLE: TxState = { phase: "idle", signature: null, error: null, errorName: null, logs: null, instructions: null, proposalIndex: null };
 
 /**
  * Compose (server) → sign and send → confirm (server read). `build` returns
@@ -35,7 +32,7 @@ function programError(message: string, logs: string[] | null): string {
  * devnet the wallet signs and sends through its own RPC; on localnet the
  * wallet signs and the localnet-only relay sends (see lib/client/transport).
  */
-export function useTx(onConfirmed?: () => void) {
+export function useTx(onConfirmed?: (signature: string) => void) {
   const { address, signTransaction, signAndSendTransaction } = useWallet();
   const [state, setState] = useState<TxState>(IDLE);
 
@@ -63,7 +60,7 @@ export function useTx(onConfirmed?: () => void) {
           if (st.status === "failed") throw new Error(`transaction failed: ${JSON.stringify(st.err, (_, v) => (typeof v === "bigint" ? v.toString() : v))}`);
           if (st.status === "confirmed" || st.status === "finalized") {
             setState((s) => ({ ...s, phase: "confirmed", error: null }));
-            onConfirmed?.();
+            onConfirmed?.(signature);
             return signature;
           }
           // Still unseen: the wallet may have sent it to another cluster.
@@ -73,7 +70,8 @@ export function useTx(onConfirmed?: () => void) {
         throw new Error(st90(CLUSTER));
       } catch (e) {
         const logs = e instanceof ApiError ? e.logs : null;
-        setState((s) => ({ ...s, phase: "failed", error: programError((e as Error).message, logs), logs }));
+        const message = (e as Error).message;
+        setState((s) => ({ ...s, phase: "failed", error: message, errorName: decodeProgramError(message, logs), logs }));
         return null;
       }
     },

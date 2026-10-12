@@ -31,3 +31,15 @@ export const REF = {
 
 /** 32 random bytes as hex: an opaque agency id, or a salt. */
 export const randomRef = () => bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
+
+/**
+ * The label after `label`: its trailing number plus one, zero-padded to the
+ * same width (`MTV-PF-0009` → `MTV-PF-0010`). Without a trailing number, the
+ * demo default `lease-demo-NNN` for entry `n`.
+ */
+export function nextRef(label: string, n: number): string {
+  const m = /^(.*?)(\d+)$/.exec(label.trim());
+  if (!m) return `lease-demo-${String(n).padStart(3, "0")}`;
+  const next = String(Number(m[2]) + 1);
+  return `${m[1]}${next.padStart(m[2]!.length, "0")}`;
+}

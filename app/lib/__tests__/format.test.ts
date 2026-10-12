@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { brsToUsd, fmtBps, fmtBrs, fmtFxDate, fmtUsd, fmtUsdHint, fxSourceLine, toScaledRate, fmtDuration, fmtNav, fmtPct, fmtRatio, fmtShares, fmtTime, fmtUnits, parseBrs, shortAddr } from "../format";
+import { brsToUsd, elapsed, fmtBps, fmtBrs, fmtFxDate, fmtUsd, fmtUsdHint, fxSourceLine, toScaledRate, fmtDuration, fmtNav, fmtPct, fmtRatio, fmtShares, fmtStamp, fmtTime, fmtUnits, parseBrs, shortAddr } from "../format";
 
 describe("format", () => {
   it("formats BRS with grouping and truncation", () => {
@@ -27,6 +27,14 @@ describe("format", () => {
   it("formats times and addresses", () => {
     expect(fmtTime(0n)).toBe("—");
     expect(fmtTime(1_791_331_200n)).toBe("2026-10-07 00:00:00 UTC");
+  });
+  it("formats claim timestamps to the second and the filed → settled time", () => {
+    expect(fmtStamp(1_791_331_207n)).toBe("2026-10-07 00:00:07");
+    expect(fmtStamp(0n)).toBe("—");
+    expect(elapsed(1_791_331_200n, null)).toBeNull();
+    const s = elapsed(1_791_331_200n, 1_791_331_200n + 312n);
+    expect(s).toBe(312n);
+    expect(fmtDuration(s!)).toBe("5m 12s");
     expect(shortAddr("8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9")).toBe("8scC…Qqv9");
   });
   it("parses BRS input exactly", () => {

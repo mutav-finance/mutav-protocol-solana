@@ -10,11 +10,13 @@ import { navPerShare } from "@mutav-finance/mutav-protocol-solana";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { TxStatus } from "@/components/TxStatus";
 import { useWallet } from "@/components/WalletProvider";
 import { useTx } from "@/lib/client/use-tx";
 import { fmtBrs, fmtNav, fmtShares } from "@/lib/format";
+import type { RefusalContext } from "@/lib/tx-error";
 import { expectedSigner, type TxRequest } from "@/lib/tx-kinds";
 import { MODE_LABEL, type Ledger, type ReserveView } from "@/lib/view";
 
@@ -151,6 +153,9 @@ export function Action({
   via,
   variant = "default",
   onDone,
+  onConfirmed,
+  next,
+  refusal,
 }: {
   label: string;
   request: TxRequest | null | (() => Promise<TxRequest | null>);
@@ -158,6 +163,12 @@ export function Action({
   via?: "squads" | "direct";
   variant?: "default" | "outline" | "destructive";
   onDone?: () => void;
+  /** Called as soon as the transaction confirms, before the post-confirmation read, with the numbers read before the send. */
+  onConfirmed?: (signature: string, before: Snap | null) => void;
+  /** Shown in place of the send button once confirmed: the result holds until the user starts the next one. */
+  next?: ReactNode;
+  /** Preview numbers for the plain-English refusal line. */
+  refusal?: RefusalContext;
 }) {
   const live = useLive();
   const gate = useContext(GateCtx);
@@ -166,7 +177,10 @@ export function Action({
   // Bumped once the post-confirmation read has landed, so "after" is fresh.
   const [tick, setTick] = useState(0);
   const handled = useRef(0);
-  const { state, run } = useTx(async () => {
+  // The confirm callback closes over the render that started the send, so it reads "before" from a ref.
+  const beforeRef = useRef<Snap | null>(null);
+  const { state, run } = useTx(async (signature) => {
+    onConfirmed?.(signature, beforeRef.current);
     await live.refresh();
     setTick((t) => t + 1);
     onDone?.();
@@ -183,13 +197,15 @@ export function Action({
   const kind = typeof request === "function" ? null : request?.kind;
   return (
     <div>
+      {state.phase === "confirmed" && next ? next : (
       <Button
         variant={variant}
         disabled={disabled || gate?.locked || busy || request === null}
         onClick={async () => {
           const req = typeof request === "function" ? await request() : request;
           if (!req) return;
-          setBefore(snapshot(live.reserve));
+          beforeRef.current = snapshot(live.reserve);
+          setBefore(beforeRef.current);
           setAfter(null);
           await run(req, via);
         }}
@@ -197,8 +213,49 @@ export function Action({
       >
         {busy ? "Working…" : label}
       </Button>
-      <TxStatus state={state} />
+      )}
+      <TxStatus state={state} refusal={refusal} />
       {state.phase === "confirmed" && before && after && <Moves before={before} after={after} />}
+    </div>
+  );
+}
+
+// ── Last action ─────────────────────────────────────────────────────────────
+
+type LastResult = { label: string; signature: string; before: Snap | null; after: Snap | null; refreshed: boolean };
+
+/**
+ * Keeps the result of a send whose row leaves its list once confirmed (a
+ * paid claim leaves the pay list, a settled one the settle list), so the
+ * confirmation, the signature and the before/after stay on the tab. Pass
+ * `confirmed(label)` to the row's Action as `onConfirmed` and `done` as its
+ * `onDone`.
+ */
+export function useLastAction() {
+  const live = useLive();
+  const [last, setLast] = useState<LastResult | null>(null);
+  // "after" is the first read once the post-confirmation refresh has landed
+  // (set during render, React's pattern for state derived from a new prop).
+  if (last && last.refreshed && !last.after) setLast({ ...last, after: snapshot(live.reserve) });
+  return {
+    last,
+    confirmed: (label: string) => (signature: string, before: Snap | null) => setLast({ label, signature, before, after: null, refreshed: false }),
+    done: () => setLast((l) => (l ? { ...l, refreshed: true } : l)),
+  };
+}
+
+export function LastAction({ last }: { last: LastResult | null }) {
+  if (!last) return null;
+  return (
+    <div role="status" aria-live="polite" style={{ border: "1px solid var(--color-success)", background: "var(--color-surface)", padding: "12px 14px", margin: "12px 0" }}>
+      <span className="font-mono" style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-3)" }}>Last action</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
+        <span aria-hidden="true" style={{ width: 6, height: 6, background: "var(--color-success)", flexShrink: 0 }} />
+        <span className="font-body" style={{ fontSize: 12, color: "var(--color-success)" }}>Confirmed</span>
+        <Mono style={{ fontSize: 12 }}>{last.label}</Mono>
+        <Explorer kind="tx" value={last.signature} />
+      </div>
+      {last.before && last.after ? <Moves before={last.before} after={last.after} /> : <Note>Reading the new state…</Note>}
     </div>
   );
 }
