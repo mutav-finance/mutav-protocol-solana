@@ -4,7 +4,8 @@
 import type { ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { InfoTooltip } from "@/components/InfoTooltip";
-import { UsdHint } from "@/components/MoneyProvider";
+import { Money, UsdHint } from "@/components/MoneyProvider";
+import { capacityLeft, type CeilingBlock, type CoverageCeiling } from "@/lib/charts";
 import type { Ledger, ReserveView } from "@/lib/view";
 
 /** What /api/ledger returns. */
@@ -78,9 +79,23 @@ export function moneyParts(s: string): [string, string, string] {
  * rule. One amber hero per view; the others pass `color` text. `usd` (the
  * BRS amount behind `value`) adds the small US$ hint under it when a rate is set.
  */
-export function HeroAmount({ phrase, tip, value, usd, color = "var(--color-text)", size = "clamp(40px, 5vw, 60px)", children }: { phrase: string; tip?: ReactNode; value: string; usd?: bigint; color?: string; size?: string; children?: ReactNode }) {
-  const [sign, whole, cents] = moneyParts(value);
-  const small = { fontSize: "0.55em", color: "var(--color-text-2)", letterSpacing: 0 } as const;
+export function HeroAmount({ value, ...rest }: HeroProps & { value: string; usd?: bigint }) {
+  return <Hero parts={moneyParts(value)} {...rest} />;
+}
+
+/**
+ * A tab's hero figure as a percentage ("18.2%"): the same typography as
+ * {@link HeroAmount}, with the "%" at 0.55em in text-2 like the decimals.
+ */
+export function HeroPercent({ value, ...rest }: HeroProps & { value: string }) {
+  const pct = value.endsWith("%");
+  return <Hero parts={["", pct ? value.slice(0, -1) : value, pct ? "%" : ""]} {...rest} />;
+}
+
+type HeroProps = { phrase: string; tip?: ReactNode; color?: string; size?: string; children?: ReactNode };
+
+function Hero({ phrase, tip, parts: [sign, whole, small], usd, color = "var(--color-text)", size = "clamp(40px, 5vw, 60px)", children }: HeroProps & { parts: [string, string, string]; usd?: bigint }) {
+  const minor = { fontSize: "0.55em", color: "var(--color-text-2)", letterSpacing: 0 } as const;
   return (
     <div className="flex flex-col gap-3">
       <span className="inline-flex items-center gap-1.5">
@@ -94,9 +109,9 @@ export function HeroAmount({ phrase, tip, value, usd, color = "var(--color-text)
         )}
       </span>
       <span className="font-display" style={{ fontVariantNumeric: "tabular-nums", fontSize: size, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em", color, overflowWrap: "anywhere" }}>
-        {sign && <span style={small}>{sign}</span>}
+        {sign && <span style={minor}>{sign}</span>}
         {whole}
-        {cents && <span style={small}>{cents}</span>}
+        {small && <span style={minor}>{small}</span>}
         {usd !== undefined && <UsdHint brs={usd} block />}
       </span>
       {children && <div className="flex max-w-[640px] items-baseline gap-2.5 border-t pt-3 text-sm">{children}</div>}
@@ -177,3 +192,33 @@ export function PlusMark({ open }: { open?: boolean }) {
   );
 }
 
+
+/** Why no new guarantee fits right now, in plain words. */
+export const CEILING_BLOCK: Record<CeilingBlock, string> = {
+  paused: "the program is paused",
+  "under-covered": "the reserve is under-covered",
+  frozen: "the reserve token account is frozen",
+  provisions: "claims set aside exceed the reserve",
+};
+
+/** "The reserve can back up to R$ X of remaining cover · R$ Y guaranteed today · R$ Z free for new leases (N% of capacity)", from {@link CoverageCeiling}. */
+export function CapacityLine({ k }: { k: CoverageCeiling }) {
+  const fig = { fontVariantNumeric: "tabular-nums", color: "var(--color-text)" } as const;
+  return (
+    <span className="font-body text-(--color-text-2) leading-relaxed text-pretty">
+      The reserve can back up to{" "}
+      <Mono style={fig}>
+        <Money brs={k.ceiling} />
+      </Mono>{" "}
+      of remaining cover ·{" "}
+      <Mono style={fig}>
+        <Money brs={k.inUse} />
+      </Mono>{" "}
+      guaranteed today ·{" "}
+      <Mono style={fig}>
+        <Money brs={k.headroom} />
+      </Mono>{" "}
+      free for new leases ({capacityLeft(k)} of capacity){k.blockedBy ? ` while ${CEILING_BLOCK[k.blockedBy]}` : ""}.
+    </span>
+  );
+}

@@ -4,7 +4,7 @@
  * /reserve Overview answers one question: "Can the reserve cover every open
  * guarantee?" Main column, top to bottom:
  *   1. Hero: the reserve balance, one status line against what it must hold,
- *      four figures that open their tab, and what the program has open.
+ *      one capacity line (the coverage ceiling, its use and headroom), four figures that open their tab, and what the program has open.
  *   2. Where the capital sits: the reserve balance split by what it backs.
  *   3. What the program enforces: the two spec promises.
  * Side column: the latest movements of the ledger, then the reserve balance
@@ -20,8 +20,8 @@ import { InfoTooltip } from "@/components/InfoTooltip";
 import { Needs, useReserve } from "@/components/reserve/ReserveShell";
 import { HistoryChart } from "@/components/reserve/HistoryChart";
 import { FlowDiagram } from "@/components/reserve/FlowDiagram";
-import { HeroAmount, Lead, abs, fmtAgo, plural } from "@/components/reserve/sections/shared";
-import { capitalSplit, type CapitalSplit } from "@/lib/charts";
+import { CapacityLine, HeroAmount, Lead, abs, fmtAgo, plural } from "@/components/reserve/sections/shared";
+import { capitalSplit, coverageCeilingOf, type CapitalSplit } from "@/lib/charts";
 import { fmtBps, fmtBrs, fmtRatio, fmtSharePrice, fmtTime } from "@/lib/format";
 import { Money } from "@/components/MoneyProvider";
 import { FLOW_KIND_LABEL, capitalQueue, claimsTimeline, coverageRows, isUnpaid, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
@@ -191,6 +191,13 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger | null }) {
           </span>
         </HeroAmount>
       </div>
+
+      <p role="group" aria-label="Coverage ceiling" className="m-0 text-[13px]">
+        <CapacityLine k={coverageCeilingOf(r)} />{" "}
+        <Link href="/reserve/coverage#ceiling-h" className="ext-link font-body text-xs">
+          How the ceiling works →
+        </Link>
+      </p>
 
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
         {kpis.map((k) => {
