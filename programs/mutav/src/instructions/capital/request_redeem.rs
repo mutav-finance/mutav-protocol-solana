@@ -158,13 +158,16 @@ pub fn handle_request_redeem(
     r.min_assets_out = min_assets_out;
     r.status = REDEEM_PENDING;
 
-    emit_cpi!(RedeemRequested {
-        config: ctx.accounts.config.key(),
-        ts: now,
-        owner,
-        seq,
-        shares,
-        min_assets_out,
-    });
+    emit_event!(
+        ctx,
+        RedeemRequested {
+            config: ctx.accounts.config.key(),
+            ts: now,
+            owner,
+            seq,
+            shares,
+            min_assets_out,
+        }
+    );
     Ok(())
 }

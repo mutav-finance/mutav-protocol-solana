@@ -5,6 +5,7 @@ use anchor_lang::{prelude::Pubkey, AccountDeserialize};
 use anchor_spl::token_interface::{Mint, TokenAccount};
 use mutav::{constants::*, errors::MutavError, events::VaultInitialized};
 use mutav_tests::helpers::*;
+use solana_account::Account;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
@@ -354,4 +355,182 @@ fn treasury_and_payments_cannot_be_reserve_accounts() {
 
     // The valid accounts still initialize.
     f.initialize(f.init_args()).expect("initialize");
+}
+
+// ---------------------------------------------------------------------------
+// The `ProgramData` gate, form by form. `initialize` reads the upgrade
+// authority out of the loader's `ProgramData` account; every malformed or
+// foreign form must fail before any account is created, with the same error
+// Anchor's typed `Account<ProgramData>` load returned.
+// ---------------------------------------------------------------------------
+
+/// Rewrites the `ProgramData` account with `edit` applied to a copy of it.
+fn edit_program_data(f: &mut Fixture, edit: impl FnOnce(&mut Account)) {
+    let addr = program_data_address();
+    let mut acc = f.svm.get_account(&addr).expect("program data");
+    edit(&mut acc);
+    f.svm.set_account(addr, acc).expect("set program data");
+}
+
+#[test]
+fn program_data_with_the_signer_as_authority_initializes() {
+    // The authority bytes are read exactly: a different signer that is the
+    // recorded authority may initialize.
+    let mut f = Fixture::uninitialized();
+    let squads = Keypair::new();
+    set_upgrade_authority(&mut f.svm, Some(squads.pubkey()));
+    let mut accts = f.init_accounts();
+    accts.upgrade_authority = squads.pubkey();
+    let ix = initialize_ix(&accts, f.init_args());
+    let payer = f.payer.insecure_clone();
+    send_ix(&mut f.svm, ix, &[&payer, &squads]).expect("initialize by the recorded authority");
+}
+
+#[test]
+fn program_data_without_authority_rejected() {
+    let mut f = Fixture::uninitialized();
+    set_upgrade_authority(&mut f.svm, None);
+    // Even a stale key left in the authority bytes does not count once the
+    // option byte says `None`.
+    let payer = f.payer.pubkey();
+    edit_program_data(&mut f, |a| a.data[13..45].copy_from_slice(payer.as_ref()));
+    let res = f.initialize(f.init_args());
+    assert_mutav_err(res, MutavError::Unauthorized);
+}
+
+#[test]
+fn program_data_with_another_authority_rejected() {
+    let mut f = Fixture::uninitialized();
+    set_upgrade_authority(&mut f.svm, Some(Keypair::new().pubkey()));
+    let res = f.initialize(f.init_args());
+    assert_mutav_err(res, MutavError::Unauthorized);
+}
+
+#[test]
+fn program_data_of_another_program_rejected() {
+    // A genuine `ProgramData` of some other program, whose upgrade authority
+    // is the signer, is not this program's: the seeds check rejects it.
+    let mut f = Fixture::uninitialized();
+    let other_program = Pubkey::new_unique();
+    let (other_pd, _) = Pubkey::find_program_address(
+        &[other_program.as_ref()],
+        &anchor_lang::solana_program::bpf_loader_upgradeable::ID,
+    );
+    let ours = f
+        .svm
+        .get_account(&program_data_address())
+        .expect("program data");
+    f.svm
+        .set_account(other_pd, ours)
+        .expect("plant foreign program data");
+    let mut ix = initialize_ix(&f.init_accounts(), f.init_args());
+    assert_eq!(ix.accounts[2].pubkey, program_data_address());
+    ix.accounts[2].pubkey = other_pd;
+    let payer = f.payer.insecure_clone();
+    assert_anchor_err(
+        send_ix(&mut f.svm, ix, &[&payer]),
+        anchor_lang::error::ErrorCode::ConstraintSeeds,
+    );
+}
+
+#[test]
+fn program_data_owned_by_another_program_rejected() {
+    let mut f = Fixture::uninitialized();
+    edit_program_data(&mut f, |a| a.owner = Pubkey::new_unique());
+    assert_anchor_err(
+        f.initialize(f.init_args()),
+        anchor_lang::error::ErrorCode::AccountOwnedByWrongProgram,
+    );
+
+    // Same bytes under the system program (lamports left in place).
+    let mut f = Fixture::uninitialized();
+    edit_program_data(&mut f, |a| {
+        a.owner = anchor_lang::solana_program::system_program::ID
+    });
+    assert_anchor_err(
+        f.initialize(f.init_args()),
+        anchor_lang::error::ErrorCode::AccountOwnedByWrongProgram,
+    );
+}
+
+#[test]
+fn program_data_missing_rejected() {
+    let mut f = Fixture::uninitialized();
+    f.svm
+        .set_account(program_data_address(), Account::default())
+        .expect("clear program data");
+    assert_anchor_err(
+        f.initialize(f.init_args()),
+        anchor_lang::error::ErrorCode::AccountNotInitialized,
+    );
+}
+
+#[test]
+fn loader_accounts_that_are_not_program_data_rejected() {
+    // Well-formed Uninitialized (0), Buffer (1, no authority) and Program (2)
+    // loader states.
+    for tag in [0u32, 1, 2] {
+        let mut f = Fixture::uninitialized();
+        edit_program_data(&mut f, |a| {
+            a.data[..4].copy_from_slice(&tag.to_le_bytes());
+            a.data[4] = 0;
+        });
+        assert_anchor_err(
+            f.initialize(f.init_args()),
+            anchor_lang::error::ErrorCode::AccountNotProgramData,
+        );
+    }
+}
+
+/// Asserts the runtime-level `InvalidAccountData` (what a loader state that
+/// fails to decode has always returned).
+fn assert_invalid_account_data(res: litesvm::types::TransactionResult) {
+    use solana_instruction::error::InstructionError;
+    use solana_transaction_error::TransactionError;
+    match res {
+        Err(e) => assert_eq!(
+            e.err,
+            TransactionError::InstructionError(0, InstructionError::InvalidAccountData),
+            "logs:\n{}",
+            e.meta.logs.join("\n")
+        ),
+        Ok(_) => panic!("expected InvalidAccountData, transaction succeeded"),
+    }
+}
+
+#[test]
+fn malformed_program_data_rejected() {
+    // An unknown loader-state tag.
+    let mut f = Fixture::uninitialized();
+    edit_program_data(&mut f, |a| a.data[..4].copy_from_slice(&4u32.to_le_bytes()));
+    assert_invalid_account_data(f.initialize(f.init_args()));
+
+    // An option byte that is neither `None` (0) nor `Some` (1).
+    for byte in [2u8, 0xff] {
+        let mut f = Fixture::uninitialized();
+        edit_program_data(&mut f, |a| a.data[12] = byte);
+        assert_invalid_account_data(f.initialize(f.init_args()));
+    }
+
+    // Truncated: `Some` with fewer than 32 authority bytes, and data too short
+    // to hold the option byte or the tag.
+    for len in [44usize, 13, 12, 3, 0] {
+        let mut f = Fixture::uninitialized();
+        edit_program_data(&mut f, |a| a.data.truncate(len));
+        assert_invalid_account_data(f.initialize(f.init_args()));
+    }
+
+    // Cut right after a `None` option byte: well-formed, no authority.
+    let mut f = Fixture::uninitialized();
+    edit_program_data(&mut f, |a| {
+        a.data.truncate(13);
+        a.data[12] = 0;
+    });
+    assert_mutav_err(f.initialize(f.init_args()), MutavError::Unauthorized);
+
+    // Exactly the 45-byte header with `Some(signer)`: accepted.
+    let mut f = Fixture::uninitialized();
+    edit_program_data(&mut f, |a| a.data.truncate(45));
+    f.initialize(f.init_args())
+        .expect("45-byte program data header");
 }

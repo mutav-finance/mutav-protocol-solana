@@ -17,9 +17,10 @@
 use anchor_lang::{prelude::*, AccountsClose};
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     errors::MutavError,
@@ -114,14 +115,17 @@ pub fn handle_cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
         // account creation, no close. The BRS stays owed to the owner.
         require!(status == DEPOSIT_PENDING, MutavError::InvalidRequestStatus);
         ctx.accounts.deposit_request.status = DEPOSIT_CANCELLED;
-        emit_cpi!(DepositParked {
-            config: config_key,
-            ts,
-            owner,
-            seq,
-            assets,
-            by,
-        });
+        emit_event!(
+            ctx,
+            DepositParked {
+                config: config_key,
+                ts,
+                owner,
+                seq,
+                assets,
+                by,
+            }
+        );
         return Ok(());
     }
 
@@ -141,22 +145,14 @@ pub fn handle_cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
         a.associated_token_program.key(),
     )?;
 
-    let authority_seeds: &[&[u8]] = &[
-        AUTHORITY_SEED,
-        config_key.as_ref(),
-        &[a.config.authority_bump],
-    ];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            a.token_program.key(),
-            TransferChecked {
-                from: a.pending_deposits.to_account_info(),
-                mint: a.reserve_mint.to_account_info(),
-                to: a.destination.to_account_info(),
-                authority: a.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
+    vault_transfer(
+        a.token_program.key(),
+        a.pending_deposits.to_account_info(),
+        a.reserve_mint.to_account_info(),
+        a.destination.to_account_info(),
+        a.vault_authority.to_account_info(),
+        &config_key,
+        a.config.authority_bump,
         assets,
         a.reserve_mint.decimals,
     )?;
@@ -167,14 +163,17 @@ pub fn handle_cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
         .checked_sub(assets)
         .ok_or(MutavError::MathOverflow)?;
 
-    emit_cpi!(DepositCancelled {
-        config: config_key,
-        ts,
-        owner,
-        seq,
-        assets,
-        by,
-    });
+    emit_event!(
+        ctx,
+        DepositCancelled {
+            config: config_key,
+            ts,
+            owner,
+            seq,
+            assets,
+            by,
+        }
+    );
     // Nothing is left on the request: it closes, rent to the owner.
     ctx.accounts
         .deposit_request

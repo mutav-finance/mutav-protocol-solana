@@ -1,6 +1,6 @@
 import { address } from "@solana/kit";
 import { guardedEnv, readDepositQueue, readReserve, rpcFor } from "@/lib/server/chain";
-import { ComposeError, composeInstructions, describeInstructions, isAdminKind, refuseOverlappingSetConfig, unsignedTransaction } from "@/lib/server/compose";
+import { ComposeError, composeInstructions, describeInstructions, isAdminKind, refuseOverlappingSetConfig, unsignedTransaction, withComputeUnitLimit } from "@/lib/server/compose";
 import { errorResponse } from "@/lib/server/respond";
 import { boundedBody } from "@/lib/server/relay";
 import { assertMember, composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
@@ -63,7 +63,8 @@ export async function POST(req: Request) {
 
     const ixs = await composeInstructions(body.request, signer, ctx);
     const { value } = await rpcFor(env).getLatestBlockhash({ commitment: "confirmed" }).send();
-    const tx = unsignedTransaction(signer, ixs, value);
+    // The wallet signs the limit with the instructions; `instructions` lists the MUTAV ones.
+    const tx = unsignedTransaction(signer, withComputeUnitLimit(body.request, ixs), value);
     return jsonResponse({ tx, instructions: describeInstructions(ixs, reserve.config), via: "direct" });
   } catch (e) {
     return errorResponse(e);

@@ -8,6 +8,7 @@ pub mod allowlist;
 pub mod constants;
 pub mod coverage;
 pub mod errors;
+#[macro_use]
 pub mod events;
 pub mod instructions;
 pub mod math;

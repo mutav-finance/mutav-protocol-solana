@@ -111,15 +111,18 @@ pub fn handle_file_claim(
     // revision, not "unset". Amendments and re-files increment it.
     x.revision = 0;
 
-    emit_cpi!(ClaimFiled {
-        config: ctx.accounts.config.key(),
-        ts: now,
-        guarantee_id: ctx.accounts.guarantee.id,
-        leg,
-        amount,
-        notice_ref_hash,
-        provisions_after: ctx.accounts.state.provisions,
-        coverage_required_after: ctx.accounts.state.coverage_required,
-    });
+    emit_event!(
+        ctx,
+        ClaimFiled {
+            config: ctx.accounts.config.key(),
+            ts: now,
+            guarantee_id: ctx.accounts.guarantee.id,
+            leg,
+            amount,
+            notice_ref_hash,
+            provisions_after: ctx.accounts.state.provisions,
+            coverage_required_after: ctx.accounts.state.coverage_required,
+        }
+    );
     Ok(())
 }

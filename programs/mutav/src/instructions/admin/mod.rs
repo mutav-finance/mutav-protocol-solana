@@ -28,10 +28,11 @@ use anchor_spl::token_interface::TokenAccount;
 
 use crate::{
     constants::{
-        AUTHORITY_SEED, BPS_DENOMINATOR, MAX_COVERAGE_RATIO_BPS, MAX_FEE_TAKE_BPS,
+        field, AUTHORITY_SEED, BPS_DENOMINATOR, MAX_COVERAGE_RATIO_BPS, MAX_FEE_TAKE_BPS,
         MIN_COVERAGE_RATIO_BPS, ROLE_ADMIN, ROLE_OPERATOR, ROLE_PAUSER, SUPPORTED_FEATURES,
     },
     errors::MutavError,
+    events::{emit_config_changes, ConfigChanges},
     state::VaultConfig,
 };
 
@@ -229,6 +230,63 @@ pub(crate) fn validate_money_accounts(
         require!(*vault_authority != a.owner, MutavError::InvalidParameter);
     }
     require_not_operator_owned(t, p, operator)
+}
+
+/// The shared body of `set_treasury_account` (`side = Installing::Treasury`)
+/// and `set_payments_account` (`side = Installing::Payments`). The two
+/// instructions, their account lists and their events stay separate
+/// (ADR 0026). Checks the new account against the current other one (read
+/// leniently, [`load_money_account`]) with [`validate_money_accounts`],
+/// writes it and emits its `ConfigUpdated`. Returns `(old, new, ts)` for the
+/// caller's own event.
+pub(crate) fn install_money_account(
+    config: &mut Account<VaultConfig>,
+    new_account: &InterfaceAccount<TokenAccount>,
+    other: &AccountInfo,
+    side: Installing,
+    event_authority: &AccountInfo,
+) -> Result<(Pubkey, Pubkey, i64)> {
+    let treasury_side = side == Installing::Treasury;
+    let config_key = config.key();
+    let vault_authority = vault_authority_key(&config_key, config.authority_bump)?;
+    let current = load_money_account(
+        other,
+        &config.reserve_token_program,
+        if treasury_side {
+            MutavError::InvalidPaymentsAccount
+        } else {
+            MutavError::InvalidTreasuryAccount
+        },
+    )?;
+    let installed = Money::of(new_account);
+    let in_place = Money::loaded(other.key(), &current);
+    let (treasury, payments) = if treasury_side {
+        (installed, in_place)
+    } else {
+        (in_place, installed)
+    };
+    validate_money_accounts(
+        &config.reserve_mint,
+        treasury,
+        payments,
+        &config.mutav_capital_wallet,
+        &vault_authority,
+        &config.operator,
+        side,
+    )?;
+
+    let new = new_account.key();
+    let (id, slot) = if treasury_side {
+        (field::TREASURY_ACCOUNT, &mut config.treasury_account)
+    } else {
+        (field::PAYMENTS_ACCOUNT, &mut config.payments_account)
+    };
+    let old = *slot;
+    let mut ch = ConfigChanges::default();
+    ch.set(id, slot, new);
+    let ts = Clock::get()?.unix_timestamp;
+    emit_config_changes(event_authority, config_key, ts, &ch)?;
+    Ok((old, new, ts))
 }
 
 /// `a` has no delegate, no close authority and is not frozen.

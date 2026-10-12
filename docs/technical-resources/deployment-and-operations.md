@@ -71,7 +71,7 @@ sequenceDiagram
 | 4. Roles and caps | `roles.ts`, `caps.ts` | Optional. Role changes are two-step: the admin proposes (`propose_role`, with `cancel_pending` first when another handover is pending), the new key accepts with `accept_role` within 72 hours. `roles.ts` also cancels a pending operator or pauser handover the config does not ask for. A pending admin handover is kept if the config names it as `nextAdmin`; otherwise `roles.ts` refuses unless `--cancel-admin` is passed. Every cancellation is logged and named in the proposal title. `set_config` proposals are sparse: they carry only the fields they change, and are wrapped as `refresh, set_config, refresh` when `c`, the NAV-move bound or the stress buffer changes, and the proposal memo lists them. The config's optional `guardians` (up to 3; none when empty) are applied by `roles.ts`, which appends `set_guardians` when the chain differs. |
 | 5. Verify | `bun scripts/devnet/verify.ts --config <cfg> --url <rpc> --confirm-cluster devnet --expected-hash <hash>` | Read-only post-deploy checks, below. `initialize` does not set the allowlist root, so run it only after the allowlist proposal (step 3) has executed, or the root check fails. |
 
-Members create, approve and execute each proposal from the admin console or the Squads app. The time lock counts from approval.
+Members create, approve and execute each proposal from the admin console or the Squads app. The time lock counts from approval. Each payload names `executeComputeUnitLimit`: the execute transaction starts with `SetComputeUnitLimit` of that value, because a large proposal such as `initialize` passes the 200,000-CU default at `opt-level = "z"` (see [Compute units](compute-units.md)).
 
 ### Guards before anything is sent
 

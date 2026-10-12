@@ -80,6 +80,7 @@ import { ADMIN_KINDS } from "../tx-kinds";
 import type { Ledger, ReserveView } from "../view";
 import { READ, rpcFor } from "./chain";
 import { serverEnv, type ServerEnv } from "./env";
+import { COMPUTE_BUDGET_PROGRAM } from "./relay";
 
 export const SYSTEM_PROGRAM = address("11111111111111111111111111111111");
 export const TOKEN_PROGRAM = address("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -632,6 +633,57 @@ export function queueSeqs(head: bigint, next: bigint, count: number): bigint[] {
 /** Re-read the guarantee so its id and agency come from the chain, not from the browser. */
 async function guaranteeAccount(ctx: ComposeContext, guarantee: string) {
   return fetchGuarantee(rpcFor(ctx.env ?? serverEnv()), address(guarantee), READ);
+}
+
+// ── Compute-unit limits ─────────────────────────────────────────────────────
+//
+// The program is built with `opt-level = "z"`: a smaller ProgramData for
+// more compute units per instruction. A one-instruction transaction gets the
+// runtime's 200,000-CU default, so the calls that can come near it carry an
+// explicit `SetComputeUnitLimit`: about 1.5x the worst case measured in
+// LiteSVM (docs/technical-resources/compute-units.md). No priority fee is
+// set, so a limit costs nothing.
+
+export const MAX_COMPUTE_UNIT_LIMIT = 1_400_000;
+
+/** Per kind, for a transaction the connected wallet signs directly. */
+export const COMPUTE_UNIT_LIMITS: Partial<Record<TxRequest["kind"], number>> = {
+  // 8 whole fills: 148,402 CU.
+  fulfil_deposits: 225_000,
+  // 8 whole fills: 163,349 CU.
+  fulfil_redeems: 250_000,
+  // 49,753 CU.
+  refresh: 75_000,
+  // refresh + set_config (every field) + refresh: 181,665 CU.
+  set_config: 275_000,
+  // 60,779 CU. Twice the worst case, not 1.5x: running out of compute must
+  // never act as a refusal of a claim payment.
+  pay_claim: 120_000,
+};
+
+/**
+ * The transaction that sends Squads `vault_transaction_execute`, whatever
+ * the proposal holds: the worst admin call measured through Squads is
+ * 203,548 CU (refresh + set_config + refresh), `initialize` through the
+ * upgrade multisig 210,469.
+ */
+export const SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT = 320_000;
+
+/** Compute Budget `SetComputeUnitLimit` (instruction 2, `u32` units). */
+export function setComputeUnitLimitInstruction(units: number): Instruction {
+  if (!Number.isInteger(units) || units < 1 || units > MAX_COMPUTE_UNIT_LIMIT) {
+    throw new Error(`compute-unit limit must be an integer in [1, ${MAX_COMPUTE_UNIT_LIMIT}], got ${units}`);
+  }
+  const data = new Uint8Array(5);
+  data[0] = 2;
+  new DataView(data.buffer).setUint32(1, units, true);
+  return { programAddress: address(COMPUTE_BUDGET_PROGRAM), accounts: [], data };
+}
+
+/** `ixs` for a direct transaction, behind `SetComputeUnitLimit` when `req`'s kind has a limit. */
+export function withComputeUnitLimit(req: TxRequest, ixs: Instruction[]): Instruction[] {
+  const units = COMPUTE_UNIT_LIMITS[req.kind];
+  return units === undefined ? ixs : [setComputeUnitLimitInstruction(units), ...ixs];
 }
 
 /** Is this kind an admin action (so it may be wrapped in a Squads proposal)? */

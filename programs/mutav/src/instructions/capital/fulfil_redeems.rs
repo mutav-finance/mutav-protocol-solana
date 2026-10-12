@@ -9,11 +9,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     token::Token,
-    token_interface::{
-        burn, transfer_checked, Burn, Mint, TokenAccount, TokenInterface, TransferChecked,
-    },
+    token_interface::{burn, Burn, Mint, TokenAccount, TokenInterface},
 };
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     coverage::{Coverage, CoverageInputs},
@@ -249,17 +248,14 @@ pub fn handle_fulfil_redeems(
         ),
         burned,
     )?;
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.reserve.to_account_info(),
-                mint: ctx.accounts.reserve_mint.to_account_info(),
-                to: ctx.accounts.claims.to_account_info(),
-                authority: ctx.accounts.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
+    vault_transfer(
+        ctx.accounts.token_program.key(),
+        ctx.accounts.reserve.to_account_info(),
+        ctx.accounts.reserve_mint.to_account_info(),
+        ctx.accounts.claims.to_account_info(),
+        ctx.accounts.vault_authority.to_account_info(),
+        &config_key,
+        config.authority_bump,
         paid,
         ctx.accounts.reserve_mint.decimals,
     )?;
@@ -296,29 +292,35 @@ pub fn handle_fulfil_redeems(
         (state.redeemed_shares_total, state.redeemed_assets_total);
 
     for x in &fills {
-        emit_cpi!(RedeemFilled {
-            config: config_key,
-            ts: now,
-            owner: x.owner,
-            seq: x.seq,
-            shares: x.shares,
-            assets: x.assets,
-            nav: x.nav,
-        });
+        emit_event!(
+            ctx,
+            RedeemFilled {
+                config: config_key,
+                ts: now,
+                owner: x.owner,
+                seq: x.seq,
+                shares: x.shares,
+                assets: x.assets,
+                nav: x.nav,
+            }
+        );
     }
     let (first, last) = (&fills[0], &fills[fills.len() - 1]);
-    emit_cpi!(RedeemsFulfilled {
-        config: config_key,
-        ts: now,
-        from_seq: first.seq,
-        to_seq: last.seq,
-        shares: burned,
-        assets: paid,
-        nav: last.nav,
-        idle_free_capital,
-        redeemed_shares_total,
-        redeemed_assets_total,
-    });
+    emit_event!(
+        ctx,
+        RedeemsFulfilled {
+            config: config_key,
+            ts: now,
+            from_seq: first.seq,
+            to_seq: last.seq,
+            shares: burned,
+            assets: paid,
+            nav: last.nav,
+            idle_free_capital,
+            redeemed_shares_total,
+            redeemed_assets_total,
+        }
+    );
     Ok(())
 }
 

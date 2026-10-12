@@ -37,7 +37,7 @@ import {
   TOKEN_PROGRAM_ADDRESS,
 } from "@mutav-finance/mutav-protocol-solana";
 import { readReserve } from "../lib/server/chain";
-import { composeInstructions } from "../lib/server/compose";
+import { composeInstructions, withComputeUnitLimit } from "../lib/server/compose";
 import { serverEnv } from "../lib/server/env";
 import { randomRef, REF } from "../lib/refs";
 import { fromHex } from "../lib/serde";
@@ -74,7 +74,7 @@ export function appEnv(url: string, config?: string, allowlist: string[] = []) {
 async function act(url: string, config: string, allowlist: string[], signer: KeyPairSigner, req: TxRequest, label: string) {
   const env = appEnv(url, config, allowlist);
   const reserve = await readReserve(env);
-  const ixs = await composeInstructions(req, signer.address, { reserve, allowlist, env });
+  const ixs = withComputeUnitLimit(req, await composeInstructions(req, signer.address, { reserve, allowlist, env }));
   const sig = await signAndSend(createSolanaRpc(url), signer.address, [signer], ixs);
   log(`${label} (${sig.slice(0, 10)}…)`);
   return sig;
@@ -138,7 +138,10 @@ export async function seed(opts: { url: string; keysDir?: string; adminKeypair?:
     },
     allowlist,
   });
-  await p.send(rpc, s("admin"), [await p.composeInitialize(cfg, { upgradeAuthority: s("admin"), payer: s("admin") })]);
+  await p.send(rpc, s("admin"), [
+    p.setComputeUnitLimitInstruction(p.INITIALIZE_COMPUTE_UNIT_LIMIT),
+    await p.composeInitialize(cfg, { upgradeAuthority: s("admin"), payer: s("admin") }),
+  ]);
   const tree = await buildAllowlist(allowlist);
   await p.send(rpc, s("admin"), [await p.composeSetAllowlistRoot(cfg, tree.root, s("admin"))]);
   const config = (await findReserveAddresses(mint)).config;
