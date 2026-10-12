@@ -76,7 +76,7 @@ NEXT_PUBLIC_CLUSTER=localnet bun run build && bun run e2e   # Playwright smoke a
 
 ## Protocol client dependency
 
-`@mutav-finance/mutav-protocol-solana` is a `file:../clients/js` dependency on this repo's own client. Bun installs `file:` dependencies as symlinks, which Turbopack cannot read, and the client's own `node_modules` would bundle a second `@solana/kit`. So the postinstall (`scripts/materialize-client.mjs`) replaces the link with a real copy of `package.json` + `dist/`. When `../clients/js/dist` is missing (fresh clone, Vercel), it first runs `bun install --frozen-lockfile` at the repo root and `bun run build` in `clients/js`. After changing the client, rebuild it (`bun run build` in `clients/js`), then `rm -rf node_modules/@mutav-finance && bun install` here to refresh the copy.
+`@mutav-finance/mutav-protocol-solana` is a `file:../clients/js` dependency on this repo's own client. Bun installs `file:` dependencies as symlinks, which Turbopack cannot read, and the client's own `node_modules` would bundle a second `@solana/kit`. So the postinstall (`scripts/materialize-client.mjs`) replaces the link with a real copy of `package.json` + `dist/`. When `../clients/js/dist` is missing (fresh clone, Vercel) or older than `../clients/js/src`, it first runs `bun install --frozen-lockfile` at the repo root (if needed) and `bun run build` in `clients/js`. It refreshes the copy whenever it is stale (older `dist/`, or a different `package.json`). After changing the client, run `bun run client:refresh` here to rebuild and refresh it without reinstalling.
 
 ## Deploy (not done)
 
