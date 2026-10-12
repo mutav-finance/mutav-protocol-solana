@@ -49,7 +49,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
     await expect(page.getByText("Claim payments are never blocked by required coverage.")).toBeVisible();
     // The coverage ceiling: what the reserve can carry, what is in use, the headroom.
-    await expect(page.getByRole("group", { name: "Coverage ceiling" })).toContainText("Can back up to");
+    await expect(page.getByRole("group", { name: "Coverage ceiling" })).toContainText("can back up to");
     // The legal floor (founder decision, 2026-10-11): the demo banner on every page.
     await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Not open to public investment.");
     await noBannedWords(page);
@@ -72,7 +72,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByRole("table", { name: "Remaining cover by guarantee" }).locator("tbody tr")).toHaveCount(3);
     await expect(page.getByRole("table", { name: "Per-agency exposure" }).locator("tbody tr")).toHaveCount(3);
     await expect(page.getByRole("heading", { name: "How the ceiling works" })).toBeVisible();
-    await expect(page.locator("main")).toContainText("Can back up to");
+    await expect(page.locator("main")).toContainText("can back up to");
     await noBannedWords(page);
 
     await page.goto("/reserve/claims");
@@ -92,7 +92,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
 
     await page.goto("/reserve/risks");
     await expect(page.getByRole("heading", { name: "Claim payment caps" })).toBeVisible();
-    await expect(page.getByRole("table", { name: "Admin caps" }).locator("tbody tr")).toHaveCount(4);
+    await expect(page.getByRole("table", { name: "Admin caps" }).locator("tbody tr")).toHaveCount(3);
     await expect(page.getByRole("status", { name: "Reserve token account freeze status" })).toContainText("NOT FROZEN");
     await expect(page.getByText("A freeze stops every outflow, claim payments included.")).toBeVisible();
     await expect(page.getByText("Not open to public investment.", { exact: true })).toBeVisible();

@@ -5,8 +5,8 @@
  * Amounts stay `bigint` until the last step, where a share of the axis is
  * turned into a fraction for layout only.
  */
-import type { Coverage } from "@mutav-finance/mutav-protocol-solana";
-import type { AgencyRow, ClaimRow, CoverageRow, FlowTotals } from "./view";
+import { BPS_DENOMINATOR, MODE_NORMAL, U64_MAX, type Coverage } from "@mutav-finance/mutav-protocol-solana";
+import type { AgencyRow, ClaimRow, CoverageRow, FlowTotals, ReserveView } from "./view";
 import { FLOW_ROLES, type Role } from "./roles";
 
 /** `part / whole` as a layout fraction in [0, 1]. Zero when `whole` is zero. */
@@ -76,14 +76,15 @@ export type CoverageCeiling = {
   ceiling: bigint;
   /** Remaining cover today. */
   inUse: bigint;
-  /** Cover a new guarantee may add now (0 while blocked or at/over the ceiling). */
+  /**
+   * Total room for new cover now, across all new guarantees (0 while blocked or at/over the ceiling).
+   * One guarantee is also bounded by `caps.maxCoverPerGuarantee` (register_guarantee Rule 3).
+   */
   headroom: bigint;
   /** Which term sets the ceiling, or `blocked` when no new guarantee fits whatever its size. */
   binding: "ratio" | "stress" | "blocked";
   blockedBy: CeilingBlock | null;
 };
-
-const U64_MAX = (1n << 64n) - 1n;
 
 /**
  * The inverse of the `register_guarantee` gate (programs/mutav/src/instructions/operator/register_guarantee.rs:95-107):
@@ -94,14 +95,19 @@ const U64_MAX = (1n << 64n) - 1n;
  * - ratio leg: `ceil(c·X / 10_000) ≤ S` ⇔ `X ≤ floor(S·10_000 / c)`;
  * - stress leg: never holds when `S < P`; always holds when `P + B ≤ S`; otherwise holds ⇔ `X ≤ S`.
  *
- * Paused, a frozen reserve account, a non-NORMAL mode or `S < P` stop every new guarantee: headroom 0.
+ * Paused, a non-NORMAL stored mode, a frozen reserve account, `S < P`, or a live snapshot that is already
+ * under-covered (`X > ceiling`, i.e. `coverage_required(X) > S`, the gate's `before.under_covered()` check, which
+ * holds even while the stored mode still reads NORMAL) stop every new guarantee: headroom 0, binding `blocked`.
+ *
+ * When `S < P` the ceiling is reported as today's cover X (nothing can grow); the `provisions` block says why,
+ * so the figure is never read as backed.
  */
 export function coverageCeiling(i: CoverageCeilingInput): CoverageCeiling {
   const S = i.stableAssets;
   const P = i.provisions;
   const X = i.remainingCoverTotal;
   const c = BigInt(i.coverageRatioBps);
-  const byRatio = c > 0n ? (S * 10_000n) / c : U64_MAX;
+  const byRatio = c > 0n ? (S * BPS_DENOMINATOR) / c : U64_MAX;
   const ratioMax = byRatio > U64_MAX ? U64_MAX : byRatio;
 
   let ceiling: bigint;
@@ -117,7 +123,17 @@ export function coverageCeiling(i: CoverageCeilingInput): CoverageCeiling {
     binding = "stress";
   }
 
-  const blockedBy: CeilingBlock | null = i.paused ? "paused" : i.mode !== 0 ? "under-covered" : i.frozen ? "frozen" : S < P ? "provisions" : null;
+  const blockedBy: CeilingBlock | null = i.paused
+    ? "paused"
+    : i.mode !== MODE_NORMAL
+      ? "under-covered"
+      : i.frozen
+        ? "frozen"
+        : S < P
+          ? "provisions"
+          : X > ceiling
+            ? "under-covered"
+            : null;
   return {
     ceiling,
     inUse: X,
@@ -128,7 +144,7 @@ export function coverageCeiling(i: CoverageCeilingInput): CoverageCeiling {
 }
 
 /** {@link coverageCeiling} from the accounts the /reserve views read. */
-export const coverageCeilingOf = (r: { config: { coverageRatioBps: number; paused: boolean; caps: { stressBuffer: bigint } }; state: { mode: number; provisions: bigint; remainingCoverTotal: bigint }; coverage: Pick<Coverage, "stableAssets">; token: { reserveFrozen: boolean } }) =>
+export const coverageCeilingOf = (r: Pick<ReserveView, "config" | "state" | "coverage" | "token">) =>
   coverageCeiling({
     stableAssets: r.coverage.stableAssets,
     coverageRatioBps: r.config.coverageRatioBps,

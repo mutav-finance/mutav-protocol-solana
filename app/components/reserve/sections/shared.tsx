@@ -182,24 +182,24 @@ export const CEILING_BLOCK: Record<CeilingBlock, string> = {
   provisions: "claims set aside exceed the reserve",
 };
 
-/** "Can back up to R$ X of guarantees · R$ Y in use · R$ Z headroom", from {@link CoverageCeiling}. */
+/** "The reserve can back up to R$ X of remaining cover · R$ Y guaranteed today · R$ Z free for new leases", from {@link CoverageCeiling}. */
 export function CapacityLine({ k }: { k: CoverageCeiling }) {
   const fig = { fontVariantNumeric: "tabular-nums", color: "var(--color-text)" } as const;
   return (
     <span className="font-body text-(--color-text-2) leading-relaxed text-pretty">
-      Can back up to{" "}
+      The reserve can back up to{" "}
       <Mono style={fig}>
         <Money brs={k.ceiling} />
       </Mono>{" "}
-      of guarantees ·{" "}
+      of remaining cover ·{" "}
       <Mono style={fig}>
         <Money brs={k.inUse} />
       </Mono>{" "}
-      in use ·{" "}
+      guaranteed today ·{" "}
       <Mono style={fig}>
         <Money brs={k.headroom} />
       </Mono>{" "}
-      headroom{k.blockedBy ? ` while ${CEILING_BLOCK[k.blockedBy]}` : ""}.
+      free for new leases{k.blockedBy ? ` while ${CEILING_BLOCK[k.blockedBy]}` : ""}.
     </span>
   );
 }

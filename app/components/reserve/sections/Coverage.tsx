@@ -191,14 +191,14 @@ function HowTheCeilingWorks({ r, k, byRatio, floor }: { r: ReserveView; k: Cover
     [
       `${c} ratio, or the stress floor.`,
       <>
-        Each unit of remaining cover needs {c} of it in reserve. While the book is small, the floor applies instead: claims set aside (<Money brs={r.state.provisions} />) plus the stress buffer (<Money brs={r.config.caps.stressBuffer} />).
+        Every R$ 1.00 of remaining cover needs R$ {(r.config.coverageRatioBps / 10_000).toFixed(2)} in the reserve. While few leases are open, a floor applies instead: claims set aside (<Money brs={r.state.provisions} />) plus the stress buffer (<Money brs={r.config.caps.stressBuffer} />).
       </>,
     ],
     [
       `Maximum cover: ${fmtBrs(k.ceiling)}.`,
       k.blockedBy
         ? `No new guarantee fits while ${CEILING_BLOCK[k.blockedBy]}.`
-        : `The reserve divided by ${c}${k.binding === "stress" ? ", capped at the reserve itself while the stress floor binds" : ""}. A new lease is accepted while remaining cover stays within it.`,
+        : `${k.binding === "stress" ? "While the floor applies, total cover can grow only up to the reserve balance itself." : `The reserve divided by ${c}.`} A new lease is accepted while total remaining cover stays at or below this.`,
     ],
   ];
   const axis = k.inUse > k.ceiling ? k.inUse : k.ceiling;
@@ -206,7 +206,7 @@ function HowTheCeilingWorks({ r, k, byRatio, floor }: { r: ReserveView; k: Cover
   const over = k.inUse > k.ceiling ? k.inUse - k.ceiling : 0n;
   const binds =
     k.binding === "stress"
-      ? "The stress floor sets the ceiling while the book is small."
+      ? "The stress floor sets the ceiling while the reserve is below claims set aside plus the stress buffer."
       : k.binding === "ratio"
         ? `The ${c} ratio sets the ceiling.`
         : `No new guarantees fit now: ${CEILING_BLOCK[k.blockedBy!]}.`;
@@ -216,10 +216,12 @@ function HowTheCeilingWorks({ r, k, byRatio, floor }: { r: ReserveView; k: Cover
         id="ceiling-h"
         title="How the ceiling works"
         note={
-          <Lead lead={`${fmtBrs(r.state.remainingCoverTotal)} of rent guaranteed across ${plural(r.state.activeGuarantees, "lease")}:`} className="text-sm">
-            the most MUTAV could ever owe if every lease defaulted at its limit. The reserve must hold {c} of that
-            {floor > byRatio ? ", or the stress floor when higher" : ""} (<span style={fig}><Money brs={s.coverageRequired} /></span>) and holds{" "}
-            <span style={fig}><Money brs={s.stableAssets} /></span>.
+          <Lead lead={`${fmtBrs(r.state.remainingCoverTotal)} guaranteed across ${plural(r.state.activeGuarantees, "lease")}`} className="text-sm">
+            is the most the reserve would pay if every lease defaulted for its full limit at the same time (unpaid rent plus move-out debts). The reserve is sized for
+            defaults as they happen, not for all of them at once: the program requires {c} of that amount
+            {floor > byRatio ? ", or the stress floor when higher" : ""} (<span style={fig}><Money brs={s.coverageRequired} /></span>), and the reserve holds{" "}
+            <span style={fig}><Money brs={s.stableAssets} /></span>. Claims already filed are set aside first, and a new lease is refused if it would push the
+            requirement above the reserve.
           </Lead>
         }
       />
@@ -238,23 +240,24 @@ function HowTheCeilingWorks({ r, k, byRatio, floor }: { r: ReserveView; k: Cover
         legend={
           <Legend>
             <ChartSwatch color={C.ink} label="in use" />
-            <ChartSwatch color={C.good} label="headroom" />
+            {!k.blockedBy && <ChartSwatch color={C.good} label="headroom" />}
             {over > 0n && <ChartSwatch color={C.bad} label="above the ceiling" />}
           </Legend>
         }
         caption={<CapacityLine k={k} />}
       >
         <Row
-          label={<RowLabel>Remaining cover</RowLabel>}
+          label={<RowLabel>Coverage ceiling</RowLabel>}
           value={fmtBrs(k.ceiling, 0)}
-          summary={`Remaining cover ${fmtBrs(k.inUse)} of a ${fmtBrs(k.ceiling)} ceiling; headroom ${fmtBrs(k.headroom)}.`}
+          summary={`Remaining cover ${fmtBrs(k.inUse)} of a ${fmtBrs(k.ceiling)} ceiling; headroom ${fmtBrs(k.headroom)}${k.blockedBy ? `, none available while ${CEILING_BLOCK[k.blockedBy]}` : ""}.`}
         >
           <Track segs={[{ f: frac(used, axis), color: C.ink }, { f: frac(k.headroom, axis), color: C.good }, { f: frac(over, axis), color: C.bad }]} />
         </Row>
       </ChartFrame>
       <p className="m-0">
         <Lead lead={binds} className="text-sm">
-          Guarantee fees and the BRS issuer&apos;s income add to the reserve and raise the ceiling, so more leases fit.
+          Guarantee fees (after the MUTAV fee) and BRS issuer income add to the reserve and raise the ceiling, so more leases fit.
+          {k.binding === "ratio" && r.config.coverageRatioBps > 0 ? ` Each R$ 1.00 added raises it by R$ ${(10_000 / r.config.coverageRatioBps).toFixed(2)}.` : ""}
         </Lead>
       </p>
     </section>

@@ -186,7 +186,10 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
       </div>
 
       <p role="group" aria-label="Coverage ceiling" className="m-0 text-[13px]">
-        <CapacityLine k={coverageCeilingOf(r)} />
+        <CapacityLine k={coverageCeilingOf(r)} />{" "}
+        <Link href="/reserve/coverage#ceiling-h" className="ext-link font-body text-xs">
+          How the ceiling works →
+        </Link>
       </p>
 
       <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
