@@ -6,9 +6,15 @@
  * transactionMessage: new TransactionMessage({ payerKey: vault,
  * instructions, recentBlockhash }) … })`, then `proposalCreate`,
  * `proposalApprove`, and `vaultTransactionExecute` after the time lock.
+ *
+ * The transaction that sends `vaultTransactionExecute` must start with
+ * `SetComputeUnitLimit(executeComputeUnitLimit)`: the inner instructions run
+ * inside it, and at `opt-level = "z"` the larger ones pass the runtime's
+ * 200,000-CU default (lib/compute.ts).
  */
 import { writeFileSync } from 'node:fs';
 import { AccountRole, getBase64Decoder, type Address, type Instruction } from '@solana/kit';
+import { SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT } from './compute';
 
 export type ProposalPayload = {
   kind: 'mutav-squads-proposal/v1';
@@ -17,6 +23,8 @@ export type ProposalPayload = {
   multisig: Address;
   vaultIndex: number;
   vault: Address;
+  /** Compute-unit limit for the execute transaction (a top-level `SetComputeUnitLimit`). */
+  executeComputeUnitLimit: number;
   instructions: {
     programAddress: Address;
     accounts: { address: Address; isSigner: boolean; isWritable: boolean }[];
@@ -27,12 +35,13 @@ export type ProposalPayload = {
 const b64 = getBase64Decoder();
 
 export function toPayload(
-  p: Omit<ProposalPayload, 'kind' | 'instructions'>,
+  p: Omit<ProposalPayload, 'kind' | 'instructions' | 'executeComputeUnitLimit'>,
   ixs: Instruction[],
 ): ProposalPayload {
   return {
     kind: 'mutav-squads-proposal/v1',
     ...p,
+    executeComputeUnitLimit: SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT,
     instructions: ixs.map((ix) => ({
       programAddress: ix.programAddress,
       accounts: (ix.accounts ?? []).map((m) => ({
@@ -59,5 +68,8 @@ export function assertOnlyVaultSigns(p: ProposalPayload) {
 export function writePayload(path: string, p: ProposalPayload) {
   assertOnlyVaultSigns(p);
   writeFileSync(path, JSON.stringify(p, null, 2) + '\n');
-  console.log(`wrote unsigned proposal ${path} (${p.instructions.length} instruction(s), vault ${p.vault})`);
+  console.log(
+    `wrote unsigned proposal ${path} (${p.instructions.length} instruction(s), vault ${p.vault}); ` +
+      `execute it with SetComputeUnitLimit(${p.executeComputeUnitLimit})`,
+  );
 }

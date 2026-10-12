@@ -54,6 +54,7 @@ import {
   TOKEN_PROGRAM,
 } from './lib/compose';
 import { postDeployChecks } from './lib/checks';
+import { INITIALIZE_COMPUTE_UNIT_LIMIT, setComputeUnitLimitInstruction } from './lib/compute';
 import { run } from './lib/exec';
 import { airdrop, assertNoProcess, LocalCluster, send, tempDir } from './lib/local';
 import { accountData } from './lib/rpc';
@@ -168,7 +169,10 @@ export async function dryRun(programKeypair?: string) {
     const sendAs = (signer: TransactionSigner, ixs: Instruction[]) => send(rpc, signer, ixs);
 
     step('initialize (signed by the upgrade authority = vault stand-in)');
-    await sendAs(vault!, [await composeInitialize(cfg, { upgradeAuthority: vault!, payer: vault! })]);
+    await sendAs(vault!, [
+      setComputeUnitLimitInstruction(INITIALIZE_COMPUTE_UNIT_LIMIT),
+      await composeInitialize(cfg, { upgradeAuthority: vault!, payer: vault! }),
+    ]);
 
     step('propose_role + accept_role (rotate operator and pauser, ADR 0020)');
     const a = await findReserveAddresses(mint, { programAddress: programId });
