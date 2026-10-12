@@ -22,6 +22,9 @@ export function SiteFooter() {
               {label}
             </Link>
           ))}
+          <a href="https://www.mutav.finance" target="_blank" rel="noopener noreferrer" className="font-mono ext-link" style={{ fontSize: 12 }}>
+            mutav.finance ↗
+          </a>
         </nav>
       </div>
     </footer>

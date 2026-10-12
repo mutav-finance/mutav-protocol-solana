@@ -13,7 +13,7 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 
 ## Stack
 
-- Next.js 16 (App Router), React 19, TypeScript, Bun, Tailwind 4, Radix / shadcn components, React Flow (protocol diagram), Vitest, Playwright.
+- Next.js 16 (App Router), React 19, TypeScript, Bun, Tailwind 4, Radix / shadcn components, Vitest, Playwright.
 - Solana: `@mutav-finance/mutav-protocol-solana` (Codama client, read helpers, math mirror, allowlist builder), `@solana/kit`, wallet-standard connection (Phantom, Solflare, Backpack). Squads v4 SDK for admin proposals.
 - Brand: vendored from the `brand` repo into `branding/` via `bun brand:import` (never edited here).
 - Deploy: Vercel, team `mutav`, at `reserve.mutav.finance` (the wildcard DNS already resolves).
@@ -30,20 +30,16 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 
 ## Routes
 
-### `/` Landing
+### `/` Redirect
 
-- The one-line story: MUTAV is an institutional rental guarantor in Brazil; every guarantee is backed by a reserve anyone can verify on Solana.
-- A live reserve strip (reserve, coverage required, free capital, NAV, active guarantees, mode) linking to `/reserve`.
-- How it works in three steps (agency registers a lease → reserve covers it, gated by required coverage → claims are paid from the reserve, never blocked).
-- The protocol diagram (React Flow): reserve, escrows, treasury, payments account, operator, admin (Squads), Nora BRS, and the coverage gate between them.
-- Calls to action: "See the reserve" (`/reserve`), "Run the demo" (`/demo`).
-- Design reference: the full wordmark over the hero; past the hero, a compact pinned bar with a solid CTA (see the "two-nav swap" pattern, compositor-only animations).
+- No app landing: MUTAV's landing is https://www.mutav.finance. `/` permanently redirects to `/reserve`, so reserve.mutav.finance opens on Transparency.
+- The nav logo links to `/reserve`; the footer links out to mutav.finance.
 
 ### `/reserve` Public transparency
 
 Read-only, no wallet needed.
 
-Money: BRS primary; US$ hint from PTAX/BCB, display only. Every amount shows in BRS; the main figures here, on `/capital` and on the landing strip carry a small muted `≈ US$ X` at the latest Banco Central PTAX selling rate (BRS = BRL 1:1), with one source line ("US$ at PTAX (Banco Central do Brasil), dd/mm/yyyy. Display only; the reserve holds BRS."). Without a rate the hints and the line are hidden. Nothing about the rate feeds a transaction.
+Money: BRS primary; US$ hint from PTAX/BCB, display only. Every amount shows in BRS; the main figures here and on `/capital` carry a small muted `≈ US$ X` at the latest Banco Central PTAX selling rate (BRS = BRL 1:1), with one source line ("US$ at PTAX (Banco Central do Brasil), dd/mm/yyyy. Display only; the reserve holds BRS."). Without a rate the hints and the line are hidden. Nothing about the rate feeds a transaction.
 
 - **Health:** `stable_assets`, `coverage_required`, surplus, `free_capital`, NAV per share, shares outstanding, `mode` (Normal / UnderCovered), `fulfil_halted`, paused, last refresh.
 - **Coverage:** remaining cover by guarantee (default and exit legs), active guarantee count, per-agency exposure.
