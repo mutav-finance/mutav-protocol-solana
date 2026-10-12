@@ -37,4 +37,5 @@ Both are credited in the [README acknowledgements](../README.md#acknowledgements
 | 2026-10-01 | Protocol spec, implementation plan, ADRs 0001–0006, repo docs | |
 | 2026-10-02 | Redemption liquidity design: partial fills at the queue head, phase-2 instant exit, upgrade readiness (spec §5.5, §13, §14; ADRs 0010, 0011) | |
 | 2026-10-06 | Task 1: core state (`VaultConfig`, `VaultState`), `initialize`, roles, pause, mint guard; account and authority skeleton adapted from `solana-foundation/vault` | |
+| 2026-10-12 | Devnet test deploy of commit `833c114` under Squads v4 multisigs; the pilot demo reserve initialized and exercised (test activity is visible) | [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet) |
 | | | |

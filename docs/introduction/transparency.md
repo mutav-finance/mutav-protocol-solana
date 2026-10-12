@@ -38,13 +38,13 @@ So two figures are always public for each account: the tracked total and the act
 
 ## The `/reserve` page
 
-The pilot app at [reserve.mutav.finance/reserve](https://reserve.mutav.finance/reserve) shows the same data in one place. It is read-only and needs no wallet. Every number is read from on-chain accounts through the client. Until the reserve is initialized on devnet, the page shows a "being deployed" notice instead of numbers.
+The pilot app at [reserve.mutav.finance/reserve](https://reserve.mutav.finance/reserve) shows the same data in one place. It is read-only and needs no wallet. Every number is read from on-chain accounts through the client. It reads the pilot demo reserve on devnet; test activity is visible.
 
 | Panel | What it shows |
 |---|---|
 | Health | Stable assets, coverage required, surplus, free capital, NAV per share, shares outstanding, mode, NAV halt, pause state, last refresh. |
 | Coverage | Remaining cover by guarantee, default and exit legs, active guarantee count, and per-agency figures derived from the guarantee accounts. |
-| Claims timeline | Each claim with its on-chain timestamps for filed, paid and settled, and the Pix settlement hash. |
+| Claims timeline | Each claim by stage (needs approval, approved, paid, settled) with its on-chain timestamps, and the Pix settlement hash. A payment above R$15k needs the admin's `approve_claim` first. |
 | Money flows | Guarantee fees in (net to the reserve, take to the treasury), issuer income in and the untracked income-inbox balance, claim payments out, deposits and redemptions. |
 | Capital queue | Pending deposits and redemptions in first-in, first-out order. |
 | Balances | On-chain balance, tracked total and unbooked amount for each reserve token account. |

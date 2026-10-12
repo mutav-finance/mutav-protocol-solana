@@ -7,7 +7,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-mutav = "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9"
+mutav = "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV"
 mutav_adapter_mock = "HnDdop5PFqvVKZNujsuakwm2K5GskAUk1GxzbDSdGuMo"
 
 [programs.localnet]

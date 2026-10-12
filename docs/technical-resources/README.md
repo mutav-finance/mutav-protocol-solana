@@ -2,7 +2,7 @@
 
 Reference material for integrators, auditors and the people who run the MUTAV reserve program on Solana. These pages describe the **devnet binary** of the `mutav` program, layout v1, as on `main`. Features planned for later upgrades are marked as such: they are not in the binary.
 
-> Unaudited software. The program is not yet deployed to devnet. Where a value is chosen at deploy time or is still open, these pages say so instead of guessing.
+> Unaudited software. The program is live on devnet as [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet), the pilot demo reserve (test activity is visible); see [Configuration and reference](configuration-and-reference.md). Where a value is chosen at deploy time or is still open, these pages say so instead of guessing.
 
 ## Pages
 
