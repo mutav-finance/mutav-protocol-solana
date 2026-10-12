@@ -13,12 +13,16 @@ type Fmt = (base: bigint, places?: number) => string;
 const MoneyCtx = createContext<Fmt>(fmtBrs);
 /** The dollar rate in use (`US$1 = R$ 5.40`), or null when amounts show in BRS. */
 const RateCtx = createContext<string | null>(null);
+/** BRL per US$1 × FX_SCALE behind the dollar amounts, or null when amounts show in BRS. */
+const UsdBrlCtx = createContext<bigint | null>(null);
 
 export function MoneyProvider({ children }: { children: ReactNode }) {
-  const { fmt, rate } = useMoney();
+  const { fmt, rate, fx } = useMoney();
   return (
     <MoneyCtx.Provider value={fmt}>
-      <RateCtx.Provider value={rate}>{children}</RateCtx.Provider>
+      <RateCtx.Provider value={rate}>
+        <UsdBrlCtx.Provider value={fx?.usdBrl ?? null}>{children}</UsdBrlCtx.Provider>
+      </RateCtx.Provider>
     </MoneyCtx.Provider>
   );
 }
@@ -38,3 +42,6 @@ export const ProvidedUsdNote = () => <UsdNote rate={useContext(RateCtx)} />;
 
 /** Format a BRS amount in the page's display currency. */
 export const useFmt = (): Fmt => useContext(MoneyCtx);
+
+/** The page's USD/BRL rate (BRL per US$1 × FX_SCALE), or null when amounts show in BRS. */
+export const useUsdBrl = (): bigint | null => useContext(UsdBrlCtx);

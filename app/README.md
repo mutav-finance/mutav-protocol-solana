@@ -12,7 +12,7 @@ Live: [reserve.mutav.finance](https://reserve.mutav.finance).
 |---|---|
 | `/` | Landing: the story, a live reserve strip with a coverage chart, how it works, who does what, the protocol diagram |
 | `/reserve` | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Explorer, and the permissionless `refresh`; snapshot charts of each |
-| `/capital` | The capital queue (`/investment`, `/investor`, `/dashboard` redirect here). Leads with: not open to public investment; pilot capital is MUTAV's own wallet. The capital provider's view: allowlist status (on-chain root + `ALLOWLIST`), position, own queue entries, and `request_deposit` / `cancel_deposit` / `claim_shares` / `request_redeem` / `cancel_redeem` / `claim_assets`. The request form renders only once the wallet's Merkle proof verifies; everyone else sees a static "allowlisted wallets only, not an offer" card |
+| `/capital` | The capital queue (`/investment`, `/investor`, `/dashboard` redirect here). Leads with: not open to public investment; pilot capital is MUTAV's own wallet. The capital provider's view: allowlist status (on-chain root + `ALLOWLIST`), position, own queue entries, and `request_deposit` / `cancel_deposit` / `claim_shares` / `request_redeem` / `cancel_redeem` / `claim_assets`. Demo: the request form is visible to every visitor; on-chain actions stay allowlist-gated (holders can always redeem, ADR 0023). Before launch, set `CAPITAL_FORMS_PUBLIC` (`lib/flags.ts`, env `NEXT_PUBLIC_CAPITAL_FORMS_PUBLIC=false`) false to show the form only to allowlisted wallets (holders get redeem only). |
 | `/operator` | Operator console: today MUTAV's team signs by hand with the operator wallet (later mutav-app's backend, KMS key). Live limits (claim caps window, payouts vs SLA, free capital), every operator instruction with its bound shown before signing, duties (today → later), recent operator transactions, safety. Actions enabled only for `VaultConfig.operator` |
 | `/demo` | Guided operator demo (six steps, with the coverage-gate preview); free-form operator actions are on `/operator` |
 | `/admin` | `VaultConfig`, Squads v4 proposal builders (create / approve / execute, with the time lock), direct signing on localnet only |
@@ -42,6 +42,7 @@ Port 3001 is a suggestion: 3000 is often taken by another local project.
 | Variable | Where | Meaning |
 |---|---|---|
 | `NEXT_PUBLIC_CLUSTER` | build time | `localnet` or `devnet` (mainnet refused) |
+| `NEXT_PUBLIC_CAPITAL_FORMS_PUBLIC` | build time | `CAPITAL_FORMS_PUBLIC` (`lib/flags.ts`). Unset or anything but `false` (demo): the `/capital` form shows to every visitor, actions stay allowlist-gated. `false` before launch: the form shows only to allowlisted wallets (holders get redeem only) |
 | `RPC_URL` | server, runtime | RPC for reads and the relay; defaults per cluster |
 | `PROGRAM_ID` | server, runtime | `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9` |
 | `CONFIG_ADDRESS` | server, runtime | the reserve's `VaultConfig` PDA |

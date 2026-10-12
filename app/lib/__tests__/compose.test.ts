@@ -2,12 +2,37 @@ import { describe, expect, it, vi } from "vitest";
 import { address, type Address } from "@solana/kit";
 import { conversionNav, findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getClearFulfilHaltInstructionDataDecoder, getFulfilDepositsInstructionDataDecoder, getSetConfigInstructionDataDecoder, navBoundsAround, publishedNav, coverageFromAccounts, identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
 import { fromHex } from "../serde";
-import { composeInstructions, COMPUTE_UNIT_LIMITS, DEFAULT_NAV_TOLERANCE_BPS, describeInstructions, MAX_COMPUTE_UNIT_LIMIT, queueSeqs, refuseOverlappingSetConfig, setComputeUnitLimitInstruction, SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT, unsignedTransaction, withComputeUnitLimit } from "../server/compose";
+import { serverEnv } from "../server/env";
+import { associatedTokenAddress, composeInstructions, COMPUTE_UNIT_LIMITS, DEFAULT_NAV_TOLERANCE_BPS, describeInstructions, MAX_COMPUTE_UNIT_LIMIT, queueSeqs, refuseOverlappingSetConfig, setComputeUnitLimitInstruction, SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT, unsignedTransaction, withComputeUnitLimit } from "../server/compose";
 import { assertRelayable, COMPUTE_BUDGET_PROGRAM, invokedPrograms, isFullySigned, RelayRefusedError } from "../server/relay";
 import type { ReserveView } from "../view";
 import { config, state } from "./fixtures";
 
-vi.mock("../server/chain", () => ({ rpcFor: () => { throw new Error("no rpc in unit tests"); } }));
+// No RPC in unit tests, except where a test sets `chain.shares`: then the
+// share-account reads (request_redeem's holder check) answer from that map.
+const chain = vi.hoisted(() => ({ shares: undefined as Map<string, bigint> | undefined, reads: [] as string[] }));
+vi.mock("../server/chain", () => ({
+  READ: { commitment: "confirmed" },
+  rpcFor: () => {
+    if (!chain.shares) throw new Error("no rpc in unit tests");
+    return {
+      getAccountInfo: (at: string) => ({
+        send: async () => {
+          chain.reads.push(at);
+          const amount = chain.shares!.get(at);
+          return { context: { slot: 0n }, value: amount === undefined ? null : tokenAccount(amount) };
+        },
+      }),
+    };
+  },
+}));
+
+/** An SPL token account as getAccountInfo returns it (base64), holding `amount`. */
+function tokenAccount(amount: bigint) {
+  const data = new Uint8Array(165);
+  new DataView(data.buffer).setBigUint64(64, amount, true);
+  return { data: [Buffer.from(data).toString("base64"), "base64"], executable: false, lamports: 1n, owner: TOKEN_PROGRAM_ADDRESS, space: 165n, rentEpoch: 0n };
+}
 
 const MINT = address("BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4");
 const WALLET = address("9b4N73CtqN6PWE9tvocRvGjJnSfiy94oev4wbR31xMeU");
@@ -204,11 +229,11 @@ describe("compose", () => {
     const tree = await buildAllowlist([WALLET, TREASURY]);
     r.config = { ...r.config, investorAllowlistRoot: tree.root };
     r.state = { ...r.state, nextRedeemSeq: 4n };
-    const [ix] = await composeInstructions({ kind: "request_redeem", shares: 2_000_000_000n }, WALLET, { reserve: r, allowlist: [WALLET, TREASURY] });
+    const [ix] = await composeInstructions({ kind: "request_redeem", shares: 2_000_000_000n }, WALLET, { reserve: r, allowlist: [WALLET, TREASURY], ownerShares: null });
     const d = describeInstructions([ix!])[0]!;
     expect(d.accounts.filter((a) => a.signer).map((a) => a.address)).toEqual([WALLET]);
-    await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, PAYMENTS, { reserve: r, allowlist: [WALLET, TREASURY] })).rejects.toThrow(/not in ALLOWLIST/);
-    await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, WALLET, { reserve: r, allowlist: [WALLET] })).rejects.toThrow(/does not hash/);
+    await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, PAYMENTS, { reserve: r, allowlist: [WALLET, TREASURY], ownerShares: null })).rejects.toThrow(/not in ALLOWLIST/);
+    await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, WALLET, { reserve: r, allowlist: [WALLET], ownerShares: null })).rejects.toThrow(/does not hash/);
   });
 
   it("request_redeem: a holder outside the allowlist composes with an empty proof (ADR 0023)", async () => {
@@ -226,6 +251,32 @@ describe("compose", () => {
     // Without shares (or no share account) it still needs a proof, which a non-listed wallet cannot build.
     await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, PAYMENTS, { reserve: r, allowlist: listed, ownerShares: 0n })).rejects.toThrow(/not in ALLOWLIST/);
     await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, PAYMENTS, { reserve: r, allowlist: listed, ownerShares: null })).rejects.toThrow(/not in ALLOWLIST/);
+  });
+
+  it("request_redeem: without an injected balance, compose reads the share account the instruction passes", async () => {
+    const r = await reserve();
+    const { buildAllowlist, getRequestRedeemInstructionDataDecoder } = await import("@mutav-finance/mutav-protocol-solana");
+    r.config = { ...r.config, investorAllowlistRoot: (await buildAllowlist([WALLET, TREASURY])).root };
+    r.state = { ...r.state, nextRedeemSeq: 4n };
+    const listed = [WALLET, TREASURY];
+    const ata = await associatedTokenAddress(PAYMENTS, address(r.addresses.shareMint));
+    const env = serverEnv({});
+    try {
+      // PAYMENTS (not listed) holds shares in its share ATA: an empty proof, and the instruction's owner_shares is that ATA.
+      chain.shares = new Map([[ata, 5_000n]]);
+      chain.reads = [];
+      const [ix] = await composeInstructions({ kind: "request_redeem", shares: 1_000n }, PAYMENTS, { reserve: r, allowlist: listed, env });
+      expect(chain.reads).toEqual([ata]);
+      expect(getRequestRedeemInstructionDataDecoder().decode(ix!.data!).eligibility).toEqual({ __kind: "Merkle", proof: [] });
+      expect(ix!.accounts!.map((a) => a.address)).toContain(ata);
+      // Empty or missing share account: a proof is needed, which a non-listed wallet cannot build.
+      chain.shares = new Map([[ata, 0n]]);
+      await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, PAYMENTS, { reserve: r, allowlist: listed, env })).rejects.toThrow(/not in ALLOWLIST/);
+      chain.shares = new Map();
+      await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, PAYMENTS, { reserve: r, allowlist: listed, env })).rejects.toThrow(/not in ALLOWLIST/);
+    } finally {
+      chain.shares = undefined;
+    }
   });
 
   it("cancels and claims are signed by the owner only, with no proof", async () => {
@@ -277,7 +328,7 @@ describe("compose", () => {
     const { buildAllowlist, getRequestDepositInstructionDataDecoder, getRequestRedeemInstructionDataDecoder } = await import("@mutav-finance/mutav-protocol-solana");
     r.config = { ...r.config, investorAllowlistRoot: (await buildAllowlist([WALLET])).root };
     r.state = { ...r.state, nextRedeemSeq: 4n };
-    const ctx = { reserve: r, allowlist: [WALLET] };
+    const ctx = { reserve: r, allowlist: [WALLET], ownerShares: null };
     const [dep] = await composeInstructions({ kind: "request_deposit", assets: 5n, minSharesOut: 4n }, WALLET, ctx);
     expect(getRequestDepositInstructionDataDecoder().decode(dep!.data!).minSharesOut).toBe(4n);
     const [dep0] = await composeInstructions({ kind: "request_deposit", assets: 5n }, WALLET, ctx);

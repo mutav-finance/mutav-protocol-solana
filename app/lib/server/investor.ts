@@ -3,13 +3,12 @@
  * token accounts (associated token accounts) and its allowlist status against
  * the on-chain root. Read-only.
  */
-import { address, fetchEncodedAccount, type Address } from "@solana/kit";
+import { address } from "@solana/kit";
 import { buildAllowlist } from "@mutav-finance/mutav-protocol-solana";
 import { checkAllowlist, type AllowlistState } from "../allowlist";
 import { bytesToHex } from "../serde";
 import type { ReserveView } from "../view";
-import { READ, rpcFor } from "./chain";
-import { associatedTokenAddress, TOKEN_PROGRAM } from "./compose";
+import { associatedTokenAddress, TOKEN_PROGRAM, tokenAmount } from "./compose";
 import type { ServerEnv } from "./env";
 
 export type InvestorView = {
@@ -30,14 +29,6 @@ export type InvestorView = {
   brs: { account: string; amount: bigint | null };
   shares: { account: string; amount: bigint | null };
 };
-
-/** SPL token account `amount`: u64 LE at [64..72). */
-export async function tokenAmount(env: ServerEnv, account: Address): Promise<bigint | null> {
-  const a = await fetchEncodedAccount(rpcFor(env), account, READ);
-  if (!a.exists || (a.data as Uint8Array).length < 72) return null;
-  const d = a.data as Uint8Array;
-  return new DataView(d.buffer, d.byteOffset, d.byteLength).getBigUint64(64, true);
-}
 
 export async function readInvestor(env: ServerEnv, r: ReserveView, ownerParam: string | null): Promise<InvestorView> {
   const root = bytesToHex(Uint8Array.from(r.config.investorAllowlistRoot));

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { historyWindow, pointAt, stableAssetsHistory, yTicks } from "../history";
+import { displayTicks, historyWindow, pointAt, stableAssetsHistory, yTicks } from "../history";
+import { brsToUsd } from "../format";
 import type { FlowRow } from "../view";
 
 const DAY = 86_400n;
@@ -81,5 +82,27 @@ describe("yTicks", () => {
 
   it("handles a flat zero line", () => {
     expect(yTicks(0n, 0n)).toEqual([0n]);
+  });
+});
+
+describe("displayTicks", () => {
+  const RATE = 5_400_000n; // R$ 5.40 per US$ 1
+  const usd = (n: bigint) => n * 1_000_000n;
+
+  it("is yTicks in BRS without a rate", () => {
+    expect(displayTicks(0n, 51_000n, null)).toEqual(yTicks(0n, 51_000n));
+  });
+
+  it("steps on round dollars with a rate, and each tick reads back exactly", () => {
+    // R$ 100,000 ≈ US$ 18,518.51: ticks every US$ 5,000 up to US$ 20,000.
+    const ticks = displayTicks(0n, usd(100_000n), RATE);
+    expect(ticks.map((t) => brsToUsd(t, RATE))).toEqual([0n, usd(5_000n), usd(10_000n), usd(15_000n), usd(20_000n)]);
+    // The top tick still clears the max, in BRS, for positioning.
+    expect(ticks.at(-1)).toBeGreaterThanOrEqual(usd(100_000n));
+  });
+
+  it("reads back exactly on a rate that does not divide evenly", () => {
+    const rate = 5_123_457n;
+    for (const t of displayTicks(-usd(3_000n), usd(77_777n), rate)) expect(brsToUsd(t, rate) % usd(1n)).toBe(0n);
   });
 });

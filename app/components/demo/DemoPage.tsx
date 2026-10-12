@@ -160,7 +160,7 @@ export function DemoPage() {
 
           <Section id="investor" title="Investor actions" kicker="Elsewhere" roles={<RoleTag role="investor" bordered />}>
             <Note>
-              Deposits, redemptions, cancels and claims are on <Link href="/capital" className="ext-link">/capital</Link>. Requests need an allowlisted wallet.
+              Deposits, redemptions, cancels and claims are on <Link href="/capital" className="ext-link">/capital</Link>. Deposits need an allowlisted wallet; holders can always redeem.
             </Note>
           </Section>
 

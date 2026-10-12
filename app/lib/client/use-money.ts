@@ -6,7 +6,7 @@
  * in reais, so a figure is never shown at a made-up rate.
  */
 import { fmtBrs, fmtUnits, fmtUsd } from "../format";
-import type { FxView } from "../server/fx";
+import type { FxResponse, FxView } from "../server/fx";
 import { usePoll } from "./use-poll";
 
 export type Money = {
@@ -17,8 +17,12 @@ export type Money = {
   rate: string | null;
 };
 
+/** /api/fx answered that no rate source is configured: polling again cannot change it. */
+export const noFxSource = (r: FxResponse) => r.fx === null;
+
 export function useMoney(): Money {
-  const fx = usePoll<FxView>("/api/fx", 60_000).data;
+  // No rate source configured (`fx: null`): stop polling, amounts stay in BRS.
+  const fx = usePoll<FxResponse>("/api/fx", 60_000, noFxSource).data?.fx ?? null;
   return {
     fx,
     fmt: (base, places = 2) => (fx ? fmtUsd(base, fx.usdBrl, places) : fmtBrs(base, places)),

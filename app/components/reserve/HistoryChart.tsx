@@ -10,10 +10,10 @@
  */
 import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Mono } from "@/components/Mono";
-import { useFmt } from "@/components/MoneyProvider";
+import { useFmt, useUsdBrl } from "@/components/MoneyProvider";
 import { PERIODS, PeriodPicker, inPeriod, type Period } from "@/components/reserve/sections/Flows";
 import { signed } from "@/components/reserve/sections/shared";
-import { historyWindow, pointAt, stableAssetsHistory, yTicks } from "@/lib/history";
+import { displayTicks, historyWindow, pointAt, stableAssetsHistory } from "@/lib/history";
 import { fmtTime } from "@/lib/format";
 import { FLOW_KIND_LABEL, type FlowRow } from "@/lib/view";
 
@@ -26,6 +26,7 @@ const day = (ts: bigint) => new Date(Number(ts) * 1000).toLocaleDateString("en-U
 
 export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; stableAssets: bigint; now: bigint }) {
   const fmtBrs = useFmt();
+  const usdBrl = useUsdBrl();
   const [period, setPeriod] = useState<Period>("90D");
   const [active, setActive] = useState<number | null>(null);
   const plot = useRef<HTMLDivElement>(null);
@@ -34,7 +35,8 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
   const w = useMemo(() => historyWindow(history, PERIODS[period]), [history, period]);
   const moves = rows.filter((r) => r.at !== null && inPeriod(r.at, now, period)).length;
 
-  const ticks = yTicks(w.min, w.max);
+  // Round steps in the unit shown (dollars when there is a rate), positioned in BRS.
+  const ticks = displayTicks(w.min, w.max, usdBrl);
   const lo = Number(ticks[0]!);
   const hi = Number(ticks.at(-1)!);
   const span = Number(w.end - w.start) || 1;

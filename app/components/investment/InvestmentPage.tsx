@@ -3,8 +3,9 @@
 /**
  * /capital — the capital provider's page (the Investor role): send a new
  * deposit or redemption request, then follow, cancel and collect it. Everyone
- * can read it; only a wallet on the on-chain allowlist can deposit, and a
- * wallet holding shares can always redeem (ADR 0023).
+ * can read it (and, in the demo, see the request form); only a wallet on the
+ * on-chain allowlist can deposit, and a wallet holding shares can always
+ * redeem (ADR 0023).
  * Cancels and collects need only the request's owner (spec §5.5).
  *
  * Layout: a left-aligned header with a decorative photo bleeding from the
@@ -124,9 +125,9 @@ export function InvestmentPage() {
                 <Stats r={d.reserve} money={money} />
                 <UsdNote rate={money.rate} />
               </div>
-              {inv.error && !inv.data && <ReadError error={inv.error} />}
+              {inv.error && !invData && <ReadError error={inv.error} onRetry={() => void inv.refresh()} />}
               <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
-                <RequestCard inv={invData} connected={connected} money={money} />
+                <RequestCard inv={invData} loading={inv.loading} connected={connected} money={money} />
                 <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} money={money} now={d.reserve.now} />
               </div>
             </div>

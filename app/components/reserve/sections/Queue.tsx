@@ -156,7 +156,7 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
           How the queue works
         </summary>
         <ol className="font-body text-(--color-text-2) m-0 mt-4 flex max-w-[720px] list-decimal flex-col gap-2 pl-5 text-sm leading-relaxed">
-          <li>An allowlisted capital provider requests a deposit (BRS) or a redemption (shares).</li>
+          <li>Allowlisted capital providers can request deposits; existing holders can always request a redemption (ADR 0023).</li>
           <li>The Reserve Admin fills requests oldest first. No request skips the line.</li>
           <li>The capital provider then collects their shares or BRS from the collection account.</li>
         </ol>

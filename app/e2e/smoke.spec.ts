@@ -142,7 +142,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/capital — not open to public investment; no request form without an allowlisted wallet", async ({ page, request }) => {
+  test("/capital — not open to public investment; demo form visible, actions gated without a wallet", async ({ page, request }) => {
     for (const old of ["/investment", "/dashboard", "/investor"]) {
       await page.goto(old);
       await expect(page).toHaveURL(/\/capital$/);
@@ -153,12 +153,16 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
       "Pilot capital comes from MUTAV's own wallet only. This page is not open to public investment and nothing here is an offer.",
     );
     await expect(page.getByRole("group", { name: "Reserve figures" })).toContainText("Share price");
-    // Without an allowlisted wallet there is no form: a static card, no amounts, no limits.
-    const card = page.getByRole("region", { name: "Capital requests" });
+    // Demo (CAPITAL_FORMS_PUBLIC): every visitor sees the form, both tabs and the limits;
+    // without a wallet the submit is disabled, with the reason.
+    const card = page.getByRole("region", { name: "Deposit request" });
     await expect(card).toContainText("Capital requests are limited to allowlisted wallets during the pilot. This is not an offer.");
-    await expect(page.getByRole("button", { name: "Request deposit" })).toHaveCount(0);
-    await expect(page.getByRole("tab", { name: "Redeem" })).toHaveCount(0);
-    await expect(page.getByLabel("You deposit")).toHaveCount(0);
+    await expect(card).toContainText("per request");
+    await expect(page.getByLabel("You deposit")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Request deposit" })).toBeDisabled();
+    await page.getByRole("tab", { name: "Redeem" }).click();
+    await expect(page.getByLabel("You redeem")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Request redemption" })).toBeDisabled();
     await expect(page.getByRole("heading", { name: "Your requests" })).toBeVisible();
     const seeded = await (await request.get("/api/reserve")).json();
     const capital = (await (await request.get(`/api/investor?owner=${seeded.config.mutavCapitalWallet}`)).json()).allowlist.state;
