@@ -222,7 +222,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
   switch (req.kind) {
     // ── public ──────────────────────────────────────────────────────────────
     case "refresh": {
-      // `refresh` takes no remaining accounts (no payout SLA, ADR 0019).
+      // `refresh` takes no remaining accounts (no settlement deadline, ADR 0019).
       return [refreshIx()];
     }
     case "advance_queue_head": {

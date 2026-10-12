@@ -73,7 +73,7 @@ describe("compose", () => {
     expect(queueSeqs(5n, 5n, 3)).toEqual([]);
   });
 
-  it("refresh takes no remaining accounts (no payout SLA, ADR 0019)", async () => {
+  it("refresh takes no remaining accounts (no settlement deadline, ADR 0019)", async () => {
     const r = await reserve();
     const [ix] = await composeInstructions({ kind: "refresh" }, WALLET, { reserve: r });
     // config, state, the four token accounts, event authority, program.

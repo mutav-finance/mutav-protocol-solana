@@ -10,12 +10,13 @@ import { navPerShare } from "@mutav-finance/mutav-protocol-solana";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { TxStatus } from "@/components/TxStatus";
 import { useWallet } from "@/components/WalletProvider";
 import { useTx } from "@/lib/client/use-tx";
-import { fmtBrs, fmtNav, fmtShares } from "@/lib/format";
+import { CLUSTER } from "@/lib/client/env";
+import { explorerUrl } from "@/lib/cluster";
+import { fmtBrs, fmtNav, fmtShares, shortAddr } from "@/lib/format";
 import type { RefusalContext } from "@/lib/tx-error";
 import { expectedSigner, type TxRequest } from "@/lib/tx-kinds";
 import { MODE_LABEL, type Ledger, type ReserveView } from "@/lib/view";
@@ -56,7 +57,7 @@ export function rolesOf(address: string | null, r: ReserveView): Role[] {
     .map(([, role]) => role);
 }
 
-const ROLE_LABEL: Record<Role, string> = { operator: "Operator", admin: "Reserve Admin", pauser: "pauser", capital: "Investor (MUTAV capital wallet)" };
+const ROLE_LABEL: Record<Role, string> = { operator: "Operator", admin: "Reserve Admin", pauser: "pauser", capital: "capital provider (MUTAV capital wallet)" };
 
 /** The program checks signers; the UI only warns when the wallet isn't the configured role. */
 export function RoleWarning({ need }: { need: Role }) {
@@ -148,6 +149,8 @@ export function Moves({ before, after }: { before: Snap; after: Snap }) {
  */
 export function Action({
   label,
+  ix,
+  confirmedTitle,
   request,
   disabled,
   via,
@@ -158,10 +161,14 @@ export function Action({
   refusal,
 }: {
   label: string;
+  /** The instruction name, shown as a small mono sub-label on the button. */
+  ix?: string;
+  /** Once confirmed: a prominent result heading ("Confirmed · MTV-PF-0100") with the signature, the before/after, then `next` below it. */
+  confirmedTitle?: string;
   request: TxRequest | null | (() => Promise<TxRequest | null>);
   disabled?: boolean;
   via?: "squads" | "direct";
-  variant?: "default" | "outline" | "destructive";
+  variant?: "default" | "outline" | "destructive-outline";
   onDone?: () => void;
   /** Called as soon as the transaction confirms, before the post-confirmation read, with the numbers read before the send. */
   onConfirmed?: (signature: string, before: Snap | null) => void;
@@ -195,12 +202,24 @@ export function Action({
 
   const busy = !["idle", "confirmed", "failed"].includes(state.phase);
   const kind = typeof request === "function" ? null : request?.kind;
+  const off = !!disabled || !!gate?.locked || busy || request === null;
+  const moves = state.phase === "confirmed" && before && after ? <Moves before={before} after={after} /> : null;
+  if (state.phase === "confirmed" && confirmedTitle && state.signature) {
+    return (
+      <div>
+        <Confirmed title={confirmedTitle} signature={state.signature} />
+        {moves ?? <Note>Reading the new state…</Note>}
+        {next && <div style={{ marginTop: 16 }}>{next}</div>}
+      </div>
+    );
+  }
   return (
     <div>
       {state.phase === "confirmed" && next ? next : (
       <Button
-        variant={variant}
-        disabled={disabled || gate?.locked || busy || request === null}
+        // A disabled primary CTA reads as the outline variant (amber at low opacity turns brown).
+        variant={off && variant === "default" ? "outline" : variant}
+        disabled={off}
         onClick={async () => {
           const req = typeof request === "function" ? await request() : request;
           if (!req) return;
@@ -211,11 +230,37 @@ export function Action({
         }}
         title={kind ? `Signer the program checks: ${expectedSigner(kind)}` : undefined}
       >
-        {busy ? "Working…" : label}
+        {busy ? "Working…" : <IxText label={label} ix={ix} />}
       </Button>
       )}
       <TxStatus state={state} refusal={refusal} />
-      {state.phase === "confirmed" && before && after && <Moves before={before} after={after} />}
+      {moves}
+    </div>
+  );
+}
+
+/** A button or tab label: the human name, with the instruction name as a small mono sub-label. */
+export function IxText({ label, ix, stacked = false }: { label: string; ix?: string; stacked?: boolean }) {
+  if (!ix) return <>{label}</>;
+  return (
+    <span style={{ display: "inline-flex", flexDirection: stacked ? "column" : "row", alignItems: stacked ? "flex-start" : "baseline", gap: stacked ? 1 : 8 }}>
+      <span>{label}</span>
+      <span className="font-mono" style={{ fontSize: 10, fontWeight: 400, letterSpacing: 0, opacity: 0.7 }}>{ix}</span>
+    </span>
+  );
+}
+
+/** A confirmed send, as a heading that reads on a recording: the result, the short signature, Explorer. */
+export function Confirmed({ title, signature }: { title: string; signature: string }) {
+  return (
+    <div role="status" aria-live="polite" style={{ display: "flex", alignItems: "center", gap: "8px 14px", flexWrap: "wrap", marginTop: 4 }}>
+      <span aria-hidden="true" style={{ width: 10, height: 10, background: "var(--color-success)", flexShrink: 0 }} />
+      <h3 className="font-display" style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: "-0.01em", color: "var(--color-text)" }}>
+        {title}
+      </h3>
+      <a href={explorerUrl("tx", signature, CLUSTER)} target="_blank" rel="noopener noreferrer" className="font-mono ext-link" style={{ fontSize: 14 }} title={signature}>
+        {shortAddr(signature, 8)} · Explorer ↗
+      </a>
     </div>
   );
 }
@@ -247,14 +292,9 @@ export function useLastAction() {
 export function LastAction({ last }: { last: LastResult | null }) {
   if (!last) return null;
   return (
-    <div role="status" aria-live="polite" style={{ border: "1px solid var(--color-success)", background: "var(--color-surface)", padding: "12px 14px", margin: "12px 0" }}>
+    <div style={{ border: "1px solid var(--color-success)", background: "var(--color-surface)", padding: "16px 20px", margin: "12px 0 16px" }}>
       <span className="font-mono" style={{ fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--color-text-3)" }}>Last action</span>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-        <span aria-hidden="true" style={{ width: 6, height: 6, background: "var(--color-success)", flexShrink: 0 }} />
-        <span className="font-body" style={{ fontSize: 12, color: "var(--color-success)" }}>Confirmed</span>
-        <Mono style={{ fontSize: 12 }}>{last.label}</Mono>
-        <Explorer kind="tx" value={last.signature} />
-      </div>
+      <Confirmed title={last.label} signature={last.signature} />
       {last.before && last.after ? <Moves before={last.before} after={last.after} /> : <Note>Reading the new state…</Note>}
     </div>
   );
@@ -282,6 +322,7 @@ export function TextField({ id, label, value, onChange, hint, numeric }: { id: s
   );
 }
 
-export const Grid = ({ children }: { children: ReactNode }) => (
-  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, margin: "12px 0" }}>{children}</div>
+/** `flush`: no top margin, for a grid that opens its column. */
+export const Grid = ({ children, flush = false }: { children: ReactNode; flush?: boolean }) => (
+  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, margin: flush ? "0 0 12px" : "12px 0" }}>{children}</div>
 );

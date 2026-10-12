@@ -357,7 +357,8 @@ export function moneyFlows(
   let depositsIn = 0n;
   let redemptionsOut = 0n;
   for (const e of ledger.capitalEvents) {
-    const seqs = e.fromSeq === e.toSeq ? `seq ${e.fromSeq}` : `seqs ${e.fromSeq}–${e.toSeq}`;
+    const n = e.toSeq - e.fromSeq + 1n;
+    const requests = `${n} request${n === 1n ? "" : "s"}`;
     if (e.side === "deposit") depositsIn += e.assets;
     else redemptionsOut += e.assets;
     rows.push({
@@ -367,7 +368,7 @@ export function moneyFlows(
       at: e.ts,
       reserveDelta: e.side === "deposit" ? e.assets : -e.assets,
       treasury: 0n,
-      detail: `${seqs} · ${e.side === "deposit" ? "minted" : "burned"} ${fmtShares(e.shares)} shares`,
+      detail: `${requests} · ${fmtShares(e.shares)} shares`,
     });
   }
   rows.sort((a, b) => Number((b.at ?? 0n) - (a.at ?? 0n)));

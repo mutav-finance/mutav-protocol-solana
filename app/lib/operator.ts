@@ -1,7 +1,7 @@
 /**
  * Operator view models for /operator: the duties of the operator key, the
- * on-chain bounds on each one, and the live limits (claim-payment cap window,
- * payouts against the SLA). Pure functions over decoded accounts.
+ * on-chain bounds on each one, and the live limits (the claim-payment cap
+ * window). Pure functions over decoded accounts.
  *
  * Duties and bounds come from spec §5.2–5.4. "Later" says what triggers the
  * instruction once mutav-app's backend sends it with the KMS-held key; where
@@ -51,7 +51,7 @@ export const DUTIES: Duty[] = [
     ix: "file_claim",
     today: "File a claim after MUTAV has verified and approved it in the platform.",
     later: "Triggered by claim approval in the platform (the agency's 15-day filing window is enforced there).",
-    bound: "Guarantee active; amount ≤ the leg's cover not yet paid or provisioned. Books a provision: NAV drops at once.",
+    bound: "Guarantee active; amount ≤ the leg's cover not yet paid or provisioned. Books a provision: the share price drops at once.",
   },
   {
     ix: "pay_claim",
@@ -61,9 +61,9 @@ export const DUTIES: Duty[] = [
   },
   {
     ix: "settle_payout",
-    today: "Record the PIX settlement (hash of the end-to-end id) once the agency has been paid.",
-    later: "Triggered by the PIX confirmation after MUTAV offramps BRS → BRL and pays the agency.",
-    bound: "Claim paid and not yet settled; the PIX hash is non-zero. The program sets no deadline: the payout SLA is the operator platform's (ADR 0019).",
+    today: "Record the PIX settlement (hash of the end-to-end id) once the landlord has been paid.",
+    later: "Triggered by the PIX confirmation after MUTAV offramps BRS → BRL and pays the landlord.",
+    bound: "Claim paid and not yet settled; the PIX hash is non-zero. The program sets no settlement deadline (ADR 0019).",
   },
 ];
 
