@@ -143,3 +143,16 @@ export function PauserAction({ title, note, children }: { title: string; note: R
     </article>
   );
 }
+
+/** A permissionless crank offered on /admin (any connected wallet sends it, no proposal): advance_queue_head. */
+export function CrankAction({ title, note, children }: { title: string; note: ReactNode; children: ReactNode }) {
+  return (
+    <article style={{ border: "1px solid var(--color-border)", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 6 }}>
+      <h3 style={{ fontSize: 15, margin: 0, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
+        {title} <RoleTag role="anyone" />
+      </h3>
+      <Note>{note}</Note>
+      {children}
+    </article>
+  );
+}

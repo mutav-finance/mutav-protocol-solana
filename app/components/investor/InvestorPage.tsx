@@ -25,7 +25,7 @@ import { ALLOWLIST_TEXT, type AllowlistState } from "@/lib/allowlist";
 import { usePoll } from "@/lib/client/use-poll";
 import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, parseUnitsOrZero, SHARE_DECIMALS, toInput } from "@/lib/format";
 import type { InvestorView } from "@/lib/server/investor";
-import { investorRequests, type Ledger, type ReserveView } from "@/lib/view";
+import { investorRequests, redeemSizeCheck, type Ledger, type ReserveView } from "@/lib/view";
 
 const STATE_BADGE: Record<AllowlistState, { label: string; color: string }> = {
   allowlisted: { label: "ALLOWLISTED", color: "var(--color-success)" },
@@ -161,7 +161,7 @@ function RequestForms({ allowed, inv }: { allowed: boolean; inv: InvestorView | 
   const depOut = assets !== null && (assets < caps.minRequest || assets > caps.maxRequest);
   const depPreview = assets ? sharesFor(assets, so, net) : null;
   const redValue = shares ? assetsFor(shares, so, net) : null;
-  const redOut = redValue !== null && (redValue < caps.minRequest || redValue > caps.maxRequest);
+  const redOut = shares !== null && redeemSizeCheck(shares, balance, so, net, caps) !== null;
   const overBalance = shares !== null && balance !== null && shares > balance;
   // Blank = no limit (0 on-chain); otherwise the least the owner accepts.
   const minSharesOut = minShares.trim() ? parseUnitsOrZero(minShares, SHARE_DECIMALS) : 0n;
@@ -202,7 +202,7 @@ function RequestForms({ allowed, inv }: { allowed: boolean; inv: InvestorView | 
             )}
           </div>
           {overBalance && <Note tone="warn">More than this wallet holds ({fmtShares(balance!)}): the program will refuse it.</Note>}
-          {redOut && <Note tone="warn">Worth less than {fmtBrs(caps.minRequest, 0)} or more than {fmtBrs(caps.maxRequest, 0)} at the current NAV: the program will refuse it.</Note>}
+          {redOut && <Note tone="warn">Worth less than {fmtBrs(caps.minRequest, 0)} (and not an exit of the whole balance, ADR 0029) or more than {fmtBrs(caps.maxRequest, 0)} at the current NAV: the program will refuse it.</Note>}
           {minAssetsOut === null && <Note tone="warn">The price limit is not a BRS amount.</Note>}
           <Note>A fill that would pay less than the limit stops at your request, which stays pending: you (or the admin) can cancel it.</Note>
           <Action label="request_redeem" disabled={!allowed} request={shares && minAssetsOut !== null ? { kind: "request_redeem", shares, minAssetsOut } : null} />

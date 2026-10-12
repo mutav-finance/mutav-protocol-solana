@@ -17,6 +17,7 @@ import {
   agencyRows,
   capitalQueue,
   claimsTimeline,
+  CLAIM_STAGE_LABEL,
   coverageRows,
   moneyFlows,
   MODE_LABEL,
@@ -158,16 +159,17 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
 // ── Claims timeline ─────────────────────────────────────────────────────────
 
 export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
-  const rows = claimsTimeline(l);
+  const rows = claimsTimeline(l, r.config.caps.maxClaimPerCall);
   if (rows.length === 0) return <Empty>No claims filed yet.</Empty>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
     <ClaimSpeedChart rows={rows} now={r.now} />
-    <Table label="Claims timeline" head={["Guarantee", "Leg", ["Amount", "num"], "Filed", "Paid", ["Filed → paid", "num"], "Settled (PIX)", ["Paid → settled", "num"], "PIX E2E hash"]}>
+    <Table label="Claims timeline" head={["Guarantee", "Leg", "Stage", ["Amount", "num"], "Filed", "Paid", ["Filed → paid", "num"], "Settled (PIX)", ["Paid → settled", "num"], "PIX E2E hash"]}>
       {rows.map((c) => (
         <tr key={c.filing}>
           <td><Explorer value={c.guarantee} label={short(c.guaranteeId)} /></td>
           <td><Mono>{c.leg}</Mono></td>
+          <td><Mono>{CLAIM_STAGE_LABEL[c.stage]}</Mono></td>
           <Num>{fmtBrs(c.amount ?? c.provision)}</Num>
           <td><Explorer value={c.filing} label={fmtTime(c.filedAt)} /></td>
           <td>{c.paidAt !== null ? <Explorer value={c.filing} label={fmtTime(c.paidAt)} /> : <Mono dim>—</Mono>}</td>

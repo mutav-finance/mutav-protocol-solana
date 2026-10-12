@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowlistedFillCount, depositHead, limitWithSlippage, redeemHead } from "../queue";
+import { allowlistedFillCount, deadSeqsAtHead, depositHead, limitWithSlippage, redeemHead } from "../queue";
 import { BRL, config, state } from "./fixtures";
 
 const sol = { netAssets: 100_000n * BRL, stableAssets: 50_000n * BRL, freeCapital: 5_000n * BRL, liquidBudget: 50_000n * BRL };
@@ -33,5 +33,18 @@ describe("queue heads (Q-2 / F10 explanation)", () => {
   it("fills deposits only up to the first de-listed owner", () => {
     expect(allowlistedFillCount(st, L([dep(0n, "A", 1n), dep(1n, "B", 1n)]), ["A"], 8)).toEqual({ count: 1, blocked: { seq: 1n, owner: "B" } });
     expect(allowlistedFillCount(st, L([dep(0n, "A", 1n)]), ["A"], 8).blocked).toBeNull();
+  });
+});
+
+describe("dead seqs at the head (advance_queue_head, ADR 0030)", () => {
+  it("counts parked, filled or closed seqs before the first pending request", () => {
+    const parked = { ...dep(2n, "A", 1n), data: { ...dep(2n, "A", 1n).data, status: 2 } };
+    // seq 1 closed (absent), seq 2 parked, seq 3 pending.
+    const ledger = { deposits: [parked, dep(3n, "B", 1n)], redeems: [] } as never;
+    const s = state({ depositHead: 1n, nextDepositSeq: 4n, redeemHead: 5n, nextRedeemSeq: 7n } as never);
+    expect(deadSeqsAtHead(s, ledger, "deposit")).toBe(2n);
+    // No pending request: everything up to the tail is dead.
+    expect(deadSeqsAtHead(s, ledger, "redeem")).toBe(2n);
+    expect(deadSeqsAtHead(state({ depositHead: 3n, nextDepositSeq: 4n } as never), ledger, "deposit")).toBe(0n);
   });
 });
