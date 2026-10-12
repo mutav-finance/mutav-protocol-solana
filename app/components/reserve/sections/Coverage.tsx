@@ -67,10 +67,10 @@ function LegLegend() {
   return (
     <span className="font-mono text-(--color-text-3) inline-flex items-center gap-4 text-xs">
       <span className="inline-flex items-center gap-2">
-        <Swatch color={LEG.default} /> Unpaid rent
+        <Swatch color={LEG.default} /> Unpaid rent cover
       </span>
       <span className="inline-flex items-center gap-2">
-        <Swatch color={LEG.exit} /> Move-out debts
+        <Swatch color={LEG.exit} /> Move-out cover
       </span>
     </span>
   );
@@ -272,8 +272,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   const floor = stressTerm(r.state.remainingCoverTotal, r.state.provisions, r.config.caps.stressBuffer);
   const totals: TotalsTerm[][] = [
     [
-      { label: "Unpaid rent", value: fmtBrs(defaultLeft) },
-      { op: "+", label: "Move-out debts", value: fmtBrs(exitLeft) },
+      { label: "Unpaid rent cover left", value: fmtBrs(defaultLeft) },
+      { op: "+", label: "Move-out cover left", value: fmtBrs(exitLeft) },
       { op: "=", label: "Remaining cover", value: fmtBrs(sum), result: true },
     ],
     [
@@ -349,8 +349,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
           </span>
         </div>
         <div className="-mx-px grid grid-cols-1 gap-px border sm:grid-cols-2" style={{ background: "var(--color-border)" }}>
-          <StripCell label="Unpaid rent" swatch={LEG.default} value={<Money brs={defaultLeft} block />} sub={`Rent and charges in arrears while leases run (the default leg); ${share(defaultLeft, sum)} of remaining.`} />
-          <StripCell label="Move-out debts" swatch={LEG.exit} value={<Money brs={exitLeft} block />} sub={`Tenant debts up to and at the end of occupation (the exit leg); ${share(exitLeft, sum)} of remaining.`} />
+          <StripCell label="Unpaid rent · cover left" swatch={LEG.default} value={<Money brs={defaultLeft} block />} sub={`The most the reserve can still pay for rent and charges in arrears while leases run (the default leg). A limit, not money owed: nothing here has been claimed. ${share(defaultLeft, sum)} of remaining cover.`} />
+          <StripCell label="Move-out debts · cover left" swatch={LEG.exit} value={<Money brs={exitLeft} block />} sub={`The most the reserve can still pay for tenant debts up to and at the end of occupation (the exit leg). A limit, not money owed: nothing here has been claimed. ${share(exitLeft, sum)} of remaining cover.`} />
         </div>
       </div>
 
