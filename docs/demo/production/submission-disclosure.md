@@ -8,9 +8,9 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 >
 > **Pre-existing:** the agency platform, a local copy with fictional data, not yet connected on-chain. Its automation is next; the safeguards are live on devnet.
 >
-> **Live on devnet:** the cold open and chapters 1–2 (registration, refusal, claim, safeguards). The PIX transfer to the agency is simulated; its settlement record is real and on-chain.
+> **Live on devnet:** the cold open and chapters 1–2, every transaction shown on Explorer, including the refused lease. The PIX transfer to the landlord is simulated; its settlement record is on-chain.
 >
-> **Local simulation:** chapter 3 runs the same program on a local validator with an accelerated clock and a mock BRS mint (six simulated months of fees, issuer revenue, claims and a withdrawal).
+> **Local simulation:** chapter 3 replays a local-validator run (accelerated clock, mock BRS mint) of six months, as an animation of its ledger. Not an expected return.
 >
 > The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
 >
@@ -18,7 +18,7 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 > Live app: https://reserve.mutav.finance
 > Program (devnet): GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, the pilot demo reserve; test activity is visible: https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 
-*(149 words)*
+*(146 words)*
 
 ## YouTube description (≤250 words)
 
@@ -26,24 +26,24 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 >
 > 0:00 Ana needs a guarantor
 > 0:17 1 · Programmable, transparent reserve
-> 0:58 2 · Programmable payments, settled in minutes
-> 1:42 3 · Capital efficiency (local simulation)
-> 2:11 Close
+> 0:57 2 · Programmable payments, settled in minutes
+> 1:38 3 · Capital efficiency (local simulation)
+> 2:08 Verify everything on Solana
 >
 > What you are seeing
-> • Built during the hackathon: the Solana program, the reserve app (public reserve pages, operator, admin and capital queue), the Codama TypeScript client and the devnet scripts.
-> • Pre-existing: the agency platform, shown from a local copy with fictional data (not yet connected on-chain). Agency-driven automation is next; its safeguards are live on devnet.
-> • Live on Solana devnet: the cold open and chapters 1–2. The PIX transfer to the agency is simulated; its settlement record is on-chain.
-> • Chapter 3 is a local simulation on an accelerated clock with a mock BRS mint: six simulated months, not devnet activity.
+> • Built during the hackathon: the Solana program, the reserve app, the Codama TypeScript client and the devnet scripts.
+> • Pre-existing: the agency platform, a local copy with fictional data (not yet connected on-chain). Agency-driven automation is next; its safeguards are live on devnet.
+> • Live on Solana devnet: the cold open and chapters 1–2. Each transaction appears on Explorer, even the refused lease. The PIX transfer to the landlord is simulated; its settlement record is on-chain.
+> • Chapter 3 animates the ledger of a local-validator run (accelerated clock, mock BRS mint): six simulated months, not devnet activity. A simulation of reserve mechanics, not an expected return.
 > • The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
 > • The claim timer shows the on-chain run from filed to settled. In operation, the operator checks each claim before filing.
 >
 > The 30-day figure for seguro-fiança: SUSEP Circular 621/2021, art. 43.
 >
 > Code (MIT): https://github.com/mutav-finance/mutav-protocol-solana
-> Live app: https://reserve.mutav.finance
-> Program (devnet): GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, the pilot demo reserve; test activity is visible: https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
+> Live app: https://reserve.mutav.finance (every account: /reserve/verify)
+> Program (devnet): https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 >
 > Music: [track, artist, licence]
 
-*(244 words)*
+*(248 words)*

@@ -13,6 +13,11 @@
  *       for ffmpeg builds without libass (no `subtitles` filter).
  *   node docs/demo/production/tools/render.cjs seq <file.html> --ms 1600 [--fps 30] --out <dir>
  *       Frame sequence of an animated card or overlay (chapter titles, later wipe, close card).
+ *   node docs/demo/production/tools/render.cjs receipts <tx-receipts.json> --out <dir>
+ *       One transaction-receipt PNG per entry (overlays/tx-receipt.html) and one transaction-rail PNG per
+ *       landed transaction (overlays/tx-rail.html?upto=k), from real getTransaction data. The file is an array
+ *       (or {"receipts": [...]}) of {instruction, signature, slot, blockTime (unix s), fee (lamports),
+ *       status ("ok" | "failed"), error?, cluster?}, in landing order.
  *
  * Playwright is resolved from $PLAYWRIGHT_FROM, the current directory, or the repo's app/ (installed there).
  * Exits on its own; no watch mode.
@@ -59,6 +64,9 @@ const STILLS = [
   ["overlays/later-wipe.html", "static", "overlays/later-wipe.png"],
   ["overlays/timer.html", "static&start=0&end=42000&frame=600", "overlays/timer-sample-running.png"],
   ["overlays/timer.html", "static&start=0&end=42000&frame=1300", "overlays/timer-sample-settled.png"],
+  ["overlays/tx-receipt.html", "static", "overlays/tx-receipt-sample.png"],
+  ["overlays/tx-receipt.html", "static&sample&ix=register_guarantee&sig=2222222222222222222222222222222222222222222222222222222222222222&slot=123456790&time=1791800021&fee=5000&status=failed&err=InsufficientFreeCapital", "overlays/tx-receipt-sample-failed.png"],
+  ["overlays/tx-rail.html", "static", "overlays/tx-rail-sample.png"],
 ];
 
 function parseSrt(text) {
@@ -73,8 +81,8 @@ function parseSrt(text) {
 }
 
 (async () => {
-  if (!["stills", "timer", "captions", "seq"].includes(cmd)) {
-    console.error("usage: render.cjs stills | timer --start <ms> --end <ms> --out <dir> | captions <srt> --out <dir> | seq <html> --ms <n> --out <dir>");
+  if (!["stills", "timer", "captions", "seq", "receipts"].includes(cmd)) {
+    console.error("usage: render.cjs stills | timer --start <ms> --end <ms> --out <dir> | captions <srt> --out <dir> | seq <html> --ms <n> --out <dir> | receipts <tx-receipts.json> --out <dir>");
     process.exit(2);
   }
   const { chromium } = loadPlaywright();
@@ -156,6 +164,26 @@ function parseSrt(text) {
       }
       console.log(`wrote ${total + 1} frames to ${out}`);
       console.log(`encode: ffmpeg -framerate ${fps} -i ${out}/f_%05d.png -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le out.mov`);
+    } else if (cmd === "receipts") {
+      const raw = JSON.parse(fs.readFileSync(path.resolve(args[1]), "utf8"));
+      const list = Array.isArray(raw) ? raw : raw.receipts;
+      if (!Array.isArray(list) || !list.length) throw new Error("tx-receipts.json: expected a non-empty array (or {receipts: [...]})");
+      const out = path.resolve(opt("out", "receipt-frames"));
+      const items = list.map((r) => ({ ix: r.instruction, sig: r.signature, ok: r.status !== "failed" }));
+      for (let i = 0; i < list.length; i++) {
+        const r = list[i];
+        const q = new URLSearchParams({ ix: r.instruction, sig: r.signature, slot: String(r.slot), time: String(r.blockTime),
+          fee: String(r.fee), status: r.status === "failed" ? "failed" : "ok", err: r.error || "", cluster: r.cluster || "Solana devnet" });
+        await page.goto(url("overlays/tx-receipt.html", `static&${q}`));
+        await page.evaluate(() => document.fonts.ready);
+        await shot(path.join(out, `receipt_${pad(i + 1, 2)}_${r.instruction}.png`));
+        const rq = new URLSearchParams({ items: JSON.stringify(items), upto: String(i + 1) });
+        if (r.cluster) rq.set("cluster", r.cluster);
+        await page.goto(url("overlays/tx-rail.html", `static&${rq}`));
+        await page.evaluate(() => document.fonts.ready);
+        await shot(path.join(out, `rail_${pad(i + 1, 2)}.png`));
+      }
+      console.log(`wrote ${list.length} receipts and ${list.length} rail states to ${out}`);
     }
   } finally {
     await browser.close();

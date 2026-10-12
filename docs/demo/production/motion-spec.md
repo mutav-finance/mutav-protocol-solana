@@ -34,7 +34,7 @@ Minimal modern electronic at **118–124 BPM**, with deep bass and space. Cuts l
 
 Signature moments:
 
-1. **Refusal (Ch1).** The music drops to a low hum. The panel desaturates except the amber "refused" chip. Hold 3 s of stillness, then the beat returns on the next downbeat.
+1. **Refusal (Ch1).** The music drops to a low hum. The panel desaturates except the ✗ receipt (or the amber "refused" chip). Hold 3 s of stillness, then the beat returns on the next downbeat with a hard cut to the failed transaction on Explorer ("the chain itself refused it").
 2. **"Settled" (Ch2).** The timer freezes on a downbeat, a light sweep crosses it and a bass hit lands.
 3. **Close.** One pillar per bar, then a sheen across the logo, then silence.
 
@@ -44,17 +44,25 @@ Signature moments:
 |---|---|
 | Cold open | Dark screen. An amber light line draws in (0.8 s, expo-out), then the reserve panel floats up from depth. |
 | Agency | A browser-window mockup (reference build, below). |
-| Ch1 | A controlled build toward the refusal's silence. The camera tightens slightly with each step and there are no cuts inside the build. |
-| Ch2 | A tight macro on the timer, then the "settled" hit. |
-| Ch3 | The chart draws in as light, numbers count up, then the in → out number in large display type. |
-| Close | Pillars, logo sheen, silence. |
+| Ch1 | A controlled build toward the refusal's silence. The camera tightens slightly with each step and there are no cuts inside the build. Two Explorer flashes: register_guarantee after the confirmation, the failed transaction after the silence. |
+| Ch2 | A tight macro on the timer, then the "settled" hit. The pay_claim and settle_payout flashes cut in where the confirmation waits were. |
+| Ch3 | The ledger-driven motion piece `ch3-flows` (27.4 s): monthly fees (amber), reserve yield (blue) and claims (red) draw in month by month, the share value climbs, the operations list scrolls, then the finale card with in → out in large display type and "Simulation of reserve mechanics · not an expected return". Its last frame holds 1.5 s. |
+| Close | A 2 s cutaway to `/reserve/verify` (every account, each with an Explorer link) under "Verify everything on Solana", then pillars, logo sheen, silence. |
 
 ## Honesty limits (non-negotiable)
 
 - The timer shows **real elapsed time**. Where waits are cut, show a visible "waits trimmed" tag.
+- Receipts, the rail and the Explorer flashes show **real transactions only**: values from `getTransaction`, captures from Explorer on devnet (or, in chapter 3, labelled "local validator").
 - Honesty labels and the "Local simulation · accelerated clock" banner stay readable: at least 26 px, on a solid glass plate, never under a sweep or a blur.
 - **No fake UI.** Animation only frames real footage: crops, scale, glass, light *around* the pixels. Never edit values, add UI elements or composite states that never existed.
 - **Flatten straight-on at the moment of reading.** Every shot where a number must be read (the refusal error, the timer, in → out, the pipeline) reaches 0° tilt and scale ≥ 1.0 before the read and holds at least 1 s.
+
+## On-chain proof (v8)
+
+- **Explorer flashes** are real devnet captures, 1.5–2 s each, hard cuts on the beat: register_guarantee (F4), the failed MTV-PF-0101 transaction with "Error · InsufficientFreeCapital" (F6b), pay_claim and settle_payout (F7). Flatten them straight-on; one gentle push at most. They replace holds, never add to them.
+- **Receipt card** (`overlays/tx-receipt.html`): a compact glass card, lower left, after each on-chain action; it builds in over about 0.45 s (fade-up, mask reveal on the instruction name) and holds about 1.5–2 s. Mono type, green ✓ or red ✗ pill, "Solana devnet".
+- **Transaction rail** (`overlays/tx-rail.html`): a slim right-edge column from the first confirmation to the end of F8; each new entry mask-reveals left to right with a faint amber wash, older entries stay. It slides out at the cut to F8b.
+- Both show only values from real `getTransaction` data. The sample PNGs (placeholder values, "Sample values" tag) are for layout only.
 
 ## Agency browser mockup rules
 
