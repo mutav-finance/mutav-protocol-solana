@@ -131,6 +131,20 @@ pub fn send_ix(svm: &mut LiteSVM, ix: Instruction, signers: &[&Keypair]) -> Tran
     send_ixs(svm, &[ix], signers)
 }
 
+/// Mirrors `INITIALIZE_COMPUTE_UNIT_LIMIT` in scripts/devnet/lib/compute.ts.
+pub const INITIALIZE_COMPUTE_UNIT_LIMIT: u32 = 260_000;
+
+/// `ComputeBudget::SetComputeUnitLimit(units)`.
+pub fn set_compute_unit_limit(units: u32) -> Instruction {
+    let mut data = vec![2u8];
+    data.extend_from_slice(&units.to_le_bytes());
+    Instruction::new_with_bytes(
+        anchor_lang::prelude::pubkey!("ComputeBudget111111111111111111111111111111"),
+        &data,
+        vec![],
+    )
+}
+
 /// Sign and send several instructions in one transaction.
 pub fn send_ixs(svm: &mut LiteSVM, ixs: &[Instruction], signers: &[&Keypair]) -> TransactionResult {
     let payer = signers[0].pubkey();
@@ -435,10 +449,13 @@ impl Fixture {
         }
     }
 
+    /// Sends `initialize` with the same explicit compute-unit limit the deploy
+    /// scripts use (`INITIALIZE_COMPUTE_UNIT_LIMIT`, scripts/devnet/lib/compute.ts):
+    /// at opt-level "z" a Token-2022 initialize passes the 200k default.
     pub fn initialize(&mut self, args: InitializeArgs) -> TransactionResult {
         let ix = initialize_ix(&self.init_accounts(), args);
         let payer = self.payer.insecure_clone();
-        send_ix(&mut self.svm, ix, &[&payer])
+        send_ixs(&mut self.svm, &[set_compute_unit_limit(INITIALIZE_COMPUTE_UNIT_LIMIT), ix], &[&payer])
     }
 
     /// Sends `ix` paid by the payer and signed by `signer` too.
