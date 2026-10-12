@@ -14,7 +14,7 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 | [`submission-disclosure.md`](submission-disclosure.md) | Text for the Colosseum form and the YouTube description. |
 | `cards/chapter-1…3.html` + `.png` | Lower-third chapter titles: "1 · Programmable, transparent reserve", "2 · Settled in minutes", "3 · Capital efficiency". Transparent. |
 | `cards/capital-card.html` + `.png` | F9 overlay "R$44k held · R$162k of cover", with a scrim over the plate. |
-| `cards/close.html` + `.png` | F13 close card: the three pillars, the tagline, the repo and the live app. Opaque. |
+| `cards/close.html` + `.png` | F13 close card: the three pillars, the tagline, the repo, the live app and the devnet program ID. Opaque. |
 | `overlays/coverage-refused-chip.html` + `.png` | F6 "Coverage gate · refused". |
 | `overlays/minimap.html` + `minimap-1-agency … minimap-5-pix.png`, `minimap-legend.png` | Flow minimap (agency platform → operator → program → BRS reserve → PIX record), one PNG per active step, plus the variant with the legend (built in the hackathon / pre-existing / simulated / next). `?active=1..5`, `?legend`. |
 | `overlays/honesty-label.html` + `honesty-built/agency/pix/fees.png` | The four honesty labels, one PNG each. `?id=built|agency|pix|fees`. |

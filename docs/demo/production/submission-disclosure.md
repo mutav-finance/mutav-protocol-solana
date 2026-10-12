@@ -14,8 +14,9 @@ Paste-ready text. Keep both in step with what the video actually shows: if the i
 >
 > Repo: https://github.com/mutav-finance/mutav-protocol-solana
 > Live app: https://reserve.mutav.finance
+> Program (devnet): GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, the pilot demo reserve; test activity is visible: https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 
-*(109 words)*
+*(121 words)*
 
 ## YouTube description (≤250 words)
 
@@ -38,7 +39,8 @@ Paste-ready text. Keep both in step with what the video actually shows: if the i
 >
 > Code (MIT): https://github.com/mutav-finance/mutav-protocol-solana
 > Live app: https://reserve.mutav.finance
+> Program (devnet): GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, the pilot demo reserve; test activity is visible: https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 >
 > Music: [track, artist, licence]
 
-*(189 words)*
+*(201 words)*

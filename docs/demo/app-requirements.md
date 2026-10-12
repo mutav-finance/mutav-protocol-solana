@@ -65,7 +65,7 @@ Values from ADR 0028: c = 0.25, max_tvl R$1M, R$120k per guarantee, claim caps R
 
 | # | Step | Signer | Wait |
 |---|---|---|---|
-| 1 | Deploy, `initialize`, `verify.ts` green | Upgrade Squads 2-of-2 | 1 h time lock |
+| 1 | Deploy, `initialize`, `verify.ts` green. **Done 2026-10-12:** program [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet), the pilot demo reserve on devnet; test activity is visible. This test deploy runs 60 s / 120 s time locks, so the waits below are shorter | Upgrade Squads 2-of-2 | 1 h time lock (120 s on the test deploy) |
 | 2 | App deployed for devnet with M1–M6 and the #59 banner | App owner | — |
 | 3 | Fund BRS: capital wallet A R$40,000, capital wallet B R$4,000, operator R$3,060 (+R$358 for the optional sweep); SOL for each | BRS holder | — |
 | 4 | `00-setup`: `set_allowlist_root` with A and B (skip if set at `initialize`) | Admin Squads 2-of-2 | 5 min time lock |
