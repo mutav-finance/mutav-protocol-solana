@@ -11,7 +11,7 @@ describe("which read each panel needs", () => {
   });
 
   it("the overview hero, the capital split, risks, verify and the /capital figures need /api/reserve only", () => {
-    for (const p of ["overview.hero", "overview.capital", "risks", "verify", "capital.figures", "capital.request", "landing"] as Panel[]) expect(needs(p)).toEqual(["reserve"]);
+    for (const p of ["overview.hero", "overview.capital", "risks", "verify", "capital.figures", "capital.request"] as Panel[]) expect(needs(p)).toEqual(["reserve"]);
   });
 
   it("coverage, claims, the queue and the wallet's entries need the account reads, never the history", () => {

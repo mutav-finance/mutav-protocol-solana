@@ -518,20 +518,6 @@ input:disabled {
           mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 14px), transparent 100%);
 }
 
-/* ── ProtocolDiagram: the fixed-coordinate React Flow canvas scales sub-pixel
-   below ~768px, so swap it for a readable stacked flow on phones. ── */
-.diagram-mobile {
-  display: none;
-}
-@media (max-width: 767px) {
-  .diagram-canvas {
-    display: none;
-  }
-  .diagram-mobile {
-    display: flex;
-  }
-}
-
 /* ── Section tabs (protocol cockpit) — underline-style, copper active ── */
 .section-tab {
   color: var(--color-text-2);
@@ -767,17 +753,7 @@ input[type="number"]::-webkit-outer-spin-button {
   padding: 2px 6px;
 }
 
-/* ── Role tags and charts ─────────────────────────────────────────────────── */
-.role-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-@media (max-width: 900px) {
-  .role-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+/* ── Charts ─────────────────────────────────────────────────── */
 /* Chart rows: hover/focus dims nothing but the row itself (opacity only). */
 .chart-row:hover .chart-bar,
 .chart-row:focus-visible .chart-bar {

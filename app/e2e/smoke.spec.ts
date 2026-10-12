@@ -14,24 +14,21 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await page.addInitScript(() => localStorage.setItem("mutav-transparency-intro-v1", "1"));
   });
 
-  test("/ — story, live strip from the chain, diagram, shared nav", async ({ page }) => {
+  test("/ redirects to /reserve (no app landing), banner and shared nav", async ({ page }) => {
+    const res = await page.request.get("/", { maxRedirects: 0 });
+    expect([307, 308]).toContain(res.status());
+    expect(res.headers()["location"]).toMatch(/\/reserve$/);
     await page.goto("/");
+    await expect(page).toHaveURL(/\/reserve$/);
     await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Not open to public investment.");
     // The smoke runs on localnet, where the banner says it is a local simulation.
     await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Local simulation");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("backed by a reserve anyone can verify");
-    const strip = page.getByTestId("live-strip");
-    await expect(strip).toContainText("LIVE FROM LOCALNET");
-    // Seeded: R$30,000 in, R$1,000 fee (R$800 net), R$1,200 issuer income swept
-    // (ADR 0017), R$2,500 claim paid → R$29,500.
-    await expect(strip).toContainText("R$ 29,500.00");
-    await expect(page.locator(".react-flow__node")).toHaveCount(9);
-    await expect(page.getByRole("heading", { name: "Who does what" })).toBeVisible();
-    for (const role of ["Reserve Admin", "Operator", "Investor"]) await expect(page.locator(".role-grid").getByRole("heading", { name: role })).toBeVisible();
-
-    // The landing uses the same sticky app nav as every other page.
+    // Transparency is the active tab; the logo opens /reserve; no link points home.
     const nav = page.getByRole("navigation", { name: "Main navigation" });
-    await expect(nav.getByRole("link", { name: "Transparency" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Transparency" })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "MUTAV", exact: true })).toHaveAttribute("href", "/reserve");
+    await expect(page.locator('a[href="/"]')).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Footer" }).getByRole("link", { name: /mutav\.finance/ })).toHaveAttribute("href", "https://www.mutav.finance");
     await page.mouse.wheel(0, 3000);
     await expect(nav).toBeInViewport();
     await noBannedWords(page);

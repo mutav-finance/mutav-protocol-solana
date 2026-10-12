@@ -32,7 +32,6 @@ export const PANEL_NEEDS = {
   "capital.figures": ["reserve"],
   "capital.request": ["reserve"],
   "capital.entries": ["reserve", "accounts"],
-  landing: ["reserve"],
 } as const satisfies Record<string, readonly ReadPart[]>;
 
 export type Panel = keyof typeof PANEL_NEEDS;
