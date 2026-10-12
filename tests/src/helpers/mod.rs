@@ -455,7 +455,11 @@ impl Fixture {
     pub fn initialize(&mut self, args: InitializeArgs) -> TransactionResult {
         let ix = initialize_ix(&self.init_accounts(), args);
         let payer = self.payer.insecure_clone();
-        send_ixs(&mut self.svm, &[set_compute_unit_limit(INITIALIZE_COMPUTE_UNIT_LIMIT), ix], &[&payer])
+        send_ixs(
+            &mut self.svm,
+            &[set_compute_unit_limit(INITIALIZE_COMPUTE_UNIT_LIMIT), ix],
+            &[&payer],
+        )
     }
 
     /// Sends `ix` paid by the payer and signed by `signer` too.
