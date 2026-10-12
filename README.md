@@ -201,7 +201,7 @@ The pilot demo reserve on devnet; test activity is visible. Every address opens 
 | Share mint | [`4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7`](https://explorer.solana.com/address/4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7?cluster=devnet) |
 | Reserve (BRS token account) | [`FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa`](https://explorer.solana.com/address/FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa?cluster=devnet) |
 | BRS mint (Nora, devnet) | [`BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4`](https://explorer.solana.com/address/BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4?cluster=devnet) |
-| Operator | [`A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k`](https://explorer.solana.com/address/A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k?cluster=devnet) |
+| Operator | [`8MtERL18dFtNPZESghbxR3g21d8FvY2mnTq855SFURPk`](https://explorer.solana.com/address/8MtERL18dFtNPZESghbxR3g21d8FvY2mnTq855SFURPk?cluster=devnet) |
 | Pauser | [`2tW76Vpu1nqctZRBMdzSrzXHcnwnMcFMJqiZyP8t5P1T`](https://explorer.solana.com/address/2tW76Vpu1nqctZRBMdzSrzXHcnwnMcFMJqiZyP8t5P1T?cluster=devnet) |
 | Treasury token account | [`BiTXGCiXuKEJS8VxBUdGrqnMpKo4umFcpH7qevitPtAU`](https://explorer.solana.com/address/BiTXGCiXuKEJS8VxBUdGrqnMpKo4umFcpH7qevitPtAU?cluster=devnet) |
 | Payments token account | [`CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj`](https://explorer.solana.com/address/CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj?cluster=devnet) |
@@ -212,6 +212,7 @@ About this deploy:
 - The on-chain program hash matches the build (`fad721d5…e6e7`). The release `v1.0.0-devnet` carries its IDL.
 - Its multisig time locks are 60 s (admin) and 120 s (upgrade), a test exception to the devnet floors of [ADR 0028](docs/decisions/0028-pilot-parameters.md) (300 s and 3,600 s). The real pilot keeps 24 h and 7 days.
 - `mutav_adapter_mock` is not deployed on devnet.
+- The operator role was rotated on 2026-10-12 to `8MtERL18dFtNPZESghbxR3g21d8FvY2mnTq855SFURPk`; the previous operator key (`A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k`, which signed the demo's recorded transactions) is revoked.
 
 ## Documentation
 

@@ -16,7 +16,7 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 
 | Path | What it is |
 |---|---|
-| [`vo-script.md`](vo-script.md) | Final voiceover (250 words) with start and end seconds per line, pauses, the 3 s silence, pronunciation and direction. |
+| [`vo-script.md`](vo-script.md) | Final voiceover (v10, frozen, 232 words; narration: AI voice by ElevenLabs) with start and end seconds per line, pauses, the 3 s silence, pronunciation and direction. |
 | [`captions.en.srt`](captions.en.srt) · [`captions.pt-BR.srt`](captions.pt-BR.srt) | Captions on the same timings; ≤2 lines, ≤42 characters per line. Cue 18 carries the real 65 s. |
 | [`edl.md`](edl.md) | Edit decision list per shot (source, in/out, overlays, zoom, transition, audio), music and loudness, and the ffmpeg recipes. |
 | [`submission-disclosure.md`](submission-disclosure.md) | Text for the Colosseum form and the YouTube description. |

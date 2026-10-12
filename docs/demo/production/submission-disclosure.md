@@ -14,21 +14,23 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 >
 > The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
 >
+> Narration: AI voice by ElevenLabs.
+>
 > Repo: https://github.com/mutav-finance/mutav-protocol-solana
 > Live app: https://reserve.mutav.finance
 > Program (devnet): GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, test activity visible: https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 
-*(145 words)*
+*(150 words)*
 
 ## YouTube description (≤250 words)
 
 > MUTAV is Brazil's onchain rent guarantee: a guarantor on the agency's side, backed by a programmable, transparent reserve on Solana. This 2-minute demo follows one lease from registration to a settled claim on devnet, then six simulated months of the reserve.
 >
-> 0:00 Ana needs a guarantor
+> 0:00 Agencies need a guarantee
 > 0:17 1 · Programmable, transparent reserve
 > 0:57 2 · Programmable payments, settled in minutes
 > 1:38 3 · Capital efficiency (local simulation)
-> 2:08 Verify everything on Solana
+> 2:08 Check it on Solana
 >
 > What you are seeing
 > • Built during the hackathon: the Solana program, the reserve app, the Codama TypeScript client and the devnet scripts.
@@ -38,12 +40,11 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 > • The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
 > • The claim timer shows this on-chain run; in operation, the operator checks each claim before filing.
 >
-> The 30-day figure for seguro-fiança: SUSEP Circular 621/2021, art. 43.
->
 > Code (MIT): https://github.com/mutav-finance/mutav-protocol-solana
 > Live app: https://reserve.mutav.finance
 > Program (devnet): https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 >
+> Narration: AI voice by ElevenLabs.
 > Music: [track, artist, licence]
 
-*(249 words)*
+*(244 words)*
