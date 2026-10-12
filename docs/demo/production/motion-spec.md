@@ -46,14 +46,15 @@ Signature moments:
 | Agency | A browser-window mockup (reference build, below). |
 | Ch1 | A controlled build toward the refusal's silence. The camera tightens slightly with each step and there are no cuts inside the build. Two Explorer flashes: register_guarantee after the confirmation, the failed transaction after the silence. |
 | Ch2 | A tight macro on the timer, then the "settled" hit. The pay_claim and settle_payout flashes cut in where the confirmation waits were. |
-| Ch3 | The ledger-driven motion piece `ch3-flows` (27.4 s): monthly fees (amber), reserve yield (blue) and claims (red) draw in month by month, the share value climbs, the operations list scrolls, then the finale card with in → out in large display type and "Simulation of reserve mechanics · not an expected return". Its last frame holds 1.5 s. |
-| Close | A 2 s cutaway to `/reserve/verify` (every account, each with an Explorer link) under "Verify everything on Solana", then pillars, logo sheen, silence. |
+| Ch3 | The ledger-driven motion piece `ch3-flows` (27.4 s): monthly fees (amber), reserve yield (blue) and claims (red) draw in month by month, the share value climbs, the operations list scrolls, then the finale card with in → out in large display type and "Simulation of reserve mechanics · not an expected return". v9: at the pilot plan's scale (R$ k / R$ M formatting, the reserve counter climbing toward R$1M, a small "Pilot plan scale (PR #63 parameters)" line). Its last frame holds 1.5 s. |
+| Close | A 2 s cutaway to `/reserve/verify` (every account, each with an Explorer link) under "Verify everything on Solana", then pillars, logo sheen, the pilot-plan line with its "plan" tag, silence. |
 
 ## Honesty limits (non-negotiable)
 
 - The timer shows **real elapsed time**. Where waits are cut, show a visible "waits trimmed" tag.
 - Receipts, the rail and the Explorer flashes show **real transactions only**: values from `getTransaction`, captures from Explorer on devnet (or, in chapter 3, labelled "local validator").
 - Honesty labels and the "Local simulation · accelerated clock" banner stay readable: at least 26 px, on a solid glass plate, never under a sweep or a blur.
+- **Scale:** the devnet amounts are sized to the test tokens available. The scale caption ("Devnet demo · sized to test tokens · pilot plan: R$1M reserve") rides in the banner slot on every devnet shot, at least 26 px on a glass plate. Never scale a devnet figure up; R$1M appears only as the pilot plan (tagged "plan") or as the simulation's labelled end state.
 - **No fake UI.** Animation only frames real footage: crops, scale, glass, light *around* the pixels. Never edit values, add UI elements or composite states that never existed.
 - **Flatten straight-on at the moment of reading.** Every shot where a number must be read (the refusal error, the timer, in → out, the pipeline) reaches 0° tilt and scale ≥ 1.0 before the read and holds at least 1 s.
 

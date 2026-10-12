@@ -13,12 +13,12 @@ MUTAV is that guarantor,
 and its reserve runs on Solana.
 
 4
-00:00:10,100 --> 00:00:13,300
-19 agencies signed letters of intent
-with MUTAV.
+00:00:10,100 --> 00:00:13,100
+19 agencies signed
+letters of intent.
 
 5
-00:00:13,500 --> 00:00:16,900
+00:00:13,300 --> 00:00:16,400
 Solana gives them a transparent reserve
 and programmable payments.
 
@@ -32,18 +32,18 @@ R$18,000 of cover,
 an opaque ID, no personal data.
 
 8
-00:00:29,300 --> 00:00:33,200
-Anyone can watch the reserve:
-what it holds in BRS,
+00:00:29,100 --> 00:00:33,700
+Anyone can watch the reserve: it holds
+BRS, Nora's Brazilian real stablecoin,
 
 9
-00:00:33,200 --> 00:00:37,000
-Nora's Brazilian real stablecoin,
-and what it must hold.
+00:00:33,900 --> 00:00:37,000
+and must keep a quarter
+of everything it guarantees:
 
 10
-00:00:37,400 --> 00:00:38,900
-The rule is code.
+00:00:37,000 --> 00:00:39,700
+every real backs four in cover.
 
 11
 00:00:40,000 --> 00:00:45,800
@@ -88,59 +88,64 @@ Seguro-fiança allows
 up to thirty days.
 
 20
-00:01:27,300 --> 00:01:30,300
-Today our operator console
+00:01:27,300 --> 00:01:29,900
+Today our operator
 signs these steps.
 
 21
-00:01:30,700 --> 00:01:33,600
+00:01:30,300 --> 00:01:33,000
 Next, the agency platform
 drives them automatically,
 
 22
-00:01:33,600 --> 00:01:37,600
-registry, claims and payments, inside
-safeguards the program already enforces.
+00:01:33,000 --> 00:01:35,600
+inside safeguards
+the program already enforces.
 
 23
-00:01:40,000 --> 00:01:44,800
-Here are six months of it,
-simulated locally on an accelerated clock.
+00:01:40,000 --> 00:01:44,200
+Here are six months of the pilot plan,
+simulated locally on an accelerated clock,
 
 24
-00:01:45,200 --> 00:01:50,200
+00:01:44,200 --> 00:01:47,600
+growing to a
+million-real reserve.
+
+25
+00:01:47,900 --> 00:01:52,900
 Guarantee fees and the reserve's yield
 flow in; small claims flow out.
 
-25
+26
 00:01:54,000 --> 00:01:58,400
 The reserve can back more leases,
 each share is worth more,
 
-26
+27
 00:01:58,700 --> 00:02:02,400
 and a capital provider takes out
 more than they put in.
 
-27
+28
 00:02:02,800 --> 00:02:08,200
 The same reserve that protects
 the landlord pays the people who fund it.
 
-28
+29
 00:02:08,600 --> 00:02:10,200
 Verify everything on Solana.
 
-29
+30
 00:02:11,000 --> 00:02:13,600
 MUTAV: a transparent,
 programmable reserve,
 
-30
+31
 00:02:13,600 --> 00:02:16,600
 claims settled in minutes,
 capital that works.
 
-31
+32
 00:02:16,900 --> 00:02:18,900
 Brazil's onchain rent guarantee.

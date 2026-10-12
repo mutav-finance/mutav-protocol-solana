@@ -1,8 +1,10 @@
-# Production kit (v8)
+# Production kit (v9)
 
 Everything needed to assemble MUTAV's 2:19.5 product demo from the harness captures: cards, overlays, the voiceover read, captions, the edit decision list and the disclosure text. It matches [`../storyboard.html`](../storyboard.html) and [`../script.md`](../script.md).
 
 Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` URIs, no network) and renders at 1920×1080. Overlays have transparent backgrounds; each has a PNG with alpha next to it. Open an HTML file in a browser to preview its in-animation; add `?static` for the end state.
+
+**v9 note (scale framing):** the devnet amounts are sized to the test tokens available, and MUTAV is built for a reserve in the millions, so: a scale caption, "Devnet demo · sized to test tokens · pilot plan: R$1M reserve" (`overlays/scale-caption.*`), rides in the banner slot on every devnet shot (it is the banner's companion line, not a second honesty label); the devnet captions lead with ratios ("R$44.5k backs R$178k of cover"); the close card adds "Pilot plan · R$1M reserve · backs ~R$3.8M of guarantees" with a "plan" tag; chapter 3 is re-run at the pilot plan's scale, with its figures as `[V3]` until the v3 ledger lands. No devnet figure is inflated. VO 250 words.
 
 **v8 note:** the on-chain proof is visible: four short Explorer flashes on devnet (register_guarantee, the refused MTV-PF-0101 landing as a failed transaction, pay_claim, settle_payout), a transaction receipt card after each on-chain action and a transaction rail through chapters 1–2, both rendered from real `getTransaction` data (`tx-receipts.json`, pending) with `tools/render.cjs receipts`. Chapter 3 is the ledger-driven motion piece `ch3-flows` (27.4 s, kept with the team's production files, rendered from the v2 simulation ledger), with optional app cutaways. The close opens on a 2 s `/reserve/verify` cutaway. The F7 line says "the PIX to the landlord". VO 243 words.
 
@@ -14,16 +16,17 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 
 | Path | What it is |
 |---|---|
-| [`vo-script.md`](vo-script.md) | Final voiceover (246 words) with start and end seconds per line, pauses, the 3 s silence, pronunciation and direction. |
+| [`vo-script.md`](vo-script.md) | Final voiceover (250 words) with start and end seconds per line, pauses, the 3 s silence, pronunciation and direction. |
 | [`captions.en.srt`](captions.en.srt) · [`captions.pt-BR.srt`](captions.pt-BR.srt) | Captions on the same timings; ≤2 lines, ≤42 characters per line. `[N]` is a placeholder. |
 | [`edl.md`](edl.md) | Edit decision list per shot (source, in/out, overlays, zoom, transition, audio), music and loudness, and the ffmpeg recipes. |
 | [`submission-disclosure.md`](submission-disclosure.md) | Text for the Colosseum form and the YouTube description. |
 | [`motion-spec.md`](motion-spec.md) | Motion direction for the full cut: look, type, easing, beat, per-chapter feel, honesty limits and the agency browser-mockup rules. |
 | `cards/chapter-1…3.html` + `.png` | Lower-third chapter titles: "1 · Programmable, transparent reserve", "2 · Programmable payments, settled in minutes", "3 · Capital efficiency". Transparent. |
-| `cards/close.html` + `.png` | F14 close card: the three pillars, the tagline, the repo, the live app and the devnet program ID. Opaque. |
+| `cards/close.html` + `.png` | F14 close card: the three pillars, the tagline, the pilot-plan line ("Pilot plan · R$1M reserve · backs ~R$3.8M of guarantees", tagged "plan"), the repo, the live app and the devnet program ID. Opaque. |
 | `overlays/coverage-refused-chip.html` + `.png` | F6 "Coverage gate · refused". |
 | `overlays/minimap.html` + `minimap-1-agency … minimap-5-pix.png`, `minimap-legend.png`, `minimap-roadmap.png` | Flow minimap (agency platform → operator → program → BRS reserve → PIX record), one PNG per active step, the variant with the legend (built in the hackathon / pre-existing / simulated / next), and the F8b roadmap variant that lights agency platform → operator in the "next" colour, labelled as roadmap. `?active=1..5`, `?legend`, `?roadmap`. |
 | `overlays/honesty-label.html` + `honesty-built/agency/pix/mock.png` | The four honesty labels (F1, F2, F7–F8, and `mock` for any optional chapter 3 app cutaway; the motion piece carries its own), one PNG each. `?id=built|agency|pix|mock`. |
+| `overlays/scale-caption.html` + `.png` | The v9 scale caption, "Devnet demo · sized to test tokens · pilot plan: R$1M reserve": top centre, directly under the app banner, on every devnet shot (F1, F3–F8b, F14a; never F2 or chapter 3). It shares the banner's slot, so it is not a second honesty label. `?top=<px>` nudges it below the banner. Transparent. |
 | `overlays/safeguards-card.html` + `.png` | F8b "Automation safeguards (on-chain today)": R$15,000 per payment, R$20,000 per 31 days, payouts only to MUTAV's fixed payments account, admin-multisig approval for larger claims, guardian pause; footer: agency platform → operator is roadmap, not live. Transparent; 0.6 s build-in. |
 | `overlays/tx-receipt.html` + `tx-receipt-sample.png`, `tx-receipt-sample-failed.png` | Transaction receipt after each on-chain action: instruction, short signature, slot, block time, fee, status, "Solana devnet"; ✓ or ✗ (the failed MTV-PF-0101 shows "Failed · InsufficientFreeCapital"). Query params carry the values; the samples use placeholder values and carry a "Sample values" tag. Transparent; about 0.45 s build-in. |
 | `overlays/tx-rail.html` + `tx-rail-sample.png` | Slim right-edge rail through chapters 1–2: each signature as it lands (instruction · short sig · ✓ or ✗), accumulating; `?items=<JSON>&upto=<k>`. The sample uses placeholder signatures. Transparent. |

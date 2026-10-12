@@ -13,12 +13,12 @@ A MUTAV é esse fiador,
 e a reserva dela roda na Solana.
 
 4
-00:00:10,100 --> 00:00:13,300
-19 imobiliárias assinaram cartas
-de intenção com a MUTAV.
+00:00:10,100 --> 00:00:13,100
+19 imobiliárias assinaram
+cartas de intenção.
 
 5
-00:00:13,500 --> 00:00:16,900
+00:00:13,300 --> 00:00:16,400
 A Solana traz uma reserva transparente
 e pagamentos programáveis.
 
@@ -32,18 +32,18 @@ on-chain: R$ 18 mil de cobertura,
 um ID opaco, nenhum dado pessoal.
 
 8
-00:00:29,300 --> 00:00:33,200
+00:00:29,100 --> 00:00:33,700
 Qualquer pessoa acompanha a reserva:
-quanto ela tem em BRS,
+ela tem BRS, a stablecoin de real da Nora,
 
 9
-00:00:33,200 --> 00:00:37,000
-a stablecoin de real da Nora,
-e quanto ela precisa ter.
+00:00:33,900 --> 00:00:37,000
+e precisa manter um quarto
+de tudo o que garante:
 
 10
-00:00:37,400 --> 00:00:38,900
-A regra é código.
+00:00:37,000 --> 00:00:39,700
+cada real sustenta quatro de cobertura.
 
 11
 00:00:40,000 --> 00:00:45,800
@@ -88,59 +88,64 @@ O seguro-fiança permite
 até trinta dias.
 
 20
-00:01:27,300 --> 00:01:30,300
-Hoje, o console do operador
+00:01:27,300 --> 00:01:29,900
+Hoje, o operador
 assina essas etapas.
 
 21
-00:01:30,700 --> 00:01:33,600
+00:01:30,300 --> 00:01:33,000
 Depois, a plataforma da imobiliária
-as executa automaticamente:
+as executa automaticamente,
 
 22
-00:01:33,600 --> 00:01:37,600
-cadastro, pedidos e pagamentos, dentro
-das salvaguardas que o programa já aplica.
+00:01:33,000 --> 00:01:35,600
+dentro das salvaguardas
+que o programa já aplica.
 
 23
-00:01:40,000 --> 00:01:44,800
-Aqui estão seis meses disso,
-simulados localmente em relógio acelerado.
+00:01:40,000 --> 00:01:44,200
+Aqui estão seis meses do plano piloto,
+simulados localmente em relógio acelerado,
 
 24
-00:01:45,200 --> 00:01:50,200
+00:01:44,200 --> 00:01:47,600
+chegando a uma reserva
+de um milhão de reais.
+
+25
+00:01:47,900 --> 00:01:52,900
 Taxas de garantia e o rendimento
 da reserva entram; pedidos pequenos saem.
 
-25
+26
 00:01:54,000 --> 00:01:58,400
 A reserva sustenta mais contratos,
 cada cota vale mais,
 
-26
+27
 00:01:58,700 --> 00:02:02,400
 e quem aporta capital
 retira mais do que colocou.
 
-27
+28
 00:02:02,800 --> 00:02:08,200
 A mesma reserva que protege o proprietário
 remunera quem a financia.
 
-28
+29
 00:02:08,600 --> 00:02:10,200
 Verifique tudo na Solana.
 
-29
+30
 00:02:11,000 --> 00:02:13,600
 MUTAV: uma reserva transparente
 e programável,
 
-30
+31
 00:02:13,600 --> 00:02:16,600
 pedidos liquidados em minutos,
 capital que trabalha.
 
-31
+32
 00:02:16,900 --> 00:02:18,900
 A garantia de aluguel onchain do Brasil.

@@ -62,6 +62,7 @@ const STILLS = [
   ["overlays/honesty-label.html", "static&id=pix", "overlays/honesty-pix.png"],
   ["overlays/honesty-label.html", "static&id=mock", "overlays/honesty-mock.png"],
   ["overlays/later-wipe.html", "static", "overlays/later-wipe.png"],
+  ["overlays/scale-caption.html", "static", "overlays/scale-caption.png"],
   ["overlays/timer.html", "static&start=0&end=42000&frame=600", "overlays/timer-sample-running.png"],
   ["overlays/timer.html", "static&start=0&end=42000&frame=1300", "overlays/timer-sample-settled.png"],
   ["overlays/tx-receipt.html", "static", "overlays/tx-receipt-sample.png"],

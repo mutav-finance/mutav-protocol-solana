@@ -10,15 +10,15 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 >
 > **Live on devnet:** the cold open and chapters 1–2, every transaction shown on Explorer, including the refused lease. The PIX transfer to the landlord is simulated; its settlement record is on-chain.
 >
-> **Local simulation:** chapter 3 replays a local-validator run (accelerated clock, mock BRS mint) of six months, as an animation of its ledger. Not an expected return.
+> **Scale:** devnet amounts are sized to the test tokens available; chapter 3 simulates the pilot plan's scale on a local validator (accelerated clock, mock BRS mint). Not an expected return.
 >
 > The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
 >
 > Repo: https://github.com/mutav-finance/mutav-protocol-solana
 > Live app: https://reserve.mutav.finance
-> Program (devnet): GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, the pilot demo reserve; test activity is visible: https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
+> Program (devnet): GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, test activity visible: https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 
-*(146 words)*
+*(145 words)*
 
 ## YouTube description (≤250 words)
 
@@ -34,16 +34,16 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 > • Built during the hackathon: the Solana program, the reserve app, the Codama TypeScript client and the devnet scripts.
 > • Pre-existing: the agency platform, a local copy with fictional data (not yet connected on-chain). Agency-driven automation is next; its safeguards are live on devnet.
 > • Live on Solana devnet: the cold open and chapters 1–2. Each transaction appears on Explorer, even the refused lease. The PIX transfer to the landlord is simulated; its settlement record is on-chain.
-> • Chapter 3 animates the ledger of a local-validator run (accelerated clock, mock BRS mint): six simulated months, not devnet activity. A simulation of reserve mechanics, not an expected return.
+> • Devnet amounts are sized to the test tokens available. Chapter 3 simulates the pilot plan's scale on a local validator (accelerated clock, mock BRS mint), not devnet activity. A simulation of reserve mechanics, not an expected return.
 > • The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
-> • The claim timer shows the on-chain run from filed to settled. In operation, the operator checks each claim before filing.
+> • The claim timer shows this on-chain run; in operation, the operator checks each claim before filing.
 >
 > The 30-day figure for seguro-fiança: SUSEP Circular 621/2021, art. 43.
 >
 > Code (MIT): https://github.com/mutav-finance/mutav-protocol-solana
-> Live app: https://reserve.mutav.finance (every account: /reserve/verify)
+> Live app: https://reserve.mutav.finance
 > Program (devnet): https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 >
 > Music: [track, artist, licence]
 
-*(248 words)*
+*(249 words)*

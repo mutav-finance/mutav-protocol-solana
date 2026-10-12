@@ -4,6 +4,8 @@ What the pilot app, the capture harness and the staged devnet state must provide
 
 The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with `main` and deployed to `reserve.mutav.finance` against the devnet program. The recording uses the real pages: `/` redirects to `/reserve` (the MUTAV landing is mutav.finance) and `/demo` redirects to `/operator`.
 
+**v9 (scale framing):** no app change is needed for the scale framing: the scale caption, the ratio captions and the close card's pilot-plan line are edit overlays. Chapter 3 is re-run on localnet at the pilot plan's scale (v3 ledger, figures `[V3]` until it lands); its optional cutaways use the `/reserve` **Capital** tab (`/reserve/capital`, formerly "Money").
+
 **v8 change (app team audit of v7 against production and the v2 simulation):** two earlier test claims (R$16,000 + R$2,000) are on the devnet timeline; F7 is rehearsed on localnet first. **v8.1:** the staged reserve holds R$44,500 after a booked guarantee-fee round, and the claim window on this demo deploy is R$50,000 per 31 days, so Ana's full R$1,500 claim can be retaken (see Devnet staging). Chapter 3 is the ledger-driven motion piece `ch3-flows` built from the v2 simulation ledger (three small claims, no `approve_claim`; share value 1.0000 → 1.1439; R$20,000 in → R$22,878.27 out); localnet app screenshots are optional cutaways, so M6 (in → out on `/capital`) is dropped. The on-chain proof becomes visible: Explorer flashes on devnet, a receipt card after each on-chain action and a transaction rail, from real `getTransaction` data; the refused MTV-PF-0101 is sent with skipPreflight so the refusal lands on-chain. The close cuts to `/reserve/verify`. The F7 VO now matches the app: "the PIX to the landlord". **v7:** the agency beat is a browser mockup of the agency dashboard; chapter 2 ends with F8b on `/reserve/risks` under an edit-overlay safeguards card; the `/operator` forms come prefilled; a "Refresh on-chain" button on `/operator` replaces the separate refresh step. **v6 (hybrid):** the cold open and chapters 1–2 are recorded live on devnet; the agency flash comes from a local copy of the agency platform with fictional data (off-chain); chapter 3 is a local simulation on an accelerated clock with a mock BRS mint (PR #72: `NEXT_PUBLIC_ACCELERATED_CLOCK=1` makes the banner read "Local simulation · accelerated clock" on every page, legal line kept). Chapter titles, the elapsed timer, the receipts, the rail, the cards and the honesty labels are **edit overlays, not app code**.
 
 ## Pending the app team (v8)
@@ -37,7 +39,7 @@ The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with 
 |---|---|---|
 | S1 | Visible copy uses coverage terms only. `main` is fixed (the Health kicker reads "Coverage" since #41). | Terminology: "coverage gate", "required coverage". |
 | S2 | `/reserve` Overview shows the coverage line ("Covered: holds 1.2× the R$36,000 it must hold" before Ana) and the ceiling line after a `refresh`. | F5; optional F12 cutaway. |
-| S3 | The `/reserve` **Money** tab (not "Capital") shows the reserve balance chart (simulated dates Nov → Apr on localnet, no share-price line) and the "Share price" figure. | Optional F10 cutaway. |
+| S3 | The `/reserve` **Capital** tab (`/reserve/capital`) shows the reserve balance chart (the six simulated months on localnet, no share-price line) and the "Share price" figure. | Optional F10 cutaway. |
 | S4 | `/reserve/verify` lists every reserve account with its Explorer link (devnet). | F14a. |
 
 ## Notes (no change needed)
@@ -57,7 +59,7 @@ The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with 
 | Agency | F2 | Agency platform, a local copy with fictional data (dashboard) | KPI cards and the "Where the book sits" pipeline with fictional data; a browser mockup with no domain in the address bar; crop the user email, the empty "Book in force" chart and the guarantees table (`production/motion-spec.md`) |
 | 1 · Programmable, transparent reserve | F3–F6b | `/operator`, Explorer, `/reserve/coverage`, `/reserve` Overview | M2, M3, S2; P1, P2, P3, P5; the register form prefilled |
 | 2 · Programmable payments, settled in minutes | F7–F8b | `/operator`, Explorer, `/reserve/claims`, `/reserve/risks` | M4, M5; P1, P3, P4; the claim form prefilled (R$1,500, Ana); the pay tab shows the R$15,000 per-call cap |
-| 3 · Capital efficiency (local simulation) | F9–F13 | the motion piece `ch3-flows`; optional localnet cutaways of the `/reserve` Money tab, `/reserve/claims` and the Overview ceiling line | the v2 ledger; S3 for the cutaways; PR #72 banner on any app cutaway |
+| 3 · Capital efficiency (local simulation) | F9–F13 | the motion piece `ch3-flows`; optional localnet cutaways of the `/reserve` Capital tab (`/reserve/capital`), `/reserve/claims` and the Overview ceiling line | the v3 ledger at the pilot plan's scale (`[V3]` until it lands); S3 for the cutaways; PR #72 banner on any app cutaway |
 | Close | F14a–F14 | `/reserve/verify` (devnet), card | S4 |
 
 ## Capture harness → v8
@@ -67,9 +69,9 @@ The harness on `feat/demo-capture` is **outdated: it targets pre-#45 routes and 
 1. **Devnet (done):** the staged reserve (see below). No `00-setup` run is needed on devnet.
 2. **The 5 live actions on devnet, on camera:** register Ana (`MTV-PF-0100`), the refused send (`MTV-PF-0101`, with skipPreflight so it lands as a failed transaction), `file_claim` R$1,500 (`NTC-PF-0001`), `pay_claim`, `settle_payout`, all on prefilled forms. **Claim retakes fit:** R$32,000 of the R$50,000 per-31-day claim window is left on this demo deploy, so Ana's R$1,500 can be re-run in full. Rehearse on localnet first. Then the F8b plate (`/reserve/risks`, `e1-reserve-risks`) and the F14a plate (`/reserve/verify`, `h1-reserve-verify`). **Log each transaction's signature and on-chain block time and write `tx-receipts.json` from `getTransaction`**, for the timer, [N], the receipts and the rail.
 3. **Explorer flashes (devnet):** register_guarantee (`x1-explorer-register`), the failed MTV-PF-0101 (`x2-explorer-refused`), pay_claim (`x3-explorer-pay`), settle_payout (`x4-explorer-settle`); settled frames, decoded once the IDL is on devnet.
-4. **Chapter 3 (done):** the v2 localnet simulation ledger and the motion piece rendered from it. Optional cutaways (localnet, `NEXT_PUBLIC_ACCELERATED_CLOCK=1`): the `/reserve` Money tab, `/reserve/claims` (C1–C3), the Overview ceiling line.
+4. **Chapter 3 (v3 in progress):** the localnet simulation at the pilot plan's scale and the motion piece re-rendered from its ledger (the v2 run stays until then). Optional cutaways (localnet, `NEXT_PUBLIC_ACCELERATED_CLOCK=1`): the `/reserve` Capital tab (`/reserve/capital`), `/reserve/claims` (the small claims), the Overview ceiling line.
 5. **F2 by hand** from the local copy of the agency platform (fictional data): the dashboard, KPI cards → "Where the book sits", built into a browser mockup with no domain in the address bar.
-6. **The #45 routes and the intro key:** `/reserve/coverage`, `/reserve/claims`, `/reserve/risks`, `/reserve/verify`, the Money tab, with locators for the restyled components, and `mutav-transparency-intro-v1` = `1` set before each page load.
+6. **The #45 routes and the intro key:** `/reserve/coverage`, `/reserve/claims`, `/reserve/risks`, `/reserve/verify`, `/reserve/capital` (the Capital tab), with locators for the restyled components, and `mutav-transparency-intro-v1` = `1` set before each page load.
 
 Capture spec as built: Chromium's screencast delivers 1080p at 30 fps, and 2× stills are saved on holds only. Zooms over motion stay at or below 1.3×; zooms on holds can reach 2× using the stills.
 
