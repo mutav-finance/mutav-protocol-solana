@@ -12,11 +12,12 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { ClusterBadge } from "@/components/ClusterBadge";
 import { Button } from "@/components/ui/button";
 
+/** Sentence case, as in the footer: "Capital queue". */
 const LINKS = [
-  { href: "/reserve", label: "transparency" },
-  { href: "/operator", label: "operator" },
-  { href: "/admin", label: "admin" },
-  { href: "/capital", label: "capital queue" },
+  { href: "/reserve", label: "Transparency" },
+  { href: "/operator", label: "Operator" },
+  { href: "/admin", label: "Admin" },
+  { href: "/capital", label: "Capital queue" },
 ];
 
 export function NavShell() {
@@ -51,7 +52,7 @@ export function NavShell() {
           href={l.href}
           aria-current={active ? "page" : undefined}
           onClick={() => setOpen(false)}
-          className={`font-body flex min-h-11 w-full items-center text-sm capitalize no-underline ${active ? "text-(--color-text) font-medium" : "text-(--color-text-2) hover:text-(--color-text)"}`}
+          className={`font-body flex min-h-11 w-full items-center text-sm no-underline ${active ? "text-(--color-text) font-medium" : "text-(--color-text-2) hover:text-(--color-text)"}`}
           style={{ borderLeft: active ? "2px solid var(--color-accent)" : "2px solid transparent", paddingLeft: 12 }}
         >
           {l.label}
