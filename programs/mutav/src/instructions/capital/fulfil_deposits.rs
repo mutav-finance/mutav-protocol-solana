@@ -6,10 +6,9 @@
 //! baseline.
 
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{
-    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
-};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     errors::MutavError,
@@ -185,22 +184,14 @@ pub fn handle_fulfil_deposits(
             !ctx.accounts.pending_deposits.is_frozen() && !ctx.accounts.reserve.is_frozen(),
             MutavError::ReserveFrozen
         );
-        let authority_seeds: &[&[u8]] = &[
-            AUTHORITY_SEED,
-            config_key.as_ref(),
-            &[config.authority_bump],
-        ];
-        transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.key(),
-                TransferChecked {
-                    from: ctx.accounts.pending_deposits.to_account_info(),
-                    mint: ctx.accounts.reserve_mint.to_account_info(),
-                    to: ctx.accounts.reserve.to_account_info(),
-                    authority: ctx.accounts.vault_authority.to_account_info(),
-                },
-                &[authority_seeds],
-            ),
+        vault_transfer(
+            ctx.accounts.token_program.key(),
+            ctx.accounts.pending_deposits.to_account_info(),
+            ctx.accounts.reserve_mint.to_account_info(),
+            ctx.accounts.reserve.to_account_info(),
+            ctx.accounts.vault_authority.to_account_info(),
+            &config_key,
+            config.authority_bump,
             total_assets,
             ctx.accounts.reserve_mint.decimals,
         )?;

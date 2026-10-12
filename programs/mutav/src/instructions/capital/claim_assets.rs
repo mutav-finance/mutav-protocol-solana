@@ -4,9 +4,10 @@
 use anchor_lang::{prelude::*, AccountsClose};
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     errors::MutavError,
@@ -92,22 +93,14 @@ pub fn handle_claim_assets(ctx: Context<ClaimAssets>) -> Result<()> {
     )?;
 
     let config_key = ctx.accounts.config.key();
-    let authority_seeds: &[&[u8]] = &[
-        AUTHORITY_SEED,
-        config_key.as_ref(),
-        &[ctx.accounts.config.authority_bump],
-    ];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.claims.to_account_info(),
-                mint: ctx.accounts.reserve_mint.to_account_info(),
-                to: ctx.accounts.destination.to_account_info(),
-                authority: ctx.accounts.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
+    vault_transfer(
+        ctx.accounts.token_program.key(),
+        ctx.accounts.claims.to_account_info(),
+        ctx.accounts.reserve_mint.to_account_info(),
+        ctx.accounts.destination.to_account_info(),
+        ctx.accounts.vault_authority.to_account_info(),
+        &config_key,
+        ctx.accounts.config.authority_bump,
         assets,
         ctx.accounts.reserve_mint.decimals,
     )?;

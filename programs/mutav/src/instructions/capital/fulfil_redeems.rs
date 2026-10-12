@@ -9,11 +9,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     token::Token,
-    token_interface::{
-        burn, transfer_checked, Burn, Mint, TokenAccount, TokenInterface, TransferChecked,
-    },
+    token_interface::{burn, Burn, Mint, TokenAccount, TokenInterface},
 };
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     coverage::{Coverage, CoverageInputs},
@@ -249,17 +248,14 @@ pub fn handle_fulfil_redeems(
         ),
         burned,
     )?;
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.reserve.to_account_info(),
-                mint: ctx.accounts.reserve_mint.to_account_info(),
-                to: ctx.accounts.claims.to_account_info(),
-                authority: ctx.accounts.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
+    vault_transfer(
+        ctx.accounts.token_program.key(),
+        ctx.accounts.reserve.to_account_info(),
+        ctx.accounts.reserve_mint.to_account_info(),
+        ctx.accounts.claims.to_account_info(),
+        ctx.accounts.vault_authority.to_account_info(),
+        &config_key,
+        config.authority_bump,
         paid,
         ctx.accounts.reserve_mint.decimals,
     )?;

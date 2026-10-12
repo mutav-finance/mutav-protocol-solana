@@ -17,9 +17,10 @@
 use anchor_lang::{prelude::*, AccountsClose};
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
+use crate::instructions::vault_transfer;
 use crate::{
     constants::*,
     errors::MutavError,
@@ -144,22 +145,14 @@ pub fn handle_cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
         a.associated_token_program.key(),
     )?;
 
-    let authority_seeds: &[&[u8]] = &[
-        AUTHORITY_SEED,
-        config_key.as_ref(),
-        &[a.config.authority_bump],
-    ];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            a.token_program.key(),
-            TransferChecked {
-                from: a.pending_deposits.to_account_info(),
-                mint: a.reserve_mint.to_account_info(),
-                to: a.destination.to_account_info(),
-                authority: a.vault_authority.to_account_info(),
-            },
-            &[authority_seeds],
-        ),
+    vault_transfer(
+        a.token_program.key(),
+        a.pending_deposits.to_account_info(),
+        a.reserve_mint.to_account_info(),
+        a.destination.to_account_info(),
+        a.vault_authority.to_account_info(),
+        &config_key,
+        a.config.authority_bump,
         assets,
         a.reserve_mint.decimals,
     )?;
