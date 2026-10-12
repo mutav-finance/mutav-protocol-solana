@@ -44,6 +44,7 @@ Port 3001 is a suggestion: 3000 is often taken by another local project.
 |---|---|---|
 | `NEXT_PUBLIC_CLUSTER` | build time | `localnet` or `devnet` (mainnet refused) |
 | `NEXT_PUBLIC_CAPITAL_FORMS_PUBLIC` | build time | `CAPITAL_FORMS_PUBLIC` (`lib/flags.ts`). Unset or anything but `false` (demo): the `/capital` form shows to every visitor, actions stay allowlist-gated. `false` before launch: the form shows only to allowlisted wallets (holders get redeem only) |
+| `NEXT_PUBLIC_ACCELERATED_CLOCK` | build time | `ACCELERATED_CLOCK` (`lib/flags.ts`). `1` only when recording the warped-clock localnet simulation: on localnet the banner reads "Local simulation · accelerated clock" (on localnet it always says "Local simulation"). Ignored on devnet |
 | `RPC_URL` | server, runtime | RPC for reads and the relay; defaults per cluster. Server-only (never `NEXT_PUBLIC_`): set a dedicated devnet RPC (Helius, Triton) for demos, the public one allows 10 `getTransaction`/`getProgramAccounts` per 10 s per IP |
 | `PROGRAM_ID` | server, runtime | defaults to the client's `MUTAV_PROGRAM_ADDRESS` (the ID declared in `lib.rs`); the live devnet demo sets `GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV` |
 | `CONFIG_ADDRESS` | server, runtime | the reserve's `VaultConfig` PDA |
