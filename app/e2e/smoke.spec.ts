@@ -17,6 +17,8 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   test("/ — story, live strip from the chain, diagram, shared nav", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Not open to public investment.");
+    // The smoke runs on localnet, where the banner says it is a local simulation.
+    await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Local simulation");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("backed by a reserve anyone can verify");
     const strip = page.getByTestId("live-strip");
     await expect(strip).toContainText("LIVE FROM LOCALNET");
