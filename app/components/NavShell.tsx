@@ -15,7 +15,6 @@ import { Button } from "@/components/ui/button";
 const LINKS = [
   { href: "/reserve", label: "transparency" },
   { href: "/operator", label: "operator" },
-  { href: "/demo", label: "demo" },
   { href: "/admin", label: "admin" },
   { href: "/capital", label: "capital queue" },
 ];

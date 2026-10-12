@@ -1,11 +1,6 @@
-import type { Metadata } from "next";
-import { DemoPage } from "@/components/demo/DemoPage";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Demo",
-  description: "The full MUTAV guarantee flow on Solana, step by step, from the operator wallet.",
-};
-
+/** The guided demo folded into the operator console (/operator); old links keep working. */
 export default function Page() {
-  return <DemoPage />;
+  permanentRedirect("/operator");
 }

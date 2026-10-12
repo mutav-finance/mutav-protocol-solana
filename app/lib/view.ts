@@ -1,5 +1,5 @@
 /**
- * View models for /reserve and /demo: pure functions from decoded on-chain
+ * View models for /reserve and /operator: pure functions from decoded on-chain
  * accounts to rows the screens render. No numbers are invented here; each row
  * is a projection or a sum of account fields.
  */
