@@ -450,7 +450,7 @@ The repository was created on 2026-10-01, inside the hackathon window (2026-09-1
 | Specification and ADRs 0001–0011; Anchor workspace; CI; Codama client pipeline | Done |
 | ADR 0012 (fiança-aligned lifecycle) and its spec changes | In review |
 | Core program, plan Tasks 1–10, with invariant tests and the `pay_claim`-never-refused property test | Must-ship · pending |
-| Codama client (Task 11); devnet deploy with a Squads-owned upgrade authority and a verified build hash (Task 12) | Must-ship · pending |
+| Codama client (Task 11); devnet deploy with a Squads-owned upgrade authority and a verified build hash (Task 12) | Must-ship · devnet deploy done: [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet), the pilot demo reserve (test activity is visible); `solana-verify` release build pending |
 | Demo video of one full lifecycle on devnet: register, a monthly agency bill (simulated PSP settlement) and `contribute_fees`, notice, filing, payment, settlement, partial redemption | Must-ship · pending |
 | Public transparency view reading devnet events (Task 18) | Must-ship · pending |
 | Surfpool fork tests against the devnet BRS mint (Task 13); operator, admin and capital-provider flows in the platform (Tasks 14–17) | Stretch · pending |
