@@ -22,8 +22,14 @@ export function fmtUnits(base: bigint, decimals: number, places = 2): string {
   return neg ? `-${body}` : body;
 }
 
-/** BRS amount as reais: `R$ 12,345.67`. */
-export const fmtBrs = (base: bigint, places = 2) => `R$ ${fmtUnits(base, BRS_DECIMALS, places)}`;
+/**
+ * Non-breaking space between a currency sign and its amount, so `R$` never
+ * wraps apart from the figure in a narrow cell or a sentence.
+ */
+const NBSP = "\u00a0";
+
+/** BRS amount as reais: `R$ 12,345.67` (the space is non-breaking). */
+export const fmtBrs = (base: bigint, places = 2) => `R$${NBSP}${fmtUnits(base, BRS_DECIMALS, places)}`;
 
 /** Scale of an FX rate: BRL per 1 USD × 1e6 (`5_400_000n` = R$5.40 per US$1). */
 export const FX_SCALE = 1_000_000n;
@@ -31,8 +37,8 @@ export const FX_SCALE = 1_000_000n;
 /** BRS base units (at par to BRL) as USD base units (6 decimals), truncated: never shown above its value. */
 export const brsToUsd = (base: bigint, usdBrl: bigint) => (base * FX_SCALE) / usdBrl;
 
-/** A BRS amount in US dollars at `usdBrl`: `US$ 2,285.18`. Display only; the chain holds BRS. */
-export const fmtUsd = (base: bigint, usdBrl: bigint, places = 2) => `US$ ${fmtUnits(brsToUsd(base, usdBrl), BRS_DECIMALS, places)}`;
+/** A BRS amount in US dollars at `usdBrl`: `US$ 2,285.18` (non-breaking space). Display only; the chain holds BRS. */
+export const fmtUsd = (base: bigint, usdBrl: bigint, places = 2) => `US$${NBSP}${fmtUnits(brsToUsd(base, usdBrl), BRS_DECIMALS, places)}`;
 
 /**
  * A rate as BRL per US$1 × FX_SCALE, always a bigint: a scaled bigint passes
