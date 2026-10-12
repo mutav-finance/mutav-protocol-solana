@@ -75,12 +75,12 @@ export function Needs({ panel, children }: { panel: Panel; children: ReactNode }
   return <ReadPending status={status} label={WAITING_LABEL[waitingOn]} error={poll.error} onRetry={() => void poll.refresh()} />;
 }
 
-/** The tabs, in order. `href` is the route; Overview is /reserve itself. The capital view is labelled "Money". */
+/** The tabs, in order. `href` is the route; Overview is /reserve itself. The money view is labelled "Ledger". */
 export const TABS: [string, string][] = [
   ["/reserve", "Overview"],
   ["/reserve/coverage", "Coverage"],
   ["/reserve/claims", "Claims"],
-  ["/reserve/capital", "Money"],
+  ["/reserve/ledger", "Ledger"],
   ["/reserve/risks", "Risks"],
   ["/reserve/verify", "Verify"],
 ];

@@ -37,7 +37,7 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 
 ### `/reserve` Public transparency
 
-Read-only, no wallet needed.
+Read-only, no wallet needed. Tabs: Overview (`/reserve`), Coverage, Claims, Ledger (`/reserve/ledger`: money flows, the dated Movements table and the capital queue; `/reserve/capital`, `/reserve/flows` and `/reserve/queue` permanently redirect there), Risks, Verify.
 
 Money: BRS primary; US$ hint from PTAX/BCB, display only. Every amount shows in BRS; the main figures here and on `/capital` carry a small muted `≈ US$ X` at the latest Banco Central PTAX selling rate (BRS = BRL 1:1), with one source line ("US$ at PTAX (Banco Central do Brasil), dd/mm/yyyy. Display only; the reserve holds BRS."). Without a rate the hints and the line are hidden. Nothing about the rate feeds a transaction.
 

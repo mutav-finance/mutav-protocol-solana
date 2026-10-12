@@ -37,7 +37,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   test("/reserve — overview: hero, where the capital sits, promises, persistent tabs", async ({ page }) => {
     await page.goto("/reserve");
     const views = page.getByRole("navigation", { name: "Transparency views" });
-    for (const tab of ["Overview", "Coverage", "Claims", "Money", "Risks", "Verify"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
+    for (const tab of ["Overview", "Coverage", "Claims", "Ledger", "Risks", "Verify"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
     await expect(views.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();
     // The hero splits the figure across spans (smaller decimals, US$ hint), so match the text content.
@@ -71,7 +71,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByText("Totals · cover against the reserve")).toBeVisible();
     await expect(page.getByText("Coverage required (higher of the two)")).toBeVisible();
 
-    await page.goto("/reserve/capital");
+    await page.goto("/reserve/ledger");
     await expect(page.getByRole("heading", { name: "Capital queue" })).toBeVisible();
     await expect(page.getByText("Chain busy, retrying…")).toBeVisible();
 
@@ -120,14 +120,22 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByText("Claim payments are never blocked by required coverage or by a pause.")).toBeVisible();
     await noBannedWords(page);
 
+    // The old Money route permanently redirects to the Ledger tab.
+    const old = await page.request.get("/reserve/capital", { maxRedirects: 0 });
+    expect(old.status()).toBe(308);
+    expect(old.headers()["location"]).toMatch(/\/reserve\/ledger$/);
     await page.goto("/reserve/capital");
+    await expect(page).toHaveURL(/\/reserve\/ledger$/);
     const flows = page.getByRole("table", { name: "Money flows" });
     await expect(flows).toContainText("Guarantee fee");
     await expect(flows).toContainText("Claim payment");
     await expect(flows).toContainText("Capital in");
-    // One name for the tab, the heading and the page title: Money.
-    await expect(page.getByRole("heading", { name: "Money", exact: true, level: 2 })).toBeVisible();
-    await expect(page).toHaveTitle(/^Money · Transparency/);
+    // One name for the tab, the heading and the page title: Ledger. The table of movements is "Movements".
+    await expect(page.getByRole("heading", { name: "Ledger", exact: true, level: 2 })).toBeVisible();
+    await expect(page.getByText("Every movement in and out of the reserve, read from the chain.")).toBeVisible();
+    await expect(page).toHaveTitle("Ledger · Transparency · MUTAV pilot");
+    await expect(page.getByRole("navigation", { name: "Transparency views" }).getByRole("link", { name: "Ledger" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: /^Movements/, level: 3 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Capital queue" })).toBeVisible();
     await noBannedWords(page);
 

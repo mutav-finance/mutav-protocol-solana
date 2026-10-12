@@ -108,7 +108,7 @@ export function QueueEntries({ rows, owner, connected, inv, now }: { rows: Inves
             </Mono>
           )}
         </span>
-        <Link href="/reserve/capital" className="ext-link font-body text-xs">
+        <Link href="/reserve/ledger" className="ext-link font-body text-xs">
           Full queue →
         </Link>
       </div>

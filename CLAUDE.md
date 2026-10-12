@@ -45,7 +45,7 @@ Rules for AI agents and humans working in this repo. `mutav-finance/mutav-protoc
 
 The pilot web app lives in [`app/`](app/) (Next.js 16, Bun). Its full rules are in [`app/CLAUDE.md`](app/CLAUDE.md); the essentials:
 
-- Routes: `/` redirects to `/reserve` (no app landing; MUTAV's landing is mutav.finance), `/reserve`, `/operator`, `/admin` (General · Money in & out · Allocation), `/capital` (capital queue; `/investment` and `/investor` redirect), `/simulator` (static `public/simulator.html`). Spec: [`app/docs/spec.md`](app/docs/spec.md).
+- Routes: `/` redirects to `/reserve` (no app landing; MUTAV's landing is mutav.finance), `/reserve` (tabs `coverage`, `claims`, `ledger`, `risks`, `verify`; `/reserve/capital` redirects to `/reserve/ledger`), `/operator`, `/admin` (General · Money in & out · Allocation), `/capital` (capital queue; `/investment` and `/investor` redirect), `/simulator` (static `public/simulator.html`). Spec: [`app/docs/spec.md`](app/docs/spec.md).
 - The pilot reserve is BRS-only and expands through adapters (ADR 0018).
 - **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts through `clients/js`. Previews use the client's math mirror and are labelled as previews.
 - **Cluster by env:** `NEXT_PUBLIC_CLUSTER` is `localnet` or `devnet`; mainnet is refused.

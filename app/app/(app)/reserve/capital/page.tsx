@@ -1,11 +1,6 @@
-import type { Metadata } from "next";
-import { CapitalTab } from "@/components/reserve/ReserveTabs";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Money · Transparency",
-  description: "Money into and out of the MUTAV reserve, the FIFO capital queue and the dated ledger, read live from Solana.",
-};
-
+/** Renamed to /reserve/ledger (the Money tab became Ledger). */
 export default function Page() {
-  return <CapitalTab />;
+  permanentRedirect("/reserve/ledger");
 }

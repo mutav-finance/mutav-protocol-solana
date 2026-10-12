@@ -318,7 +318,7 @@ export function Money({ mode }: { mode: Mode }) {
       title="Money in & out"
       roles={<RoleLine items={[{ role: "admin", prefix: "queue filled and settings set by the" }, { role: "operator", prefix: "fees, income and claims by the" }, { role: "investor", prefix: "requests by the" }]} />}
     >
-      <WhatThis>Each flow into and out of the reserve, with the settings that govern it. Steps signed by the Operator or a capital provider are context, linked to where they happen; full charts are on <Link href="/reserve/capital" className="ext-link">/reserve/capital</Link>.</WhatThis>
+      <WhatThis>Each flow into and out of the reserve, with the settings that govern it. Steps signed by the Operator or a capital provider are context, linked to where they happen; full charts are on <Link href="/reserve/ledger" className="ext-link">/reserve/ledger</Link>.</WhatThis>
       <Divider>In</Divider>
       <Deposits mode={mode} />
       <Fees mode={mode} />

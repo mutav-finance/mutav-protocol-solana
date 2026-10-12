@@ -245,15 +245,15 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
         </div>
       </div>
 
-      {/* [E] The dated ledger; the period filter applies here only. */}
-      <div id="ledger" className="flex scroll-mt-32 flex-col gap-4">
+      {/* [E] The dated movements; the period filter applies here only. */}
+      <div id="movements" className="flex scroll-mt-32 flex-col gap-4">
         <BlockHead
           title={
             <>
-              Ledger{all.length > 0 && <Mono dim> · {rows.length}</Mono>}
+              Movements{all.length > 0 && <Mono dim> · {rows.length}</Mono>}
             </>
           }
-          aside={<PeriodPicker value={period} onChange={pick} label="Ledger period" />}
+          aside={<PeriodPicker value={period} onChange={pick} label="Movements period" />}
         />
         {all.length === 0 ? (
           <Empty>No money has moved yet. Fees, claim payments and capital fills appear here.</Empty>
@@ -287,7 +287,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
           <li>Net from guarantees = guarantee fees net + issuer income net − claim payments. Capital net = capital in − capital out. A deposit is not income.</li>
           <li>Guarantee fees, issuer income, the MUTAV fee and claim payments are lifetime totals from the reserve&apos;s state account.</li>
           <li>Capital sums the fills in the last 100 transactions of each queue account (deposits waiting in line, redemptions waiting in line).</li>
-          <li>Each side has its own scale. Totals are since launch; the period filter applies to the ledger only.</li>
+          <li>Each side has its own scale. Totals are since launch; the period filter applies to the movements only.</li>
         </ul>
       </details>
     </div>
@@ -297,7 +297,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
 /** The Flows section of /reserve: heading (the question) and body. */
 export function FlowsSection({ d }: { d: Data }) {
   return (
-    <Section id="flows" title="Money" kicker="Money in and out" subtitle="Where did the reserve's money come from, and where did it go?">
+    <Section id="flows" title="Ledger" kicker="Money in and out" subtitle="Every movement in and out of the reserve, read from the chain.">
       <Flows r={d.reserve} l={d.ledger} />
     </Section>
   );

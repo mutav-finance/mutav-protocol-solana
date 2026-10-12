@@ -30,7 +30,7 @@ import { FLOW_KIND_LABEL, capitalQueue, claimsTimeline, coverageRows, isUnpaid, 
 /** The two promises the spec makes, each linked to the view that shows them. */
 const PROMISES: [string, string, string, string][] = [
   ["Claim payments are never blocked by required coverage.", "The gate stops new guarantees and redemptions only.", "/reserve/claims", "See claims"],
-  ["New capital needs an approved wallet.", "The allowlist gates new capital; existing holders can always redeem (KYC off-chain). Every request waits in the same line.", "/reserve/capital#queue", "See the capital queue"],
+  ["New capital needs an approved wallet.", "The allowlist gates new capital; existing holders can always redeem (KYC off-chain). Every request waits in the same line.", "/reserve/ledger#queue", "See the capital queue"],
 ];
 
 /** Movements shown in the side column, and the window the count covers. */
@@ -402,7 +402,7 @@ function RecentActivity({ r, rows }: { r: ReserveView; rows: FlowRow[] }) {
             {plural(recent, "movement")} in the last {ACTIVITY_DAYS.toString()} days
           </Mono>
         </span>
-        <Link href="/reserve/capital#ledger" className="ext-link font-body text-xs">
+        <Link href="/reserve/ledger#movements" className="ext-link font-body text-xs">
           Full ledger →
         </Link>
       </div>
