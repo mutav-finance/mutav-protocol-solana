@@ -25,6 +25,7 @@ type Result = {
   endBalance: number;
   tesouroShare: number;
   tvlRefused: number;
+  cumWithdrawals: number;
   capitalRaised: number;
   claimCapMonths: number;
   take: number;
