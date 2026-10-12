@@ -115,8 +115,8 @@ function Deposits({ mode }: { mode: Mode }) {
   return (
     <Sub id="money-deposits" title="Capital deposits" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
-        <Context who="investor" figure={m(`${q.deposits.length} waiting · ${fmtBrs(reserve.state.pendingDepositsTotal, 0)}`)} href="/investor">
-          request_deposit escrows BRS in the FIFO queue (allowlisted wallets; in the pilot, MUTAV&apos;s capital wallet).
+        <Context who="investor" figure={m(`${q.deposits.length} waiting · ${fmtBrs(reserve.state.pendingDepositsTotal, 0)}`)} href="/capital">
+          request_deposit escrows BRS in the FIFO queue (allowlisted wallets).
         </Context>
       </Contexts>
       <Cards>
@@ -220,7 +220,7 @@ function Redemptions({ mode }: { mode: Mode }) {
   return (
     <Sub id="money-redemptions" title="Redemptions" badge={<RoleTag role="admin" prefix="filled by the" />}>
       <Contexts>
-        <Context who="investor" figure={m(`${q.redeems.length} waiting · ${fmtShares(reserve.state.pendingRedeemShares)} shares`)} href="/investor">
+        <Context who="investor" figure={m(`${q.redeems.length} waiting · ${fmtShares(reserve.state.pendingRedeemShares)} shares`)} href="/capital">
           request_redeem escrows shares in the FIFO queue; the owner later claims the BRS with claim_assets.
         </Context>
       </Contexts>
@@ -255,7 +255,7 @@ function Claims({ mode }: { mode: Mode }) {
         <Context who="operator" figure={m(`−${fmtBrs(reserve.state.claimsPaidTotal, 0)} · ${fmtBrs(cap.paid, 0)} this window`)} href="/operator">
           pay_claim sends BRS to the payments account within the claim caps (claims_paid_total); never blocked by required coverage or pause.
         </Context>
-        <Context who="anyone" href="/reserve#claims" linkLabel="/reserve">
+        <Context who="anyone" href="/reserve/claims" linkLabel="/reserve/claims">
           The claims timeline (filed → paid → settled) is public.
         </Context>
       </Contexts>
@@ -317,7 +317,7 @@ export function Money({ mode }: { mode: Mode }) {
       title="Money in & out"
       roles={<RoleLine items={[{ role: "admin", prefix: "queue filled and settings set by the" }, { role: "operator", prefix: "fees, income and claims by the" }, { role: "investor", prefix: "requests by the" }]} />}
     >
-      <WhatThis>Each flow into and out of the reserve, with the settings that govern it. Steps signed by the Operator or an Investor are context, linked to where they happen; full charts are on <Link href="/reserve#flows" className="ext-link">/reserve</Link>.</WhatThis>
+      <WhatThis>Each flow into and out of the reserve, with the settings that govern it. Steps signed by the Operator or an Investor are context, linked to where they happen; full charts are on <Link href="/reserve/capital" className="ext-link">/reserve/capital</Link>.</WhatThis>
       <Divider>In</Divider>
       <Deposits mode={mode} />
       <Fees mode={mode} />

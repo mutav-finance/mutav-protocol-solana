@@ -188,7 +188,7 @@ function AccountsTable() {
   return (
     <KV
       rows={[
-        [<Meaning key="r" label="Allowlist root">Merkle root of the wallets allowed to request deposits and redemptions.</Meaning>, m(`${bytesToHex(Uint8Array.from(c.investorAllowlistRoot)).slice(0, 24)}…`)],
+        [<Meaning key="r" label="Allowlist root">Merkle root of the wallets allowed to request deposits (holders can always redeem).</Meaning>, m(`${bytesToHex(Uint8Array.from(c.investorAllowlistRoot)).slice(0, 24)}…`)],
         [<Meaning key="t" label="Treasury account">Receives the fee take and the income take. Outside the reserve.</Meaning>, <Explorer key="t" value={c.treasuryAccount} full />],
         [<Meaning key="p" label="Payments account">Receives every pay_claim; MUTAV forwards it to the landlord by PIX.</Meaning>, <Explorer key="p" value={c.paymentsAccount} full />],
         [<Meaning key="m" label="BRS mint">The reserve asset (issued by Nora). Fixed at initialize.</Meaning>, <Explorer key="m" value={c.reserveMint} full />],

@@ -24,7 +24,7 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 - **Cluster by env:** `NEXT_PUBLIC_CLUSTER` = `localnet` (Surfpool / local validator seeded by the protocol's dry-run scripts) or `devnet`. Mainnet is refused.
 - **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts via the client's read helpers. Previews (for example the coverage gate) use the client's math mirror and are labelled as previews.
 - **Language:** English for the hackathon. MUTAV's guarantee is a *fiança*: say "guarantee fee", "claim payment", "reserve". Never "premium", "insurance", "policy", "yield vault".
-- **Not open to public investment.** The pilot runs on MUTAV's own capital. Capital requests are gated by the on-chain allowlist (KYC off-chain); in the pilot the allowlisted capital provider is MUTAV's capital wallet. Investor-facing copy says so.
+- **Not open to public investment.** The pilot runs on MUTAV's own capital. Capital requests are gated by the on-chain allowlist (KYC off-chain); in the pilot the allowlisted capital provider is MUTAV's capital wallet. Copy mentions it where it covers access. Separately, every page (and `public/simulator.html`) carries the demo banner (`components/DemoBanner.tsx`): pilot demo, **not open to public investment**, capital participation only through a regulated vehicle to eligible investors. That is the legal floor (founder decision, 2026-10-11); never remove or soften it until the regulated vehicle is live.
 - **Wallets send; the app relays only on localnet.** On devnet the wallet signs and sends (`solana:signAndSendTransaction`) and the app confirms through its read endpoint; `/api/tx/send` relays signed bytes on localnet only (MUTAV, the configured Squads multisig and Compute Budget instructions; 4 KB body cap).
 - **Roles are explicit.** Every page tags each action and each number with the role that signs or owns it: Reserve Admin, Operator, Investor (or Anyone for cranks), one colour and one shape per role (`lib/roles.ts`, `components/RoleTag.tsx`).
 
@@ -42,6 +42,8 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 ### `/reserve` Public transparency
 
 Read-only, no wallet needed.
+
+Money: BRS primary; US$ hint from PTAX/BCB, display only. Every amount shows in BRS; the main figures here, on `/capital` and on the landing strip carry a small muted `≈ US$ X` at the latest Banco Central PTAX selling rate (BRS = BRL 1:1), with one source line ("US$ at PTAX (Banco Central do Brasil), dd/mm/yyyy. Display only; the reserve holds BRS."). Without a rate the hints and the line are hidden. Nothing about the rate feeds a transaction.
 
 - **Health:** `stable_assets`, `coverage_required`, surplus, `free_capital`, NAV per share, shares outstanding, `mode` (Normal / UnderCovered), `fulfil_halted`, paused, last refresh.
 - **Coverage:** remaining cover by guarantee (default and exit legs), active guarantee count, per-agency exposure.
@@ -63,14 +65,14 @@ During the launch and the hackathon MUTAV's team operates the reserve by hand fr
 - **Recent activity:** the operator key's last MUTAV transactions, and the last operator `accept_role` (role = 1) in VaultConfig's recent history, when the RPC keeps history.
 - **Safety:** what bounds a compromised operator key (caps, fixed payments account, `revoke_operator`, admin-only config).
 
-### `/investor` Investor view
+### `/capital` Capital queue (was `/investor`)
 
 Read by anyone; actions gated on the allowlist.
 
 - **Allowlist status** of the connected wallet: its Merkle proof (client `buildAllowlist` over `ALLOWLIST`) checked with `verifyAllowlistProof` against `VaultConfig.investor_allowlist_root`. States: allowlisted, not listed (KYC is done off-chain), root unset, list mismatch.
 - **Position:** reserve shares, value at NAV now (math mirror, labelled preview), BRS in the wallet, waiting deposits and redemptions.
 - **Queue entries** of the wallet, with `cancel_deposit`, `claim_shares`, `cancel_redeem`, `claim_assets` where the request's state allows them (owner only, no proof).
-- **New requests:** `request_deposit`, `request_redeem`, the proof built by the server, each with an optional price limit (`min_shares_out`, `min_assets_out`; 0 = none; a "preview − 1%" shortcut) and "Redeem all". A request that heads its queue and would not fill now says why (preview). Without an allowlisted wallet the view stays visible, read-only.
+- **New requests:** `request_deposit`, `request_redeem`, the proof built by the server, each with an optional price limit (`min_shares_out`, `min_assets_out`; 0 = none; a "preview − 1%" shortcut) and "Redeem all". A request that heads its queue and would not fill now says why (preview). Demo: the request form is visible to every visitor; on-chain actions stay allowlist-gated (holders can always redeem, ADR 0023). Before launch, set `CAPITAL_FORMS_PUBLIC` (`lib/flags.ts`, env `NEXT_PUBLIC_CAPITAL_FORMS_PUBLIC=false`) false to show the form only to allowlisted wallets (holders get redeem only).
 
 ### `/demo` Guided demo (operator cockpit)
 

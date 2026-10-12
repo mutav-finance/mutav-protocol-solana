@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { claimSpeed, coverBars, flowBars, frac, navBasis, coverageMeter } from "../charts";
+import { coverageRequired, stressTerm } from "@mutav-finance/mutav-protocol-solana";
+import { capitalSplit, claimSpeed, coverBars, flowBars, frac, navBasis, coverageMeter } from "../charts";
 import type { ClaimRow, CoverageRow } from "../view";
 import { BRL } from "./fixtures";
 
@@ -63,5 +64,31 @@ describe("chart shaping", () => {
     expect(bars.find((b) => b.key === "take")).toMatchObject({ direction: "outside" });
     // ADR 0017: issuer income flows in, swept by the operator; there is no take on it (ADR 0019).
     expect(bars.find((b) => b.key === "income")).toMatchObject({ direction: "in", by: "operator", amount: 1_500n, source: "state" });
+  });
+
+  it("splits covered stable assets into provisions, the rest of required and free capital", () => {
+    const s = capitalSplit({ stableAssets: 58_700n * BRL, coverageRequired: 3_500n * BRL, freeCapital: 55_200n * BRL }, 3_200n * BRL);
+    expect(s).toMatchObject({ provisions: 3_200n * BRL, restRequired: 300n * BRL, freeCapital: 55_200n * BRL, shortfall: 0n, axis: 58_700n * BRL });
+    expect(s.provisions + s.restRequired + s.freeCapital).toBe(s.stableAssets);
+  });
+
+  it("holds the stress floor beyond provisions when it binds over the ratio (ADR 0022)", () => {
+    // One lease, cover R$40k, nothing filed, stress buffer R$19k, c = 25%.
+    const cover = 40_000n * BRL;
+    const buffer = 19_000n * BRL;
+    const byRatio = coverageRequired(cover, 2_500, 0n, 0n);
+    const floor = stressTerm(cover, 0n, buffer);
+    expect(byRatio).toBe(10_000n * BRL);
+    expect(floor).toBe(19_000n * BRL);
+    const required = coverageRequired(cover, 2_500, 0n, buffer);
+    expect(required).toBe(19_000n * BRL);
+    const s = capitalSplit({ stableAssets: 60_000n * BRL, coverageRequired: required, freeCapital: 41_000n * BRL }, 0n);
+    expect(s).toMatchObject({ provisions: 0n, restRequired: 19_000n * BRL, freeCapital: 41_000n * BRL, shortfall: 0n });
+    expect(s.provisions + s.restRequired + s.freeCapital).toBe(s.stableAssets);
+  });
+
+  it("commits every held unit and reports the shortfall when under-covered", () => {
+    const s = capitalSplit({ stableAssets: 3_100n * BRL, coverageRequired: 3_500n * BRL, freeCapital: 0n }, 3_200n * BRL);
+    expect(s).toMatchObject({ provisions: 3_100n * BRL, restRequired: 0n, freeCapital: 0n, shortfall: 400n * BRL, axis: 3_500n * BRL });
   });
 });
