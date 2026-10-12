@@ -67,5 +67,6 @@ var lines=[q.get('l1')||'',q.get('l2')||''].filter(Boolean);
 var c=document.querySelector('.cap');
 lines.forEach(function(l,i){var s=document.createElement('span');s.textContent=l;c.appendChild(s);if(i<lines.length-1)c.appendChild(document.createElement('br'));});
 </script>
+<script>(function(){function f(){var s=Math.min(innerWidth/1920,innerHeight/1080);document.body.style.zoom=s<1?s:1}f();addEventListener("resize",f)})();</script>
 </body>
 </html>

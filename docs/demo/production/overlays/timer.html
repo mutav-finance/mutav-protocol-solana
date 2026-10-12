@@ -88,5 +88,6 @@ window.timerInfo={start:start,end:end,fps:fps,durationMs:dur};
 if(q.has('frame')){window.setFrame(+q.get('frame'));}
 else{var t0=performance.now();(function tick(){show(performance.now()-t0);if(performance.now()-t0<=dur)requestAnimationFrame(tick);})();}
 </script>
+<script>(function(){function f(){var s=Math.min(innerWidth/1920,innerHeight/1080);document.body.style.zoom=s<1?s:1}f();addEventListener("resize",f)})();</script>
 </body>
 </html>
