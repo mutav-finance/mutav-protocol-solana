@@ -30,18 +30,22 @@ export function ClaimsTab() {
     </Needs>
   );
 }
-/** Capital: where the money came from and went (flows, ledger), and the queue. */
+/**
+ * Money: where the money came from and went (flows, ledger), and the queue.
+ * One wrapper, so the two sections sit on their own section padding instead
+ * of the view's wide gap between top-level blocks.
+ */
 export function CapitalTab() {
   const { d } = useReserve();
   return (
-    <>
+    <div className="flex flex-col">
       <Needs panel="flows">
         <FlowsSection d={d} />
       </Needs>
       <Needs panel="queue">
         <QueueSection d={d} />
       </Needs>
-    </>
+    </div>
   );
 }
 export function RisksTab() {
@@ -51,9 +55,9 @@ export function RisksTab() {
 export function VerifyTab() {
   const { d } = useReserve();
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <AccountsSection d={d} />
-      <Glossary />
-    </>
+      <Glossary coverageRatioBps={d.reserve.config.coverageRatioBps} />
+    </div>
   );
 }

@@ -25,7 +25,7 @@ describe("decodeProgramError", () => {
 describe("refusalLine", () => {
   const gate = { needed: R(45_000), stableAssets: R(44_000), newCover: R(18_000), maxCover: R(120_000) };
   it("explains the coverage gate with the preview numbers", () => {
-    expect(refusalLine("InsufficientFreeCapital", { gate })).toBe("Refused by the coverage gate: needs R$\u00a045,000.00 of required coverage, the reserve holds R$\u00a044,000.00.");
+    expect(refusalLine("InsufficientFreeCapital", { gate })).toBe("Refused by the coverage gate: needs R$\u00a045,000.00 of required coverage; the reserve holds R$\u00a044,000.00.");
     expect(refusalLine("GuaranteeCapExceeded", { gate: { ...gate, newCover: R(130_000) } })).toBe("Refused by the per-guarantee cap: R$\u00a0130,000.00 of cover is above the R$\u00a0120,000.00 cap.");
   });
   it("explains the claim caps", () => {

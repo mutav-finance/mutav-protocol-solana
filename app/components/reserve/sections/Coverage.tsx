@@ -18,7 +18,7 @@ import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
-import { fmtBps, fmtBrs, fmtPct, fmtTime } from "@/lib/format";
+import { fmtBrs, fmtPct, fmtPctOf, fmtTime } from "@/lib/format";
 import { Money } from "@/components/MoneyProvider";
 import { capacityLeft, coverageCeilingOf, frac, type CoverageCeiling } from "@/lib/charts";
 import { activeRemainingCover, agencyRows, coverageRows, type AgencyRow, type CoverageRow, type Ledger, type ReserveView } from "@/lib/view";
@@ -39,7 +39,7 @@ const LABEL_STYLE = { letterSpacing: "0.01em" };
 const LEG = { default: C.ink, exit: C.mid };
 
 /** `part` as a share of `whole`, for display only; an em dash when there is no whole. */
-const share = (part: bigint, whole: bigint) => (whole > 0n ? fmtBps((part * 10_000n) / whole, 1) : "—");
+const share = fmtPctOf;
 
 /** Active guarantees by remaining cover (largest first), then closed ones by registration. */
 function byRemaining(rows: CoverageRow[]): CoverageRow[] {
@@ -51,8 +51,8 @@ function byRemaining(rows: CoverageRow[]): CoverageRow[] {
 const GUARANTEE_HEAD: (string | [string, "num"])[] = ["Guarantee", "Agency", ["Remaining", "num"], ["Unpaid rent left", "num"], ["Move-out debts left", "num"]];
 const COVER_TIPS = {
   Remaining: "Unpaid rent left plus move-out debts left. Bars scale to the largest active guarantee.",
-  "Unpaid rent left": "The default leg: limit for rent and charges in arrears while the lease runs, minus what was already paid on it.",
-  "Move-out debts left": "The exit leg: limit for the tenant's debts up to and at the end of occupation, minus what was already paid on it.",
+  "Unpaid rent left": "Limit for rent and charges in arrears while the lease runs, minus what was already paid on it.",
+  "Move-out debts left": "Limit for the tenant's debts up to and at the end of occupation, minus what was already paid on it.",
 };
 const AGENCY_TIPS = {
   "Share of remaining cover": "Remaining cover of the agency ÷ remaining cover of every active guarantee. The program sets no per-agency cap.",
@@ -278,7 +278,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
     ],
     [
       { label: `${fmtPct(r.config.coverageRatioBps)} × remaining cover`, value: fmtBrs(byRatio) },
-      { op: "or", label: "Provisions + stress buffer", value: fmtBrs(floor) },
+      { op: "or", label: "Set aside for claims + stress buffer", value: fmtBrs(floor) },
       { op: "=", label: "Coverage required (higher of the two)", value: fmtBrs(s.coverageRequired), result: true },
     ],
   ];
@@ -304,8 +304,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
         <HeroAmount phrase="Allocated to coverage" value={fmtBrs(s.coverageRequired)}>
           <span className="font-body text-(--color-text-2) flex flex-col gap-1 leading-relaxed">
             <span>
-              {`Held to back the guarantees: ${(frac(s.coverageRequired, s.stableAssets) * 100).toFixed(1)}% of the `}
-              <span className="whitespace-nowrap">{fmtBrs(s.stableAssets, 0)}</span> reserve.
+              {`Held to back the guarantees: ${fmtPctOf(s.coverageRequired, s.stableAssets)} of the `}
+              <span className="whitespace-nowrap">{fmtBrs(s.stableAssets)}</span> reserve.
             </span>
             <span>
               {s.coverageRequired > coverageRequired(r.state.remainingCoverTotal, r.config.coverageRatioBps, 0n, 0n)
@@ -318,10 +318,10 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
             <span className="font-body text-(--color-text-2) flex flex-col gap-1 leading-relaxed">
               {k.blockedBy && <span style={{ color: "var(--color-error)" }}>{`No new lease fits while ${CEILING_BLOCK[k.blockedBy]}.`}</span>}
               <span>
-                <span className="whitespace-nowrap">{fmtBrs(k.headroom, 0)}</span> of the <span className="whitespace-nowrap">{fmtBrs(k.ceiling, 0)}</span> ceiling free for new leases.
+                <span className="whitespace-nowrap">{fmtBrs(k.headroom)}</span> of the <span className="whitespace-nowrap">{fmtBrs(k.ceiling)}</span> ceiling free for new leases.
               </span>
               <span>
-                <span className="whitespace-nowrap">{fmtBrs(k.inUse, 0)}</span>
+                <span className="whitespace-nowrap">{fmtBrs(k.inUse)}</span>
                 {` in use on ${plural(active.length, "active guarantee", "active guarantees")} at ${plural(agenciesActive, "agency", "agencies")}, after claims paid.`}
               </span>
             </span>
@@ -364,8 +364,8 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
           </span>
         </div>
         <div className="-mx-px grid grid-cols-1 gap-px border sm:grid-cols-2" style={{ background: "var(--color-border)" }}>
-          <StripCell label="Unpaid rent · cover left" swatch={LEG.default} value={<Money brs={defaultLeft} block />} sub={`The most the reserve can still pay for rent and charges in arrears while leases run (the default leg). A limit, not money owed: nothing here has been claimed. ${share(defaultLeft, sum)} of remaining cover.`} />
-          <StripCell label="Move-out debts · cover left" swatch={LEG.exit} value={<Money brs={exitLeft} block />} sub={`The most the reserve can still pay for tenant debts up to and at the end of occupation (the exit leg). A limit, not money owed: nothing here has been claimed. ${share(exitLeft, sum)} of remaining cover.`} />
+          <StripCell label="Unpaid rent · cover left" swatch={LEG.default} value={<Money brs={defaultLeft} block />} sub={`The most the reserve can still pay for rent and charges in arrears while leases run. A limit, not money owed: nothing here has been claimed. ${share(defaultLeft, sum)} of remaining cover.`} />
+          <StripCell label="Move-out debts · cover left" swatch={LEG.exit} value={<Money brs={exitLeft} block />} sub={`The most the reserve can still pay for tenant debts up to and at the end of occupation. A limit, not money owed: nothing here has been claimed. ${share(exitLeft, sum)} of remaining cover.`} />
         </div>
       </div>
 
@@ -447,7 +447,7 @@ export function CoverageSection({ d }: { d: Data }) {
       title="Coverage"
       kicker="Guarantees"
       subtitle="What the reserve guarantees today, by lease and by agency."
-      info="Each guarantee is a fiança in two parts: unpaid rent (the default leg) and move-out debts (the exit leg). Remaining cover is cover minus what was already paid. The Operator registers guarantees; the Reserve Admin sets the caps. IDs are hashes; names stay off-chain."
+      info="Each guarantee is a fiança in two parts: unpaid rent and move-out debts. Remaining cover is cover minus what was already paid. The Operator registers guarantees; the Reserve Admin sets the caps. IDs are hashes; names stay off-chain."
     >
       <Coverage r={d.reserve} l={d.ledger} />
     </Section>

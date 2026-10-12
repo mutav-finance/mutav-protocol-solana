@@ -6,13 +6,16 @@
  *   1. The live freeze state of the reserve's BRS token account.
  *   2. Claim payments: bounded by the two caps.
  *   3. Admin caps: the other limits the Reserve Admin sets (reserve size, cover per guarantee, stress buffer).
- *   4. Who provides capital (the allowlist; not open to public investment).
+ *   4. Authority: where claim payments go (the payments account) and who can pause.
+ *   5. Who provides capital (the allowlist; not open to public investment).
  * The BRS freeze authority is shown on the Verify tab's mint card.
  * Renders on-chain values from /api/ledger; nothing is computed here.
  */
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Mono } from "@/components/Mono";
+import { Explorer } from "@/components/Explorer";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Money } from "@/components/MoneyProvider";
 import { CLAIM_WINDOW_DAYS } from "@mutav-finance/mutav-protocol-solana";
 import { type ReserveView } from "@/lib/view";
@@ -47,7 +50,7 @@ function FreezeStatus({ r }: { r: ReserveView }) {
       <BlockHead id="risk-freeze-h" title="Reserve token account freeze" note={<Lead lead="BRS is issued by Nora, and Nora can freeze it." className="text-sm">A freeze stops every outflow, claim payments included.</Lead>} />
       <div className="bg-(--color-surface) flex flex-col gap-2 border px-6 py-4" style={frozen ? { borderColor: "var(--color-error)" } : undefined} role="status" aria-label="Reserve token account freeze status">
         <Label>Reserve token account</Label>
-        <Mono style={{ fontSize: 22, fontWeight: 700, color: frozen ? "var(--color-error)" : "var(--color-text)", whiteSpace: "nowrap" }}>{frozen ? "FROZEN NOW" : "NOT FROZEN"}</Mono>
+        <StatusBadge color={frozen ? "var(--color-error)" : "var(--color-success)"} label={frozen ? "FROZEN NOW" : "NOT FROZEN"} />
       </div>
     </section>
   );
@@ -60,7 +63,7 @@ function ClaimLimits({ r }: { r: ReserveView }) {
     <div className="bg-(--color-surface) flex min-w-0 flex-col gap-2 px-6 py-4">
       <Label>{k}</Label>
       <Mono style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text)", whiteSpace: "nowrap" }}>{v}</Mono>
-      <span className="font-mono text-(--color-text-3) text-2xs">{sub}</span>
+      <span className="font-body text-(--color-text-2) text-xs leading-snug">{sub}</span>
     </div>
   );
   return (
@@ -116,7 +119,64 @@ function AdminCaps({ r }: { r: ReserveView }) {
   );
 }
 
-/** Block 4 · who provides capital. Text only, no figures. */
+/** The program's empty key slot (`Pubkey::default()`): an unset guardian. */
+const EMPTY_KEY = "11111111111111111111111111111111";
+
+/**
+ * Block 4 · authority: the fixed account every claim payment goes to, and
+ * who can pause the program. Both read from the config account.
+ */
+function Authority({ r }: { r: ReserveView }) {
+  const c = r.config;
+  const rpc = r.explorerRpc;
+  const guardians = c.guardians.filter((g) => g !== EMPTY_KEY);
+  return (
+    <section aria-labelledby="risk-authority-h" className="flex flex-col gap-4">
+      <BlockHead
+        id="risk-authority-h"
+        title="Where claim payments go, and who can pause"
+        note={<Lead lead="Claim payments go to one fixed account." className="text-sm">Only the Reserve Admin can change it. Below it, every key that can pause the program.</Lead>}
+        aside={<HeadLink href="/reserve/verify">See every account</HeadLink>}
+      />
+      <Table label="Authority" head={["Role", "Address", "What it can do"]}>
+        <tr>
+          <td>Payments account</td>
+          <td>
+            <Explorer value={c.paymentsAccount} rpc={rpc} />
+          </td>
+          <td>Receives every claim payment. A fixed address set by the Reserve Admin; the operator cannot pay anywhere else.</td>
+        </tr>
+        <tr>
+          <td>Pause / guardian</td>
+          <td>
+            <span className="flex flex-col gap-1">
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <Explorer value={c.pauser} rpc={rpc} />
+                <span className="font-body text-(--color-text-3) text-xs">pauser</span>
+              </span>
+              <span className="inline-flex flex-wrap items-center gap-2">
+                <Explorer value={c.admin} rpc={rpc} />
+                <span className="font-body text-(--color-text-3) text-xs">Reserve Admin</span>
+              </span>
+              {guardians.map((g) => (
+                <span key={g} className="inline-flex flex-wrap items-center gap-2">
+                  <Explorer value={g} rpc={rpc} />
+                  <span className="font-body text-(--color-text-3) text-xs">guardian</span>
+                </span>
+              ))}
+            </span>
+          </td>
+          <td>
+            Can pause the program: new guarantees and capital moves stop; claim payments do not.
+            {guardians.length === 0 ? " No guardian keys are set." : ` ${guardians.length === 1 ? "One guardian key" : `${guardians.length} guardian keys`} may pause, nothing else.`} Only the Reserve Admin unpauses.
+          </td>
+        </tr>
+      </Table>
+    </section>
+  );
+}
+
+/** Block 5 · who provides capital. Text only, no figures. */
 function CapitalTerms() {
   return (
     <section aria-labelledby="risk-capital-h" className="flex flex-col gap-4">
@@ -146,6 +206,7 @@ export function Disclosures({ r }: { r: ReserveView }) {
       <FreezeStatus r={r} />
       <ClaimLimits r={r} />
       <AdminCaps r={r} />
+      <Authority r={r} />
       <CapitalTerms />
     </div>
   );
@@ -157,6 +218,7 @@ export function DisclosuresSection({ d }: { d: Data }) {
     <Section
       id="disclosures"
       title="Risks"
+      kicker="Disclosures"
       subtitle="What limits each payment, and who can move money."
     >
       <Disclosures r={d.reserve} />

@@ -80,6 +80,15 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByRole("heading", { name: "Your requests" })).toBeVisible();
   });
 
+  test("unknown routes get the dark 404 with a way back; the app icon is served", async ({ page, request }) => {
+    const res = await page.goto("/nope");
+    expect(res?.status()).toBe(404);
+    await expect(page.getByRole("heading", { name: "Nothing here", level: 1 })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: /Go to Transparency/ })).toHaveAttribute("href", "/reserve");
+    await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Not open to public investment.");
+    expect((await request.get("/icon.svg")).status()).toBe(200);
+  });
+
   test("/reserve — first visit opens How to read this page", async ({ page }) => {
     await page.addInitScript(() => localStorage.removeItem("mutav-transparency-intro-v1"));
     await page.goto("/reserve");
@@ -106,7 +115,8 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await page.goto("/reserve/claims");
     const claims = page.getByRole("table", { name: "Claims timeline" });
     await expect(claims.locator("tbody tr")).toHaveCount(1);
-    await expect(claims).toContainText("default");
+    // Legs read in reader words (unpaid rent / move-out debts), statuses as uppercase badges.
+    await expect(claims).toContainText("unpaid rent");
     await expect(page.getByText("Claim payments are never blocked by required coverage or by a pause.")).toBeVisible();
     await noBannedWords(page);
 
@@ -114,7 +124,10 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     const flows = page.getByRole("table", { name: "Money flows" });
     await expect(flows).toContainText("Guarantee fee");
     await expect(flows).toContainText("Claim payment");
-    await expect(flows).toContainText("Deposit");
+    await expect(flows).toContainText("Capital in");
+    // One name for the tab, the heading and the page title: Money.
+    await expect(page.getByRole("heading", { name: "Money", exact: true, level: 2 })).toBeVisible();
+    await expect(page).toHaveTitle(/^Money · Transparency/);
     await expect(page.getByRole("heading", { name: "Capital queue" })).toBeVisible();
     await noBannedWords(page);
 
@@ -126,6 +139,10 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByText("Not open to public investment.", { exact: true })).toBeVisible();
     await expect(page.getByText("nothing here is an offer", { exact: false }).first()).toBeVisible();
     await noBannedWords(page);
+
+    // Risks names where claim payments go and who can pause, each on Explorer.
+    await expect(page.getByRole("table", { name: "Authority" })).toContainText("Payments account");
+    await expect(page.getByRole("table", { name: "Authority" })).toContainText("Pause / guardian");
 
     await page.goto("/reserve/verify");
     await expect(page.getByText("8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9")).toBeVisible();
@@ -149,7 +166,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByRole("region", { name: "Emergency" })).toContainText("NOT PAUSED");
     await expect(page.getByText("DIRECT SIGNING · LOCALNET ONLY").first()).toBeVisible();
     await expect(page.getByText("NO SQUADS MULTISIG CONFIGURED")).toBeVisible();
-    await expect(page.locator("#general-coverage")).toContainText("10.00%");
+    await expect(page.locator("#general-coverage")).toContainText("10.0%");
     await expect(page.locator("#money").getByRole("button", { name: "Sign directly: fulfil_deposits" })).toBeVisible();
     await expect(page.locator("#allocation-composition")).toContainText("100% BRS (pilot)");
     await expect(page.locator("#allocation-composition")).toContainText("Min in BRS (settlement token): 100%");
@@ -166,7 +183,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Not open to public investment.");
     await expect(page.getByRole("heading", { name: "Capital queue", level: 1 })).toBeVisible();
     await expect(page.getByRole("note", { name: "Not open to public investment" })).toContainText(
-      "Pilot capital comes from MUTAV's own wallet only. This page is not open to public investment and nothing here is an offer.",
+      "Pilot capital comes from MUTAV's own wallet only. The pilot is not open to public investment and nothing here is an offer.",
     );
     await expect(page.getByRole("group", { name: "Reserve figures" })).toContainText("Share price");
     // Demo (CAPITAL_FORMS_PUBLIC): every visitor sees the form, both tabs and the limits;

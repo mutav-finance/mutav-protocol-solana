@@ -8,7 +8,7 @@
  * from /api/ledger; nothing is hardcoded.
  */
 import type { ReactNode } from "react";
-import { RoleTag } from "@/components/RoleTag";
+import { PauserTag, RoleTag } from "@/components/RoleTag";
 import { type ReserveView } from "@/lib/view";
 import { ACCOUNT_ROLES, type AccountRole } from "@/lib/roles";
 import { Section } from "@/components/Section";
@@ -77,15 +77,8 @@ export function Accounts({ r }: { r: ReserveView }) {
       address: r.config.pauser,
       a: ACCOUNT_ROLES.pauser,
       does: "Can pause and revoke the operator. Nothing else.",
-      // Its own key, held on the Reserve Admin side: a PAUSER tag, so it does not read as the admin.
-      tag: (
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <span className="font-mono text-(--color-text) text-2xs uppercase" style={{ letterSpacing: "0.06em" }}>
-            Pauser
-          </span>
-          <span className="font-body text-(--color-text-3) text-2xs">held on the Reserve Admin side</span>
-        </span>
-      ),
+      // Its own key, held on the Reserve Admin side: a PAUSER tag (admin colour, hollow), so it does not read as the admin.
+      tag: <PauserTag suffix={<span className="font-body text-(--color-text-3) text-2xs normal-case" style={{ letterSpacing: 0 }}>held on the Reserve Admin side</span>} />,
     },
     { name: "Operator", address: r.config.operator, a: ACCOUNT_ROLES.operator, does: "Registers guarantees and pays claims, within the caps." },
     { name: "MUTAV capital wallet", address: r.config.mutavCapitalWallet, a: ACCOUNT_ROLES.capital, does: "Requests deposits and redemptions through the queue, like any approved wallet." },
