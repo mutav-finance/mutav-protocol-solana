@@ -192,8 +192,8 @@ export function RequestCard({ inv, loading, connected }: { inv: InvestorView | n
         </div>
 
         <p className="font-mono text-(--color-text-3) m-0 text-2xs">
-          Min {fmtBrs(caps.minRequest, 0)}
-          {capShares(caps.minRequest)} · max {fmtBrs(caps.maxRequest, 0)}
+          Min {fmtBrs(caps.minRequest)}
+          {capShares(caps.minRequest)} · max {fmtBrs(caps.maxRequest)}
           {capShares(caps.maxRequest)} per request
         </p>
         <div className="[&>div>button]:h-11 [&>div>button]:w-full [&>div>button:disabled]:bg-(--color-surface-3) [&>div>button:disabled]:text-(--color-text-3) [&>div>button:disabled]:opacity-100">
