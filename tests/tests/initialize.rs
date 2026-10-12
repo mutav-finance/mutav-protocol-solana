@@ -488,10 +488,14 @@ fn assert_invalid_account_data(res: litesvm::types::TransactionResult) {
     use solana_instruction::error::InstructionError;
     use solana_transaction_error::TransactionError;
     match res {
-        Err(e) => assert_eq!(
+        // Any index: the fixture puts a compute-unit limit before initialize.
+        Err(e) => assert!(
+            matches!(
+                e.err,
+                TransactionError::InstructionError(_, InstructionError::InvalidAccountData)
+            ),
+            "got {:?}, logs:\n{}",
             e.err,
-            TransactionError::InstructionError(0, InstructionError::InvalidAccountData),
-            "logs:\n{}",
             e.meta.logs.join("\n")
         ),
         Ok(_) => panic!("expected InvalidAccountData, transaction succeeded"),
