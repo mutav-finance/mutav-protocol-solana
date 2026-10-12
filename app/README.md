@@ -45,7 +45,7 @@ Port 3001 is a suggestion: 3000 is often taken by another local project.
 | `NEXT_PUBLIC_CLUSTER` | build time | `localnet` or `devnet` (mainnet refused) |
 | `NEXT_PUBLIC_CAPITAL_FORMS_PUBLIC` | build time | `CAPITAL_FORMS_PUBLIC` (`lib/flags.ts`). Unset or anything but `false` (demo): the `/capital` form shows to every visitor, actions stay allowlist-gated. `false` before launch: the form shows only to allowlisted wallets (holders get redeem only) |
 | `RPC_URL` | server, runtime | RPC for reads and the relay; defaults per cluster. Server-only (never `NEXT_PUBLIC_`): set a dedicated devnet RPC (Helius, Triton) for demos, the public one allows 10 `getTransaction`/`getProgramAccounts` per 10 s per IP |
-| `PROGRAM_ID` | server, runtime | `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9` |
+| `PROGRAM_ID` | server, runtime | defaults to the client's `MUTAV_PROGRAM_ADDRESS` (the ID declared in `lib.rs`); the live devnet demo sets `GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV` |
 | `CONFIG_ADDRESS` | server, runtime | the reserve's `VaultConfig` PDA |
 | `SQUADS_MULTISIG` | server, runtime | the Squads v4 multisig whose vault is `VaultConfig.admin` |
 | `ALLOWLIST` | server, runtime | allowlisted wallets (public), to build `request_deposit` proofs; `/admin` proposes its root (`set_allowlist_root`) |
@@ -76,7 +76,7 @@ NEXT_PUBLIC_CLUSTER=localnet bun run build && bun run e2e   # Playwright smoke a
 
 ## Protocol client dependency
 
-`@mutav-finance/mutav-protocol-solana` is a `file:../clients/js` dependency on this repo's own client. Bun installs `file:` dependencies as symlinks, which Turbopack cannot read, and the client's own `node_modules` would bundle a second `@solana/kit`. So the postinstall (`scripts/materialize-client.mjs`) replaces the link with a real copy of `package.json` + `dist/`. When `../clients/js/dist` is missing (fresh clone, Vercel), it first runs `bun install --frozen-lockfile` at the repo root and `bun run build` in `clients/js`. After changing the client, rebuild it (`bun run build` in `clients/js`), then `rm -rf node_modules/@mutav-finance && bun install` here to refresh the copy.
+`@mutav-finance/mutav-protocol-solana` is a `file:../clients/js` dependency on this repo's own client. Bun installs `file:` dependencies as symlinks, which Turbopack cannot read, and the client's own `node_modules` would bundle a second `@solana/kit`. So the postinstall (`scripts/materialize-client.mjs`) replaces the link with a real copy of `package.json` + `dist/`. When `../clients/js/dist` is missing (fresh clone, Vercel) or older than `../clients/js/src`, it first runs `bun install --frozen-lockfile` at the repo root (if needed) and `bun run build` in `clients/js`. It refreshes the copy whenever it is stale (older `dist/`, or a different `package.json`). After changing the client, run `bun run client:refresh` here to rebuild and refresh it without reinstalling.
 
 ## Deploy (not done)
 
@@ -92,7 +92,7 @@ Target: Vercel, team `mutav`, project `mutav-pilot-app` at `reserve.mutav.financ
 | Build Command | `bun run build` |
 | Environment | `NEXT_PUBLIC_CLUSTER=devnet`, plus `RPC_URL`, `PROGRAM_ID`, `CONFIG_ADDRESS`, `SQUADS_MULTISIG`, `ALLOWLIST` |
 
-No separate prebuild step is needed; if the postinstall is ever skipped, use `cd ../clients/js && bun install && bun run build && cd ../../app && bun install` as the Install Command. Needed before going live: the protocol deployed and initialized on devnet, then `CONFIG_ADDRESS`, `SQUADS_MULTISIG` and `ALLOWLIST` set in the project.
+No separate prebuild step is needed; if the postinstall is ever skipped, use `cd ../clients/js && bun install && bun run build && cd ../../app && bun install` as the Install Command. The production project reads the pilot demo reserve on devnet: `PROGRAM_ID`, `CONFIG_ADDRESS`, `SQUADS_MULTISIG`, `ALLOWLIST` and `PAYMENTS_OWNER` are set to the deploy listed in the [README](../README.md#devnet-addresses).
 
 ## Brand
 

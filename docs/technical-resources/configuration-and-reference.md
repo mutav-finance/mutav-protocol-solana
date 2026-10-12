@@ -2,7 +2,7 @@
 
 Every address, authority, parameter and constant of the `mutav` program as built in the devnet binary. Use this page to check what you are talking to before you read or sign anything.
 
-> The program ID is declared in code but the program is not yet deployed to devnet. The reserve PDAs below are derived from the declared program ID and the devnet reserve mint. They become live accounts once `initialize` runs under that ID.
+> The program is live on devnet as `GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`: the pilot demo reserve, a test deploy of layout v1 (commit `833c114`); test activity is visible. The addresses below are that deploy's. The ID declared in [`lib.rs`](../../programs/mutav/src/lib.rs) is `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9`, kept for the verified `solana-verify` release build; PDAs derived under it differ. The demo's multisig time locks are 60 s / 120 s, a test exception to ADR 0028.
 
 Explorer links follow the pattern `https://explorer.solana.com/address/<address>?cluster=devnet`.
 
@@ -10,11 +10,11 @@ Explorer links follow the pattern `https://explorer.solana.com/address/<address>
 
 | Component | Devnet address | Notes |
 |---|---|---|
-| Program ID | `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9` | Declared in [`lib.rs`](../../programs/mutav/src/lib.rs) and `Anchor.toml`. Deploy pending. |
+| Program ID | [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet) | The live devnet deploy (`Anchor.toml` `[programs.devnet]`). Declared ID in `lib.rs`: `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9`, for the verified release. |
 | Loader | `BPFLoaderUpgradeab1e11111111111111111111111` | BPF Loader Upgradeable. ProgramData is derived by the loader from the program ID. |
-| Upgrade authority | Set at deploy | The vault of the upgrade multisig (Squads v4, long time lock). |
-| IDL | Set at deploy | Program Metadata account, written by the upgrade authority in the same Squads proposal as each upgrade. |
-| Event authority | `AquHfairQemYYusuBkppBWmgBK6zgmtw1vk5aoAZnHWx` | PDA `["__event_authority"]`, used by Anchor `emit_cpi!`. |
+| Upgrade authority | `AyKDdFrYQABjpkn29Sdj5hEGVymyEXzEHrGhzqPqvb1n` | The vault of the upgrade multisig (Squads v4, long time lock). |
+| IDL | Release [`v1.0.0-devnet`](https://github.com/mutav-finance/mutav-protocol-solana/releases/tag/v1.0.0-devnet) (`mutav.json`) | On-chain: Program Metadata account, written by the upgrade authority in the same Squads proposal as each upgrade. |
+| Event authority | `HN24uhMvb7ij6wneSbaHCaackCtPQvzCqvtGCqc9BPky` | PDA `["__event_authority"]`, used by Anchor `emit_cpi!`. |
 
 ## Mints and token programs
 
@@ -22,7 +22,7 @@ Explorer links follow the pattern `https://explorer.solana.com/address/<address>
 |---|---|---|
 | Reserve mint (BRS) | `BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4` | The issuer's devnet BRS. Classic SPL Token, 6 decimals. Stored in `VaultConfig.reserve_mint`; immutable after `initialize`, which requires 6 decimals. |
 | Reserve token program | `TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA` | Classic SPL Token. Stored as `reserve_token_program`. Any other program fails with `InvalidTokenProgram`. |
-| Share mint | `EmusG8JSunj1ZWJTDQEyTE2jfg5wRojwhXWTmH39hqfs` | PDA `["share_mint", config]`. Classic SPL Token, 6 decimals. Mint and freeze authority: the vault authority PDA. |
+| Share mint | `4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7` | PDA `["share_mint", config]`. Classic SPL Token, 6 decimals. Mint and freeze authority: the vault authority PDA. |
 | Associated Token program | `ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL` | Derives the income inbox. |
 
 The mint guard in `initialize` refuses a Token-2022 reserve mint with any of: permanent delegate, transfer hook, transfer fee or transfer-fee authority, non-transferable, default-frozen, scaled UI amount, interest-bearing or pausable.
@@ -33,15 +33,15 @@ Every PDA except `VaultConfig` includes the config address in its seeds. Seed st
 
 | Name | Seeds | Devnet address | Purpose |
 |---|---|---|---|
-| `VaultConfig` | `["config", reserve_mint]` | `8CDkR7ausijvx2tY4qBLanZ4yxExZht4MrHeM87WC63u` | Configuration, roles, caps. One per reserve mint. |
-| `VaultState` | `["state", config]` | `4bmZKvPDq8MWpVBbTBuQun4fexefRjzVcePWrT51npHi` | Internal accounting, queue heads, claim window. |
-| Vault authority | `["authority", config]` | `BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK` | Holds no data. Owns every reserve token account. Mint and freeze authority of the share mint. |
-| `reserve` | `["reserve", config]` | `7zEMG3rnN5VEmcBNECJmLg9nJqCKtxz7VK2kREWvjA5m` | Liquid reserve BRS. Tracked by `brs_balance`. |
-| `pending_deposits` | `["pending_deposits", config]` | `4pS5twyH3icCja8kmEsTgFfEXyDZCjj7ajrb9AV2NJvS` | BRS escrowed by deposit requests. |
-| `pending_redemptions` | `["pending_redemptions", config]` | `GsP2K22t8xqkVEWt82PCAGFSWp9uN4GifVNRLuw7q3PY` | Shares escrowed by redeem requests. |
-| `claims` | `["claims", config]` | `5bMo1dQfWyS2bqpUGtmX528JF639HboVDZueTsAsSXv9` | BRS owed to holders on filled redemptions, waiting for `claim_assets`. |
-| `unsolicited` | `["unsolicited", config]` | `maSJLaMsH4K9KJBDUyDhanMRwrbzXbn8vuGL5rJ4KvP` | Created at `initialize`. Holds untracked BRS, never counted in stable assets, NAV or coverage. The instructions that move money in and out of it (`skim`, `classify_unsolicited`, `book_unsolicited`, `return_unsolicited`) come with a later upgrade. |
-| Income inbox | ATA of (vault authority, token program, reserve mint) | `KLcyCunPGYocfRvAjWkLSPbMScHxcAuBfR56UqDA2NP` | Where the issuer pays its monthly revenue share. Untracked until `sweep_income` books a statement. |
+| `VaultConfig` | `["config", reserve_mint]` | `CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q` | Configuration, roles, caps. One per reserve mint. |
+| `VaultState` | `["state", config]` | `G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex` | Internal accounting, queue heads, claim window. |
+| Vault authority | `["authority", config]` | `AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu` | Holds no data. Owns every reserve token account. Mint and freeze authority of the share mint. |
+| `reserve` | `["reserve", config]` | `FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa` | Liquid reserve BRS. Tracked by `brs_balance`. |
+| `pending_deposits` | `["pending_deposits", config]` | `FBtvP6z1mMPNjyHREDLzZGfEBD4bCcjGE3iW6BjRrFC9` | BRS escrowed by deposit requests. |
+| `pending_redemptions` | `["pending_redemptions", config]` | `7a5bjKC2rpQgqrPYD1vsrFaHc7JGz78EBfMknMtNT8i5` | Shares escrowed by redeem requests. |
+| `claims` | `["claims", config]` | `5Nch4AFcZs9k8TeVK4WfFjyWMHQiLnFx8YLoQsALNwBs` | BRS owed to holders on filled redemptions, waiting for `claim_assets`. |
+| `unsolicited` | `["unsolicited", config]` | `GWkRvroQsyDjyhN6DsUDid5LqR1omHKvATtanPz4r1JD` | Created at `initialize`. Holds untracked BRS, never counted in stable assets, NAV or coverage. The instructions that move money in and out of it (`skim`, `classify_unsolicited`, `book_unsolicited`, `return_unsolicited`) come with a later upgrade. |
+| Income inbox | ATA of (vault authority, token program, reserve mint) | `E9asDwtKTdqbrnrgKgXQuKX6WqFUpWF56SY9WM6vDWWH` | Where the issuer pays its monthly revenue share. Untracked until `sweep_income` books a statement. |
 
 The reserve's money is split across separate token accounts, so a freeze of one account does not trap every balance.
 
@@ -75,9 +75,9 @@ There is no per-holder account: the open-exit rule reads the owner's share balan
 | Operator (`VaultConfig.operator`) | Hot key | Set at deploy | Guarantees (register, close), guarantee fees, issuer income, claims (file, pay) and settlement records. Reinstating a guarantee and amending or re-filing a claim come with a later upgrade. `Pubkey::default()` when revoked. On devnet a keypair generated at deploy and used by hand from the operator console. Later a KMS-backed key in the MUTAV platform. |
 | Pauser (`VaultConfig.pauser`) | Separate key | Set at deploy | `pause` and `revoke_operator`, with no time lock. Generated at deploy. |
 | Guardians (`VaultConfig.guardians`) | Up to 3 keys, appointed by the admin in one step | Set at deploy | `pause` only in the pilot. Devnet starts with 1 guardian, a key separate from the pauser. With the first adapter upgrade, also the risk-reducing adapter actions of ADR 0027. |
-| Share mint authority | Vault authority PDA | `BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK` | Mints shares only in `claim_shares`. |
-| Share freeze authority | Vault authority PDA | `BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK` | Unused by v1. Kept so share-transfer restrictions stay possible without a new mint. |
-| Reserve token accounts owner | Vault authority PDA | `BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK` | Owns `reserve`, `pending_deposits`, `pending_redemptions`, `claims`, `unsolicited` and the income inbox. |
+| Share mint authority | Vault authority PDA | `AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu` | Mints shares only in `claim_shares`. |
+| Share freeze authority | Vault authority PDA | `AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu` | Unused by v1. Kept so share-transfer restrictions stay possible without a new mint. |
+| Reserve token accounts owner | Vault authority PDA | `AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu` | Owns `reserve`, `pending_deposits`, `pending_redemptions`, `claims`, `unsolicited` and the income inbox. |
 | BRS mint authority (issuer) | Account owned by the issuer's minting program | `7764rLMKF8fd4daejEESKBDPjE5EQBEQNgKCKNCpMwJv` | Owner program `9fBSeVHUCaHHUzkktiRp5Yn35emxx3S1ERzn7oHsi8je`. Read 2026-10-06 ([spec §12 Q34](../spec.md#12-open-questions)). |
 | BRS freeze authority (issuer) | Issuer wallet | `nora7ZTxmDrLdVheVazpsthHFB8u3JzgHeyh9foTZWC` | Can freeze any BRS token account, the reserve's included. Mainnet arrangements are open ([spec §12 Q34](../spec.md#12-open-questions), [open questions](../meta/open-questions.md#open-questions)). |
 | Treasury account | MUTAV BRS token account | Set at deploy | Receives MUTAV's take of each guarantee fee. Not owned by the operator, the capital wallet or the vault authority. |
