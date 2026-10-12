@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MUTAV Demo Storyboard</title>
+<style>
+/* Tokens lifted from mutav/web app/globals.css (fund dark = live mutav.finance). Print uses fund light. */
+:root{
+  --canvas:#0E0F11;--surface:#16181C;--surface-2:#1E2126;--surface-3:#252830;--border:#2A2D33;
+  --text:#F0F0EE;--text-2:#8A8F99;--text-3:#555B66;--accent:#E8A020;--accent-dim:#9E6A10;
+  --success:#3DAB72;--error:#C94040;
+  --grid:linear-gradient(to right,rgba(240,240,238,.03) 1px,transparent 1px),linear-gradient(to bottom,rgba(240,240,238,.03) 1px,transparent 1px);
+  --font-display:"Helvetica Neue","Arial Black",Arial,ui-sans-serif,system-ui,sans-serif;
+  --font-sans:"Inter","Helvetica Neue",Arial,ui-sans-serif,system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;border-radius:0}
+html{background:var(--canvas);color:var(--text);font-family:var(--font-sans);-webkit-font-smoothing:antialiased}
+body{margin:0;background-color:var(--canvas);background-image:var(--grid);background-size:24px 24px;line-height:1.55;font-size:15px}
+a{color:var(--accent)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.kicker{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-2);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.kicker::before{content:"";width:2px;height:12px;background:var(--accent);display:inline-block}
+h1,h2,h3{font-family:var(--font-display);font-weight:800;text-transform:uppercase;letter-spacing:-.01em;line-height:1.05;margin:0}
+h1{font-size:clamp(34px,6vw,68px);letter-spacing:-.03em}
+h2{font-size:clamp(24px,3.2vw,36px);margin-bottom:18px}
+h3{font-size:17px;letter-spacing:0}
+.amber{color:var(--accent)}
+.muted{color:var(--text-2)}
+.dim{color:var(--text-3)}
+section{padding:56px 0;border-bottom:1px solid var(--border)}
+.card{background:var(--surface);border:1px solid var(--border);padding:18px 20px;position:relative}
+.dots{position:absolute;top:12px;right:14px;display:flex;gap:4px}
+.dots i{width:5px;height:5px;background:var(--accent);display:block}
+.dots i:nth-child(2){opacity:.6}.dots i:nth-child(3){opacity:.3}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.stat{font-family:var(--font-mono);font-size:28px;color:var(--text);line-height:1.1}
+.stat small{font-size:12px;color:var(--text-2);display:block;margin-top:6px;font-family:var(--font-sans)}
+.pill{display:inline-block;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--border);padding:3px 8px;color:var(--text-2)}
+.pill.a{border-color:var(--accent);color:var(--accent)}
+.pill.r{border-color:var(--error);color:var(--error)}
+.pill.g{border-color:var(--success);color:var(--success)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-2);text-align:left;font-weight:500;border-bottom:1px solid var(--border);padding:8px 10px}
+td{border-bottom:1px solid var(--border);padding:9px 10px;vertical-align:top}
+.tablewrap{overflow-x:auto;border:1px solid var(--border);background:var(--surface)}
+ul.clean{margin:0;padding-left:18px}ul.clean li{margin:4px 0}
+ol.steps{margin:0;padding-left:22px}ol.steps li{margin:8px 0}
+.check{list-style:none;padding:0;margin:0}
+.check li{padding:8px 0 8px 28px;position:relative;border-bottom:1px solid var(--border)}
+.check li::before{content:"";position:absolute;left:0;top:11px;width:13px;height:13px;border:1px solid var(--accent)}
+.flag{border-left:3px solid var(--error);background:rgba(201,64,64,.07);padding:10px 14px;margin:10px 0}
+.note{border-left:3px solid var(--accent);background:rgba(232,160,32,.06);padding:10px 14px;margin:10px 0}
+
+/* Cover */
+.cover{padding:72px 0 56px}
+.cover .lede{font-size:clamp(16px,1.8vw,20px);color:var(--text-2);max-width:820px;margin:22px 0 30px}
+.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--border);background:var(--surface)}
+.meta div{padding:14px 16px;border-right:1px solid var(--border)}
+.meta div:last-child{border-right:0}
+.meta b{display:block;font-family:var(--font-mono);font-size:20px;font-weight:500;margin-top:4px}
+.wow{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.wow .card h3{margin:6px 0 8px;font-size:20px}
+
+/* Timeline */
+.tl{display:flex;width:100%;border:1px solid var(--border);background:var(--surface);margin-top:8px}
+.tl a{display:block;padding:10px 10px 12px;border-right:1px solid var(--border);text-decoration:none;color:var(--text);min-width:0}
+.tl a:last-child{border-right:0}
+.tl a.hot{background:linear-gradient(0deg,rgba(232,160,32,.14),rgba(232,160,32,.02));border-top:2px solid var(--accent)}
+.tl .t{font-family:var(--font-mono);font-size:10.5px;color:var(--accent)}
+.tl .n{font-weight:700;font-size:12.5px;display:block;margin-top:3px;line-height:1.25;overflow-wrap:anywhere}
+.tl .f{font-family:var(--font-mono);font-size:10px;color:var(--text-3);display:block;margin-top:4px}
+.scale{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--text-3);margin-top:6px}
+
+/* Frames */
+.frame{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px;padding:28px 0;border-top:1px solid var(--border)}
+.frame:first-of-type{border-top:0}
+.fhead{grid-column:1/-1;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.fno{font-family:var(--font-mono);font-size:13px;color:var(--canvas);background:var(--accent);padding:2px 8px;font-weight:600}
+.fhead h3{font-size:20px}
+.fhead .tc{font-family:var(--font-mono);font-size:13px;color:var(--text-2)}
+.fhead .route{font-family:var(--font-mono);font-size:12px;color:var(--accent);border:1px solid var(--accent-dim);padding:2px 7px}
+.fields dt{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-2);margin-top:12px;display:flex;align-items:center;gap:7px}
+.fields dt::before{content:"";width:2px;height:10px;background:var(--accent)}
+.fields dd{margin:4px 0 0;font-size:14px}
+.vo{font-size:16px;line-height:1.5;border-left:2px solid var(--accent);padding:4px 0 4px 12px;font-style:normal}
+.overlay{font-family:var(--font-mono);font-size:12.5px;background:var(--surface-2);border:1px solid var(--border);padding:6px 9px;display:inline-block}
+.opt{border:1px dashed var(--accent);padding:8px 10px;margin-top:8px;font-size:13.5px}
+.opt b{font-family:var(--font-mono);font-size:11px;color:var(--accent);letter-spacing:.06em}
+
+/* Wireframes (scale with their own width) */
+.wfbox{container-type:inline-size}
+.wf{position:relative;aspect-ratio:16/9;background:#0b0c0e;border:1px solid var(--border);overflow:hidden;font-size:1.55cqw;font-family:var(--font-sans);color:var(--text)}
+.wf-url{height:2.4em;display:flex;align-items:center;gap:.5em;padding:0 .8em;background:#141518;border-bottom:1px solid var(--border)}
+.wf-url i{width:.6em;height:.6em;background:var(--surface-3);border-radius:50%!important;display:block}
+.wf-url span{margin-left:.6em;flex:1;background:#1c1e22;padding:.2em .7em;font-family:var(--font-mono);font-size:.85em;color:var(--text-2);white-space:nowrap;overflow:hidden}
+.wf-url em{font-style:normal;font-family:var(--font-mono);font-size:.75em;border:1px solid var(--accent-dim);color:var(--accent);padding:.1em .5em}
+.wf-nav{height:2.3em;display:flex;align-items:center;gap:1.2em;padding:0 1em;border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:.82em;color:var(--text-2)}
+.wf-nav b{color:var(--text);font-family:var(--font-display);letter-spacing:.06em}
+.wf-nav .on{color:var(--accent)}
+.wf-nav .badge{margin-left:auto;border:1px solid var(--success);color:var(--success);padding:.1em .5em;font-size:.9em}
+.wf-body{padding:.9em 1.1em;display:flex;flex-direction:column;gap:.6em}
+.wf-title{font-family:var(--font-display);font-weight:800;font-size:1.6em;text-transform:uppercase}
+.wf-tabs{display:flex;gap:.3em;flex-wrap:wrap}
+.wf-tabs span{font-family:var(--font-mono);font-size:.75em;border:1px solid var(--border);padding:.2em .5em;color:var(--text-2)}
+.wf-tabs span.on{border-color:var(--accent);color:var(--text);background:var(--surface-2)}
+.wf-bound{border:1px dashed #3a3e46;padding:.45em .6em;font-size:.78em;color:var(--text-2)}
+.wf-bound .k{display:flex;justify-content:space-between;font-family:var(--font-mono);color:var(--text)}
+.wf-fields{display:grid;grid-template-columns:repeat(5,1fr);gap:.5em}
+.wf-field{font-size:.72em;color:var(--text-2)}
+.wf-field div{margin-top:.25em;border:1px solid var(--border);background:var(--surface);padding:.3em .45em;font-family:var(--font-mono);color:var(--text);font-size:1.15em;white-space:nowrap;overflow:hidden}
+.wf-prev{border:1px solid var(--success);background:var(--surface);padding:.45em .6em;font-size:.78em}
+.wf-prev.bad{border-color:var(--error)}
+.wf-prev .h{font-family:var(--font-display);font-weight:700;color:var(--success);margin-bottom:.2em}
+.wf-prev.bad .h{color:var(--error)}
+.wf-prev .k{display:flex;justify-content:space-between;font-family:var(--font-mono)}
+.wf-btn{display:inline-block;background:var(--accent);color:var(--canvas);font-weight:700;font-size:.85em;padding:.4em .8em;font-family:var(--font-mono)}
+.wf-btn.out{background:transparent;color:var(--text);border:1px solid var(--text-2)}
+.wf-status{font-family:var(--font-mono);font-size:.8em;display:flex;gap:.6em;align-items:center}
+.wf-status .sq{width:.5em;height:.5em;background:var(--success);display:inline-block}
+.wf-status.bad{color:var(--error)}.wf-status.bad .sq{background:var(--error)}
+.wf-table{width:100%;border-collapse:collapse;font-size:.75em}
+.wf-table th,.wf-table td{border-bottom:1px solid var(--border);padding:.25em .4em;font-size:1em}
+.wf-table th{font-size:.85em}
+.up{color:var(--success)}.down{color:#d08a3a}
+.wf-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:.4em}
+.wf-metric{border:1px solid var(--border);background:var(--surface);padding:.4em .5em;font-size:.7em;color:var(--text-2);text-transform:uppercase;letter-spacing:.04em}
+.wf-metric b{display:block;font-family:var(--font-mono);font-size:1.6em;color:var(--text);text-transform:none;letter-spacing:0;margin-top:.15em;font-weight:500}
+.wf-bar{height:1.1em;background:var(--surface-2);position:relative;border:1px solid var(--border)}
+.wf-bar span{position:absolute;left:0;top:0;bottom:0;background:var(--accent-dim)}
+.wf-bar em{position:absolute;top:-.3em;bottom:-.3em;width:2px;background:var(--text)}
+.hl{outline:.18em dashed var(--accent);outline-offset:.2em;position:relative}
+.hl.r{outline-color:var(--error)}
+.tag{position:absolute;top:-1.5em;right:0;font-family:var(--font-mono);font-size:.7em;background:var(--accent);color:var(--canvas);padding:.05em .45em;font-weight:700;white-space:nowrap;z-index:2}
+.hl.r .tag{background:var(--error);color:#fff}
+.mk{position:absolute;width:1.6em;height:1.6em;border-radius:50%!important;background:var(--accent);color:var(--canvas);font-family:var(--font-mono);font-weight:700;font-size:.85em;display:flex;align-items:center;justify-content:center;z-index:3;box-shadow:0 0 0 .25em rgba(232,160,32,.25)}
+.wf-wallet{position:absolute;right:1.2em;top:3.2em;width:24%;background:#1d1a2b;border:1px solid #4b3f8a;padding:.6em;font-size:.72em;color:#cfc8f5}
+.wf-wallet b{display:block;color:#fff;margin-bottom:.3em}
+.wf-wallet .x{margin-top:.5em;display:flex;gap:.4em}.wf-wallet .x span{flex:1;text-align:center;padding:.25em;border:1px solid #4b3f8a}.wf-wallet .x span.p{background:#ab9ff2;color:#1d1a2b}
+.wf-cap{position:absolute;left:0;right:0;bottom:0;padding:.5em 1em;background:linear-gradient(0deg,rgba(0,0,0,.85),rgba(0,0,0,0));font-family:var(--font-mono);font-size:.85em;color:var(--text)}
+.wf-card{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:0 7%;background-color:var(--canvas);background-image:var(--grid);background-size:1.6em 1.6em}
+.wf-card .k{font-family:var(--font-mono);font-size:.85em;letter-spacing:.1em;color:var(--text-2);text-transform:uppercase;display:flex;gap:.5em;align-items:center}
+.wf-card .k::before{content:"";width:.15em;height:1em;background:var(--accent)}
+.wf-card .h{font-family:var(--font-display);font-weight:800;font-size:3.6em;line-height:1;text-transform:uppercase;letter-spacing:-.02em;margin:.25em 0}
+.wf-card .s{font-size:1.2em;color:var(--text-2)}
+.wf-split{display:grid;grid-template-columns:1fr 1fr;gap:.8em}
+.wf-ex{background:#f4f4f2;color:#222;border-color:#ccc}
+.wf-ex .wf-url{background:#e6e6e3;border-color:#ccc}.wf-ex .wf-url span{background:#fff;color:#555}
+.wf-ex .exbox{border:1px solid #ccc;background:#fff;padding:.5em .6em;font-size:.78em}
+.wf-ex .exbox .k{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:.2em 0;font-family:var(--font-mono)}
+.wf-ex .exh{font-weight:700;font-size:1.1em;padding:.2em 0}
+
+/* Script */
+.script p{font-size:17px;line-height:1.65;margin:0 0 12px;max-width:860px}
+.script .tc{font-family:var(--font-mono);font-size:11px;color:var(--accent);display:block;margin-bottom:2px}
+.script .alt{color:var(--text-2);border-left:2px dashed var(--accent);padding-left:12px}
+
+/* Phone */
+@media (max-width:860px){
+  .frame{grid-template-columns:1fr}
+  .grid2,.grid3,.wow{grid-template-columns:1fr}
+  .meta{grid-template-columns:1fr 1fr}
+  .meta div:nth-child(2){border-right:0}
+  .meta div:nth-child(-n+2){border-bottom:1px solid var(--border)}
+  .tl{flex-direction:column}
+  .tl a{width:100%!important;border-right:0;border-bottom:1px solid var(--border)}
+  .scale{display:none}
+  body{font-size:14.5px}
+}
+
+/* Print: light tokens, one frame per page */
+@media print{
+  :root{--canvas:#FFFFFF;--surface:#FFFFFF;--surface-2:#F1F0EC;--surface-3:#E7E5E0;--border:#D9D7D2;--text:#1A1A1A;--text-2:#555B66;--text-3:#8A8F99;--accent:#B87A0E;--accent-dim:#E8C47A;--grid:none;color-scheme:light}
+  @page{size:A4 landscape;margin:11mm}
+  body{background:#fff;font-size:12.5px}
+  section{padding:0 0 14px;border:0;break-before:page}
+  section.cover{break-before:auto}
+  .frame{break-before:page;break-inside:avoid;padding-top:0;border:0}
+  .frame:first-of-type{break-before:auto}
+  #frames > h2, #frames > .kicker{break-after:avoid}
+  .wf{background:#fafafa;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .wf-card{background-image:none}
+  .fno,.mk,.tag,.wf-btn,.wf-wallet{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tablewrap{overflow:visible}
+  tr{break-inside:avoid}
+  a{color:inherit;text-decoration:none}
+  .noprint{display:none}
+}
+
+.wf-nav .meter{margin-left:auto;font-family:var(--font-mono);font-size:.85em;border:1px solid var(--accent-dim);color:var(--accent);padding:.1em .5em}
+.wf-nav .meter + .badge{margin-left:.6em}
+/*badge now from the #59 banner*/.wf-nav::after{content:none;font-family:var(--font-mono);font-size:.85em;border:1px solid var(--accent);color:var(--accent);padding:.1em .5em;margin-left:.6em}
+.mm{position:absolute;right:.8em;bottom:2.6em;display:flex;flex-wrap:wrap;align-items:center;gap:.25em;max-width:46%;justify-content:flex-end;font-family:var(--font-mono);font-size:.62em;background:rgba(14,15,17,.88);border:1px solid var(--border);padding:.35em .45em;z-index:4}
+.mm i{font-style:normal;color:var(--text-3)}
+.mm-n{border:1px solid var(--border);padding:.1em .35em;color:var(--text-3)}
+.mm-n.built{border-color:var(--accent-dim)}.mm-n.sim{border-style:dashed}.mm-n.pre{border-color:var(--text-3)}
+.mm-n.act{background:var(--accent);color:var(--canvas);border-color:var(--accent)}
+.mm-lg{flex-basis:100%;display:flex;flex-wrap:wrap;gap:.6em;margin-top:.3em;color:var(--text-2)}
+.mm-lg span::before{content:"■ "}.mm-lg .built::before{color:var(--accent)}.mm-lg .pre::before{color:var(--text-3)}.mm-lg .sim::before{color:var(--error)}.mm-lg .nxt::before{color:var(--success)}
+@media print{.mm{background:#fff}}
+.wf-banner{background:var(--accent);color:var(--canvas);font-family:var(--font-mono);font-size:.7em;font-weight:700;padding:.2em .8em;letter-spacing:.04em}
+.wf-timer{position:absolute;right:.8em;top:5.4em;font-family:var(--font-mono);font-size:1.1em;background:rgba(14,15,17,.9);border:1px solid var(--accent);color:var(--accent);padding:.2em .6em;z-index:4}
+.wf-lt{font-family:var(--font-display);font-weight:800;text-transform:uppercase;font-size:.95em;border-left:.25em solid var(--accent);padding:.1em .5em;background:rgba(232,160,32,.12);align-self:flex-start}
+.kind{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;padding:2px 7px;border:1px solid var(--border);color:var(--text-2)}
+.kind.MAIN{border-color:var(--accent);color:var(--accent)}.kind.FLASH{border-style:dashed}
+.pillar{font-family:var(--font-mono);font-size:11px;color:var(--text-3)}
+.ph{color:var(--error);font-weight:700}
+</style>
+</head>
+<body>
+<section class="cover">
+ <div class="wrap">
+  <p class="kicker">MUTAV · Colosseum Crypto World's Fair · Product demo storyboard · v6</p>
+  <h1>Three pillars, <span class="amber">one lease</span>.</h1>
+  <p class="lede">A hybrid cut. The cold open, the agency flash and chapters 1–2 run live on Solana devnet (reserve.mutav.finance): Ana's lease goes on-chain, the next one is refused, her missed rent is claimed and settled in one take. Chapter 3 switches to a local simulation on an accelerated clock: six months of fees, issuer revenue, a large claim approved by the admin, more cover, each share worth more and a withdrawal above its deposit. The app banner labels each environment.</p>
+  <div class="meta">
+   <div><span class="kicker">Runtime</span><b>2:15</b></div>
+   <div><span class="kicker">Voiceover</span><b>216 words</b></div>
+   <div><span class="kicker">Live clicks</span><b>5</b></div>
+   <div><span class="kicker">Deadline</span><b>Oct 12 · 23:59 BRT</b></div>
+  </div>
+  <div class="wow">
+   <div class="card"><div class="dots"><i></i><i></i><i></i></div><p class="kicker">Pillar 1 · 0:37</p><h3>The <span class="amber">refusal</span></h3><p class="muted" style="margin:0">One more lease needs R$45,000; the reserve holds R$44,000. Refused, nothing moves, 3 s of silence.</p></div>
+   <div class="card"><div class="dots"><i></i><i></i><i></i></div><p class="kicker">Pillar 2 · 0:58</p><h3>Settled <span class="amber">in minutes</span></h3><p class="muted" style="margin:0">The claim runs live: file, pay, settle, with an elapsed timer from filed to settled.</p></div>
+  </div>
+  <p class="dim mono" style="font-size:12px;margin-top:22px">Recorded on Solana devnet · numbers checked against ADR 0028 (c = 0.25) · Ana, agency names and lease references are fictional · Companion: script.md</p>
+ </div>
+</section>
+
+<section id="timeline">
+ <div class="wrap">
+  <p class="kicker">Structure</p>
+  <h2>Three chapters, <span class="amber">2:15</span></h2>
+  <div class="tl" role="list"><a role="listitem" class="" href="#f1" style="width:7.4%"><span class="t">0:00</span><span class="n">Cold open</span><span class="f">10 s</span></a><a role="listitem" class="" href="#f2" style="width:3.7%"><span class="t">0:10</span><span class="n">Agency</span><span class="f">5 s</span></a><a role="listitem" class="hot" href="#f3" style="width:31.9%"><span class="t">0:15</span><span class="n">1 · Programmable, transparent reserve</span><span class="f">43 s</span></a><a role="listitem" class="hot" href="#f7" style="width:28.1%"><span class="t">0:58</span><span class="n">2 · Settled in minutes</span><span class="f">38 s</span></a><a role="listitem" class="hot" href="#f9" style="width:21.9%"><span class="t">1:36</span><span class="n">3 · Capital efficiency (local simulation)</span><span class="f">29.5 s</span></a><a role="listitem" class="" href="#f14" style="width:7.0%"><span class="t">2:05.5</span><span class="n">Close</span><span class="f">9.5 s</span></a></div>
+  <div class="scale"><span>0:00</span><span>0:30</span><span>1:00</span><span>1:30</span><span>2:00</span><span>2:15</span></div>
+  <p class="muted" style="margin-top:18px;max-width:860px"><b>Environments:</b> devnet live for the cold open, the agency flash and chapters 1–2, under the app's "Pilot demo · Solana devnet" banner; a local simulation on an accelerated clock for chapter 3, under the banner "Local simulation · accelerated clock" (PR #72, <span class="mono">NEXT_PUBLIC_ACCELERATED_CLOCK=1</span>), introduced by a 1.5 s transition card. No corner badges. <b>Pacing:</b> each chapter opens with a 2 s lower-third title over the action. MAIN actions run at real speed with one zoom and a 1.5–3 s hold; FLASH shots are ≤ 2–3 s with hard cuts; END STATES are staged off camera and only the result is shown. The #59 banner ("Pilot demo · Solana devnet · Not open to public investment") is the persistent badge and disclaimer; at most one more honesty label per shot. Edit overlays: chapter titles, the elapsed timer, the coverage meter, the "Coverage gate · refused" chip, the cards. Music drops out for the refusal hold.</p>
+ </div>
+</section>
+
+<section id="numbers">
+ <div class="wrap">
+  <p class="kicker">The numbers</p>
+  <h2>Devnet chapters, and the <span class="amber">simulation</span></h2>
+  <p class="muted" style="max-width:900px">Chapters 1–2 run on the staged devnet reserve (program GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, c = 0.25). Only R$2,000 of the R$20,000 per-31-day claim window is left (an earlier R$18,000 test claim), so the claim is one take.</p>
+  <div class="tablewrap"><table class="num"><tr><th>Step</th><th>Action</th><th>Stable assets</th><th>Coverage required</th><th>Free capital</th><th>Value per share</th><th>Check</th></tr><tr><td>0</td><td>Staged devnet reserve (earlier test claims): R$44,000 held, 73,333.33 shares at 0.600000</td><td>R$44,000</td><td>—</td><td>—</td><td>0.600000</td><td>TVL ≪ R$1M</td></tr><tr><td>1</td><td>Book: 8 leases MTV-PF-0001…0008, R$18,000 cover each = R$144,000</td><td>R$44,000</td><td>R$36,000</td><td>R$8,000</td><td>0.600000</td><td>R$18k ≤ R$120k per guarantee</td></tr><tr><td>2</td><td><b>Ana</b> MTV-PF-0100: + R$18,000 cover (operator)</td><td>R$44,000</td><td>R$40,500</td><td>R$3,500</td><td>0.600000</td><td>fits: needs R$4,500 of R$8,000</td></tr><tr><td>3</td><td><b>Next equal lease</b> MTV-PF-0101: would need R$45,000</td><td>R$44,000</td><td>R$40,500</td><td>R$3,500</td><td>0.600000</td><td>refused: R$1,000 short; nothing changes</td></tr><tr><td>4</td><td>file_claim R$1,500 on Ana, default leg</td><td>R$44,000</td><td>R$40,500</td><td>R$3,500</td><td>0.579545</td><td>set aside; required = max(25% × cover, provisions)</td></tr><tr><td>5</td><td>pay_claim R$1,500 (one devnet take)</td><td>R$42,500</td><td>R$40,125</td><td>R$2,375</td><td>0.579545</td><td>still covered; ≤ R$15k/call; uses R$1,500 of the R$2,000 left in the period</td></tr><tr><td>5-alt</td><td>Retake only: pay_claim R$500</td><td>R$43,500</td><td>R$40,375</td><td>R$3,125</td><td>0.586364</td><td>still covered; fits the R$500 left after a failed take</td></tr></table></div>
+  <h3 style="margin:24px 0 12px">Chapter 3 · local simulation (placeholders until the localnet run)</h3>
+  <div class="tablewrap"><table class="num"><tr><th>Item</th><th>Value</th></tr><tr><td>Months</td><td>1 → 6 (simulated, accelerated clock, mock BRS mint)</td></tr><tr><td>Stable assets</td><td>R$<span class=ph>[X]</span> → R$<span class=ph>[X]</span></td></tr><tr><td>Guarantee fees to the reserve (net of the 20% take)</td><td>R$<span class=ph>[X]</span></td></tr><tr><td>Issuer revenue swept</td><td>R$<span class=ph>[X]</span></td></tr><tr><td>Large claim (above R$15k, admin approve_claim)</td><td>R$<span class=ph>[X]</span>, month <span class=ph>[X]</span></td></tr><tr><td>Coverage ceiling ("can back up to")</td><td>R$<span class=ph>[X]</span> → R$<span class=ph>[X]</span></td></tr><tr><td>Value per share</td><td><span class=ph>[X]</span> → <span class=ph>[X]</span></td></tr><tr><td>Capital provider withdrawal</td><td>R$<span class=ph>[X]</span> in → R$<span class=ph>[X]</span> out</td></tr></table></div>
+  <div class="flag"><b>[X] = to fill from the localnet build.</b> Every [X] in captions, cards and the shot list comes from this table once the simulation has run. The /simulator projections are not in the video.</div>
+ </div>
+</section>
+
+<section id="frames">
+ <div class="wrap">
+  <p class="kicker">Storyboard</p>
+  <h2>Shot by <span class="amber">shot</span></h2>
+  <p class="muted" style="max-width:860px">Wireframes sketch the restyled app (PR #45 routes), not screenshots. Amber dashed boxes mark what to zoom or click. Each frame's Retake note says what a redo consumes on-chain.</p>
+  <article class="frame" id="f1">
+   <div class="fhead"><span class="fno">F1</span><span class="kind END">END STATE</span><h3>Cold open: Ana needs a guarantor</h3><span class="pillar">Open</span><span class="tc">0:00 – 0:10 · 10 s</span><span class="route">/reserve (Overview)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">PILOT DEMO · SOLANA DEVNET — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Capital</span><span class="">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$36,000 / HELD R$44,000</span></div><div class="wf-body"><div class="wf-tabs"><span class="on">Overview</span><span class="">Coverage</span><span class="">Claims</span><span class="">Capital</span><span class="">Risks</span><span class="">Verify</span></div><div class="wf-metrics"><div class="wf-metric">Stable assets<b>R$44,000</b></div><div class="wf-metric">Coverage required<b>R$36,000</b></div><div class="wf-metric">Free capital<b>R$8,000</b></div><div class="wf-metric">Active guarantees<b>8</b></div></div></div><div class="wf-cap">Built during the hackathon: Solana program + reserve app</div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>Product on screen from frame 1: the public reserve Overview after staging (R$44,000 held, R$36,000 required, 8 leases). No wallet. The #59 banner is visible.</dd>
+    <dt>VO</dt><dd class="vo">"Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and its reserve runs on Solana."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Built during the hackathon: Solana program + reserve app</span></dd>
+    <dt>Honesty label</dt><dd>Built during the hackathon: Solana program + reserve app</dd>
+    <dt>On-chain proof</dt><dd>Live figures read from the devnet program accounts.</dd>
+    <dt>Edit</dt><dd>Slow push-in ≤ 1.3× (motion). No title card before it.</dd>
+    <dt>Retake</dt><dd>Read-only: repeat freely.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f2">
+   <div class="fhead"><span class="fno">F2</span><span class="kind FLASH">FLASH</span><h3>Agency</h3><span class="pillar">Open</span><span class="tc">0:10 – 0:15 · 5 s</span><span class="route">app.mutav.finance (agency view)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>app.mutav.finance/agency</span></div><div class="wf-body"><div class="wf-title" style="font-size:1.2em">Contratos</div><table class="wf-table"><tr><th>Inquilino</th><th>Imóvel</th><th>Aluguel</th><th>Garantia</th></tr><tr><td>Ana (fictional)</td><td>Passo Fundo · RS</td><td class="mono">R$1.500</td><td><span class="pill">MUTAV</span></td></tr><tr><td>…</td><td>…</td><td class="mono">…</td><td>…</td></tr></table></div><div class="wf-cap">Agency platform · pre-hackathon · not on-chain yet</div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>Ana's fictional lease in the agency platform (mutav-app). Hard cuts in and out.</dd>
+    <dt>VO</dt><dd class="vo">"Her agency works in MUTAV's platform; every lease becomes an account on-chain."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Agency platform · pre-hackathon · not on-chain yet</span></dd>
+    <dt>Honesty label</dt><dd>Agency platform · pre-hackathon · not on-chain yet</dd>
+    <dt>On-chain proof</dt><dd>None: off-chain, labelled as such.</dd>
+    <dt>Edit</dt><dd>Flash: hard cuts, no zoom.</dd>
+    <dt>Retake</dt><dd>Read-only: repeat freely.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f3">
+   <div class="fhead"><span class="fno">F3</span><span class="kind MAIN">MAIN</span><h3>Ana's lease goes on-chain</h3><span class="pillar">1 · Programmable, transparent reserve</span><span class="tc">0:15 – 0:25 · 10 s</span><span class="route">/operator · register_guarantee</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">PILOT DEMO · SOLANA DEVNET — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="">Capital</span><span class="on">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$36,000 / HELD R$44,000</span></div><div class="wf-body"><div class="wf-lt">1 · Programmable, transparent reserve</div><div class="wf-tabs"><span class="on">register_guarantee</span><span class="">contribute_fees</span><span class="">sweep_income</span><span class="">file_claim</span><span class="">pay_claim</span><span class="">settle_payout</span><span class="">close_guarantee</span></div><div class="wf-fields hl"><span class="tag">JUMP-CUT TYPING</span><div class="wf-field">Lease reference<div>MTV-PF-0100</div></div><div class="wf-field">Agency<div>Imobiliária Planalto</div></div><div class="wf-field">Monthly rent<div>1500</div></div><div class="wf-field">Default cover (× rent)<div>6 · R$9,000</div></div><div class="wf-field">Exit cover (× rent)<div>6 · R$9,000</div></div></div><div class="wf-prev"><div class="h">PREVIEW · Fits</div><div class="k"><span>New cover</span><span>R$18,000</span></div><div class="k"><span>Coverage required after</span><span>R$40,500 (25%)</span></div></div><div class="wf-status hl"><span class="tag">STATUS CHIP · OVERLAY</span><span class="sq"></span><span class="up">Signed by operator</span><span style="color:var(--accent)">4kQm…x9Tz ↗</span></div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>Chapter title (lower third, 2 s). Register tab: opaque reference MTV-PF-0100, rent 1500, 6× + 6×; green preview; click register_guarantee; "Confirmed" chip with the short signature. Hold 1.5 s.</dd>
+    <dt>VO</dt><dd class="vo">"Our operator puts Ana's lease on-chain: eighteen thousand reais of cover, an opaque ID, no personal data."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Rent R$1,500 · cover 6× + 6× = R$18,000</span></dd>
+    <dt>Honesty label</dt><dd>none (banner only)</dd>
+    <dt>On-chain proof</dt><dd>A confirmed devnet transaction.</dd>
+    <dt>Edit</dt><dd>Main action at real speed; typing jump-cut; one zoom on the chip; cut before the form resets.</dd>
+    <dt>Retake</dt><dd>Consumes R$4,500 of free capital and the reference. Reset: close_guarantee VOID, then register as MTV-PF-0100b (the VOID lease stays visible as "closed").</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f4">
+   <div class="fhead"><span class="fno">F4</span><span class="kind FLASH">FLASH</span><h3>Explorer: one account per lease</h3><span class="pillar">1 · Programmable, transparent reserve</span><span class="tc">0:25 – 0:27 · 2 s</span><span class="route">Solana Explorer (devnet)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-url"><i></i><i></i><i></i><span>explorer.solana.com/address/7Gq…?cluster=devnet</span><em>DEVNET</em></div><div class="wf-body"><div class="wf-bound hl"><span class="tag">FLASH 2 s</span><div class="k"><span>Account</span><span>Guarantee PDA · 7Gq3…Lw2N</span></div><div class="k"><span>Owner</span><span>MUTAV program 8scC…Qqv9</span></div><div class="k"><span>id</span><span>0x5e1f…a9c3 (hash, no name)</span></div><div class="k"><span>default / exit cover</span><span>9,000 / 9,000</span></div></div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>The new Guarantee PDA on Explorer: owner, opaque id, cover legs. Captured as an end state; check it on devnet.</dd>
+    <dt>VO</dt><dd class="vo"><span class="dim">(the F3 line continues over this flash)</span></dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Guarantee PDA · owner: MUTAV program</span></dd>
+    <dt>Honesty label</dt><dd>none (banner only)</dd>
+    <dt>On-chain proof</dt><dd>The one Explorer shot.</dd>
+    <dt>Edit</dt><dd>Flash ≤ 2 s, hard cuts.</dd>
+    <dt>Retake</dt><dd>Read-only: repeat freely.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f5">
+   <div class="fhead"><span class="fno">F5</span><span class="kind END">END STATE</span><h3>Anyone can watch the reserve</h3><span class="pillar">1 · Programmable, transparent reserve</span><span class="tc">0:27 – 0:37 · 10 s</span><span class="route">/reserve/coverage</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">PILOT DEMO · SOLANA DEVNET — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve/coverage</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Capital</span><span class="">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,500 / HELD R$44,000</span></div><div class="wf-body"><div class="wf-tabs"><span class="">Overview</span><span class="on">Coverage</span><span class="">Claims</span><span class="">Capital</span><span class="">Risks</span><span class="">Verify</span></div><div class="hl"><span class="tag">ZOOM</span><div class="wf-metrics"><div class="wf-metric">Stable assets (BRS)<b>R$44,000</b></div><div class="wf-metric">Coverage required<b>R$36,000 → R$40,500</b></div><div class="wf-metric">Free capital<b>R$3,500</b></div><div class="wf-metric">Active guarantees<b>9</b></div></div></div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>/reserve/coverage with no wallet: held vs required, R$36,000 → R$40,500 (zoom). Ana's row at the bottom.</dd>
+    <dt>VO</dt><dd class="vo">"Anyone can watch the reserve: what it holds in BRS, Nora's Brazilian real stablecoin, and what it must hold. The rule is code."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Held R$44,000 · required R$36,000 → R$40,500</span></dd>
+    <dt>Honesty label</dt><dd>none (banner only)</dd>
+    <dt>On-chain proof</dt><dd>The same state read independently by a public page.</dd>
+    <dt>Edit</dt><dd>One zoom on held vs required.</dd>
+    <dt>Retake</dt><dd>Read-only: repeat freely.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f6">
+   <div class="fhead"><span class="fno">F6</span><span class="kind MAIN">MAIN</span><h3>The refusal</h3><span class="pillar">1 · Programmable, transparent reserve</span><span class="tc">0:37 – 0:58 · 21 s</span><span class="route">/operator · register_guarantee</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">PILOT DEMO · SOLANA DEVNET — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="">Capital</span><span class="on">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,500 / HELD R$44,000</span></div><div class="wf-body"><div class="wf-prev bad hl r"><span class="tag">RED PREVIEW</span><div class="h">PREVIEW · Would be refused</div><div class="k"><span>Coverage required after</span><span>R$45,000 (25%)</span></div><div class="k"><span>Stable assets</span><span>R$44,000</span></div><div class="k"><span>Headroom after</span><span style="color:var(--error)">R$1,000 short</span></div></div><span class="wf-btn out">Send anyway</span><div class="wf-status bad hl r"><span class="tag">HOLD 3 s · SILENCE</span><span class="sq"></span><span>Refused: not enough free capital for this cover</span></div><div class="pill r" style="align-self:flex-start;font-size:1em">COVERAGE GATE · REFUSED</div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>Next reference MTV-PF-0101, same amounts: red preview (R$45,000 needed, R$44,000 held). Click send: the clean refusal message, the "Coverage gate · refused" overlay; the meter does not move. 3 s of silence.</dd>
+    <dt>VO</dt><dd class="vo">"One more lease would need forty-five thousand; the reserve holds forty-four. <span class="dim mono" style="font-size:12px">[click]</span> Refused. MUTAV can't promise what its reserve can't back."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Needs R$45,000 · holds R$44,000 · refused</span></dd>
+    <dt>Honesty label</dt><dd>none (banner only)</dd>
+    <dt>On-chain proof</dt><dd>The program's own error (InsufficientFreeCapital, raw details collapsed). No Explorer link: a refused transaction never lands.</dd>
+    <dt>Edit</dt><dd>Main action. Zoom on the preview, then the refusal; music out; 3 s silence on the unchanged meter.</dd>
+    <dt>Retake</dt><dd>Repeatable without limit: nothing lands.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f7">
+   <div class="fhead"><span class="fno">F7</span><span class="kind MAIN">MAIN</span><h3>The claim, live</h3><span class="pillar">2 · Settled in minutes</span><span class="tc">0:58 – 1:20 · 22 s</span><span class="route">/operator · file_claim → pay_claim → settle_payout</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">PILOT DEMO · SOLANA DEVNET — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/operator</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="">Capital</span><span class="on">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,125 / HELD R$42,500</span></div><div class="wf-body"><div class="wf-lt">2 · Settled in minutes</div><div class="wf-tabs"><span class="">register_guarantee</span><span class="">contribute_fees</span><span class="">sweep_income</span><span class="">file_claim</span><span class="">pay_claim</span><span class="on">settle_payout</span><span class="">close_guarantee</span></div><div class="wf-bound hl"><span class="tag">ZOOM ON THE CAP</span><div class="k"><span>pay_claim · max per call</span><span>R$15,000</span></div><div class="k"><span>Claim</span><span>R$1,500 · Ana · default leg</span></div></div><div class="wf-status hl"><span class="tag">STATUS CHIP · OVERLAY</span><span class="sq"></span><span class="up">Signed by operator</span><span style="color:var(--accent)">2bVx…k1Qe ↗</span></div></div><div class="wf-timer">⏱ FILED → [elapsed]</div><div class="wf-cap">PIX transfer simulated on devnet · settlement recorded on-chain</div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>"Later" wipe and chapter title. Live: file_claim (R$1,500, NTC-PF-0001) → pay_claim (zoom on the R$15,000 cap) → settle_payout; each click 2–3 s, the elapsed timer running from "filed".</dd>
+    <dt>VO</dt><dd class="vo">"Now say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the agency is recorded on-chain."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Claim R$1,500 · cap R$15,000 per call</span></dd>
+    <dt>Honesty label</dt><dd>PIX transfer simulated on devnet · settlement recorded on-chain</dd>
+    <dt>On-chain proof</dt><dd>Three confirmed transactions on one ClaimFiling PDA.</dd>
+    <dt>Edit</dt><dd>Timer overlay driven by the logged on-chain timestamps (it jumps honestly across cuts). Cut confirmation waits.</dd>
+    <dt>Retake</dt><dd>One devnet take. The claim window has R$2,000 of room (an earlier R$18,000 test claim uses R$18,000 of the R$20,000 per 31 days), so rehearse on localnet first, then take it once with R$1,500. A retake uses a smaller claim (≤ R$500, e.g. part of a month's rent) with the alternate VO "Now say Ana falls behind on part of a month's rent." and caption "Claim R$500 · cap R$15,000 per call". If only the capture was bad, re-capture the screens, not the claim.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f8">
+   <div class="fhead"><span class="fno">F8</span><span class="kind END">END STATE</span><h3>Filed → paid → settled</h3><span class="pillar">2 · Settled in minutes</span><span class="tc">1:20 – 1:36 · 16 s</span><span class="route">/reserve/claims</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">PILOT DEMO · SOLANA DEVNET — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>reserve.mutav.finance/reserve/claims</span><em>DEVNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Capital</span><span class="">Operator</span><span class="">Admin</span><span class="meter">REQUIRED R$40,125 / HELD R$42,500</span></div><div class="wf-body"><div class="wf-tabs"><span class="">Overview</span><span class="">Coverage</span><span class="on">Claims</span><span class="">Capital</span><span class="">Risks</span><span class="">Verify</span></div><div class="hl"><span class="tag">HOLD 3 s</span><table class="wf-table"><tr><th>Guarantee</th><th>Amount</th><th>Filed</th><th>Paid</th><th>Settled</th><th>Filed→settled</th></tr><tr><td class="mono" style="color:var(--accent)">5e1f…</td><td class="mono">R$1,500</td><td class="mono">hh:mm:ss</td><td class="mono">hh:mm:ss</td><td class="mono">hh:mm:ss</td><td class="mono up">[N]</td></tr></table></div></div><div class="wf-timer">⏱ FILED → SETTLED · [N]</div><div class="wf-cap">PIX transfer simulated on devnet · settlement recorded on-chain</div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>/reserve/claims: filed → paid → settled with on-chain timestamps; the timer stops at settled. Hold 3 s. Still covered: R$42,500 held, R$40,125 required. The public timeline also shows an earlier R$18,000 test claim: fine to be visible on a disclaimed demo reserve. Frame the shot so Ana's row is the highlighted one.</dd>
+    <dt>VO</dt><dd class="vo">"On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Filed → settled on-chain: [N] s · seguro-fiança: 30 days</span></dd>
+    <dt>Honesty label</dt><dd>PIX transfer simulated on devnet · settlement recorded on-chain</dd>
+    <dt>On-chain proof</dt><dd>Timestamps from the ClaimFiling PDA. [N] = settled_at − filed_at, from the real on-chain timestamps; the unit is "seconds" if under 2 minutes, "minutes" otherwise. Do not claim real-world claims settle in seconds: the operator checks each claim first.</dd>
+    <dt>Edit</dt><dd>SUSEP Circ. 621/2021 art. 43 goes in the video description.</dd>
+    <dt>Retake</dt><dd>Read-only: repeat freely.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f9">
+   <div class="fhead"><span class="fno">F9</span><span class="kind FLASH">FLASH</span><h3>Switch: six months, simulated</h3><span class="pillar">3 · Capital efficiency</span><span class="tc">1:36 – 1:37.5 · 1.5 s</span><span class="route">transition card (edit)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-card"><div class="k">Environment switch</div><div class="h" style="font-size:2.4em">Six months, simulated locally on an <span class="amber">accelerated clock</span></div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>A 1.5 s card marks the switch from devnet to the local simulation. From here the corner badge reads "Local simulation · accelerated clock".</dd>
+    <dt>VO</dt><dd class="vo"><span class="dim">(no voiceover: the card carries the switch)</span></dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Six months, simulated locally on an accelerated clock</span></dd>
+    <dt>Honesty label</dt><dd>none (banner only)</dd>
+    <dt>On-chain proof</dt><dd>None: a card.</dd>
+    <dt>Edit</dt><dd>Hard cut in; the chapter 3 lower third starts on the next shot.</dd>
+    <dt>Retake</dt><dd>Made in the editor.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f10">
+   <div class="fhead"><span class="fno">F10</span><span class="kind END">END STATE</span><h3>Six months of fees and issuer revenue</h3><span class="pillar">3 · Capital efficiency</span><span class="tc">1:37.5 – 1:46.5 · 9 s</span><span class="route">/reserve (history) → /reserve/capital (localnet)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">LOCAL SIMULATION · ACCELERATED CLOCK — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>localhost/reserve</span><em>LOCALNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Investment</span><span class="">Operator</span><span class="">Admin</span></div><div class="wf-body"><div class="wf-lt">3 · Capital efficiency</div><div class="wf-tabs"><span class="on">Overview</span><span class="">Coverage</span><span class="">Claims</span><span class="">Capital</span><span class="">Risks</span><span class="">Verify</span></div><div class="wf-bound hl"><span class="tag">HISTORY · MONTH 1…6 (SIMULATED)</span><div class="wf-bar"><span style="width:85%"></span></div><div class="k"><span>Stable assets, month 1 → 6</span><span>R$<span class="ph">[X]</span> → R$<span class="ph">[X]</span></span></div></div><div class="wf-metrics"><div class="wf-metric">Guarantee fees → reserve<b>R$<span class="ph">[X]</span></b></div><div class="wf-metric">Issuer revenue → reserve<b>R$<span class="ph">[X]</span></b></div><div class="wf-metric">Active guarantees<b><span class="ph">[X]</span></b></div><div class="wf-metric">Months<b>6 (simulated)</b></div></div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>The /reserve history chart, Month 1…6 (simulated), then the Capital tab with guarantee fees and issuer revenue landing in the reserve.</dd>
+    <dt>VO</dt><dd class="vo">"Here are six months of it, simulated locally on an accelerated clock. Guarantee fees and issuer revenue flow into the reserve."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Months 1–6 simulated · fees + issuer revenue: R$<span class="ph">[X]</span></span></dd>
+    <dt>Honesty label</dt><dd>Mock BRS mint · local validator</dd>
+    <dt>On-chain proof</dt><dd>Localnet program accounts (the same program build), mock BRS mint.</dd>
+    <dt>Edit</dt><dd>One slow push on the chart; cut to the flows.</dd>
+    <dt>Retake</dt><dd>Re-run the localnet simulation: unlimited.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f11">
+   <div class="fhead"><span class="fno">F11</span><span class="kind END">END STATE</span><h3>A large claim, approved by the admin</h3><span class="pillar">3 · Capital efficiency</span><span class="tc">1:46.5 – 1:50.5 · 4 s</span><span class="route">/reserve/claims (localnet)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">LOCAL SIMULATION · ACCELERATED CLOCK — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>localhost/reserve/claims</span><em>LOCALNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Investment</span><span class="">Operator</span><span class="">Admin</span></div><div class="wf-body"><div class="wf-tabs"><span class="">Overview</span><span class="">Coverage</span><span class="on">Claims</span><span class="">Capital</span><span class="">Risks</span><span class="">Verify</span></div><div class="hl"><span class="tag">FILED → APPROVED → PAID → SETTLED</span><table class="wf-table"><tr><th>Claim</th><th>Amount</th><th>Filed</th><th>Approved (admin)</th><th>Paid</th><th>Settled</th></tr><tr><td class="mono">month <span class="ph">[X]</span></td><td class="mono">R$<span class="ph">[X]</span></td><td class="mono">✓</td><td class="mono up">✓ above R$15k</td><td class="mono">✓</td><td class="mono">✓</td></tr></table></div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>One claim above the R$15,000 per-call cap: filed → approved by the admin multisig → paid → settled, on the simulated timeline.</dd>
+    <dt>VO</dt><dd class="vo">"Claims are paid, large ones approved by the admin."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Claim R$<span class="ph">[X]</span> · above R$15k: admin approval · paid</span></dd>
+    <dt>Honesty label</dt><dd>none (banner only)</dd>
+    <dt>On-chain proof</dt><dd>Localnet ClaimFiling with its approval and timestamps.</dd>
+    <dt>Edit</dt><dd>Hold on the approved stage.</dd>
+    <dt>Retake</dt><dd>Re-run the simulation.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f12">
+   <div class="fhead"><span class="fno">F12</span><span class="kind END">END STATE</span><h3>More cover, and each share worth more</h3><span class="pillar">3 · Capital efficiency</span><span class="tc">1:50.5 – 1:55.5 · 5 s</span><span class="route">/reserve (localnet)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">LOCAL SIMULATION · ACCELERATED CLOCK — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>localhost/reserve</span><em>LOCALNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="on">Reserve</span><span class="">Investment</span><span class="">Operator</span><span class="">Admin</span></div><div class="wf-body"><div class="hl"><span class="tag">HOLD</span><div class="wf-metrics"><div class="wf-metric">Can back up to<b>R$<span class="ph">[X]</span> → R$<span class="ph">[X]</span></b></div><div class="wf-metric">Value per share<b><span class="ph">[X]</span> → <span class="ph">[X]</span></b></div><div class="wf-metric">Coverage required<b>R$<span class="ph">[X]</span></b></div><div class="wf-metric">Stable assets<b>R$<span class="ph">[X]</span></b></div></div></div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>The coverage ceiling ("can back up to R$[X]") rising and the share price rising, month 1 → month 6.</dd>
+    <dt>VO</dt><dd class="vo">"The reserve can back more leases, each share is worth more,"</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">Can back up to R$<span class="ph">[X]</span> → R$<span class="ph">[X]</span> · share <span class="ph">[X]</span> → <span class="ph">[X]</span></span></dd>
+    <dt>Honesty label</dt><dd>none (banner only)</dd>
+    <dt>On-chain proof</dt><dd>Localnet VaultState after refresh.</dd>
+    <dt>Edit</dt><dd>Zoom from the hold still.</dd>
+    <dt>Retake</dt><dd>Re-run the simulation.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f13">
+   <div class="fhead"><span class="fno">F13</span><span class="kind END">END STATE</span><h3>Capital out, above what went in</h3><span class="pillar">3 · Capital efficiency</span><span class="tc">1:55.5 – 2:05.5 · 10 s</span><span class="route">/capital (localnet)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-banner">LOCAL SIMULATION · ACCELERATED CLOCK — Not open to public investment</div><div class="wf-url"><i></i><i></i><i></i><span>localhost/capital</span><em>LOCALNET</em></div><div class="wf-nav"><b>MUTAV</b><span class="">Reserve</span><span class="on">Investment</span><span class="">Operator</span><span class="">Admin</span></div><div class="wf-body"><div class="wf-bound hl"><span class="tag">IN → OUT, IN REAIS</span><div class="k"><span>Deposited</span><span>R$<span class="ph">[X]</span></span></div><div class="k"><span>Withdrawn</span><span class="up">R$<span class="ph">[X]</span></span></div></div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>One capital provider's withdrawal, filled from free capital above required coverage after claims: R$[X] in → R$[X] out. The banner carries the not-open-to-public-investment line.</dd>
+    <dt>VO</dt><dd class="vo">"and a capital provider takes out more than they put in. The same reserve that protects the landlord pays the people who fund it."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">R$<span class="ph">[X]</span> in → R$<span class="ph">[X]</span> out · simulated</span></dd>
+    <dt>Honesty label</dt><dd>none (banner only)</dd>
+    <dt>On-chain proof</dt><dd>Localnet claim_assets transaction.</dd>
+    <dt>Edit</dt><dd>Reais only; no rate or APY.</dd>
+    <dt>Retake</dt><dd>Re-run the simulation.</dd>
+   </dl>
+  </article>
+  <article class="frame" id="f14">
+   <div class="fhead"><span class="fno">F14</span><span class="kind END">END STATE</span><h3>Close</h3><span class="pillar">Close</span><span class="tc">2:05.5 – 2:15 · 9.5 s</span><span class="route">card (made in the editor)</span></div>
+   <div class="wfbox"><div class="wf"><div class="wf-card"><div class="k">MUTAV</div><div class="s mono" style="font-size:1em;color:var(--text)">1 · Transparent, programmable reserve<br>2 · Claims settled in minutes<br>3 · Capital-efficient cover</div><div class="h" style="font-size:2.4em">Brazil's onchain <span class="amber">rent guarantee</span></div><div class="s mono" style="font-size:.9em;color:var(--text)">reserve.mutav.finance · github.com/mutav-finance/mutav-protocol-solana</div></div></div></div>
+   <dl class="fields">
+    <dt>On screen</dt><dd>The three pillars, one line each, then the tagline, the repo and the live app.</dd>
+    <dt>VO</dt><dd class="vo">"MUTAV: a transparent, programmable reserve, claims settled in minutes, capital-efficient cover. Brazil's onchain rent guarantee."</dd>
+    <dt>Caption (&lt; 60 chars)</dt><dd><span class="overlay">reserve.mutav.finance · open source (MIT)</span></dd>
+    <dt>Honesty label</dt><dd>none (banner only)</dd>
+    <dt>On-chain proof</dt><dd>—</dd>
+    <dt>Edit</dt><dd>Hold to 2:15.</dd>
+    <dt>Retake</dt><dd>Made in the editor.</dd>
+   </dl>
+  </article>
+ </div>
+</section>
+
+<section id="labels">
+ <div class="wrap">
+  <p class="kicker">Label discipline</p>
+  <h2>One honesty label <span class="amber">per shot</span> besides the banner</h2>
+  <div class="tablewrap"><table class=""><tr><th>Shot</th><th>Honesty label (besides the app banner)</th></tr><tr><td>F1 · END STATE</td><td>Built during the hackathon: Solana program + reserve app</td></tr><tr><td>F2 · FLASH</td><td>Agency platform · pre-hackathon · not on-chain yet</td></tr><tr><td>F3 · MAIN</td><td>—</td></tr><tr><td>F4 · FLASH</td><td>—</td></tr><tr><td>F5 · END STATE</td><td>—</td></tr><tr><td>F6 · MAIN</td><td>—</td></tr><tr><td>F7 · MAIN</td><td>PIX transfer simulated on devnet · settlement recorded on-chain</td></tr><tr><td>F8 · END STATE</td><td>PIX transfer simulated on devnet · settlement recorded on-chain</td></tr><tr><td>F9 · FLASH</td><td>—</td></tr><tr><td>F10 · END STATE</td><td>Mock BRS mint · local validator</td></tr><tr><td>F11 · END STATE</td><td>—</td></tr><tr><td>F12 · END STATE</td><td>—</td></tr><tr><td>F13 · END STATE</td><td>—</td></tr><tr><td>F14 · END STATE</td><td>—</td></tr></table></div>
+ </div>
+</section>
+
+<section id="script" class="script">
+ <div class="wrap">
+  <p class="kicker">Narration</p>
+  <h2>Full script · <span class="amber">216 words</span></h2>
+  <p class="muted mono" style="font-size:12px">Verbatim. About 1:30 of speech at 145–150 wpm inside 2:15; the rest is holds, the refusal silence, the timer and the switch card. [N] and the chapter 3 [X] numbers are filled in after capture.</p>
+  <p><span class="tc">0:00 · Cold open</span>Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and its reserve runs on Solana.</p><p><span class="tc">0:10 · Agency</span>Her agency works in MUTAV's platform; every lease becomes an account on-chain.</p><p><span class="tc">0:15 · 1 · Programmable, transparent reserve</span>Our operator puts Ana's lease on-chain: eighteen thousand reais of cover, an opaque ID, no personal data. Anyone can watch the reserve: what it holds in BRS, Nora's Brazilian real stablecoin, and what it must hold. The rule is code. One more lease would need forty-five thousand; the reserve holds forty-four. (click) Refused. MUTAV can't promise what its reserve can't back.</p><p><span class="tc">0:58 · 2 · Settled in minutes</span>Now say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the agency is recorded on-chain. On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days.</p><p><span class="tc">1:36 · 3 · Capital efficiency</span>Here are six months of it, simulated locally on an accelerated clock. Guarantee fees and issuer revenue flow into the reserve. Claims are paid, large ones approved by the admin. The reserve can back more leases, each share is worth more, and a capital provider takes out more than they put in. The same reserve that protects the landlord pays the people who fund it.</p><p><span class="tc">2:05.5 · Close</span>MUTAV: a transparent, programmable reserve, claims settled in minutes, capital-efficient cover. Brazil's onchain rent guarantee.</p>
+  <p class="alt"><span class="tc">Alt · F7 retake</span>Now say Ana falls behind on part of a month's rent. (instead of "Now say Ana misses a month."; caption "Claim R$500 · cap R$15,000 per call")</p>
+  <div class="note"><b>Say it like this:</b> "CPF" as letters; "PIX" as "peeks"; "seguro-fiança" in Portuguese; "real" (the currency) as "ray-AL"; the agency line (12 words) fits its 5 s flash at 150 wpm.</div>
+  <div class="note"><b>Production note · [N]:</b> [N] comes from the real on-chain timestamps (settled_at − filed_at on the ClaimFiling PDA). The unit is "seconds" if it is under 2 minutes and "minutes" otherwise; round down, never up. The line is about this on-chain run: it does not claim that real-world claims settle in seconds, since the operator checks each claim first (the pitch covers that).</div>
+ </div>
+</section>
+
+<section id="routes">
+ <div class="wrap">
+  <p class="kicker">Recording surface</p>
+  <h2>Route <span class="amber">map</span></h2>
+  <div class="tablewrap"><table class=""><tr><th>Route</th><th>Before #45</th><th>On main (#45 merged)</th><th>Used in</th></tr><tr><td>/</td><td>Landing</td><td>Landing (restyled)</td><td>—</td></tr><tr><td>/reserve</td><td>Transparency, one long page</td><td>Overview + sub-routes</td><td>F1 (devnet) · F10, F12 (localnet)</td></tr><tr><td>/reserve/coverage</td><td>— (section)</td><td>Coverage tab</td><td>F5</td></tr><tr><td>/reserve/claims</td><td>— (section #claims)</td><td>Claims tab</td><td>F8 (devnet) · F11 (localnet)</td></tr><tr><td>/reserve/capital</td><td>— (#flows, #queue)</td><td>Capital tab (flows + queue)</td><td>F10 (localnet)</td></tr><tr><td>/reserve/risks</td><td>— (#disclosures)</td><td>Risks tab</td><td>—</td></tr><tr><td>/reserve/verify</td><td>— (#accounts)</td><td>Verify tab</td><td>—</td></tr><tr><td>/capital</td><td>— (/investor)</td><td>Capital queue (/investment, /investor redirect)</td><td>F13 (localnet)</td></tr><tr><td>/operator</td><td>Operator console</td><td>Same, restyled</td><td>F3, F6, F7</td></tr><tr><td>/admin</td><td>Squads proposals</td><td>Same, restyled</td><td>off camera (fills)</td></tr><tr><td>/demo</td><td>Guided six steps</td><td>Same; a cleaned version is the optional alternative surface</td><td>alternative</td></tr><tr><td>app.mutav.finance</td><td>Agency platform (mutav-app, pre-existing)</td><td>—</td><td>F2</td></tr></table></div>
+  <p class="muted" style="margin-top:10px">Plan on the real pages; a cleaned <span class="mono">/demo</span> is the optional alternative. Main shows amounts in BRS with a small muted ≈ US$ hint (BCB PTAX); the story is told in reais and the disclaimer line stays (app-requirements).</p>
+ </div>
+</section>
+
+<section id="production">
+ <div class="wrap">
+  <p class="kicker">Production guidance</p>
+  <h2>Stage, capture, <span class="amber">then voice</span></h2>
+  <h3 style="margin:8px 0 12px">1 · Capture order</h3>
+  <div class="tablewrap"><table class=""><tr><th>#</th><th>Step</th><th>Who</th><th>Where</th></tr><tr><td>1</td><td>Devnet program GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV deployed and staged (done): R$44,000 held, R$36,000 required, R$8,000 free, 8 leases</td><td>—</td><td>done</td></tr><tr><td>2</td><td>Load the operator's agency records in the recording browser</td><td>Recorder</td><td>—</td></tr><tr><td>3</td><td>Rehearse chapters 1–2 on localnet with the same numbers</td><td>Recorder</td><td>—</td></tr><tr><td>4</td><td>Devnet capture: F1, F2, F3 (Ana MTV-PF-0100), F4, F5, F6 (MTV-PF-0101), then the claim, one take (F7), and F8. Log tx timestamps for the timer</td><td>Operator; anyone</td><td>—</td></tr><tr><td>5</td><td>Localnet simulation: start the app with <span class="mono">NEXT_PUBLIC_ACCELERATED_CLOCK=1</span> (the banner reads "Local simulation · accelerated clock"); run six simulated months (fees, issuer revenue, one claim above R$15k with admin approval, a capital provider's withdrawal); fill the [X] numbers</td><td>Simulation script; local admin</td><td>local</td></tr><tr><td>6</td><td>Localnet capture: F10–F13 end states</td><td>Recorder</td><td>—</td></tr><tr><td>7</td><td>Edit: chapter titles, the transition card (F9), the timer, the close card</td><td>Editor</td><td>—</td></tr></table></div>
+  <h3 style="margin:28px 0 12px">2 · Capture</h3>
+  <div class="card"><ul class="clean">
+   <li><b>Capture harness:</b> Chromium's screencast delivers 1080p at 30 fps; 2× stills are saved on holds only. Zooms over motion ≤ 1.3×; zooms on holds up to 2×, from the stills.</li>
+   <li><b>Agency records:</b> Before capture, load the operator's agency records into the recording browser.</li>
+   <li><b>Wallet:</b> the injected disposable test wallet signs; no pop-ups. Signatures show as "Signed by …" chips.</li>
+   <li><b>Five live clicks</b> on camera: register, the refused send, file, pay, settle. Log each transaction's on-chain time; the timer overlay is driven by them.</li>
+   <li><b>End states:</b> the Explorer shot (F4) is captured on devnet after F3; chapter 3 (F10–F13) is captured on localnet after the six simulated months have run.</li>
+  </ul></div>
+  <h3 style="margin:28px 0 12px">3 · Voice, captions, edit, export</h3>
+  <div class="card"><ol class="steps">
+   <li><b>Rough cut</b> the clips to the frame timings with the overlays.</li>
+   <li><b>Record the VO to the cut</b>: quiet soft room, mic 10–15 cm with a pop filter, peaks around −12 dBFS, 140–150 wpm, two or three takes per line, 5 s of room tone. Fill in [N] first.</li>
+   <li><b>Captions:</b> English VO with English burned-in captions (under 60 characters, with the specific numbers) plus an English SRT. Optional: a PT-BR SRT track for the Superteam Brazil jury.</li>
+   <li><b>Fine-tune</b> so each on-screen event lands on its words. Music none or very low, out under the F7 silence.</li>
+   <li><b>Export</b> ≤ 2:15, H.264 1080p30, AAC 48 kHz, about −14 LUFS. Upload unlisted (YouTube preferred, or Loom); check the field on the Colosseum submission form. Put the SUSEP Circ. 621/2021 art. 43 source in the description.</li>
+  </ol></div>
+ </div>
+</section>
+
+<section id="runsheet">
+ <div class="wrap">
+  <p class="kicker">Day of · BRT</p>
+  <h2>Run <span class="amber">sheet</span></h2>
+  <div class="tablewrap"><table class=""><tr><th>When</th><th>What</th></tr><tr><td>Oct 12 · morning</td><td>Rehearse chapters 1–2 on localnet; build and run the chapter 3 simulation; fill the [X] numbers.</td></tr><tr><td>by 12:00</td><td>Devnet capture of F1–F8 (one claim take). Read [N] from the claim timestamps.</td></tr><tr><td>12:00–13:00</td><td>Localnet capture of F10–F13 with the accelerated-clock banner.</td></tr><tr><td>13:00–15:00</td><td>Rough cut; record the VO to the cut with [N] and the [X] numbers filled in.</td></tr><tr><td>15:00–18:00</td><td>Fine-tune; English burned-in captions + SRT; optional PT-BR SRT.</td></tr><tr><td>18:00</td><td>Review muted and with sound: ≤ 2:15, one honesty label per shot.</td></tr><tr><td>19:00</td><td>Export, upload unlisted, test in a private window.</td></tr><tr><td>19:30</td><td>Judge-ready check of reserve.mutav.finance in a private window.</td></tr><tr><td>20:00</td><td>Submit (Colosseum + Superteam BR track).</td></tr><tr><td>23:00</td><td>Hard stop; the rest is buffer.</td></tr></table></div>
+ </div>
+</section>
+
+<section id="risks">
+ <div class="wrap">
+  <p class="kicker">Risks</p>
+  <h2>What can go <span class="amber">wrong</span></h2>
+  <div class="tablewrap"><table class=""><tr><th>Risk</th><th>Where</th><th>What to do</th></tr><tr><td>One devnet claim take</td><td>F7</td><td>The window has R$2,000 left. Rehearse on localnet; if the take fails, retake with a claim ≤ R$500 and the alternate VO and caption.</td></tr><tr><td>State drifted</td><td>F6</td><td>Free capital before Ana must be in [R$4,500, R$9,000). Close strays with close_guarantee VOID.</td></tr><tr><td>Known app behaviours</td><td>F3, F6, F7</td><td>Register resets to a red preview; the refusal error carries encoded text; paid and settled rows vanish. Workarounds per shot; fixes in app-requirements.</td></tr><tr><td>Simulation numbers not ready</td><td>F10–F13</td><td>The [X] placeholders must be filled from the localnet run before the VO is recorded; captions and cards follow.</td></tr><tr><td>Accelerated-clock banner missing</td><td>F10–F13</td><td>Start the localnet app with NEXT_PUBLIC_ACCELERATED_CLOCK=1 (PR #72); without it the chapter would look like devnet.</td></tr><tr><td>Over 2:15</td><td>edit</td><td>Trim F5 and F8 (−2 s each); never trim the F6 silence.</td></tr><tr><td>Claim under two minutes</td><td>F8</td><td>[N] from settled_at − filed_at: "seconds" under 2 min, "minutes" otherwise; round down.</td></tr></table></div>
+  <h3 style="margin:28px 0 12px">What judges will see afterwards</h3>
+  <div class="tablewrap"><table class=""><tr><th>Artefact</th><th>How it reads</th></tr><tr><td>/reserve (devnet)</td><td>Covered, mode Normal: R$42,500 held, R$40,125 required, value per share 0.579545 (the payoff is in the local simulation, not on devnet)</td></tr><tr><td>Ana's guarantee (MTV-PF-0100)</td><td>Active · default left R$7,500 · exit left R$9,000 · opaque id, no names</td></tr><tr><td>/reserve/claims (devnet)</td><td>Two claims: an earlier R$18,000 test claim and Ana's R$1,500, filed → paid → settled</td></tr><tr><td>The refused lease</td><td>Nothing: it never landed</td></tr></table></div>
+ </div>
+</section>
+
+<section id="questions" style="border-bottom:0">
+ <div class="wrap">
+  <p class="kicker">Production</p>
+  <h2>Open production <span class="amber">decisions</span></h2>
+  <ol class="steps"><li>Plan B (fits the devnet BRS in hand) or Plan A (pilot product; needs more sandbox BRS and a 12× form).</li><li>Recording surface: the real pages (default) or a cleaned /demo.</li><li>Whether to include the optional simulated issuer-revenue sweep.</li><li>Narrator, pronunciation of "MUTAV", face cam or not.</li></ol>
+  <p class="dim mono" style="font-size:12px;margin-top:28px">Ana is a fictional persona; agency names and lease references are fictional. Personal data stays with MUTAV off-chain; the chain holds opaque ids and hashes only. Pilot capital is MUTAV's own; not open to outside investors.</p>
+ </div>
+</section>
+</body>
+</html>
