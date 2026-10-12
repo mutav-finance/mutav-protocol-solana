@@ -31,7 +31,16 @@ export function nextDelay(intervalMs: number, failures: number, retryAfterS: num
 }
 
 /**
- * Poll a read route. Pauses while the tab is hidden; `refresh()` reads now
+ * Whether this tick reads: the first read always does (a link opened in a
+ * background tab, a screenshot or automation tool must not sit on
+ * skeletons); later polls pause while the tab is hidden.
+ */
+export function shouldRead(first: boolean, visibility: DocumentVisibilityState | undefined = typeof document === "undefined" ? undefined : document.visibilityState): boolean {
+  return first || visibility === undefined || visibility === "visible";
+}
+
+/**
+ * Poll a read route. Reads once at mount, then pauses while the tab is hidden; `refresh()` reads now
  * (used right after a transaction confirms) and skips the CDN's 3 s read
  * cache with a fresh query parameter, so "how the numbers moved" is current.
  * Never two reads of one poll at once; while the server says the chain is
@@ -96,8 +105,10 @@ export function usePoll<T>(url: string, intervalMs = 10_000, until?: (data: T) =
   useEffect(() => {
     alive.current = true;
     failures.current = 0;
+    let first = true;
     const tick = async () => {
-      if (typeof document === "undefined" || document.visibilityState === "visible") {
+      if (shouldRead(first)) {
+        first = false;
         const d = await read();
         if (d !== null && stop.current?.(d)) return;
       }

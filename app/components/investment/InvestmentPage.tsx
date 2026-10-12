@@ -16,7 +16,7 @@ import type { ReactNode } from "react";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { Money, MoneyProvider, UsdSource } from "@/components/MoneyProvider";
 import { Mono } from "@/components/Mono";
-import { ReadError } from "@/components/Section";
+import { ReadError, ReadPending } from "@/components/Section";
 import { LiveProvider } from "@/components/demo/shared";
 import { QueueEntries } from "./QueueEntries";
 import { useInvestor } from "./useInvestor";
@@ -106,7 +106,7 @@ function Header() {
 }
 
 export function InvestmentPage() {
-  const { connected, owner, poll, d, inv, invData, mine, refresh } = useInvestor();
+  const { connected, owner, poll, accounts, accountsStatus, d, inv, invData, mine, refresh } = useInvestor();
   const pad = { paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" };
   return (
     <MoneyProvider>
@@ -127,7 +127,11 @@ export function InvestmentPage() {
               {inv.error && !invData && <ReadError error={inv.error} onRetry={() => void inv.refresh()} />}
               <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
                 <RequestCard inv={invData} loading={inv.loading} connected={connected} />
-                <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} now={d.reserve.now} />
+                {accountsStatus === "ready" ? (
+                  <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} now={d.reserve.now} />
+                ) : (
+                  <ReadPending status={accountsStatus} label="Requests loading…" error={accounts.error} onRetry={() => void accounts.refresh()} />
+                )}
               </div>
             </div>
           </LiveProvider>

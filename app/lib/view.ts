@@ -45,7 +45,18 @@ export type Ledger = {
   income: (Row<IncomeReceipt> & { blockTime: bigint | null })[];
   deposits: Row<DepositRequest>[];
   redeems: Row<RedeemRequest>[];
+  /**
+   * Set when the history read answered before decoding every recent fill
+   * (the RPC's transaction budget): `capitalEvents` lacks this many
+   * transactions, which the next reads fill in.
+   */
+  fillsMissing?: number;
 };
+
+/** The ledger's account reads (/api/accounts): what coverage, claims and the queue need. */
+export type LedgerAccounts = Pick<Ledger, "guarantees" | "filings" | "deposits" | "redeems">;
+/** The ledger's history (/api/history): receipts and capital-queue fills, the heavy read. */
+export type LedgerHistory = Pick<Ledger, "fees" | "income" | "capitalEvents" | "fillsMissing">;
 
 export type ReserveAddressesView = {
   config: string;
