@@ -166,7 +166,7 @@ ffmpeg -f concat -i build/cap-en/captions.concat.txt -r 30 -c:v prores_ks -profi
 ffmpeg -i picture-ov2.mp4 -i build/captions-en.mov -filter_complex "[0][1]overlay=eof_action=pass" -c:v libx264 -crf 14 picture-cap.mp4
 ```
 
-Fill in [N] in both SRTs before rendering. The caption and timer tracks run about 1 s past their last cue; `-t 139.5` on the export trims it.
+Both SRTs carry the real figure (65 s, cue 18). The caption and timer tracks run about 1 s past their last cue; `-t 139.5` on the export trims it.
 
 **7 · Export 1080p30 H.264 MP4** with the normalised mix:
 
@@ -181,7 +181,7 @@ Upload `captions.en.srt` and `captions.pt-BR.srt` to YouTube as caption tracks t
 ## Final checks
 
 - Runtime ≤ 2:20 (target 2:19.5). One honesty label per shot besides the banner. Every on-screen number matches the storyboard's numbers table.
-- [N] filled in (VO and both SRTs) with the right unit, from Ana's own timestamps.
+- The 65 s is in the VO ("sixty-five seconds") and both SRTs (cue 18), from Ana's own timestamps.
 - Every Explorer flash is 1.5–2 s and on the beat; every receipt and rail entry matches `tx-receipts.json` (no sample PNG in the cut).
 - Chapter 3: the finale card reads "Simulation of reserve mechanics · not an expected return"; the captions carry the v3 figures, with no `[V3]` left.
 - Scale: the scale caption is on every devnet shot (S1, S3–S9b, S15a) and never over S2 or chapter 3; R$1M appears only as the pilot plan (tagged "plan") or as the simulation's labelled end state.

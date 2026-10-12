@@ -29,17 +29,17 @@ Companion to the storyboard (`storyboard.html`); the two match.
 >
 > **0:17 · 1 · Programmable, transparent reserve** Our operator puts Ana's lease on-chain: eighteen thousand reais of cover, an opaque ID, no personal data. Anyone can watch the reserve: it holds BRS, Nora's Brazilian real stablecoin, and must keep a quarter of everything it guarantees: every real backs four in cover. One more lease would need forty-five thousand; the reserve holds forty-four and a half. (click) Refused. MUTAV can't promise what its reserve can't back.
 >
-> **0:57 · 2 · Programmable payments, settled in minutes** Say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the landlord is recorded on-chain. On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days. Today our operator signs these steps. Next, the agency platform drives them automatically, inside safeguards the program already enforces.
+> **0:57 · 2 · Programmable payments, settled in minutes** Say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the landlord is recorded on-chain. On-chain, filed to settled in sixty-five seconds. Seguro-fiança allows up to thirty days. Today our operator signs these steps. Next, the agency platform drives them automatically, inside safeguards the program already enforces.
 >
 > **1:38 · 3 · Capital efficiency** Here are six months of the pilot plan, simulated locally on an accelerated clock, growing to a million-real reserve. Guarantee fees and the reserve's yield flow in; small claims flow out. The reserve can back more leases, each share is worth more, and a capital provider takes out more than they put in. The same reserve that protects the landlord pays the people who fund it.
 >
 > **2:08 · Close** Verify everything on Solana. MUTAV: a transparent, programmable reserve, claims settled in minutes, capital that works. Brazil's onchain rent guarantee.
 
-**F7 claim window:** The claim window on this demo deploy is R$50,000 per 31 days (raised from the pilot's R$20,000 so the live claim can be retaken; disclosed in the repo README) and R$32,000 of it is left (two earlier test claims, R$16,000 + R$2,000). Ana's R$1,500 claim fits, and so do full R$1,500 retakes; after her claim the window reads R$19,500 / R$50,000. Rehearse F7 on localnet first. If only the capture was bad, re-capture the screens, not the claim.
+**F7 claim window:** The claim window on this demo deploy is R$50,000 per 31 days (raised from the pilot's R$20,000 so the live claim can be retaken; disclosed in the repo README) and R$32,000 of it is left (two earlier test claims, R$16,000 + R$2,000). Ana's R$1,500 claim fits, and so do full R$1,500 retakes; after her claim the window read R$19,500 / R$50,000. Done: the takes landed and the cap is back to R$20,000, so the window now reads R$19,500 / R$20,000. Rehearse F7 on localnet first. If only the capture was bad, re-capture the screens, not the claim.
 
 **F8b wording:** the safeguards are live on devnet today; the agency-platform integration is next (roadmap). Keep "Today … Next …" as written; don't say or caption that the agency platform drives the program now.
 
-[N] comes from the real on-chain timestamps of **Ana's** claim (settled_at − filed_at on her ClaimFiling PDA), not from the page's "slowest filed → paid" figure (that comes from the earlier test claims). Fill it in before recording the VO. Say "seconds" if it is under 2 minutes and "minutes" otherwise, and round down, never up. The line describes this on-chain run only; it does not claim real-world claims settle in seconds, since the operator checks each claim first (the pitch covers that).
+The 65 s comes from the real on-chain timestamps of **Ana's** claim (settled_at − filed_at on her ClaimFiling PDA), not from the page's "slowest filed → paid" figure (that comes from the earlier test claims). Filed 21:34:10 UTC (file_claim), settled 21:35:15 UTC (settle_payout), Oct 12: 65 s, under 2 minutes, so the VO says "sixty-five seconds". The line describes this on-chain run only; it does not claim real-world claims settle in seconds, since the operator checks each claim first (the pitch covers that).
 
 ## 3. Shot list
 
@@ -119,11 +119,11 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Retake:** Retakes fit: R$32,000 of the R$50,000 per-31-day claim window is left on this demo deploy, so a paid take can be redone with the full R$1,500 claim (same VO and caption). Each retake adds one more claim and R$1,500 less held: re-read the end-state figures for F8. Rehearse on localnet first. If only the capture was bad, re-capture the screens, not the claim.
 
 **F8 · END STATE · 2 · Programmable payments, settled in minutes · 1:16.5 – 1:27 · /reserve/claims**: Filed → paid → settled
-- **On screen:** /reserve/claims: Ana's row is the newest, on top: filed → paid → settled with her on-chain timestamps; the timer stops at settled. Hold about 2.8 s after the VO. Still covered: R$43,000 held, R$40,125 required. The timeline also lists the two earlier test claims (R$16,000 and R$2,000), fine on a disclaimed demo reserve. The page's "slowest filed → paid 1m 44s" summary comes from those test claims: frame Ana's row and her own times, and take [N] from them. The page says "received by landlord (PIX)", as the VO now does.
-- **VO:** "On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days."
-- **Caption:** Filed → settled on-chain: [N] s · seguro-fiança: 30 days
+- **On screen:** /reserve/claims: Ana's row is the newest, on top: filed → paid → settled with her on-chain timestamps; the timer stops at settled. Hold about 2.8 s after the VO. Still covered: R$43,000 held, R$40,125 required. The timeline also lists the two earlier test claims (R$16,000 and R$2,000), fine on a disclaimed demo reserve. The page's "slowest filed → paid 1m 44s" summary comes from those test claims: frame Ana's row and her own times, and the 65 s comes from them. The page says "received by landlord (PIX)", as the VO now does.
+- **VO:** "On-chain, filed to settled in sixty-five seconds. Seguro-fiança allows up to thirty days."
+- **Caption:** Filed → settled: 65 s on-chain · seguro-fiança: 30 days
 - **Honesty label:** PIX transfer simulated on devnet · settlement recorded on-chain
-- **Proof:** Timestamps from Ana's ClaimFiling PDA. [N] = settled_at − filed_at; the unit is "seconds" if under 2 minutes, "minutes" otherwise. Do not claim real-world claims settle in seconds: the operator checks each claim first.
+- **Proof:** Timestamps from Ana's ClaimFiling PDA: filed 21:34:10 UTC (file_claim), settled 21:35:15 UTC (settle_payout), Oct 12: settled_at − filed_at = 65 s. Do not claim real-world claims settle in seconds: the operator checks each claim first.
 - **Edit:** Hold still ≤ 2× on Ana's three timestamps. SUSEP Circ. 621/2021 art. 43 goes in the video description.
 - **Retake:** Read-only: repeat freely.
 
@@ -295,9 +295,9 @@ Captions read start → end (if the ceiling peaks before month 6, the caption st
 | When | What |
 |---|---|
 | Oct 12 · morning | Rehearse chapters 1–2 on localnet (F7 first there). The chapter 3 v3 ledger (pilot scale) and its motion piece are being rebuilt; §4 reads `[V3]` until then. |
-| by 12:00 | Staging is done (R$44,500 held, R$36,000 required, R$8,500 free, 8 leases, Normal). Set the intro key; press "Refresh on-chain" on /operator right before rolling. Devnet capture of F1, F3–F8b and F14a (claim retakes fit); the four Explorer flashes; F2 from the local agency copy. Read [N] from Ana's claim timestamps; write `tx-receipts.json`. |
+| by 12:00 | Staging is done (R$44,500 held, R$36,000 required, R$8,500 free, 8 leases, Normal). Set the intro key; press "Refresh on-chain" on /operator right before rolling. Devnet capture of F1, F3–F8b and F14a (claim retakes fit); the four Explorer flashes; F2 from the local agency copy. **Done:** devnet takes F3, F6, F6b (on-chain failure, InsufficientFreeCapital 6008) and F7 (file, pay, settle); 65 s read from Ana's claim; `tx-receipts.json` written; the IDL is published on-chain; the claim cap is reverted to R$20,000 (window R$19,500 / R$20,000). |
 | 12:00–13:00 | Render the receipts and rail from `tx-receipts.json`; optional localnet cutaways for chapter 3. |
-| 13:00–15:00 | Rough cut; record the VO to the cut with [N] filled in. |
+| 13:00–15:00 | Rough cut; record the VO to the cut (line 15: "sixty-five seconds"). |
 | 15:00–18:00 | Fine-tune; English burned-in captions + SRT; optional PT-BR SRT. |
 | 18:00 | Review muted and with sound: ≤ 2:20, one honesty label per shot, every flash ≤ 2 s. |
 | 19:00 | Export, upload unlisted, test in a private window. |
@@ -305,13 +305,15 @@ Captions read start → end (if the ceiling peaks before month 6, the caption st
 | 20:00 | Submit (Colosseum + Superteam BR track). |
 | 23:00 | Hard stop; the rest is buffer. |
 
+**Proof transactions (Solana devnet):** `register_guarantee` for MTV-PF-0100, confirmed: [Cz27…BzQa](https://explorer.solana.com/tx/Cz27XuD8B76Wd9ZHH72Xg3kjy6CHW7AT4bJVsdjPYBBfLtncrKHZNEo356jTcuHZsQybFCaHKJQmbt2XAQRBzQa?cluster=devnet). The refused MTV-PF-0101 send, failed on-chain with InsufficientFreeCapital (6008): [3Uti…ESH9](https://explorer.solana.com/tx/3UtiNTSZXwjwmVkVxivEsrhFezCvpbTUErwi6KSZKwCoSFnkdhu4JXmVYsLdnHxby99Vkk9u8QRDtFgie3jAESH9?cluster=devnet).
+
 ## 9. Risks
 
 | Risk | Where | What to do |
 |---|---|---|
-| Claim take fails | F7 | R$32,000 of claim window is left (R$50,000 per 31 days on this demo deploy): retake with the full R$1,500 claim. Rehearse on localnet first; re-read the end-state figures after a retake. If only the capture was bad, re-capture the screens. |
-| Refusal doesn't land on-chain | F6b | Needs skipPreflight on the MTV-PF-0101 send (pending app/harness). Without it, drop F6b, keep the "Coverage gate · refused" chip in F6 and give the 2 s back to the F6 tail. |
-| Explorer shows raw bytes | F4, F6b, F7 | The IDL is not yet on devnet (pending the app team). Raw data is acceptable for 2 s; the receipt card names the instruction. |
+| Claim take fails | F7 | Done: the F7 takes landed (file, pay, settle). The claim cap is back to R$20,000 (window R$19,500 / R$20,000), so another R$1,500 claim does not fit: re-capture the screens, not the claim. |
+| Refusal doesn't land on-chain | F6b | Resolved: the MTV-PF-0101 send landed as a failed transaction (InsufficientFreeCapital, 6008). |
+| Explorer shows raw bytes | F4, F6b, F7 | Resolved: the IDL is published on devnet, so Explorer decodes the instructions; the receipt card names them too. |
 | State drifted | F6 | Free capital before Ana must be in [R$4,500, R$9,000). Close strays with close_guarantee VOID. |
 | Known app behaviours | F3, F6, F7 | Register advances to MTV-PF-0101 with a red preview (cut before it in F3); paid and settled rows vanish. Workarounds per shot; fixes in app-requirements. |
 | Skeleton or intro in frame | all app shots | Set `mutav-transparency-intro-v1` = `1` (or Skip); start clips on the settled frame. |
@@ -320,7 +322,7 @@ Captions read start → end (if the ceiling peaks before month 6, the caption st
 | Scale read as a devnet result | F1–F8b, F14 | The scale caption says the devnet amounts are sized to test tokens; R$1M appears only as the pilot plan (tagged "plan") or as the simulation's labelled end state. Never scale a devnet figure up. |
 | Over 2:20 | edit | Trim F5 (−2 s), then shorten F13's 1.5 s hold; never trim the silence, a flash below 1.5 s, or the F8b safeguards read. |
 | Automation read as live | F8b | The VO says "Today … Next …"; the card says "on-chain today" for the safeguards and "roadmap" for agency platform → operator. Keep both; no caption may say the agency platform drives the program now. |
-| Claim under two minutes | F8 | [N] from Ana's settled_at − filed_at (not the page's "slowest" figure): "seconds" under 2 min, "minutes" otherwise; round down. |
+| Claim under two minutes | F8 | Resolved: 65 s from Ana's settled_at − filed_at (not the page's "slowest" figure), said as "sixty-five seconds". |
 
 ## 10. What judges will see afterwards
 

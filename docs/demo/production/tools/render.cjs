@@ -17,7 +17,8 @@
  *       One transaction-receipt PNG per entry (overlays/tx-receipt.html) and one transaction-rail PNG per
  *       landed transaction (overlays/tx-rail.html?upto=k), from real getTransaction data. The file is an array
  *       (or {"receipts": [...]}) of {instruction, signature, slot, blockTime (unix s), fee (lamports),
- *       status ("ok" | "failed"), error?, cluster?}, in landing order.
+ *       status ("ok" | "failed"), error?, cluster?}, in landing order. The raw export's block_time, fee_lamports
+ *       and error object ({mutav_error: {name}}) are read too.
  *
  * Playwright is resolved from $PLAYWRIGHT_FROM, the current directory, or the repo's app/ (installed there).
  * Exits on its own; no watch mode.
@@ -170,6 +171,9 @@ function parseSrt(text) {
       const list = Array.isArray(raw) ? raw : raw.receipts;
       if (!Array.isArray(list) || !list.length) throw new Error("tx-receipts.json: expected a non-empty array (or {receipts: [...]})");
       const out = path.resolve(opt("out", "receipt-frames"));
+      // Accepts the documented shape and the raw export's snake_case fields (block_time, fee_lamports, error object).
+      const errName = (e) => !e ? "" : typeof e === "string" ? e : (e.mutav_error && e.mutav_error.name) || (e.custom_code != null ? `Custom ${e.custom_code}` : "Error");
+      list.forEach((r) => { r.blockTime = r.blockTime ?? r.block_time; r.fee = r.fee ?? r.fee_lamports; r.error = errName(r.error); });
       const items = list.map((r) => ({ ix: r.instruction, sig: r.signature, ok: r.status !== "failed" }));
       for (let i = 0; i < list.length; i++) {
         const r = list[i];

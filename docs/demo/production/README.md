@@ -17,7 +17,7 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 | Path | What it is |
 |---|---|
 | [`vo-script.md`](vo-script.md) | Final voiceover (250 words) with start and end seconds per line, pauses, the 3 s silence, pronunciation and direction. |
-| [`captions.en.srt`](captions.en.srt) · [`captions.pt-BR.srt`](captions.pt-BR.srt) | Captions on the same timings; ≤2 lines, ≤42 characters per line. `[N]` is a placeholder. |
+| [`captions.en.srt`](captions.en.srt) · [`captions.pt-BR.srt`](captions.pt-BR.srt) | Captions on the same timings; ≤2 lines, ≤42 characters per line. Cue 18 carries the real 65 s. |
 | [`edl.md`](edl.md) | Edit decision list per shot (source, in/out, overlays, zoom, transition, audio), music and loudness, and the ffmpeg recipes. |
 | [`submission-disclosure.md`](submission-disclosure.md) | Text for the Colosseum form and the YouTube description. |
 | [`motion-spec.md`](motion-spec.md) | Motion direction for the full cut: look, type, easing, beat, per-chapter feel, honesty limits and the agency browser-mockup rules. |
@@ -38,7 +38,7 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 ## Order of assembly
 
 1. **Capture** (storyboard run sheet): set `localStorage` `mutav-transparency-intro-v1` = `1` (or Skip), press "Refresh on-chain" on `/operator`, then the 5 live actions (prefilled forms; claim retakes fit), plates and end states, including `/reserve/risks` for F8b and `/reserve/verify` for F14a, and the four Explorer flashes. Start every clip on the settled frame. Log each signature and block time; write `tx-receipts.json` from `getTransaction`.
-2. **Fill in [N]** from Ana's `settled_at − filed_at`: "seconds" under 2 minutes, "minutes" otherwise. Update `vo-script.md` line 15 and both SRTs (cue 18).
+2. **The claim time is filled in:** Ana's `settled_at − filed_at` is 65 s, so `vo-script.md` line 15 says "sixty-five seconds" and both SRTs (cue 18) carry it.
 3. **Render the timer** from the real timestamps, the receipts and rail (`render.cjs receipts tx-receipts.json`), and the animated titles, wipe and close card if you want them animated (`edl.md`, "On-chain overlays", "The timer" and "Animated cards and overlays").
 4. **Rough cut** the picture per the EDL: cut shots, zooms, join.
 5. **Overlays:** PNGs, then the alpha videos (titles, wipe, timer).

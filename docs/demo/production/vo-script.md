@@ -12,7 +12,7 @@
 - **The Explorer flashes (F4, F6b, F7):** no voice over F6b (the music returns after the silence); the F7 flashes sit in the gaps between lines 13, 14 and 15. Don't fill them.
 - **The refusal:** "Refused." is short and flat, not dramatic. Then the line after it, then **3 s of silence**: no voice and no music, only room tone.
 - **Numbers** are said as words, exactly as written. Don't add "about" or round anything.
-- **[N]** comes from the real on-chain timestamps of Ana's claim (settled_at − filed_at on her ClaimFiling PDA), not from the page's "slowest filed → paid" figure. Say "seconds" if it is under 2 minutes and "minutes" otherwise; round down, never up. The line describes this on-chain run only. Don't ad-lib that real-world claims settle in seconds: in operation the operator checks each claim first (the pitch covers that).
+- **Sixty-five seconds** comes from the real on-chain timestamps of Ana's claim (settled_at − filed_at on her ClaimFiling PDA), not from the page's "slowest filed → paid" figure. Filed 21:34:10 UTC (file_claim), settled 21:35:15 UTC (settle_payout): 65 s. The line describes this on-chain run only. Don't ad-lib that real-world claims settle in seconds: in operation the operator checks each claim first (the pitch covers that).
 - **Recording:** a quiet, soft room; mic 10–15 cm away with a pop filter; peaks around −12 dBFS; 48 kHz WAV. Two or three takes per line; 5 s of room tone at the start (used for the silence).
 
 ## Pronunciation
@@ -56,7 +56,7 @@ Start and End are program seconds. `‖` = a breath pause (about 0.3 s). `(pause
 | — | 68.6 | 70.5 | F7 | *(pause: pay_claim on Explorer 68.8–70.3)* |
 | 14 | 70.5 | 74.7 | F7 | and the PIX to the landlord is recorded on-chain. |
 | — | 74.7 | 77.0 | F7 → F8 | *(pause: settle_payout on Explorer 74.8–76.5; cut to the claims timeline)* |
-| 15 | 77.0 | 80.4 | F8 | On-chain, filed to settled in [N] seconds. |
+| 15 | 77.0 | 80.4 | F8 | On-chain, filed to settled in sixty-five seconds. |
 | 16 | 80.8 | 84.2 | F8 | Seguro-fiança allows up to thirty days. |
 | — | 84.2 | 87.3 | F8 → F8b | *(pause: hold on Ana's timestamps; cut to /reserve/risks at 87.0)* |
 | 17 | 87.3 | 95.6 | F8b | Today our operator signs these steps. ‖ Next, the agency platform drives them automatically, ‖ inside safeguards the program already enforces. |
@@ -73,9 +73,7 @@ Start and End are program seconds. `‖` = a breath pause (about 0.3 s). `(pause
 
 Line 21 lands "more than they put in" on the finale card's in → out (it builds in at 121.3).
 
-If [N] is 2 minutes or more, line 15 reads "On-chain, filed to settled in [N] minutes." (same length).
-
-**F7 retakes:** the claim window on this demo deploy is R$50,000 per 31 days (R$32,000 left), so a retake re-runs the full R$1,500 claim with the same lines 11–14 and captions. After Ana's claim the window reads R$19,500 / R$50,000.
+**F7 retakes:** the claim window on this demo deploy is R$50,000 per 31 days (R$32,000 left), so a retake re-runs the full R$1,500 claim with the same lines 11–14 and captions. After Ana's claim the window read R$19,500 / R$50,000. Done: the takes landed and the cap is back to R$20,000, so the window now reads R$19,500 / R$20,000.
 
 ## Word count by beat
 
