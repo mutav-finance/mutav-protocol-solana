@@ -11,7 +11,7 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 | [Landing](https://reserve.mutav.finance) | The story, who does what (■ Reserve Admin, ◆ Operator, ▲ Investor), the protocol diagram |
 | [`/reserve`](https://reserve.mutav.finance/reserve) | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Solana Explorer. No wallet needed |
 | [`/operator`](https://reserve.mutav.finance/operator) | Operator console. During the pilot MUTAV's team signs by hand with the operator wallet; later mutav-app's backend sends the same instructions with a KMS-held key |
-| [`/investor`](https://reserve.mutav.finance/investor) | Capital-provider view. Demo: the request form is visible to every visitor; on-chain actions stay allowlist-gated (holders can always redeem, ADR 0023). Before launch, set `CAPITAL_FORMS_PUBLIC` false to show the form only to allowlisted wallets (holders get redeem only). The pilot runs on MUTAV's own capital and is not open to public investment |
+| [`/capital`](https://reserve.mutav.finance/capital) | Capital queue (`/investment` and `/investor` redirect here). Demo: the request form is visible to every visitor; on-chain actions stay allowlist-gated (holders can always redeem, ADR 0023). Before launch, set `CAPITAL_FORMS_PUBLIC` false to show the form only to allowlisted wallets (holders get redeem only). The pilot runs on MUTAV's own capital and is not open to public investment |
 | [`/admin`](https://reserve.mutav.finance/admin) | Reserve Admin: Squads v4 proposals (create, approve, execute after the time lock) |
 | [`/demo`](https://reserve.mutav.finance/demo) | Guided six-step walkthrough, with the coverage-gate preview |
 | [`/simulator`](https://reserve.mutav.finance/simulator) | Reserve simulator: size the reserve, coverage, yield against Selic |
@@ -51,7 +51,7 @@ mutav-protocol-solana/
 ├── tests/                        # LiteSVM integration tests
 ├── tests-fork/                   # Surfpool mainnet/devnet-fork tests
 ├── clients/js/                   # Codama-generated client (@mutav-finance/mutav-protocol-solana)
-├── app/                          # pilot web app (Next.js): landing, /reserve, /operator, /investor, /admin, /demo, /simulator
+├── app/                          # pilot web app (Next.js): landing, /reserve, /operator, /capital, /admin, /demo, /simulator
 ├── scripts/                      # devnet bootstrap: initialize, roles, caps, allowlist
 └── docs/
     ├── spec.md                   # protocol specification (source of business rules)
@@ -102,7 +102,7 @@ No command in this repo runs in watch mode.
 
 ## Pilot app
 
-[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana, live at [reserve.mutav.finance](https://reserve.mutav.finance): `/` landing (story, live reserve strip, who does what, protocol diagram), `/reserve` public transparency (health, coverage, claims timeline, flows, every account on Explorer, with snapshot charts), `/operator` the operator console, `/investor` the allowlist-gated capital-provider view, `/admin` Squads v4 proposal builders, `/demo` a guided walkthrough with the coverage-gate preview, and `/simulator` the reserve simulator. Every action is tagged with the role that signs it: Reserve Admin, Operator or Investor. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
+[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana, live at [reserve.mutav.finance](https://reserve.mutav.finance): `/` landing (story, live reserve strip, who does what, protocol diagram), `/reserve` public transparency (sub-routes `coverage`, `claims`, `capital`, `risks`, `verify`: health, coverage, claims timeline, flows, every account on Explorer, with snapshot charts), `/operator` the operator console, `/capital` the allowlist-gated capital queue, `/admin` Squads v4 proposal builders, `/demo` a guided walkthrough with the coverage-gate preview, and `/simulator` the reserve simulator. Every action is tagged with the role that signs it: Reserve Admin, Operator or Investor. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
 
 Run it locally against a seeded validator (port 3001, since 3000 is often taken):
 

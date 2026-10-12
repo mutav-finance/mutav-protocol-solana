@@ -57,7 +57,7 @@ flowchart LR
 
 ## What the agency can check
 
-Anyone, with no wallet, can read the public `/reserve` page of the pilot app at [reserve.mutav.finance](https://reserve.mutav.finance): reserve health, coverage, each claim's filed, paid and settled timestamps, money flows and every account on Solana Explorer. The pages read the pilot demo reserve on devnet; test activity is visible.
+Anyone, with no wallet, can read the public `/reserve` page of the pilot app at [reserve.mutav.finance](https://reserve.mutav.finance): reserve health, coverage, each claim's stage (needs approval, approved, paid, settled) with its timestamps, money flows and every account on Solana Explorer. The pages read the pilot demo reserve on devnet; test activity is visible.
 
 ## Status
 
