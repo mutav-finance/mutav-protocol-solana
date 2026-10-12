@@ -48,7 +48,7 @@ describe("fmtPct", () => {
 describe("fmtUsd", () => {
   it("converts BRS at the USD/BRL rate, truncating", () => {
     expect(brsToUsd(5_400_000n, 5_400_000n)).toBe(1_000_000n);
-    expect(fmtUsd(58_700_000_000n, 5_400_000n)).toBe("$ 10,870.37");
-    expect(fmtUsd(1n, 5_400_000n)).toBe("$ 0.00");
+    expect(fmtUsd(58_700_000_000n, 5_400_000n)).toBe("US$ 10,870.37");
+    expect(fmtUsd(1n, 5_400_000n)).toBe("US$ 0.00");
   });
 });

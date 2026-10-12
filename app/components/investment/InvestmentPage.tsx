@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * /investment — the capital provider's page (the Investor role): send a new
+ * /capital — the capital provider's page (the Investor role): send a new
  * deposit or redemption request, then follow, cancel and collect it. Everyone
  * can read it; only a wallet on the on-chain allowlist can send requests.
  * Cancels and collects need only the request's owner (spec §5.5).
@@ -11,6 +11,7 @@
  * request card on the left as the lead and the wallet's requests beside it.
  */
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { UsdNote } from "@/components/MoneyProvider";
 import { Mono } from "@/components/Mono";
 import { ReadError } from "@/components/Section";
 import { LiveProvider } from "@/components/demo/shared";
@@ -40,7 +41,7 @@ function Stat({ label, tip, value }: { label: string; tip: string; value: string
 }
 
 function Stats({ r, money }: { r: ReserveView; money: Money }) {
-  const usd = money.rate ? ` Shown in dollars at ${money.rate}.` : "";
+  const usd = money.rate ? ` Shown in US dollars at ${money.rate}.` : "";
   return (
     <div role="group" aria-label="Reserve figures" className="bg-(--color-surface-2) grid grid-cols-1 gap-x-6 gap-y-4 border px-5 py-4 sm:grid-cols-3">
       <Stat label="Share price" tip="Reserve value after claims set aside, per share." value={fmtSharePrice(r.state.navPerShare)} />
@@ -77,14 +78,22 @@ function Header() {
         style={{ opacity: 0.14 }}
       />
       <div className="relative mx-auto flex w-full max-w-[1040px] flex-col gap-3">
-        <span className="font-mono text-(--color-accent) text-xs uppercase tracking-[0.12em]">Capital queue</span>
+        <span className="font-mono text-(--color-accent) text-xs uppercase tracking-[0.12em]">Pilot reserve</span>
         <h1
           className="font-display text-(--color-text) m-0 uppercase md:max-w-[50%]"
           style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.05 }}
         >
-          Investment
+          Capital queue
         </h1>
-        <p className="font-body text-(--color-text-2) m-0 max-w-[60ch] text-sm md:max-w-[50%]">Deposit BRS for shares. Redeem shares for BRS. Requests fill in order.</p>
+        <p className="font-body text-(--color-text-2) m-0 max-w-[60ch] text-sm md:max-w-[50%]">The pilot reserve&apos;s capital queue: deposits of BRS for shares and redemptions of shares for BRS, filled in order.</p>
+        <p
+          role="note"
+          aria-label="Not open to public investment"
+          className="font-body text-(--color-text) m-0 max-w-[60ch] py-1 pl-3 text-sm font-medium md:max-w-[50%]"
+          style={{ borderLeft: "1px solid var(--color-copper)" }}
+        >
+          Pilot capital comes from MUTAV&apos;s own wallet only. This page is not open to public investment and nothing here is an offer. Requests need a wallet on the on-chain allowlist.
+        </p>
       </div>
     </header>
   );
@@ -105,7 +114,10 @@ export function InvestmentPage() {
         {d && (
           <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh }}>
             <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6">
-              <Stats r={d.reserve} money={money} />
+              <div className="flex flex-col gap-2">
+                <Stats r={d.reserve} money={money} />
+                <UsdNote rate={money.rate} />
+              </div>
               {inv.error && !inv.data && <ReadError error={inv.error} />}
               <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
                 <RequestCard inv={invData} connected={connected} money={money} />

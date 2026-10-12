@@ -13,11 +13,11 @@ import { ClusterBadge } from "@/components/ClusterBadge";
 import { Button } from "@/components/ui/button";
 
 const LINKS = [
-  { href: "/investment", label: "investment" },
   { href: "/reserve", label: "transparency" },
   { href: "/operator", label: "operator" },
   { href: "/demo", label: "demo" },
   { href: "/admin", label: "admin" },
+  { href: "/capital", label: "capital queue" },
 ];
 
 export function NavShell() {

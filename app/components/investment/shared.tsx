@@ -1,5 +1,5 @@
 /**
- * Shared bits of the /investment views: labels, row formatters and the brand
+ * Shared bits of the /capital views: labels, row formatters and the brand
  * block frame. Pure reads of the shared poll; no new data.
  */
 import type { ReactNode } from "react";

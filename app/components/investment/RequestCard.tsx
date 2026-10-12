@@ -1,16 +1,22 @@
 "use client";
 
 /**
- * The request card on /investment: one form for both sides of the capital
+ * The request card on /capital: one form for both sides of the capital
  * queue, switched by the Deposit / Redeem tabs. The first field is what waits
  * in line (BRS for a deposit, shares for a redemption); "You receive" is
  * worked out at today's share price: the Reserve Admin fills requests in order
  * at the share price of the fill. The server composes the unsigned
  * transaction (with the Merkle proof); the connected wallet signs.
+ *
+ * The legal floor: the form (amounts, preview, limits) renders only for a
+ * connected wallet on the on-chain allowlist. Everyone else sees a static
+ * card that says requests are limited to allowlisted wallets and that this is
+ * not an offer.
  */
 import { useState, type ReactNode } from "react";
 import { assetsFor, sharesFor } from "@mutav-finance/mutav-protocol-solana";
 import { Button } from "@/components/ui/button";
+import { ConnectButton } from "@/components/ConnectButton";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Action, Note, useLive } from "@/components/demo/shared";
@@ -50,6 +56,23 @@ function Field({ id, title, unit, value, onChange, foot, readOnly }: { id: strin
   );
 }
 
+/** What a wallet that is not allowlisted (or no wallet) sees: no form, no amounts, no offer. */
+function GatedCard({ connected, checking }: { connected: boolean; checking: boolean }) {
+  return (
+    <section aria-label="Capital requests" className="bg-(--color-surface) flex w-full flex-col gap-4 border px-6 py-5">
+      <p className="font-body text-(--color-text) m-0 text-sm leading-relaxed">
+        Capital requests are limited to allowlisted wallets during the pilot. This is not an offer.
+      </p>
+      {!connected && (
+        <div className="self-start">
+          <ConnectButton />
+        </div>
+      )}
+      {connected && checking && <p className="font-body text-(--color-text-3) m-0 text-xs">Checking access…</p>}
+    </section>
+  );
+}
+
 export function RequestCard({ inv, connected, money }: { inv: InvestorView | null; connected: boolean; money: Money }) {
   const { reserve } = useLive();
   const caps = reserve.config.caps;
@@ -80,7 +103,7 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
     setInput("");
     setLimit("");
   };
-  const blocked = paused ? null : !connected ? "Connect an approved wallet to request." : state === null ? "Checking access…" : canRequest ? null : "This wallet isn't approved. Access is by allowlist (KYC off-chain).";
+  if (!connected || state !== "allowlisted") return <GatedCard connected={connected} checking={state === null} />;
 
   return (
     <section aria-label={deposit ? "Deposit request" : "Redemption request"} className="bg-(--color-surface) flex w-full flex-col border">
@@ -146,7 +169,6 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
         <p className="font-mono text-(--color-text-3) m-0 text-2xs">
           Min {money.fmt(caps.minRequest, 0)} · max {money.fmt(caps.maxRequest, 0)} per request
         </p>
-        {blocked && <p className="font-body text-(--color-text-2) m-0 text-center text-xs">{blocked}</p>}
         <div className="[&>div>button]:h-11 [&>div>button]:w-full [&>div>button:disabled]:bg-(--color-surface-3) [&>div>button:disabled]:text-(--color-text-3) [&>div>button:disabled]:opacity-100">
           {deposit ? (
             <Action label="Request deposit" disabled={!canRequest} request={amount && minOut !== null ? { kind: "request_deposit", assets: amount, minSharesOut: minOut } : null} />

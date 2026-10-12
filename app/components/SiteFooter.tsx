@@ -14,9 +14,9 @@ export function SiteFooter() {
           {[
             ["/reserve", "Transparency"],
             ["/operator", "Operator"],
-            ["/investment", "Investment"],
             ["/demo", "Demo"],
             ["/admin", "Admin"],
+            ["/capital", "Capital queue"],
           ].map(([href, label]) => (
             <Link key={href} href={href!} className="font-mono ext-link" style={{ fontSize: 12 }}>
               {label}

@@ -6,7 +6,7 @@
  *   1. Hero: the reserve balance, one status line against what it must hold,
  *      four figures that open their tab, and what the program has open.
  *   2. Where the capital sits: the reserve balance split by what it backs.
- *   3. What never changes: the two spec promises.
+ *   3. What the program enforces: the two spec promises.
  * Side column: the latest movements of the ledger, then the reserve balance
  * over time rebuilt from those movements.
  * Renders on-chain values from /api/ledger; nothing beyond sums and shares.
@@ -121,7 +121,7 @@ function programLine(r: ReserveView): { text: string; fine: boolean } {
     stopped.add("redemptions");
     why.push("queue fills halted");
   }
-  if (stopped.size === 0) return { text: "All open: guarantees, deposits, redemptions.", fine: true };
+  if (stopped.size === 0) return { text: "Nothing paused: guarantees and queue fills run normally.", fine: true };
   const open = ALL_OPS.filter((x) => !stopped.has(x));
   const list = ALL_OPS.filter((x) => stopped.has(x)).join(", ");
   return { text: `Stopped: new ${list} (${why.join("; ")}).${open.length ? ` Open: ${open.join(", ")}.` : ""} Claim payments are never stopped.`, fine: false };
@@ -347,12 +347,12 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
   );
 }
 
-// ── 3 · What never changes ──────────────────────────────────────────────────
+// ── 3 · What the program enforces ──────────────────────────────────────────────────
 
 function Promises() {
   return (
     <section aria-labelledby="promises-h" className="flex flex-col gap-4">
-      <H3 id="promises-h">What never changes</H3>
+      <H3 id="promises-h">What the program enforces</H3>
       <ol className="m-0 grid gap-4 p-0" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))" }}>
         {PROMISES.map(([text, note, href, cta], i) => (
           <li key={href} className="bg-(--color-surface) flex list-none flex-col gap-2 border p-6">

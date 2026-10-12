@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The reads behind /investment: the shared /api/ledger poll and
+ * The reads behind /capital: the shared /api/ledger poll and
  * the connected wallet's /api/investor view (balances, allowlist state), with
  * the wallet's queue entries derived from them. No new data.
  */

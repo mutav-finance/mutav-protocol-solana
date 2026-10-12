@@ -84,7 +84,7 @@ export default function Landing() {
           </h2>
           <p className="font-body" style={{ fontSize: 14, color: "var(--color-text-2)", margin: "0 0 28px", maxWidth: 720, lineHeight: 1.6 }}>
             One Solana program holds the reserve. The Operator runs guarantees and claims; the Reserve Admin is a Squads multisig with a time lock; the
-            Investor enters and leaves through the FIFO queue. Nobody holds a key that can move reserve funds alone.
+            A capital provider enters and leaves through the FIFO queue. Nobody holds a key that can move reserve funds alone.
           </p>
           <ProtocolDiagram />
         </section>

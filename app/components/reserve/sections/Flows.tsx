@@ -245,8 +245,8 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
           }
         />
         <div className="grid grid-cols-1 gap-px border lg:grid-cols-2" style={{ background: "var(--color-border)" }}>
-          <FlowGroup title="Earnings" note="What the reserve earned from its guarantees, after the claim payments it made." net={earned} bars={earnings} />
-          <FlowGroup title="Capital" note="Investor money filled in and out of the reserve. Not earnings." net={capital} bars={capitalBars} />
+          <FlowGroup title="Net from guarantees" note="Guarantee fees and issuer income, minus claim payments." net={earned} bars={earnings} />
+          <FlowGroup title="Capital" note="Capital provider money filled in and out of the reserve. Not income." net={capital} bars={capitalBars} />
         </div>
       </div>
 

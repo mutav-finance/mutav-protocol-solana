@@ -71,7 +71,7 @@ function Summary({ deposits, redeems, capital, owed, now }: { deposits: QueueRow
         <span className="font-body text-(--color-text-2) text-sm">{deposits.length === 0 ? "No deposit is waiting." : `${plural(deposits.length, "deposit", "deposits")} waiting. Filled in order.`}</span>
       </div>
       <div className="grid grid-cols-1 gap-px sm:grid-cols-2 lg:col-span-7">
-        <Cell label="Shares to redeem" value={fmtShares(sum(redeems))} sub={`Shares investors asked to turn back into BRS, in ${plural(redeems.length, "request", "requests")}.`} />
+        <Cell label="Shares to redeem" value={fmtShares(sum(redeems))} sub={`Shares capital providers asked to turn back into BRS, in ${plural(redeems.length, "request", "requests")}.`} />
         <Cell label="Oldest request" value={oldest ? fmtAgo(now, oldest.requestedAt) : "none"} sub={oldest ? `The ${oldest.side === "deposit" ? "deposit" : "redemption"} waiting longest; it fills next on its side.` : "Nothing is waiting in either line."} />
         <Cell label="Ready to collect" value={fmtBrs(owed)} sub="Redeemed BRS not yet withdrawn." />
         <Cell label="MUTAV capital" value={`${ours} of ${all.length}`} sub="Requests from the MUTAV capital wallet. They wait in the same line, with no priority." />
@@ -157,9 +157,9 @@ export function Queue({ r, l }: { r: ReserveView; l: Ledger }) {
           How the queue works
         </summary>
         <ol className="font-body text-(--color-text-2) m-0 mt-4 flex max-w-[720px] list-decimal flex-col gap-2 pl-5 text-sm leading-relaxed">
-          <li>An allowlisted investor requests a deposit (BRS) or a redemption (shares).</li>
+          <li>An allowlisted capital provider requests a deposit (BRS) or a redemption (shares).</li>
           <li>The Reserve Admin fills requests oldest first. No request skips the line.</li>
-          <li>The investor then collects their shares or BRS from the collection account.</li>
+          <li>The capital provider then collects their shares or BRS from the collection account.</li>
         </ol>
       </details>
     </div>

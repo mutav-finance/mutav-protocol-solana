@@ -16,6 +16,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
 
   test("/ — story, live strip from the chain, diagram, shared nav", async ({ page }) => {
     await page.goto("/");
+    await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Not open to public investment.");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("backed by a reserve anyone can verify");
     const strip = page.getByTestId("live-strip");
     await expect(strip).toContainText("LIVE FROM LOCALNET");
@@ -84,6 +85,10 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
 
     await page.goto("/reserve/risks");
     await expect(page.getByRole("heading", { name: "Claim payment caps" })).toBeVisible();
+    await expect(page.getByRole("status", { name: "Reserve token account freeze status" })).toContainText("NOT FROZEN");
+    await expect(page.getByText("A freeze stops every outflow, claim payments included.")).toBeVisible();
+    await expect(page.getByText("Not open to public investment.", { exact: true })).toBeVisible();
+    await expect(page.getByText("nothing here is an offer", { exact: false }).first()).toBeVisible();
     await noBannedWords(page);
 
     await page.goto("/reserve/verify");
@@ -137,18 +142,23 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/investment — swap-style request card and requests, read-only without a wallet, gated on the on-chain allowlist", async ({ page, request }) => {
-    for (const old of ["/dashboard", "/investor"]) {
+  test("/capital — not open to public investment; no request form without an allowlisted wallet", async ({ page, request }) => {
+    for (const old of ["/investment", "/dashboard", "/investor"]) {
       await page.goto(old);
-      await expect(page).toHaveURL(/\/investment$/);
+      await expect(page).toHaveURL(/\/capital$/);
     }
-    await expect(page.getByRole("heading", { name: "Investment", level: 1 })).toBeVisible();
-    await expect(page.getByText("Connect an approved wallet to request.")).toBeVisible();
+    await expect(page.getByRole("note", { name: "Pilot demo" })).toContainText("Not open to public investment.");
+    await expect(page.getByRole("heading", { name: "Capital queue", level: 1 })).toBeVisible();
+    await expect(page.getByRole("note", { name: "Not open to public investment" })).toContainText(
+      "Pilot capital comes from MUTAV's own wallet only. This page is not open to public investment and nothing here is an offer.",
+    );
     await expect(page.getByRole("group", { name: "Reserve figures" })).toContainText("Share price");
-    // Without a wallet the page stays read-only.
-    await expect(page.getByRole("button", { name: "Request deposit" })).toBeDisabled();
-    await page.getByRole("tab", { name: "Redeem" }).click();
-    await expect(page.getByRole("button", { name: "Request redemption" })).toBeDisabled();
+    // Without an allowlisted wallet there is no form: a static card, no amounts, no limits.
+    const card = page.getByRole("region", { name: "Capital requests" });
+    await expect(card).toContainText("Capital requests are limited to allowlisted wallets during the pilot. This is not an offer.");
+    await expect(page.getByRole("button", { name: "Request deposit" })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Redeem" })).toHaveCount(0);
+    await expect(page.getByLabel("You deposit")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Your requests" })).toBeVisible();
     const seeded = await (await request.get("/api/reserve")).json();
     const capital = (await (await request.get(`/api/investor?owner=${seeded.config.mutavCapitalWallet}`)).json()).allowlist.state;
@@ -171,6 +181,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
 
   test("/simulator — static reserve simulator in protocol terms, one full view", async ({ page }) => {
     await page.goto("/simulator");
+    await expect(page.locator(".demo-banner").and(page.getByRole("note", { name: "Pilot demo" }))).toContainText("Not open to public investment.");
     await expect(page.getByRole("heading", { name: "Reserve simulator", level: 1 })).toBeVisible();
     await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0,25");
     await expect(page.locator("#glance")).toContainText("Coverage & safety");

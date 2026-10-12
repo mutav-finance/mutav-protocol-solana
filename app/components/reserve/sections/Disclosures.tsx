@@ -2,10 +2,11 @@
 
 /**
  * /reserve · Risks (Disclosures). Answers one question: "What could stop this
- * reserve, and what limits each risk?" Two blocks, top to bottom:
- *   1. Claim payments: bounded by the two caps.
- *   2. Who provides capital (the allowlist).
- * The BRS freeze authority is shown on the Overview's mint card.
+ * reserve, and what limits each risk?" Three blocks, top to bottom:
+ *   1. The live freeze state of the reserve's BRS token account.
+ *   2. Claim payments: bounded by the two caps.
+ *   3. Who provides capital (the allowlist; not open to public investment).
+ * The BRS freeze authority is shown on the Verify tab's mint card.
  * Renders on-chain values from /api/ledger; nothing is computed here.
  */
 import type { ReactNode } from "react";
@@ -36,7 +37,21 @@ const HeadLink = ({ href, children }: { href: string; children: string }) => (
   </Link>
 );
 
-/** Block 1 · claim payments: two caps in one strip. */
+/** Block 1 · the one risk with a live on-chain state: is the reserve's BRS token account frozen? Error colour only when frozen. */
+function FreezeStatus({ r }: { r: ReserveView }) {
+  const frozen = r.token.reserveFrozen;
+  return (
+    <section aria-labelledby="risk-freeze-h" className="flex flex-col gap-4">
+      <BlockHead id="risk-freeze-h" title="Reserve token account freeze" note={<Lead lead="BRS is issued by Nora, and Nora can freeze it." className="text-sm">A freeze stops every outflow, claim payments included.</Lead>} />
+      <div className="bg-(--color-surface) flex flex-col gap-2 border px-6 py-4" style={frozen ? { borderColor: "var(--color-error)" } : undefined} role="status" aria-label="Reserve token account freeze status">
+        <Label>Reserve token account</Label>
+        <Mono style={{ fontSize: 22, fontWeight: 700, color: frozen ? "var(--color-error)" : "var(--color-text)", whiteSpace: "nowrap" }}>{frozen ? "FROZEN NOW" : "NOT FROZEN"}</Mono>
+      </div>
+    </section>
+  );
+}
+
+/** Block 2 · claim payments: two caps in one strip. */
 function ClaimLimits({ r }: { r: ReserveView }) {
   const fmtBrs = useFmt();
   const caps = r.config.caps;
@@ -63,7 +78,7 @@ function ClaimLimits({ r }: { r: ReserveView }) {
   );
 }
 
-/** Block 2 · who provides capital. Text only, no figures. */
+/** Block 3 · who provides capital. Text only, no figures. */
 function CapitalTerms() {
   return (
     <section aria-labelledby="risk-capital-h" className="flex flex-col gap-4">
@@ -76,6 +91,11 @@ function CapitalTerms() {
               Every approved wallet waits in the same line, oldest first.
             </Lead>
           </p>
+          <p className="m-0">
+            <Lead lead="Not open to public investment." className="text-sm">
+              The pilot runs on MUTAV&apos;s own capital; capital requests are limited to allowlisted wallets, and nothing here is an offer.
+            </Lead>
+          </p>
         </article>
       </div>
     </section>
@@ -85,6 +105,7 @@ function CapitalTerms() {
 export function Disclosures({ r }: { r: ReserveView }) {
   return (
     <div className="flex flex-col gap-10 md:gap-12">
+      <FreezeStatus r={r} />
       <ClaimLimits r={r} />
       <CapitalTerms />
     </div>

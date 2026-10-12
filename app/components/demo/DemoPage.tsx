@@ -110,7 +110,7 @@ export function DemoPage() {
 
           <Section id="guided" title="Guided demo" kicker="Six steps" roles={<RoleLegend />}>
             <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <Step n={1} title="Capital in" instruction="request_deposit → fulfil_deposits → claim_shares" roles={["investor", "admin"]} why={<>The Investor (an allowlisted capital wallet) requests a deposit. It waits in the FIFO queue until the Reserve Admin multisig fulfils it at the NAV of that moment; then the Investor claims its shares. MUTAV&apos;s capital takes the same path as any allowlisted investor: no special door.</>}>
+              <Step n={1} title="Capital in" instruction="request_deposit → fulfil_deposits → claim_shares" roles={["investor", "admin"]} why={<>The Investor (an allowlisted capital wallet) requests a deposit. It waits in the FIFO queue until the Reserve Admin multisig fulfils it at the NAV of that moment; then the Investor claims its shares. MUTAV&apos;s capital takes the same path as any allowlisted capital provider: no special door.</>}>
                 <Sub title="a. Request" role="investor"><DepositForm /></Sub>
                 <Sub title="b. Fulfil" role="admin">
                   <PendingDeposits />
@@ -160,7 +160,7 @@ export function DemoPage() {
 
           <Section id="investor" title="Investor actions" kicker="Elsewhere" roles={<RoleTag role="investor" bordered />}>
             <Note>
-              Deposits, redemptions, cancels and claims are on <Link href="/investment" className="ext-link">/investment</Link>. Requests need an allowlisted wallet.
+              Deposits, redemptions, cancels and claims are on <Link href="/capital" className="ext-link">/capital</Link>. Requests need an allowlisted wallet.
             </Note>
           </Section>
 

@@ -1,11 +1,6 @@
-import type { Metadata } from "next";
-import { InvestmentPage } from "@/components/investment/InvestmentPage";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Investment",
-  description: "Deposit BRS into the MUTAV pilot reserve's capital queue, or redeem shares. Allowlisted wallets only.",
-};
-
+/** /investment became /capital (the capital queue); old links keep working. */
 export default function Page() {
-  return <InvestmentPage />;
+  permanentRedirect("/capital");
 }

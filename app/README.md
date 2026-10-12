@@ -4,13 +4,15 @@ A small web app that shows the MUTAV reserve program working on Solana. Built fo
 
 MUTAV is an institutional rental guarantor in Brazil. Every guarantee (a *fiança*) is backed by a reserve anyone can verify on Solana. Capital actions are gated by an on-chain allowlist (KYC off-chain).
 
+**Not open to public investment.** The pilot runs on MUTAV's own capital, and every page carries the demo banner (`components/DemoBanner.tsx`). Investor-facing copy leads with: not open to public investment. Nothing in this app is an offer.
+
 Live: [reserve.mutav.finance](https://reserve.mutav.finance).
 
 | Route | What it is |
 |---|---|
 | `/` | Landing: the story, a live reserve strip with a coverage chart, how it works, who does what, the protocol diagram |
 | `/reserve` | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Explorer, and the permissionless `refresh`; snapshot charts of each |
-| `/investor` | The capital provider's view: allowlist status (on-chain root + `ALLOWLIST`), position, own queue entries, and `request_deposit` / `cancel_deposit` / `claim_shares` / `request_redeem` / `cancel_redeem` / `claim_assets`. Read-only unless the wallet's Merkle proof verifies |
+| `/capital` | The capital queue (`/investment`, `/investor`, `/dashboard` redirect here). Leads with: not open to public investment; pilot capital is MUTAV's own wallet. The capital provider's view: allowlist status (on-chain root + `ALLOWLIST`), position, own queue entries, and `request_deposit` / `cancel_deposit` / `claim_shares` / `request_redeem` / `cancel_redeem` / `claim_assets`. The request form renders only once the wallet's Merkle proof verifies; everyone else sees a static "allowlisted wallets only, not an offer" card |
 | `/operator` | Operator console: today MUTAV's team signs by hand with the operator wallet (later mutav-app's backend, KMS key). Live limits (claim caps window, payouts vs SLA, free capital), every operator instruction with its bound shown before signing, duties (today → later), recent operator transactions, safety. Actions enabled only for `VaultConfig.operator` |
 | `/demo` | Guided operator demo (six steps, with the coverage-gate preview); free-form operator actions are on `/operator` |
 | `/admin` | `VaultConfig`, Squads v4 proposal builders (create / approve / execute, with the time lock), direct signing on localnet only |

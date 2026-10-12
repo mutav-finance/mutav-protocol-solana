@@ -1,7 +1,7 @@
 /**
  * "Who does what": the three roles, each with the instructions the program
  * accepts its signature for (from lib/roles, which mirrors the program's
- * signer checks). Same tags as on /reserve, /investor, /demo and /admin.
+ * signer checks). Same tags as on /reserve, /capital, /demo and /admin.
  */
 import Link from "next/link";
 import { RoleMarker, RoleTag } from "@/components/RoleTag";
@@ -16,7 +16,7 @@ const NOTE: Partial<Record<Role, string>> = {
 const PAGE: Partial<Record<Role, [string, string]>> = {
   admin: ["/admin", "Admin console"],
   operator: ["/operator", "Operator console"],
-  investor: ["/investment", "Investment"],
+  investor: ["/capital", "Capital queue"],
 };
 
 export function WhoDoesWhat() {

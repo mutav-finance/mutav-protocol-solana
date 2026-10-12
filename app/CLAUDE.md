@@ -2,7 +2,7 @@
 
 # app/ — pilot web app rules
 
-Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto World's Fair, 2026). Live at https://reserve.mutav.finance (Vercel project `mutav-pilot-app`, team `mutav`, root `app`, deploys from `main`). Routes: `/` landing, `/reserve` public transparency, `/operator` operator console, `/investor` allowlist-gated investor view, `/admin` Squads admin console, `/demo` guided walkthrough, `/simulator` reserve simulator (static `public/simulator.html`). Spec: [`docs/spec.md`](docs/spec.md). It lives in `app/` of `mutav-protocol-solana`; the repo-root [`CLAUDE.md`](../CLAUDE.md) rules apply here too. Production surfaces stay in `mutav-app`, which ports these screens later (mutav-app #369).
+Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto World's Fair, 2026). Live at https://reserve.mutav.finance (Vercel project `mutav-pilot-app`, team `mutav`, root `app`, deploys from `main`). Routes: `/` landing, `/reserve` public transparency, `/operator` operator console, `/admin` Squads admin console, `/capital` allowlist-gated capital queue (`/investment`, `/investor` and `/dashboard` redirect there), `/demo` guided walkthrough, `/simulator` reserve simulator (static `public/simulator.html`). Spec: [`docs/spec.md`](docs/spec.md). It lives in `app/` of `mutav-protocol-solana`; the repo-root [`CLAUDE.md`](../CLAUDE.md) rules apply here too. Production surfaces stay in `mutav-app`, which ports these screens later (mutav-app #369).
 
 ## Rules (from the spec — non-negotiable)
 
@@ -13,6 +13,7 @@ Demo and reference app for the MUTAV reserve program on Solana (Colosseum Crypto
 - **Read the chain, don't mirror it.** Every number on screen comes from on-chain accounts via the client's read helpers (`@mutav-finance/mutav-protocol-solana`). Previews (the coverage gate) use the client's math mirror and are **labelled as previews**. Never hardcode or cache a number the chain owns.
 - **Language:** English. MUTAV's guarantee is a *fiança*: say "guarantee fee", "claim payment", "reserve". Never "premium", "insurance", "policy", "yield vault" (a unit test greps the UI for these).
 - **Allowlist and demo banner.** Investor actions are gated by the on-chain allowlist (KYC off-chain). Beyond that, every page (and `public/simulator.html`) carries the demo banner (`components/DemoBanner.tsx`): pilot demo, **not open to public investment**, capital participation only through a regulated vehicle to eligible investors. That is the legal floor (founder decision, 2026-10-11); never remove or soften it until the regulated vehicle is live.
+- **Investor-facing copy leads with: not open to public investment.** `/capital` and the Risks tab say so in the page itself (pilot capital is MUTAV's own wallet; nothing is an offer). The request form (amounts, preview, limits) renders only for an allowlisted wallet; everyone else sees a static card. Public copy says "capital provider"; "Investor" stays only as the on-chain role tag.
 - **Investor money in dollars.** On investor screens, BRS amounts show in USD at the `/api/fx` rate (display only; the chain holds BRS). Where the copy is about BRS itself (its peg, its value), use reais.
 
 ## Dependencies

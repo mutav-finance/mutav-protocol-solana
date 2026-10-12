@@ -31,8 +31,8 @@ export const FX_SCALE = 1_000_000n;
 /** BRS base units (at par to BRL) as USD base units (6 decimals), truncated: never shown above its value. */
 export const brsToUsd = (base: bigint, usdBrl: bigint) => (base * FX_SCALE) / usdBrl;
 
-/** A BRS amount shown in dollars at `usdBrl`: `$ 2,285.18`. Display only; the chain holds BRS. */
-export const fmtUsd = (base: bigint, usdBrl: bigint, places = 2) => `$ ${fmtUnits(brsToUsd(base, usdBrl), BRS_DECIMALS, places)}`;
+/** A BRS amount shown in US dollars at `usdBrl`: `US$ 2,285.18`. Display only; the chain holds BRS. */
+export const fmtUsd = (base: bigint, usdBrl: bigint, places = 2) => `US$ ${fmtUnits(brsToUsd(base, usdBrl), BRS_DECIMALS, places)}`;
 
 /** Reserve shares: `12,345.678901`. */
 export const fmtShares = (base: bigint) => fmtUnits(base, SHARE_DECIMALS, 6);

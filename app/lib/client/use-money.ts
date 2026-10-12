@@ -13,7 +13,7 @@ export type Money = {
   fx: FxView | null;
   /** A BRS amount as dollars, or as reais when there is no rate. */
   fmt: (base: bigint, places?: number) => string;
-  /** The rate in use, `$1 = R$ 5.40`; null without one. */
+  /** The rate in use, `US$1 = R$ 5.40`; null without one. */
   rate: string | null;
 };
 
@@ -22,6 +22,6 @@ export function useMoney(): Money {
   return {
     fx,
     fmt: (base, places = 2) => (fx ? fmtUsd(base, fx.usdBrl, places) : fmtBrs(base, places)),
-    rate: fx ? `$1 = R$ ${fmtUnits(fx.usdBrl, 6)}` : null,
+    rate: fx ? `US$1 = R$ ${fmtUnits(fx.usdBrl, 6)}` : null,
   };
 }

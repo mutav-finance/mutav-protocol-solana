@@ -63,7 +63,7 @@ During the launch and the hackathon MUTAV's team operates the reserve by hand fr
 - **Recent activity:** the operator key's last MUTAV transactions, and the last operator `accept_role` (role = 1) in VaultConfig's recent history, when the RPC keeps history.
 - **Safety:** what bounds a compromised operator key (caps, fixed payments account, `revoke_operator`, admin-only config).
 
-### `/investor` Investor view
+### `/capital` Capital queue (was `/investor`)
 
 Read by anyone; actions gated on the allowlist.
 
