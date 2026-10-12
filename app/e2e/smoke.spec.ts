@@ -53,6 +53,33 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
+  test("/reserve and /capital render from the cheap reads while the ledger's history is throttled", async ({ page }) => {
+    // The public devnet RPC throttles the heavy history read: /api/history and /api/ledger answer 503 busy.
+    await page.route(/\/api\/(history|ledger)(\?|$)/, (route) =>
+      route.fulfill({ status: 503, headers: { "content-type": "application/json", "retry-after": "10" }, body: JSON.stringify({ error: "Chain busy: the RPC is rate limiting, retrying shortly", busy: true, retryAfter: 10 }) }),
+    );
+    await page.goto("/reserve");
+    await expect(page.locator("main")).toContainText("Reserve balance?R$ 29,500.00");
+    await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Where the capital sits" })).toBeVisible();
+    // Only the history panel waits, inside the side column.
+    await expect(page.locator("aside").getByText("Chain busy, retrying…")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recent activity" })).toHaveCount(0);
+
+    await page.goto("/reserve/coverage");
+    await expect(page.getByText("3 active guarantees")).toBeVisible();
+    await expect(page.getByText("Totals · cover against the reserve")).toBeVisible();
+    await expect(page.getByText("Coverage required (higher of the two)")).toBeVisible();
+
+    await page.goto("/reserve/capital");
+    await expect(page.getByRole("heading", { name: "Capital queue" })).toBeVisible();
+    await expect(page.getByText("Chain busy, retrying…")).toBeVisible();
+
+    await page.goto("/capital");
+    await expect(page.getByRole("group", { name: "Reserve figures" })).toContainText("R$ 29,500.00");
+    await expect(page.getByRole("heading", { name: "Your requests" })).toBeVisible();
+  });
+
   test("/reserve — first visit opens How to read this page", async ({ page }) => {
     await page.addInitScript(() => localStorage.removeItem("mutav-transparency-intro-v1"));
     await page.goto("/reserve");

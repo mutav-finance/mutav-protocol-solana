@@ -1,7 +1,11 @@
 "use client";
 
-/** The /reserve tab bodies: each renders its sections from the shared read. */
-import { useReserve } from "@/components/reserve/ReserveShell";
+/**
+ * The /reserve tab bodies: each renders its sections from the shared reads.
+ * A section that needs the ledger's accounts or history waits for that read
+ * inside its own slot (`<Needs>`); the rest of the tab renders from /api/reserve.
+ */
+import { Needs, useReserve } from "@/components/reserve/ReserveShell";
 import { AccountsSection } from "@/components/reserve/sections/Accounts";
 import { ClaimsSection } from "@/components/reserve/sections/Claims";
 import { CoverageSection } from "@/components/reserve/sections/Coverage";
@@ -11,18 +15,32 @@ import { Glossary } from "@/components/reserve/sections/Glossary";
 import { QueueSection } from "@/components/reserve/sections/Queue";
 
 export function CoverageTab() {
-  return <CoverageSection d={useReserve().d} />;
+  const { d } = useReserve();
+  return (
+    <Needs panel="coverage">
+      <CoverageSection d={d} />
+    </Needs>
+  );
 }
 export function ClaimsTab() {
-  return <ClaimsSection d={useReserve().d} />;
+  const { d } = useReserve();
+  return (
+    <Needs panel="claims">
+      <ClaimsSection d={d} />
+    </Needs>
+  );
 }
 /** Capital: where the money came from and went (flows, ledger), and the queue. */
 export function CapitalTab() {
   const { d } = useReserve();
   return (
     <>
-      <FlowsSection d={d} />
-      <QueueSection d={d} />
+      <Needs panel="flows">
+        <FlowsSection d={d} />
+      </Needs>
+      <Needs panel="queue">
+        <QueueSection d={d} />
+      </Needs>
     </>
   );
 }
