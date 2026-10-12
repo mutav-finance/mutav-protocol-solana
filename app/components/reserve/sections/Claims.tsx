@@ -12,7 +12,7 @@ import { useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { fmtDuration } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
-import { claimsTimeline, type ClaimRow, type Ledger, type ReserveView } from "@/lib/view";
+import { claimsTimeline, isUnpaid, type ClaimRow, type Ledger, type ReserveView } from "@/lib/view";
 import { claimSpeed, frac } from "@/lib/charts";
 import { C, ChartFrame, Legend, Row, RowLabel, Swatch, Track, type Seg } from "@/components/charts/Charts";
 
@@ -63,7 +63,7 @@ function Summary({ rows, total, period, onPeriod }: { rows: ClaimRow[]; total: n
   const settled = rows.filter((c) => c.settledAt !== null).length;
   const pay = slowest(rows.map((c) => c.fileToPay));
   const settle = slowest(rows.map((c) => c.payToSettle));
-  const awaiting = rows.filter((c) => c.stage === "filed").length;
+  const awaiting = rows.filter((c) => isUnpaid(c.stage)).length;
   return (
     <div className="bg-(--color-surface) border">
       <div className="flex flex-wrap items-start justify-between gap-6 p-6">
@@ -133,7 +133,7 @@ function SpeedChart({ rows, now }: { rows: ClaimRow[]; now: bigint }) {
 }
 
 export function Claims({ r, l }: { r: ReserveView; l: Ledger }) {
-  const rows = claimsTimeline(l);
+  const rows = claimsTimeline(l, r.config.caps.maxClaimPerCall);
   if (rows.length === 0)
     return (
       <div className="flex flex-col gap-6">

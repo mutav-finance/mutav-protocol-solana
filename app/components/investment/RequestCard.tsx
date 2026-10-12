@@ -26,6 +26,7 @@ import { BRS_DECIMALS, SHARE_DECIMALS, fmtShares, fmtUnits, parseBrs, parseUnits
 import { limitWithSlippage } from "@/lib/queue";
 import type { Money } from "@/lib/client/use-money";
 import type { InvestorView } from "@/lib/server/investor";
+import { redeemSizeCheck } from "@/lib/view";
 
 type Side = "deposit" | "redeem";
 
@@ -97,9 +98,11 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
   // What the request is worth in BRS, for the per-request limits.
   const value = amount ? (deposit ? amount : preview) : null;
   const canRequest = !paused && (deposit ? listed : listed || holder);
-  const outside = value !== null && (value < caps.minRequest || value > caps.maxRequest);
-
   const balance = deposit ? (inv?.brs.amount ?? null) : (inv?.shares.amount ?? null);
+  // Redeem: below the minimum only a full exit of the share account passes (ADR 0029).
+  const outside = deposit
+    ? value !== null && (value < caps.minRequest || value > caps.maxRequest)
+    : amount !== null && redeemSizeCheck(amount, balance, sharesOutstanding, netAssets, caps) !== null;
   const decimals = deposit ? BRS_DECIMALS : SHARE_DECIMALS;
   const overBalance = !deposit && amount !== null && balance !== null && amount > balance;
   const outDecimals = deposit ? SHARE_DECIMALS : BRS_DECIMALS;

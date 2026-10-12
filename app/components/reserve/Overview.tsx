@@ -23,7 +23,7 @@ import { HeroAmount, Lead, fmtAgo } from "@/components/reserve/sections/shared";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
 import { fmtBps, fmtRatio, fmtSharePrice, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
-import { capitalQueue, claimsTimeline, coverageRows, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
+import { capitalQueue, claimsTimeline, coverageRows, isUnpaid, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
 
 /** The two promises the spec makes, each linked to the view that shows them. */
 const PROMISES: [string, string, string, string][] = [
@@ -152,7 +152,7 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
 
   const active = coverageRows(l.guarantees).filter((g) => g.active);
   const agencies = new Set(active.map((g) => g.agencyId)).size;
-  const awaiting = claimsTimeline(l).filter((c) => c.stage === "filed").length;
+  const awaiting = claimsTimeline(l).filter((c) => isUnpaid(c.stage)).length;
 
   const kpis: { label: string; value: string; def: string; href?: string }[] = [
     { label: "Free capital", value: fmtBrs(sol.freeCapital), def: "Free for new guarantees and redemptions." },
@@ -275,7 +275,7 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
   const fmtBrs = useFmt();
   const c = capitalSplit(r.coverage, r.state.provisions);
   const under = c.shortfall > 0n;
-  const filed = claimsTimeline(l).filter((x) => x.stage === "filed").length;
+  const filed = claimsTimeline(l).filter((x) => isUnpaid(x.stage)).length;
   const rows = splitRows(c, filed);
   const committed = c.provisions + c.restRequired;
 

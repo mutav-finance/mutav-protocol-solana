@@ -25,7 +25,7 @@ import { usePoll } from "@/lib/client/use-poll";
 import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
 import { claimCap, claimCapRefusal, claimWork, DUTIES } from "@/lib/operator";
 import type { OperatorHistory } from "@/lib/server/operator";
-import { claimsTimeline, type Ledger, type ReserveView } from "@/lib/view";
+import { claimsTimeline, isUnpaid, type Ledger, type ReserveView } from "@/lib/view";
 
 const REVOKED = "11111111111111111111111111111111";
 
@@ -95,14 +95,14 @@ const kv = (k: string, v: ReactNode) => (
 function PayBound() {
   const { reserve, ledger } = useLive();
   const cap = claimCap(reserve.config, reserve.state, reserve.now);
-  const filed = claimsTimeline(ledger).filter((c) => c.stage === "filed");
+  const filed = claimsTimeline(ledger).filter((c) => isUnpaid(c.stage));
   return (
     <Bound>
       {kv("Max per call", fmtBrs(cap.perCall))}
       {kv("Left in the last 31 days", `${fmtBrs(cap.remaining)} of ${fmtBrs(cap.perPeriod)}`)}
       {kv("Liquid BRS in the reserve", fmtBrs(reserve.state.brsBalance))}
       {filed.map((c) => {
-        const refusal = claimCapRefusal(cap, c.provision);
+        const refusal = claimCapRefusal(cap, c.provision, c.approvedAmount);
         return kv(`PREVIEW · ${c.guaranteeId.slice(0, 8)}… ${fmtBrs(c.provision, 0)}`, <span style={{ color: refusal ? "var(--color-error)" : "var(--color-success)" }}>{refusal ? `refused: ${refusal}` : "within the caps"}</span>);
       })}
       <span>Never gated by required coverage: under-coverage does not stop a claim payment. The destination is fixed to the payments account.</span>
@@ -204,7 +204,7 @@ function Console({ locked }: { locked: boolean }) {
 // ── Live limits, duties, activity, safety ───────────────────────────────────
 
 function Limits({ r, l }: { r: ReserveView; l: Ledger }) {
-  const rows = claimsTimeline(l);
+  const rows = claimsTimeline(l, r.config.caps.maxClaimPerCall);
   const work = claimWork(rows);
   const open = rows.filter((c) => c.stage !== "settled");
   return (

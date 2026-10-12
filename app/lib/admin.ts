@@ -40,7 +40,7 @@ export const CONFIG_FIELD_HOME = {
 export const CONFIG_FIELD_NOT_EDITED: Record<string, string> = {
   featureFlags: "SUPPORTED_FEATURES = 0 in the pilot binary: no feature can be switched on",
   mutavCapitalWallet: "the allowlisted capital wallet; fixed for the pilot",
-  stressBuffer: "edited with the coverage screens of a later app change (ADR 0022); read by no rule of this binary yet",
+  stressBuffer: "locked by ADR 0028 (R$19k, DEVNET_LOCKED): the floor inside coverage required, max(c × cover, provisions + min(buffer, unprovisioned)) (ADR 0022)",
   maxQueueWaitSecs: "the exit fallback is off (0) until it is built (ADR 0025)",
   maxReinstateAge: "edited with reinstate_guarantee, a later upgrade (ADR 0020)",
 };
