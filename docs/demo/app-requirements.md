@@ -1,10 +1,10 @@
 # Demo: app and devnet requirements
 
-What the pilot app, the capture harness and the staged devnet state must provide before the product demo is recorded. These are written requirements for the code sessions; owners are unassigned. The cut is described in [`script.md`](script.md) and [`storyboard.html`](storyboard.html) (v5).
+What the pilot app, the capture harness and the staged devnet state must provide before the product demo is recorded. These are written requirements for the code sessions; owners are unassigned. The cut is described in [`script.md`](script.md) and [`storyboard.html`](storyboard.html) (v6).
 
 The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with `main` and deployed to `reserve.mutav.finance` against the devnet program. A cleaned `/demo` is the optional alternative surface; the requirements below apply to whichever surface is recorded.
 
-**v5 change:** the demo is organised in three chapters, one per pitch pillar (programmable, transparent reserve · settled in minutes · capital efficiency). The claim now runs live on camera, so its confirmations must stay visible. Chapter titles, the elapsed timer, the coverage meter, the "Coverage gate · refused" chip, the cards and the honesty labels are **edit overlays, not app code**. The numbers are unchanged from v4 (6× + 6× cover, rent R$1,500).
+**v6 change (hybrid):** the cold open, the agency flash and chapters 1–2 are recorded live on devnet; chapter 3 is a local simulation on an accelerated clock with a mock BRS mint, labelled by the app banner (PR #72: `NEXT_PUBLIC_ACCELERATED_CLOCK=1` makes the banner read "Local simulation · accelerated clock" on every page, legal line kept). No corner badges; a 1.5 s switch card is made in the editor. The devnet fee and withdrawal staging (`05-offcamera`) is dropped. **Earlier (v5):** the demo is organised in three chapters, one per pitch pillar (programmable, transparent reserve · settled in minutes · capital efficiency). The claim now runs live on camera, so its confirmations must stay visible. Chapter titles, the elapsed timer, the coverage meter, the "Coverage gate · refused" chip, the cards and the honesty labels are **edit overlays, not app code**. The numbers are unchanged from v4 (6× + 6× cover, rent R$1,500).
 
 ## Must (before recording)
 
@@ -15,7 +15,7 @@ The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with 
 | M3 | **The register form holds its "Confirmed" result**, with no red preview after it. Today it resets to the next reference at once and shows a red "Send anyway" preview under the result. | F3 holds on the confirmation. |
 | M4 | **`pay_claim` and `settle_payout` keep a visible confirmation after sending**: the status, the signature and the before/after. Today the row disappears once sent and takes all three with it. | The claim runs live in pillar 2 (F7). |
 | M5 | **`/reserve/claims` shows each claim's stage (needs approval → approved → paid → settled) and the filed, paid and settled timestamps** (to the second) and the filed → settled duration. Ana's R$1,500 claim is under the R$15k per-call cap, so it skips `approve_claim`. | F8 and the [N] minutes. |
-| M6 | **Dropped (legal floor):** no in → out position on `/capital` in the video; a gain to a capital wallet reads as a return. F12 holds on the page's own notice: not open to public investment; pilot capital is MUTAV's own wallet. | Pillar 3's end state (F12). |
+| M6 | **In → out on `/capital`, in the localnet simulation only:** the capital provider's deposited and withdrawn amounts in reais (R$[X] in → R$[X] out), under the "Local simulation · accelerated clock" banner. No rate or APY. Fallback: an edit overlay from the two transaction amounts. | Chapter 3 end state (F13). |
 
 ## Covered by #59 (merged)
 
@@ -43,17 +43,17 @@ The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with 
 | Agency | F2 | `app.mutav.finance` | A demo agency account with Ana's fictional lease (rent R$1,500), or the harness's agency stub |
 | 1 · Programmable, transparent reserve | F3–F6 | `/operator`, Explorer, `/reserve/coverage` | M2, M3; rent 1500, 6× + 6× in the register form |
 | 2 · Settled in minutes | F7–F8 | `/operator`, `/reserve/claims` | M4, M5; the pay tab shows the R$15,000 per-call cap |
-| 3 · Capital efficiency | F9–F12 | `/reserve`, `/reserve/capital`, `/capital` | M1, M6, S2, S3 |
+| 3 · Capital efficiency (localnet) | F9–F13 | `/reserve` (history chart, Month 1…6), `/reserve/capital`, `/reserve/claims`, `/capital` | M1, M6, S2, S3; PR #72 banner; the simulation below |
 | Close | F13 | card | none |
 
-## Capture harness → v5
+## Capture harness → v6
 
-The harness on `feat/demo-capture` (routes and locators in `app/e2e/demo/pages.ts`) was built for v2 (the under-coverage take, c = 0.10). A code session must change:
+The harness on `feat/demo-capture` (routes and locators in `app/e2e/demo/pages.ts`). A code session must provide:
 
-1. **`00-setup` (off camera):** the ADR 0028 seed via `DEMO_PARAMS` (c = 0.25): deposits A R$40,000 and B R$4,000 with the Squads fill; 8 leases at rent 1500, 6× + 6×.
-2. **The 5 live actions, on camera:** register Ana (`MTV-PF-0009`), the refused send (`MTV-PF-0010`), `file_claim` R$1,500 (`NTC-PF-0001`), `pay_claim`, `settle_payout`. **Log each transaction's signature and on-chain block time** to a file, for the elapsed-timer overlay and [N].
-3. **Plates and end-state captures:** the F9 `/reserve` plate right after the refusal; Explorer on Ana's Guarantee PDA; and, after `05-offcamera`, the fee receipt (`/reserve/capital`), `/reserve` still covered, and the `/capital` notice.
-4. **`05-offcamera`:** `contribute_fees` R$3,060; B's `request_redeem` of all 6,666.67 shares → the admin `fulfil_redeems` fill → B's `claim_assets` (expected R$4,086.18); `refresh`.
+1. **Devnet (done):** the staged reserve (see below). No `00-setup` run is needed on devnet.
+2. **The 5 live actions on devnet, on camera:** register Ana (`MTV-PF-0100`), the refused send (`MTV-PF-0101`), `file_claim` R$1,500 (`NTC-PF-0001`), `pay_claim`, `settle_payout`. **One claim take** (R$2,000 left in the claim window); a retake uses a claim ≤ R$500. **Log each transaction's signature and on-chain block time**, for the timer and [N]. Rehearse on localnet first.
+3. **The localnet simulation (chapter 3):** the same program on a local validator with a mock BRS mint and an accelerated clock; the app started with `NEXT_PUBLIC_ACCELERATED_CLOCK=1` (PR #72). Six simulated months: guarantee fees and issuer revenue landing, one claim above R$15,000 going filed → `approve_claim` (admin) → paid → settled, the coverage ceiling rising, the value per share rising, and one capital provider's withdrawal above its deposit. Output the figures that fill the storyboard's [X] placeholders.
+4. **Chapter 3 captures:** `/reserve` history chart (Month 1…6), the Capital tab flows, `/reserve/claims` (the large claim), `/reserve` (ceiling and value per share), `/capital` (in → out).
 5. **The agency stub** for F2, or a hand capture.
 6. **The #45 routes:** `/reserve/coverage`, `/reserve/claims`, `/reserve/capital`, `/capital`, with locators for the restyled components.
 
@@ -61,9 +61,9 @@ Capture spec as built: Chromium's screencast delivers 1080p at 30 fps, and 2× s
 
 ## Devnet staging
 
-**Staged state (done, 2026-10-12):** program `GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`. Held R$44,000, cover R$144,000, required R$36,000, free R$8,000; 8 active leases `MTV-PF-0001…0008`. Value per share **0.600000** (earlier test claims), 73,333.33 shares outstanding (B holds 6,666.67). Ana is `MTV-PF-0009` (Imobiliária Planalto), the refused lease `MTV-PF-0010`; other agencies Casa Gaúcha Imóveis and Rio Grande Lar. An earlier R$18,000 test claim is on the public timeline and uses R$18,000 of the R$20,000 per-31-day cap: **only one R$1,500 claim can be paid** unless the admin raises `max_claim_per_period` (Squads `set_config`, 60 s time lock). Time locks on this deploy: 60 s (admin), 120 s (upgrade). The recording browser must load the operator's agency records before capture.
+**Staged state (done, 2026-10-12):** program `GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`. Held R$44,000, cover R$144,000, required R$36,000, free R$8,000; 8 active leases `MTV-PF-0001…0008`. Value per share **0.600000** (earlier test claims), 73,333.33 shares outstanding (B holds 6,666.67). Ana is `MTV-PF-0100` (Imobiliária Planalto), the refused lease `MTV-PF-0101`; other agencies Casa Gaúcha Imóveis and Rio Grande Lar. An earlier R$18,000 test claim is on the public timeline and uses R$18,000 of the R$20,000 per-31-day cap: **the claim is one devnet take** (R$2,000 left); a retake uses a claim ≤ R$500. Time locks on this deploy: 60 s (admin), 120 s (upgrade). The recording browser must load the operator's agency records before capture.
 
-Values from ADR 0028: c = 0.25, max_tvl R$1M, R$120k per guarantee, claim caps R$15k per call and R$20k per 31 days, requests R$1k–R$100k, fee take 20%. Total devnet BRS needed ≈ R$47,060 (≈ R$47,418 with the optional issuer-revenue sweep).
+Values from ADR 0028: c = 0.25, max_tvl R$1M, R$120k per guarantee, claim caps R$15k per call and R$20k per 31 days, requests R$1k–R$100k, fee take 20%. 
 
 | # | Step | Signer | Wait |
 |---|---|---|---|
@@ -73,19 +73,18 @@ Values from ADR 0028: c = 0.25, max_tvl R$1M, R$120k per guarantee, claim caps R
 | 4 | `00-setup`: `set_allowlist_root` with A and B (skip if set at `initialize`) | Admin Squads 2-of-2 | 60 s time lock |
 | 5 | `00-setup`: `request_deposit` A 40,000, B 4,000 → `fulfil_deposits` (count 2) → `claim_shares` | A, B; Admin Squads 2-of-2 | 60 s time lock |
 | 6 | `00-setup`: register 8 leases, rent 1,500, 6× + 6× (R$18,000 each), `MTV-PF-0001…0008`, agencies Imobiliária Planalto (Ana's), Casa Gaúcha Imóveis, Rio Grande Lar (fictional). Check: R$44,000 held, R$36,000 required, R$8,000 free, value per share 0.600000 | Operator | — |
-| 7 | On camera: the 5 live actions (harness item 2) | Operator | — |
-| 8 | `05-offcamera`: fees, redemption with the Squads fill, `refresh` | Operator; B; Admin Squads 2-of-2; anyone | 60 s time lock |
+| 7 | On camera: the 5 live actions (harness item 2), one claim take | Operator | — |
+| 8 | Chapter 3 on localnet: the six-month simulation (harness item 3), `NEXT_PUBLIC_ACCELERATED_CLOCK=1` | Simulation script; local admin | local |
 
 Free capital before Ana must be in [R$4,500, R$9,000) so that Ana fits and the next equal lease is refused. If staging drifts, close stray leases with `close_guarantee` VOID.
 
 ## Restore path
 
-None is needed: the reserve stays covered throughout and ends with free capital R$736.82, mode Normal. If any take leaves it under-covered, restore with a deposit and a Squads `fulfil_deposits` (allowed while under-covered: `programs/mutav/src/instructions/capital/fulfil_deposits.rs` calls it the recapitalization path; it is gated only by pause, the fulfil halt and the TVL cap), then send `refresh`, the only instruction that changes the mode. The alternative without the multisig is `close_guarantee` RELEASED on demo leases, then `refresh`.
+None is needed: the devnet reserve stays covered and ends with R$42,500 held, R$40,125 required, free capital R$2,375, mode Normal. If any take leaves it under-covered, restore with a deposit and a Squads `fulfil_deposits` (allowed while under-covered: `programs/mutav/src/instructions/capital/fulfil_deposits.rs` calls it the recapitalization path; it is gated only by pause, the fulfil halt and the TVL cap), then send `refresh`, the only instruction that changes the mode. The alternative without the multisig is `close_guarantee` RELEASED on demo leases, then `refresh`.
 
-## Publicly visible afterwards
+## Publicly visible afterwards (devnet)
 
-- `/reserve`: covered, mode Normal, stable R$40,861.82, required R$40,125, value per share 0.612927.
-- Ana's guarantee: active, default left R$7,500, exit left R$9,000, opaque id only.
+- `/reserve`: covered, mode Normal, R$42,500 held, R$40,125 required, value per share 0.579545. The capital payoff is shown only in the local simulation.
+- Ana's guarantee (`MTV-PF-0100`): active, default left R$7,500, exit left R$9,000, opaque id only.
 - `/reserve/claims`: two claims: an earlier R$18,000 test claim and Ana's R$1,500, filed → paid → settled.
-- `/reserve/capital`: deposits R$40,000 and R$4,000, one fee receipt, one claim payment, one redemption of R$4,086.18.
 - The refused lease leaves nothing on-chain.

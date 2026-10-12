@@ -1,4 +1,4 @@
-# Edit decision list (v5, 2:08)
+# Edit decision list (v6, 2:15)
 
 Program time is the finished cut (mm:ss.s). **Source** is a harness clip (`clips/<name>.mp4` from the capture run, with its `events.json`) or a kit file. Source in and out points are given against the clip's logged events (`type-start`, `click`, `result`, `hold`), because exact seconds depend on the capture; the program times are fixed.
 
@@ -17,15 +17,16 @@ Clip names: those that exist in the harness today are used as is (`b-register-an
 | S5 · F5 coverage | 0:27.0–0:37.0 | `a3-reserve-coverage` *(v5)*: `/reserve/coverage`, no wallet; 10 s incl. the `hold` | optional `minimap-4-reserve.png` | 0:31.0 on: hold still 1.0 → 1.6× on held vs required (R$36,000 → R$40,500) | hard cut | VO 6–7 |
 | S6 · F6 refusal | 0:37.0–0:58.0 | `c-refusal`: red preview visible → `click` (lands at 0:44.5) → `result` → `hold` (3 s) → hold on the meter to fill | `overlays/coverage-refused-chip.png` 0:45.4–0:56.0, placed next to the refusal message | 0:37–0:43 push ≤1.25× on the red preview; 0:45.4–0:50.0 still ≤2× on the refusal; 0:50.0–0:53.0 ease out to the unchanged meter | hard cut | VO 8–10. **Music out at 0:44.3** (0.3 s fade). **0:50.0–0:53.0 silence:** no VO, no music, room tone only. Music back at 0:53.0 (1 s fade-in) |
 | S7 · "Later" wipe | 0:58.0–0:59.6 | `overlays/later-wipe` (1.6 s sequence) over the S6 → S8 junction | — | — | the wipe is the transition: cut under it at 0:58.5 | music continues |
-| S8 · F7 claim live | 0:59.6–1:20.0 | `d1-file-claim`: `click` −1 s → `result` +0.8 s · `d2-pay-claim`: `click` −1 s → `result` +0.8 s · `d4-settle` *(v5: `d3-settle-payout`)*: `click` −1 s → `result` +1 s. Cut confirmation waits; each click 2–3 s on screen | `cards/chapter-2` 0:59.0–1:01.0 · **timer** from the `file_claim` result (≈1:04.6) to 1:36.0 · `overlays/honesty-pix.png` 1:10.0–1:36.0 (one label across F7–F8) | ≤1.3× on the R$15,000 cap during `pay_claim` | hard cuts between the three actions | VO 11–14 |
+| S8 · F7 claim live (one devnet take; retake ≤ R$500 with the alternate VO line 11) | 0:59.6–1:20.0 | `d1-file-claim`: `click` −1 s → `result` +0.8 s · `d2-pay-claim`: `click` −1 s → `result` +0.8 s · `d4-settle` *(v5: `d3-settle-payout`)*: `click` −1 s → `result` +1 s. Cut confirmation waits; each click 2–3 s on screen | `cards/chapter-2` 0:59.0–1:01.0 · **timer** from the `file_claim` result (≈1:04.6) to 1:36.0 · `overlays/honesty-pix.png` 1:10.0–1:36.0 (one label across F7–F8) | ≤1.3× on the R$15,000 cap during `pay_claim` | hard cuts between the three actions | VO 11–14 |
 | S9 · F8 claims timeline | 1:20.0–1:36.0 | `d4-reserve-claims` *(v5)*: `/reserve/claims`, filed → paid → settled with timestamps; `hold` 3 s. The earlier R$18,000 test claim is also listed (fine on a disclaimed demo reserve): frame or highlight Ana's row | timer holds in its settled state (amber) · honesty-pix continues | 1:24.0–1:27.0 hold still ≤2× on the three timestamps | hard cut | VO 15–16 |
-| S10 · F9 capacity | 1:36.0–1:44.5 | `f9-reserve-plate` *(v5)*: `/reserve` captured right after the refusal, before the claim; 8.5 s | `cards/chapter-3` 1:36.0–1:38.0 · `cards/capital-card.png` 1:42.5–1:44.5 | slow push ≤1.15× | hard cut | VO 17 (first part) |
-| S11 · F10 fee receipt | 1:44.5–1:47.0 | `f10-fee-receipt` *(v5)*: `/reserve/capital` fee receipt row (R$3,060 gross, R$2,448 to the reserve, R$612 to MUTAV); 2.5 s | `overlays/honesty-fees.png` 1:44.6–1:46.9 | none | hard cuts | VO 17 ("and guarantee fees flow back in") |
-| S12 · F11 still covered | 1:47.0–1:52.0 | `f11-reserve-share` *(v5)*: `/reserve` after the off-camera fees, redemption and refresh; `hold` still | none (no share-value callout) | hold still ≤2× on coverage required / held | hard cut | VO 18 |
-| S13 · F12 not open to public investment | 1:52.0–1:58.0 | `f12-capital` *(v5)*: `/capital` lead line (not open to public investment); `hold` 3 s | none (no in → out callout) | hold still ≤1.5× on the notice | hard cut | VO 19 |
-| S14 · F13 close | 1:58.0–2:08.0 | `cards/close` (2 s build-in sequence, then `cards/close.png` held) | — | none | 0.5 s fade to black at 2:07.5 | VO 20–21. Music lifts slightly, fades out 2:06–2:08 |
+| S10 · F9 switch card | 1:36.0–1:37.5 | `cards/switch` *(v6, made in the editor)*: "Six months, simulated locally on an accelerated clock", 1.5 s | — | none | hard cut in; hard cut out | music continues; no VO |
+| S11 · F10 six months | 1:37.5–1:46.5 | `g1-sim-history` *(v6, localnet)*: `/reserve` history chart Month 1…6 → Capital tab, fees and issuer revenue landing. Recorded with `NEXT_PUBLIC_ACCELERATED_CLOCK=1` (the banner reads "Local simulation · accelerated clock") | `cards/chapter-3` 1:37.5–1:39.5 · honesty label "Mock BRS mint · local validator" 1:40.0–1:46.3 | slow push ≤1.15× on the chart | hard cut | VO 17 |
+| S12 · F11 large claim | 1:46.5–1:50.5 | `g2-sim-claim` *(v6, localnet)*: `/reserve/claims`, one claim above R$15k: filed → approved (admin) → paid → settled | none | hold still ≤2× on the approved stage | hard cut | VO 18 |
+| S13 · F12 cover and share | 1:50.5–1:55.5 | `g3-sim-reserve` *(v6, localnet)*: `/reserve`, "can back up to R$[X]" and value per share, month 1 → 6 | none | hold still ≤2× | hard cut | VO 19 |
+| S14 · F13 capital out | 1:55.5–2:05.5 | `g4-sim-capital` *(v6, localnet)*: `/capital`, the capital provider's withdrawal, R$[X] in → R$[X] out | none | hold still ≤1.5× on in → out | hard cut | VO 20 |
+| S15 · F14 close | 2:05.5–2:15.0 | `cards/close` (2 s build-in sequence, then `cards/close.png` held) | — | none | 0.5 s fade to black at 2:14.5 | VO 21–22. Music lifts slightly, fades out 2:13–2:15 |
 
-Chapter 3 shot boundaries are 1–2 s different from the storyboard frames so the VO fits at 145 wpm; chapter starts are unchanged. If the cut runs over 2:10, trim the S6 tail after the silence (0:53–0:58, up to −4 s) and S9's hold (−2 s). Never trim the silence itself.
+Chapter 3 is captured on localnet; every [X] figure comes from the simulation run. If the cut runs over 2:15, trim the S6 tail after the silence (0:53–0:58, up to −4 s) and S9's hold (−2 s). Never trim the silence itself. The devnet wallet-B payoff and the fee-receipt shot are dropped; `cards/capital-card`, `overlays/honesty-fees` and `overlays/figure-callout` are not used in v6.
 
 ## The timer (S8–S9)
 
@@ -54,7 +55,7 @@ The chapter titles animate in over 0.8 s and hold; fade them out in the edit ove
 - One royalty-free, low, unobtrusive bed: soft pulse or ambient keys, no vocals, no big drops, about 90–110 BPM. Sources with clear licences: YouTube Audio Library, Pixabay Music, or Uppbeat (credit as their licence asks; put the credit in the YouTube description).
 - Level: about −20 dB under the VO (the bed sits near −34 LUFS when the VO is near −14). Duck a further 3 dB under VO lines if the bed has a melody.
 - **Out for the refusal hold:** fade out over 0.3 s at 0:44.3, silent through 0:53.0, back in over 1 s. The 0:50.0–0:53.0 silence is room tone only.
-- Out at the end: fade 2:06–2:08.
+- Out at the end: fade 2:13–2:15.
 
 ## Audio mix and loudness
 

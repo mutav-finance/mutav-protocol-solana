@@ -1,14 +1,16 @@
-# Production kit (v5)
+# Production kit (v6)
 
-Everything needed to assemble MUTAV's 2:08 product demo from the harness captures: cards, overlays, the voiceover read, captions, the edit decision list and the disclosure text. It matches [`../storyboard.html`](../storyboard.html) and [`../script.md`](../script.md).
+Everything needed to assemble MUTAV's 2:15 product demo from the harness captures: cards, overlays, the voiceover read, captions, the edit decision list and the disclosure text. It matches [`../storyboard.html`](../storyboard.html) and [`../script.md`](../script.md).
 
 Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` URIs, no network) and renders at 1920×1080. Overlays have transparent backgrounds; each has a PNG with alpha next to it. Open an HTML file in a browser to preview its in-animation; add `?static` for the end state.
+
+**v6 note:** chapter 3 is a local simulation on an accelerated clock, labelled by the app banner (`NEXT_PUBLIC_ACCELERATED_CLOCK=1`, PR #72) and introduced by a 1.5 s switch card made in the editor. No corner badge is needed. Not used in v6: `cards/capital-card`, `overlays/honesty-fees`, `overlays/figure-callout` (kept for reference).
 
 ## Index
 
 | Path | What it is |
 |---|---|
-| [`vo-script.md`](vo-script.md) | Final voiceover (199 words) with start and end seconds per line, pauses, the 3 s silence, pronunciation and direction. |
+| [`vo-script.md`](vo-script.md) | Final voiceover (216 words) with start and end seconds per line, pauses, the 3 s silence, pronunciation and direction. |
 | [`captions.en.srt`](captions.en.srt) · [`captions.pt-BR.srt`](captions.pt-BR.srt) | Captions on the same timings; ≤2 lines, ≤42 characters per line. `[N]` is a placeholder. |
 | [`edl.md`](edl.md) | Edit decision list per shot (source, in/out, overlays, zoom, transition, audio), music and loudness, and the ffmpeg recipes. |
 | [`submission-disclosure.md`](submission-disclosure.md) | Text for the Colosseum form and the YouTube description. |
@@ -34,7 +36,7 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 6. **Record the VO** to the rough cut, following `vo-script.md`.
 7. **Mix** VO and music with the refusal drop; two-pass loudnorm to −14 LUFS / −1 dBTP.
 8. **Captions:** burn in the English SRT; keep both SRTs for upload.
-9. **Export** 1080p30 H.264 MP4; review muted and with sound; check runtime ≤ 2:10.
+9. **Export** 1080p30 H.264 MP4; review muted and with sound; check runtime ≤ 2:15.
 10. **Publish** with the text in `submission-disclosure.md`.
 
 ## Re-rendering the PNGs

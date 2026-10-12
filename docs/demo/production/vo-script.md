@@ -1,12 +1,12 @@
-# Voiceover: final read (v5)
+# Voiceover: final read (v6)
 
-**197 words · about 1:22 of speech · 2:08 runtime.** Timings are program time (the finished cut), in seconds. Record to the rough cut so each line lands on its picture. The captions (`captions.en.srt`) use the same timings.
+**216 words · about 1:30 of speech · 2:15 runtime.** Timings are program time (the finished cut), in seconds. Record to the rough cut so each line lands on its picture. The captions (`captions.en.srt`) use the same timings.
 
 ## Direction
 
 - **Tone:** warm, plain, confident. A person explaining something they built, not an announcer. No hype, no upspeak.
 - **Pace:** about 145 wpm. The cold open runs a touch quicker (about 150) to fit 10 s; chapter 3 can breathe.
-- **Line 19 is the legal floor:** "During the pilot the reserve is not open to public investment." Say it plainly, not as a teaser. Smile on the close instead.
+- **Chapter 3 is a local simulation:** line 17 says so ("simulated locally on an accelerated clock"); the app banner carries "Local simulation · accelerated clock" and the not-open-to-public-investment line. Read the [X] figures only as they appear on screen; the VO itself names no amounts in chapter 3.
 - **The refusal:** "Refused." is short and flat, not dramatic. Then the line after it, then **3 s of silence**: no voice and no music, only room tone.
 - **Numbers** are said as words, exactly as written. Don't add "about" or round anything.
 - **[N]** comes from the real on-chain timestamps (settled_at − filed_at on the ClaimFiling PDA). Say "seconds" if it is under 2 minutes and "minutes" otherwise; round down, never up. The line describes this on-chain run only. Don't ad-lib that real-world claims settle in seconds: in operation the operator checks each claim first (the pitch covers that).
@@ -54,15 +54,19 @@ Start and End are program seconds. `‖` = a breath pause (about 0.3 s). `(pause
 | — | 75.6 | 81.0 | F7 → F8 | *(pause: settle confirms; cut to the claims timeline)* |
 | 15 | 81.0 | 84.4 | F8 | On-chain, filed to settled in [N] seconds. |
 | 16 | 84.8 | 88.2 | F8 | Seguro-fiança allows up to thirty days. |
-| — | 88.2 | 96.4 | F8 → F9 | *(pause: hold on the timestamps; chapter 3 title)* |
-| 17 | 96.4 | 106.6 | F9–F10 | Because the reserve keeps a quarter of what it guarantees, ‖ every real of capital can back up to four in cover, ‖ and guarantee fees flow back in. |
-| 18 | 107.2 | 111.4 | F11 | Even after Ana's claim, the reserve stays covered. |
-| 19 | 112.0 | 117.4 | F12 | During the pilot the reserve is not open to public investment. |
-| 20 | 118.4 | 123.6 | F13 | MUTAV: ‖ a transparent, programmable reserve, ‖ claims settled in minutes, ‖ capital-efficient cover. |
-| 21 | 124.2 | 126.4 | F13 | Brazil's onchain rent guarantee. |
-| — | 126.4 | 128.0 | F13 | *(hold; music out)* |
+| — | 88.2 | 96.0 | F8 | *(pause: hold on the timestamps)* |
+| — | 96.0 | 97.6 | F9 | *(pause: the 1.5 s switch card "Six months, simulated locally on an accelerated clock"; chapter 3 title)* |
+| 17 | 97.6 | 106.2 | F10 | Here are six months of it, ‖ simulated locally on an accelerated clock. ‖ Guarantee fees and issuer revenue flow into the reserve. |
+| 18 | 106.6 | 110.2 | F11 | Claims are paid, ‖ large ones approved by the admin. |
+| 19 | 110.6 | 115.0 | F12 | The reserve can back more leases, ‖ each share is worth more, |
+| 20 | 115.4 | 125.4 | F13 | and a capital provider takes out more than they put in. ‖ The same reserve that protects the landlord pays the people who fund it. |
+| 21 | 126.0 | 131.6 | F14 | MUTAV: ‖ a transparent, programmable reserve, ‖ claims settled in minutes, ‖ capital-efficient cover. |
+| 22 | 132.2 | 134.4 | F14 | Brazil's onchain rent guarantee. |
+| — | 134.4 | 135.0 | F14 | *(hold; music out)* |
 
 If [N] is 2 minutes or more, line 15 reads "On-chain, filed to settled in [N] minutes." (same length).
+
+**Alternate line 11 (F7 retake only, claim ≤ R$500):** "Now say Ana falls behind on part of a month's rent." Caption: "Claim R$500 · cap R$15,000 per call".
 
 ## Word count by beat
 
@@ -72,6 +76,6 @@ If [N] is 2 minutes or more, line 15 reads "On-chain, filed to settled in [N] mi
 | Agency | 0:10–0:15 | 12 | 5.0 s (4.8 s at 150) |
 | 1 · Programmable, transparent reserve | 0:15–0:58 | 60 | 24.8 s |
 | 2 · Settled in minutes | 0:58–1:36 | 40 | 16.6 s |
-| 3 · Capital efficiency | 1:36–1:58 | 46 | 19.0 s |
-| Close | 1:58–2:08 | 15 | 6.2 s |
-| **Total** | **2:08** | **197** | **1:22** |
+| 3 · Capital efficiency (local simulation) | 1:36–2:05.5 | 66 | 27.3 s (26.4 s at 150) |
+| Close | 2:05.5–2:15 | 15 | 6.2 s |
+| **Total** | **2:15** | **216** | **1:29** |

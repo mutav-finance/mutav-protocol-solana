@@ -83,39 +83,45 @@ O seguro-fiança permite
 até trinta dias.
 
 19
-00:01:36,400 --> 00:01:40,200
-Como a reserva guarda um quarto
-do que garante,
+00:01:37,600 --> 00:01:41,600
+Aqui estão seis meses disso,
+simulados localmente em relógio acelerado.
 
 20
-00:01:40,200 --> 00:01:44,900
-cada real de capital sustenta
-até quatro de cobertura
+00:01:41,800 --> 00:01:46,200
+Taxas de garantia e receita do emissor
+entram na reserva.
 
 21
-00:01:44,900 --> 00:01:46,600
-e as taxas de garantia voltam à reserva.
+00:01:46,600 --> 00:01:50,200
+Os pedidos são pagos,
+os grandes aprovados pelo admin.
 
 22
-00:01:47,200 --> 00:01:51,400
-Mesmo depois do pedido da Ana,
-a reserva segue coberta.
+00:01:50,600 --> 00:01:55,000
+A reserva sustenta mais contratos,
+cada cota vale mais,
 
 23
-00:01:52,000 --> 00:01:57,400
-Durante o piloto, a reserva não está
-aberta a investimento público.
+00:01:55,400 --> 00:01:59,800
+e quem aporta capital
+retira mais do que colocou.
 
 24
-00:01:58,400 --> 00:02:00,800
+00:02:00,200 --> 00:02:05,400
+A mesma reserva que protege o proprietário
+remunera quem a financia.
+
+25
+00:02:06,000 --> 00:02:08,600
 MUTAV: uma reserva transparente
 e programável,
 
-25
-00:02:00,800 --> 00:02:03,600
+26
+00:02:08,600 --> 00:02:11,600
 pedidos liquidados em minutos,
 cobertura eficiente em capital.
 
-26
-00:02:04,200 --> 00:02:06,400
+27
+00:02:12,200 --> 00:02:14,400
 A garantia de aluguel onchain do Brasil.
