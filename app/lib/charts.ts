@@ -73,7 +73,7 @@ export type CapitalSplit = {
   stableAssets: bigint;
   /** Held against filed, unpaid claims (capped at what is held). */
   provisions: bigint;
-  /** Held against the rest of coverage required, beyond provisions. */
+  /** Held against coverage required beyond provisions (the ratio leg or the stress floor, whichever binds). */
   restRequired: bigint;
   freeCapital: bigint;
   /** Coverage required beyond stable assets (≥ 0). */

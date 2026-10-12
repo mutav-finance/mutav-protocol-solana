@@ -120,7 +120,7 @@ const MOBILE: [string, string, Role?][] = [
   ["Operator", "Registers guarantees, contributes guarantee fees, files, pays and settles claims.", "operator"],
   ["Coverage gate", "A new guarantee is accepted only if its cover fits in free capital. Redemptions pass the same gate."],
   ["Reserve", "BRS held by the program. Publishes NAV, coverage required and free capital."],
-  ["Investor", "Requests deposits and redemptions, then claims shares or assets. Allowlist-gated; in the pilot, MUTAV's capital wallet.", "investor"],
+  ["Investor", "Requests deposits and redemptions, then claims shares or assets. Deposits are allowlist-gated; holders can always redeem. In the pilot, MUTAV's capital wallet.", "investor"],
   ["Escrows", "Deposits and redemptions wait in FIFO escrows until the Reserve Admin fulfils them."],
   ["Reserve Admin (Squads)", "M-of-N multisig with a time lock. Fulfils the queues, sets config and caps, pauses.", "admin"],
   ["Treasury", "Receives MUTAV's take of each guarantee fee, outside the reserve."],

@@ -14,6 +14,13 @@ export const MOCK = process.env.NODE_ENV !== "production" && process.env.NEXT_PU
 
 export const ACTION_LABEL = { cancel_deposit: "Cancel deposit", claim_shares: "Collect shares", cancel_redeem: "Cancel redemption", claim_assets: "Collect BRS" } as const;
 
+/** A parked request's cancel only returns the escrow to its owner (ADR 0030): it reads as a collect. */
+export const PARKED_ACTION_LABEL = { cancel_deposit: "Collect BRS", cancel_redeem: "Collect shares" } as const;
+
+/** The button label for `a` on row `x`. */
+export const actionLabel = (x: InvestorRequest, a: InvestorRequest["actions"][number]) =>
+  x.status === "parked" && (a === "cancel_deposit" || a === "cancel_redeem") ? PARKED_ACTION_LABEL[a] : ACTION_LABEL[a];
+
 /** Inter Medium 12px caps label (STYLE.md card label). */
 export const LABEL = "font-body text-(--color-text-2) text-xs font-medium uppercase";
 export const TRACKING = { letterSpacing: "0.01em" };
@@ -35,13 +42,9 @@ export function statusName(x: InvestorRequest): string {
   switch (x.status) {
     case "pending":
       return "Waiting";
-    case "partially filled":
-      return "Partly filled";
     case "fulfilled":
     case "filled":
       return "Filled";
-    case "cancelled":
-      return "Cancelled";
     case "parked":
       // Parked by the admin's cancel (ADR 0030): out of the queue; the owner collects with cancel_deposit / cancel_redeem.
       return "Parked";

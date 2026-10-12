@@ -159,7 +159,7 @@ export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; sta
       </div>
 
       <figcaption className="font-body text-(--color-text-3) text-2xs leading-relaxed">
-        Rebuilt from the ledger: today&apos;s reserve balance, walked back through every dated guarantee fee, issuer income, claim payment and queue fill.
+        Reconstructed from recent activity (last 100 transactions per account): today&apos;s reserve balance, walked back through the dated guarantee fees, issuer income, claim payments and queue fills.
       </figcaption>
 
       {/* sr-only on a <div>: a table sizes to its content and would widen the page. */}

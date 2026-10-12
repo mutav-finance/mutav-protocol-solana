@@ -71,7 +71,7 @@ function ClaimLimits({ r }: { r: ReserveView }) {
         aside={<HeadLink href="/reserve/claims">See claims</HeadLink>}
       />
       <div className="grid grid-cols-1 gap-px border sm:grid-cols-2" style={{ background: "var(--color-border)" }}>
-        {cell("Max per claim payment", fmtBrs(caps.maxClaimPerCall), "for one claim payment")}
+        {cell("Operator limit per payment", fmtBrs(caps.maxClaimPerCall), "above it, the Reserve Admin approves the exact amount")}
         {cell("Max in any 31 days", fmtBrs(caps.maxClaimPerPeriod), "all claim payments together")}
       </div>
     </section>
@@ -87,13 +87,13 @@ function CapitalTerms() {
         <article className="bg-(--color-surface) flex flex-col gap-3 border p-6">
           <h4 className="font-display text-(--color-text) m-0 text-lg leading-snug font-bold">Approved wallets only</h4>
           <p className="m-0">
-            <Lead lead="An on-chain allowlist gates deposits and redemptions (KYC off-chain)." className="text-sm">
-              Every approved wallet waits in the same line, oldest first.
+            <Lead lead="The allowlist gates new capital; existing holders can always redeem." className="text-sm">
+              The on-chain allowlist (KYC off-chain) gates deposits. Every request waits in the same line, oldest first.
             </Lead>
           </p>
           <p className="m-0">
             <Lead lead="Not open to public investment." className="text-sm">
-              The pilot runs on MUTAV&apos;s own capital; capital requests are limited to allowlisted wallets, and nothing here is an offer.
+              The pilot runs on MUTAV&apos;s own capital; new capital requests are limited to allowlisted wallets, and nothing here is an offer.
             </Lead>
           </p>
         </article>

@@ -49,7 +49,7 @@ type Keys = Record<"mint" | "admin" | "operator" | "pauser" | "capital" | "treas
 
 let built: Promise<{ reserve: ReserveView; ledger: Ledger; keys: Keys }> | null = null;
 
-/** The fictional reserve: R$60k from MUTAV's capital wallet in two fills, four leases at two agencies, fees, income and one paid claim. */
+/** The fictional reserve (ADR 0028 values): R$60k from MUTAV's capital wallet in two fills, five leases at two agencies, fees, income, one paid claim and one filed claim above the operator limit. */
 async function build() {
   const now = BigInt(Math.floor(Date.now() / 1000));
   const keys = Object.fromEntries(
@@ -90,6 +90,8 @@ async function build() {
     lease("LEASE-2026-0002", agencyA, 3_200n, now - 45n * DAY, { provisionDefault: 3_200n * BRL, openClaims: 1 }),
     lease("LEASE-2026-0003", agencyB, 1_800n, now - 30n * DAY),
     lease("LEASE-2026-0004", agencyB, 2_000n, now - 90n * DAY, { status: 1, closedAt: now - 10n * DAY }),
+    // A claim above `maxClaimPerCall`: it waits for the Reserve Admin's approve_claim.
+    lease("LEASE-2026-0005", agencyB, 6_000n, now - 20n * DAY, { provisionDefault: 16_000n * BRL, openClaims: 1 }),
   ]);
   const gAddr = await Promise.all(g.map((_, i) => addressOf(`guarantee:${i}`)));
   const remaining = (x: (typeof g)[number]) => (x.status === 0 ? x.defaultCover - x.defaultPaid + x.exitCover - x.exitPaid : 0n);
@@ -129,17 +131,20 @@ async function build() {
   ];
   const notice1 = await bytes(REF.notice("NOTICE-0001"));
   const notice2 = await bytes(REF.notice("NOTICE-0002"));
+  const notice3 = await bytes(REF.notice("NOTICE-0003"));
   const unpaid = { paidAmount: 0n, paidAt: 0n, paymentsAccount: ZERO, pixE2eHash: zeros(32), settledAt: 0n, approvedAmount: 0n, revision: 0 };
   const filings = [
     {
       address: await addressOf("filing:0"),
       data: {
-        discriminator: disc, version: 1, bump: 255, guarantee: gAddr[0]!, leg: 0, noticeRefHash: notice1, provision: 2_500n * BRL, filedAt: now - 20n * DAY, status: 3,
+        discriminator: disc, version: 1, bump: 255, guarantee: gAddr[0]!, leg: 1, noticeRefHash: notice1, provision: 2_500n * BRL, filedAt: now - 20n * DAY, status: 3,
         paidAmount: 2_500n * BRL, paidAt: now - 19n * DAY, paymentsAccount: keys.payments, pixE2eHash: await bytes(REF.pixE2e("E1234567820261006120000demo0001")), settledAt: now - 18n * DAY,
         approvedAmount: 0n, revision: 0, reserved: zeros(32),
       },
     },
-    { address: await addressOf("filing:1"), data: { discriminator: disc, version: 1, bump: 255, guarantee: gAddr[1]!, leg: 0, noticeRefHash: notice2, provision: 3_200n * BRL, filedAt: now - 2n * DAY, status: 0, ...unpaid, reserved: zeros(32) } },
+    { address: await addressOf("filing:1"), data: { discriminator: disc, version: 1, bump: 255, guarantee: gAddr[1]!, leg: 1, noticeRefHash: notice2, provision: 3_200n * BRL, filedAt: now - 2n * DAY, status: 0, ...unpaid, reserved: zeros(32) } },
+    // Above the operator limit per payment (R$15k): not approved yet (approvedAmount 0).
+    { address: await addressOf("filing:2"), data: { discriminator: disc, version: 1, bump: 255, guarantee: gAddr[4]!, leg: 1, noticeRefHash: notice3, provision: 16_000n * BRL, filedAt: now - 1n * DAY, status: 0, ...unpaid, reserved: zeros(32) } },
   ];
 
   const deposited = 50_000n * BRL;
@@ -153,7 +158,7 @@ async function build() {
   const deposits = [
     {
       address: await addressOf("deposit:1"),
-      data: { discriminator: disc, version: 1, bump: 255, owner: keys.capital, seq: 1n, assets: 10_000n * BRL, sharesOut: 0n, navAtFulfil: 0n, requestedAt: now - 1n * DAY, fulfilledAt: 0n, status: 0, minSharesOut: 0n, reserved: zeros(32) },
+      data: { discriminator: disc, version: 1, bump: 255, owner: keys.capital, seq: 2n, assets: 10_000n * BRL, sharesOut: 0n, navAtFulfil: 0n, requestedAt: now - 1n * DAY, fulfilledAt: 0n, status: 0, minSharesOut: 0n, reserved: zeros(32) },
     },
   ];
   const redeems = [
@@ -162,6 +167,14 @@ async function build() {
       data: {
         discriminator: disc, version: 1, bump: 255, owner: keys.capital, seq: 0n, shares: 5_000n * BRL, assetsOut: 0n, navAtFill: 0n,
         requestedAt: now - 3n * DAY, filledAt: 0n, status: 0, sharesFilled: 0n, minAssetsOut: 0n, reserved: zeros(32),
+      },
+    },
+    {
+      // Parked by the Reserve Admin (ADR 0030): out of the queue, the shares still owed to the owner.
+      address: await addressOf("redeem:1"),
+      data: {
+        discriminator: disc, version: 1, bump: 255, owner: keys.capital, seq: 1n, shares: 2_000n * BRL, assetsOut: 0n, navAtFill: 0n,
+        requestedAt: now - 2n * DAY, filledAt: 0n, status: 2, sharesFilled: 0n, minAssetsOut: 0n, reserved: zeros(32),
       },
     },
   ];
@@ -178,20 +191,20 @@ async function build() {
     reserveTokenProgram: TOKEN_PROGRAM,
     reserveDecimals: 6,
     shareMint: addresses.shareMint,
-    coverageRatioBps: 1_000,
+    coverageRatioBps: 2_500,
     feeTakeBps: 2_000,
     paymentsAccount: keys.payments,
     treasuryAccount: keys.treasury,
     investorAllowlistRoot: await sha256("mock:allowlist-root"),
     caps: {
-      maxTvl: 300_000n * BRL,
-      maxCoverPerGuarantee: 40_000n * BRL,
-      maxClaimPerCall: 10_000n * BRL,
+      maxTvl: 1_000_000n * BRL,
+      maxCoverPerGuarantee: 120_000n * BRL,
+      maxClaimPerCall: 15_000n * BRL,
       maxClaimPerPeriod: 20_000n * BRL,
       minRequest: 1_000n * BRL,
       maxRequest: 100_000n * BRL,
       maxNavMoveBps: 10_000,
-      stressBuffer: 0n,
+      stressBuffer: 19_000n * BRL,
       maxQueueWaitSecs: 0n,
       maxReinstateAge: 0n,
       reserved: zeros(32),
@@ -232,9 +245,9 @@ async function build() {
     pendingRedeemShares: redeems.reduce((s, r) => s + r.data.shares, 0n),
     claimableAssetsTotal: 0n,
     activeGuarantees: g.filter((x) => x.status === 0).length,
-    nextDepositSeq: 2n,
-    depositHead: 1n,
-    nextRedeemSeq: 1n,
+    nextDepositSeq: 3n,
+    depositHead: 2n,
+    nextRedeemSeq: 2n,
     redeemHead: 0n,
     feesInTotal: fees.reduce((s, f) => s + f.data.gross, 0n),
     feeTakeTotal: fees.reduce((s, f) => s + f.data.take, 0n),
@@ -243,7 +256,8 @@ async function build() {
     lastRefreshTs: now - 3_600n,
     lastRefreshSlot: 400_020_000n,
     incomeTotal: incomeNet,
-    inflowNav: NAV_SCALE,
+    // Refresh folds verified inflows into the published NAV and resets this.
+    inflowNav: 0n,
     // The one paid claim, in its UTC-day bucket (day % 31) of the 31-day window.
     claimDayBuckets: Array.from({ length: 31 }, (_, i) => (BigInt(i) === ((now - 19n * DAY) / DAY) % 31n ? claimsPaid : 0n)),
     claimDayAnchor: (now - 19n * DAY) / DAY,
@@ -275,7 +289,7 @@ async function build() {
   };
   const ledger: Ledger = {
     capitalEvents: [
-      { side: "deposit", signature: await signatureOf("fill:0"), ts: now - 59n * DAY, fromSeq: 0n, toSeq: 0n, assets: deposited, shares: deposited, nav: NAV_SCALE },
+      { side: "deposit", signature: await signatureOf("fill:0"), ts: now - 59n * DAY, fromSeq: 1n, toSeq: 1n, assets: deposited, shares: deposited, nav: NAV_SCALE },
       { side: "deposit", signature: await signatureOf("fill:seed"), ts: now - 88n * DAY, fromSeq: 0n, toSeq: 0n, assets: seedFill, shares: seedFill, nav: NAV_SCALE },
     ],
     guarantees: g.map((data, i) => ({ address: gAddr[i]!, data: data as never })),
@@ -329,7 +343,8 @@ export async function mockInvestor(owner: string | null): Promise<InvestorView> 
     owner,
     allowlist: { state: "allowlisted", ...allowlist },
     brs: { account: await addressOf(`brs-ata:${owner}`), amount: 25_000n * BRL },
-    shares: { account: await addressOf(`share-ata:${owner}`), amount: 45_000n * BRL },
+    // Every share outstanding, less those escrowed in redeem requests (pending or parked).
+    shares: { account: await addressOf(`share-ata:${owner}`), amount: reserve.state.sharesOutstanding - reserve.state.pendingRedeemShares },
   };
 }
 

@@ -21,14 +21,14 @@ import { HistoryChart } from "@/components/reserve/HistoryChart";
 import { FlowDiagram } from "@/components/reserve/FlowDiagram";
 import { HeroAmount, Lead, fmtAgo } from "@/components/reserve/sections/shared";
 import { capitalSplit, type CapitalSplit } from "@/lib/charts";
-import { fmtBps, fmtPct, fmtRatio, fmtSharePrice } from "@/lib/format";
+import { fmtBps, fmtRatio, fmtSharePrice, fmtTime } from "@/lib/format";
 import { useFmt } from "@/components/MoneyProvider";
 import { capitalQueue, claimsTimeline, coverageRows, moneyFlows, type FlowRow, type ReserveView, type Ledger } from "@/lib/view";
 
 /** The two promises the spec makes, each linked to the view that shows them. */
 const PROMISES: [string, string, string, string][] = [
   ["Claim payments are never blocked by required coverage.", "The gate stops new guarantees and redemptions only.", "/reserve/claims", "See claims"],
-  ["Capital requests need an approved wallet.", "An on-chain allowlist gates deposits and redemptions (KYC off-chain). Every approved wallet waits in the same line.", "/reserve/capital#queue", "See the capital queue"],
+  ["New capital needs an approved wallet.", "The allowlist gates new capital; existing holders can always redeem (KYC off-chain). Every request waits in the same line.", "/reserve/capital#queue", "See the capital queue"],
 ];
 
 const FLOW_LABEL = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" } as const;
@@ -156,7 +156,7 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger }) {
 
   const kpis: { label: string; value: string; def: string; href?: string }[] = [
     { label: "Free capital", value: fmtBrs(sol.freeCapital), def: "Free for new guarantees and redemptions." },
-    { label: "Share price", value: fmtSharePrice(s.navPerShare), def: "What each share is worth, after claims are set aside." },
+    { label: `Share price (published at last refresh · ${fmtTime(s.lastRefreshTs)})`, value: fmtSharePrice(s.navPerShare), def: "What each share is worth, after claims are set aside." },
     {
       label: "Remaining cover",
       value: fmtBrs(s.remainingCoverTotal),
@@ -260,12 +260,12 @@ function Donut({ parts, axis, center, centerLabel, centerColor }: { parts: [bigi
 
 type SplitRow = { label: string; sub: string; value: bigint; color: string; outline?: boolean; negative?: boolean };
 
-function splitRows(c: CapitalSplit, filed: number, coverageRatioBps: number): SplitRow[] {
+function splitRows(c: CapitalSplit, filed: number): SplitRow[] {
   const under = c.shortfall > 0n;
   const rows: SplitRow[] = [
     { label: "Set aside for claims", sub: filed ? `${plural(filed, "claim")} filed, not yet paid` : "booked when a claim is filed", value: c.provisions, color: PROVISION },
   ];
-  if (!under || c.restRequired > 0n) rows.push({ label: "Required buffer", sub: `rest of the ${fmtPct(coverageRatioBps)} held on remaining cover`, value: c.restRequired, color: REST });
+  if (!under || c.restRequired > 0n) rows.push({ label: "Required buffer", sub: "Required beyond provisions (ratio or stress floor)", value: c.restRequired, color: REST });
   rows.push({ label: "Free capital", sub: under ? "nothing free while under-covered" : "Free for new guarantees and redemptions.", value: c.freeCapital, color: FREE });
   if (under) rows.push({ label: "Shortfall", sub: "required, not held", value: c.shortfall, color: SHORT, outline: true, negative: true });
   return rows;
@@ -276,7 +276,7 @@ function WhereCapitalSits({ r, l }: { r: ReserveView; l: Ledger }) {
   const c = capitalSplit(r.coverage, r.state.provisions);
   const under = c.shortfall > 0n;
   const filed = claimsTimeline(l).filter((x) => x.stage === "filed").length;
-  const rows = splitRows(c, filed, r.config.coverageRatioBps);
+  const rows = splitRows(c, filed);
   const committed = c.provisions + c.restRequired;
 
   const pending = capitalQueue(r.state, l).deposits.reduce((s, x) => s + x.waiting, 0n);

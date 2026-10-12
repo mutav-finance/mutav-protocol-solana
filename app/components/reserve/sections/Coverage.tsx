@@ -21,7 +21,7 @@ import { useFmt } from "@/components/MoneyProvider";
 import { frac } from "@/lib/charts";
 import { activeRemainingCover, agencyRows, coverageRows, type AgencyRow, type CoverageRow, type Ledger, type ReserveView } from "@/lib/view";
 import { C } from "@/components/charts/Charts";
-import { coverageRequired } from "@mutav-finance/mutav-protocol-solana";
+import { coverageRequired, stressTerm } from "@mutav-finance/mutav-protocol-solana";
 import { TotalsStrip, type TotalsTerm } from "@/components/reserve/sections/Flows";
 
 import { BlockHead, Empty, HeroAmount, MotionStyle, Num, PlusMark, Table, short } from "@/components/reserve/sections/shared";
@@ -203,10 +203,12 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
   );
   const row = (g: CoverageRow) => <GuaranteeRow key={g.address} g={g} axis={coverAxis} agency={<AgencyCell id={g.agencyId} />} />;
 
-  // [F] Totals that close the sums. Coverage required is max(ceil(c × remaining cover), provisions)
-  // (spec §4, ADR 0016); the ratio leg comes from the client's math mirror with provisions at 0.
+  // [F] Totals that close the sums. Coverage required is the higher of ceil(c × remaining cover)
+  // and provisions + min(stress buffer, unprovisioned cover) (spec §4, ADR 0016, ADR 0022). Both legs
+  // come from the client's math mirror: the ratio leg with provisions and stress buffer at 0.
   const s = r.coverage;
-  const byRatio = coverageRequired(r.state.remainingCoverTotal, r.config.coverageRatioBps, 0n);
+  const byRatio = coverageRequired(r.state.remainingCoverTotal, r.config.coverageRatioBps, 0n, 0n);
+  const floor = stressTerm(r.state.remainingCoverTotal, r.state.provisions, r.config.caps.stressBuffer);
   const totals: TotalsTerm[][] = [
     [
       { label: "Unpaid rent", value: fmtBrs(defaultLeft) },
@@ -215,7 +217,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
     ],
     [
       { label: `${fmtPct(r.config.coverageRatioBps)} × remaining cover`, value: fmtBrs(byRatio) },
-      { op: "or", label: "Set aside for claims", value: fmtBrs(r.state.provisions) },
+      { op: "or", label: "Provisions + stress buffer", value: fmtBrs(floor) },
       { op: "=", label: "Coverage required (higher of the two)", value: fmtBrs(s.coverageRequired), result: true },
     ],
   ];
@@ -324,7 +326,7 @@ export function Coverage({ r, l }: { r: ReserveView; l: Ledger }) {
       <TotalsStrip
         title="Totals · cover against the reserve"
         groups={totals}
-        note="Coverage required is the higher of the coverage ratio times remaining cover (rounded up) and what is set aside for claims."
+        note="Coverage required is the higher of the coverage ratio times remaining cover (rounded up) and the floor: what is set aside for claims plus the stress buffer (capped at the cover not yet set aside)."
       />
     </div>
   );

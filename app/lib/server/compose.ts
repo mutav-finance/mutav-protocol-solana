@@ -135,6 +135,8 @@ export type ComposeContext = {
   ledger?: Partial<Pick<Ledger, "deposits">>;
   /** Allowlisted owners, to build the Merkle proof for `request_deposit` / `request_redeem`. */
   allowlist?: string[];
+  /** `request_redeem` only: the signer's share associated token account balance (null = no account). */
+  ownerShares?: bigint | null;
   /** Server env for re-reads (defaults to process.env). */
   env?: ServerEnv;
 };
@@ -364,7 +366,10 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       ];
     }
     case "request_redeem": {
-      const proof = await allowlistProof(ctx, signerAddress);
+      // Entry is gated, exit is not (ADR 0023): the program checks eligibility
+      // only when the owner's share account is empty (request_redeem.rs), so
+      // a holder sends an empty proof, listed or not.
+      const proof = (ctx.ownerShares ?? 0n) > 0n ? [] : await allowlistProof(ctx, signerAddress);
       const seq = r.state.nextRedeemSeq;
       return [
         getRequestRedeemInstruction(

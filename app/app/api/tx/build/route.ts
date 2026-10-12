@@ -1,12 +1,13 @@
 import { address } from "@solana/kit";
 import { guardedEnv, readDepositQueue, readReserve, rpcFor } from "@/lib/server/chain";
-import { ComposeError, composeInstructions, describeInstructions, isAdminKind, refuseOverlappingSetConfig, unsignedTransaction, withComputeUnitLimit } from "@/lib/server/compose";
+import { associatedTokenAddress, ComposeError, composeInstructions, describeInstructions, isAdminKind, refuseOverlappingSetConfig, unsignedTransaction, withComputeUnitLimit } from "@/lib/server/compose";
 import { errorResponse } from "@/lib/server/respond";
 import { boundedBody } from "@/lib/server/relay";
 import { assertMember, composeProposalCreate, readMultisig, vaultAddress } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 import type { TxRequest } from "@/lib/tx-kinds";
 import { MockChainError, mockEnabled } from "@/lib/server/mock";
+import { tokenAmount } from "@/lib/server/investor";
 import { baselineMemo, setConfigFields } from "@/lib/config-diff";
 import { identifyMutavInstruction, MutavInstruction } from "@mutav-finance/mutav-protocol-solana";
 
@@ -44,7 +45,9 @@ export async function POST(req: Request) {
     // A proposal is built only for a multisig member (one account read, before the queue or proposal scans).
     if (vault) await assertMember(env, signer);
     const ledger = body.request.kind === "fulfil_deposits" ? { deposits: await readDepositQueue(env, reserve, body.request.count) } : undefined;
-    const ctx = { reserve, ledger, allowlist: env.allowlist, env };
+    // A redemption reads the signer's share balance: a holder needs no allowlist proof (ADR 0023).
+    const ownerShares = body.request.kind === "request_redeem" ? await tokenAmount(env, await associatedTokenAddress(signer, address(reserve.addresses.shareMint))) : undefined;
+    const ctx = { reserve, ledger, allowlist: env.allowlist, ownerShares, env };
 
     if (vault) {
       if (body.request.kind === "set_config") refuseOverlappingSetConfig((await readMultisig(env, reserve.now)).proposals);

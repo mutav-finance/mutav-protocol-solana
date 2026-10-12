@@ -14,7 +14,7 @@ import { depositHead, redeemHead, type HeadStatus } from "@/lib/queue";
 import type { Money } from "@/lib/client/use-money";
 import type { InvestorView } from "@/lib/server/investor";
 import type { InvestorRequest } from "@/lib/view";
-import { ACTION_LABEL, claimOf, lineOf, sideName, statusName, waitingOf } from "./shared";
+import { actionLabel, claimOf, lineOf, sideName, statusName, waitingOf } from "./shared";
 
 const NUM = { fontVariantNumeric: "tabular-nums" } as const;
 
@@ -50,7 +50,7 @@ function RowActions({ x }: { x: InvestorRequest }) {
   return (
     <div className="col-start-2 col-end-4 flex flex-wrap gap-2 [&_button]:h-7 [&_button]:px-2.5 [&_button]:text-xs">
       {x.actions.map((a) => (
-        <Action key={a} label={ACTION_LABEL[a]} variant={a.startsWith("cancel") ? "outline" : "default"} request={{ kind: a, seq: x.seq }} />
+        <Action key={a} label={actionLabel(x, a)} variant={a.startsWith("cancel") && x.status !== "parked" ? "outline" : "default"} request={{ kind: a, seq: x.seq }} />
       ))}
     </div>
   );

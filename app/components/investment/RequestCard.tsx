@@ -8,10 +8,11 @@
  * at the share price of the fill. The server composes the unsigned
  * transaction (with the Merkle proof); the connected wallet signs.
  *
- * The legal floor: the form (amounts, preview, limits) renders only for a
- * connected wallet on the on-chain allowlist. Everyone else sees a static
- * card that says requests are limited to allowlisted wallets and that this is
- * not an offer.
+ * The legal floor: the deposit form (amounts, preview, limits) renders only
+ * for a connected wallet on the on-chain allowlist. Entry is gated, exit is
+ * not (ADR 0023): a connected wallet holding shares also gets the Redeem tab,
+ * listed or not. Everyone else sees a static card that says requests are
+ * limited to allowlisted wallets and that this is not an offer.
  */
 import { useState, type ReactNode } from "react";
 import { assetsFor, sharesFor } from "@mutav-finance/mutav-protocol-solana";
@@ -80,9 +81,13 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
   const { netAssets } = reserve.coverage;
   const state = inv?.allowlist.state ?? null;
   const paused = reserve.config.paused;
-  const canRequest = connected && state === "allowlisted" && !paused;
+  const listed = connected && state === "allowlisted";
+  // The program skips the allowlist for an owner whose share account holds shares (request_redeem.rs).
+  const holder = connected && (inv?.shares.amount ?? 0n) > 0n;
 
-  const [side, setSide] = useState<Side>("deposit");
+  const [chosen, setSide] = useState<Side>("deposit");
+  // A holder outside the allowlist can only redeem.
+  const side: Side = listed ? chosen : "redeem";
   const [input, setInput] = useState("");
   // Price limit (min shares out / min BRS out). Blank = no limit (0 on-chain).
   const [limit, setLimit] = useState("");
@@ -91,6 +96,7 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
   const preview = amount ? (deposit ? sharesFor(amount, sharesOutstanding, netAssets) : assetsFor(amount, sharesOutstanding, netAssets)) : null;
   // What the request is worth in BRS, for the per-request limits.
   const value = amount ? (deposit ? amount : preview) : null;
+  const canRequest = !paused && (deposit ? listed : listed || holder);
   const outside = value !== null && (value < caps.minRequest || value > caps.maxRequest);
 
   const balance = deposit ? (inv?.brs.amount ?? null) : (inv?.shares.amount ?? null);
@@ -103,16 +109,18 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
     setInput("");
     setLimit("");
   };
-  if (!connected || state !== "allowlisted") return <GatedCard connected={connected} checking={state === null} />;
+  if (!listed && !holder) return <GatedCard connected={connected} checking={state === null} />;
 
   return (
     <section aria-label={deposit ? "Deposit request" : "Redemption request"} className="bg-(--color-surface) flex w-full flex-col border">
       <div className="flex flex-col gap-4 px-6 py-5">
         <Tabs value={side} onValueChange={(v) => switchTo(v as Side)}>
           <TabsList className="w-full">
-            <TabsTrigger value="deposit" className="flex-1">
-              Deposit
-            </TabsTrigger>
+            {listed && (
+              <TabsTrigger value="deposit" className="flex-1">
+                Deposit
+              </TabsTrigger>
+            )}
             <TabsTrigger value="redeem" className="flex-1">
               Redeem
             </TabsTrigger>
@@ -176,6 +184,7 @@ export function RequestCard({ inv, connected, money }: { inv: InvestorView | nul
             <Action label="Request redemption" disabled={!canRequest} request={amount && minOut !== null ? { kind: "request_redeem", shares: amount, minAssetsOut: minOut } : null} />
           )}
         </div>
+        {!listed && <Note>The allowlist gates new capital; existing holders can always redeem.</Note>}
         {paused && <Note tone="warn">Requests are paused by the Reserve Admin. Cancel and collect stay open.</Note>}
         {outside && <Note tone="warn">Outside the per-request limits: the program will refuse it.</Note>}
         {overBalance && <Note tone="warn">More than this wallet holds ({fmtShares(balance!)}): the program will refuse it.</Note>}

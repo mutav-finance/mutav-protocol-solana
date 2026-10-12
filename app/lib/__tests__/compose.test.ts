@@ -211,6 +211,23 @@ describe("compose", () => {
     await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, WALLET, { reserve: r, allowlist: [WALLET] })).rejects.toThrow(/does not hash/);
   });
 
+  it("request_redeem: a holder outside the allowlist composes with an empty proof (ADR 0023)", async () => {
+    const r = await reserve();
+    const { buildAllowlist, getRequestRedeemInstructionDataDecoder } = await import("@mutav-finance/mutav-protocol-solana");
+    r.config = { ...r.config, investorAllowlistRoot: (await buildAllowlist([WALLET, TREASURY])).root };
+    r.state = { ...r.state, nextRedeemSeq: 4n };
+    const listed = [WALLET, TREASURY];
+    // PAYMENTS is not listed: with shares it may exit, as the program skips the eligibility check.
+    const [ix] = await composeInstructions({ kind: "request_redeem", shares: 1_000n }, PAYMENTS, { reserve: r, allowlist: listed, ownerShares: 5_000n });
+    const data = getRequestRedeemInstructionDataDecoder().decode(ix!.data!);
+    expect(data.eligibility).toEqual({ __kind: "Merkle", proof: [] });
+    expect(data.shares).toBe(1_000n);
+    expect(describeInstructions([ix!])[0]!.accounts.filter((a) => a.signer).map((a) => a.address)).toEqual([PAYMENTS]);
+    // Without shares (or no share account) it still needs a proof, which a non-listed wallet cannot build.
+    await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, PAYMENTS, { reserve: r, allowlist: listed, ownerShares: 0n })).rejects.toThrow(/not in ALLOWLIST/);
+    await expect(composeInstructions({ kind: "request_redeem", shares: 1n }, PAYMENTS, { reserve: r, allowlist: listed, ownerShares: null })).rejects.toThrow(/not in ALLOWLIST/);
+  });
+
   it("cancels and claims are signed by the owner only, with no proof", async () => {
     const r = await reserve();
     for (const kind of ["cancel_deposit", "cancel_redeem", "claim_assets"] as const) {

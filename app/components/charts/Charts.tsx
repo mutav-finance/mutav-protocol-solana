@@ -336,7 +336,7 @@ export function ClaimCapChart({ cap }: { cap: ClaimCap }) {
           <Swatch color={C.mid} label="max per call" />
         </Legend>
       }
-      caption={<>{window} From VaultState.claim_period_start / claim_period_paid and caps.max_claim_per_period / max_claim_per_call / claim_period_secs ({fmtDuration(cap.periodSecs)}), set by the Reserve Admin. Largest pay_claim the caps allow now: {fmtBrs(cap.maxNextPayment)}.</>}
+      caption={<>{window} Largest pay_claim the caps allow now: {fmtBrs(cap.maxNextPayment)}.</>}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Row label={<RowLabel>Per period</RowLabel>} value={`${fmtBrs(cap.paid, 0)} / ${fmtBrs(cap.perPeriod, 0)}`} summary={`Paid ${fmtBrs(cap.paid)} of the ${fmtBrs(cap.perPeriod)} period cap; ${fmtBrs(cap.remaining)} left.`} labelWidth={130}>

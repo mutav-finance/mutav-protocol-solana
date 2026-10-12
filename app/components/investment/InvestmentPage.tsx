@@ -3,7 +3,8 @@
 /**
  * /capital — the capital provider's page (the Investor role): send a new
  * deposit or redemption request, then follow, cancel and collect it. Everyone
- * can read it; only a wallet on the on-chain allowlist can send requests.
+ * can read it; only a wallet on the on-chain allowlist can deposit, and a
+ * wallet holding shares can always redeem (ADR 0023).
  * Cancels and collects need only the request's owner (spec §5.5).
  *
  * Layout: a left-aligned header with a decorative photo bleeding from the
@@ -17,7 +18,7 @@ import { ReadError } from "@/components/Section";
 import { LiveProvider } from "@/components/demo/shared";
 import { QueueEntries } from "./QueueEntries";
 import { useInvestor } from "./useInvestor";
-import { fmtSharePrice } from "@/lib/format";
+import { fmtSharePrice, fmtTime } from "@/lib/format";
 import { useMoney, type Money } from "@/lib/client/use-money";
 import type { ReserveView } from "@/lib/view";
 import { RequestCard } from "./RequestCard";
@@ -44,7 +45,12 @@ function Stats({ r, money }: { r: ReserveView; money: Money }) {
   const usd = money.rate ? ` Shown in US dollars at ${money.rate}.` : "";
   return (
     <div role="group" aria-label="Reserve figures" className="bg-(--color-surface-2) grid grid-cols-1 gap-x-6 gap-y-4 border px-5 py-4 sm:grid-cols-3">
-      <Stat label="Share price" tip="Reserve value after claims set aside, per share." value={fmtSharePrice(r.state.navPerShare)} />
+      {/* The strip's labels do not wrap: the publication time goes in the definition. */}
+      <Stat
+        label="Share price"
+        tip={`Published at last refresh · ${fmtTime(r.state.lastRefreshTs)}. Reserve value after claims set aside, per share.`}
+        value={fmtSharePrice(r.state.navPerShare)}
+      />
       <Stat label="Reserve balance" tip={`BRS the reserve holds now.${usd}`} value={money.fmt(r.coverage.stableAssets)} />
       <Stat label="Free capital" tip={`What the reserve can use for redemptions and new guarantees.${usd}`} value={money.fmt(r.coverage.freeCapital)} />
     </div>
@@ -92,7 +98,7 @@ function Header() {
           className="font-body text-(--color-text) m-0 max-w-[60ch] py-1 pl-3 text-sm font-medium md:max-w-[50%]"
           style={{ borderLeft: "1px solid var(--color-copper)" }}
         >
-          Pilot capital comes from MUTAV&apos;s own wallet only. This page is not open to public investment and nothing here is an offer. Requests need a wallet on the on-chain allowlist.
+          Pilot capital comes from MUTAV&apos;s own wallet only. This page is not open to public investment and nothing here is an offer. New capital needs a wallet on the on-chain allowlist; existing holders can always redeem.
         </p>
       </div>
     </header>

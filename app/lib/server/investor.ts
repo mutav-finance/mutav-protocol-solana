@@ -32,7 +32,7 @@ export type InvestorView = {
 };
 
 /** SPL token account `amount`: u64 LE at [64..72). */
-async function tokenAmount(env: ServerEnv, account: Address): Promise<bigint | null> {
+export async function tokenAmount(env: ServerEnv, account: Address): Promise<bigint | null> {
   const a = await fetchEncodedAccount(rpcFor(env), account, READ);
   if (!a.exists || (a.data as Uint8Array).length < 72) return null;
   const d = a.data as Uint8Array;
