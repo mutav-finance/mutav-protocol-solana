@@ -15,7 +15,7 @@ The recording assumes the restyle in PR #45 (`feat/app-landing`) is merged with 
 | M3 | **The register form holds its "Confirmed" result**, with no red preview after it. Today it resets to the next reference at once and shows a red "Send anyway" preview under the result. | F3 holds on the confirmation. |
 | M4 | **`pay_claim` and `settle_payout` keep a visible confirmation after sending**: the status, the signature and the before/after. Today the row disappears once sent and takes all three with it. | The claim runs live in pillar 2 (F7). |
 | M5 | **`/reserve/claims` shows each claim's stage (needs approval → approved → paid → settled) and the filed, paid and settled timestamps** (to the second) and the filed → settled duration. Ana's R$1,500 claim is under the R$15k per-call cap, so it skips `approve_claim`. | F8 and [N]. |
-| M6 | **In → out on `/capital`, in the localnet simulation only:** the capital provider's deposited and withdrawn amounts in reais (R$[X] in → R$[X] out), under the "Local simulation · accelerated clock" banner. No rate or APY. Fallback: an edit overlay from the two transaction amounts. | Chapter 3 end state (F13). |
+| M6 | **In → out on `/capital`, in the localnet simulation only:** the capital provider's deposited and withdrawn amounts in reais (in the run: R$20,000 in → R$20,774.35 out), under the "Local simulation · accelerated clock" banner. No rate or APY. Fallback: an edit overlay from the two transaction amounts. | Chapter 3 end state (F13). |
 
 ## Covered by #59 (merged)
 
@@ -52,8 +52,8 @@ The harness on `feat/demo-capture` (routes and locators in `app/e2e/demo/pages.t
 
 1. **Devnet (done):** the staged reserve (see below). No `00-setup` run is needed on devnet.
 2. **The 5 live actions on devnet, on camera:** register Ana (`MTV-PF-0100`), the refused send (`MTV-PF-0101`), `file_claim` R$1,500 (`NTC-PF-0001`), `pay_claim`, `settle_payout`. **One claim take** (R$2,000 left in the claim window); a retake uses a claim ≤ R$500. **Log each transaction's signature and on-chain block time**, for the timer and [N]. Rehearse on localnet first.
-3. **The localnet simulation (chapter 3):** the same program on a local validator with a mock BRS mint and an accelerated clock; the app started with `NEXT_PUBLIC_ACCELERATED_CLOCK=1` (PR #72). Six simulated months: guarantee fees and issuer revenue landing, one claim above R$15,000 going filed → `approve_claim` (admin) → paid → settled, the coverage ceiling rising, the value per share rising, and one capital provider's withdrawal above its deposit. Output the figures that fill the storyboard's [X] placeholders.
-4. **Chapter 3 captures:** `/reserve` history chart (Month 1…6), the Capital tab flows, `/reserve/claims` (the large claim), `/reserve` (ceiling and value per share), `/capital` (in → out).
+3. **The localnet simulation (chapter 3):** the same program on a local validator with a mock BRS mint and an accelerated clock; the app started with `NEXT_PUBLIC_ACCELERATED_CLOCK=1` (PR #72). Six simulated months: guarantee fees and issuer revenue landing, one claim above R$15,000 going filed → `approve_claim` (admin) → paid → settled, the coverage ceiling rising, the value per share rising, and one capital provider's withdrawal above its deposit. Done: the run's figures fill the storyboard's numbers table (three claims, C2 R$16,000 approved by the admin; R$20,000 in → R$20,774.35 out).
+4. **Chapter 3 captures:** `/reserve` history chart (Month 1…6), the Capital tab flows, `/reserve/claims` (claim C2's four stages), `/reserve` (ceiling and value per share), `/capital` (in → out).
 5. **F2 by hand** from the local copy of the agency platform (fictional data; cover amount framed out, URL bar cropped).
 6. **The #45 routes:** `/reserve/coverage`, `/reserve/claims`, `/reserve/capital`, `/capital`, with locators for the restyled components.
 

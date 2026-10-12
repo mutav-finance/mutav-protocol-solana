@@ -4,7 +4,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 - **Runtime:** 2:15. **Voiceover:** 217 words, verbatim below. Hybrid: cold open and chapters 1–2 live on devnet; the agency flash from a local copy of the agency platform with fictional data (off-chain); chapter 3 a local simulation on an accelerated clock.
 - **Recorded**, not live: silent clips (injected test wallet, no pop-ups), a rough cut with titles, timer and cards, then the VO recorded to the cut. Frames are tagged MAIN / FLASH / END STATE.
-- **Numbers:** devnet chapters on the staged reserve (c = 0.25); chapter 3 numbers are [X] placeholders until the localnet run. Ana, agency names and lease references are fictional.
+- **Numbers:** devnet chapters on the staged reserve (c = 0.25); chapter 3 numbers come from the localnet run (accelerated clock, mock BRS mint; statement months Nov 2026 → Apr 2027). Ana, agency names and lease references are fictional.
 - **Labels:** the app banner names the environment ("Pilot demo · Solana devnet", or "Local simulation · accelerated clock" with `NEXT_PUBLIC_ACCELERATED_CLOCK=1`, PR #72); no corner badges; at most one more honesty label per shot.
 
 ## 1. Beats
@@ -81,7 +81,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Caption:** Held R$44,000 · required R$36,000 → R$40,500
 - **Honesty label:** none (banner only)
 - **Proof:** The same state read independently by a public page.
-- **Edit:** One zoom on held vs required.
+- **Edit:** One zoom on held vs required. *Conditional:* If PR #75 (the coverage-ceiling explainer) is merged by recording time, the page also shows the ceiling on devnet: can back up to R$176k, headroom R$32k; keep it in frame. Without #75 the shot is as written.
 - **Retake:** Read-only: repeat freely.
 
 **F6 · MAIN · 1 · Programmable, transparent reserve · 0:37 – 0:58 · /operator · register_guarantee**: The refusal
@@ -121,39 +121,39 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Retake:** Made in the editor.
 
 **F10 · END STATE · 3 · Capital efficiency · 1:37.5 – 1:46.5 · /reserve (history) → /reserve/capital (localnet)**: Six months of fees and issuer revenue
-- **On screen:** The /reserve history chart, Month 1…6 (simulated), then the Capital tab with guarantee fees and issuer revenue landing in the reserve.
+- **On screen:** The /reserve history chart, Month 1…6 (simulated), with "All" selected so the whole run shows, including the month-3 dip in share value (0.9522 after the R$16,000 claim). Then the Capital tab with guarantee fees and issuer revenue landing in the reserve.
 - **VO:** "Here are six months of it, simulated locally on an accelerated clock. Guarantee fees and issuer revenue flow into the reserve."
-- **Caption:** Months 1–6 simulated · fees + issuer revenue: R$[X]
+- **Caption:** Six months · 3 claims paid · 1 approved by the admin
 - **Honesty label:** Mock BRS mint · local validator
 - **Proof:** Localnet program accounts (the same program build), mock BRS mint.
-- **Edit:** One slow push on the chart; cut to the flows.
+- **Edit:** One slow push on the chart, the month-3 dip kept in frame (don't crop it out); cut to the flows.
 - **Retake:** Re-run the localnet simulation: unlimited.
 
 **F11 · END STATE · 3 · Capital efficiency · 1:46.5 – 1:50.5 · /reserve/claims (localnet)**: A large claim, approved by the admin
-- **On screen:** One claim above the R$15,000 per-call cap: filed → approved by the admin multisig → paid → settled, on the simulated timeline.
+- **On screen:** Claim C2, R$16,000, above the R$15,000 per-call cap, with its four stages on /reserve/claims: filed 01-08 → approved by the admin multisig 01-09 → paid 01-10 → settled 01-12 (simulated dates).
 - **VO:** "Claims are paid, large ones approved by the admin."
-- **Caption:** Claim R$[X] · above R$15k: admin approval · paid
+- **Caption:** Claim R$16,000 · above R$15k: admin approval · paid
 - **Honesty label:** none (banner only)
 - **Proof:** Localnet ClaimFiling with its approval and timestamps.
 - **Edit:** Hold on the approved stage.
 - **Retake:** Re-run the simulation.
 
 **F12 · END STATE · 3 · Capital efficiency · 1:50.5 – 1:55.5 · /reserve (localnet)**: More cover, and each share worth more
-- **On screen:** The coverage ceiling ("can back up to R$[X]") rising and the share price rising, month 1 → month 6.
+- **On screen:** The coverage ceiling ("can back up to") and the value per share, month 1 → month 6: R$489.9k → R$562.0k, and 1.000 at the deposit → 1.039 at the withdrawal.
 - **VO:** "The reserve can back more leases, each share is worth more,"
-- **Caption:** Can back up to R$[X] → R$[X] · share [X] → [X]
+- **Caption:** Can back R$490k → R$562k of cover · second callout: Share value 1.000 → 1.039
 - **Honesty label:** none (banner only)
 - **Proof:** Localnet VaultState after refresh.
-- **Edit:** Zoom from the hold still.
+- **Edit:** Zoom from the hold still. *Production note:* the ceiling is not a straight climb: it peaked at R$630k in month 4 and ends at R$562k, so the caption reads start → end (month 1 → month 6). The share value starts at the capital provider's deposit price, 1.000000 on 2026-11-02.
 - **Retake:** Re-run the simulation.
 
 **F13 · END STATE · 3 · Capital efficiency · 1:55.5 – 2:05.5 · /capital (localnet)**: Capital out, above what went in
-- **On screen:** One capital provider's withdrawal, filled from free capital above required coverage after claims: R$[X] in → R$[X] out. The banner carries the not-open-to-public-investment line.
+- **On screen:** One capital provider's withdrawal, filled from free capital above required coverage after claims: R$20,000 in (2026-11-02, at 1.000000 per share) → R$20,774.35 out (2027-04-27, at 1.038718). The banner carries the not-open-to-public-investment line.
 - **VO:** "and a capital provider takes out more than they put in. The same reserve that protects the landlord pays the people who fund it."
-- **Caption:** R$[X] in → R$[X] out · simulated
+- **Caption:** R$20,000 in → R$20,774 out · simulated
 - **Honesty label:** none (banner only)
 - **Proof:** Localnet claim_assets transaction.
-- **Edit:** Reais only; no rate or APY.
+- **Edit:** Reais only; no rate, APY or percentage.
 - **Retake:** Re-run the simulation.
 
 **F14 · END STATE · Close · 2:05.5 – 2:15 · card (made in the editor)**: Close
@@ -179,18 +179,27 @@ Companion to the storyboard (`storyboard.html`); the two match.
 | 5 | pay_claim R$1,500 (one devnet take) | R$42,500 | R$40,125 | R$2,375 | 0.579545 | still covered; ≤ R$15k/call; uses R$1,500 of the R$2,000 left in the period |
 | 5-alt | Retake only: pay_claim R$500 | R$43,500 | R$40,375 | R$3,125 | 0.586364 | still covered; fits the R$500 left after a failed take |
 
-**Chapter 3 · local simulation ([X] = fill from the localnet run).** The /simulator projections are not in the video.
+**Chapter 3 · local simulation** (local validator, accelerated clock, mock BRS mint; statement months Nov 2026 → Apr 2027). Reais and share values only: no rate or APY. The /simulator projections are not in the video.
+
+| Month | 1 · Nov | 2 · Dec | 3 · Jan | 4 · Feb | 5 · Mar | 6 · Apr |
+|---|---|---|---|---|---|---|
+| Value per share | 1.0207 | 1.0332 | 0.9522 (after the R$16,000 claim) | 0.9826 | 1.0017 | 1.0387 |
+| Coverage ceiling ("can back up to") | R$489.9k | R$597.2k | R$550.4k | R$629.9k | R$602.1k | R$562.0k |
+
+| Claim | Amount | Filed | Approved (admin multisig) | Paid | Settled |
+|---|---|---|---|---|---|
+| C1 | R$1,800 | 12-12 | — (under R$15k) | 12-14 | 12-16 |
+| C2 | R$16,000 | 01-08 | 01-09 | 01-10 | 01-12 |
+| C3 | R$2,300 | 03-12 | — (under R$15k) | 03-14 | 03-16 |
 
 | Item | Value |
 |---|---|
-| Months | 1 → 6 (simulated, accelerated clock, mock BRS mint) |
-| Stable assets | R$[X] → R$[X] |
-| Guarantee fees to the reserve (net of the 20% take) | R$[X] |
-| Issuer revenue swept | R$[X] |
-| Large claim (above R$15k, admin approve_claim) | R$[X], month [X] |
-| Coverage ceiling ("can back up to") | R$[X] → R$[X] |
-| Value per share | [X] → [X] |
-| Capital provider withdrawal | R$[X] in → R$[X] out |
+| Capital provider | Deposited R$20,000 on 2026-11-02 at 1.000000 per share; withdrew everything on 2027-04-27 at 1.038718: R$20,774.35 |
+| End state · reserve | R$140,491.59 held; 19 leases, cover R$481,900; required R$120,475; free R$20,016.59 |
+| End state · ceiling | R$561,966.35, headroom R$80,066.35 |
+| End state · treasury, mode | R$4,029.60; Normal |
+
+Captions read start → end: the ceiling peaked at R$630k in month 4 and ends at R$562k; the share value dips in month 3 after the R$16,000 claim, and the chart keeps that dip in frame.
 
 ## 5. Route map
 
@@ -216,8 +225,8 @@ Companion to the storyboard (`storyboard.html`); the two match.
 | 1 | Devnet program GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV deployed and staged (done): R$44,000 held, R$36,000 required, R$8,000 free, 8 leases | — | done |
 | 2 | Load the operator's agency records in the recording browser | Recorder | — |
 | 3 | Rehearse chapters 1–2 on localnet with the same numbers | Recorder | — |
-| 4 | Devnet capture: F1, F3 (Ana MTV-PF-0100), F4, F5, F6 (MTV-PF-0101), then the claim, one take (F7), and F8. Log tx timestamps for the timer. F2 is captured from the local agency copy (cover amount framed out, URL bar cropped) | Operator; anyone | — |
-| 5 | Localnet simulation: start the app with NEXT_PUBLIC_ACCELERATED_CLOCK=1 (the banner reads "Local simulation · accelerated clock"); run six simulated months (fees, issuer revenue, one claim above R$15k with admin approval, a capital provider's withdrawal); fill the [X] numbers | Simulation script; local admin | local |
+| 4 | Before recording, send a permissionless `refresh` on devnet first (the published value per share was about 10 h old). Devnet capture: F1, F3 (Ana MTV-PF-0100), F4, F5, F6 (MTV-PF-0101), then the claim, one take (F7), and F8. Log tx timestamps for the timer. F2 is captured from the local agency copy (cover amount framed out, URL bar cropped) | Operator; anyone | — |
+| 5 | Localnet simulation (done): six simulated months, Nov 2026 → Apr 2027, on a local validator with an accelerated clock and a mock BRS mint (fees, issuer revenue, three claims, one above R$15k with admin approval, a capital provider's withdrawal); figures in §4. Start the app with NEXT_PUBLIC_ACCELERATED_CLOCK=1 (the banner reads "Local simulation · accelerated clock") | Simulation script; local admin | local |
 | 6 | Localnet capture: F10–F13 end states | Recorder | — |
 | 7 | Edit: chapter titles, the transition card (F9), the timer, the close card | Editor | — |
 
@@ -233,10 +242,10 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 | When | What |
 |---|---|
-| Oct 12 · morning | Rehearse chapters 1–2 on localnet; build and run the chapter 3 simulation; fill the [X] numbers. |
-| by 12:00 | Devnet capture of F1 and F3–F8 (one claim take); F2 from the local agency copy. Read [N] from the claim timestamps. |
+| Oct 12 · morning | Rehearse chapters 1–2 on localnet. The chapter 3 simulation has run; its figures are in §4. |
+| by 12:00 | Send a permissionless `refresh` on devnet first (the published value per share was about 10 h old). Devnet capture of F1 and F3–F8 (one claim take); F2 from the local agency copy. Read [N] from the claim timestamps. |
 | 12:00–13:00 | Localnet capture of F10–F13 with the accelerated-clock banner. |
-| 13:00–15:00 | Rough cut; record the VO to the cut with [N] and the [X] numbers filled in. |
+| 13:00–15:00 | Rough cut; record the VO to the cut with [N] filled in. |
 | 15:00–18:00 | Fine-tune; English burned-in captions + SRT; optional PT-BR SRT. |
 | 18:00 | Review muted and with sound: ≤ 2:15, one honesty label per shot. |
 | 19:00 | Export, upload unlisted, test in a private window. |
@@ -251,7 +260,8 @@ Companion to the storyboard (`storyboard.html`); the two match.
 | One devnet claim take | F7 | The window has R$2,000 left. Rehearse on localnet; if the take fails, retake with a claim ≤ R$500 and the alternate VO and caption. |
 | State drifted | F6 | Free capital before Ana must be in [R$4,500, R$9,000). Close strays with close_guarantee VOID. |
 | Known app behaviours | F3, F6, F7 | Register resets to a red preview; the refusal error carries encoded text; paid and settled rows vanish. Workarounds per shot; fixes in app-requirements. |
-| Simulation numbers not ready | F10–F13 | The [X] placeholders must be filled from the localnet run before the VO is recorded; captions and cards follow. |
+| Simulation numbers drift | F10–F13 | The figures in §4 come from one localnet run. If a re-run changes them, update §4 and the captions before recording; captions and cards follow. |
+| Stale devnet share value | F1, F5 | Send a permissionless `refresh` on devnet before recording; the published value was about 10 h old. |
 | Accelerated-clock banner missing | F10–F13 | Start the localnet app with NEXT_PUBLIC_ACCELERATED_CLOCK=1 (PR #72); without it the chapter would look like devnet. |
 | Over 2:15 | edit | Trim F5 and F8 (−2 s each), then the F6 tail after the silence (0:53–0:58); never trim the silence itself. |
 | Claim under two minutes | F8 | [N] from settled_at − filed_at: "seconds" under 2 min, "minutes" otherwise; round down. |

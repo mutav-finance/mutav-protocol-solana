@@ -6,7 +6,7 @@
 
 - **Tone:** warm, plain, confident. A person explaining something they built, not an announcer. No hype, no upspeak.
 - **Pace:** about 145 wpm. The cold open runs a touch quicker (about 150) to fit 10 s; chapter 3 can breathe.
-- **Chapter 3 is a local simulation:** line 17 says so ("simulated locally on an accelerated clock"); the app banner carries "Local simulation · accelerated clock" and the not-open-to-public-investment line. Read the [X] figures only as they appear on screen; the VO itself names no amounts in chapter 3.
+- **Chapter 3 is a local simulation:** line 17 says so ("simulated locally on an accelerated clock"); the app banner carries "Local simulation · accelerated clock" and the not-open-to-public-investment line. The chapter 3 figures appear only on screen (the app and the captions); the VO names no amounts in chapter 3, and none are added.
 - **The refusal:** "Refused." is short and flat, not dramatic. Then the line after it, then **3 s of silence**: no voice and no music, only room tone.
 - **Numbers** are said as words, exactly as written. Don't add "about" or round anything.
 - **[N]** comes from the real on-chain timestamps (settled_at − filed_at on the ClaimFiling PDA). Say "seconds" if it is under 2 minutes and "minutes" otherwise; round down, never up. The line describes this on-chain run only. Don't ad-lib that real-world claims settle in seconds: in operation the operator checks each claim first (the pitch covers that).
