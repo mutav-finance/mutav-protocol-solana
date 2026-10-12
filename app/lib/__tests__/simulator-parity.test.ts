@@ -25,6 +25,7 @@ type Result = {
   endBalance: number;
   tesouroShare: number;
   tvlRefused: number;
+  cumWithdrawals: number;
   capitalRaised: number;
   claimCapMonths: number;
   take: number;
@@ -210,37 +211,47 @@ describe("simulator on the pilot", () => {
   it("the pilot preset holds the founders' parameters (ADR 0028)", () => {
     expect(PILOT).toMatchObject({
       perMonth: 10, months: 6, growthTarget: 60, feePct: 12, rent: 2200, defaultCover: 12, exitCover: 6,
-      coverageRatio: 0.25, startCapital: 100_000, monthlyRaise: 100_000, raiseFrom: 1,
+      coverageRatio: 0.25, startCapital: 120_000, monthlyRaise: 100_000, raiseFrom: 2,
       maxTvl: 1_000_000, maxCoverPerGuarantee: 120_000, maxClaimPerCall: 15_000, maxClaimPerPeriod: 20_000,
       maxTesouroSharePct: 0, withdraw: "buffer",
     });
   });
 
-  it("backs 10 leases on the R$100k start at c = 0.25 and runs the 60-lease and conservative 30-lease pilots", () => {
+  it("backs 12 leases on the R$120k start at c = 0.25 and runs the 60-lease and conservative 30-lease pilots", () => {
     const rec = pilot();
-    expect(rec.capacityAtStart).toBe(10);
-    expect(rec.capitalRaised).toBe(700_000);
+    expect(rec.capacityAtStart).toBe(12);
+    expect(rec.capitalRaised).toBe(620_000);
+    expect(rec.cumWithdrawals).toBe(0);
     expect(rec.finalActive).toBe(60);
     expect(rec.blockedMonths).toBe(0);
     expect(rec.claimCapMonths).toBe(0);
     const cons = pilot({ coverageRatio: 0.5, perMonth: 5 });
-    expect(cons.capacityAtStart).toBe(5);
+    expect(cons.capacityAtStart).toBe(6);
     expect(cons.finalActive).toBe(30);
     expect(cons.blockedMonths).toBe(0);
   });
 
-  it("drops to 2 leases at full backing (c = 1.0); the raises take it to 18", () => {
+  it("drops to 3 leases at full backing (c = 1.0); the raises take it to 16", () => {
     const full = pilot({ coverageRatio: 1 });
-    expect(full.capacityAtStart).toBe(2);
-    expect(full.finalActive).toBe(18);
+    expect(full.capacityAtStart).toBe(3);
+    expect(full.finalActive).toBe(16);
     expect(full.firstRefusal).toBe("free-capital");
   });
 
-  it("stalls at 75 leases at 28 a month (Scale to 170)", () => {
+  it("stalls at 66 leases at 28 a month (Scale to 170)", () => {
     const r = pilot({ perMonth: 28 });
-    expect(r.finalActive).toBe(75);
+    expect(r.finalActive).toBe(66);
     expect(r.firstRefusal).toBe("free-capital");
     expect(sim.mutavCoverageRequired(170 * 39_600 * BRL_UNITS, 2_500, 0) / BRL_UNITS).toBe(1_683_000);
+  });
+
+  it("Path to R$1M: 17 a month and R$170k a month from month 2 reach the R$1M cap in month 6", () => {
+    const r = pilot({ perMonth: 17, growthTarget: 102, monthlyRaise: 170_000 });
+    expect(r.rows[5].balance).toBeGreaterThanOrEqual(1_000_000);
+    expect(r.rows[4].balance).toBeLessThan(1_000_000);
+    expect(r.finalActive).toBe(97);
+    expect(r.rows[0].active).toBe(12);
+    expect(r.tvlRefused).toBeGreaterThan(0);
   });
 
   it("refuses every lease above the per-guarantee cap", () => {
