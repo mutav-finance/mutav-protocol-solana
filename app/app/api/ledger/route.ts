@@ -1,6 +1,6 @@
-import { guardedEnv, readLedger, readReserve } from "@/lib/server/chain";
+import { guardedEnv, readLedger, readReserveShared } from "@/lib/server/chain";
 import { errorResponse, readResponse } from "@/lib/server/respond";
-import { cachedRead, isFresh } from "@/lib/server/read-cache";
+import { cachedRead, HEAVY_TTL_MS, isFresh } from "@/lib/server/read-cache";
 import { jsonResponse } from "@/lib/serde";
 import { mockEnabled, mockLedger } from "@/lib/server/mock";
 
@@ -11,9 +11,9 @@ export async function GET(req: Request) {
     const env = await guardedEnv();
     return readResponse(
       await cachedRead("ledger", async () => {
-        const reserve = await readReserve(env);
+        const reserve = await readReserveShared(env, { fresh: isFresh(req) });
         return { reserve, ledger: await readLedger(env, reserve) };
-      }, { fresh: isFresh(req) }),
+      }, { fresh: isFresh(req), ttlMs: HEAVY_TTL_MS }),
     );
   } catch (e) {
     return errorResponse(e);
