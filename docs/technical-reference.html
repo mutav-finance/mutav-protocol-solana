@@ -158,7 +158,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
       <span class="chip hot">2026-10-11</span>
       <span class="chip">Layout v1</span>
       <span class="chip">Anchor · classic SPL Token</span>
-      <span class="chip">Devnet deploy pending</span>
+      <span class="chip">Live on devnet (demo reserve)</span>
     </div>
     <p class="disclaimer">Unaudited software. Not legal advice. Not an offer of securities. During the pilot the reserve is not open to public investment. Where a value is chosen at deploy or still open, this page says so instead of guessing.</p>
   </div>
@@ -241,17 +241,17 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <!-- ============================================================ 2 -->
 <section id="configuration" class="level2">
 <h2><span class="num">2</span>Configuration &amp; reference<a class="anchor" href="#configuration" aria-label="Link to this section">#</a></h2>
-<p>Every address, authority, parameter and constant of the program as built in the devnet binary. The program ID is declared in code but the program is not yet deployed to devnet. The reserve PDAs below are derived from the declared program ID and the devnet reserve mint with the client's <code>findReserveAddresses</code>; they become live accounts once <code>initialize</code> runs under that ID.</p>
+<p>Every address, authority, parameter and constant of the program as built in the devnet binary. The program is live on devnet as <a href="https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet"><code>GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV</code></a>: the pilot demo reserve, a test deploy of layout v1 (commit <code>833c114</code>); test activity is visible. The addresses below are that deploy's. The ID declared in <code>lib.rs</code> is <code>8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9</code>, kept for the verified <code>solana-verify</code> release build; PDAs derived under it differ. The demo's multisig time locks are 60&nbsp;s / 120&nbsp;s, a test exception to ADR 0028.</p>
 
 <h3 id="cfg-program">2.1 Program<a class="anchor" href="#cfg-program">#</a></h3>
 <div class="tbl-wrap"><table class="tbl">
 <thead><tr><th>Component</th><th>Devnet address</th><th>Explorer</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>Program ID</td><td><code class="addr">8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9</code></td><td><a href="https://explorer.solana.com/address/8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9?cluster=devnet">view</a></td><td>Declared in <code>lib.rs</code> and <code>Anchor.toml</code>. Deploy pending.</td></tr>
+<tr><td>Program ID</td><td><code class="addr">GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV</code></td><td><a href="https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet">view</a></td><td>The live devnet deploy (<code>Anchor.toml</code> <code>[programs.devnet]</code>). Declared ID in <code>lib.rs</code>: <code>8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9</code>, for the verified release.</td></tr>
 <tr><td>Loader</td><td><code class="addr">BPFLoaderUpgradeab1e11111111111111111111111</code></td><td></td><td>BPF Loader Upgradeable. ProgramData is derived by the loader from the program ID.</td></tr>
-<tr><td>Upgrade authority</td><td>Set at deploy</td><td></td><td>The vault of the upgrade multisig (Squads v4, long time lock).</td></tr>
+<tr><td>Upgrade authority</td><td><code class="addr">AyKDdFrYQABjpkn29Sdj5hEGVymyEXzEHrGhzqPqvb1n</code></td><td><a href="https://explorer.solana.com/address/AyKDdFrYQABjpkn29Sdj5hEGVymyEXzEHrGhzqPqvb1n?cluster=devnet">view</a></td><td>The vault of the upgrade multisig (Squads v4, long time lock).</td></tr>
 <tr><td>IDL</td><td>Set at deploy</td><td></td><td>Program Metadata account, written by the upgrade authority in the same Squads proposal as each upgrade.</td></tr>
-<tr><td>Event authority</td><td><code class="addr">AquHfairQemYYusuBkppBWmgBK6zgmtw1vk5aoAZnHWx</code></td><td><a href="https://explorer.solana.com/address/AquHfairQemYYusuBkppBWmgBK6zgmtw1vk5aoAZnHWx?cluster=devnet">view</a></td><td>PDA <code>["__event_authority"]</code>, used by Anchor <code>emit_cpi!</code>.</td></tr>
+<tr><td>Event authority</td><td><code class="addr">HN24uhMvb7ij6wneSbaHCaackCtPQvzCqvtGCqc9BPky</code></td><td><a href="https://explorer.solana.com/address/HN24uhMvb7ij6wneSbaHCaackCtPQvzCqvtGCqc9BPky?cluster=devnet">view</a></td><td>PDA <code>["__event_authority"]</code>, used by Anchor <code>emit_cpi!</code>.</td></tr>
 </tbody></table></div>
 
 <h3 id="cfg-mints">2.2 Mints and token programs<a class="anchor" href="#cfg-mints">#</a></h3>
@@ -260,7 +260,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <tbody>
 <tr><td>Reserve mint (BRS)</td><td><code class="addr">BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4</code></td><td><a href="https://explorer.solana.com/address/BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4?cluster=devnet">view</a></td><td>The issuer's devnet BRS. Classic SPL Token, 6 decimals. Stored in <code>VaultConfig.reserve_mint</code>; immutable after <code>initialize</code>, which requires 6 decimals.</td></tr>
 <tr><td>Reserve token program</td><td><code class="addr">TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA</code></td><td><a href="https://explorer.solana.com/address/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA?cluster=devnet">view</a></td><td>Classic SPL Token. Stored as <code>reserve_token_program</code>; any other program fails with <code>InvalidTokenProgram</code>.</td></tr>
-<tr><td>Share mint</td><td><code class="addr">EmusG8JSunj1ZWJTDQEyTE2jfg5wRojwhXWTmH39hqfs</code></td><td><a href="https://explorer.solana.com/address/EmusG8JSunj1ZWJTDQEyTE2jfg5wRojwhXWTmH39hqfs?cluster=devnet">view</a></td><td>PDA <code>["share_mint", config]</code>. Classic SPL Token, 6 decimals. Mint and freeze authority: the vault authority PDA.</td></tr>
+<tr><td>Share mint</td><td><code class="addr">4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7</code></td><td><a href="https://explorer.solana.com/address/4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7?cluster=devnet">view</a></td><td>PDA <code>["share_mint", config]</code>. Classic SPL Token, 6 decimals. Mint and freeze authority: the vault authority PDA.</td></tr>
 <tr><td>Associated Token program</td><td><code class="addr">ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL</code></td><td></td><td>Derives the income inbox.</td></tr>
 </tbody></table></div>
 <p>The mint guard in <code>initialize</code> refuses a Token-2022 reserve mint with any of: permanent delegate, transfer hook, transfer fee or transfer-fee authority, non-transferable, default-frozen, scaled UI amount, interest-bearing or pausable.</p>
@@ -270,15 +270,15 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <div class="tbl-wrap"><table class="tbl">
 <thead><tr><th>Name</th><th>Seeds</th><th>Devnet address</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td><code>VaultConfig</code></td><td><code>["config", reserve_mint]</code></td><td><code class="addr">8CDkR7ausijvx2tY4qBLanZ4yxExZht4MrHeM87WC63u</code></td><td>Configuration, roles, caps. One per reserve mint.</td></tr>
-<tr><td><code>VaultState</code></td><td><code>["state", config]</code></td><td><code class="addr">4bmZKvPDq8MWpVBbTBuQun4fexefRjzVcePWrT51npHi</code></td><td>Internal accounting, queue heads, claim window.</td></tr>
-<tr><td>Vault authority</td><td><code>["authority", config]</code></td><td><code class="addr">BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK</code></td><td>Holds no data. Owns every reserve token account. Mint and freeze authority of the share mint.</td></tr>
-<tr><td><code>reserve</code></td><td><code>["reserve", config]</code></td><td><code class="addr">7zEMG3rnN5VEmcBNECJmLg9nJqCKtxz7VK2kREWvjA5m</code></td><td>Liquid reserve BRS. Tracked by <code>brs_balance</code>.</td></tr>
-<tr><td><code>pending_deposits</code></td><td><code>["pending_deposits", config]</code></td><td><code class="addr">4pS5twyH3icCja8kmEsTgFfEXyDZCjj7ajrb9AV2NJvS</code></td><td>BRS escrowed by deposit requests.</td></tr>
-<tr><td><code>pending_redemptions</code></td><td><code>["pending_redemptions", config]</code></td><td><code class="addr">GsP2K22t8xqkVEWt82PCAGFSWp9uN4GifVNRLuw7q3PY</code></td><td>Shares escrowed by redeem requests.</td></tr>
-<tr><td><code>claims</code></td><td><code>["claims", config]</code></td><td><code class="addr">5bMo1dQfWyS2bqpUGtmX528JF639HboVDZueTsAsSXv9</code></td><td>BRS owed to holders on filled redemptions, waiting for <code>claim_assets</code>.</td></tr>
-<tr><td><code>unsolicited</code></td><td><code>["unsolicited", config]</code></td><td><code class="addr">maSJLaMsH4K9KJBDUyDhanMRwrbzXbn8vuGL5rJ4KvP</code></td><td>Created at <code>initialize</code>, empty in this release. Never counted in stable assets, NAV or coverage. The instructions that move money in and out of it come with a later upgrade.</td></tr>
-<tr><td>Income inbox</td><td>ATA of (vault authority, token program, reserve mint)</td><td><code class="addr">KLcyCunPGYocfRvAjWkLSPbMScHxcAuBfR56UqDA2NP</code></td><td>Where the issuer pays its monthly revenue share. Untracked until <code>sweep_income</code> books a statement.</td></tr>
+<tr><td><code>VaultConfig</code></td><td><code>["config", reserve_mint]</code></td><td><code class="addr">CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q</code></td><td>Configuration, roles, caps. One per reserve mint.</td></tr>
+<tr><td><code>VaultState</code></td><td><code>["state", config]</code></td><td><code class="addr">G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex</code></td><td>Internal accounting, queue heads, claim window.</td></tr>
+<tr><td>Vault authority</td><td><code>["authority", config]</code></td><td><code class="addr">AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu</code></td><td>Holds no data. Owns every reserve token account. Mint and freeze authority of the share mint.</td></tr>
+<tr><td><code>reserve</code></td><td><code>["reserve", config]</code></td><td><code class="addr">FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa</code></td><td>Liquid reserve BRS. Tracked by <code>brs_balance</code>.</td></tr>
+<tr><td><code>pending_deposits</code></td><td><code>["pending_deposits", config]</code></td><td><code class="addr">FBtvP6z1mMPNjyHREDLzZGfEBD4bCcjGE3iW6BjRrFC9</code></td><td>BRS escrowed by deposit requests.</td></tr>
+<tr><td><code>pending_redemptions</code></td><td><code>["pending_redemptions", config]</code></td><td><code class="addr">7a5bjKC2rpQgqrPYD1vsrFaHc7JGz78EBfMknMtNT8i5</code></td><td>Shares escrowed by redeem requests.</td></tr>
+<tr><td><code>claims</code></td><td><code>["claims", config]</code></td><td><code class="addr">5Nch4AFcZs9k8TeVK4WfFjyWMHQiLnFx8YLoQsALNwBs</code></td><td>BRS owed to holders on filled redemptions, waiting for <code>claim_assets</code>.</td></tr>
+<tr><td><code>unsolicited</code></td><td><code>["unsolicited", config]</code></td><td><code class="addr">GWkRvroQsyDjyhN6DsUDid5LqR1omHKvATtanPz4r1JD</code></td><td>Created at <code>initialize</code>, empty in this release. Never counted in stable assets, NAV or coverage. The instructions that move money in and out of it come with a later upgrade.</td></tr>
+<tr><td>Income inbox</td><td>ATA of (vault authority, token program, reserve mint)</td><td><code class="addr">E9asDwtKTdqbrnrgKgXQuKX6WqFUpWF56SY9WM6vDWWH</code></td><td>Where the issuer pays its monthly revenue share. Untracked until <code>sweep_income</code> books a statement.</td></tr>
 </tbody></table></div>
 <p>The reserve's money is split across separate token accounts, so a freeze of one account does not trap every balance. <code>reserve</code> is a PDA, not an associated token account, so a mistaken send to the vault authority's "wallet" address lands in the income inbox, outside NAV.</p>
 
@@ -311,9 +311,9 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <tr><td>Operator (<code>VaultConfig.operator</code>)</td><td>Hot key</td><td>Set at deploy</td><td>Guarantees (register, close), guarantee fees, issuer income, claims (file, pay) and settlement records. <code>Pubkey::default()</code> when revoked. On devnet a keypair generated at deploy and used by hand from the operator console; later a KMS-backed key in the MUTAV platform.</td></tr>
 <tr><td>Pauser (<code>VaultConfig.pauser</code>)</td><td>Separate key</td><td>Set at deploy</td><td><code>pause</code> and <code>revoke_operator</code>, with no time lock.</td></tr>
 <tr><td>Guardians (<code>VaultConfig.guardians</code>)</td><td>Up to 3 keys, appointed by the admin in one step</td><td>Set at deploy</td><td><code>pause</code> only in the pilot. Devnet starts with 1 guardian, separate from the pauser. With the first adapter upgrade, also the risk-reducing adapter actions of ADR 0027.</td></tr>
-<tr><td>Share mint authority</td><td>Vault authority PDA</td><td><code class="addr">BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK</code></td><td>Mints shares only in <code>claim_shares</code>.</td></tr>
-<tr><td>Share freeze authority</td><td>Vault authority PDA</td><td><code class="addr">BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK</code></td><td>Unused by v1. Kept so share-transfer restrictions stay possible without a new mint.</td></tr>
-<tr><td>Reserve token accounts owner</td><td>Vault authority PDA</td><td><code class="addr">BsVcrAmq5x1qD2anp2hHyWmabjLxRjHbmNUtiQXxqVK</code></td><td>Owns <code>reserve</code>, <code>pending_deposits</code>, <code>pending_redemptions</code>, <code>claims</code>, <code>unsolicited</code> and the income inbox.</td></tr>
+<tr><td>Share mint authority</td><td>Vault authority PDA</td><td><code class="addr">AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu</code></td><td>Mints shares only in <code>claim_shares</code>.</td></tr>
+<tr><td>Share freeze authority</td><td>Vault authority PDA</td><td><code class="addr">AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu</code></td><td>Unused by v1. Kept so share-transfer restrictions stay possible without a new mint.</td></tr>
+<tr><td>Reserve token accounts owner</td><td>Vault authority PDA</td><td><code class="addr">AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu</code></td><td>Owns <code>reserve</code>, <code>pending_deposits</code>, <code>pending_redemptions</code>, <code>claims</code>, <code>unsolicited</code> and the income inbox.</td></tr>
 <tr><td>BRS mint authority (issuer)</td><td>Account owned by the issuer's minting program</td><td><code class="addr">7764rLMKF8fd4daejEESKBDPjE5EQBEQNgKCKNCpMwJv</code></td><td>Owner program <code class="addr">9fBSeVHUCaHHUzkktiRp5Yn35emxx3S1ERzn7oHsi8je</code>. Read 2026-10-06 (spec §12 Q34).</td></tr>
 <tr><td>BRS freeze authority (issuer)</td><td>Issuer wallet</td><td><code class="addr">nora7ZTxmDrLdVheVazpsthHFB8u3JzgHeyh9foTZWC</code></td><td>Can freeze any BRS token account, the reserve's included. Mainnet arrangements are open (spec §12 Q34).</td></tr>
 <tr><td>Treasury account</td><td>MUTAV BRS token account</td><td>Set at deploy</td><td>Receives MUTAV's take of each guarantee fee. Not owned by the operator, the capital wallet or the vault authority.</td></tr>

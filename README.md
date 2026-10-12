@@ -16,7 +16,7 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 | [`/demo`](https://reserve.mutav.finance/demo) | Guided six-step walkthrough, with the coverage-gate preview |
 | [`/simulator`](https://reserve.mutav.finance/simulator) | Reserve simulator: size the reserve, coverage, yield against Selic |
 
-> **Status:** the app is live; the program (`8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9`) is being deployed to devnet under a Squads multisig. Until the reserve is initialized, the live pages show a "being deployed" notice instead of numbers. To see every page with data today, run the app against a seeded local validator ([Pilot app](#pilot-app)).
+> **Status:** the program is live on devnet as [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet), with its upgrade authority and reserve admin held by Squads v4 multisigs. It runs the pilot demo reserve on devnet; test activity is visible, and the live pages read it. Addresses: [Devnet addresses](#devnet-addresses). To run every page against a seeded local validator instead, see [Pilot app](#pilot-app).
 
 **Read next:** the [litepaper](docs/litepaper.md), the [specification](docs/spec.md), the [architecture decisions](docs/decisions/) and the [development provenance](docs/provenance.md).
 
@@ -185,21 +185,32 @@ The devnet example sets `caps.maxNavMoveBps = 10000`. The NAV-move guard measure
 
 ### Devnet addresses
 
-To fill at deploy.
+The pilot demo reserve on devnet; test activity is visible. Every address opens on Solana Explorer (devnet), and [`/api/reserve`](https://reserve.mutav.finance/api/reserve) returns the same set as JSON.
 
 | What | Address |
 |---|---|
-| Program `mutav` | `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9` (declared; not yet deployed) |
-| Upgrade authority (Squads vault) | _TBD_ |
-| Squads multisig | _TBD_ |
-| `VaultConfig` (`["config", BRS mint]`) | _TBD_ |
-| `VaultState` | _TBD_ |
-| Share mint | _TBD_ |
-| Reserve (BRS token account) | _TBD_ |
-| BRS mint (Nora, devnet) | `BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4` |
-| Operator | _TBD_ |
-| Pauser | _TBD_ |
-| Treasury / payments token accounts | _TBD_ |
+| Program `mutav` | [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet) |
+| Upgrade authority (upgrade multisig vault) | [`AyKDdFrYQABjpkn29Sdj5hEGVymyEXzEHrGhzqPqvb1n`](https://explorer.solana.com/address/AyKDdFrYQABjpkn29Sdj5hEGVymyEXzEHrGhzqPqvb1n?cluster=devnet) |
+| Upgrade multisig (Squads v4, 2-of-2) | [`6W3WxRCQ9fzz4jdZZVB2JQLaMf7WXx7F2DwYVjK1yUDs`](https://explorer.solana.com/address/6W3WxRCQ9fzz4jdZZVB2JQLaMf7WXx7F2DwYVjK1yUDs?cluster=devnet) |
+| Admin multisig (Squads v4, 2-of-2) | [`HrYif2YLwKJc5aMMp6qQjd9WhdkD9JBjajjGyr4a92xR`](https://explorer.solana.com/address/HrYif2YLwKJc5aMMp6qQjd9WhdkD9JBjajjGyr4a92xR?cluster=devnet) |
+| Reserve admin (admin multisig vault, `VaultConfig.admin`) | [`6CnwNdEp8dYeKFA6ns89vDBNdmdniR1xyBbrhub6ZKcy`](https://explorer.solana.com/address/6CnwNdEp8dYeKFA6ns89vDBNdmdniR1xyBbrhub6ZKcy?cluster=devnet) |
+| `VaultConfig` (`["config", BRS mint]`) | [`CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q`](https://explorer.solana.com/address/CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q?cluster=devnet) |
+| `VaultState` | [`G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex`](https://explorer.solana.com/address/G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex?cluster=devnet) |
+| Vault authority | [`AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu`](https://explorer.solana.com/address/AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu?cluster=devnet) |
+| Share mint | [`4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7`](https://explorer.solana.com/address/4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7?cluster=devnet) |
+| Reserve (BRS token account) | [`FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa`](https://explorer.solana.com/address/FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa?cluster=devnet) |
+| BRS mint (Nora, devnet) | [`BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4`](https://explorer.solana.com/address/BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4?cluster=devnet) |
+| Operator | [`A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k`](https://explorer.solana.com/address/A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k?cluster=devnet) |
+| Pauser | [`2tW76Vpu1nqctZRBMdzSrzXHcnwnMcFMJqiZyP8t5P1T`](https://explorer.solana.com/address/2tW76Vpu1nqctZRBMdzSrzXHcnwnMcFMJqiZyP8t5P1T?cluster=devnet) |
+| Treasury token account | [`BiTXGCiXuKEJS8VxBUdGrqnMpKo4umFcpH7qevitPtAU`](https://explorer.solana.com/address/BiTXGCiXuKEJS8VxBUdGrqnMpKo4umFcpH7qevitPtAU?cluster=devnet) |
+| Payments token account | [`CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj`](https://explorer.solana.com/address/CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj?cluster=devnet) |
+
+About this deploy:
+
+- It is a test deploy of commit `833c114` (layout v1, the binary on `main` at the time) built with `anchor build` under its own program ID. The ID declared in [`lib.rs`](programs/mutav/src/lib.rs), `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9`, is kept for the verified `solana-verify` release build, so the reserve PDAs above differ from those derived under the declared ID.
+- The on-chain program hash matches the build (`fad721d5…e6e7`). The release `v1.0.0-devnet` carries its IDL.
+- Its multisig time locks are 60 s (admin) and 120 s (upgrade), a test exception to the devnet floors of [ADR 0028](docs/decisions/0028-pilot-parameters.md) (300 s and 3,600 s). The real pilot keeps 24 h and 7 days.
+- `mutav_adapter_mock` is not deployed on devnet.
 
 ## Documentation
 

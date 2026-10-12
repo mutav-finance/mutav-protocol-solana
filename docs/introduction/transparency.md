@@ -38,7 +38,7 @@ So two figures are always public for each account: the tracked total and the act
 
 ## The `/reserve` page
 
-The pilot app at [reserve.mutav.finance/reserve](https://reserve.mutav.finance/reserve) shows the same data in one place. It is read-only and needs no wallet. Every number is read from on-chain accounts through the client. Until the reserve is initialized on devnet, the page shows a "being deployed" notice instead of numbers.
+The pilot app at [reserve.mutav.finance/reserve](https://reserve.mutav.finance/reserve) shows the same data in one place. It is read-only and needs no wallet. Every number is read from on-chain accounts through the client. It reads the pilot demo reserve on devnet; test activity is visible.
 
 | Panel | What it shows |
 |---|---|

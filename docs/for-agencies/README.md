@@ -57,13 +57,13 @@ flowchart LR
 
 ## What the agency can check
 
-Anyone, with no wallet, can read the public `/reserve` page of the pilot app at [reserve.mutav.finance](https://reserve.mutav.finance): reserve health, coverage, each claim's filed, paid and settled timestamps, money flows and every account on Solana Explorer. Until the reserve is initialized on devnet, its pages show a "being deployed" notice instead of numbers.
+Anyone, with no wallet, can read the public `/reserve` page of the pilot app at [reserve.mutav.finance](https://reserve.mutav.finance): reserve health, coverage, each claim's filed, paid and settled timestamps, money flows and every account on Solana Explorer. The pages read the pilot demo reserve on devnet; test activity is visible.
 
 ## Status
 
 | Item | Status |
 |---|---|
-| `mutav` program on devnet | Program ID `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9` declared; devnet deploy pending |
+| `mutav` program on devnet | Live: [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet), the pilot demo reserve; test activity is visible. Addresses in the [README](../../README.md#devnet-addresses) |
 | Pilot capital | MUTAV's own. The reserve is not open to public investment during the pilot |
 | Agency platform (onboarding, registration, monthly bills) | Built in the MUTAV platform; Pix settlement in sandbox; boleto issuance waits on a licensed payment provider |
 | Operator | Signed by hand from the pilot console; later a KMS-held key in the platform |

@@ -55,11 +55,11 @@ The binding sources behind every page are the [specification](../spec.md) and th
 
 | Thing | Location |
 |---|---|
-| Pilot app | [reserve.mutav.finance](https://reserve.mutav.finance). Until the reserve is initialized on devnet, its pages show a "being deployed" notice instead of numbers. |
-| Program | `programs/mutav/` in this repository. Program ID `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9` (declared; devnet deployment pending). |
+| Pilot app | [reserve.mutav.finance](https://reserve.mutav.finance). It reads the pilot demo reserve on devnet; test activity is visible. |
+| Program | `programs/mutav/` in this repository. Live on devnet as [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet), a test deploy under its own ID; the ID declared in `lib.rs` is kept for the verified release build. |
 | TypeScript client | `clients/js/`, published as `@mutav-finance/mutav-protocol-solana`. It composes transactions and never signs. |
 | Reserve asset | BRS, a BRL stablecoin issued by Nora. Devnet mint `BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4`. |
-| Reserve accounts, multisigs and role keys | Set at deploy. |
+| Reserve accounts, multisigs and role keys | Listed in the [README devnet addresses](../../README.md#devnet-addresses). |
 
 ## Sources
 

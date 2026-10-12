@@ -358,7 +358,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 
 <section class="level2" id="live">
 <h2><span class="num">5</span>What's live</h2>
-<p><span class="status live">Live</span> The pilot app at <a href="https://reserve.mutav.finance">reserve.mutav.finance</a>. Until the reserve is initialized on devnet, its pages show a "being deployed" notice instead of numbers.</p>
+<p><span class="status live">Live</span> The pilot app at <a href="https://reserve.mutav.finance">reserve.mutav.finance</a>. It reads the pilot demo reserve on devnet; test activity is visible.</p>
 <ul class="routes">
 <li><a href="https://reserve.mutav.finance">/</a><span>The story, who does what, and the protocol diagram.</span></li>
 <li><a href="https://reserve.mutav.finance/reserve">/reserve</a><span>Public transparency: health, coverage, claims, money flows, the capital queue and every account on Solana Explorer. No wallet needed.</span></li>
@@ -368,13 +368,16 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:22px 0 40px;colo
 <li><a href="https://reserve.mutav.finance/demo">/demo</a><span>A guided walkthrough with the coverage-gate preview.</span></li>
 <li><a href="https://reserve.mutav.finance/simulator">/simulator</a><span>Reserve simulator: size the reserve and see coverage required.</span></li>
 </ul>
-<p><span class="status pending">Deploying</span> The devnet program. Its ID is declared; the other addresses are set at deploy.</p>
+<p><span class="status live">Live</span> The devnet program, running the pilot demo reserve under Squads v4 multisigs. Every address opens on Solana Explorer (devnet); the multisigs and roles are in the repository README.</p>
 <div class="tbl-wrap"><table class="tbl">
 <thead><tr><th>What</th><th>Address</th></tr></thead>
 <tbody>
-<tr><td>Program <code>mutav</code></td><td class="addr">8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9</td></tr>
-<tr><td>BRS mint (Nora, devnet)</td><td class="addr">BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4</td></tr>
-<tr><td>Reserve, multisig and roles</td><td class="muted">Set at deploy</td></tr>
+<tr><td>Program <code>mutav</code></td><td class="addr"><a href="https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet">GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV</a></td></tr>
+<tr><td><code>VaultConfig</code></td><td class="addr"><a href="https://explorer.solana.com/address/CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q?cluster=devnet">CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q</a></td></tr>
+<tr><td><code>VaultState</code></td><td class="addr"><a href="https://explorer.solana.com/address/G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex?cluster=devnet">G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex</a></td></tr>
+<tr><td>Share mint</td><td class="addr"><a href="https://explorer.solana.com/address/4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7?cluster=devnet">4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7</a></td></tr>
+<tr><td>Reserve (BRS token account)</td><td class="addr"><a href="https://explorer.solana.com/address/FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa?cluster=devnet">FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa</a></td></tr>
+<tr><td>BRS mint (Nora, devnet)</td><td class="addr"><a href="https://explorer.solana.com/address/BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4?cluster=devnet">BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4</a></td></tr>
 </tbody></table></div>
 </section>
 
