@@ -27,12 +27,20 @@ import { ROLE_META, type Role } from "@/lib/roles";
 type BoxData = { title: string; sub: string; w: number; h: number; accent?: boolean; gate?: boolean; role?: Role };
 
 const HIDDEN: React.CSSProperties = { opacity: 0, width: 1, height: 1, minWidth: 0, minHeight: 0, border: "none", background: "transparent" };
-const SIDES = [
+/**
+ * Handle ids: a side's centre (`t`, `b`, `l`, `r`), plus off-centre points
+ * (`l25` = left side at 25% down, `b25`/`b75` = bottom at 25%/75% across) so
+ * two edges meeting one box land apart and their labels never stack.
+ */
+const SIDES: [string, Position, React.CSSProperties?][] = [
   ["t", Position.Top],
   ["b", Position.Bottom],
   ["l", Position.Left],
   ["r", Position.Right],
-] as const;
+  ["l25", Position.Left, { top: "25%" }],
+  ["b25", Position.Bottom, { left: "25%" }],
+  ["b75", Position.Bottom, { left: "75%" }],
+];
 
 function Box({ data }: NodeProps<Node<BoxData>>) {
   return (
@@ -65,9 +73,9 @@ function Box({ data }: NodeProps<Node<BoxData>>) {
       <span className="font-mono" style={{ fontSize: 9.5, color: "var(--color-text-3)", lineHeight: 1.4, whiteSpace: "pre-line" }}>
         {data.sub}
       </span>
-      {SIDES.flatMap(([id, pos]) => [
-        <Handle key={`s${id}`} id={`s${id}`} type="source" position={pos} style={HIDDEN} />,
-        <Handle key={`t${id}`} id={`t${id}`} type="target" position={pos} style={HIDDEN} />,
+      {SIDES.flatMap(([id, pos, at]) => [
+        <Handle key={`s${id}`} id={`s${id}`} type="source" position={pos} style={{ ...HIDDEN, ...at }} />,
+        <Handle key={`t${id}`} id={`t${id}`} type="target" position={pos} style={{ ...HIDDEN, ...at }} />,
       ])}
     </div>
   );
@@ -77,16 +85,19 @@ const nodeTypes = { box: Box };
 
 const n = (id: string, x: number, y: number, data: BoxData): Node<BoxData> => ({ id, type: "box", position: { x, y }, data, draggable: false, selectable: false });
 
+// Layout: the operator's fee take and contribute_fees share one trunk down the
+// left; Nora sits on the bottom row and meets the reserve from below, so no two
+// labels share a segment; the right column leaves room for the widest label.
 const NODES: Node<BoxData>[] = [
   n("operator", 0, 20, { title: "OPERATOR", sub: "MUTAV platform key\nregisters · fees · claims", w: 190, h: 74, role: "operator" }),
-  n("gate", 300, 26, { title: "COVERAGE GATE", sub: "new cover must fit\nin free capital", w: 170, h: 62, gate: true }),
-  n("admin", 840, 20, { title: "RESERVE ADMIN", sub: "Squads M-of-N multisig\ntime-locked proposals", w: 200, h: 74, role: "admin" }),
+  n("gate", 425, 26, { title: "COVERAGE GATE", sub: "new cover must fit\nin free capital", w: 170, h: 62, gate: true }),
+  n("admin", 890, 20, { title: "RESERVE ADMIN", sub: "Squads M-of-N multisig\ntime-locked proposals", w: 200, h: 74, role: "admin" }),
   n("reserve", 380, 170, { title: "RESERVE", sub: "BRS held by the program\nNAV · coverage · free capital\nshares minted at NAV", w: 260, h: 130, accent: true }),
-  n("escrows", 820, 186, { title: "ESCROWS", sub: "pending deposits\npending redemptions\nclaims (filled redemptions)", w: 220, h: 98 }),
-  n("nora", 0, 200, { title: "NORA · BRS", sub: "issues the BRL stablecoin\nholds its freeze authority", w: 200, h: 70 }),
-  n("treasury", 120, 390, { title: "TREASURY", sub: "MUTAV's fee take\n(operating revenue)", w: 190, h: 64 }),
-  n("investor", 840, 390, { title: "INVESTOR", sub: "allowlisted capital wallet\n(KYC off-chain)", w: 200, h: 64, role: "investor" }),
+  n("escrows", 880, 186, { title: "ESCROWS", sub: "pending deposits\npending redemptions\nclaims (filled redemptions)", w: 220, h: 98 }),
+  n("treasury", 0, 390, { title: "TREASURY", sub: "MUTAV's fee take\n(operating revenue)", w: 190, h: 64 }),
+  n("nora", 220, 390, { title: "NORA · BRS", sub: "issues the BRL stablecoin\nholds its freeze authority", w: 200, h: 64 }),
   n("payments", 560, 390, { title: "PAYMENTS ACCOUNT", sub: "claim payments out\n→ PIX to the agency", w: 220, h: 64 }),
+  n("investor", 890, 390, { title: "INVESTOR", sub: "allowlisted capital wallet\n(KYC off-chain)", w: 200, h: 64, role: "investor" }),
 ];
 
 const edge = (id: string, source: string, sh: string, target: string, th: string, label: string, opts: { accent?: boolean; dashed?: boolean } = {}): Edge => ({
@@ -107,12 +118,12 @@ const edge = (id: string, source: string, sh: string, target: string, th: string
 const EDGES: Edge[] = [
   edge("e1", "operator", "r", "gate", "l", "register_guarantee"),
   edge("e2", "gate", "b", "reserve", "t", "fits → cover booked", { accent: true }),
-  edge("e3", "operator", "b", "reserve", "l", "contribute_fees (net)"),
+  edge("e3", "operator", "b", "reserve", "l25", "contribute_fees (net)"),
   edge("e4", "operator", "b", "treasury", "t", "fee take"),
-  edge("e5", "reserve", "b", "payments", "t", "pay_claim · never gated"),
+  edge("e5", "reserve", "b75", "payments", "t", "pay_claim · never gated"),
   edge("e6", "admin", "b", "escrows", "t", "fulfil_deposits / fulfil_redeems"),
   edge("e7", "escrows", "l", "reserve", "r", "deposits in · redemptions out (gated)"),
-  edge("e8", "nora", "r", "reserve", "l", "freeze authority", { dashed: true }),
+  edge("e8", "nora", "t", "reserve", "b25", "freeze authority", { dashed: true }),
   edge("e9", "investor", "t", "escrows", "b", "request_deposit / request_redeem"),
 ];
 

@@ -3,9 +3,9 @@ import { brsToUsd, elapsed, fmtBps, fmtBrs, fmtFxDate, fmtUsd, fmtUsdHint, fxSou
 
 describe("format", () => {
   it("formats BRS with grouping and truncation", () => {
-    expect(fmtBrs(12_345_678_901n)).toBe("R$ 12,345.67");
-    expect(fmtBrs(0n)).toBe("R$ 0.00");
-    expect(fmtBrs(999_999n)).toBe("R$ 0.99");
+    expect(fmtBrs(12_345_678_901n)).toBe("R$\u00a012,345.67");
+    expect(fmtBrs(0n)).toBe("R$\u00a00.00");
+    expect(fmtBrs(999_999n)).toBe("R$\u00a00.99");
     expect(fmtUnits(-1_500_000n, 6)).toBe("-1.50");
   });
   it("formats shares and NAV", () => {
@@ -56,8 +56,8 @@ describe("fmtPct", () => {
 describe("fmtUsd", () => {
   it("converts BRS at the USD/BRL rate, truncating", () => {
     expect(brsToUsd(5_400_000n, 5_400_000n)).toBe(1_000_000n);
-    expect(fmtUsd(58_700_000_000n, 5_400_000n)).toBe("US$ 10,870.37");
-    expect(fmtUsd(1n, 5_400_000n)).toBe("US$ 0.00");
+    expect(fmtUsd(58_700_000_000n, 5_400_000n)).toBe("US$\u00a010,870.37");
+    expect(fmtUsd(1n, 5_400_000n)).toBe("US$\u00a00.00");
   });
 });
 
@@ -70,18 +70,18 @@ describe("US$ hint", () => {
   });
 
   it("formats with a bigint rate", () => {
-    expect(fmtUsdHint(58_700_000_000n, 5_400_000n)).toBe("≈ US$ 10,870.37");
+    expect(fmtUsdHint(58_700_000_000n, 5_400_000n)).toBe("≈ US$\u00a010,870.37");
   });
 
   it("formats with a numeric rate (no BigInt/number mixing)", () => {
-    expect(fmtUsdHint(58_700_000_000n, 5.4)).toBe("≈ US$ 10,870.37");
-    expect(fmtUsdHint(4_989_200n, 4.9892)).toBe("≈ US$ 1.00");
+    expect(fmtUsdHint(58_700_000_000n, 5.4)).toBe("≈ US$\u00a010,870.37");
+    expect(fmtUsdHint(4_989_200n, 4.9892)).toBe("≈ US$\u00a01.00");
   });
 
   it("carries a sign, given or from a negative amount", () => {
-    expect(fmtUsdHint(5_400_000n, 5_400_000n, "+")).toBe("≈ +US$ 1.00");
-    expect(fmtUsdHint(5_400_000n, 5_400_000n, "−")).toBe("≈ −US$ 1.00");
-    expect(fmtUsdHint(-5_400_000n, 5_400_000n)).toBe("≈ −US$ 1.00");
+    expect(fmtUsdHint(5_400_000n, 5_400_000n, "+")).toBe("≈ +US$\u00a01.00");
+    expect(fmtUsdHint(5_400_000n, 5_400_000n, "−")).toBe("≈ −US$\u00a01.00");
+    expect(fmtUsdHint(-5_400_000n, 5_400_000n)).toBe("≈ −US$\u00a01.00");
   });
 
   it("is empty without a usable rate", () => {
