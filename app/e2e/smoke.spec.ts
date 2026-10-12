@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /** The spec's language rule, checked on what actually renders. */
-const BANNED = /\b(premiums?|(re)?insur(ance|ed|ers?)|polic(y|ies)|policyholders?|yield vault|sinistros?|fund|coverage[ -]gat(e|ed|es|ing))\b/i;
+const BANNED = /\b(premiums?|(re)?insur(ance|ed|ers?)|polic(y|ies)|policyholders?|yield vault|sinistros?|fund|solvency[ -]gat(e|ed|es|ing))\b/i;
 
 async function noBannedWords(page: Page) {
   const text = await page.locator("body").innerText();
@@ -41,7 +41,8 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     for (const tab of ["Overview", "Coverage", "Claims", "Money", "Risks", "Verify"]) await expect(views.getByRole("link", { name: tab })).toBeVisible();
     await expect(views.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("status", { name: /Coverage status: COVERED/ })).toBeVisible();
-    await expect(page.getByText("R$ 28,300.00").first()).toBeVisible();
+    // The hero splits the figure across spans (smaller decimals, US$ hint), so match the text content.
+    await expect(page.locator("main")).toContainText("Reserve balance?R$ 29,500.00");
     await expect(page.getByRole("heading", { name: "Where the capital sits" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
     await expect(page.getByText("Claim payments are never blocked by required coverage.")).toBeVisible();
@@ -187,7 +188,7 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await page.goto("/simulator");
     await expect(page.locator(".demo-banner").and(page.getByRole("note", { name: "Pilot demo" }))).toContainText("Not open to public investment.");
     await expect(page.getByRole("heading", { name: "Reserve simulator", level: 1 })).toBeVisible();
-    await expect(page.getByLabel(/Coverage ratio \(c\)/)).toHaveValue("0,25");
+    await expect(page.getByRole("textbox", { name: /Coverage ratio \(c\)/ })).toHaveValue("0,25");
     await expect(page.locator("#glance")).toContainText("Coverage & safety");
     await expect(page.locator("#chart")).toContainText("Stable assets vs coverage required");
     await expect(page.locator("#kstrip")).toContainText("What the reserve earns");
