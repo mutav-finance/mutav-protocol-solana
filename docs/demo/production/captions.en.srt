@@ -1,0 +1,127 @@
+1
+00:00:00,300 --> 00:00:03,400
+Ana wants to rent an apartment
+in Passo Fundo.
+
+2
+00:00:03,600 --> 00:00:05,600
+Her landlord wants a guarantor.
+
+3
+00:00:05,800 --> 00:00:09,800
+MUTAV is that guarantor,
+and its reserve runs on Solana.
+
+4
+00:00:10,100 --> 00:00:14,900
+Her agency works in MUTAV's platform;
+every lease becomes an account on-chain.
+
+5
+00:00:17,000 --> 00:00:20,600
+Our operator puts Ana's lease on-chain:
+R$18,000 of cover,
+
+6
+00:00:20,600 --> 00:00:24,500
+an opaque ID, no personal data.
+
+7
+00:00:27,300 --> 00:00:31,200
+Anyone can watch the reserve:
+what it holds in BRS,
+
+8
+00:00:31,200 --> 00:00:35,000
+Nora's Brazilian real stablecoin,
+and what it must hold.
+
+9
+00:00:35,400 --> 00:00:36,900
+The rule is code.
+
+10
+00:00:38,000 --> 00:00:43,000
+One more lease would need R$45,000;
+the reserve holds R$44,000.
+
+11
+00:00:45,600 --> 00:00:46,400
+Refused.
+
+12
+00:00:46,800 --> 00:00:50,000
+MUTAV can't promise
+what its reserve can't back.
+
+13
+00:00:59,400 --> 00:01:01,800
+Now say Ana misses a month.
+
+14
+00:01:02,400 --> 00:01:04,600
+The operator files the claim,
+
+15
+00:01:06,400 --> 00:01:09,600
+the reserve pays
+within the admin's cap,
+
+16
+00:01:11,400 --> 00:01:15,600
+and the PIX to the agency
+is recorded on-chain.
+
+17
+00:01:21,000 --> 00:01:24,400
+On-chain, filed to settled
+in [N] seconds.
+
+18
+00:01:24,800 --> 00:01:28,200
+Seguro-fiança allows
+up to thirty days.
+
+19
+00:01:37,600 --> 00:01:41,600
+Here are six months of it,
+simulated locally on an accelerated clock.
+
+20
+00:01:41,800 --> 00:01:46,200
+Guarantee fees and issuer revenue
+flow into the reserve.
+
+21
+00:01:46,600 --> 00:01:50,200
+Claims are paid,
+large ones approved by the admin.
+
+22
+00:01:50,600 --> 00:01:55,000
+The reserve can back more leases,
+each share is worth more,
+
+23
+00:01:55,400 --> 00:01:59,800
+and a capital provider takes out
+more than they put in.
+
+24
+00:02:00,200 --> 00:02:05,400
+The same reserve that protects
+the landlord pays the people who fund it.
+
+25
+00:02:06,000 --> 00:02:08,600
+MUTAV: a transparent,
+programmable reserve,
+
+26
+00:02:08,600 --> 00:02:11,600
+claims settled in minutes,
+capital-efficient cover.
+
+27
+00:02:12,200 --> 00:02:14,400
+Brazil's onchain rent guarantee.

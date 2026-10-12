@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>MUTAV Demo Research</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+  :root{--bg:#fbfaf7;--fg:#1d1d1f;--muted:#5b5b60;--accent:#b8730f;--link:#1f5fbf;--rule:#e2dfd8;--th:#f1eee7;--code:#efece5}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121214;--fg:#e8e6e3;--muted:#a3a1a8;--accent:#e8a020;--link:#7fb0ff;--rule:#2c2c31;--th:#1c1c20;--code:#1f1f24}}
+  :root[data-theme="dark"]{--bg:#121214;--fg:#e8e6e3;--muted:#a3a1a8;--accent:#e8a020;--link:#7fb0ff;--rule:#2c2c31;--th:#1c1c20;--code:#1f1f24}
+  html{background:var(--bg)}
+  body{background:var(--bg);color:var(--fg);font:17px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;max-width:820px;margin:0 auto;padding:40px 16px 80px}
+  header#title-block-header{display:none}
+  h1{font-size:2.1em;line-height:1.2;margin:.2em 0 .6em;letter-spacing:-.01em}
+  h2{font-size:1.35em;line-height:1.3;margin:2.2em 0 .6em;padding-top:.8em;border-top:1px solid var(--rule)}
+  h1+p{font-size:1.06em;border-left:3px solid var(--accent);padding-left:16px}
+  a{color:var(--link);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+  strong{font-weight:650}
+  code{font:0.88em ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code);padding:1px 5px;border-radius:4px;word-break:break-word}
+  table{border-collapse:collapse;width:100%;font-size:.9em;margin:1.4em 0;display:block;overflow-x:auto}
+  th,td{border:1px solid var(--rule);padding:8px 10px;vertical-align:top;text-align:left}
+  th{background:var(--th)}
+  td:first-child{white-space:nowrap}
+  @media (max-width:600px){td:first-child{white-space:normal}body{font-size:16px}}
+  .meta{color:var(--muted);font-size:.85em;margin-bottom:2em}
+  </style>
+</head>
+<body>
+<h1 id="show-the-refusal-then-show-the-payout">Show the refusal, then
+show the payout</h1>
+<p>MUTAV's demo should be a technical walkthrough of one lease in one
+take: one end-to-end flow, a staged refusal, visible on-chain proof, and
+honest labels. That is the pattern in winning Colosseum fintech demos
+and in professional product-video craft. A second pitch wastes the slot.
+Colosseum asks for a product-demo video of <strong>no more than three
+minutes</strong> that explains "how the product works". It sits next to
+a separate 2-to-3-minute pitch video. Colosseum's founders say the demo
+is about the <em>how</em>, and what judges care about most is "the
+reasoning behind these decisions, especially with regard to Solana
+integration" (<a
+href="https://blog.colosseum.com/perfecting-your-hackathon-submission/">Colosseum
+blog</a>; <a
+href="https://colosseum.com/hackathon#h-faq-11">colosseum.com/hackathon</a>).
+Winning 2025 demos put product on screen within <strong>about 10
+seconds</strong>, run one realistic counterparty flow, show a devnet
+signature, and say plainly what was shipped during the hackathon. The
+existing storyboard already has the right spine: Ana's lease registered,
+a second lease refused by the coverage gate, the claim filed, paid and
+settled. It needs four changes. First, add a short agency-platform shot
+and an architecture strip that labels what is pre-existing, what was
+built in the hackathon, and what is simulated. Second, cut the 21%
+flywheel beat, which is pitch material. Third, tighten the zoom and
+capture spec so the 200% punch-ins don't blur. Fourth, script the
+capture with Playwright and disposable devnet wallets so retakes are
+deterministic. Two process items: the judging criteria in the team's
+handoff brief are out of date, and the deadline needs one confirmation
+in the submission form.</p>
+<h2
+id="colosseum-scores-the-demo-on-product-execution-not-on-the-old-rubric">Colosseum
+scores the demo on Product + Execution, not on the old rubric</h2>
+<p>The current Colosseum submission is a pitch to its venture fund and
+accelerator. The FAQ says the team wants to understand "founder-market
+fit, how the opportunity was uncovered, how the team prioritizes" (<a
+href="https://colosseum.com/hackathon#h-faq-11">colosseum.com/hackathon</a>).
+The official criteria are <strong>Founder + Market Fit, Insight, Product
++ Execution, Potential Market Size, Founder Communication, Viability and
+Traction</strong>. Product + Execution asks "How well does the product
+work? How does it stack up against the competition? How quickly is the
+team shipping?" Shortlisted teams get a 15-minute Zoom interview, and
+winners are announced about a month after the deadline (<a
+href="https://colosseum.com/hackathon#h-faq-12">colosseum.com/hackathon</a>).
+No weights are published. The team's internal handoff brief lists
+"Functionality, Impact, Novelty, UX, Open-source and Business Plan" as
+the official criteria. That list comes from 2024-era community docs such
+as a Superteam Canada Notion page (<a
+href="https://superteamcan.notion.site/Colosseum-Tips-1ae380b97c4681cabad4e7f85ae0af7b">Superteam
+Canada</a>) and is <strong>outdated</strong>. Plan against the current
+rubric. The demo carries <strong>Product + Execution</strong> most
+directly. It also carries <strong>Insight</strong>: the per-lease
+exposure registry plus the coverage gate is the mechanism nobody else
+has. Viability and Traction belong mainly to the pitch.</p>
+<p>The two videos have distinct jobs. In the Breakout 2025 workshop,
+Nate Levine, Matty Taylor and Clay Robbins described the pitch as "the
+why" and the technical demo as "the how". The demo should cover core
+features, the tech stack, and why some components were prioritized over
+others. It must be "technical, direct, and specific to implementation",
+and teams should "avoid turning this into another pitch" (<a
+href="https://blog.colosseum.com/perfecting-your-hackathon-submission/">Colosseum
+blog</a>). Their named mistakes include running over time, "overly
+flashy visuals with little substance," buzzwords, and failing to explain
+the Solana integration clearly. Matty Taylor's earlier advice still
+holds: prioritize the features that "create an amazing working demo on
+devnet" and build toward the user's "aha" moment (<a
+href="https://blog.colosseum.com/how-to-win-a-colosseum-hackathon/">How
+to Win a Colosseum Hackathon</a>). GitHub reviewers check that the team
+"did significant work during the hackathon" and "prioritized feature
+development strategically", not code style (<a
+href="https://colosseum.com/hackathon#h-faq-13">colosseum.com/hackathon</a>).</p>
+<p>Disclosure is a rule, not a courtesy. "Builders may use pre-existing
+code, but teams must disclose all relevant past development work in the
+submission form." Only work between the start and end dates is judged,
+and misrepresentation can lead to disqualification (<a
+href="https://colosseum.com/hackathon#h-faq-4">colosseum.com/hackathon</a>).
+Devnet is normal. Colosseum's only technical requirement is to integrate
+with Solana "in some capacity," and its accelerator describes cohorts
+moving "from devnet to mainnet" (<a
+href="https://blog.colosseum.com/how-to-win-a-colosseum-hackathon/">How
+to Win</a>; <a
+href="https://blog.colosseum.com/introducing-colosseum-accelerator-cohort-1/">Accelerator
+Cohort 1</a>). No host or format is mandated. The Arena form has a
+separate demo-video link, a <code>demoVideoPublic</code> flag, and a
+live-product link with access instructions (Colosseum Copilot submission
+schema).</p>
+<p><strong>Deadline discrepancy, to resolve today.</strong> The
+colosseum.com page says only "Sep 14 — Oct 12" (<a
+href="https://colosseum.com/hackathon">colosseum.com/hackathon</a>).
+Colosseum Copilot's event registry gives
+<strong>2026-10-13T06:59Z</strong>. That is 03:59 BRT on Oct 13, which
+equals 23:59 Pacific on Oct 12. The storyboard and the team target
+<strong>Oct 12, 23:59 BRT</strong>, about four hours earlier than
+Copilot's timestamp. Keep the earlier target and confirm the cutoff in
+the Arena form itself. The run sheet's 20:30 submit and 23:00 hard stop
+leave buffer on either reading.</p>
+<h2
+id="winning-fintech-demos-reach-product-in-10-seconds-and-prove-one-transaction">Winning
+fintech demos reach product in 10 seconds and prove one transaction</h2>
+<p>The 2025 winners share a compact arc. <strong>MCPay</strong>
+(Cypherpunk, 1st Stablecoins) starts its 3:01 demo by separating old
+work from new: "we've been building MCPay for a while, but over the past
+four weeks, we've pushed it to the next level." The product is on screen
+by about 0:15. One flow runs on "Solana devnet only", and the on-chain
+proof comes at about 2:15: "The payment just occurred 4 seconds ago… in
+the explorer as well" (<a href="https://youtu.be/KAqft_GZBuY">MCPay
+demo</a>). <strong>Yumi Finance</strong> (Cypherpunk, 1st DeFi) says
+"let me go straight to it" and is inside a realistic merchant checkout
+in <strong>under 10 seconds</strong>. It runs one installment purchase
+through wallet signature. At about 2:00 it says "During the hackathon,
+we shipped the total redesign of our underwriting flow and integrated
+with Solana," then closes on a 45-second architecture beat (<a
+href="https://youtu.be/II7UAWZGK90">Yumi demo</a>).
+<strong>LocalPay</strong> (Breakout, 3rd Stablecoins) fits a stat,
+founder-market fit, a real dinner payment, licensed-partner plumbing and
+"what we had to solve" into <strong>2:02</strong> (<a
+href="https://youtu.be/nDbkEy6-ID8">LocalPay demo</a>).</p>
+<p>The multi-role winners are the closest structural match for MUTAV.
+<strong>Pencil Finance</strong> walks issuer → admin approval →
+investor, including a 30/70 junior/senior tranche split with on-chain
+admin signing (<a
+href="https://colosseum.com/projects/explore/pencil-finance-1">Pencil</a>).
+<strong>attn.markets</strong> shows a sponsor portal and ends with a
+<strong>2-of-2 Squads multisig</strong> between the sponsor and an
+automated co-signer (<a
+href="https://colosseum.com/projects/explore/attn.markets">attn.markets</a>).
+Infrastructure entries made the integration surface itself the demo.
+Credible Finance walked through API docs and partner-portal ledgers (<a
+href="https://colosseum.com/projects/explore/credible-finance-1">Credible</a>).
+Autonom ran terminal scripts that verify Merkle proofs on devnet (<a
+href="https://colosseum.com/projects/explore/autonom-unleashing-rwas-in-solana">Autonom</a>).
+LocalPay, Credible and Legasi each spent screen time on how fiat touches
+the system: licensed partners, an NBFI credit line, an EMI off-ramp.
+<strong>Regulated fiat plumbing counts as technical substance, not a
+distraction.</strong></p>
+<p>Two counterweights matter. First, product proof is not everything.
+Frontier 2026 winners DashX (a 57-second pitch, no demo link), Housd
+(tokenized residential real-estate debt, "static slide decks") and
+KinnectFi won without showing a live product (<a
+href="https://colosseum.com/projects/explore/dashx-1">DashX</a>; <a
+href="https://colosseum.com/projects/explore/housd">Housd</a>; <a
+href="https://colosseum.com/projects/explore/kinnectfi">KinnectFi</a>).
+Team, insight and traction can carry a submission, so the demo competes
+for execution points, not for the whole decision. Second, on-chain proof
+in winning demos is <strong>light</strong>: one or two signatures and
+one explorer moment. Nobody in the sample lingered on explorer screens.
+Several winners' videos have since gone private or unavailable on
+YouTube, so keep MUTAV's link watchable by anyone with it until winners
+are announced.</p>
+<h2
+id="professional-craft-lead-with-the-stakes-hold-on-results-cut-every-wait">Professional
+craft: lead with the stakes, hold on results, cut every wait</h2>
+<p>Outside crypto, the best short product videos keep the real UI
+full-frame, show one job per video, and open on value. Linear's Head of
+Product narrates "Introducing Linear Initiatives" from a small webcam
+bubble while the real interface fills the frame. Linear's reels show "a
+single job to be done per reel" (<a
+href="https://www.moonb.io/blog/product-launch-video">Moonb</a>).
+Figma's Motion launch puts the control and its effect in the same frame,
+so the viewer never has to remember what was clicked (<a
+href="https://www.moonb.io/blog/product-launch-video">Moonb</a>). Stripe
+employs a dedicated Demo Engineer and builds believable fictional
+merchants for its keynotes, such as "GlowGuide" in 2025 (<a
+href="https://stripe.com/jobs/listing/demo-engineer/7390314">Stripe
+jobs</a>; <a
+href="https://stripe.com/sessions/2025/product-keynote">Stripe Sessions
+2025</a>). Its Rocket Rides marketplace is the canonical two-sided demo
+cast (<a href="https://docs.stripe.com/connect/express-accounts">Stripe
+docs</a>). Peter Cohan's <em>Great Demo!</em> rule, "Do the Last Thing
+First," and Guy Kawasaki's "don't try building to a crescendo" both
+argue for front-loading the strongest result (<a
+href="https://www.skmurphy.com/blog/2014/02/20/improve-your-sales-pitch/">SK
+Murphy</a>). Supademo says the first 10 seconds should state the
+viewer's problem, not introduce the product (<a
+href="https://supademo.com/blog/demo-script">Supademo</a>).</p>
+<p>Arcade's 2026 benchmarks (14 million interactive sessions) give the
+only hard numbers. They come from click-through demos, not linear video,
+so treat them as directional. Completion peaks at <strong>40% for 9–12
+steps</strong>. <strong>Step 7 is the main drop-off</strong>, and
+viewers who pass it are 2.3× likelier to finish. On-screen labels over
+<strong>60 characters cut completion 12%</strong>, and specific numbers
+beat vague claims (<a
+href="https://www.arcade.software/post/2026-arcade-benchmarks">Arcade</a>).
+Translated to a 3-minute film: the first 45–60 seconds are the decision
+window. Aim for about a dozen visible actions, not 25. Keep every
+caption chip short.</p>
+<p>Screen polish is mostly discipline. "Lots of mouse movement can make
+the viewer feel disoriented": move with purpose, then park the cursor
+(<a
+href="https://goconsensus.com/blog/5-crucial-tips-to-recording-the-best-product-video">Consensus</a>).
+Callouts, zooms and pans beat pointing, and the edit order is to cut
+dead air <em>before</em> adding effects (<a
+href="https://www.techsmith.com/blog/edit-demo-recording/">TechSmith</a>).
+Record one capability per take, at a frame slightly larger than the app,
+with notifications off (<a
+href="https://goconsensus.com/blog/5-crucial-tips-to-recording-the-best-product-video">Consensus</a>).
+Narration runs at <strong>about 140–150 wpm</strong> (<a
+href="https://breadnbeyond.com/how-many-words-does-a-60-seconds-explainer-video-needs/">Bread
+n Beyond</a>), so a 3:00 video holds roughly 420 words at most, and
+fewer if results need room to land. Burn in open captions, because
+publishers report up to <strong>85% of feed video plays muted</strong>
+(<a
+href="https://digiday.com/media/silent-world-facebook-video/">Digiday</a>).
+Don't narrate what judges can already see; add context instead (<a
+href="https://angelhack.com/blog/10-tips-to-help-you-rock-your-next-hackathon-demo/">AngelHack</a>).
+On voice, Arcade measured <strong>14% higher completion</strong> with AI
+voiceover in interactive demos, and &gt;55% completion when a demo opens
+with a personal camera intro (<a
+href="https://www.arcade.software/post/2026-arcade-benchmarks">Arcade</a>).
+ETHGlobal bans text-to-speech narration and sped-up footage outright (<a
+href="https://ethglobal.com/events/cannes/info/details">ETHGlobal
+rules</a>). Colosseum has no such rule, but a founder's real voice is
+the lower-risk choice for a trust product. Disclose a cloned voice if
+one is used.</p>
+<h2
+id="make-the-coverage-gate-visible-as-designed-behavior-not-a-failure">Make
+the coverage gate visible as designed behavior, not a failure</h2>
+<p>No recorded crypto credit or guarantee demo in this research staged a
+coverage refusal on screen. That gap is the opportunity. The closest
+primary analogue is Stripe Radar. A block is a first-class outcome typed
+<code>blocked</code>, with a plain-language reason ("Stripe blocked this
+charge as too risky"). It is distinct from an issuer decline, and
+deterministic test inputs always trigger it (<a
+href="https://docs.stripe.com/declines">Stripe Declines</a>; <a
+href="https://stripe.com/en-dk/docs/radar/testing">Radar testing</a>).
+Squads shows prevention through state: a proposal cannot reach "Ready
+for Execution" until approvals meet the threshold (<a
+href="https://www.quicknode.com/guides/solana-development/3rd-party-integrations/multisig-with-squads">QuickNode</a>).
+For MUTAV, the refusal works in three beats. State the rule. Show the
+same action that just succeeded now fail with a named reason. Then show
+that the state is unchanged. Pre-seed the reserve so the refusal is
+deterministic, not lucky. The storyboard already does all of this in
+F6–F7: the red preview replays the program's rule,
+<code>InsufficientFreeCapital</code> is shown by name, and the note
+"Nothing was written" confirms state. It is the strongest Insight beat
+in the submission.</p>
+<p>For money movement, the backend-demo rule is to show the architecture
+first, so viewers know which component is on screen (<a
+href="https://rxhl.notion.site/How-To-Present-Backend-Demos-861303c09e3e48fcb33a2a6999260e59">How
+To Present Backend Demos</a>, snippet only). Colosseum names
+"architecture visuals" as acceptable demo content (<a
+href="https://blog.colosseum.com/perfecting-your-hackathon-submission/">Colosseum
+blog</a>). A judging breakdown scores demos higher for real data and
+lower for "hardcoded everything" (<a
+href="https://blogs.reskilll.com/what-hackathon-judges-look-for-complete-judging-criteria-breakdown-2026/">Reskilll</a>).
+The devices that follow are design judgement, not sourced findings. A
+before/after table under each confirmed transaction. A status chip with
+a truncated signature. <strong>One</strong> cut to Solana Explorer with
+the devnet badge. Timestamps on the claim row (filed → paid → settled)
+to back the "within minutes" claim. The storyboard's "How the reserve
+moved" tables and the <code>/reserve#claims</code> duration columns are
+exactly these devices. The one thing missing is an architecture strip
+that answers "why is this on-chain?" before the mechanics start. The
+answer is that reserve math and the coverage gate are enforced by the
+program, while personal data stays off-chain.</p>
+<h2
+id="tell-the-two-sided-story-honestly-label-what-is-old-new-simulated-and-next">Tell
+the two-sided story honestly: label what is old, new, simulated and
+next</h2>
+<p>Infrastructure companies sell the platform through one named
+fictional business. For Stripe that is Rocket Rides, and at Sessions
+2025 a pet-salon platform paying fees from its Stripe balance (<a
+href="https://docs.stripe.com/connect/saas-platforms-and-marketplaces">Stripe
+docs</a>; <a
+href="https://frontierfintech.substack.com/p/82-step-by-step-ferociously-stripe">Frontier
+Fintech</a>). MUTAV's cast is already right: Ana, Imobiliária Exemplo,
+Passo Fundo. What's missing is the <strong>agency side of the
+product</strong>. The storyboard never shows app.mutav.finance, so a
+judge sees an operator console and a public reserve page, and nothing
+the agency uses. One short shot of the agency platform, labeled
+honestly, turns "a reserve program" into "a B2B guarantee product with a
+protocol underneath." The protocol then appears exactly where it
+acts.</p>
+<p>Honesty here is a strength, provided each disclosure is paired with
+what is real. MCPay and Yumi disclosed prior work inside the video.
+Autonom separated pre-hackathon deployments from its new Solana work (<a
+href="https://youtu.be/KAqft_GZBuY">MCPay demo</a>; <a
+href="https://youtu.be/II7UAWZGK90">Yumi demo</a>). ETHGlobal's
+continuity rules ask teams to "clearly distinguish between what's new
+and what's reused," and flag "large single commits or missing histories"
+for possible disqualification (<a
+href="https://ethglobal.com/events/cannes/info/details">ETHGlobal
+rules</a>). Mocking external services so a demo reaches its payoff is
+accepted practice, as long as it is disclosed (<a
+href="https://www.hackerearth.com/blog/10-tips-win-hackathon">HackerEarth</a>).
+MUTAV needs three labels, each kept short:</p>
+<ul>
+<li><strong>The agency platform:</strong> "built before the hackathon ·
+not yet wired on-chain".</li>
+<li><strong>The PIX step:</strong> "Devnet: PIX transfer simulated ·
+settlement record on-chain". The storyboard already has this caption in
+F10.</li>
+<li><strong>The network:</strong> a persistent devnet badge.</li>
+</ul>
+<p>A single legend on the architecture strip (built during the hackathon
+/ pre-existing / simulated / next) covers all three in one frame. The
+submission form's prior-work and <code>repoContext</code> fields should
+mirror the video exactly. The public <code>/reserve</code> page does not
+say the PIX was simulated, so the submission text must.</p>
+<h2
+id="production-toolchain-script-the-capture-render-the-cards-keep-the-voice-human">Production
+toolchain: script the capture, render the cards, keep the voice
+human</h2>
+<p><strong>Capture.</strong> Playwright's built-in
+<code>recordVideo</code> defaults to fitting 800×800 and exposes no
+quality or fps settings (<a
+href="https://playwright.dev/docs/videos">Playwright docs</a>). A GitHub
+issue reports Chromium's recorder bitrate hard-coded at about 1 Mbit/s
+(<a
+href="https://github.com/microsoft/playwright/issues/31424">playwright#31424</a>).
+That is acceptable for a rough cut and soft on text-heavy dashboards.
+The 2026 demo-as-code pattern takes a CDP screencast or a screenshot per
+frame, logs every click's bounding box to JSON, then composites a vector
+cursor and an eased zoom camera in a second pass. See <a
+href="https://github.com/ashrafchowdury/programatic-demo">programatic-demo</a>
+(Playwright + Remotion, a hold of at least 1.3 s per zoom) and <a
+href="https://github.com/surajshetty3416/demo-video-skill">demo-video-skill</a>
+(Playwright + Pillow + ffmpeg at 60 fps, where reframing is a re-render,
+not a re-shoot). For signing, it is more reliable to inject a
+Wallet-Standard test wallet holding a <strong>disposable devnet
+keypair</strong> via <code>addInitScript</code> than to automate the
+Phantom extension. That is a judgement call, since no authoritative
+Phantom-automation source was found. Splice in one hand-recorded real
+Phantom approval for texture. Squads rounds signed with Ledger stay
+manual and off-camera. Wait on UI state ("Confirmed"), not fixed sleeps.
+Keep the keypair devnet-only and out of git.</p>
+<p><strong>Zoom and cards.</strong> GUI tools like Screen Studio
+auto-zoom only from their own cursor telemetry. On imported footage they
+lose cursor smoothing (<a
+href="https://screen.studio/guide/creating-project-from-existing-video">Screen
+Studio guide</a>), so drive zoom from the script's click log instead. A
+1.5–2× punch-in on a 1080p capture shows upscaled pixels. Capture at
+<code>deviceScaleFactor: 2</code>, or keep zoom at 1.3× or below. For
+title cards and the architecture strip, <strong>HyperFrames</strong>
+(Apache 2.0, HTML + GSAP, official Claude Code plugin, deterministic MP4
+via headless Chrome and FFmpeg) is the lowest-friction agent-authored
+option (<a
+href="https://github.com/heygen-com/hyperframes">hyperframes</a>).
+Remotion is free for companies of up to three employees (<a
+href="https://github.com/remotion-dev/remotion/blob/main/LICENSE.md">Remotion
+license</a>). On a fanless laptop, run renders serially at concurrency
+2–3 and never alongside test suites.</p>
+<p><strong>Voice, captions, assembly, hosting.</strong> Record the
+founder's voice to the rough cut. If a clone is needed for regeneration,
+ElevenLabs Professional Voice Cloning requires live verification and the
+Creator plan, and fine-tuning takes hours (<a
+href="https://www.proofnews.org/ai-tools-make-it-easy-to-clone-someones-voice-without-consent/">Proof
+News</a>). Generate captions from the script's own text, with Whisper
+used only for timing, and prompt it with "MUTAV, PIX, BRS, CPF". Ship an
+SRT as well as burned-in captions. Assemble in ffmpeg and finish with a
+two-pass <code>loudnorm</code> at about −14 LUFS and −1 dBTP. Sources
+split between −14 and −16 (<a
+href="https://dev.to/javidjamae/ffmpeg-loudnorm-filter-ebu-r128-loudness-normalization-guide-15d4">dev.to</a>;
+<a
+href="https://instagit.com/browser-use/video-use/social-media-loudness-normalization-targets/">video-use</a>).
+Keep a <code>timeline.json</code> so the ≤3:00 limit is a computed
+check. Upload to <strong>YouTube as unlisted</strong> at least an hour
+early, check it in a logged-out window, and keep the MP4 as a
+backup.</p>
+<h2
+id="storyboard-changes-keep-the-spine-add-the-agency-and-architecture-cut-the-flywheel">Storyboard
+changes: keep the spine, add the agency and architecture, cut the
+flywheel</h2>
+<p>The <a href="../storyboard.html">storyboard</a> already does much
+right:</p>
+<ul>
+<li>Product appears at 0:06.</li>
+<li>The refusal lands inside the first minute.</li>
+<li>One explorer proof shot.</li>
+<li>Timestamped claim durations.</li>
+<li>A simulated-PIX caption.</li>
+<li>A 303-word script, about 2:10 of speech in 2:45 of picture.</li>
+<li>Per-frame retake costs.</li>
+</ul>
+<p>The changes below rebalance it toward Colosseum's "how" and "what we
+shipped" questions and away from pitch content.</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Frame</th>
+<th>Action</th>
+<th>Change and reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F1 Cold open (6 s)</td>
+<td><strong>Keep, tighten to 5 s</strong></td>
+<td>The problem hook is correct for the first 10 s. Trim one second to
+fund the new beat.</td>
+</tr>
+<tr>
+<td><em>new</em> F1b Agency + architecture (~10 s)</td>
+<td><strong>Add after F1</strong></td>
+<td>About 4 s of app.mutav.finance (Imobiliária Exemplo, Ana's
+application) labeled "Agency platform · built before the hackathon · not
+yet wired on-chain". Then about 6 s of a HyperFrames strip: Agency
+platform → Operator → MUTAV program + BRS reserve → PIX record, with a
+legend for built in hackathon / pre-existing / simulated. VO in MCPay
+style: "Her agency runs on our platform. What we built for this
+hackathon is underneath: a Solana program and reserve the operator
+drives." This answers the two-sided story, disclosure and "overall
+architecture" in one beat.</td>
+</tr>
+<tr>
+<td>F2–F3 Register + sign (21 s)</td>
+<td><strong>Keep; cut F2 to ~7 s</strong></td>
+<td>Replace the "2× typing" speed-up with a jump cut. Avoid
+speed-ramping in a demo whose claim is "within minutes". Keep the
+before/after table hold.</td>
+</tr>
+<tr>
+<td>F4 Explorer PDA (11 s)</td>
+<td><strong>Keep</strong></td>
+<td>The one explorer proof shot and the "why on-chain" answer: opaque
+ID, no CPF. Drop the optional explorer cut in F11 so this stays the only
+one.</td>
+</tr>
+<tr>
+<td>F5 Public reserve (7 s)</td>
+<td><strong>Trim to ~4 s</strong></td>
+<td>It repeats F3's numbers. The point is "read independently, no
+wallet", which one zoomed row makes.</td>
+</tr>
+<tr>
+<td>F6–F7 The refusal (30 s)</td>
+<td><strong>Keep as the centerpiece</strong></td>
+<td>It now lands at about 0:49–1:19. Cap zoom at about 1.3× unless
+captured at 2× (the storyboard specifies 170–200%). Overlay the outcome
+type "Coverage gate · refused" next to the raw error name, Radar-style.
+Add the optional skipPreflight explorer link only if Phantom balks.</td>
+</tr>
+<tr>
+<td>F8 Claim filed (12 s)</td>
+<td><strong>Keep; optional agency cut</strong></td>
+<td>If the agency app has a default or claim screen, a 2 s cut there
+completes the two-sided loop ("the agency sends the claim"). Otherwise
+VO only. Don't stage an agency screen that isn't real.</td>
+</tr>
+<tr>
+<td>F9 Paid (16 s)</td>
+<td><strong>Keep; choose Edit A</strong></td>
+<td>Edit A shows the reserve dipping below target and the claim paid
+anyway. The refusal and the payout then become one rule seen from both
+sides: the gate stops new guarantees, never claims. The cut F12 frees
+the 5 s this needs.</td>
+</tr>
+<tr>
+<td>F10 PIX record (14 s)</td>
+<td><strong>Keep</strong></td>
+<td>The "Devnet: PIX simulated · record on-chain" caption and timestamps
+are model disclosure. The "up to 30 days for seguro-fiança" comparison
+is sourced to SUSEP Circular 621/2021, art. 43, as cited in the <a
+href="../../litepaper.html">litepaper</a>.</td>
+</tr>
+<tr>
+<td>F11 Anyone can verify (13 s)</td>
+<td><strong>Trim to ~10 s</strong></td>
+<td>Keep the scroll to "Every account", including the Squads 2-of-2
+admin vault, which signals operational custody the way attn.markets did.
+No second explorer cut.</td>
+</tr>
+<tr>
+<td>F12 Flywheel + 21% (17 s)</td>
+<td><strong>Cut; move to the pitch video</strong></td>
+<td>Modeled returns are Viability and pitch material, and Colosseum
+warns against the demo becoming "another pitch". Replace it with a ~6 s
+"What's real / what's next" card: agency ↔︎ chain wiring, real PIX rails,
+mainnet. Make it visually distinct from the footage.</td>
+</tr>
+<tr>
+<td>F13 Close (18 s)</td>
+<td><strong>Tighten to ~12 s</strong></td>
+<td>Keep the app URL, repo, "open source, live on devnet", and the
+silent hold. One CTA only. Add the voice-clone credit if a clone is
+used.</td>
+</tr>
+</tbody>
+</table>
+<p>The revised cut runs about <strong>2:34</strong>: 5 + 10 + 7 + 12 +
+11 + 4 + 15 + 15 + 12 + 21 + 14 + 10 + 6 + 12 seconds. The voiceover
+stays near 300 words, because the new beats replace F12's 38 words.</p>
+<p>Production changes for the run sheet:</p>
+<ul>
+<li><strong>Capture.</strong> Capture the operator and reserve beats
+with a Playwright script and an injected disposable devnet operator
+keypair, at 1920×1080 viewport with 2× frames, logging clicks for the
+zoom pass. Rehearse the full script on localnet first, so the on-chain
+consumption the storyboard's retake notes track (lease references,
+notices, the per-period claim cap) is spent only once on devnet.</li>
+<li><strong>Phantom.</strong> Record one real Phantom approval by hand
+with Screen Studio.</li>
+<li><strong>Cards.</strong> Render F1, F1b, the "next" card and F13 in
+HyperFrames.</li>
+<li><strong>Spec fix.</strong> Export at 60 fps if the cursor is
+composited, since motion is smoother. The storyboard's 30 fps suits
+screen-recorder output.</li>
+<li><strong>Terminology pass.</strong> Check the script and captions for
+"coverage gate" and "required coverage", "guarantee fee", and MUTAV as
+"the guarantor".</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<p>The research changes what "compelling" means for this entry. Winners
+did not out-polish anyone. Polished-but-empty is a named failure mode,
+and slide-only pitches still won in 2026. Winners made one claim
+<strong>checkable</strong>: a payment "4 seconds ago" in the explorer, a
+signed multisig, a real checkout. MUTAV has a stronger checkable claim
+than most, because its signature moment is a <strong>refusal that leaves
+state unchanged</strong>, paired with a payout the same rule never
+blocks. Few demos show what a protocol <em>won't</em> do. That is the
+Insight a guarantor should lead with, and it fits inside a minute.</p>
+<p>The biggest risk is not production quality but <strong>ambiguity
+about what is real</strong>. Two things would trigger the
+misrepresentation clause or quietly cost Product + Execution credit: an
+agency platform that looks wired to the chain, or a PIX that looks like
+it moved money. The architecture-strip legend and the "what's next" card
+turn that risk into evidence of disciplined scoping. That speaks
+directly to "how the team prioritizes." Confirm the cutoff in the Arena
+form today, and update the handoff brief's rubric so the pitch video is
+also built against the current criteria.</p>
+</body>
+</html>
