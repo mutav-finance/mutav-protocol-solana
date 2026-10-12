@@ -81,12 +81,17 @@ jobs:
 
       # 1. Verified build (Docker) and executable hash.
       - name: solana-verify build
-        run: solana-verify build --library-name mutav --base-image "${VERIFY_BASE_IMAGE}"
+        # The container writes target/ as root; hand it back to the runner
+        # user so the IDL build below can write target/debug.
+        run: |
+          solana-verify build --library-name mutav --base-image "${VERIFY_BASE_IMAGE}"
+          sudo chown -R "$(id -u):$(id -g)" target
 
       - name: Executable hash
         id: hash
         run: |
           hash="$(solana-verify get-executable-hash target/deploy/mutav.so)"
+          echo "Executable hash: ${hash}"
           echo "hash=${hash}" >> "$GITHUB_OUTPUT"
           echo "${hash}" > mutav.hash
           printf '### Executable hash\n`%s` (ref `%s`, commit `%s`)\n' "${hash}" "${{ inputs.ref }}" "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
