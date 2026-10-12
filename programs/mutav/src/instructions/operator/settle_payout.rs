@@ -54,12 +54,15 @@ pub fn handle_settle_payout(
     x.pix_e2e_hash = pix_e2e_hash;
     x.settled_at = now;
 
-    emit_cpi!(PayoutSettled {
-        config: ctx.accounts.config.key(),
-        ts: now,
-        guarantee_id: ctx.accounts.guarantee.id,
-        notice_ref_hash,
-        pix_e2e_hash,
-    });
+    emit_event!(
+        ctx,
+        PayoutSettled {
+            config: ctx.accounts.config.key(),
+            ts: now,
+            guarantee_id: ctx.accounts.guarantee.id,
+            notice_ref_hash,
+            pix_e2e_hash,
+        }
+    );
     Ok(())
 }

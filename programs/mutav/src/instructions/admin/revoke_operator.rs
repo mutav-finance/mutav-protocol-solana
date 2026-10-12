@@ -50,11 +50,14 @@ pub fn handle_revoke_operator(ctx: Context<RevokeOperator>) -> Result<()> {
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(OperatorRevoked {
-        config: config_key,
-        ts,
-        by,
-    });
+    emit_event!(
+        ctx,
+        OperatorRevoked {
+            config: config_key,
+            ts,
+            by,
+        }
+    );
     Ok(())
 }
 
@@ -92,10 +95,13 @@ pub fn handle_revoke_pauser(ctx: Context<RevokePauser>) -> Result<()> {
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(PauserRevoked {
-        config: config_key,
-        ts,
-        by,
-    });
+    emit_event!(
+        ctx,
+        PauserRevoked {
+            config: config_key,
+            ts,
+            by,
+        }
+    );
     Ok(())
 }

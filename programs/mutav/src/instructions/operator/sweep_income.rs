@@ -166,16 +166,19 @@ pub fn handle_sweep_income(
     r.net = net;
     r.slot = clock.slot;
 
-    emit_cpi!(IncomeSwept {
-        config: ctx.accounts.config.key(),
-        ts: clock.unix_timestamp,
-        income_ref_hash,
-        period,
-        amount,
-        inbox_after,
-        income_total: ctx.accounts.state.income_total,
-        brs_balance: ctx.accounts.state.brs_balance,
-    });
+    emit_event!(
+        ctx,
+        IncomeSwept {
+            config: ctx.accounts.config.key(),
+            ts: clock.unix_timestamp,
+            income_ref_hash,
+            period,
+            amount,
+            inbox_after,
+            income_total: ctx.accounts.state.income_total,
+            brs_balance: ctx.accounts.state.brs_balance,
+        }
+    );
     Ok(())
 }
 

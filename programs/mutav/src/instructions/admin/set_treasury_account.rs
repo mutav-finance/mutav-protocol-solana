@@ -71,11 +71,14 @@ pub fn handle_set_treasury_account(ctx: Context<SetTreasuryAccount>) -> Result<(
     let config_key = config.key();
     let ts = Clock::get()?.unix_timestamp;
     emit_config_changes(&ctx.accounts.event_authority, config_key, ts, &ch)?;
-    emit_cpi!(TreasuryAccountUpdated {
-        config: config_key,
-        ts,
-        old,
-        new,
-    });
+    emit_event!(
+        ctx,
+        TreasuryAccountUpdated {
+            config: config_key,
+            ts,
+            old,
+            new,
+        }
+    );
     Ok(())
 }

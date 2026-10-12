@@ -111,13 +111,16 @@ pub fn handle_request_deposit(
     r.min_shares_out = min_shares_out;
     r.status = DEPOSIT_PENDING;
 
-    emit_cpi!(DepositRequested {
-        config: ctx.accounts.config.key(),
-        ts: now,
-        owner,
-        seq,
-        assets,
-        min_shares_out,
-    });
+    emit_event!(
+        ctx,
+        DepositRequested {
+            config: ctx.accounts.config.key(),
+            ts: now,
+            owner,
+            seq,
+            assets,
+            min_shares_out,
+        }
+    );
     Ok(())
 }

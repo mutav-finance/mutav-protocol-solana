@@ -231,19 +231,22 @@ pub fn handle_pay_claim(
         state.claims_paid_total,
     );
     let payments_account = ctx.accounts.payments_account.key();
-    emit_cpi!(ClaimPaid {
-        config: config_key,
-        ts: now,
-        guarantee_id: ctx.accounts.guarantee.id,
-        leg,
-        amount,
-        notice_ref_hash,
-        payments_account,
-        provisions_after,
-        coverage_required_after,
-        window_paid,
-        brs_balance_after,
-        claims_paid_total,
-    });
+    emit_event!(
+        ctx,
+        ClaimPaid {
+            config: config_key,
+            ts: now,
+            guarantee_id: ctx.accounts.guarantee.id,
+            leg,
+            amount,
+            notice_ref_hash,
+            payments_account,
+            provisions_after,
+            coverage_required_after,
+            window_paid,
+            brs_balance_after,
+            claims_paid_total,
+        }
+    );
     Ok(())
 }

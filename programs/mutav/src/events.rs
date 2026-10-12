@@ -1,10 +1,18 @@
-//! Events (spec §9), emitted with `emit_cpi!` for the mutav-app indexer and the
-//! public transparency page. Every event carries `config` and `ts`.
+//! Events (spec §9), emitted as `emit_cpi!`-format self-CPIs (`emit_event!`)
+//! for the mutav-app indexer and the public transparency page. Every event carries `config` and `ts`.
 //!
 //! The event set is frozen for the pilot (spec §14.2): existing events never
 //! change fields; new information goes in a new event.
 
-use anchor_lang::prelude::*;
+use anchor_lang::{
+    event::EVENT_IX_TAG_LE,
+    prelude::*,
+    solana_program::{
+        instruction::{AccountMeta, Instruction},
+        program::invoke_signed,
+    },
+    Discriminator,
+};
 
 // ---------------------------------------------------------------------------
 // `ConfigUpdated` value encoding
@@ -64,37 +72,80 @@ impl ConfigChanges {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Emitting
+// ---------------------------------------------------------------------------
+
+/// Emits `$event` through the event-authority self-CPI, in the exact wire
+/// format of `emit_cpi!`: this program, one readonly signer account (the
+/// event authority, signed by its seeds), data = event-ix tag ++
+/// discriminator ++ Borsh body. Unlike `emit_cpi!`, the CPI is built once in
+/// the shared, non-inlined `emit_event_ix` instead of at every call site.
+macro_rules! emit_event {
+    ($ctx:expr, $event:expr) => {
+        $crate::events::emit_event(&$ctx.accounts.event_authority, &$event)?
+    };
+}
+
+/// The self-CPI data of `event`: event-ix tag ++ discriminator ++ Borsh body,
+/// the bytes `emit_cpi!` sends (`EVENT_IX_TAG_LE` ++ `Event::data`). The
+/// 256-byte capacity is `Event::data`'s, so no event reallocates.
+pub fn event_ix_data<E: AnchorSerialize + Discriminator>(event: &E) -> Result<Vec<u8>> {
+    let mut data = Vec::with_capacity(256);
+    data.extend_from_slice(EVENT_IX_TAG_LE);
+    data.extend_from_slice(E::DISCRIMINATOR);
+    event.serialize(&mut data)?;
+    Ok(data)
+}
+
+/// Serializes `event` and sends it as one event self-CPI.
+#[inline(never)]
+pub fn emit_event<E: AnchorSerialize + Discriminator>(
+    event_authority: &AccountInfo,
+    event: &E,
+) -> Result<()> {
+    emit_event_ix(event_authority, event_ix_data(event)?)
+}
+
+/// Sends one event self-CPI with `data` from `event_ix_data`.
+#[inline(never)]
+pub fn emit_event_ix(event_authority: &AccountInfo, data: Vec<u8>) -> Result<()> {
+    invoke_event(event_authority, &event_ix(event_authority, data))
+}
+
+fn event_ix(event_authority: &AccountInfo, data: Vec<u8>) -> Instruction {
+    Instruction {
+        program_id: crate::ID,
+        accounts: vec![AccountMeta::new_readonly(*event_authority.key, true)],
+        data,
+    }
+}
+
+/// The program's only event `invoke_signed`: the event authority signs with
+/// its seeds, as in `emit_cpi!`.
+fn invoke_event(event_authority: &AccountInfo, ix: &Instruction) -> Result<()> {
+    let signer_seeds: &[&[u8]] = &[b"__event_authority", &[crate::EVENT_AUTHORITY_AND_BUMP.1]];
+    invoke_signed(ix, std::slice::from_ref(event_authority), &[signer_seeds])?;
+    Ok(())
+}
+
 /// Emits one `ConfigUpdated` per recorded change through the event authority
-/// self-CPI, in the exact wire format of `emit_cpi!` (event-ix tag,
-/// discriminator, Borsh body).
+/// self-CPI, in the same wire format as `emit_event!`.
 ///
-/// `emit_cpi!` allocates a fresh instruction per event, and the program's bump
-/// allocator never frees, so a `set_config` touching ~40 fields ran out of the
-/// 32 KiB heap. This reuses one instruction buffer; each CPI then only costs
-/// the runtime's copy of the ~110-byte instruction.
+/// A fresh instruction per event would exhaust the heap (the program's bump
+/// allocator never frees), so a `set_config` touching ~40 fields ran out of
+/// the 32 KiB heap. This reuses one instruction buffer; each CPI then only
+/// costs the runtime's copy of the ~110-byte instruction.
 pub fn emit_config_changes(
     event_authority: &AccountInfo,
     config: Pubkey,
     ts: i64,
     changes: &ConfigChanges,
 ) -> Result<()> {
-    use anchor_lang::{
-        event::EVENT_IX_TAG_LE,
-        solana_program::{
-            instruction::{AccountMeta, Instruction},
-            program::invoke_signed,
-        },
-        Discriminator,
-    };
     if changes.0.is_empty() {
         return Ok(());
     }
-    let mut ix = Instruction {
-        program_id: crate::ID,
-        accounts: vec![AccountMeta::new_readonly(*event_authority.key, true)],
-        data: Vec::with_capacity(128),
-    };
-    let signer_seeds: &[&[u8]] = &[b"__event_authority", &[crate::EVENT_AUTHORITY_AND_BUMP.1]];
+    let mut ix = event_ix(event_authority, Vec::with_capacity(128));
     for &(field, old, new) in &changes.0 {
         ix.data.clear();
         ix.data.extend_from_slice(EVENT_IX_TAG_LE);
@@ -107,7 +158,7 @@ pub fn emit_config_changes(
             new,
         }
         .serialize(&mut ix.data)?;
-        invoke_signed(&ix, std::slice::from_ref(event_authority), &[signer_seeds])?;
+        invoke_event(event_authority, &ix)?;
     }
     Ok(())
 }

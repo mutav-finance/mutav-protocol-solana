@@ -235,15 +235,18 @@ pub fn handle_initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Resu
     state.bump = ctx.bumps.state;
     // Empty accounting: mode Normal (0), every total and queue seq 0.
 
-    emit_cpi!(VaultInitialized {
-        config: config_key,
-        ts: Clock::get()?.unix_timestamp,
-        admin: args.admin,
-        operator: args.operator,
-        pauser: args.pauser,
-        reserve_mint: ctx.accounts.reserve_mint.key(),
-        share_mint,
-    });
+    emit_event!(
+        ctx,
+        VaultInitialized {
+            config: config_key,
+            ts: Clock::get()?.unix_timestamp,
+            admin: args.admin,
+            operator: args.operator,
+            pauser: args.pauser,
+            reserve_mint: ctx.accounts.reserve_mint.key(),
+            share_mint,
+        }
+    );
     Ok(())
 }
 

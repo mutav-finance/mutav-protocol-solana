@@ -118,13 +118,16 @@ pub fn handle_claim_assets(ctx: Context<ClaimAssets>) -> Result<()> {
         .checked_sub(assets)
         .ok_or(MutavError::MathOverflow)?;
 
-    emit_cpi!(AssetsClaimed {
-        config: config_key,
-        ts: Clock::get()?.unix_timestamp,
-        owner,
-        seq,
-        assets,
-    });
+    emit_event!(
+        ctx,
+        AssetsClaimed {
+            config: config_key,
+            ts: Clock::get()?.unix_timestamp,
+            owner,
+            seq,
+            assets,
+        }
+    );
 
     // A filled request closes once its assets are claimed (spec §3.8).
     ctx.accounts

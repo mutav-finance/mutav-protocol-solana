@@ -237,20 +237,23 @@ pub fn handle_fulfil_deposits(
         (state.deposited_assets_total, state.minted_shares_total);
 
     for e in filled {
-        emit_cpi!(e);
+        emit_event!(ctx, e);
     }
     if fills > 0 {
-        emit_cpi!(DepositsFulfilled {
-            config: config_key,
-            ts: now,
-            from_seq,
-            to_seq,
-            assets: total_assets,
-            shares: total_shares,
-            nav: batch_nav,
-            deposited_assets_total,
-            minted_shares_total,
-        });
+        emit_event!(
+            ctx,
+            DepositsFulfilled {
+                config: config_key,
+                ts: now,
+                from_seq,
+                to_seq,
+                assets: total_assets,
+                shares: total_shares,
+                nav: batch_nav,
+                deposited_assets_total,
+                minted_shares_total,
+            }
+        );
     }
     Ok(())
 }

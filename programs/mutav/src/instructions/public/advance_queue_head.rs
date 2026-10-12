@@ -90,11 +90,14 @@ pub fn handle_advance_queue_head(ctx: Context<AdvanceQueueHead>, queue: u8, max:
         QUEUE_DEPOSIT => state.deposit_head = head,
         _ => state.redeem_head = head,
     }
-    emit_cpi!(QueueHeadsAdvanced {
-        config: config_key,
-        ts: Clock::get()?.unix_timestamp,
-        redeem_head: state.redeem_head,
-        deposit_head: state.deposit_head,
-    });
+    emit_event!(
+        ctx,
+        QueueHeadsAdvanced {
+            config: config_key,
+            ts: Clock::get()?.unix_timestamp,
+            redeem_head: state.redeem_head,
+            deposit_head: state.deposit_head,
+        }
+    );
     Ok(())
 }

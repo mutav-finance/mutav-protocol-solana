@@ -75,16 +75,19 @@ pub fn handle_approve_claim(
     let previous_amount = x.approved_amount;
     x.approved_amount = amount;
 
-    emit_cpi!(ClaimApproved {
-        config: ctx.accounts.config.key(),
-        ts: Clock::get()?.unix_timestamp,
-        guarantee_id: ctx.accounts.guarantee.id,
-        leg: x.leg,
-        notice_ref_hash,
-        amount,
-        revision: x.revision,
-        previous_amount,
-        max_claim_per_call: ctx.accounts.config.caps.max_claim_per_call,
-    });
+    emit_event!(
+        ctx,
+        ClaimApproved {
+            config: ctx.accounts.config.key(),
+            ts: Clock::get()?.unix_timestamp,
+            guarantee_id: ctx.accounts.guarantee.id,
+            leg: x.leg,
+            notice_ref_hash,
+            amount,
+            revision: x.revision,
+            previous_amount,
+            max_claim_per_call: ctx.accounts.config.caps.max_claim_per_call,
+        }
+    );
     Ok(())
 }

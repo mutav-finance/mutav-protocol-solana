@@ -114,14 +114,17 @@ pub fn handle_cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
         // account creation, no close. The BRS stays owed to the owner.
         require!(status == DEPOSIT_PENDING, MutavError::InvalidRequestStatus);
         ctx.accounts.deposit_request.status = DEPOSIT_CANCELLED;
-        emit_cpi!(DepositParked {
-            config: config_key,
-            ts,
-            owner,
-            seq,
-            assets,
-            by,
-        });
+        emit_event!(
+            ctx,
+            DepositParked {
+                config: config_key,
+                ts,
+                owner,
+                seq,
+                assets,
+                by,
+            }
+        );
         return Ok(());
     }
 
@@ -167,14 +170,17 @@ pub fn handle_cancel_deposit(ctx: Context<CancelDeposit>) -> Result<()> {
         .checked_sub(assets)
         .ok_or(MutavError::MathOverflow)?;
 
-    emit_cpi!(DepositCancelled {
-        config: config_key,
-        ts,
-        owner,
-        seq,
-        assets,
-        by,
-    });
+    emit_event!(
+        ctx,
+        DepositCancelled {
+            config: config_key,
+            ts,
+            owner,
+            seq,
+            assets,
+            by,
+        }
+    );
     // Nothing is left on the request: it closes, rent to the owner.
     ctx.accounts
         .deposit_request

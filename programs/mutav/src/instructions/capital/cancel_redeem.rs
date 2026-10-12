@@ -112,14 +112,17 @@ pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
         // account creation, no close. The shares stay owed to the owner.
         require!(status == REDEEM_PENDING, MutavError::InvalidRequestStatus);
         ctx.accounts.redeem_request.status = REDEEM_CANCELLED;
-        emit_cpi!(RedeemParked {
-            config: config_key,
-            ts,
-            owner,
-            seq,
-            shares,
-            by,
-        });
+        emit_event!(
+            ctx,
+            RedeemParked {
+                config: config_key,
+                ts,
+                owner,
+                seq,
+                shares,
+                by,
+            }
+        );
         return Ok(());
     }
 
@@ -165,14 +168,17 @@ pub fn handle_cancel_redeem(ctx: Context<CancelRedeem>) -> Result<()> {
         .checked_sub(shares)
         .ok_or(MutavError::MathOverflow)?;
 
-    emit_cpi!(RedeemCancelled {
-        config: config_key,
-        ts,
-        owner,
-        seq,
-        shares_returned: shares,
-        by,
-    });
+    emit_event!(
+        ctx,
+        RedeemCancelled {
+            config: config_key,
+            ts,
+            owner,
+            seq,
+            shares_returned: shares,
+            by,
+        }
+    );
 
     // Nothing is left on the request: it closes, rent to the owner.
     ctx.accounts
