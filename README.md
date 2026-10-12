@@ -131,7 +131,8 @@ bun scripts/devnet/dry-run.ts --program-keypair ~/.config/solana/mutav/mutav-key
 
 # 1. Fill a copy of scripts/devnet/devnet.example.json outside the repo (every <FILL: …>):
 #    both multisigs, their exact members, the vaults, roles and money accounts.
-#    Build with `solana-verify build` and record the executable hash of the verified build.
+#    Build with `solana-verify build --library-name mutav --base-image <VERIFY_BASE_IMAGE
+#    from .github/workflows/release.yml>` and record the executable hash of the verified build.
 CFG=~/mutav/devnet.json; RPC=https://api.devnet.solana.com
 HASH=$(solana-verify get-executable-hash target/deploy/mutav.so)
 
