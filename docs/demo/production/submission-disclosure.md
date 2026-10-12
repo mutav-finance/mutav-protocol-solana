@@ -6,9 +6,9 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 
 > **Built during the hackathon:** the MUTAV Solana program (Anchor), the reserve app at reserve.mutav.finance (public reserve pages, operator console, admin console, capital queue), the Codama-generated TypeScript client, and the devnet scripts.
 >
-> **Pre-existing:** the agency platform shown briefly at the start. It is not yet connected on-chain.
+> **Pre-existing:** the agency platform shown briefly at the start, a local copy with fictional data. It is not yet connected on-chain.
 >
-> **Live on devnet:** the opening and chapters 1–2 (lease registration, the refusal, the claim). The PIX transfer to the agency is simulated; its settlement record is real and on-chain.
+> **Live on devnet:** the cold open and chapters 1–2 (lease registration, the refusal, the claim). The PIX transfer to the agency is simulated; its settlement record is real and on-chain.
 >
 > **Local simulation:** chapter 3 runs the same program on a local validator with an accelerated clock and a mock BRS mint (six simulated months of fees, issuer revenue, claims and a withdrawal).
 >
@@ -18,7 +18,7 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 > Live app: https://reserve.mutav.finance
 > Program (devnet): GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV, the pilot demo reserve; test activity is visible: https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet
 
-*(141 words)*
+*(148 words)*
 
 ## YouTube description (≤250 words)
 
@@ -32,8 +32,8 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 >
 > What you are seeing
 > • Built during the hackathon: the Solana program, the reserve app (public reserve pages, operator, admin and capital queue), the Codama TypeScript client and the devnet scripts.
-> • Pre-existing: the agency platform (not yet connected on-chain).
-> • Live on Solana devnet: the opening and chapters 1–2. The PIX transfer to the agency is simulated; its settlement record is on-chain.
+> • Pre-existing: the agency platform, shown from a local copy with fictional data (not yet connected on-chain).
+> • Live on Solana devnet: the cold open and chapters 1–2. The PIX transfer to the agency is simulated; its settlement record is on-chain.
 > • Chapter 3 is a local simulation on an accelerated clock with a mock BRS mint: six simulated months, not devnet activity.
 > • The pilot is not open to public investment. Ana, the agencies and the lease references are fictional.
 > • The claim timer shows the on-chain run from filed to settled. In operation, the operator checks each claim before filing.
@@ -46,4 +46,4 @@ Paste-ready text. Keep both in step with what the video actually shows: chapter 
 >
 > Music: [track, artist, licence]
 
-*(217 words)*
+*(232 words)*

@@ -2,7 +2,7 @@
 
 Companion to the storyboard (`storyboard.html`); the two match.
 
-- **Runtime:** 2:15. **Voiceover:** 217 words, verbatim below. Hybrid: cold open, agency and chapters 1–2 live on devnet; chapter 3 a local simulation on an accelerated clock.
+- **Runtime:** 2:15. **Voiceover:** 217 words, verbatim below. Hybrid: cold open and chapters 1–2 live on devnet; the agency flash from a local copy of the agency platform with fictional data (off-chain); chapter 3 a local simulation on an accelerated clock.
 - **Recorded**, not live: silent clips (injected test wallet, no pop-ups), a rough cut with titles, timer and cards, then the VO recorded to the cut. Frames are tagged MAIN / FLASH / END STATE.
 - **Numbers:** devnet chapters on the staged reserve (c = 0.25); chapter 3 numbers are [X] placeholders until the localnet run. Ana, agency names and lease references are fictional.
 - **Labels:** the app banner names the environment ("Pilot demo · Solana devnet", or "Local simulation · accelerated clock" with `NEXT_PUBLIC_ACCELERATED_CLOCK=1`, PR #72); no corner badges; at most one more honesty label per shot.
@@ -48,8 +48,8 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Edit:** Slow push-in ≤ 1.3× (motion). No title card before it.
 - **Retake:** Read-only: repeat freely.
 
-**F2 · FLASH · Open · 0:10 – 0:15 · app.mutav.finance (agency view)**: Agency
-- **On screen:** Ana's fictional lease in the agency platform (mutav-app). Hard cuts in and out.
+**F2 · FLASH · Open · 0:10 – 0:15 · agency platform (local copy) · guarantee detail**: Agency
+- **On screen:** Ana's guarantee detail in a local copy of the agency platform with fictional data (not the live platform): agency Imobiliária Planalto, tenant Ana Souza, status Active, tag MTV-PF-0100. Frame out the cover amount (the platform's default product shows a R$45,000 limit, not the on-chain R$18,000) and hide or crop the URL bar. Hard cuts in and out.
 - **VO:** "Her agency works in MUTAV's platform; every lease becomes an account on-chain."
 - **Caption:** Agency platform · pre-hackathon · not on-chain yet
 - **Honesty label:** Agency platform · pre-hackathon · not on-chain yet
@@ -68,7 +68,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 **F4 · FLASH · 1 · Programmable, transparent reserve · 0:25 – 0:27 · Solana Explorer (devnet)**: Explorer: one account per lease
 - **On screen:** The new Guarantee PDA on Explorer: owner, opaque id, cover legs. Captured as an end state; check it on devnet.
-- **VO:** (the F3 line continues)
+- **VO:** (the F3 line continues over this flash)
 - **Caption:** Guarantee PDA · owner: MUTAV program
 - **Honesty label:** none (banner only)
 - **Proof:** The one Explorer shot.
@@ -112,8 +112,8 @@ Companion to the storyboard (`storyboard.html`); the two match.
 - **Retake:** Read-only: repeat freely.
 
 **F9 · FLASH · 3 · Capital efficiency · 1:36 – 1:37.5 · transition card (edit)**: Switch: six months, simulated
-- **On screen:** A 1.5 s card marks the switch from devnet to the local simulation. From here the corner badge reads "Local simulation · accelerated clock".
-- **VO:** (none: the card carries the switch)
+- **On screen:** A 1.5 s card marks the switch from devnet to the local simulation. From here the app banner reads "Local simulation · accelerated clock".
+- **VO:** (no voiceover: the card carries the switch)
 - **Caption:** Six months, simulated locally on an accelerated clock
 - **Honesty label:** none (banner only)
 - **Proof:** None: a card.
@@ -203,11 +203,11 @@ Companion to the storyboard (`storyboard.html`); the two match.
 | /reserve/capital | — (#flows, #queue) | Capital tab (flows + queue) | F10 (localnet) |
 | /reserve/risks | — (#disclosures) | Risks tab | — |
 | /reserve/verify | — (#accounts) | Verify tab | — |
-| /capital | — (/investor) | Capital queue (`/investment`, `/investor` redirect) | F13 (localnet) |
+| /capital | — (old capital page) | Capital queue (old paths redirect here) | F13 (localnet) |
 | /operator | Operator console | Same, restyled | F3, F6, F7 |
 | /admin | Squads proposals | Same, restyled | off camera (fills) |
 | /demo | Guided six steps | Same; a cleaned version is the optional alternative surface | alternative |
-| app.mutav.finance | Agency platform (mutav-app, pre-existing) | — | F2 |
+| agency platform | Pre-existing (mutav-app) | A local copy with fictional data, not the live platform | F2 |
 
 ## 6. Capture order
 
@@ -216,7 +216,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 | 1 | Devnet program GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV deployed and staged (done): R$44,000 held, R$36,000 required, R$8,000 free, 8 leases | — | done |
 | 2 | Load the operator's agency records in the recording browser | Recorder | — |
 | 3 | Rehearse chapters 1–2 on localnet with the same numbers | Recorder | — |
-| 4 | Devnet capture: F1, F2, F3 (Ana MTV-PF-0100), F4, F5, F6 (MTV-PF-0101), then the claim, one take (F7), and F8. Log tx timestamps for the timer | Operator; anyone | — |
+| 4 | Devnet capture: F1, F3 (Ana MTV-PF-0100), F4, F5, F6 (MTV-PF-0101), then the claim, one take (F7), and F8. Log tx timestamps for the timer. F2 is captured from the local agency copy (cover amount framed out, URL bar cropped) | Operator; anyone | — |
 | 5 | Localnet simulation: start the app with NEXT_PUBLIC_ACCELERATED_CLOCK=1 (the banner reads "Local simulation · accelerated clock"); run six simulated months (fees, issuer revenue, one claim above R$15k with admin approval, a capital provider's withdrawal); fill the [X] numbers | Simulation script; local admin | local |
 | 6 | Localnet capture: F10–F13 end states | Recorder | — |
 | 7 | Edit: chapter titles, the transition card (F9), the timer, the close card | Editor | — |
@@ -234,7 +234,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 | When | What |
 |---|---|
 | Oct 12 · morning | Rehearse chapters 1–2 on localnet; build and run the chapter 3 simulation; fill the [X] numbers. |
-| by 12:00 | Devnet capture of F1–F8 (one claim take). Read [N] from the claim timestamps. |
+| by 12:00 | Devnet capture of F1 and F3–F8 (one claim take); F2 from the local agency copy. Read [N] from the claim timestamps. |
 | 12:00–13:00 | Localnet capture of F10–F13 with the accelerated-clock banner. |
 | 13:00–15:00 | Rough cut; record the VO to the cut with [N] and the [X] numbers filled in. |
 | 15:00–18:00 | Fine-tune; English burned-in captions + SRT; optional PT-BR SRT. |
@@ -253,7 +253,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 | Known app behaviours | F3, F6, F7 | Register resets to a red preview; the refusal error carries encoded text; paid and settled rows vanish. Workarounds per shot; fixes in app-requirements. |
 | Simulation numbers not ready | F10–F13 | The [X] placeholders must be filled from the localnet run before the VO is recorded; captions and cards follow. |
 | Accelerated-clock banner missing | F10–F13 | Start the localnet app with NEXT_PUBLIC_ACCELERATED_CLOCK=1 (PR #72); without it the chapter would look like devnet. |
-| Over 2:15 | edit | Trim F5 and F8 (−2 s each); never trim the F6 silence. |
+| Over 2:15 | edit | Trim F5 and F8 (−2 s each), then the F6 tail after the silence (0:53–0:58); never trim the silence itself. |
 | Claim under two minutes | F8 | [N] from settled_at − filed_at: "seconds" under 2 min, "minutes" otherwise; round down. |
 
 ## 10. What judges will see afterwards

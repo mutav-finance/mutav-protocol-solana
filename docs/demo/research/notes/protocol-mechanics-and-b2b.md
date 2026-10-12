@@ -47,7 +47,7 @@ I found no demo-specific source on staging a refusal. The best primary analogue 
 - Name the refusal the way Radar does: a first-class outcome type plus a human-readable reason. That shows it is designed behavior.
 
 ### Gaps
-- I found no recorded crypto protocol demo (insurance or credit) that stages a solvency or coverage refusal on screen. No source covers judge reactions to "negative path" demos specifically.
+- I found no recorded crypto protocol demo (insurance or credit) that stages a coverage refusal on screen. No source covers judge reactions to "negative path" demos specifically.
 
 ## 3. Two-sided B2B demos (end-customer surface and the infrastructure in one story)
 
