@@ -138,26 +138,6 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     }
   });
 
-  test("/demo — six steps and a live gate preview", async ({ page }) => {
-    await page.goto("/demo");
-    await expect(page.getByRole("heading", { name: "Run the demo" })).toBeVisible();
-    for (let n = 1; n <= 6; n++) await expect(page.locator(`#step-${n}`)).toBeVisible();
-
-    const step2 = page.locator("#step-2");
-    const preview = step2.getByTestId("gate-preview");
-    // At c = 0.10 (ADR 0016) free capital is R$27,550: a R$1,500 rent at 3× + 1×
-    // (R$6,000 of cover) fits, and so does R$3,000 (R$12,000)…
-    await expect(preview).toContainText("Fits");
-    await step2.getByLabel("Monthly rent (BRS)").fill("3000");
-    await expect(preview).toContainText("Fits");
-    // …while R$12,000 (R$48,000 of cover) is above max_cover_per_guarantee (R$40,000).
-    await step2.getByLabel("Monthly rent (BRS)").fill("12000");
-    await expect(preview).toContainText("Would be refused: GuaranteeCapExceeded");
-    await expect(step2.getByRole("button", { name: /Send anyway/ })).toBeVisible();
-    await expect(page.getByText("NO WALLET CONNECTED")).toBeVisible();
-    await noBannedWords(page);
-  });
-
   test("/admin — General controls, Money in & out, Allocation; direct signing labelled localnet-only", async ({ page }) => {
     await page.goto("/admin");
     const nav = page.getByRole("navigation", { name: "Admin sections" });
@@ -207,12 +187,29 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
-  test("/operator — read-only without the operator wallet, with limits and duties", async ({ page }) => {
-    await page.goto("/operator");
+  test("/operator — read-only without the operator wallet, with live figures, the gate preview, limits and duties", async ({ page }) => {
+    // The guided demo folded into the operator console.
+    await page.goto("/demo");
+    await expect(page).toHaveURL(/\/operator$/);
     await expect(page.getByRole("heading", { name: "Operator", level: 1 })).toBeVisible();
     await expect(page.getByText("READ-ONLY · NO WALLET CONNECTED")).toBeVisible();
+    const stats = page.getByTestId("reserve-stats");
+    for (const label of ["Reserve balance", "Coverage required", "Free capital", "Set aside for claims", "Share price"]) await expect(stats).toContainText(label);
+    await expect(stats).toContainText("R$ 29,500.00");
+    await expect(stats).toContainText("MODE · NORMAL");
+    await expect(page.getByRole("button", { name: "Refresh on-chain" })).toBeVisible();
+
+    // The recording script's prefill: MTV-PF-0100 at Imobiliária Planalto, R$1,500 rent, 6× + 6× (R$18,000 of cover) fits…
+    const console_ = page.locator("#console");
+    await expect(console_.getByLabel("Lease reference")).toHaveValue("MTV-PF-0100");
+    await expect(console_.getByLabel("Agency")).toHaveValue("Imobiliária Planalto");
+    const preview = console_.getByTestId("gate-preview");
+    await expect(preview).toContainText("Fits");
+    // …while R$12,000 (R$144,000 of cover) is above max_cover_per_guarantee (R$40,000).
+    await console_.getByLabel("Monthly rent (BRS)").fill("12000");
+    await expect(preview).toContainText("Would be refused: GuaranteeCapExceeded");
+    await expect(console_.getByRole("button", { name: /Send anyway/ })).toBeDisabled();
     await expect(page.getByRole("figure", { name: "Claim-payment caps" })).toContainText("R$ 2,500 / R$ 20,000");
-    await expect(page.locator("#console").getByRole("button", { name: "register_guarantee" })).toBeDisabled();
     // register, close, contribute_fees, sweep_income (ADR 0017), file, pay, settle.
     await expect(page.getByRole("table", { name: "Operator duties" }).locator("tbody tr")).toHaveCount(7);
     await expect(page.getByRole("heading", { name: "If the operator key is compromised" })).toBeVisible();

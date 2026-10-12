@@ -10,12 +10,14 @@
  * - No rounded corners, no shadows, surface-1 background
  */
 
+import type { ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { InfoTooltip } from "@/components/InfoTooltip";
 
 interface MetricCardProps {
   label: string;
-  value: string;
+  /** A string, or a node such as `<Money>` (BRS with its US$ hint). */
+  value: ReactNode;
   unit?: string;
   tooltip?: string;
   /** amber accent on the value — use only for Net APY */

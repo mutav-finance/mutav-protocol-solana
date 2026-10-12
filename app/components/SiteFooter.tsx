@@ -14,7 +14,6 @@ export function SiteFooter() {
           {[
             ["/reserve", "Transparency"],
             ["/operator", "Operator"],
-            ["/demo", "Demo"],
             ["/admin", "Admin"],
             ["/capital", "Capital queue"],
           ].map(([href, label]) => (

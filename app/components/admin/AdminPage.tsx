@@ -11,6 +11,8 @@
  */
 import { Page, ReadError } from "@/components/Section";
 import { StatusBadge } from "@/components/StatusBadge";
+import { MoneyProvider } from "@/components/MoneyProvider";
+import { ReserveStats } from "@/components/ReserveStats";
 import { RoleTag } from "@/components/RoleTag";
 import { LiveProvider, Note } from "@/components/demo/shared";
 import { PendingSetConfig, type Mode } from "@/components/admin/shared";
@@ -49,14 +51,18 @@ export function AdminPage() {
   const mode = modeOf(sq.data);
   const d = poll.data;
   return (
+    <MoneyProvider>
     <Page
+      kicker={`Admin · Solana ${CLUSTER}`}
       title="Admin console"
-      lede={<><span style={{ display: "block", marginBottom: 10 }}><RoleTag role="admin" bordered /></span>For members of MUTAV&apos;s admin multisig: general controls, the money flows the admin acts on, and where the reserve&apos;s assets sit. Wallets sign; this page holds no key.</>}
+      lede={<>For members of MUTAV&apos;s admin multisig: general controls, the money flows the admin acts on, and where the reserve&apos;s assets sit. Every change is a Squads proposal; wallets sign; this page holds no key.</>}
+      aside={<RoleTag role="admin" bordered />}
     >
       {poll.error && !d && <ReadError error={poll.error} />}
       {d && (
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh: async () => { await Promise.all([poll.refresh(), sq.refresh()]); } }}>
           <PendingSetConfig.Provider value={sq.data?.configured ? pendingSetConfig(sq.data.multisig.proposals) : null}>
+          <ReserveStats r={d.reserve} />
           <SectionNav />
           {mode?.via === "direct" && (
             <div role="note" style={{ border: "1px solid var(--color-copper)", padding: "10px 14px", marginBottom: 8 }}>
@@ -71,5 +77,6 @@ export function AdminPage() {
         </LiveProvider>
       )}
     </Page>
+    </MoneyProvider>
   );
 }

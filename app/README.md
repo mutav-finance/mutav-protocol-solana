@@ -13,8 +13,7 @@ Live: [reserve.mutav.finance](https://reserve.mutav.finance).
 | `/` | Redirects to `/reserve` (308). No app landing: MUTAV's landing is [mutav.finance](https://www.mutav.finance) |
 | `/reserve` | Public transparency: health, coverage, claims timeline, money flows, capital queue, disclosures, every account on Explorer, and the permissionless `refresh`; snapshot charts of each |
 | `/capital` | The capital queue (`/investment`, `/investor`, `/dashboard` redirect here). Leads with: not open to public investment; pilot capital is MUTAV's own wallet. The capital provider's view: allowlist status (on-chain root + `ALLOWLIST`), position, own queue entries, and `request_deposit` / `cancel_deposit` / `claim_shares` / `request_redeem` / `cancel_redeem` / `claim_assets`. Demo: the request form is visible to every visitor; on-chain actions stay allowlist-gated (holders can always redeem, ADR 0023). Before launch, set `CAPITAL_FORMS_PUBLIC` (`lib/flags.ts`, env `NEXT_PUBLIC_CAPITAL_FORMS_PUBLIC=false`) false to show the form only to allowlisted wallets (holders get redeem only). |
-| `/operator` | Operator console: today MUTAV's team signs by hand with the operator wallet (later mutav-app's backend, KMS key). Live limits (claim caps window, payouts vs SLA, free capital), every operator instruction with its bound shown before signing, duties (today → later), recent operator transactions, safety. Actions enabled only for `VaultConfig.operator` |
-| `/demo` | Guided operator demo (six steps, with the coverage-gate preview); free-form operator actions are on `/operator` |
+| `/operator` | Operator console (`/demo` redirects here): today MUTAV's team signs by hand with the operator wallet (later mutav-app's backend, KMS key). Live reserve figures and the permissionless `refresh`, live limits (claim caps window, payouts vs SLA, free capital), every operator instruction with its bound shown before signing, duties (today → later), recent operator transactions, safety. Actions enabled only for `VaultConfig.operator` |
 | `/admin` | `VaultConfig`, Squads v4 proposal builders (create / approve / execute, with the time lock), direct signing on localnet only |
 | `/simulator` | The reserve simulator, a standalone page (`public/simulator.html`): reserve sizing, coverage, yield against Selic |
 
@@ -66,7 +65,7 @@ PORT=3001 bun run dev
 bun run localnet:down    # stop it and assert nothing is left running
 ```
 
-The seed generates throwaway localnet keys (admin, operator, capital wallet) in a temp directory **outside the repo** and prints their paths; import them into a wallet to drive `/demo` and `/admin` locally. Pass `--admin-keypair <path>` to use your own local admin key. Nothing under `scripts/` runs against devnet yet: devnet admin steps are Squads proposals.
+The seed generates throwaway localnet keys (admin, operator, capital wallet) in a temp directory **outside the repo** and prints their paths; import them into a wallet to drive `/operator` and `/admin` locally. Pass `--admin-keypair <path>` to use your own local admin key. Nothing under `scripts/` runs against devnet yet: devnet admin steps are Squads proposals.
 
 ## Tests
 
