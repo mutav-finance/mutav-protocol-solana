@@ -7,6 +7,8 @@
  * detail (the two partial durations and explorer links).
  * Open claims (needs approval, approved, awaiting payment, then awaiting PIX)
  * sort first, then newest filing.
+ * Below 600px each claim stacks as a block (`.claims-table` in globals.css):
+ * stage and amount, guarantee and the chevron, then the times, each labelled.
  * The program sets no settlement deadline (ADR 0019): the payout SLA is the
  * operator platform's, so no row is marked late.
  */
@@ -87,7 +89,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Table label="Claims timeline" head={["Status", "Guarantee", ["Amount", "num"], ["Filed (UTC)", "num"], ["Paid (UTC)", "num"], ["Settled (UTC)", "num"], ["Filed → settled", "num"], ["Details", "num"]]} tips={TIPS}>
+      <Table label="Claims timeline" head={["Status", "Guarantee", ["Amount", "num"], ["Filed (UTC)", "num"], ["Paid (UTC)", "num"], ["Settled (UTC)", "num"], ["Filed → settled", "num"], ["Details", "num"]]} tips={TIPS} className="claims-table">
         {visible.map((c) => {
           const isOpen = open.has(c.filing);
           const detailId = `claim-${c.filing}`;
@@ -110,10 +112,10 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                   </span>
                 </td>
                 <Num>{fmtBrs(c.amount ?? c.provision)}</Num>
-                <Num>{fmtStamp(c.filedAt)}</Num>
-                <Num>{c.paidAt !== null ? fmtStamp(c.paidAt) : "—"}</Num>
-                <Num>{c.settledAt !== null ? fmtStamp(c.settledAt) : c.paidAt !== null ? "pending" : "—"}</Num>
-                <Num>{settled !== null ? fmtDuration(settled) : "—"}</Num>
+                <Num label="Filed (UTC)">{fmtStamp(c.filedAt)}</Num>
+                <Num label="Paid (UTC)">{c.paidAt !== null ? fmtStamp(c.paidAt) : "—"}</Num>
+                <Num label="Settled (UTC)">{c.settledAt !== null ? fmtStamp(c.settledAt) : c.paidAt !== null ? "pending" : "—"}</Num>
+                <Num label="Filed → settled">{settled !== null ? fmtDuration(settled) : "—"}</Num>
                 <td className="num">
                   <Button
                     type="button"
@@ -132,7 +134,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                 </td>
               </tr>
               {isOpen && (
-                <tr id={detailId}>
+                <tr id={detailId} className="claims-detail">
                   <td colSpan={8} className="bg-(--color-surface)">
                     <div className="grid grid-cols-1 gap-4 py-2 sm:grid-cols-2 lg:grid-cols-4">
                       <Detail label="Filed">
