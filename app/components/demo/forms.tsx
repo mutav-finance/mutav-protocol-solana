@@ -20,7 +20,7 @@ import { nextRef, REF } from "@/lib/refs";
 import { claimCap } from "@/lib/operator";
 import { bytesToHex } from "@/lib/serde";
 import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE } from "@/lib/view";
-import { Action, Field, Grid, Note, RoleWarning, TextField, useLive } from "./shared";
+import { Action, Field, Grid, LastAction, Note, RoleWarning, TextField, useLastAction, useLive } from "./shared";
 
 const hex = (b: ArrayLike<number>) => bytesToHex(Uint8Array.from(b));
 
@@ -373,16 +373,31 @@ export function PayClaimList() {
   const { ledger, reserve } = useLive();
   const cap = claimCap(reserve.config, reserve.state, reserve.now);
   const open = claimsTimeline(ledger).filter((c) => c.stage === "filed");
-  if (open.length === 0) return <Note>No filed claim waiting for payment. File one first.</Note>;
+  const last = useLastAction();
+  if (open.length === 0) {
+    return (
+      <>
+        <LastAction last={last.last} />
+        <Note>No filed claim waiting for payment. File one first.</Note>
+      </>
+    );
+  }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <LastAction last={last.last} />
       <RoleWarning need="operator" />
       {open.map((c) => (
         <div key={c.filing} style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
           <Mono style={{ fontSize: 12, minWidth: 280 }}>
             {c.guaranteeId.slice(0, 8)}… · {c.leg} leg · {fmtBrs(c.provision)} · filed {fmtTime(c.filedAt)}
           </Mono>
-          <Action label={`pay_claim ${fmtBrs(c.provision, 0)}`} request={{ kind: "pay_claim", guarantee: c.guarantee, leg: c.leg === "exit" ? 2 : 1, amount: c.provision, noticeRefHash: c.noticeRefHash }} refusal={{ claim: { amount: c.provision, perCall: cap.perCall, remaining: cap.remaining } }} />
+          <Action
+            label={`pay_claim ${fmtBrs(c.provision, 0)}`}
+            request={{ kind: "pay_claim", guarantee: c.guarantee, leg: c.leg === "exit" ? 2 : 1, amount: c.provision, noticeRefHash: c.noticeRefHash }}
+            refusal={{ claim: { amount: c.provision, perCall: cap.perCall, remaining: cap.remaining } }}
+            onConfirmed={last.confirmed(`pay_claim ${fmtBrs(c.provision)} · ${c.guaranteeId.slice(0, 8)}… ${c.leg} leg`)}
+            onDone={last.done}
+          />
         </div>
       ))}
     </div>
@@ -394,9 +409,18 @@ export function SettleList() {
   const { ledger } = useLive();
   const paid = claimsTimeline(ledger).filter((c) => c.stage === "paid");
   const [e2e, setE2e] = useState<Record<string, string>>({});
-  if (paid.length === 0) return <Note>No paid claim waiting for settlement.</Note>;
+  const last = useLastAction();
+  if (paid.length === 0) {
+    return (
+      <>
+        <LastAction last={last.last} />
+        <Note>No paid claim waiting for settlement.</Note>
+      </>
+    );
+  }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <LastAction last={last.last} />
       <RoleWarning need="operator" />
       {paid.map((c) => {
         const id = e2e[c.filing] ?? `E12345678${new Date().toISOString().slice(0, 10).replace(/-/g, "")}demo${c.noticeRefHash.slice(0, 6)}`;
@@ -409,7 +433,12 @@ export function SettleList() {
               <div style={{ minWidth: 320 }}>
                 <TextField id={`pix-${c.filing}`} label="PIX end-to-end id" value={id} onChange={(v) => setE2e((m) => ({ ...m, [c.filing]: v }))} hint="only its SHA-256 goes on-chain" />
               </div>
-              <Action label="settle_payout" request={async () => ({ kind: "settle_payout", guarantee: c.guarantee, noticeRefHash: c.noticeRefHash, pixE2eHash: await REF.pixE2e(id.trim()) })} />
+              <Action
+                label="settle_payout"
+                request={async () => ({ kind: "settle_payout", guarantee: c.guarantee, noticeRefHash: c.noticeRefHash, pixE2eHash: await REF.pixE2e(id.trim()) })}
+                onConfirmed={last.confirmed(`settle_payout ${fmtBrs(c.amount ?? 0n)} · ${c.guaranteeId.slice(0, 8)}… ${c.leg} leg`)}
+                onDone={last.done}
+              />
             </div>
           </div>
         );

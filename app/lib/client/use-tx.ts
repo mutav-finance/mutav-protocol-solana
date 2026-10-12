@@ -32,7 +32,7 @@ const IDLE: TxState = { phase: "idle", signature: null, error: null, errorName: 
  * devnet the wallet signs and sends through its own RPC; on localnet the
  * wallet signs and the localnet-only relay sends (see lib/client/transport).
  */
-export function useTx(onConfirmed?: () => void) {
+export function useTx(onConfirmed?: (signature: string) => void) {
   const { address, signTransaction, signAndSendTransaction } = useWallet();
   const [state, setState] = useState<TxState>(IDLE);
 
@@ -60,7 +60,7 @@ export function useTx(onConfirmed?: () => void) {
           if (st.status === "failed") throw new Error(`transaction failed: ${JSON.stringify(st.err, (_, v) => (typeof v === "bigint" ? v.toString() : v))}`);
           if (st.status === "confirmed" || st.status === "finalized") {
             setState((s) => ({ ...s, phase: "confirmed", error: null }));
-            onConfirmed?.();
+            onConfirmed?.(signature);
             return signature;
           }
           // Still unseen: the wallet may have sent it to another cluster.
