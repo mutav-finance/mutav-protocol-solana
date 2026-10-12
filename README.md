@@ -209,6 +209,7 @@ About this deploy:
 - It is a test deploy of commit `833c114` (layout v1, the binary on `main` at the time) built with `anchor build` under its own program ID. The ID declared in [`lib.rs`](programs/mutav/src/lib.rs), `8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9`, is kept for the verified `solana-verify` release build, so the reserve PDAs above differ from those derived under the declared ID.
 - The on-chain program hash matches the build (`fad721d5…e6e7`). The release `v1.0.0-devnet` carries its IDL.
 - Its multisig time locks are 60 s (admin) and 120 s (upgrade), a test exception to the devnet floors of [ADR 0028](docs/decisions/0028-pilot-parameters.md) (300 s and 3,600 s). The real pilot keeps 24 h and 7 days.
+- Demo deploy: claim ceiling raised to R$50k per 31 days to allow retakes of the live claim. The pilot runs R$20k (ADR 0028). `verify.ts` therefore reports `max_claim_per_period` against its devnet locked value (`DEVNET_LOCKED`); that mismatch is expected.
 - `mutav_adapter_mock` is not deployed on devnet.
 
 ## Documentation
