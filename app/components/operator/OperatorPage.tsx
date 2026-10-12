@@ -336,7 +336,7 @@ export function OperatorPage() {
       {!d && !poll.error && <p className="font-mono" style={{ fontSize: 12, color: "var(--color-text-3)" }}>Reading the chain…</p>}
       {d && (
         <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh: async () => { await Promise.all([poll.refresh(), history.refresh()]); } }}>
-          <ReserveStats r={d.reserve} sticky badges={<Who r={d.reserve} />} />
+          <ReserveStats r={d.reserve} badges={<Who r={d.reserve} />} />
           <Section id="console" title="Console" kicker={locked ? "Read-only" : "Operator wallet connected"} action={<RoleLine items={[{ role: "operator", prefix: "every action signed by" }]}>The program checks the signer; the wallet signs; the app holds no key.</RoleLine>}>
             {d && address && address === d.reserve.config.pendingOperator && (
               <Note tone="ok">
