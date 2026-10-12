@@ -141,8 +141,8 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
 
     // Risks names where claim payments go and who can pause, each on Explorer.
-    await expect(page.getByRole("table", { name: "Authority" })).toContainText("Payments account");
-    await expect(page.getByRole("table", { name: "Authority" })).toContainText("Pause / guardian");
+    await expect(page.getByRole("group", { name: "Authority" })).toContainText("Payments account");
+    await expect(page.getByRole("group", { name: "Authority" })).toContainText("Pause / guardian");
 
     await page.goto("/reserve/verify");
     await expect(page.getByText("8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9")).toBeVisible();

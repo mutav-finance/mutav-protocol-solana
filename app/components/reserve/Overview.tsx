@@ -203,8 +203,8 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger | null }) {
         </Link>
       </p>
 
-      {/* 2×2 below 1360px so a full "R$ 144,000.00" never clips; one row of four above it, at a smaller figure size. Cards stretch to equal height. */}
-      <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 min-[1360px]:grid-cols-4">
+      {/* Always 2×2 in the main column, so a full "R$ 144,000.00" never clips; cards stretch to equal height. */}
+      <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2">
         {kpis.map((k) => {
           const body = (
             <>
@@ -212,7 +212,7 @@ function Hero({ r, l }: { r: ReserveView; l: Ledger | null }) {
                 <Label tip={k.tip}>{k.label}</Label>
                 {k.href && <Mono style={{ fontSize: 12, color: "var(--color-text-3)" }}>→</Mono>}
               </span>
-              <Mono className="text-2xl min-[1360px]:text-xl" style={{ ...NUM, fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", color: "var(--color-text)" }}>
+              <Mono className="text-2xl" style={{ ...NUM, fontWeight: 700, lineHeight: 1.2, whiteSpace: "nowrap", color: "var(--color-text)" }}>
                 {k.value}
               </Mono>
               <span className="font-body text-(--color-text-2) text-[13px] leading-snug text-pretty">{k.def}</span>

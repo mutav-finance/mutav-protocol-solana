@@ -119,6 +119,14 @@ function AdminCaps({ r }: { r: ReserveView }) {
   );
 }
 
+/** An address on Explorer with who holds it. */
+const Key = ({ address, rpc, who }: { address: string; rpc: string; who: string }) => (
+  <span className="inline-flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+    <Explorer value={address} rpc={rpc} />
+    <span className="font-body text-(--color-text-3) text-xs">{who}</span>
+  </span>
+);
+
 /** The program's empty key slot (`Pubkey::default()`): an unset guardian. */
 const EMPTY_KEY = "11111111111111111111111111111111";
 
@@ -138,40 +146,27 @@ function Authority({ r }: { r: ReserveView }) {
         note={<Lead lead="Claim payments go to one fixed account." className="text-sm">Only the Reserve Admin can change it. Below it, every key that can pause the program.</Lead>}
         aside={<HeadLink href="/reserve/verify">See every account</HeadLink>}
       />
-      <Table label="Authority" head={["Role", "Address", "What it can do"]}>
-        <tr>
-          <td>Payments account</td>
-          <td>
-            <Explorer value={c.paymentsAccount} rpc={rpc} />
-          </td>
-          <td>Receives every claim payment. A fixed address set by the Reserve Admin; the operator cannot pay anywhere else.</td>
-        </tr>
-        <tr>
-          <td>Pause / guardian</td>
-          <td>
-            <span className="flex flex-col gap-1">
-              <span className="inline-flex flex-wrap items-center gap-2">
-                <Explorer value={c.pauser} rpc={rpc} />
-                <span className="font-body text-(--color-text-3) text-xs">pauser</span>
-              </span>
-              <span className="inline-flex flex-wrap items-center gap-2">
-                <Explorer value={c.admin} rpc={rpc} />
-                <span className="font-body text-(--color-text-3) text-xs">Reserve Admin</span>
-              </span>
-              {guardians.map((g) => (
-                <span key={g} className="inline-flex flex-wrap items-center gap-2">
-                  <Explorer value={g} rpc={rpc} />
-                  <span className="font-body text-(--color-text-3) text-xs">guardian</span>
-                </span>
-              ))}
-            </span>
-          </td>
-          <td>
+      <div role="group" aria-label="Authority" className="grid grid-cols-1 gap-px border md:grid-cols-2" style={{ background: "var(--color-border)" }}>
+        <div className="bg-(--color-surface) flex min-w-0 flex-col gap-3 px-6 py-4">
+          <Label>Payments account</Label>
+          <Key address={c.paymentsAccount} rpc={rpc} who="fixed; set by the Reserve Admin" />
+          <span className="font-body text-(--color-text-2) text-xs leading-snug">Receives every claim payment. The operator cannot pay anywhere else.</span>
+        </div>
+        <div className="bg-(--color-surface) flex min-w-0 flex-col gap-3 px-6 py-4">
+          <Label>Pause / guardian</Label>
+          <span className="flex flex-col gap-1.5">
+            <Key address={c.pauser} rpc={rpc} who="pauser" />
+            <Key address={c.admin} rpc={rpc} who="Reserve Admin" />
+            {guardians.map((g) => (
+              <Key key={g} address={g} rpc={rpc} who="guardian" />
+            ))}
+          </span>
+          <span className="font-body text-(--color-text-2) text-xs leading-snug">
             Can pause the program: new guarantees and capital moves stop; claim payments do not.
-            {guardians.length === 0 ? " No guardian keys are set." : ` ${guardians.length === 1 ? "One guardian key" : `${guardians.length} guardian keys`} may pause, nothing else.`} Only the Reserve Admin unpauses.
-          </td>
-        </tr>
-      </Table>
+            {guardians.length === 0 ? " No guardian keys are set." : ` ${guardians.length === 1 ? "The guardian key" : "Guardian keys"} may pause, nothing else.`} Only the Reserve Admin unpauses.
+          </span>
+        </div>
+      </div>
     </section>
   );
 }
