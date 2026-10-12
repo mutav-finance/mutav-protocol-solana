@@ -105,7 +105,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 **F8 · END STATE · 2 · Settled in minutes · 1:20 – 1:36 · /reserve/claims**: Filed → paid → settled
 - **On screen:** /reserve/claims: filed → paid → settled with on-chain timestamps; the timer stops at settled. Hold 3 s. Still covered: R$42,500 held, R$40,125 required. The public timeline also shows an earlier R$18,000 test claim: fine to be visible on a disclaimed demo reserve. Frame the shot so Ana's row is the highlighted one.
 - **VO:** "On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days."
-- **Caption:** On-chain, filed → settled: [N] s · seguro-fiança: up to 30 days
+- **Caption:** Filed → settled on-chain: [N] s · seguro-fiança: 30 days
 - **Honesty label:** PIX transfer simulated on devnet · settlement recorded on-chain
 - **Proof:** Timestamps from the ClaimFiling PDA. [N] = settled_at − filed_at, from the real on-chain timestamps; the unit is "seconds" if under 2 minutes, "minutes" otherwise. Do not claim real-world claims settle in seconds: the operator checks each claim first.
 - **Edit:** SUSEP Circ. 621/2021 art. 43 goes in the video description.
