@@ -33,7 +33,14 @@ export type InvestorTx =
   | { kind: "cancel_redeem"; seq: bigint }
   | { kind: "claim_assets"; seq: bigint };
 
-export type PublicTx = { kind: "refresh" };
+export type PublicTx =
+  | { kind: "refresh" }
+  /**
+   * Permissionless crank (spec §5.8, ADR 0026): moves a queue head over dead
+   * seqs (parked or closed requests). No signer; the connected wallet pays the fee.
+   * `max`: request accounts read, 1–24 (default 16).
+   */
+  | { kind: "advance_queue_head"; queue: "deposit" | "redeem"; max?: number };
 
 /** The proposed operator or pauser key takes its role, signing itself (ADR 0020). 1 = operator, 2 = pauser. */
 export type RoleTx = { kind: "accept_role"; role: 1 | 2 };
@@ -64,6 +71,10 @@ export type AdminTx =
       coverageRatioBps?: number;
       /** MUTAV's take from each guarantee fee, `≤ MAX_FEE_TAKE_BPS` (3_000). */
       feeTakeBps?: number;
+      /**
+       * `stressBuffer` is left out on purpose: ADR 0028 locks it (R$19k,
+       * `DEVNET_LOCKED`), so the app never proposes a change to it.
+       */
       caps?: Partial<Record<"maxTvl" | "maxCoverPerGuarantee" | "maxClaimPerCall" | "maxClaimPerPeriod" | "minRequest" | "maxRequest", bigint>>;
       /** `caps.max_nav_move_bps`, the NAV-move guard (spec §7), 0–10_000. */
       maxNavMoveBps?: number;
@@ -77,7 +88,20 @@ export type AdminTx =
   /** Point claim payments at a new BRS token account (spec §2.1 checks run on-chain). */
   | { kind: "set_payments_account"; paymentsAccount: string }
   /** Pauser key or admin, no time lock: clears the operator at once. */
-  | { kind: "revoke_operator" };
+  | { kind: "revoke_operator" }
+  /**
+   * Approve the exact amount of a filed claim above `max_claim_per_call`
+   * (ADR 0021). `filing` is the ClaimFiling address; the server re-reads it and
+   * binds the amount to its provision and the revision to its revision.
+   */
+  | { kind: "approve_claim"; guarantee: string; filing: string }
+  /**
+   * Park a pending request (ADR 0030): `cancel_deposit` / `cancel_redeem`
+   * signed by the admin, owner = the request's owner. Nothing moves; the owner
+   * collects the escrow later.
+   */
+  | { kind: "park_deposit"; seq: bigint }
+  | { kind: "park_redeem"; seq: bigint };
 
 export type TxRequest = OperatorTx | InvestorTx | PublicTx | RoleTx | AdminTx;
 export type TxKind = TxRequest["kind"];
@@ -92,6 +116,9 @@ export const ADMIN_KINDS: ReadonlySet<TxKind> = new Set([
   "set_roles",
   "set_payments_account",
   "cancel_pending",
+  "approve_claim",
+  "park_deposit",
+  "park_redeem",
 ]);
 export const OPERATOR_KINDS: ReadonlySet<TxKind> = new Set([
   "register_guarantee",
@@ -109,6 +136,6 @@ export function expectedSigner(kind: TxKind): "operator" | "admin" | "pauser-or-
   if (OPERATOR_KINDS.has(kind)) return "operator";
   if (ADMIN_KINDS.has(kind)) return "admin";
   if (kind === "pause" || kind === "revoke_operator") return "pauser-or-admin";
-  if (kind === "refresh") return "anyone";
+  if (kind === "refresh" || kind === "advance_queue_head") return "anyone";
   return "investor";
 }

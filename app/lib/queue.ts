@@ -6,8 +6,8 @@
  * current accounts: the program decides at execution, at that moment's NAV.
  *
  * Plus the admin's own rule for deposit fills: the head's owner must still
- * be on the current allowlist (a de-listed owner's deposit is cancelled, not
- * filled).
+ * be on the current allowlist (a de-listed owner's deposit is parked by the
+ * admin, ADR 0030, not filled).
  */
 import { assetsFor, sharesFor, type VaultConfig, type VaultState } from "@mutav-finance/mutav-protocol-solana";
 import { fmtBrs, fmtShares } from "./format";
@@ -46,9 +46,9 @@ export function depositHead(
   if (config.paused) stuck.push("the reserve is paused");
   if (state.fulfilHalted) stuck.push("fulfilment is halted by the NAV-move guard: clear_fulfil_halt first");
   if (shares === 0n) stuck.push("it would mint 0 shares at NAV now");
-  else if (req.minSharesOut > 0n && shares < req.minSharesOut) stuck.push(`its price limit is not met: ${fmtShares(shares)} shares at NAV now, the owner asks for at least ${lim("deposit", req.minSharesOut)}. The owner or the admin cancels it, or the price recovers`);
+  else if (req.minSharesOut > 0n && shares < req.minSharesOut) stuck.push(`its price limit is not met: ${fmtShares(shares)} shares at NAV now, the owner asks for at least ${lim("deposit", req.minSharesOut)}. The owner cancels it, the admin parks it, or the price recovers`);
   if (sol.stableAssets + req.assets > config.caps.maxTvl) stuck.push(`the reserve would pass max TVL: ${fmtBrs(sol.stableAssets)} + ${fmtBrs(req.assets)} > ${fmtBrs(config.caps.maxTvl, 0)}`);
-  if (allowlist && !allowlist.includes(req.owner)) stuck.push("its owner is not on the current allowlist: cancel it (the admin can) instead of filling it");
+  if (allowlist && !allowlist.includes(req.owner)) stuck.push("its owner is not on the current allowlist: the admin parks it instead of filling it");
   return { side: "deposit", seq: req.seq, owner: req.owner, value: req.assets, shares, limit: req.minSharesOut, stuck };
 }
 
@@ -73,7 +73,7 @@ export function redeemHead(
     const which = budget === sol.freeCapital ? "free capital" : budget === sol.liquidBudget ? "the liquid balance net of provisions" : "the max BRS of this fill";
     stuck.push(`it needs ${fmtBrs(value)} and only ${fmtBrs(budget)} is available (${which}); whole requests only, so the queue waits behind it`);
   }
-  if (req.minAssetsOut > 0n && value < req.minAssetsOut) stuck.push(`its price limit is not met: ${fmtBrs(value)} at NAV now, the owner asks for at least ${lim("redeem", req.minAssetsOut)}. The owner or the admin cancels it, or the price recovers`);
+  if (req.minAssetsOut > 0n && value < req.minAssetsOut) stuck.push(`its price limit is not met: ${fmtBrs(value)} at NAV now, the owner asks for at least ${lim("redeem", req.minAssetsOut)}. The owner cancels it, the admin parks it, or the price recovers`);
   return { side: "redeem", seq: req.seq, owner: req.owner, value, shares: req.shares, limit: req.minAssetsOut, stuck };
 }
 
@@ -85,7 +85,7 @@ export function limitWithSlippage(preview: bigint, bps: number): bigint {
 
 /**
  * The deposit seqs a fill may include: from the head, stopping before the
- * first request whose owner is off the current allowlist (the admin cancels
+ * first request whose owner is off the current allowlist (the admin parks
  * those rather than filling them). Returns how many to fill and the blocker.
  */
 export function allowlistedFillCount(
@@ -98,4 +98,20 @@ export function allowlistedFillCount(
   const i = q.findIndex((r) => !allowlist.includes(r.owner));
   if (i === -1) return { count: Math.min(count, q.length || count), blocked: null };
   return { count: i, blocked: { seq: q[i]!.seq, owner: q[i]!.owner } };
+}
+
+/**
+ * Dead seqs at the head of a queue: from `head` up to the first pending
+ * request (or the tail), i.e. parked (ADR 0030), filled or closed requests
+ * that `advance_queue_head` moves the head over (spec §5.8).
+ */
+export function deadSeqsAtHead(
+  state: Pick<VaultState, "depositHead" | "redeemHead" | "nextDepositSeq" | "nextRedeemSeq">,
+  ledger: Pick<Ledger, "deposits" | "redeems">,
+  side: "deposit" | "redeem",
+): bigint {
+  const q = capitalQueue(state, ledger);
+  const [head, next, first] = side === "deposit" ? [state.depositHead, state.nextDepositSeq, q.deposits[0]] : [state.redeemHead, state.nextRedeemSeq, q.redeems[0]];
+  const live = first ? first.seq : next;
+  return live > head ? live - head : 0n;
 }

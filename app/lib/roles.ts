@@ -118,8 +118,13 @@ export type Instruction = keyof typeof INSTRUCTION_ROLE;
 /** Instructions signed only by the pauser key or the admin (no time lock). */
 export const PAUSER_OR_ADMIN: ReadonlySet<Instruction> = new Set(["pause", "revoke_operator"]);
 
-/** `set_roles` composes `propose_role` for each changed key (ADR 0020). */
-export const roleOf = (ix: Instruction | TxKind): Role => (ix === "set_roles" ? "admin" : INSTRUCTION_ROLE[ix as Instruction]);
+/**
+ * `set_roles` composes `propose_role` for each changed key (ADR 0020);
+ * `park_deposit` / `park_redeem` are the admin's `cancel_deposit` /
+ * `cancel_redeem` (ADR 0030).
+ */
+export const roleOf = (ix: Instruction | TxKind): Role =>
+  ix === "set_roles" || ix === "park_deposit" || ix === "park_redeem" ? "admin" : INSTRUCTION_ROLE[ix as Instruction];
 
 /** The instructions each role may sign, in the order above. */
 export function instructionsBy(role: Role): Instruction[] {

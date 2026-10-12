@@ -17,7 +17,7 @@ import { fmtBps, fmtBrs, fmtShares, fmtTime, parseBrs, parseHundredths } from "@
 import { agencyIdFor, refsSaltFor } from "@/lib/client/operator-refs";
 import { REF } from "@/lib/refs";
 import { bytesToHex } from "@/lib/serde";
-import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE } from "@/lib/view";
+import { claimsTimeline, DEPOSIT_FULFILLED, GUARANTEE_ACTIVE, isUnpaid } from "@/lib/view";
 import { Action, Field, Grid, Note, RoleWarning, TextField, useLive } from "./shared";
 
 const hex = (b: ArrayLike<number>) => bytesToHex(Uint8Array.from(b));
@@ -337,7 +337,7 @@ export function FileClaimForm({ p = "" }: { p?: string }) {
 /** Filed, unpaid claims, each with a Pay button (`pay_claim` for the filed provision). */
 export function PayClaimList() {
   const { ledger } = useLive();
-  const open = claimsTimeline(ledger).filter((c) => c.stage === "filed");
+  const open = claimsTimeline(ledger).filter((c) => isUnpaid(c.stage));
   if (open.length === 0) return <Note>No filed claim waiting for payment. File one first.</Note>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>

@@ -8,7 +8,7 @@
  * the spec does not document a trigger it says so instead of inventing one.
  */
 import { CLAIM_WINDOW_DAYS, claimWindowPaid, type VaultConfig, type VaultState } from "@mutav-finance/mutav-protocol-solana";
-import type { ClaimRow } from "./view";
+import { isUnpaid, type ClaimRow } from "./view";
 
 export type OperatorInstruction = "register_guarantee" | "close_guarantee" | "contribute_fees" | "sweep_income" | "file_claim" | "pay_claim" | "settle_payout";
 
@@ -99,9 +99,14 @@ export function claimCap(
   };
 }
 
-/** Why a pay_claim of `amount` would be refused by the caps, or null if they allow it. */
-export function claimCapRefusal(cap: ClaimCap, amount: bigint): "ClaimCallCapExceeded" | "ClaimPeriodCapExceeded" | null {
-  if (amount > cap.perCall) return "ClaimCallCapExceeded";
+/**
+ * Why a pay_claim of `amount` would be refused by the caps, or null if they
+ * allow it. Above the per-call cap only the exact amount the Reserve Admin
+ * approved passes (`approved`, ADR 0021); approved payments still count toward
+ * the period cap.
+ */
+export function claimCapRefusal(cap: ClaimCap, amount: bigint, approved = 0n): "ClaimCallCapExceeded" | "ClaimPeriodCapExceeded" | null {
+  if (amount > cap.perCall && approved !== amount) return "ClaimCallCapExceeded";
   if (amount > cap.remaining) return "ClaimPeriodCapExceeded";
   return null;
 }
@@ -109,7 +114,7 @@ export function claimCapRefusal(cap: ClaimCap, amount: bigint): "ClaimCallCapExc
 /** Claims the operator still has to act on: filed and unpaid, paid and unsettled. */
 export function claimWork(rows: ClaimRow[]) {
   return {
-    toPay: rows.filter((c) => c.stage === "filed").length,
+    toPay: rows.filter((c) => isUnpaid(c.stage)).length,
     toSettle: rows.filter((c) => c.stage === "paid").length,
   };
 }

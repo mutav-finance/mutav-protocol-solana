@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { address, createNoopSigner, getAddressEncoder, type Address, type Instruction } from "@solana/kit";
 import {
   buildAllowlist,
+  getAdvanceQueueHeadInstruction,
+  getApproveClaimInstruction,
+  getCancelDepositInstruction,
+  getCancelRedeemInstruction,
   getCancelPendingInstruction,
   getClearFulfilHaltInstruction,
   getFulfilDepositsInstruction,
@@ -215,5 +219,36 @@ describe("A3 proposal decoding: outside the admin set", () => {
     expect(d.program).toBe("foreign");
     expect(d.details[0]).toEqual({ label: "changes", value: "members/threshold — review in the Squads UI", warn: true });
     expect(d.details[1]?.value).toBe("AddMember, ChangeThreshold");
+  });
+});
+
+describe("A3 proposal decoding: claims and the capital queue (ADR 0021, ADR 0030)", () => {
+  const FILING = a("Stake11111111111111111111111111111111111111");
+  const GUARANTEE = a("Vote111111111111111111111111111111111111111");
+  const REQUEST = a("SysvarRent111111111111111111111111111111111");
+  it("approve_claim is an admin instruction: amount, revision and filing shown, nothing flagged", () => {
+    const ix = getApproveClaimInstruction({ ...common, admin, guarantee: GUARANTEE, claimFiling: FILING, noticeRefHash: new Uint8Array(32).fill(7), amount: 20_000_000_000n, expectedRevision: 3 }, o);
+    const d = decodeInstruction(raw(ix), ctx());
+    expect(d).toMatchObject({ program: "mutav", name: "ApproveClaim" });
+    expect(warns(d)).toEqual([]);
+    expect(detail(d, "claim filing")?.value).toBe(FILING);
+    expect(detail(d, "expected revision")?.value).toBe("3");
+    expect(detail(d, "notice ref hash")?.value).toBe("07".repeat(32));
+  });
+  it("the admin's cancel_deposit / cancel_redeem park the request: owner shown, config checked at index 2", () => {
+    const acc = { ...common, signer: admin, owner: OWNER, state: ANY, pendingDeposits: ANY, pendingRedemptions: ANY, vaultAuthority: ANY, reserveMint: MINT, tokenProgram: TOKEN, destination: ANY, ownerShares: ANY, shareMint: ANY, shareTokenProgram: TOKEN };
+    for (const ix of [getCancelDepositInstruction({ ...acc, depositRequest: REQUEST }, o), getCancelRedeemInstruction({ ...acc, redeemRequest: REQUEST }, o)]) {
+      const d = decodeInstruction(raw(ix), ctx());
+      expect(warns(d)).toEqual([]);
+      expect(detail(d, "owner")?.value).toBe(OWNER);
+      expect(detail(d, "request")?.value).toBe(REQUEST);
+      const other = decodeInstruction(raw({ ...ix, accounts: ix.accounts.map((m, i) => (i === 2 ? { ...m, address: OTHER_CONFIG } : m)) } as Instruction), ctx());
+      expect(warns(other)).toContain("config");
+    }
+  });
+  it("advance_queue_head is accepted with its config at index 0", () => {
+    const d = decodeInstruction(raw(getAdvanceQueueHeadInstruction({ ...common, state: ANY, queue: 2, max: 4 }, o)), ctx());
+    expect(warns(d)).toEqual([]);
+    expect(detail(d, "queue")?.value).toBe("2");
   });
 });

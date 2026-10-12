@@ -12,17 +12,17 @@ import { Section } from "@/components/Section";
 import { Explorer } from "@/components/Explorer";
 import { Mono } from "@/components/Mono";
 import { RoleLine, RoleTag } from "@/components/RoleTag";
-import { Grid, Note, TextField, useLive } from "@/components/demo/shared";
-import { AdminAction, Cards, DataTable, ExternalTag, Facts, PLANNED, Sub, WhatThis, type Mode } from "@/components/admin/shared";
+import { Action, Grid, Note, TextField, useLive } from "@/components/demo/shared";
+import { AdminAction, Cards, CrankAction, DataTable, ExternalTag, Facts, Sub, WhatThis, type Mode } from "@/components/admin/shared";
 import { ConfigCard, bpsField, brsField } from "@/components/admin/ConfigCard";
 import { capsError, MAX_FEE_TAKE_BPS } from "@/lib/admin";
 import { conversionNav, navBoundsAround } from "@mutav-finance/mutav-protocol-solana";
 import { fmtBrs, fmtNav, fmtShares, fmtTime, parseBrs } from "@/lib/format";
-import { depositHead, redeemHead, type HeadStatus } from "@/lib/queue";
-import { claimCap } from "@/lib/operator";
+import { deadSeqsAtHead, depositHead, redeemHead, type HeadStatus } from "@/lib/queue";
+import { claimCap, claimCapRefusal } from "@/lib/operator";
 import { incomeSummary } from "@/lib/reserve-assets";
 import type { Role } from "@/lib/roles";
-import { capitalQueue, fmtPeriod } from "@/lib/view";
+import { capitalQueue, CLAIM_STAGE_LABEL, claimsTimeline, fmtPeriod } from "@/lib/view";
 
 const m = (x: ReactNode) => <Mono style={{ fontSize: 12 }}>{x}</Mono>;
 
@@ -77,6 +77,32 @@ function HeadNote({ head }: { head: HeadStatus | null }) {
   );
 }
 
+/**
+ * The admin's park of the head request (ADR 0030: its cancel parks, nothing
+ * moves) and the permissionless crank that then moves the head over it.
+ */
+function ParkAndAdvance({ side, mode, head }: { side: "deposit" | "redeem"; mode: Mode; head: HeadStatus | null }) {
+  const { reserve, ledger } = useLive();
+  const dead = deadSeqsAtHead(reserve.state, ledger, side);
+  const escrow = side === "deposit" ? "BRS" : "shares";
+  const collect = side === "deposit" ? "cancel_deposit" : "cancel_redeem";
+  return (
+    <>
+      <AdminAction title="Park the head request" label={`park_${side}`} mode={mode} request={head ? { kind: side === "deposit" ? "park_deposit" : "park_redeem", seq: head.seq } : null}>
+        <Facts
+          now={m(head ? `head seq ${head.seq} · owner ${head.owner.slice(0, 8)}…` : "queue empty")}
+          bound={m("pending requests only · moves nothing")}
+          does={`${collect} signed by the admin parks the request (ADR 0030): it leaves the queue, its ${escrow} stay in escrow, owed to the owner, who alone collects them with ${collect}. For a head that cannot fill (a price limit, a de-listed owner).`}
+        />
+      </AdminAction>
+      <CrankAction title="Advance the queue head" note={`advance_queue_head moves the ${side} head over parked, filled or closed requests, up to the first pending one. Anyone may send it; it moves no funds.`}>
+        {m(`${dead} dead seq${dead === 1n ? "" : "s"} at the head (seq ${side === "deposit" ? reserve.state.depositHead : reserve.state.redeemHead})`)}
+        <Action label="advance_queue_head" variant="outline" request={dead > 0n ? { kind: "advance_queue_head", queue: side } : null} />
+      </CrankAction>
+    </>
+  );
+}
+
 // ── In ──────────────────────────────────────────────────────────────────────
 
 function Deposits({ mode }: { mode: Mode }) {
@@ -105,8 +131,9 @@ function Deposits({ mode }: { mode: Mode }) {
             {nb.field}
           </Grid>
           <HeadNote head={head} />
-          <Note>The server fills only up to the first request whose owner is off the current allowlist, and refuses when that request is the head: cancel it first.</Note>
+          <Note>The server fills only up to the first request whose owner is off the current allowlist, and refuses when that request is the head: park it first.</Note>
         </AdminAction>
+        <ParkAndAdvance side="deposit" mode={mode} head={head} />
         <ConfigCard
           title="Request sizes"
           mode={mode}
@@ -211,15 +238,17 @@ function Redemptions({ mode }: { mode: Mode }) {
           </Grid>
           <HeadNote head={head} />
         </AdminAction>
+        <ParkAndAdvance side="redeem" mode={mode} head={head} />
       </Cards>
     </Sub>
   );
 }
 
 function Claims({ mode }: { mode: Mode }) {
-  const { reserve } = useLive();
+  const { reserve, ledger } = useLive();
   const c = reserve.config;
   const cap = claimCap(c, reserve.state, reserve.now);
+  const overCap = claimsTimeline(ledger, c.caps.maxClaimPerCall).filter((x) => x.stage === "needs_approval" || x.stage === "approved");
   return (
     <Sub id="money-claims" title="Claim payments" badge={<RoleTag role="operator" prefix="paid by the" />}>
       <Contexts>
@@ -241,17 +270,35 @@ function Claims({ mode }: { mode: Mode }) {
             return { kind: "set_config", caps };
           }}
           bound="BRS amounts"
-          does="Bound what the operator key can pay: per pay_claim and over any 31 days (a sliding window, ADR 0019). They bound a compromised key, not MUTAV's liability; a payment above them is the admin path below. The payout SLA lives in the operator platform, not in the program."
+          does="Bound what the operator key can pay: per pay_claim and over any 31 days (a sliding window, ADR 0019). They bound a compromised key, not MUTAV's liability; a payment above the per-call one needs the admin's approve_claim below. The payout SLA lives in the operator platform, not in the program."
         />
       </Cards>
-      <DataTable label="Planned claim path" head={["Instruction", "Signer", "What it will do", "Status"]}>
-        <tr aria-disabled="true" style={{ opacity: 0.6 }}>
-          <td>{m("pay_claim_admin")}</td>
-          <td><RoleTag role="admin" /></td>
-          <td style={{ whiteSpace: "normal" }}><span className="font-body" style={{ fontSize: 12 }}>Pays a claim above the operator&apos;s caps through a time-locked proposal (ADR 0012). Until it ships, MUTAV advances such a payment from its own funds.</span></td>
-          <td>{PLANNED}</td>
-        </tr>
-      </DataTable>
+      {overCap.length === 0 ? (
+        <Note>No filed claim above the operator&apos;s limit per payment ({fmtBrs(c.caps.maxClaimPerCall, 0)}).</Note>
+      ) : (
+        <Cards>
+          {overCap.map((x) => {
+            const refusal = claimCapRefusal(cap, x.provision, x.provision);
+            return (
+              <AdminAction
+                key={x.filing}
+                title={`Approve claim ${x.guaranteeId.slice(0, 8)}… · ${x.leg}`}
+                label="approve_claim"
+                mode={mode}
+                request={x.stage === "needs_approval" ? { kind: "approve_claim", guarantee: x.guarantee, filing: x.filing } : null}
+              >
+                <Facts
+                  now={m(`${CLAIM_STAGE_LABEL[x.stage]} · provision ${fmtBrs(x.provision)} · filed ${fmtTime(x.filedAt)}`)}
+                  bound={m(`amount = the provision · its revision · ${fmtBrs(cap.remaining, 0)} left of ${fmtBrs(cap.perPeriod, 0)} in the last 31 days`)}
+                  does="Approves the exact amount this claim pays above the operator's limit per payment (ADR 0021); the operator then sends pay_claim. The admin approves the amount, not the merits. Approved payments still count toward the 31-day cap."
+                />
+                {refusal && <Note tone="warn">The 31-day cap has {fmtBrs(cap.remaining)} left: pay_claim stays refused ({refusal}) until room frees up.</Note>}
+                <Note><Explorer value={x.filing} /></Note>
+              </AdminAction>
+            );
+          })}
+        </Cards>
+      )}
     </Sub>
   );
 }
