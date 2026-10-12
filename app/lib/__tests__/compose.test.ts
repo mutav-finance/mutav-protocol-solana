@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { address, type Address } from "@solana/kit";
 import { conversionNav, findIncomeInboxAddress, findIncomeReceiptPda, findReserveAddresses, getClearFulfilHaltInstructionDataDecoder, getFulfilDepositsInstructionDataDecoder, getSetConfigInstructionDataDecoder, navBoundsAround, publishedNav, coverageFromAccounts, identifyMutavInstruction, MutavInstruction, MUTAV_PROGRAM_ADDRESS, TOKEN_PROGRAM_ADDRESS } from "@mutav-finance/mutav-protocol-solana";
 import { fromHex } from "../serde";
-import { composeInstructions, DEFAULT_NAV_TOLERANCE_BPS, describeInstructions, queueSeqs, refuseOverlappingSetConfig, unsignedTransaction } from "../server/compose";
-import { assertRelayable, invokedPrograms, isFullySigned, RelayRefusedError } from "../server/relay";
+import { composeInstructions, COMPUTE_UNIT_LIMITS, DEFAULT_NAV_TOLERANCE_BPS, describeInstructions, MAX_COMPUTE_UNIT_LIMIT, queueSeqs, refuseOverlappingSetConfig, setComputeUnitLimitInstruction, SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT, unsignedTransaction, withComputeUnitLimit } from "../server/compose";
+import { assertRelayable, COMPUTE_BUDGET_PROGRAM, invokedPrograms, isFullySigned, RelayRefusedError } from "../server/relay";
 import type { ReserveView } from "../view";
 import { config, state } from "./fixtures";
 
@@ -229,6 +229,30 @@ describe("compose", () => {
     const policy = { mutav: MUTAV_PROGRAM_ADDRESS, squadsProgram: "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf", squadsMultisig: null };
     expect(() => assertRelayable(tx, policy)).toThrow(/not fully signed/);
     expect(() => assertRelayable(tx, { ...policy, mutav: WALLET })).toThrow(RelayRefusedError);
+  });
+
+  it("puts SetComputeUnitLimit first for the kinds that can come near 200k CU (opt-level z)", async () => {
+    const r = await reserve();
+    const fill = await composeInstructions({ kind: "fulfil_deposits", count: 8 }, WALLET, { reserve: r });
+    const ixs = withComputeUnitLimit({ kind: "fulfil_deposits", count: 8 }, fill);
+    expect(ixs).toHaveLength(fill.length + 1);
+    expect(ixs[0]!.programAddress).toBe(COMPUTE_BUDGET_PROGRAM);
+    // SetComputeUnitLimit = 2, then the u32 units.
+    expect(Array.from(ixs[0]!.data!)).toEqual([2, ...new Uint8Array(new Uint32Array([COMPUTE_UNIT_LIMITS.fulfil_deposits!]).buffer)]);
+    expect(ixs.slice(1)).toEqual(fill);
+    const tx = unsignedTransaction(WALLET, ixs, lifetime);
+    expect(invokedPrograms(tx)).toEqual([COMPUTE_BUDGET_PROGRAM, MUTAV_PROGRAM_ADDRESS]);
+    // Kinds well under the default go unchanged.
+    const claim = await composeInstructions({ kind: "claim_shares", seq: 3n }, WALLET, { reserve: r });
+    expect(withComputeUnitLimit({ kind: "claim_shares", seq: 3n }, claim)).toBe(claim);
+    for (const k of ["fulfil_deposits", "fulfil_redeems", "refresh", "set_config", "pay_claim"] as const) {
+      expect(COMPUTE_UNIT_LIMITS[k]).toBeGreaterThan(0);
+    }
+    for (const units of [...Object.values(COMPUTE_UNIT_LIMITS), SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT]) {
+      expect(units).toBeLessThanOrEqual(MAX_COMPUTE_UNIT_LIMIT);
+    }
+    expect(() => setComputeUnitLimitInstruction(MAX_COMPUTE_UNIT_LIMIT + 1)).toThrow(/compute-unit limit/);
+    expect(() => setComputeUnitLimitInstruction(0)).toThrow(/compute-unit limit/);
   });
 
   it("request_deposit and request_redeem carry the owner's price limits (0 = none)", async () => {

@@ -15,6 +15,7 @@ Read them in this order.
 | [Math reference](math-reference.md) | Coverage quantities (stable assets, required coverage, surplus, free capital), the underwater rule, NAV and share pricing, fee and income splits, the NAV-move guard, fill bounds and the sliding claim window, each with its rounding direction. |
 | [Client SDK](client-sdk.md) | `@mutav-finance/mutav-protocol-solana`: PDAs, reads, the math mirror, previews and instruction composers. It composes unsigned transactions only. |
 | [Deployment and operations](deployment-and-operations.md) | The guarded devnet deploy flow, post-deploy verification, upgrades, the `refresh` crank, monitoring and the runbooks. |
+| [Compute units](compute-units.md) | What each instruction costs at `opt-level = "z"` and `3`, directly and through Squads, and the `SetComputeUnitLimit` each composed transaction carries. |
 | [FAQ](faq.md) | Short answers to the questions integrators and reviewers ask most. |
 
 ## The system in one picture

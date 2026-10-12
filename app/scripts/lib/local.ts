@@ -52,6 +52,7 @@ export async function protocolLib() {
   const local = await import(join(p, "scripts/devnet/lib/local.ts"));
   const compose = await import(join(p, "scripts/devnet/lib/compose.ts"));
   const config = await import(join(p, "scripts/devnet/lib/config.ts"));
+  const compute = await import(join(p, "scripts/devnet/lib/compute.ts"));
   return {
     dir: p,
     programSo: join(p, "target", "deploy", "mutav.so"),
@@ -61,6 +62,8 @@ export async function protocolLib() {
     confirm: local.confirm as (rpc: unknown, sig: string, resend?: { wire: string; lastValidBlockHeight: bigint }) => Promise<void>,
     assertNoProcess: local.assertNoProcess as (pattern: string) => void,
     composeInitialize: compose.composeInitialize as (cfg: unknown, s: { upgradeAuthority: KeyPairSigner; payer: KeyPairSigner }) => Promise<Instruction>,
+    INITIALIZE_COMPUTE_UNIT_LIMIT: compute.INITIALIZE_COMPUTE_UNIT_LIMIT as number,
+    setComputeUnitLimitInstruction: compute.setComputeUnitLimitInstruction as (units: number) => Instruction,
     composeSetAllowlistRoot: compose.composeSetAllowlistRoot as (cfg: unknown, root: Uint8Array, admin: KeyPairSigner) => Promise<Instruction>,
     associatedTokenAddress: compose.associatedTokenAddress as (owner: Address, mint: Address) => Promise<Address>,
     TOKEN_PROGRAM: compose.TOKEN_PROGRAM as Address,

@@ -60,6 +60,7 @@
 * [Math reference](technical-resources/math-reference.md)
 * [Client SDK](technical-resources/client-sdk.md)
 * [Deployment and operations](technical-resources/deployment-and-operations.md)
+* [Compute units](technical-resources/compute-units.md)
 * [FAQ](technical-resources/faq.md)
 
 ## Research

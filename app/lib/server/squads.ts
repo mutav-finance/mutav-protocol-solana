@@ -8,6 +8,7 @@
  */
 import * as multisig from "@sqds/multisig";
 import {
+  ComputeBudgetProgram,
   Connection,
   PublicKey,
   TransactionInstruction,
@@ -26,6 +27,7 @@ import {
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
 import type { ServerEnv } from "./env";
+import { SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT } from "./compose";
 import { baselineCovers, isLiveProposal, parseBaselineMemo, setConfigFields, staleCarry, staleCarryText } from "../config-diff";
 import { decodeInstruction, foreignPrograms, newMoneyAccount, squadsConfigChange, tokenAccountFacts, type DecodeContext, type DecodedInstruction, type RawInstruction } from "../proposal-decode";
 import { bytesToHex } from "../serde";
@@ -315,7 +317,9 @@ export async function composeProposalAction(env: ServerEnv, member: string, inde
       await assertExecutable(env, member, index);
       if (config) await assertNoStaleCarry(env, index, config);
       const { instruction } = await multisig.instructions.vaultTransactionExecute({ connection: conn(env), ...args });
-      return unsigned(env, member, [instruction]);
+      // The inner instructions run inside this transaction: at opt-level "z"
+      // the larger ones pass the 200,000-CU default (compose.ts).
+      return unsigned(env, member, [ComputeBudgetProgram.setComputeUnitLimit({ units: SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT }), instruction]);
     }
   }
 }

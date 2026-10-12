@@ -58,6 +58,7 @@ import {
   TOKEN_PROGRAM,
 } from '../scripts/devnet/lib/compose';
 import { parseConfig } from '../scripts/devnet/lib/config';
+import { INITIALIZE_COMPUTE_UNIT_LIMIT, setComputeUnitLimitInstruction } from '../scripts/devnet/lib/compute';
 import { airdrop, assertNoProcess, LocalCluster, run, send, tempDir, type LocalRpc } from '../scripts/devnet/lib/local';
 import { deploy } from '../scripts/devnet/deploy';
 
@@ -182,7 +183,10 @@ export async function forkHappyPath(programKeypair?: string) {
 
     step('initialize with the real BRS mint (mint guard)');
     const sendAs = (s: TransactionSigner, ixs: Instruction[]) => send(rpc, s, ixs);
-    await sendAs(vault!, [await composeInitialize(cfg, { upgradeAuthority: vault!, payer: vault! })]);
+    await sendAs(vault!, [
+      setComputeUnitLimitInstruction(INITIALIZE_COMPUTE_UNIT_LIMIT),
+      await composeInitialize(cfg, { upgradeAuthority: vault!, payer: vault! }),
+    ]);
     const a = await findReserveAddresses(BRS_DEVNET_MINT, po);
     let r = await fetchReserve(rpc, BRS_DEVNET_MINT, po);
     check(r.config.data.reserveMint === BRS_DEVNET_MINT, 'initialized with the real BRS mint');
