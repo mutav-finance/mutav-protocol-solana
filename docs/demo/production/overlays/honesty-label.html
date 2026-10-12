@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Honesty label</title>
-<!-- Honesty label, bottom right above the caption zone. ?id=built|agency|pix|fees. One per shot besides the app banner.
+<!-- Honesty label, bottom right above the caption zone. ?id=built|agency|pix|mock. One per shot besides the app banner.
      1920x1080. Self-contained: inline CSS/JS, fonts as data: URIs (Geist, Inter, JetBrains Mono; SIL OFL).
      Query params: ?static (final state, no animation) · ?t=<ms> (freeze the in-animation at ms). -->
 <style>
@@ -68,7 +68,7 @@ var L={
  built:'Built during the hackathon<em>:</em> Solana program + reserve app',
  agency:'Agency platform <em>·</em> pre-hackathon <em>·</em> not on-chain yet',
  pix:'PIX transfer simulated on devnet <em>·</em> settlement recorded on-chain',
- fees:'Two months of fees, one step for the demo'
+ mock:'Mock BRS mint <em>·</em> local validator'
 };
 var id=new URLSearchParams(location.search).get('id')||'built';
 document.getElementById('t').innerHTML=L[id]||L.built;
