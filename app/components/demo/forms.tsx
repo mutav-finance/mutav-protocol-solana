@@ -193,6 +193,7 @@ export function RegisterForm({ onRefusedPreview, p = "", aside }: { onRefusedPre
                 last.confirmed(`Registered · ${ref}`)(signature, before);
               }}
               onDone={last.done}
+              predicted={preview && !preview.fits ? preview.refusal : null}
               refusal={preview ? { gate: { needed: preview.needed, stableAssets: preview.stableAssets, newCover: preview.newCover, maxCover: reserve.config.caps.maxCoverPerGuarantee } } : undefined}
               next={
                 <Button

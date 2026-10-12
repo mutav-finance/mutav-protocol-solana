@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALREADY_RECORDED, decodeProgramError, refusalLine } from "../tx-error";
+import { ALREADY_RECORDED, decodeProgramError, errorText, refusalLine } from "../tx-error";
 
 const R = (reais: number) => BigInt(reais) * 1_000_000n;
 
@@ -37,5 +37,34 @@ describe("refusalLine", () => {
     expect(refusalLine("InsufficientFreeCapital")).toBe("Refused by the program: not enough free capital for this cover.");
     expect(refusalLine("UnderCovered")).toMatch(/^Refused by the coverage gate: the reserve is under-covered/);
     expect(refusalLine("SomethingNew")).toBe("Refused by the program: SomethingNew.");
+  });
+});
+
+describe("wallet and simulation error shapes", () => {
+  const decode = (e: unknown) => decodeProgramError(errorText(e), null);
+  it("reads the hex form from a plain Error message", () => {
+    expect(decode(new Error("Transaction simulation failed: Error processing Instruction 1: custom program error: 0x1778"))).toBe("InsufficientFreeCapital");
+  });
+  it("reads the InstructionError JSON shape", () => {
+    expect(decode({ InstructionError: [1, { Custom: 6008 }] })).toBe("InsufficientFreeCapital");
+    expect(decode('{"InstructionError":[2,{"Custom":6008}]}')).toBe("InsufficientFreeCapital");
+  });
+  it("digs into Phantom / Wallet Standard error objects", () => {
+    expect(decode({ code: -32603, message: "Unexpected error", cause: new Error("custom program error: 0x1778") })).toBe("InsufficientFreeCapital");
+    expect(decode({ message: "Unexpected error", error: { InstructionError: [0, { Custom: 6008 }] } })).toBe("InsufficientFreeCapital");
+    expect(decode({ message: "Unexpected error", data: { err: { InstructionError: [0, { Custom: 6008 }] } } })).toBe("InsufficientFreeCapital");
+    expect(decode({ message: "Unexpected error", logs: ["Program log: AnchorError occurred. Error Code: InsufficientFreeCapital. Error Number: 6008."] })).toBe("InsufficientFreeCapital");
+    expect(decode({ message: "Unexpected error", data: { logs: ["Program X failed: custom program error: 0x1778"] } })).toBe("InsufficientFreeCapital");
+  });
+  it("names every MUTAV custom code, not only the console's", () => {
+    expect(decode(new Error("custom program error: 0x1785"))).toBe("NotAllowlisted");
+    expect(decode({ InstructionError: [0, { Custom: 6046 }] })).toBe("ClaimRevisionMismatch");
+    expect(decode({ InstructionError: [0, { Custom: 6026 }] })).toBe("PostCpiCheckFailed");
+  });
+  it("leaves a bare 'Unexpected error' undecoded and survives cycles", () => {
+    const e: Record<string, unknown> = { message: "Unexpected error" };
+    e.cause = e;
+    expect(decode(e)).toBeNull();
+    expect(errorText(e)).toContain("Unexpected error");
   });
 });

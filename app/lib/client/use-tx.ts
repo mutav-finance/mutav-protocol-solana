@@ -2,7 +2,7 @@
 import { useCallback, useState } from "react";
 import { useWallet } from "@/components/WalletProvider";
 import type { TxRequest } from "../tx-kinds";
-import { decodeProgramError } from "../tx-error";
+import { decodeProgramError, errorText } from "../tx-error";
 import { ApiError, getJson, postJson } from "./api";
 import { CLUSTER } from "./env";
 import { NOT_SEEN_HINT_SECS, notSeenText, transportFor, walletSendError } from "./transport";
@@ -37,7 +37,12 @@ export function useTx(onConfirmed?: (signature: string) => void) {
   const [state, setState] = useState<TxState>(IDLE);
 
   const runWith = useCallback(
-    async (build: () => Promise<{ tx: string; instructions?: TxInstructionInfo[]; proposalIndex?: bigint }>) => {
+    async (
+      build: () => Promise<{ tx: string; instructions?: TxInstructionInfo[]; proposalIndex?: bigint }>,
+      /** The refusal the preview predicts ("Send anyway"): named when the wallet's own simulation rejects without a decodable code. */
+      predicted?: string | null,
+    ) => {
+      let walletRejected = false;
       try {
         setState({ ...IDLE, phase: "building" });
         const built = await build();
@@ -47,7 +52,10 @@ export function useTx(onConfirmed?: (signature: string) => void) {
           try {
             signature = await signAndSendTransaction(built.tx);
           } catch (e) {
-            throw new Error(walletSendError((e as Error).message, CLUSTER));
+            // Wallets bury the program error in .cause/.error/.data/.logs; keep all of it for the decoder and Details.
+            const message = walletSendError(errorText(e) || (e as Error)?.message || String(e), CLUSTER);
+            walletRejected = message !== "The wallet declined the request.";
+            throw new Error(message);
           }
         } else {
           const signed = await signTransaction(built.tx);
@@ -71,7 +79,8 @@ export function useTx(onConfirmed?: (signature: string) => void) {
       } catch (e) {
         const logs = e instanceof ApiError ? e.logs : null;
         const message = (e as Error).message;
-        setState((s) => ({ ...s, phase: "failed", error: message, errorName: decodeProgramError(message, logs), logs }));
+        const errorName = decodeProgramError(message, logs) ?? (walletRejected && predicted ? predicted : null);
+        setState((s) => ({ ...s, phase: "failed", error: message, errorName, logs }));
         return null;
       }
     },
@@ -79,12 +88,12 @@ export function useTx(onConfirmed?: (signature: string) => void) {
   );
 
   const run = useCallback(
-    (request: TxRequest, via?: "squads" | "direct") => {
+    (request: TxRequest, via?: "squads" | "direct", predicted?: string | null) => {
       if (!address) {
         setState({ ...IDLE, phase: "failed", error: "Connect a wallet first." });
         return Promise.resolve(null);
       }
-      return runWith(() => postJson("/api/tx/build", { request, signer: address, via }));
+      return runWith(() => postJson("/api/tx/build", { request, signer: address, via }), predicted);
     },
     [address, runWith],
   );
