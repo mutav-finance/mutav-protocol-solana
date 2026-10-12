@@ -2,7 +2,7 @@
 
 Companion to the storyboard (`storyboard.html`); the two match.
 
-- **Runtime:** 2:08. **Voiceover:** 201 words, verbatim below. Three chapters, one per pitch pillar; five live clicks.
+- **Runtime:** 2:08. **Voiceover:** 199 words, verbatim below. Three chapters, one per pitch pillar; five live clicks.
 - **Recorded**, not live: silent clips (injected test wallet, no pop-ups), a rough cut with titles, timer and cards, then the VO recorded to the cut. Frames are tagged MAIN / FLASH / END STATE.
 - **Numbers:** v4 Plan B, unchanged (c = 0.25, 6× + 6× cover). Ana, agency names and lease references are fictional.
 - **Labels:** the #59 banner is the persistent badge and disclaimer; at most one more honesty label per shot.
@@ -22,18 +22,18 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 > **0:00 · Cold open** Ana wants to rent an apartment in Passo Fundo. Her landlord wants a guarantor. MUTAV is that guarantor, and its reserve runs on Solana.
 >
-> **0:10 · Agency** Her agency works in MUTAV's platform. Every lease it signs becomes an account on Solana.
+> **0:10 · Agency** Her agency works in MUTAV's platform; every lease becomes an account on-chain.
 >
 > **0:15 · 1 · Programmable, transparent reserve** Our operator puts Ana's lease on-chain: eighteen thousand reais of cover, an opaque ID, no personal data. Anyone can watch the reserve: what it holds in BRS, Nora's Brazilian real stablecoin, and what it must hold. The rule is code. One more lease would need forty-five thousand; the reserve holds forty-four. (click) Refused. MUTAV can't promise what its reserve can't back.
 >
-> **0:58 · 2 · Settled in minutes** Now say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the agency is recorded on-chain. Filed to settled in [N] minutes. Seguro-fiança allows up to thirty days.
+> **0:58 · 2 · Settled in minutes** Now say Ana misses a month. The operator files the claim, the reserve pays within the admin's cap, and the PIX to the agency is recorded on-chain. On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days.
 >
 > **1:36 · 3 · Capital efficiency** Because the reserve keeps a quarter of what it guarantees, every real of capital can back up to four in cover and earn its fees. Even after Ana's claim, each share is worth more. The same reserve that protects the landlord pays the people who fund it.
 >
 > **1:58 · Close** MUTAV: a transparent, programmable reserve, claims settled in minutes, capital that works. Brazil's onchain rent guarantee.
 >
 
-[N] = whole minutes from filed_at to settled_at in the real capture; fill in before recording the VO.
+[N] comes from the real on-chain timestamps (settled_at − filed_at on the ClaimFiling PDA); fill it in before recording the VO. Say "seconds" if it is under 2 minutes and "minutes" otherwise, and round down, never up. The line describes this on-chain run only; it does not claim real-world claims settle in seconds, since the operator checks each claim first (the pitch covers that).
 
 ## 3. Shot list
 
@@ -48,7 +48,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 **F2 · FLASH · Open · 0:10 – 0:15 · app.mutav.finance (agency view)**: Agency
 - **On screen:** Ana's fictional lease in the agency platform (mutav-app). Hard cuts in and out.
-- **VO:** "Her agency works in MUTAV's platform. Every lease it signs becomes an account on Solana."
+- **VO:** "Her agency works in MUTAV's platform; every lease becomes an account on-chain."
 - **Caption:** Agency platform · pre-hackathon · not on-chain yet
 - **Honesty label:** Agency platform · pre-hackathon · not on-chain yet
 - **Proof:** None: off-chain, labelled as such.
@@ -102,10 +102,10 @@ Companion to the storyboard (`storyboard.html`); the two match.
 
 **F8 · END STATE · 2 · Settled in minutes · 1:20 – 1:36 · /reserve/claims**: Filed → paid → settled
 - **On screen:** /reserve/claims: filed → paid → settled with on-chain timestamps; the timer stops at settled. Hold 3 s. Still covered: R$42,500 held, R$40,125 required.
-- **VO:** "Filed to settled in [N] minutes. Seguro-fiança allows up to thirty days."
-- **Caption:** Filed → settled: [N] · seguro-fiança: up to 30 days
+- **VO:** "On-chain, filed to settled in [N] seconds. Seguro-fiança allows up to thirty days."
+- **Caption:** On-chain, filed → settled: [N] s · seguro-fiança: up to 30 days
 - **Honesty label:** PIX transfer simulated on devnet · settlement recorded on-chain
-- **Proof:** Timestamps from the ClaimFiling PDA. [N] = settled_at − filed_at; if under two minutes, say "under [N] minutes" or the seconds.
+- **Proof:** Timestamps from the ClaimFiling PDA. [N] = settled_at − filed_at, from the real on-chain timestamps; the unit is "seconds" if under 2 minutes, "minutes" otherwise. Do not claim real-world claims settle in seconds: the operator checks each claim first.
 - **Edit:** SUSEP Circ. 621/2021 art. 43 goes in the video description.
 - **Retake:** Read-only: repeat freely.
 
@@ -167,7 +167,7 @@ Companion to the storyboard (`storyboard.html`); the two match.
 | 5 | pay_claim R$1,500 (operator) | R$42,500 | R$40,125 | R$2,375 | 0.965909 | (b) still covered; (e) ≤ R$15k/call, ≤ R$20k/31 days |
 | 6 | contribute_fees R$3,060 gross = 17 lease-months × 12% × R$1,500; take R$612 → treasury, R$2,448 → reserve (operator) | R$44,948 | R$40,125 | R$4,823 | 1.021545 | (c) above the deposit value |
 | 7 | Wallet B redeems 4,000 shares → R$4,086.18 (Squads fill, then claim_assets) | R$40,861.82 | R$40,125 | R$736.82 | 1.021545 | (d) ≤ free R$4,823; ≥ R$1k; whole fill; still covered |
-| 6b (optional) | sweep_income R$357.90: one month of issuer revenue at 70% of CDI (9.555% a year ÷ 12) on R$44,948, simulated on devnet | R$45,305.90 | R$40,125 | R$5,180.90 | 1.029680 | B would receive R$4,118.72 |
+| 6b (optional) | sweep_income R$357.90: one month of issuer revenue on R$44,948, simulated on devnet | R$45,305.90 | R$40,125 | R$5,180.90 | 1.029680 | B would receive R$4,118.72 |
 
 Two months of fees: one month beats a one-month-rent claim only with more than 10.4 leases (0.8 × 0.12 × N > 1), and the ≈ R$50k of devnet BRS in hand holds 9 at c = 0.25. Devnet BRS needed ≈ R$47,060.
 
@@ -248,7 +248,7 @@ No restore is needed: the reserve stays covered (free capital R$736.82 at the en
 | NAV not published | F11 | Send refresh (permissionless) before capturing. |
 | Withdrawal not filled | off camera | Check mode Normal, not paused, no fulfil halt, free ≥ R$4,086.18 before the fill. A frozen redemption shows "pending" with an amber note. |
 | Over 2:10 | edit | Trim F5 and F8 (−2 s each); never trim the F6 silence. |
-| Claim under two minutes | F8 | If settled_at − filed_at < 2 min, say "in under [N] minutes" or the seconds; never round up a promise. |
+| Claim under two minutes | F8 | [N] from settled_at − filed_at: "seconds" if under 2 min, "minutes" otherwise; round down, never up. Say it is the on-chain run, not real-world operations. |
 
 ## 10. What judges will see afterwards
 

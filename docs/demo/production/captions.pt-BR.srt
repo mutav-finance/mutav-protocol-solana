@@ -1,0 +1,121 @@
+1
+00:00:00,300 --> 00:00:03,400
+Ana quer alugar um apartamento
+em Passo Fundo.
+
+2
+00:00:03,600 --> 00:00:05,600
+O proprietário pede um fiador.
+
+3
+00:00:05,800 --> 00:00:09,800
+A MUTAV é esse fiador,
+e a reserva dela roda na Solana.
+
+4
+00:00:10,100 --> 00:00:14,900
+A imobiliária usa a plataforma da MUTAV;
+cada contrato vira uma conta on-chain.
+
+5
+00:00:17,000 --> 00:00:20,600
+Nosso operador leva o contrato da Ana
+on-chain: R$ 18 mil de cobertura,
+
+6
+00:00:20,600 --> 00:00:24,500
+um ID opaco, nenhum dado pessoal.
+
+7
+00:00:27,300 --> 00:00:31,200
+Qualquer pessoa acompanha a reserva:
+quanto ela tem em BRS,
+
+8
+00:00:31,200 --> 00:00:35,000
+a stablecoin de real da Nora,
+e quanto ela precisa ter.
+
+9
+00:00:35,400 --> 00:00:36,900
+A regra é código.
+
+10
+00:00:38,000 --> 00:00:43,000
+Mais um contrato exigiria R$ 45 mil;
+a reserva tem R$ 44 mil.
+
+11
+00:00:45,600 --> 00:00:46,400
+Recusado.
+
+12
+00:00:46,800 --> 00:00:50,000
+A MUTAV não promete o que
+a reserva não consegue lastrear.
+
+13
+00:00:59,400 --> 00:01:01,800
+Agora, digamos que a Ana atrase um mês.
+
+14
+00:01:02,400 --> 00:01:04,600
+O operador registra o pedido,
+
+15
+00:01:06,400 --> 00:01:09,600
+a reserva paga dentro
+do limite definido pelo admin,
+
+16
+00:01:11,400 --> 00:01:15,600
+e o PIX para a imobiliária
+fica registrado on-chain.
+
+17
+00:01:21,000 --> 00:01:24,400
+On-chain, do pedido à liquidação
+em [N] segundos.
+
+18
+00:01:24,800 --> 00:01:28,200
+O seguro-fiança permite
+até trinta dias.
+
+19
+00:01:36,400 --> 00:01:40,200
+Como a reserva guarda um quarto
+do que garante,
+
+20
+00:01:40,200 --> 00:01:44,900
+cada real de capital sustenta
+até quatro de cobertura
+
+21
+00:01:44,900 --> 00:01:46,600
+e recebe as taxas de garantia.
+
+22
+00:01:47,200 --> 00:01:51,400
+Mesmo depois do pedido da Ana,
+cada cota vale mais.
+
+23
+00:01:52,000 --> 00:01:57,400
+A mesma reserva que protege
+o proprietário paga quem a financia.
+
+24
+00:01:58,400 --> 00:02:00,800
+MUTAV: uma reserva transparente
+e programável,
+
+25
+00:02:00,800 --> 00:02:03,600
+pedidos liquidados em minutos,
+capital que trabalha.
+
+26
+00:02:04,200 --> 00:02:06,400
+A garantia de aluguel onchain do Brasil.
