@@ -11,6 +11,7 @@ import {
   compileTransaction,
   createNoopSigner,
   createTransactionMessage,
+  fetchEncodedAccount,
   getAddressEncoder,
   getBase64EncodedWireTransaction,
   getProgramDerivedAddress,
@@ -117,6 +118,14 @@ export async function associatedTokenAddress(owner: Address, mint: Address, toke
   return ata;
 }
 
+/** SPL token account `amount`: u64 LE at [64..72); null when the account does not exist. */
+export async function tokenAmount(env: ServerEnv, account: Address): Promise<bigint | null> {
+  const a = await fetchEncodedAccount(rpcFor(env), account, READ);
+  if (!a.exists || (a.data as Uint8Array).length < 72) return null;
+  const d = a.data as Uint8Array;
+  return new DataView(d.buffer, d.byteOffset, d.byteLength).getBigUint64(64, true);
+}
+
 /** Associated Token Account program `CreateIdempotent` (instruction 1). */
 export async function createAtaIdempotent(payer: Address, owner: Address, mint: Address, tokenProgram: Address = TOKEN_PROGRAM): Promise<Instruction> {
   return {
@@ -154,6 +163,12 @@ export type ComposeContext = {
   ledger?: Partial<Pick<Ledger, "deposits" | "redeems" | "filings">>;
   /** Allowlisted owners, to build the Merkle proof for `request_deposit` / `request_redeem`. */
   allowlist?: string[];
+  /**
+   * `request_redeem` only: the balance of the signer's share associated token
+   * account (null = no account). Left out, compose reads that same account
+   * (the one the instruction passes as `owner_shares`); tests inject it.
+   */
+  ownerShares?: bigint | null;
   /** Server env for re-reads (defaults to process.env). */
   env?: ServerEnv;
 };
@@ -397,7 +412,13 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
       ];
     }
     case "request_redeem": {
-      const proof = await allowlistProof(ctx, signerAddress);
+      // Entry is gated, exit is not (ADR 0023): the program checks eligibility
+      // only when the owner's share account is empty (request_redeem.rs), so
+      // a holder sends an empty proof, listed or not. The balance is read from
+      // the same account the instruction passes as `owner_shares`.
+      const ownerShares = await associatedTokenAddress(signerAddress, a.shareMint);
+      const held = ctx.ownerShares !== undefined ? ctx.ownerShares : await tokenAmount(ctx.env ?? serverEnv(), ownerShares);
+      const proof = (held ?? 0n) > 0n ? [] : await allowlistProof(ctx, signerAddress);
       const seq = r.state.nextRedeemSeq;
       return [
         getRequestRedeemInstruction(
@@ -406,7 +427,7 @@ export async function composeInstructions(req: TxRequest, signerAddress: Address
             owner: signer,
             state: a.state,
             redeemRequest: (await findRedeemRequestPda({ config, seq }, o))[0],
-            ownerShares: await associatedTokenAddress(signerAddress, a.shareMint),
+            ownerShares,
             pendingRedemptions: a.pendingRedemptions,
             shareMint: a.shareMint,
             shareTokenProgram: TOKEN_PROGRAM,

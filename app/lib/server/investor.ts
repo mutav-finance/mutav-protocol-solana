@@ -32,7 +32,7 @@ export type InvestorView = {
 };
 
 /** SPL token account `amount`: u64 LE at [64..72). */
-function tokenAmount(a: MaybeEncodedAccount): bigint | null {
+function encodedTokenAmount(a: MaybeEncodedAccount): bigint | null {
   if (!a.exists || (a.data as Uint8Array).length < 72) return null;
   const d = a.data as Uint8Array;
   return new DataView(d.buffer, d.byteOffset, d.byteLength).getBigUint64(64, true);
@@ -55,8 +55,8 @@ export async function readInvestor(env: ServerEnv, r: ReserveView, ownerParam: s
     // Both token accounts in one getMultipleAccounts.
     fetchEncodedAccounts(rpcFor(env), [brsAta, shareAta], READ),
   ]);
-  const brs = tokenAmount(brsAcc!);
-  const shares = tokenAmount(shareAcc!);
+  const brs = encodedTokenAmount(brsAcc!);
+  const shares = encodedTokenAmount(shareAcc!);
   return {
     owner,
     allowlist: { state: check.state, ...base },

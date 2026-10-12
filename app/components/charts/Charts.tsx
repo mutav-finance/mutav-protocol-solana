@@ -24,13 +24,13 @@ const short = (hex: string) => `${hex.slice(0, 8)}…`;
 
 export function ChartFrame({ title, caption, legend, children, id }: { title: string; caption: ReactNode; legend?: ReactNode; children: ReactNode; id?: string }) {
   return (
-    <figure id={id} aria-label={title} style={{ margin: 0, border: "1px solid var(--color-border)", background: "var(--color-surface)", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-        <p className="font-body" style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{title}</p>
+    <figure id={id} aria-label={title} className="bg-(--color-surface) m-0 flex min-w-0 flex-col gap-4 border p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <p className="font-body text-(--color-text-2) m-0 text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>{title}</p>
         {legend}
       </div>
       {children}
-      <figcaption className="font-body" style={{ fontSize: 11, color: "var(--color-text-3)", lineHeight: 1.5 }}>
+      <figcaption className="font-body text-(--color-text-3) text-2xs leading-relaxed">
         {caption}
       </figcaption>
     </figure>
@@ -39,7 +39,7 @@ export function ChartFrame({ title, caption, legend, children, id }: { title: st
 
 export function Swatch({ color, label, outline }: { color: string; label: string; outline?: boolean }) {
   return (
-    <span className="font-mono" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--color-text-2)" }}>
+    <span className="font-body" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--color-text-2)", fontVariantNumeric: "tabular-nums" }}>
       <span aria-hidden="true" style={{ width: 10, height: 10, background: outline ? "transparent" : color, border: outline ? `1px solid ${color}` : undefined, display: "inline-block" }} />
       {label}
     </span>
@@ -48,10 +48,10 @@ export function Swatch({ color, label, outline }: { color: string; label: string
 
 export const Legend = ({ children }: { children: ReactNode }) => <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>{children}</div>;
 
-type Seg = { f: number; color: string; outline?: boolean };
+export type Seg = { f: number; color: string; outline?: boolean };
 
 /** A bar track: segments laid left to right with a 2px surface gap between them. */
-function Track({ segs, height = 12, align = "left", marker }: { segs: Seg[]; height?: number; align?: "left" | "right"; marker?: { f: number; label: string } }) {
+export function Track({ segs, height = 12, align = "left", marker }: { segs: Seg[]; height?: number; align?: "left" | "right"; marker?: { f: number; label: string } }) {
   const shown = segs.filter((s) => s.f > 0);
   return (
     <div style={{ position: "relative", height, display: "flex", justifyContent: align === "right" ? "flex-end" : "flex-start", minWidth: 0 }}>
@@ -71,14 +71,14 @@ function Track({ segs, height = 12, align = "left", marker }: { segs: Seg[]; hei
         />
       ))}
       {marker && (
-        <div aria-hidden="true" title={marker.label} style={{ position: "absolute", left: pct(marker.f), top: -4, bottom: -4, borderLeft: "1px dashed var(--color-text-2)" }} />
+        <div aria-hidden="true" title={marker.label} style={{ position: "absolute", left: pct(marker.f), top: -4, bottom: -4, borderLeft: "1px solid var(--color-text-2)" }} />
       )}
     </div>
   );
 }
 
 /** One chart row: label | track | value. Focusable; the summary is its accessible name and hover title. */
-function Row({ label, value, summary, children, labelWidth = 170 }: { label: ReactNode; value: ReactNode; summary: string; children: ReactNode; labelWidth?: number }) {
+export function Row({ label, value, summary, children, labelWidth = 170 }: { label: ReactNode; value: ReactNode; summary: string; children: ReactNode; labelWidth?: number }) {
   return (
     <div className="chart-row" tabIndex={0} role="img" aria-label={summary} title={summary} style={{ ["--label-w" as string]: `${labelWidth}px` }}>
       <div className="chart-row-label">{label}</div>
@@ -88,7 +88,7 @@ function Row({ label, value, summary, children, labelWidth = 170 }: { label: Rea
   );
 }
 
-const RowLabel = ({ children, sub }: { children: ReactNode; sub?: ReactNode }) => (
+export const RowLabel = ({ children, sub }: { children: ReactNode; sub?: ReactNode }) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
     <span className="font-body" style={{ fontSize: 12, color: "var(--color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{children}</span>
     {sub}
@@ -97,7 +97,8 @@ const RowLabel = ({ children, sub }: { children: ReactNode; sub?: ReactNode }) =
 
 // ── Coverage vs the reserve ─────────────────────────────────────────────────
 
-const C = {
+/** Chart palette (brand tokens). */
+export const C = {
   ink: "var(--color-chart-1)",
   mid: "var(--color-chart-2)",
   good: "var(--color-success)",
@@ -143,7 +144,7 @@ export function CoverageChart({ s, ratioBps, compact = false }: { s: Pick<Covera
         {rows}
         <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           {legend}
-          <Mono style={{ fontSize: 11, color: m.underCovered ? "var(--color-error)" : "var(--color-text-3)" }}>{verdict}</Mono>
+          <span className="font-body" style={{ fontSize: 11, color: m.underCovered ? "var(--color-error)" : "var(--color-text-3)", fontVariantNumeric: "tabular-nums" }}>{verdict}</span>
         </div>
       </div>
     );
@@ -229,7 +230,7 @@ export function ClaimSpeedChart({ rows, now }: { rows: ClaimRow[]; now: bigint }
   if (claims.length === 0) return null;
   const panel = (title: string, axis: bigint, pick: (c: (typeof claims)[number]) => { v: bigint | null; seg: Seg | null; text: string }, marker?: { f: number; label: string }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
-      <p className="font-mono" style={{ fontSize: 11, color: "var(--color-text-2)", margin: 0, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+      <p className="font-body" style={{ fontSize: 11, color: "var(--color-text-2)", margin: 0, letterSpacing: "0.06em", textTransform: "uppercase", fontVariantNumeric: "tabular-nums" }}>
         {title} <span style={{ color: "var(--color-text-3)" }}>· axis 0 – {fmtDuration(axis)}</span>
       </p>
       {claims.map((c) => {
@@ -335,7 +336,7 @@ export function ClaimCapChart({ cap }: { cap: ClaimCap }) {
           <Swatch color={C.mid} label="max per call" />
         </Legend>
       }
-      caption={<>{window} From VaultState.claim_period_start / claim_period_paid and caps.max_claim_per_period / max_claim_per_call / claim_period_secs ({fmtDuration(cap.periodSecs)}), set by the Reserve Admin. Largest pay_claim the caps allow now: {fmtBrs(cap.maxNextPayment)}.</>}
+      caption={<>{window} Largest pay_claim the caps allow now: {fmtBrs(cap.maxNextPayment)}.</>}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Row label={<RowLabel>Per period</RowLabel>} value={`${fmtBrs(cap.paid, 0)} / ${fmtBrs(cap.perPeriod, 0)}`} summary={`Paid ${fmtBrs(cap.paid)} of the ${fmtBrs(cap.perPeriod)} period cap; ${fmtBrs(cap.remaining)} left.`} labelWidth={130}>
@@ -353,7 +354,7 @@ export function ClaimCapChart({ cap }: { cap: ClaimCap }) {
 
 /**
  * What the reserve holds, on one axis: BRS (the settlement token, left) and
- * any adapter assets (right) make up stable assets; the dashed marker is the
+ * any adapter assets (right) make up stable assets; the vertical marker is the
  * settlement floor (ADR 0018), and BRS must reach past it. In the pilot that
  * is BRS only with a 100% floor. The income inbox is drawn outlined on its own
  * row because it counts toward nothing until the operator sweeps it.
@@ -374,22 +375,22 @@ export function CompositionChart({ c }: { c: Composition }) {
       }
       caption={
         <>
-          Stable assets = brs_balance{c.brsOnly ? "" : " + adapter value at the bounded price"}, from VaultState; {c.brsOnly ? "the pilot reserve holds BRS only (ADR 0018). " : ""}The dashed line is the settlement floor, the minimum held in BRS ({fmtPct(c.floorBps)} = {fmtBrs(c.floorValue, 0)}, set by the Reserve Admin); adapters may use only the share above it. The inbox is the vault authority&apos;s BRS account.
+          Stable assets = brs_balance{c.brsOnly ? "" : " + adapter value at the bounded price"}, from VaultState; {c.brsOnly ? "the pilot reserve holds BRS only (ADR 0018). " : ""}The vertical line is the settlement floor, the minimum held in BRS ({fmtPct(c.floorBps)} = {fmtBrs(c.floorValue, 0)}, set by the Reserve Admin); adapters may use only the share above it. The inbox is the vault authority&apos;s BRS account.
         </>
       }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Row
-          label={<RowLabel sub={<Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>{c.brsOnly ? "100% BRS (pilot)" : `BRS ${share(c.brsShareBps)} · adapters ${share(c.adapterShareBps)}`}</Mono>}>{c.brsOnly ? "BRS in reserve" : "Counted (stable assets)"}</RowLabel>}
+          label={<RowLabel sub={<span className="font-body" style={{ fontSize: 11, color: "var(--color-text-3)", fontVariantNumeric: "tabular-nums" }}>{c.brsOnly ? "100% BRS (pilot)" : `BRS ${share(c.brsShareBps)} · adapters ${share(c.adapterShareBps)}`}</span>}>{c.brsOnly ? "BRS in reserve" : "Counted (stable assets)"}</RowLabel>}
           value={fmtBrs(c.stableAssets, 0)}
           summary={`Stable assets ${fmtBrs(c.stableAssets)}: BRS ${fmtBrs(c.brs)}${c.brsOnly ? "" : `, through adapters ${fmtBrs(c.adapterValue)}`}. ${floor}.`}
           labelWidth={190}
         >
           <Track segs={[{ f: frac(c.brs, axis), color: c.belowFloor ? C.bad : C.ink }, { f: frac(c.adapterValue, axis), color: C.mid }]} marker={{ f: frac(c.floorValue, axis), label: floor }} />
         </Row>
-        <Mono style={{ fontSize: 11, color: c.belowFloor ? "var(--color-error)" : "var(--color-text-3)", alignSelf: "flex-end" }}>
+        <span className="font-body" style={{ fontSize: 11, color: c.belowFloor ? "var(--color-error)" : "var(--color-text-3)", alignSelf: "flex-end", fontVariantNumeric: "tabular-nums" }}>
           ┆ {floor}{c.belowFloor ? " · BRS is below it" : ""}
-        </Mono>
+        </span>
         <Row
           label={<RowLabel sub={<RoleTag role="operator" prefix="swept by the" />}>Income inbox</RowLabel>}
           value={fmtBrs(c.inbox, 0)}

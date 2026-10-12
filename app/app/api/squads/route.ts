@@ -6,10 +6,12 @@ import { cachedRead, isFresh } from "@/lib/server/read-cache";
 import { boundedBody } from "@/lib/server/relay";
 import { composeProposalAction, readMultisig, vaultAddress, type ProposalAction } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
+import { MockChainError, mockEnabled, mockSquads } from "@/lib/server/mock";
 
 /** The admin multisig and its recent proposals, or why there is none. */
 export async function GET(req: Request) {
   try {
+    if (mockEnabled()) return jsonResponse(await mockSquads());
     const env = await guardedEnv();
     return readResponse(
       await cachedRead("squads", async () => {
@@ -30,6 +32,7 @@ const ACTIONS: readonly ProposalAction[] = ["approve", "reject", "cancel", "exec
 /** Compose an unsigned approve, reject, cancel or execute transaction for a member's wallet. */
 export async function POST(req: Request) {
   try {
+    if (mockEnabled()) throw new MockChainError();
     const body = decode<{ action: ProposalAction; index: bigint; member: string }>(await boundedBody(req));
     if (!ACTIONS.includes(body.action)) throw new ComposeError(`unknown action ${String(body.action)}`);
     if (typeof body.index !== "bigint" || body.index < 1n) throw new ComposeError("index must be a proposal index");

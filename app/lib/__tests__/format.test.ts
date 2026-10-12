@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtBps, fmtBrs, fmtDuration, fmtNav, fmtPct, fmtRatio, fmtShares, fmtTime, fmtUnits, parseBrs, shortAddr } from "../format";
+import { brsToUsd, fmtBps, fmtBrs, fmtFxDate, fmtUsd, fmtUsdHint, fxSourceLine, toScaledRate, fmtDuration, fmtNav, fmtPct, fmtRatio, fmtShares, fmtTime, fmtUnits, parseBrs, shortAddr } from "../format";
 
 describe("format", () => {
   it("formats BRS with grouping and truncation", () => {
@@ -42,5 +42,50 @@ describe("format", () => {
 describe("fmtPct", () => {
   it("prints whole and fractional percentages without trailing zeros", () => {
     expect([fmtPct(10_000), fmtPct(5_000), fmtPct(2_550), fmtPct(0)]).toEqual(["100%", "50%", "25.5%", "0%"]);
+  });
+});
+
+describe("fmtUsd", () => {
+  it("converts BRS at the USD/BRL rate, truncating", () => {
+    expect(brsToUsd(5_400_000n, 5_400_000n)).toBe(1_000_000n);
+    expect(fmtUsd(58_700_000_000n, 5_400_000n)).toBe("US$ 10,870.37");
+    expect(fmtUsd(1n, 5_400_000n)).toBe("US$ 0.00");
+  });
+});
+
+describe("US$ hint", () => {
+  it("scales a rate to a bigint whatever form it arrives in", () => {
+    expect(toScaledRate(4_989_200n)).toBe(4_989_200n);
+    expect(toScaledRate(4.9892)).toBe(4_989_200n);
+    expect(toScaledRate("5.40")).toBe(5_400_000n);
+    for (const bad of [0, -1, NaN, Infinity, "x", null, undefined, 0n, {}]) expect(toScaledRate(bad)).toBeNull();
+  });
+
+  it("formats with a bigint rate", () => {
+    expect(fmtUsdHint(58_700_000_000n, 5_400_000n)).toBe("≈ US$ 10,870.37");
+  });
+
+  it("formats with a numeric rate (no BigInt/number mixing)", () => {
+    expect(fmtUsdHint(58_700_000_000n, 5.4)).toBe("≈ US$ 10,870.37");
+    expect(fmtUsdHint(4_989_200n, 4.9892)).toBe("≈ US$ 1.00");
+  });
+
+  it("carries a sign, given or from a negative amount", () => {
+    expect(fmtUsdHint(5_400_000n, 5_400_000n, "+")).toBe("≈ +US$ 1.00");
+    expect(fmtUsdHint(5_400_000n, 5_400_000n, "−")).toBe("≈ −US$ 1.00");
+    expect(fmtUsdHint(-5_400_000n, 5_400_000n)).toBe("≈ −US$ 1.00");
+  });
+
+  it("is empty without a usable rate", () => {
+    expect(fmtUsdHint(5_400_000n, null)).toBe("");
+    expect(fmtUsdHint(5_400_000n, 0)).toBe("");
+  });
+
+  it("writes the source line with the quote's own date", () => {
+    expect(fmtFxDate("2026-10-09T13:07:30-03:00")).toBe("09/10/2026");
+    expect(fxSourceLine({ source: "PTAX/BCB", asOf: "2026-10-09T13:07:30-03:00" })).toBe(
+      "US$ at PTAX (Banco Central do Brasil), 09/10/2026. Display only; the reserve holds BRS.",
+    );
+    expect(fxSourceLine({ source: "mock rate", asOf: "2026-10-12T10:00:00-03:00" })).toBe("US$ at mock rate, 12/10/2026. Display only; the reserve holds BRS.");
   });
 });
