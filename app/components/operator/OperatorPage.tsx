@@ -112,7 +112,7 @@ function SettleBound() {
   const paid = claimsTimeline(ledger).filter((c) => c.stage === "paid");
   return (
     <Bound>
-      {paid.length === 0 && <span>No paid claim waiting for settlement.</span>}
+      {paid.length === 0 && <span>No paid claim waiting for settlement. </span>}
       {paid.map((p) => kv(`${p.guaranteeId.slice(0, 8)}… ${p.leg} · ${fmtBrs(p.amount ?? 0n, 0)}`, <span>paid {p.paidAt !== null ? fmtTime(p.paidAt) : "—"}</span>))}
       <span>The program sets no settlement deadline: the payout SLA is the operator platform&apos;s (ADR 0019).</span>
     </Bound>

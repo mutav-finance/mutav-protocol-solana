@@ -90,11 +90,11 @@ export function snapshot(r: ReserveView): Snap {
   const s = r.state;
   const sol = r.coverage;
   return {
-    "Stable assets": { v: sol.stableAssets, fmt: fmtBrs as never },
+    "Reserve balance": { v: sol.stableAssets, fmt: fmtBrs as never },
     "Coverage required": { v: sol.coverageRequired, fmt: fmtBrs as never },
     "Free capital": { v: sol.freeCapital, fmt: fmtBrs as never },
-    "Open provisions": { v: s.provisions, fmt: fmtBrs as never },
-    "NAV per share (from accounts)": { v: navPerShare(sol.netAssets, s.sharesOutstanding), fmt: fmtNav as never },
+    "Set aside for claims": { v: s.provisions, fmt: fmtBrs as never },
+    "Share price (live, from accounts)": { v: navPerShare(sol.netAssets, s.sharesOutstanding), fmt: fmtNav as never },
     "Shares outstanding": { v: s.sharesOutstanding, fmt: fmtShares as never },
     "Active guarantees": { v: s.activeGuarantees, fmt: String as never },
     "Fee take to treasury (total)": { v: s.feeTakeTotal, fmt: fmtBrs as never },

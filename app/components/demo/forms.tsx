@@ -151,7 +151,7 @@ export function RegisterForm({ onRefusedPreview, p = "" }: { onRefusedPreview?: 
             {kv("New cover", fmtBrs(preview.newCover))}
             {kv("Free capital before", fmtBrs(preview.freeCapitalBefore))}
             {kv("Coverage required after", `${fmtBrs(preview.coverageRequiredAfter)} (${fmtBps(reserve.config.coverageRatioBps)} of cover)`)}
-            {kv("Stable assets", fmtBrs(preview.stableAssets))}
+            {kv("Reserve balance", fmtBrs(preview.stableAssets))}
             {kv("Headroom after", fmtBrs(preview.headroomAfter < 0n ? -preview.headroomAfter : preview.headroomAfter), preview.headroomAfter < 0n ? "var(--color-error)" : "var(--color-success)")}
           </div>
         </PreviewBox>
