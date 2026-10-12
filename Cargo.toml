@@ -18,6 +18,11 @@ anchor-lang = "1.2.0"
 anchor-spl = { version = "1.2.0", default-features = false, features = ["token", "token_2022"] }
 
 [profile.release]
+# Size over speed: about 229 KB smaller than opt-level 3, so about 1.16 SOL
+# less locked in ProgramData, for 25-95% more compute units per instruction.
+# The off-chain composers set explicit compute-unit limits to cover it; see
+# docs/technical-resources/compute-units.md.
+opt-level = "z"
 overflow-checks = true
 lto = "fat"
 codegen-units = 1
