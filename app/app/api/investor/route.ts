@@ -1,4 +1,4 @@
-import { guardedEnv, readReserve } from "@/lib/server/chain";
+import { guardedEnv, readReserveShared } from "@/lib/server/chain";
 import { readInvestor } from "@/lib/server/investor";
 import { errorResponse, readResponse } from "@/lib/server/respond";
 import { cachedInvestorRead, isFresh } from "@/lib/server/read-cache";
@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     const owner = parseOwner(new URL(req.url).searchParams.get("owner"));
     if (owner === undefined) return jsonResponse({ error: "owner must be a wallet address" }, { status: 400 });
     const env = await guardedEnv();
-    return readResponse(await cachedInvestorRead(owner, async () => readInvestor(env, await readReserve(env), owner), { fresh: isFresh(req) }));
+    return readResponse(await cachedInvestorRead(owner, async () => readInvestor(env, await readReserveShared(env, { fresh: isFresh(req) }), owner), { fresh: isFresh(req) }));
   } catch (e) {
     return errorResponse(e);
   }

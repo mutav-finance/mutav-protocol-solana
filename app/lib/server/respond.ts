@@ -4,6 +4,8 @@ import { NotConfiguredError } from "./chain";
 import { RelayRefusedError } from "./relay";
 import { ComposeError } from "./compose";
 import { ProposalRefusedError, StaleCarryError } from "./squads";
+import type { Cached } from "./read-cache";
+import { isUpstreamError, retryAfterMs } from "./rpc-retry";
 
 /**
  * A2: public read routes are cached at the CDN for 3 s and served stale for
@@ -12,7 +14,20 @@ import { ProposalRefusedError, StaleCarryError } from "./squads";
  */
 export const READ_CACHE = "public, s-maxage=3, stale-while-revalidate=10";
 
-export const readResponse = (value: unknown) => jsonResponse(value, { headers: { "cache-control": READ_CACHE } });
+/** Seconds a client should wait before asking again while the RPC is busy. */
+export const BUSY_RETRY_AFTER_S = 5;
+
+/**
+ * A read route's answer. A stale value (the RPC was busy; this is the last
+ * good read) says so in `x-chain-stale: true` and `x-chain-read-at` (ms since
+ * epoch), and the CDN keeps it for 1 s only.
+ */
+export const readResponse = ({ value, stale, at }: Cached<unknown>) =>
+  jsonResponse(value, {
+    headers: stale
+      ? { "cache-control": "public, s-maxage=1", "x-chain-stale": "true", "x-chain-read-at": String(at), "retry-after": String(BUSY_RETRY_AFTER_S) }
+      : { "cache-control": READ_CACHE },
+  });
 
 /**
  * Map an error to a JSON response; never leaks a stack, and every URL in the
@@ -28,5 +43,13 @@ export function errorResponse(e: unknown): Response {
   if (e instanceof MainnetRefusedError || e instanceof RelayRefusedError) return jsonResponse({ error: message }, { status: 403 });
   if (e instanceof ComposeError || e instanceof ProposalRefusedError) return jsonResponse({ error: message }, { status: 400 });
   if (e instanceof StaleCarryError) return jsonResponse({ error: message }, { status: 409 });
+  // The RPC is rate limiting or unreachable: a retryable 503, not a broken gateway.
+  if (isUpstreamError(e)) {
+    const retryAfter = Math.max(BUSY_RETRY_AFTER_S, Math.ceil((retryAfterMs(e) ?? 0) / 1000));
+    return jsonResponse(
+      { error: "Chain busy: the RPC is rate limiting, retrying shortly", busy: true, retryAfter },
+      { status: 503, headers: { "retry-after": String(retryAfter) } },
+    );
+  }
   return jsonResponse({ error: message, logs: logs ?? null }, { status: 502 });
 }

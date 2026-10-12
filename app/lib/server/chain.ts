@@ -3,7 +3,11 @@
  * decoders and PDA helpers. Read-only: nothing here signs or sends.
  */
 import {
+  assertAccountExists,
+  createDefaultRpcTransport,
   createSolanaRpc,
+  createSolanaRpcFromTransport,
+  fetchEncodedAccounts,
   getBase58Decoder,
   getBase58Encoder,
   getBase64Encoder,
@@ -22,7 +26,7 @@ import {
   findGuaranteePda,
   getGuaranteeDecoder,
   fetchVaultConfig,
-  fetchVaultState,
+  decodeVaultState,
   findDepositRequestPda,
   findFeeReceiptPda,
   findRedeemRequestPda,
@@ -34,18 +38,24 @@ import {
   getDepositsFulfilledEventDecoder,
   getRedeemsFulfilledEventDecoder,
 } from "@mutav-finance/mutav-protocol-solana";
-import { fetchEncodedAccount, getAddressDecoder } from "@solana/kit";
+import { getAddressDecoder, type MaybeEncodedAccount } from "@solana/kit";
 import type { CapitalEvent, Ledger, PaymentsFacts, ReserveView, Row, TokenFacts } from "../view";
 import { assertGenesis } from "../cluster";
 import { serverEnv, type ServerEnv } from "./env";
+import { cachedRead } from "./read-cache";
+import { retryingTransport, schedulerFor } from "./rpc-retry";
 
 export class NotConfiguredError extends Error {
   override name = "NotConfiguredError";
 }
 
+/** One RPC client per URL per instance; every call retries on HTTP 429 (rpc-retry.ts). */
 let cached: { url: string; rpc: ReturnType<typeof createSolanaRpc> } | null = null;
 export function rpcFor(env: ServerEnv) {
-  if (!cached || cached.url !== env.rpcUrl) cached = { url: env.rpcUrl, rpc: createSolanaRpc(env.rpcUrl) };
+  if (!cached || cached.url !== env.rpcUrl) {
+    const transport = retryingTransport(createDefaultRpcTransport({ url: env.rpcUrl }), { scheduler: schedulerFor(env.rpcUrl) });
+    cached = { url: env.rpcUrl, rpc: createSolanaRpcFromTransport(transport) as ReturnType<typeof createSolanaRpc> };
+  }
   return cached.rpc;
 }
 
@@ -76,17 +86,50 @@ const b58 = getBase58Decoder();
 const b64 = getBase64Encoder();
 const b58enc = getBase58Encoder();
 
-/** Cluster time: block time of the current slot, falling back to the wall clock. */
-async function clusterNow(env: ServerEnv): Promise<{ slot: bigint; now: bigint }> {
-  const rpc = rpcFor(env);
-  const slot = await rpc.getSlot(READ).send();
-  let t: bigint | null = null;
-  try {
-    t = (await rpc.getBlockTime(slot).send()) as unknown as bigint | null;
-  } catch {
-    t = null;
-  }
-  return { slot, now: t !== null ? BigInt(t) : BigInt(Math.floor(Date.now() / 1000)) };
+const CLOCK_SYSVAR = "SysvarC1ock11111111111111111111111111111111" as Address;
+
+/**
+ * Cluster time from the Clock sysvar (what the program's `Clock::get()` sees):
+ * slot u64 at [0..8), unix_timestamp i64 at [32..40). Read in the reserve's
+ * account batch, so it costs no extra RPC call; the wall clock if absent.
+ */
+export function clockFacts(a: MaybeEncodedAccount): { slot: bigint; now: bigint } {
+  if (!a.exists || (a.data as Uint8Array).length < 40) return { slot: 0n, now: BigInt(Math.floor(Date.now() / 1000)) };
+  const d = a.data as Uint8Array;
+  const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
+  return { slot: dv.getBigUint64(0, true), now: dv.getBigInt64(32, true) };
+}
+
+/**
+ * The reserve snapshot for the READ routes, shared by all of them through the
+ * read cache (one read per TTL per instance, concurrent callers coalesced).
+ * Never stale: a composed read fails rather than build on an old snapshot,
+ * and the route then answers with its own last good value. Transaction
+ * routes call `readReserve` directly, never this.
+ */
+export async function readReserveShared(env: ServerEnv, opts: { fresh?: boolean } = {}): Promise<ReserveView> {
+  return (await cachedRead("reserve", () => readReserve(env), { ...opts, allowStale: false })).value;
+}
+
+/** Block time per slot (immutable once confirmed), bounded. */
+const blockTimes = new Map<bigint, bigint>();
+const MAX_BLOCK_TIMES = 4096;
+
+/** Concurrent RPC calls per fan-out (per-receipt block times, per-signature transactions). */
+const FANOUT = 8;
+
+/** `Promise.all(xs.map(fn))` with at most `limit` calls in flight; order kept. */
+export async function mapLimit<A, B>(xs: readonly A[], fn: (x: A) => Promise<B>, limit = FANOUT): Promise<B[]> {
+  const out = new Array<B>(xs.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < xs.length) {
+      const i = next++;
+      out[i] = await fn(xs[i]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, xs.length) }, worker));
+  return out;
 }
 
 export async function readReserve(env = serverEnv()): Promise<ReserveView> {
@@ -98,14 +141,17 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
   if (addresses.config !== env.configAddress) {
     throw new Error(`CONFIG_ADDRESS ${env.configAddress} is not the config PDA of its reserve mint under ${env.programId}`);
   }
-  const [state, clock, token, inbox, payments] = await Promise.all([
-    fetchVaultState(rpc, addresses.state, READ),
-    clusterNow(env),
-    readTokenFacts(env, config.data.reserveMint, addresses.reserve),
+  const [[stateAcc, mintAcc, reserveAcc, paymentsAcc, clockAcc], inbox] = await Promise.all([
+    // One getMultipleAccounts for the state, the mint, the reserve, the payments account and the clock.
+    fetchEncodedAccounts(rpc, [addresses.state, config.data.reserveMint, addresses.reserve, config.data.paymentsAccount, CLOCK_SYSVAR], READ),
     // ADR 0017: issuer income paid and not swept yet (never in NAV).
     fetchIncomeInbox(rpc, { vaultAuthority: addresses.vaultAuthority, config: config.data }),
-    readPaymentsFacts(env, config.data.paymentsAccount),
   ]);
+  assertAccountExists(stateAcc!);
+  const state = decodeVaultState(stateAcc!);
+  const token = tokenFacts(config.data.reserveMint, mintAcc!, reserveAcc!);
+  const payments = paymentsFacts(env, paymentsAcc!);
+  const clock = clockFacts(clockAcc!);
   return {
     cluster: env.cluster,
     programId: env.programId,
@@ -127,8 +173,7 @@ export async function readReserve(env = serverEnv()): Promise<ReserveView> {
  * owner [32..64), delegate option [72..76) + key [76..108), state [108],
  * close-authority option [129..133) + key [133..165)).
  */
-async function readPaymentsFacts(env: ServerEnv, account: Address): Promise<PaymentsFacts> {
-  const a = await fetchEncodedAccount(rpcFor(env), account, READ);
+function paymentsFacts(env: ServerEnv, a: MaybeEncodedAccount): PaymentsFacts {
   const expectedOwner = env.paymentsOwner;
   if (!a.exists || (a.data as Uint8Array).length < 165) return { exists: false, owner: null, mint: null, delegate: null, closeAuthority: null, frozen: false, expectedOwner };
   const d = a.data as Uint8Array;
@@ -151,9 +196,7 @@ async function readPaymentsFacts(env: ServerEnv, account: Address): Promise<Paym
  * [44] decimals, [45] initialized, [46..50) freeze-authority option, [50..82) freeze authority.
  * Token account: [108] state (1 = initialized, 2 = frozen).
  */
-async function readTokenFacts(env: ServerEnv, mint: Address, reserve: Address): Promise<TokenFacts> {
-  const rpc = rpcFor(env);
-  const [m, r] = await Promise.all([fetchEncodedAccount(rpc, mint, READ), fetchEncodedAccount(rpc, reserve, READ)]);
+function tokenFacts(mint: Address, m: MaybeEncodedAccount, r: MaybeEncodedAccount): TokenFacts {
   const ad = getAddressDecoder();
   let freezeAuthority: string | null = null;
   let supply: bigint | null = null;
@@ -246,15 +289,21 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
     incomeAll.map(async (i) => (await findIncomeReceiptPda({ config, incomeRefHash: i.data.refHash }, o))[0] === i.address),
   );
   const blockTimeOf = async (slot: bigint): Promise<bigint | null> => {
+    const hit = blockTimes.get(slot);
+    if (hit !== undefined) return hit;
     try {
       const t = await rpc.getBlockTime(slot).send();
-      return t === null ? null : BigInt(t as unknown as number);
+      if (t === null) return null;
+      // A confirmed slot's block time never changes: ask once per instance.
+      if (blockTimes.size >= MAX_BLOCK_TIMES) blockTimes.clear();
+      blockTimes.set(slot, BigInt(t as unknown as number));
+      return BigInt(t as unknown as number);
     } catch {
       return null;
     }
   };
-  const fees = await Promise.all(feesAll.filter((_, i) => feeOk[i]).map(async (f) => ({ ...f, blockTime: await blockTimeOf(f.data.slot) })));
-  const income = await Promise.all(incomeAll.filter((_, i) => incomeOk[i]).map(async (r) => ({ ...r, blockTime: await blockTimeOf(r.data.slot) })));
+  const fees = await mapLimit(feesAll.filter((_, i) => feeOk[i]), async (f) => ({ ...f, blockTime: await blockTimeOf(f.data.slot) }));
+  const income = await mapLimit(incomeAll.filter((_, i) => incomeOk[i]), async (r) => ({ ...r, blockTime: await blockTimeOf(r.data.slot) }));
 
   const depSeqs = seqRange(r.state.nextDepositSeq);
   const redSeqs = seqRange(r.state.nextRedeemSeq);
@@ -262,9 +311,11 @@ export async function readLedger(env = serverEnv(), reserve?: ReserveView): Prom
     Promise.all(depSeqs.map(async (seq) => (await findDepositRequestPda({ config, seq }, o))[0])),
     Promise.all(redSeqs.map(async (seq) => (await findRedeemRequestPda({ config, seq }, o))[0])),
   ]);
+  // getMultipleAccounts takes at most ACCOUNT_BATCH addresses per call.
+  const chunks = <A>(xs: A[]) => Array.from({ length: Math.ceil(xs.length / ACCOUNT_BATCH) }, (_, k) => xs.slice(k * ACCOUNT_BATCH, (k + 1) * ACCOUNT_BATCH));
   const [depAccs, redAccs] = await Promise.all([
-    depAddrs.length ? fetchAllMaybeDepositRequest(rpc, depAddrs, READ) : Promise.resolve([]),
-    redAddrs.length ? fetchAllMaybeRedeemRequest(rpc, redAddrs, READ) : Promise.resolve([]),
+    Promise.all(chunks(depAddrs).map((c) => fetchAllMaybeDepositRequest(rpc, c, READ))).then((x) => x.flat()),
+    Promise.all(chunks(redAddrs).map((c) => fetchAllMaybeRedeemRequest(rpc, c, READ))).then((x) => x.flat()),
   ]);
 
   const capitalEvents = await readCapitalEvents(env, r);
@@ -335,6 +386,7 @@ export async function readCapitalEvents(env: ServerEnv, r: ReserveView): Promise
     const rows = await rpc.getSignaturesForAddress(a as Address, { ...READ, limit: 100 }).send();
     for (const row of rows) if (!row.err) sigs.add(row.signature);
   }
-  const all = (await Promise.all([...sigs].map((s) => eventsOf(env, s, r.addresses.config)))).flat();
+  // A cold instance decodes up to 200 transactions: a few at a time, not one burst.
+  const all = (await mapLimit([...sigs], (s) => eventsOf(env, s, r.addresses.config))).flat();
   return all.sort((a, b) => Number(b.ts - a.ts));
 }
