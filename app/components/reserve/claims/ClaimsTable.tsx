@@ -22,11 +22,11 @@ import { Num, Table, short } from "@/components/reserve/sections/shared";
 const PAGE = 10;
 
 const TIPS = {
-  Status: "Needs the Reserve Admin's approval, approved, awaiting payment, paid from the reserve, or received by the landlord (PIX), from the claim filing on-chain.",
+  Status: "Needs the Reserve Admin's approval, approved, awaiting payment, paid from the reserve, or received by the agency (PIX), from the claim filing on-chain.",
   "Filed (UTC)": "When file_claim was recorded on-chain (ClaimFiling filed_at).",
   "Paid (UTC)": "When pay_claim moved the claim payment out of the reserve (ClaimFiling paid_at).",
-  "Settled (UTC)": "When settle_payout recorded the landlord's PIX receipt (ClaimFiling settled_at).",
-  "Filed → settled": "From filing to the landlord receiving it by PIX.",
+  "Settled (UTC)": "When settle_payout recorded the agency's PIX receipt (ClaimFiling settled_at).",
+  "Filed → settled": "From filing to the agency receiving it by PIX.",
 };
 
 type Status = { label: string; color: string; title?: string; rank: number };
@@ -47,7 +47,7 @@ export function claimStatus(c: ClaimRow): Status {
     case "filed":
       return s("awaiting payment", 2, "Filed, not paid yet.");
     case "paid":
-      return s(CLAIM_STAGE_LABEL.paid, 3, "Paid from the reserve; the landlord has not received it by PIX yet.");
+      return s(CLAIM_STAGE_LABEL.paid, 3, "Paid from the reserve; the agency has not received it by PIX yet.");
     default:
       return s(CLAIM_STAGE_LABEL.settled, 4);
   }
@@ -140,7 +140,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                         <Explorer value={c.filing} label={fmtTime(c.filedAt)} />
                       </Detail>
                       <Detail label="Paid">{c.paidAt !== null ? <Explorer value={c.filing} label={fmtTime(c.paidAt)} /> : <span className="font-body text-(--color-text-3)">not paid yet</span>}</Detail>
-                      <Detail label="Received by the landlord (PIX)">
+                      <Detail label="Received by the agency (PIX)">
                         {c.settledAt !== null ? <Mono style={{ fontSize: 12 }}>{fmtTime(c.settledAt)}</Mono> : <span className="font-body text-(--color-text-3)" style={{ fontSize: 12 }}>pending</span>}
                       </Detail>
                       <Detail label="Guarantee">

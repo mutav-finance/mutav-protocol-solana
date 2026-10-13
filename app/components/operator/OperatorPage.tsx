@@ -114,7 +114,7 @@ function SettleBound() {
   return (
     <Bound>
       {paid.map((p) => kv(`${p.guaranteeId.slice(0, 8)}… ${p.leg} · ${fmtBrs(p.amount ?? 0n)}`, <span>paid {p.paidAt !== null ? fmtTime(p.paidAt) : "—"}</span>))}
-      <span>Records the PIX that paid the landlord: only the hash of its end-to-end id goes on-chain. The program sets no settlement deadline (ADR 0019).</span>
+      <span>Records the PIX that paid the agency (the agency then pays the landlord): only the hash of its end-to-end id goes on-chain. The program sets no settlement deadline (ADR 0019).</span>
     </Bound>
   );
 }

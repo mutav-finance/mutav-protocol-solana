@@ -2,7 +2,7 @@
  * The reserve's money paths, in the deck's style. Purely presentational: no
  * figures, so nothing here mirrors the chain.
  *
- *   Guarantee fees ──▶ ┌─────────┐ ──▶ Claim payments (landlords, via PIX)
+ *   Guarantee fees ──▶ ┌─────────┐ ──▶ Claim payments (agencies, via PIX)
  *   (MUTAV fee split)  │ Reserve │
  *   Approved wallets ┄▶└─────────┘ ──▶ Redemptions (approved wallets)
  *
@@ -19,7 +19,7 @@ const LABEL = "font-mono text-[11px] leading-4 uppercase tracking-[0.08em]";
 
 const ARIA =
   "How money moves through the reserve. In: guarantee fees, after the MUTAV fee is split off, and deposits from approved wallets, which first wait in line. " +
-  "Out: claim payments to landlords via PIX, and redemptions to approved wallets.";
+  "Out: claim payments to agencies via PIX (the agency pays the landlord), and redemptions to approved wallets.";
 
 function Node({ title, sub, children, compact }: { title: string; sub?: string; children?: ReactNode; compact?: boolean }) {
   return (
@@ -112,7 +112,7 @@ export function FlowDiagram({ compact = false }: { compact?: boolean }) {
         <div className={side}>
           <div className="flex flex-col lg:flex-row lg:items-center">
             <Arrow color={OUT} label="Paid out" />
-            <Node title="Claim payments" sub="landlords, via PIX" compact={compact} />
+            <Node title="Claim payments" sub="agencies, via PIX" compact={compact} />
           </div>
           <div className="flex flex-col lg:flex-row lg:items-center">
             <Arrow color={OUT} label="Redeemed" />
