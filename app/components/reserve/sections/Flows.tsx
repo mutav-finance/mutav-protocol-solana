@@ -218,7 +218,7 @@ export function Flows({ r, l }: { r: ReserveView; l: Ledger }) {
       amount: totals.incomeNetToReserve,
       dir: "in",
     },
-    { label: "Claim payments", sub: "paid to landlords", amount: totals.claimsPaid, dir: "out" },
+    { label: "Claim payments", sub: "paid to agencies", amount: totals.claimsPaid, dir: "out" },
   ];
   const capitalBars: Bar[] = [
     { label: "Capital in", sub: "deposits filled", amount: totals.depositsIn, dir: "in" },

@@ -68,7 +68,7 @@ function Summary({ rows, total, period, onPeriod }: { rows: ClaimRow[]; total: n
         {/* The same hero as the Overview; text colour, since the Overview's balance is the one amber figure. */}
         <HeroAmount phrase={`Claims paid · ${PERIOD_NAME[period]}`} value={fmtBrs(paidSum)} usd={paidSum}>
           <span className="font-body text-(--color-text-2)">
-            {paidRows.length} of {rows.length} {rows.length === 1 ? "claim" : "claims"} paid · {settled} received by the landlord (PIX)
+            {paidRows.length} of {rows.length} {rows.length === 1 ? "claim" : "claims"} paid · {settled} received by the agency (PIX)
             {rows.length !== total && <span className="text-(--color-text-3)"> · {total} on record</span>}
           </span>
         </HeroAmount>
@@ -76,7 +76,7 @@ function Summary({ rows, total, period, onPeriod }: { rows: ClaimRow[]; total: n
       </div>
       <div className="grid grid-cols-1 border-t sm:grid-cols-3">
         <Cell first label="Slowest filed → paid" value={pay === null ? "—" : fmtDuration(pay)} sub={pay === null ? "None paid yet." : "From filing to the claim payment."} />
-        <Cell label="Slowest paid → settled" value={settle === null ? "—" : fmtDuration(settle)} sub={settle === null ? "None received by the landlord yet." : "From payment to the landlord's PIX receipt."} />
+        <Cell label="Slowest paid → settled" value={settle === null ? "—" : fmtDuration(settle)} sub={settle === null ? "None received by the agency yet." : "From payment to the agency's PIX receipt."} />
         <Cell label="Awaiting payment" value={String(awaiting)} sub="Filed on-chain, not yet paid." />
       </div>
     </div>
@@ -173,7 +173,7 @@ export function ClaimsSection({ d }: { d: Data }) {
       title="Claims"
       kicker="Claim payments"
       subtitle="Are claims paid on time?"
-      info="Filed: the claim is booked and its amount set aside for claims, so the share price reflects it before any money leaves the reserve. Paid: the claim payment leaves the reserve. Settled: the landlord receives it by PIX."
+      info="Filed: the claim is booked and its amount set aside for claims, so the share price reflects it before any money leaves the reserve. Paid: the claim payment leaves the reserve. Settled: the agency receives it by PIX (recorded on-chain) and pays the landlord."
     >
       <Claims r={d.reserve} l={d.ledger} />
     </Section>

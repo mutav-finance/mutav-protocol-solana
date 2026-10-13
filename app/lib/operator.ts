@@ -61,8 +61,8 @@ export const DUTIES: Duty[] = [
   },
   {
     ix: "settle_payout",
-    today: "Record the PIX settlement (hash of the end-to-end id) once the landlord has been paid.",
-    later: "Triggered by the PIX confirmation after MUTAV offramps BRS → BRL and pays the landlord.",
+    today: "Record the PIX settlement (hash of the end-to-end id) once the agency has been paid.",
+    later: "Triggered by the PIX confirmation after MUTAV offramps BRS → BRL and pays the agency by PIX; the agency then pays the landlord.",
     bound: "Claim paid and not yet settled; the PIX hash is non-zero. The program sets no settlement deadline (ADR 0019).",
   },
 ];
