@@ -1,0 +1,145 @@
+1
+00:00:00,300 --> 00:00:03,300
+As imobiliárias exigem garantia
+em todo contrato de aluguel.
+
+2
+00:00:03,400 --> 00:00:04,550
+Se o inquilino não paga,
+
+3
+00:00:04,700 --> 00:00:09,950
+a imobiliária cobre por conta própria.
+Outras soluções levam até 60 dias.
+
+4
+00:00:10,100 --> 00:00:12,600
+A MUTAV respalda a imobiliária, na Solana.
+
+5
+00:00:13,000 --> 00:00:18,000
+19 imobiliárias assinaram cartas de intenção.
+No hackathon, construímos o protocolo.
+
+6
+00:00:19,000 --> 00:00:23,400
+Toda garantia tem lastro de verdade?
+Primeiro, a garantia da Ana: R$ 18 mil.
+
+7
+00:00:23,400 --> 00:00:28,900
+On-chain, ela é só um ID,
+nenhum dado pessoal.
+
+8
+00:00:29,300 --> 00:00:33,700
+A reserva tem BRS, uma stablecoin
+brasileira da Nora Finance,
+
+9
+00:00:33,900 --> 00:00:37,000
+e qualquer pessoa confere
+que ela cumpre
+
+10
+00:00:37,000 --> 00:00:39,700
+a cobertura definida
+pelo admin da reserva.
+
+11
+00:00:40,000 --> 00:00:45,800
+Vamos tentar mais um contrato.
+Precisa de R$ 45.000; temos R$ 44.500.
+
+12
+00:00:47,600 --> 00:00:48,400
+Recusado.
+
+13
+00:00:48,800 --> 00:00:52,000
+Não prometemos
+o que não conseguimos lastrear.
+
+14
+00:00:56,400 --> 00:00:59,000
+E quando a Ana atrasa o aluguel?
+
+15
+00:01:01,400 --> 00:01:04,450
+A imobiliária abre o pedido,
+nosso operador verifica,
+
+16
+00:01:04,900 --> 00:01:08,450
+a reserva paga,
+dentro dos limites do multisig,
+
+17
+00:01:10,500 --> 00:01:14,700
+e o nosso PIX à imobiliária
+fica registrado on-chain.
+
+18
+00:01:17,000 --> 00:01:20,400
+Do pedido à liquidação, on-chain:
+65 segundos.
+
+19
+00:01:21,200 --> 00:01:24,200
+E não 60 dias.
+
+20
+00:01:24,600 --> 00:01:28,200
+E está tudo público: cada garantia,
+pedido e conta,
+
+21
+00:01:28,200 --> 00:01:31,600
+ao vivo em reserve.mutav.finance.
+
+22
+00:01:34,500 --> 00:01:37,800
+Hoje, nossa equipe assina cada etapa
+no nosso console de operador.
+
+23
+00:01:37,800 --> 00:01:41,200
+Depois, uma server wallet
+na nossa plataforma assina,
+
+24
+00:01:41,200 --> 00:01:44,600
+dentro de limites
+que o programa aplica.
+
+25
+00:01:45,100 --> 00:01:49,100
+Como a reserva cresce? Seis meses do
+plano piloto, simulados localmente,
+
+26
+00:01:49,100 --> 00:01:53,100
+levando a reserva
+a R$ 1 milhão.
+
+27
+00:01:55,100 --> 00:02:00,100
+Entram capital novo, taxas de garantia e rendimento.
+Saem pedidos pequenos.
+
+28
+00:02:01,200 --> 00:02:05,600
+Assim, a reserva sustenta mais contratos.
+
+29
+00:02:10,200 --> 00:02:12,800
+MUTAV: uma reserva que você vê,
+
+30
+00:02:12,800 --> 00:02:15,800
+pagamentos automáticos
+e capital que trabalha.
+
+31
+00:02:16,100 --> 00:02:17,970
+A garantia de aluguel on-chain do Brasil.

@@ -1,0 +1,496 @@
+{
+  "meta": {
+    "cluster": "devnet",
+    "program": "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV",
+    "generated_at": "2026-10-12T21:36:10.039Z",
+    "idl_source": "on-chain Program Metadata (canonical \"idl\", zlib)",
+    "idl_metadata_pda": "FP8nxzMHsvYcJZ55Jr3oS1HmzdFb17okxf4156U13dAb",
+    "onchain_idl_matches_local": true,
+    "note": "Read-only export via getTransaction (commitment confirmed, maxSupportedTransactionVersion 0). MUTAV instructions decoded from the 8-byte Anchor discriminator, including those reached by CPI (e.g. Squads execute); events decoded from emit_cpi self-invocations."
+  },
+  "receipts": [
+    {
+      "label": "register_0100",
+      "signature": "Cz27XuD8B76Wd9ZHH72Xg3kjy6CHW7AT4bJVsdjPYBBfLtncrKHZNEo356jTcuHZsQybFCaHKJQmbt2XAQRBzQa",
+      "explorer": "https://explorer.solana.com/tx/Cz27XuD8B76Wd9ZHH72Xg3kjy6CHW7AT4bJVsdjPYBBfLtncrKHZNEo356jTcuHZsQybFCaHKJQmbt2XAQRBzQa?cluster=devnet",
+      "source": "cli",
+      "slot": 510395010,
+      "block_time": 1791839483,
+      "block_time_iso": "2026-10-12T21:11:23.000Z",
+      "fee_lamports": "80000",
+      "fee_sol": 0.00008,
+      "status": "success",
+      "error": null,
+      "program_id": "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV",
+      "top_level_programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV"
+      ],
+      "instruction": "register_guarantee",
+      "accounts": [
+        {
+          "name": "operator",
+          "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+        },
+        {
+          "name": "config",
+          "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+        },
+        {
+          "name": "state",
+          "pubkey": "G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex"
+        },
+        {
+          "name": "guarantee",
+          "pubkey": "DHPZ1CEGSQSW1gGQuv2b5WNbycZpVFz2mV2ae5X63sCD"
+        },
+        {
+          "name": "reserve",
+          "pubkey": "FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa"
+        },
+        {
+          "name": "payer",
+          "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+        }
+      ],
+      "mutav_instructions": [
+        {
+          "name": "register_guarantee",
+          "top_level_index": 2,
+          "via_cpi": false,
+          "accounts": [
+            {
+              "name": "operator",
+              "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+            },
+            {
+              "name": "config",
+              "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+            },
+            {
+              "name": "state",
+              "pubkey": "G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex"
+            },
+            {
+              "name": "guarantee",
+              "pubkey": "DHPZ1CEGSQSW1gGQuv2b5WNbycZpVFz2mV2ae5X63sCD"
+            },
+            {
+              "name": "reserve",
+              "pubkey": "FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa"
+            },
+            {
+              "name": "payer",
+              "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+            }
+          ]
+        }
+      ],
+      "compute_units_consumed": 45495,
+      "events": [
+        {
+          "name": "GuaranteeRegistered",
+          "data": {
+            "config": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q",
+            "ts": "1791839483",
+            "id": "e4411ae1148f094955daf88d4d4bc21e5a633a3f1b2b089f95dd21af46482aea",
+            "agency_id": "ec63c027ca68c1043ef226d7451165a7f0cc8027a172ea466438f020ae1f61ef",
+            "refs_hash": "ede704c67b186483690434852b74fd6d01e6be036b9c620867dcf3ac818df302",
+            "default_cover": "9000000000",
+            "exit_cover": "9000000000",
+            "remaining_cover_total": "162000000000",
+            "coverage_required": "40500000000",
+            "active_guarantees": 9
+          }
+        }
+      ]
+    },
+    {
+      "label": "refused_0101",
+      "signature": "3UtiNTSZXwjwmVkVxivEsrhFezCvpbTUErwi6KSZKwCoSFnkdhu4JXmVYsLdnHxby99Vkk9u8QRDtFgie3jAESH9",
+      "explorer": "https://explorer.solana.com/tx/3UtiNTSZXwjwmVkVxivEsrhFezCvpbTUErwi6KSZKwCoSFnkdhu4JXmVYsLdnHxby99Vkk9u8QRDtFgie3jAESH9?cluster=devnet",
+      "source": "cli",
+      "slot": 510400256,
+      "block_time": 1791840734,
+      "block_time_iso": "2026-10-12T21:32:14.000Z",
+      "fee_lamports": "5000",
+      "fee_sol": 0.000005,
+      "status": "failed",
+      "error": {
+        "raw": {
+          "InstructionError": [
+            "0",
+            {
+              "Custom": "6008"
+            }
+          ]
+        },
+        "custom_code": 6008,
+        "failing_program": "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV",
+        "mutav_error": {
+          "code": 6008,
+          "name": "InsufficientFreeCapital",
+          "msg": "Insufficient free capital"
+        },
+        "anchor_log": "Program log: AnchorError thrown in programs/mutav/src/instructions/operator/register_guarantee.rs:105. Error Code: InsufficientFreeCapital. Error Number: 6008. Error Message: Insufficient free capital."
+      },
+      "program_id": "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV",
+      "top_level_programs": [
+        "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV"
+      ],
+      "instruction": "register_guarantee",
+      "accounts": [
+        {
+          "name": "operator",
+          "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+        },
+        {
+          "name": "config",
+          "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+        },
+        {
+          "name": "state",
+          "pubkey": "G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex"
+        },
+        {
+          "name": "guarantee",
+          "pubkey": "GojVb9mm5AVCcUrqkULbLcp4EH8Ebt6aBr9imGoV67Un"
+        },
+        {
+          "name": "reserve",
+          "pubkey": "FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa"
+        },
+        {
+          "name": "payer",
+          "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+        }
+      ],
+      "mutav_instructions": [
+        {
+          "name": "register_guarantee",
+          "top_level_index": 0,
+          "via_cpi": false,
+          "accounts": [
+            {
+              "name": "operator",
+              "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+            },
+            {
+              "name": "config",
+              "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+            },
+            {
+              "name": "state",
+              "pubkey": "G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex"
+            },
+            {
+              "name": "guarantee",
+              "pubkey": "GojVb9mm5AVCcUrqkULbLcp4EH8Ebt6aBr9imGoV67Un"
+            },
+            {
+              "name": "reserve",
+              "pubkey": "FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa"
+            },
+            {
+              "name": "payer",
+              "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+            }
+          ]
+        }
+      ],
+      "compute_units_consumed": 36953,
+      "events": []
+    },
+    {
+      "label": "file_claim",
+      "signature": "3wgKGb9J2Nk2HceDwFTsb2yF94Jzvuict9KzARXeoYmpBC4Dsc9ZkdXx9jpYdLwgj2gtxcZKEoTgq1xGc5NbQtoQ",
+      "explorer": "https://explorer.solana.com/tx/3wgKGb9J2Nk2HceDwFTsb2yF94Jzvuict9KzARXeoYmpBC4Dsc9ZkdXx9jpYdLwgj2gtxcZKEoTgq1xGc5NbQtoQ?cluster=devnet",
+      "source": "cli",
+      "slot": 510400741,
+      "block_time": 1791840850,
+      "block_time_iso": "2026-10-12T21:34:10.000Z",
+      "fee_lamports": "80000",
+      "fee_sol": 0.00008,
+      "status": "success",
+      "error": null,
+      "program_id": "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV",
+      "top_level_programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV"
+      ],
+      "instruction": "file_claim",
+      "accounts": [
+        {
+          "name": "operator",
+          "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+        },
+        {
+          "name": "config",
+          "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+        },
+        {
+          "name": "state",
+          "pubkey": "G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex"
+        },
+        {
+          "name": "guarantee",
+          "pubkey": "DHPZ1CEGSQSW1gGQuv2b5WNbycZpVFz2mV2ae5X63sCD"
+        },
+        {
+          "name": "claim_filing",
+          "pubkey": "8Gx9eBzgdVBG3nMwxc8GNXUhqxRXbyPwe3NrfeyTbnzZ"
+        },
+        {
+          "name": "payer",
+          "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+        }
+      ],
+      "mutav_instructions": [
+        {
+          "name": "file_claim",
+          "top_level_index": 2,
+          "via_cpi": false,
+          "accounts": [
+            {
+              "name": "operator",
+              "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+            },
+            {
+              "name": "config",
+              "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+            },
+            {
+              "name": "state",
+              "pubkey": "G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex"
+            },
+            {
+              "name": "guarantee",
+              "pubkey": "DHPZ1CEGSQSW1gGQuv2b5WNbycZpVFz2mV2ae5X63sCD"
+            },
+            {
+              "name": "claim_filing",
+              "pubkey": "8Gx9eBzgdVBG3nMwxc8GNXUhqxRXbyPwe3NrfeyTbnzZ"
+            },
+            {
+              "name": "payer",
+              "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+            }
+          ]
+        }
+      ],
+      "compute_units_consumed": 48464,
+      "events": [
+        {
+          "name": "ClaimFiled",
+          "data": {
+            "config": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q",
+            "ts": "1791840850",
+            "guarantee_id": "e4411ae1148f094955daf88d4d4bc21e5a633a3f1b2b089f95dd21af46482aea",
+            "leg": 1,
+            "amount": "1500000000",
+            "notice_ref_hash": "87499e9604f2ac3c0a4c1efc80e16d89fa8065e28e2ca8f50d2c37feaf30c97b",
+            "provisions_after": "1500000000",
+            "coverage_required_after": "40500000000"
+          }
+        }
+      ]
+    },
+    {
+      "label": "pay_claim",
+      "signature": "24FTwRUXcufgAaGPgvWVMcewNWBbtKAfUZuT19bDjgEAeenP7FMs4NqBdW7yHqX5eBt92Y9sGhp2pZB5QqU6mPiH",
+      "explorer": "https://explorer.solana.com/tx/24FTwRUXcufgAaGPgvWVMcewNWBbtKAfUZuT19bDjgEAeenP7FMs4NqBdW7yHqX5eBt92Y9sGhp2pZB5QqU6mPiH?cluster=devnet",
+      "source": "cli",
+      "slot": 510400880,
+      "block_time": 1791840883,
+      "block_time_iso": "2026-10-12T21:34:43.000Z",
+      "fee_lamports": "50000",
+      "fee_sol": 0.00005,
+      "status": "success",
+      "error": null,
+      "program_id": "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV",
+      "top_level_programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV"
+      ],
+      "instruction": "pay_claim",
+      "accounts": [
+        {
+          "name": "operator",
+          "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+        },
+        {
+          "name": "config",
+          "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+        },
+        {
+          "name": "state",
+          "pubkey": "G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex"
+        },
+        {
+          "name": "guarantee",
+          "pubkey": "DHPZ1CEGSQSW1gGQuv2b5WNbycZpVFz2mV2ae5X63sCD"
+        },
+        {
+          "name": "claim_filing",
+          "pubkey": "8Gx9eBzgdVBG3nMwxc8GNXUhqxRXbyPwe3NrfeyTbnzZ"
+        },
+        {
+          "name": "reserve",
+          "pubkey": "FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa"
+        },
+        {
+          "name": "payments_account",
+          "pubkey": "CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj"
+        },
+        {
+          "name": "vault_authority",
+          "pubkey": "AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu"
+        },
+        {
+          "name": "reserve_mint",
+          "pubkey": "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4"
+        }
+      ],
+      "mutav_instructions": [
+        {
+          "name": "pay_claim",
+          "top_level_index": 2,
+          "via_cpi": false,
+          "accounts": [
+            {
+              "name": "operator",
+              "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+            },
+            {
+              "name": "config",
+              "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+            },
+            {
+              "name": "state",
+              "pubkey": "G5E5siKpWWpsKBdwFiC44Y7QR8cddiCFyR9p5U3TNbex"
+            },
+            {
+              "name": "guarantee",
+              "pubkey": "DHPZ1CEGSQSW1gGQuv2b5WNbycZpVFz2mV2ae5X63sCD"
+            },
+            {
+              "name": "claim_filing",
+              "pubkey": "8Gx9eBzgdVBG3nMwxc8GNXUhqxRXbyPwe3NrfeyTbnzZ"
+            },
+            {
+              "name": "reserve",
+              "pubkey": "FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa"
+            },
+            {
+              "name": "payments_account",
+              "pubkey": "CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj"
+            },
+            {
+              "name": "vault_authority",
+              "pubkey": "AwUve4PtAXYWTnxWMgFmcMep7rbgdRwY39cJeC27GEJu"
+            },
+            {
+              "name": "reserve_mint",
+              "pubkey": "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4"
+            }
+          ]
+        }
+      ],
+      "compute_units_consumed": 65345,
+      "events": [
+        {
+          "name": "ClaimPaid",
+          "data": {
+            "config": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q",
+            "ts": "1791840883",
+            "guarantee_id": "e4411ae1148f094955daf88d4d4bc21e5a633a3f1b2b089f95dd21af46482aea",
+            "leg": 1,
+            "amount": "1500000000",
+            "notice_ref_hash": "87499e9604f2ac3c0a4c1efc80e16d89fa8065e28e2ca8f50d2c37feaf30c97b",
+            "payments_account": "CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj",
+            "provisions_after": "0",
+            "coverage_required_after": "40125000000",
+            "window_paid": "19500000000",
+            "brs_balance_after": "43000000000",
+            "claims_paid_total": "19500000000"
+          }
+        }
+      ]
+    },
+    {
+      "label": "settle_payout",
+      "signature": "4PfaCZggRAKdUzneS6K2Tox8CtCTnztsamKUNJqNhqA62TpTm3x3bRMCUvRnNQfcbrZUBrfDAygiUy5rQHScy9pm",
+      "explorer": "https://explorer.solana.com/tx/4PfaCZggRAKdUzneS6K2Tox8CtCTnztsamKUNJqNhqA62TpTm3x3bRMCUvRnNQfcbrZUBrfDAygiUy5rQHScy9pm?cluster=devnet",
+      "source": "cli",
+      "slot": 510401013,
+      "block_time": 1791840915,
+      "block_time_iso": "2026-10-12T21:35:15.000Z",
+      "fee_lamports": "80000",
+      "fee_sol": 0.00008,
+      "status": "success",
+      "error": null,
+      "program_id": "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV",
+      "top_level_programs": [
+        "ComputeBudget111111111111111111111111111111",
+        "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV"
+      ],
+      "instruction": "settle_payout",
+      "accounts": [
+        {
+          "name": "operator",
+          "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+        },
+        {
+          "name": "config",
+          "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+        },
+        {
+          "name": "guarantee",
+          "pubkey": "DHPZ1CEGSQSW1gGQuv2b5WNbycZpVFz2mV2ae5X63sCD"
+        },
+        {
+          "name": "claim_filing",
+          "pubkey": "8Gx9eBzgdVBG3nMwxc8GNXUhqxRXbyPwe3NrfeyTbnzZ"
+        }
+      ],
+      "mutav_instructions": [
+        {
+          "name": "settle_payout",
+          "top_level_index": 2,
+          "via_cpi": false,
+          "accounts": [
+            {
+              "name": "operator",
+              "pubkey": "A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k"
+            },
+            {
+              "name": "config",
+              "pubkey": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q"
+            },
+            {
+              "name": "guarantee",
+              "pubkey": "DHPZ1CEGSQSW1gGQuv2b5WNbycZpVFz2mV2ae5X63sCD"
+            },
+            {
+              "name": "claim_filing",
+              "pubkey": "8Gx9eBzgdVBG3nMwxc8GNXUhqxRXbyPwe3NrfeyTbnzZ"
+            }
+          ]
+        }
+      ],
+      "compute_units_consumed": 21253,
+      "events": [
+        {
+          "name": "PayoutSettled",
+          "data": {
+            "config": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q",
+            "ts": "1791840915",
+            "guarantee_id": "e4411ae1148f094955daf88d4d4bc21e5a633a3f1b2b089f95dd21af46482aea",
+            "notice_ref_hash": "87499e9604f2ac3c0a4c1efc80e16d89fa8065e28e2ca8f50d2c37feaf30c97b",
+            "pix_e2e_hash": "e8c5b2f6e3e7389fd4378f7c3949a7d39fc9dc58f925e1c2e8ef6862693f82a9"
+          }
+        }
+      ]
+    }
+  ]
+}
