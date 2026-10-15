@@ -129,7 +129,7 @@ Seeds: `["config", reserve_mint]`. One per reserve. Written only by admin instru
 | `reserve_decimals` | `u8` | Immutable |
 | `share_mint` | `Pubkey` | Share mint (authority = vault authority PDA) |
 | `coverage_ratio_bps` | `u16` | `c`. Program bounds `MIN_COVERAGE_RATIO_BPS = 1_000` (0.10; ADR 0016) to `MAX_COVERAGE_RATIO_BPS = 10_000` (1.0; ADR 0022). Starts at `1_000` on devnet |
-| `fee_take_bps` | `u16` | MUTAV's take from each guarantee fee. `≤ MAX_FEE_TAKE_BPS = 3_000`. Value **TBD** |
+| `fee_take_bps` | `u16` | MUTAV's take from each guarantee fee. `≤ MAX_FEE_TAKE_BPS = 3_000`. Starts at **2_000** (20%, ADR 0028) |
 | `payments_account` | `Pubkey` | The whitelisted MUTAV payments token account (BRS) |
 | `treasury_account` | `Pubkey` | The whitelisted MUTAV treasury token account (BRS) that receives MUTAV's take. Changed only by the admin through `set_treasury_account` |
 | `investor_allowlist_root` | `[u8; 32]` | Merkle root of allowlisted investor wallets |
@@ -157,8 +157,8 @@ Every field from `adapter_count` to `attester_epoch` is written zero by `initial
 
 | Field | Type | Meaning |
 |---|---|---|
-| `claims_tail_secs` | `i64` | Length of the claims tail after the lease ends or an exoneration takes effect (ADR 0012). Value **TBD** (§12 Q35). `0` = not set: `notify_exoneration` and `record_keys_returned` fail with `ClaimsTailNotSet`, so no guarantee leaves `ACTIVE` except by exhaustion or `VOID` |
-| `payment_term_secs` | `i64` | Contractual term N from a complete payment request to payment (principal pagador, §2.2). Disclosure only: the program never refuses a payment because of it. Value **TBD** (§12 Q36). `0` = not disclosed |
+| `claims_tail_secs` | `i64` | Length of the claims tail after the lease ends or an exoneration takes effect (ADR 0012). Starts at **2_000** (20%, ADR 0028) (§12 Q35). `0` = not set: `notify_exoneration` and `record_keys_returned` fail with `ClaimsTailNotSet`, so no guarantee leaves `ACTIVE` except by exhaustion or `VOID` |
+| `payment_term_secs` | `i64` | Contractual term N from a complete payment request to payment (principal pagador, §2.2). Disclosure only: the program never refuses a payment because of it. Starts at **2_000** (20%, ADR 0028) (§12 Q36). `0` = not disclosed |
 | `optional_categories` | `u8` | Bitmask of claim categories that are off by default. Bit 0 = `CAT_TERMINATION_PENALTY`. `0` = all optional categories disabled. `set_config` rejects bits outside `SUPPORTED_OPTIONAL_CATEGORIES` (`0b1`) with `InvalidParameter` |
 | `backstop_amount` | `u64` | MUTAV Brasil's disclosed backstop commitment, in BRS base units (PC-34). A separate layer: never counted in `stable_assets`, `coverage_required` or NAV. `0` = none disclosed |
 | `backstop_commitment_hash` | `[u8; 32]` | Commitment to the signed backstop commitment and its latest attestation (e.g. quarterly: MUTAV Brasil's assets exceed its guarantee liabilities). Zero = none disclosed |
@@ -1020,7 +1020,7 @@ Outside `Caps`, in `VaultConfig`:
 | Field | Type | Enforced in | Devnet |
 |---|---|---|---|
 | `coverage_ratio_bps` (`c`) | `u16` | all gates. `1_000 ≤ c ≤ 10_000`; a change needs a `refresh` in the same slot | `2_500` (0.25; ADR 0028. Program floor 0.10, ADR 0016) |
-| `fee_take_bps` | `u16` | `contribute_fees` | TBD (§12 Q4), program max `3_000` |
+| `fee_take_bps` | `u16` | `contribute_fees` | `2_000` (20%) at launch (ADR 0028), program max `3_000` |
 | `claims_tail_secs` | `i64` | *ADR 0012 carve, built later.* `notify_exoneration`, `record_keys_returned` (fixes `claims_tail_until_ts`); `0` blocks both | TBD (§12 Q35); never longer than the 3-year prescription of rent claims (CC 206 §3º I) |
 | `payment_term_secs` | `i64` | *ADR 0012 carve.* Disclosure only (contractual term from a complete payment request) | TBD (§12 Q36) |
 | `optional_categories` | `u8` | *ADR 0012 carve.* `file_claim` (bit 0 enables `CAT_TERMINATION_PENALTY`) | `0` (disabled) |

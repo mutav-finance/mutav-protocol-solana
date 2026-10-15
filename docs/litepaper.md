@@ -102,13 +102,13 @@ Revenue is the *taxa da fiança*, billed monthly to partner agencies. Claim paym
 | *Valor afiançado* per lease | Default sub-limit 12× rent (under legal review) + exit sub-limit 6× rent = **R$39,600** |
 | Book | Pilot: 17 new leases a month, 97 by month 6 at the R$1M cap (ADR 0028). Operating plan: ~170 leases across up to 5 partner agencies (~34 each); gross fees ≈R$37,400 a month at full book (02 business plan) |
 | Expected claims against fees | ≈20% for rent arrears alone (RS base delinquency, 2.01%); ≈21–37% once exit debts are included, by scope (§12). The pilot plan assumes a rounder 2.5% (ADR 0028) |
-| MUTAV revenue | Take `t` on each fee (20% in the devnet and pilot config, ADR 0028; final rate open; program maximum 30%) |
+| MUTAV revenue | Take `t` on each fee (20% at launch, ADR 0028; program maximum 30%) |
 | Reserve | Working target R$300k (02 business plan); the pilot starts at R$120k plus R$170k a month from month 2 and reaches the R$1M cap in month 6 (ADR 0028); sizing rule open (§8) |
 | Reserve growth | Net guarantee fees and issuer partnership revenue (§10) build the reserve, and a larger reserve backs more required coverage, so more leases. Issuer partnership revenue is a separate line from fees, never counted in coverage, and nothing here is a yield promise |
 
 ```figure id="fig-1b-agency-month" title="Figure 1b. One agency, one month"
 Left-to-right flow (Sankey or stacked flow), labelled "working parameters, illustrative".
-[34 guarantees in force × R$220] = [Consolidated bill R$7,480] --"paid by boleto or PIX"--> [BRL at MUTAV] --"1:1 via authorized minter"--> [7,480 BRS]; a thinner parallel branch [Consolidated bill] --"or paid in BRS (Solana Pay)"--> [7,480 BRS] --"contribute_fees (1 fee receipt)"--> split into [MUTAV treasury: take t (20% devnet config; final rate open)] and [Reserve: net].
+[34 guarantees in force × R$220] = [Consolidated bill R$7,480] --"paid by boleto or PIX"--> [BRL at MUTAV] --"1:1 via authorized minter"--> [7,480 BRS]; a thinner parallel branch [Consolidated bill] --"or paid in BRS (Solana Pay)"--> [7,480 BRS] --"contribute_fees (1 fee receipt)"--> split into [MUTAV treasury: take t (20% devnet config)] and [Reserve: net].
 Side branch from the reserve: "expected claim payments ≈ 20% of fees (rent arrears, RS base) to ≈ 30% (with exit debts, scope B)".
 Reserve box annotation: "c governed: full backing or expected-loss sizing (§8)".
 Footnote: "Not a return; the final take and the sizing rule are open."
@@ -391,7 +391,7 @@ Caption line: "Each part priced at the NAV of its own fill; rounding favours the
 | Flow | Instruction | Destination | Shares? | Public as |
 |---|---|---|---|---|
 | Guarantee fees, net of the take (monthly agency bill paid by boleto or PIX, converted to BRS) | `contribute_fees` | `reserve` | Never minted | 1 fee receipt per agency bill (`invoice_ref_hash`); `FeesContributed{gross, take, net}` |
-| MUTAV operation (the take, `fee_take_bps`: 20% in the devnet and pilot config, final rate open; program max 30%) | Same call, separate transfer | Whitelisted `treasury_account` | None; never in the reserve or NAV | `fee_take_total` |
+| MUTAV operation (the take, `fee_take_bps`: 20% at launch; program max 30%) | Same call, separate transfer | Whitelisted `treasury_account` | None; never in the reserve or NAV | `fee_take_total` |
 | MUTAV as capital provider | `request_deposit` / `request_redeem` from the disclosed capital wallet | `pending_deposits` → `reserve` | At NAV, like any provider | Queue events filtered by `mutav_capital_wallet` |
 | Issuer income: Nora's monthly BRS revenue share, routed by MUTAV into the reserve ([ADR 0017](decisions/0017-brs-income-intake.md)) | `sweep_income`, one per Nora statement, from the income inbox | `reserve`; no take, all of it builds the reserve ([ADR 0019](decisions/0019-v1-layout-for-the-devnet-release.md)) | Never minted | 1 `IncomeReceipt` per statement (`income_ref_hash`); `IncomeSwept{amount, inbox_after}`; `income_total` |
 
@@ -441,7 +441,7 @@ The **mint guard** rejects any Token-2022 reserve mint with a PermanentDelegate,
 
 **Initialization and upgrades.** Only the upgrade authority can call `initialize`. Accounts carry a version and zeroed padding, and layouts are append-only ([spec §14](spec.md#14-upgrade-readiness)); since `v1.0.0-devnet`, an `idl-compat` CI check refuses any interface change that is not append-only. Each upgrade ships as a `solana-verify` build in one Squads proposal announced during the time lock; enabling a feature takes a second proposal. Signers decode every instruction before approving and never pre-sign with durable nonces: in April 2026 Drift lost about $285M when a 2-of-5 multisig with no time lock was taken over through pre-signed durable-nonce transactions.
 
-**Reviews before devnet** ([reviews and audits](security/reviews-and-audits.md)). Before the layout froze, the program, client, scripts and app went through five parallel adversarial reviews, a review against the published audits of a comparable Solana program, an OWASP Smart Contract Top 10 (2026) pass and a simplification review ([ADR 0026](decisions/0026-program-simplification-for-the-freeze.md)), which removed four account types and the state the pilot does not use. Their decisions are ADRs 0019–0030. An internal security audit of the fixed code followed, and every confirmed finding is fixed; among them a High, a holder able to wedge the redemption queue by breaking its own token account, fixed by parking ([ADR 0030](decisions/0030-admin-cancel-parks-the-request.md)). The tests run on LiteSVM, with property tests for the claim path and rounding, invariant checks after instructions and golden layout fixtures. **No independent audit has been done yet**; one is planned before mainnet, auditor and date not chosen.
+**Reviews before devnet** ([reviews and audits](security/reviews-and-audits.md)). Before the layout froze, the program, client, scripts and app went through five parallel adversarial reviews, a review against the published audits of a comparable Solana program, an OWASP Smart Contract Top 10 (2026) pass and a simplification review ([ADR 0026](decisions/0026-program-simplification-for-the-freeze.md)), which removed four account types and the state the pilot does not use. Their decisions are ADRs 0019–0030. A first internal security audit of the fixed code followed (2026-10-11), and every confirmed finding is fixed; more internal audits will follow, each dated in the reviews log; among them a High, a holder able to wedge the redemption queue by breaking its own token account, fixed by parking ([ADR 0030](decisions/0030-admin-cancel-parks-the-request.md)). The tests run on LiteSVM, with property tests for the claim path and rounding, invariant checks after instructions and golden layout fixtures. **No independent audit has been done yet**; one is planned before mainnet, auditor and date not chosen.
 
 ```figure id="fig-7-governance" title="Figure 7 (optional). Governance and upgrade path"
 Left-to-right pipeline: [Verified build (solana-verify)] -> [Buffer account (hash = build hash)] -> [Bundled Squads proposal: upgrade + IDL + verify PDA] -> [Time lock — public announcement on transparency page] -> [Execute] -> [Smoke checks].
@@ -463,7 +463,7 @@ The repository was created on 2026-10-01, inside the hackathon window (2026-09-1
 |---|---|
 | Specification and ADRs 0001–0030; Anchor workspace; CI with `idl-compat`; Codama client | Done. ADR 0027 is still proposed; the rest are accepted |
 | Core program: 34 instructions, LiteSVM integration, property, invariant and layout tests, including the `pay_claim`-never-refused property test | Done (v1 layout frozen) |
-| Pre-devnet reviews and internal security audit, with every confirmed finding fixed (§11) | Done |
+| Pre-devnet reviews and the first internal security audit (2026-10-11), with every confirmed finding fixed (§11) | Done |
 | Devnet deploy with Squads-owned upgrade authority and reserve admin | Done: [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet), release `v1.0.0-devnet`, the pilot demo reserve (test activity is visible). The on-chain program hash matches the build; the `solana-verify` release build is pending |
 | Pilot app at [reserve.mutav.finance](https://reserve.mutav.finance): public transparency pages reading the devnet reserve, operator console, Squads proposal builders for the admin, capital queue, reserve simulator | Done |
 | Demo video of the lifecycle on devnet | Done ([demo](demo/)) |
@@ -586,7 +586,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 - for counsel: whether an accessories-inclusive ceiling displaces CC 822, whether exhaustion extinguishes the fiança for the art. 59 liminar, and whether a public below-target flag invites a CC 826 / LI 40 II argument;
 - two legs or only categories; the backstop amount;
 - agency billing: late-payment terms, activation fees, the take in BRL or BRS;
-- the take rate (20% on devnet) and the caps after the pilot; the provision formula; recoveries;
+- the take rate after the pilot (it starts at 20%) and the caps; the provision formula; recoveries;
 - whether the pilot waits for a full independent audit;
 - the issuers' answers on PDA mints, CPI burn, `BondPrice` and a BRS↔TESOURO path.
 
@@ -657,7 +657,7 @@ If MUTAV failed, landlords could require tenants to replace the guarantee within
 | `max_claim_per_period` | `pay_claim`, over any 31 consecutive UTC days (approved payments included) | R$20k | Decided (ADR 0028); about 2% of `max_tvl` |
 | `stress_buffer` | `coverage_required` (ADR 0022, in the v1 binary) | R$19k | Decided (ADR 0028); at most `max_tvl` |
 | `c` (`coverage_ratio_bps`) | All gates | 0.25 (conservative variant 0.50) | Decided (ADR 0028); program range 0.10–1.0 (ADR 0016, ADR 0022); the two-tail-year check stays off-chain |
-| `fee_take_bps` | `contribute_fees` | 20% | Devnet config (ADR 0028); final rate open; program max 30% |
+| `fee_take_bps` | `contribute_fees` | 20% | Decided: starts at 20% (ADR 0028); program max 30% |
 | `min_request` / `max_request` | `request_*` | R$1,000 / R$100,000 | Decided (ADR 0028); a full exit below the minimum is allowed down to a tenth of it (ADR 0029) |
 | `max_nav_move_bps` | `refresh` and both fills | 100% on devnet | Lowered for the real pilot (value open) |
 | Admin / upgrade time locks | Squads | 24 h / 7 days in the real pilot (devnet floors 5 min / 1 h) | Decided (ADR 0020) |
