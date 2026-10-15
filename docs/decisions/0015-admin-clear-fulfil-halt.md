@@ -1,6 +1,6 @@
 # 0015 — Admin clear for the NAV-move halt
 
-- **Status:** Proposed (2026-10-06), pending founder confirmation (Julia, Draau). Resolves the clearing path left TBD in spec §5.8 step 3.
+- **Status:** Accepted (2026-10-15), confirmed by the founders (Julia, Draau); proposed 2026-10-06. In the v1 devnet binary (`v1.0.0-devnet`). Resolves the clearing path left TBD in spec §5.8 step 3.
 
 ## Context
 

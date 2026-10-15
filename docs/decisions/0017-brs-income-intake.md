@@ -1,6 +1,6 @@
 # 0017 — BRS income intake: an income inbox and `sweep_income`
 
-- **Status:** Proposed (2026-10-07), pending founder confirmation (Julia, Draau). Building it before the devnet layout freeze was approved by Julia. Follows the design review *BRS Yield Intake* (2026-10-06, `.claude/notes/worlds-fair-research/brs-yield-intake.html` in the workspace). Amends ADR 0015 (one more effect of `clear_fulfil_halt`) and adds to the mint guard of spec §5.1 (PC-19).
+- **Status:** Accepted (2026-10-15), confirmed by the founders (Julia, Draau); proposed 2026-10-07. In the v1 devnet binary (`v1.0.0-devnet`). Building it before the devnet layout freeze was approved by Julia. Follows the design review *BRS Yield Intake* (2026-10-06, `.claude/notes/worlds-fair-research/brs-yield-intake.html` in the workspace). Amends ADR 0015 (one more effect of `clear_fulfil_halt`) and adds to the mint guard of spec §5.1 (PC-19).
 
 ## Context
 
