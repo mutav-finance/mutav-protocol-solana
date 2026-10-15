@@ -69,7 +69,7 @@ flowchart LR
 | OWASP Smart Contract Top 10 (2026) pass | The target design checked against each category. | Done. Its decisions are part of the design on these pages. |
 | Simplification review (2026-10-10) | The planned v1 checked against Solana and Anchor guidance (transaction size, Borsh enum evolution, `init_if_needed`, sealevel attacks) to remove state the pilot does not use before the freeze. | Done. Recorded in [ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md). |
 | Fix wave | Bounded pull requests, each with tests first, an ADR and spec update for every economic change, and a regenerated client for every IDL change. | In progress. |
-| Internal security audit | A fresh review of the fixed code before deploy. | Pending. |
+| Internal security audit | A fresh review of the fixed code before deploy. | Done (2026-10-11): the Wave 1 review (five finders plus verifiers). Every confirmed finding is fixed (#51, #52, #54, #58); the High finding is ADR 0030. |
 | Review report | Published in this repository after its fixes land. | Pending. |
 
 The report is held back until the fixes are merged, so these pages describe the decided design, not the findings.
