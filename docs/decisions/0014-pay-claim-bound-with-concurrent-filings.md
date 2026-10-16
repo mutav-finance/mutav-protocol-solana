@@ -1,6 +1,6 @@
 # 0014 — `pay_claim` bound with concurrent filings on one leg
 
-- **Status:** Proposed (2026-10-06), pending founder confirmation (Julia, Draau). Refines spec §5.4 `pay_claim` rule 2.
+- **Status:** Accepted (2026-10-15), confirmed by the founders (Julia, Draau); proposed 2026-10-06. In the v1 devnet binary (`v1.0.0-devnet`). Refines spec §5.4 `pay_claim` rule 2.
 
 ## Context
 
