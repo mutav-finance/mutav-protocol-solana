@@ -4,7 +4,7 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 
 ## Try it
 
-**Live pilot app: [reserve.mutav.finance](https://reserve.mutav.finance)**. Built for the Colosseum Crypto World's Fair (Sep 14 – Oct 12, 2026).
+**Live pilot app: [reserve.mutav.finance](https://reserve.mutav.finance)**. Built for the Colosseum Crypto World's Fair (Sep 14 – Oct 12, 2026); submitted on 2026-10-12 and now in judging. The demo keeps every page open, including the capital area.
 
 | Page | What it shows |
 |---|---|
@@ -16,7 +16,7 @@ MUTAV is an institutional *fiador*: it gives Brazilian tenants a rental guarante
 
 > **Status:** the program is live on devnet as [`GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV`](https://explorer.solana.com/address/GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV?cluster=devnet), with its upgrade authority and reserve admin held by Squads v4 multisigs. It runs the pilot demo reserve on devnet; test activity is visible, and the live pages read it. Addresses: [Devnet addresses](#devnet-addresses). To run every page against a seeded local validator instead, see [Pilot app](#pilot-app).
 
-**Read next:** the [litepaper](docs/litepaper.md), the [specification](docs/spec.md), the [architecture decisions](docs/decisions/) and the [development provenance](docs/provenance.md).
+**Read next:** the [protocol litepaper](docs/litepaper.md) (a model for running guarantees on-chain), the [Brazil pilot paper](docs/pilot/brazil-pilot.md) (the first deployment), the [specification](docs/spec.md), the [architecture decisions](docs/decisions/) and the [development provenance](docs/provenance.md).
 
 **Where to look in the code:**
 
@@ -31,7 +31,7 @@ The goal of the pilot is to prove that a digital-asset reserve can be run as a v
 
 The pilot reserve holds BRS (Nora Finance, 1:1 BRL stablecoin). More assets can be added later through whitelisted, capped adapters: Etherfuse TESOURO (tokenized Brazilian treasury) is the first candidate, pending an Etherfuse BRS path ([ADR 0018](docs/decisions/0018-brs-only-pilot-reserve.md)).
 
-The reserve grows from two sources besides capital: **guarantee fees** (`contribute_fees`, net of MUTAV's take) and **issuer income**, Nora's monthly BRS revenue share to its partners. Nora pays that income into the reserve's *income inbox* (the vault authority's associated token account for BRS, created at `initialize`), where it counts toward nothing; each month the operator sweeps the amount on Nora's statement into the reserve with `sweep_income`, which books it and raises NAV ([ADR 0017](docs/decisions/0017-brs-income-intake.md), proposed). It is shown as issuer partnership revenue, separate from fees, and never enters the coverage math.
+The reserve grows from two sources besides capital: **guarantee fees** (`contribute_fees`, net of MUTAV's take) and **issuer income**, Nora's monthly BRS revenue share to its partners. Nora pays that income into the reserve's *income inbox* (the vault authority's associated token account for BRS, created at `initialize`), where it counts toward nothing; each month the operator sweeps the amount on Nora's statement into the reserve with `sweep_income`, which books it and raises NAV ([ADR 0017](docs/decisions/0017-brs-income-intake.md)). It is shown as issuer partnership revenue, separate from fees, and never enters the coverage math.
 
 ## Scope of this repo
 
@@ -214,7 +214,9 @@ About this deploy:
 
 ## Documentation
 
-- [Litepaper](docs/litepaper.md) ([HTML](docs/litepaper.html)): the protocol and the pilot in one read.
+- [Protocol litepaper](docs/litepaper.md) ([HTML](docs/litepaper.html)): *Verifiable Guarantees on a Public Chain*, a model for running guarantees on-chain and its Solana implementation. Draft for comment (v0.5).
+- [Brazil pilot paper](docs/pilot/brazil-pilot.md) ([HTML](docs/pilot/brazil-pilot.html)): the first deployment: rental guarantees in Brazil, MUTAV as *fiador*, the pilot configuration and its risks. Draft for comment (v0.1).
+- Comments on either paper: open an issue with the [`litepaper`](https://github.com/mutav-finance/mutav-protocol-solana/labels/litepaper) label, until 2026-11-15.
 - [Protocol specification](docs/spec.md): accounts, instructions, invariants, caps, events.
 - [Implementation plan](docs/plan.md): task-by-task plan for the hackathon build.
 - [Architecture decisions](docs/decisions/): ADRs for the locked design choices.
@@ -228,7 +230,7 @@ About this deploy:
 
 There are **no keys in this repository**: no keypairs, no secret keys, no private-key environment variables. The client composes transactions and never signs; the pilot app's connected wallet signs, and its server only relays signed transactions. The operator key is held in KMS by mutav-app, and admin authority is a Squads multisig. Program and deploy keypairs live outside the repo, and `*.json` keypair files are gitignored.
 
-The program is **unaudited and pre-pilot**. Do not deposit funds you are not prepared to lose. To report a vulnerability, see [SECURITY.md](SECURITY.md).
+The program runs on **devnet only** and is **pre-pilot**. It has had internal reviews ([dated here](docs/reviews/)) and **no independent audit**; one comes before any outside capital. The demo reserve holds test tokens, and the reserve is not open to public investment. To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## License
 
