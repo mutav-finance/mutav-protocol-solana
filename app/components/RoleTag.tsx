@@ -1,21 +1,50 @@
 /**
- * RoleTag — who does this. One colour and one shape per role, used on every
- * page: Reserve Admin ■, Operator ◆, Investor ▲, Anyone ○. The text label is
- * always shown, so a role never reads from colour alone.
+ * RoleTag — who does this. One colour per role on the brand's 6px-square
+ * badge mark (STYLE.md: square + mono label), used on every page: Reserve
+ * Admin, Operator, Investor filled; Anyone hollow. The pauser key, held on the
+ * Reserve Admin side, gets the admin colour hollow ({@link PauserTag}). The
+ * text label is always shown, so a role never reads from colour alone.
  */
 import type { ReactNode } from "react";
 import { ROLE_META, type Role } from "@/lib/roles";
 
-export function RoleMarker({ role, size = 8 }: { role: Role; size?: number }) {
-  const { color, marker } = ROLE_META[role];
-  const s = size;
+/** The 6px square: filled, or a 1px hollow outline. */
+export function SquareMark({ color, hollow = false, size = 6 }: { color: string; hollow?: boolean; size?: number }) {
   return (
-    <svg width={s} height={s} viewBox="0 0 10 10" aria-hidden="true" style={{ flexShrink: 0, display: "block" }}>
-      {marker === "square" && <rect x="1" y="1" width="8" height="8" fill={color} />}
-      {marker === "diamond" && <path d="M5 0 L10 5 L5 10 L0 5 Z" fill={color} />}
-      {marker === "triangle" && <path d="M5 0.5 L9.8 9.5 L0.2 9.5 Z" fill={color} />}
-      {marker === "ring" && <rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke={color} strokeWidth="1.5" />}
-    </svg>
+    <span
+      aria-hidden="true"
+      style={{ width: size, height: size, flexShrink: 0, display: "inline-block", boxSizing: "border-box", background: hollow ? "transparent" : color, border: hollow ? `1px solid ${color}` : undefined }}
+    />
+  );
+}
+
+export function RoleMarker({ role, size = 6 }: { role: Role; size?: number }) {
+  const { color, marker } = ROLE_META[role];
+  return <SquareMark color={color} hollow={marker === "hollow"} size={size} />;
+}
+
+const TAG_STYLE = {
+  display: "inline-flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: "2px 8px",
+  fontSize: 11,
+  fontWeight: 500,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--color-text-2)",
+  verticalAlign: "middle",
+  maxWidth: "100%",
+} as const;
+
+/** The pauser key's tag: the admin colour, hollow (its own key on the Reserve Admin side, not the multisig). */
+export function PauserTag({ suffix }: { suffix?: ReactNode }) {
+  return (
+    <span className="font-mono" data-role="pauser" style={TAG_STYLE}>
+      <SquareMark color={ROLE_META.admin.color} hollow />
+      <span style={{ color: "var(--color-text)", whiteSpace: "nowrap" }}>Pauser</span>
+      {suffix}
+    </span>
   );
 }
 
@@ -31,17 +60,7 @@ export function RoleTag({ role, bordered = false, prefix, suffix }: { role: Role
       className="font-mono"
       data-role={role}
       style={{
-        display: "inline-flex",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: "2px 6px",
-        fontSize: 11,
-        fontWeight: 500,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--color-text-2)",
-        verticalAlign: "middle",
-        maxWidth: "100%",
+        ...TAG_STYLE,
         ...(bordered ? { border: `1px solid ${m.color}`, padding: "3px 8px", background: "var(--color-surface)" } : {}),
       }}
     >

@@ -32,8 +32,8 @@ export type RoleMeta = {
   duty: string;
   /** CSS custom property of the role colour (defined per front in globals.css). */
   color: string;
-  /** Shape marker: the secondary encoding, so a role never reads from colour alone. */
-  marker: "square" | "diamond" | "triangle" | "ring";
+  /** The 6px-square badge mark (STYLE.md): filled in the role colour, or hollow for "Anyone". The label always shows, so a role never reads from colour alone. */
+  marker: "solid" | "hollow";
 };
 
 export const ROLE_META: Record<Role, RoleMeta> = {
@@ -42,28 +42,28 @@ export const ROLE_META: Record<Role, RoleMeta> = {
     holder: "Squads v4 multisig, time-locked (plus a separate pauser key)",
     duty: "Sets config and caps, fulfils the capital queue, pauses and unpauses.",
     color: "var(--color-role-admin)",
-    marker: "square",
+    marker: "solid",
   },
   operator: {
     label: "Operator",
     holder: "MUTAV's operator key",
     duty: "Issues guarantees, books guarantee fees and issuer income, files, pays and settles claims.",
     color: "var(--color-role-operator)",
-    marker: "diamond",
+    marker: "solid",
   },
   investor: {
     label: "Investor",
     holder: "An allowlisted capital wallet",
     duty: "Requests deposits and redemptions, then claims its shares or assets.",
     color: "var(--color-role-investor)",
-    marker: "triangle",
+    marker: "solid",
   },
   anyone: {
     label: "Anyone",
     holder: "Any wallet",
     duty: "Runs the permissionless cranks.",
     color: "var(--color-text-3)",
-    marker: "ring",
+    marker: "hollow",
   },
 };
 

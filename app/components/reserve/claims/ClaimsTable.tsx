@@ -9,25 +9,24 @@
  * sort first, then newest filing.
  * Below 600px each claim stacks as a block (`.claims-table` in globals.css):
  * stage and amount, guarantee and the chevron, then the times, each labelled.
- * The program sets no settlement deadline (ADR 0019): the payout SLA is the
- * operator platform's, so no row is marked late.
+ * The program sets no settlement deadline (ADR 0019), so no row is marked late.
  */
 import { Fragment, useState, type ReactNode } from "react";
 import { Mono } from "@/components/Mono";
 import { Explorer } from "@/components/Explorer";
 import { Button } from "@/components/ui/button";
 import { elapsed, fmtBrs, fmtDuration, fmtStamp, fmtTime } from "@/lib/format";
-import { CLAIM_STAGE_LABEL, type ClaimRow } from "@/lib/view";
+import { CLAIM_STAGE_LABEL, LEG_LABEL, type ClaimRow } from "@/lib/view";
 import { Num, Table, short } from "@/components/reserve/sections/shared";
 
 const PAGE = 10;
 
 const TIPS = {
-  Status: "Needs the Reserve Admin's approval, approved, awaiting payment, paid from the reserve, or received by the landlord (PIX), from the claim filing on-chain.",
+  Status: "Needs the Reserve Admin's approval, approved, awaiting payment, paid from the reserve, or received by the agency (PIX), from the claim filing on-chain.",
   "Filed (UTC)": "When file_claim was recorded on-chain (ClaimFiling filed_at).",
   "Paid (UTC)": "When pay_claim moved the claim payment out of the reserve (ClaimFiling paid_at).",
-  "Settled (UTC)": "When settle_payout recorded the landlord's PIX receipt (ClaimFiling settled_at).",
-  "Filed → settled": "From filing to the landlord receiving it by PIX.",
+  "Settled (UTC)": "When settle_payout recorded the agency's PIX receipt (ClaimFiling settled_at).",
+  "Filed → settled": "From filing to the agency receiving it by PIX.",
 };
 
 type Status = { label: string; color: string; title?: string; rank: number };
@@ -48,18 +47,18 @@ export function claimStatus(c: ClaimRow): Status {
     case "filed":
       return s("awaiting payment", 2, "Filed, not paid yet.");
     case "paid":
-      return s(CLAIM_STAGE_LABEL.paid, 3, "Paid from the reserve; the landlord has not received it by PIX yet.");
+      return s(CLAIM_STAGE_LABEL.paid, 3, "Paid from the reserve; the agency has not received it by PIX yet.");
     default:
       return s(CLAIM_STAGE_LABEL.settled, 4);
   }
 }
 
-/** 6px square badge with a mono label (brand status mark, no fill behind the text). */
+/** 6px square badge with an uppercase mono label, like every other badge (brand status mark, no fill behind the text). */
 export function StatusBadge({ s }: { s: Status }) {
   return (
     <span className="inline-flex items-center gap-2" title={s.title}>
       <span aria-hidden="true" style={{ width: 6, height: 6, background: s.color, display: "inline-block", flexShrink: 0 }} />
-      <Mono style={{ color: s.color === "var(--color-text-3)" ? "var(--color-text-2)" : s.color, fontSize: 12 }}>{s.label}</Mono>
+      <Mono style={{ color: s.color === "var(--color-text-3)" ? "var(--color-text-2)" : s.color, fontSize: 12, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{s.label}</Mono>
     </span>
   );
 }
@@ -108,7 +107,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                 <td>
                   <span className="inline-flex items-baseline gap-2">
                     <Explorer value={c.guarantee} label={short(c.guaranteeId)} />
-                    <span className="font-body" style={{ fontSize: 11, color: "var(--color-text-3)" }}>{c.leg}</span>
+                    <span className="font-body" style={{ fontSize: 11, color: "var(--color-text-3)" }}>{LEG_LABEL[c.leg]}</span>
                   </span>
                 </td>
                 <Num>{fmtBrs(c.amount ?? c.provision)}</Num>
@@ -141,7 +140,7 @@ export function ClaimsTable({ rows }: { rows: ClaimRow[] }) {
                         <Explorer value={c.filing} label={fmtTime(c.filedAt)} />
                       </Detail>
                       <Detail label="Paid">{c.paidAt !== null ? <Explorer value={c.filing} label={fmtTime(c.paidAt)} /> : <span className="font-body text-(--color-text-3)">not paid yet</span>}</Detail>
-                      <Detail label="Received by landlord (PIX)">
+                      <Detail label="Received by the agency (PIX)">
                         {c.settledAt !== null ? <Mono style={{ fontSize: 12 }}>{fmtTime(c.settledAt)}</Mono> : <span className="font-body text-(--color-text-3)" style={{ fontSize: 12 }}>pending</span>}
                       </Detail>
                       <Detail label="Guarantee">

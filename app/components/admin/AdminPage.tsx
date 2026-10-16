@@ -9,6 +9,7 @@
  * directly by the pauser key. When the configured admin is not a Squads vault
  * (localnet only), actions can be signed directly, clearly labelled.
  */
+import { useEffect, useState } from "react";
 import { Page, ReadError } from "@/components/Section";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MoneyProvider } from "@/components/MoneyProvider";
@@ -32,16 +33,43 @@ function modeOf(sq: SquadsResp | null): Mode {
   return null;
 }
 
-/** Sticky in-page nav, under the site bar (56px + hairline). */
+/**
+ * Sticky in-page nav under the site bar, in the /reserve tab style: body
+ * font, 2px amber underline on the section in view.
+ */
 function SectionNav() {
+  const [active, setActive] = useState<string>(ADMIN_SECTIONS[0].id);
+  useEffect(() => {
+    const els = ADMIN_SECTIONS.map((s) => document.getElementById(s.id)).filter((e): e is HTMLElement => !!e);
+    const io = new IntersectionObserver(
+      (entries) => {
+        const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (top) setActive(top.target.id);
+      },
+      { rootMargin: "-120px 0px -60% 0px" },
+    );
+    els.forEach((e) => io.observe(e));
+    return () => io.disconnect();
+  }, []);
   return (
-    <nav aria-label="Admin sections" style={{ position: "sticky", top: 57, zIndex: 90, background: "var(--color-canvas)", borderBottom: "1px solid var(--color-border)", margin: "0 0 8px", padding: "10px 0", display: "flex", flexWrap: "wrap", gap: "6px 20px" }}>
-      {ADMIN_SECTIONS.map((s, i) => (
-        <a key={s.id} href={`#${s.id}`} className="font-mono ext-link" style={{ fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-          {String(i + 1).padStart(2, "0")} {s.label}
-        </a>
-      ))}
-    </nav>
+    <div className="bg-(--color-canvas) sticky top-14 z-[90] mb-2 border-b">
+      <nav aria-label="Admin sections" className="scroll-dark scroll-fade-x -mb-px flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        {ADMIN_SECTIONS.map((s) => {
+          const on = active === s.id;
+          return (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              aria-current={on ? "location" : undefined}
+              onClick={() => setActive(s.id)}
+              className={`font-body inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm whitespace-nowrap no-underline ${on ? "text-(--color-text) border-(--color-accent) font-medium" : "text-(--color-text-2) hover:text-(--color-text) border-transparent"}`}
+            >
+              {s.label}
+            </a>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
 
@@ -65,8 +93,8 @@ export function AdminPage() {
           <ReserveStats r={d.reserve} />
           <SectionNav />
           {mode?.via === "direct" && (
-            <div role="note" style={{ border: "1px solid var(--color-copper)", padding: "10px 14px", marginBottom: 8 }}>
-              <StatusBadge color="var(--color-copper)" label="DIRECT SIGNING · LOCALNET ONLY" />
+            <div role="note" style={{ border: "1px solid var(--color-border)", padding: "10px 14px", marginBottom: 8 }}>
+              <StatusBadge color="var(--color-text-3)" label="DIRECT SIGNING · LOCALNET ONLY" />
               <Note>The configured admin is a plain local key, not a Squads vault. Actions are signed directly by that key. On devnet every admin action is a proposal.</Note>
             </div>
           )}

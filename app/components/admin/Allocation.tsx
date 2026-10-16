@@ -46,8 +46,8 @@ function CompositionNow({ c }: { c: Composition }) {
     <div className="grid-2">
       <CompositionChart c={c} />
       <div className="grid-metrics" style={{ alignContent: "start" }}>
-        <MetricCard dense label="BRS in reserve" value={fmtBrs(c.brs)} unit={c.brsOnly ? "brs_balance · 100% BRS (pilot)" : `brs_balance · ${share(c.brsShareBps)} of stable assets`} />
-        <MetricCard dense label="Min in BRS (settlement token)" value={fmtPct(c.floorBps)} unit={c.floorBps === BPS_MAX ? "the pilot floor: nothing may be allocated" : `${fmtBrs(c.floorValue, 0)} now · ${fmtBrs(c.roomAboveFloor, 0)} above it`} />
+        <MetricCard dense label="BRS in reserve" value={fmtBrs(c.brs)} unit={c.brsOnly ? "brs_balance · 100% BRS (pilot)" : `brs_balance · ${share(c.brsShareBps)} of the reserve balance`} />
+        <MetricCard dense label="Min in BRS (settlement token)" value={fmtPct(c.floorBps)} unit={c.floorBps === BPS_MAX ? "the pilot floor: nothing may be allocated" : `${fmtBrs(c.floorValue)} now · ${fmtBrs(c.roomAboveFloor)} above it`} />
         <MetricCard dense label="Income inbox" value={fmtBrs(c.inbox)} unit="not yet counted: swept by the Operator" />
         <MetricCard dense label="Adapters" value={`${used} of ${ADAPTER_SLOTS}`} unit={used === 0 ? "none whitelisted: no other asset can be held" : "whitelisted in VaultConfig.adapters"} />
         {!c.brsOnly && <MetricCard dense label="Through adapters" value={fmtBrs(c.adapterValue)} unit={`at the bounded price · ${share(c.adapterShareBps)}`} />}
@@ -110,10 +110,10 @@ function Adapters({ c }: { c: Composition }) {
             <td className="num">{m(a.slot)}</td>
             <td><Explorer value={a.programId} /></td>
             <td><Explorer value={a.assetMint} /></td>
-            <td className="num">{m(fmtBrs(a.cap, 0))}</td>
+            <td className="num">{m(fmtBrs(a.cap))}</td>
             <td>{m("with the upgrade")}</td>
             <td>{m("per adapter, with the upgrade")}</td>
-            <td className="num">{m(fmtBrs(a.allocated, 0))}</td>
+            <td className="num">{m(fmtBrs(a.allocated))}</td>
             <td>{m(a.enabled ? "yes" : "no")}</td>
           </tr>
         ))
@@ -156,10 +156,10 @@ function FloorControl({ mode, c }: { mode: Mode; c: Composition }) {
       <Facts
         now={m(`${fmtPct(c.floorBps)} in BRS (min_settlement_bps)`)}
         bound={m(`0 – ${BPS_MAX} bps · pilot ${BPS_MAX} (100%)`)}
-        does="The minimum share of stable assets held in BRS, the token guarantee fees come in and claim payments go out in. 100% in the pilot: the program holds BRS only and has no floor field yet (ADR 0018, ADR 0019); it returns with the first adapter."
+        does="The minimum share of the reserve balance held in BRS, the token guarantee fees come in and claim payments go out in. 100% in the pilot: the program holds BRS only and has no floor field yet (ADR 0018, ADR 0019); it returns with the first adapter."
       />
       <Grid>
-        <TextField id="adm-settlement-floor" label="New floor (bps)" value={floor} onChange={setFloor} numeric hint={v === null ? `now ${fmtPct(c.floorBps)} · 0 – ${BPS_MAX} bps` : v === c.floorBps ? "unchanged: nothing to propose" : `${fmtPct(v)} · preview: at least ${fmtBrs(preview!, 0)} in BRS at today's stable assets`} />
+        <TextField id="adm-settlement-floor" label="New floor (bps)" value={floor} onChange={setFloor} numeric hint={v === null ? `now ${fmtPct(c.floorBps)} · 0 – ${BPS_MAX} bps` : v === c.floorBps ? "unchanged: nothing to propose" : `${fmtPct(v)} · preview: at least ${fmtBrs(preview!)} in BRS at today's stable assets`} />
       </Grid>
     </AdminAction>
   );
@@ -196,7 +196,7 @@ export function Allocation({ mode }: { mode: Mode }) {
       {/* Alias for links to the earlier #reserve-assets anchor. */}
       <span id={ALLOCATION_ALIAS} aria-hidden="true" style={{ position: "relative", top: -112, display: "block", height: 0 }} />
       <WhatThis>
-        The pilot reserve holds BRS only (ADR 0018). BRS bears no yield; the reserve receives Nora&apos;s issuer partnership revenue in BRS (ADR 0017), at a rate set by a commercial agreement that is not on-chain (MUTAV expects it below but near Selic, pending Nora&apos;s confirmation). More assets can be added later through whitelisted, capped adapters; TESOURO is the first candidate, not a commitment.
+        The pilot reserve holds BRS only (ADR 0018). BRS bears no yield; the reserve receives Nora&apos;s issuer revenue share in BRS (ADR 0017), at a rate set by an off-chain agreement. More assets can be added later through whitelisted, capped adapters; TESOURO is the first candidate, not a commitment.
       </WhatThis>
       <Sub id="allocation-composition" title="Composition" badge={LIVE}>
         <CompositionNow c={c} />

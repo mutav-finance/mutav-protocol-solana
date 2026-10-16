@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" data-composition-variables='[
+  {"id":"mode","type":"enum","label":"Mode","default":"claim","options":[{"value":"register","label":"Register"},{"value":"refusal","label":"Refusal"},{"value":"claim","label":"Claim"}]},
+  {"id":"steps","type":"string","label":"Step times (s, comma-separated, relative to clip start; empty = mode defaults)","default":""},
+  {"id":"amount","type":"string","label":"Claim payout label","default":"R$1,500"}
+]'>
+  <head>
+    <meta charset="UTF-8" />
+    <!-- MUTAV live diagram: a 460x260 annotation card. Sub-composition: everything lives inside <template>. -->
+  </head>
+  <body>
+    <template id="live-diagram-template">
+      <style>
+        @font-face { font-family: "Inter"; font-weight: 100 900; font-style: normal; src: url("../assets/fonts/Inter.woff2") format("woff2"); }
+        @font-face { font-family: "JetBrains Mono"; font-weight: 100 800; font-style: normal; src: url("../assets/fonts/JetBrainsMono.woff2") format("woff2"); }
+        #root { position: absolute; inset: 0; overflow: hidden; }
+        .ld-card { position: absolute; left: 0; top: 0; width: 460px; height: 260px; border-radius: 12px; background: rgba(22,24,28,.94);
+          border: 1px solid #2a2d33; box-shadow: 0 24px 50px -18px rgba(0,0,0,.8); opacity: 0; overflow: hidden; }
+        .ld-card svg { position: absolute; left: 0; top: 0; width: 460px; height: 260px; overflow: visible; }
+        .ld-title { position: absolute; left: 24px; top: 22px; font-family: "JetBrains Mono", monospace; font-size: 14px; letter-spacing: .14em; color: #8a8f99; }
+        .ld-step { position: absolute; left: 24px; right: 20px; top: 206px; font-family: "Inter", sans-serif; font-size: 19px; font-weight: 500; color: #f0f0ee; white-space: nowrap; opacity: 0; }
+        .ld-nl { font-family: "Inter", sans-serif; font-size: 18px; fill: #a3a8b1; text-anchor: middle; }
+        .ld-sub { font-family: "JetBrains Mono", monospace; font-size: 13px; letter-spacing: .06em; fill: #e8a020; text-anchor: middle; }
+        .ld-d { fill: none; stroke-dasharray: 1 1.2; stroke-dashoffset: 1.1; stroke-linecap: round; stroke-linejoin: round; }
+        .ld-mode { opacity: 0; }
+      </style>
+
+      <div id="root" class="ld-root" data-composition-id="live-diagram" data-width="460" data-height="260">
+        <div class="ld-card">
+          <div class="ld-title"></div>
+          <svg viewBox="0 0 460 260">
+            <!-- ===== node row (register + claim): Operator · Reserve · Agency · Landlord ===== -->
+            <g class="ld-mode ld-nodes">
+              <!-- operator: clipboard -->
+              <g class="ld-n-op">
+                <rect x="40" y="70" width="36" height="44" rx="5" fill="none" stroke="#f0f0ee" stroke-width="2"/>
+                <path d="M50 70 V64 H66 V70 M48 84 H68 M48 94 H68 M48 104 H60" fill="none" stroke="#8a8f99" stroke-width="2"/>
+                <text class="ld-nl" x="58" y="146">Operator</text>
+              </g>
+              <!-- reserve: vessel -->
+              <g class="ld-n-res">
+                <rect x="157" y="68" width="40" height="48" rx="8" fill="none" stroke="#e8a020" stroke-width="2.5"/>
+                <rect x="159" y="88" width="36" height="26" rx="6" fill="#e8a020" fill-opacity=".85"/>
+                <path d="M163 62 H191" stroke="#e8a020" stroke-width="2.5" stroke-linecap="round"/>
+                <text class="ld-nl" x="177" y="146" style="fill:#f0f0ee">Reserve</text>
+                <text class="ld-sub" x="177" y="166">on Solana</text>
+              </g>
+              <!-- agency: storefront -->
+              <g class="ld-n-ag">
+                <rect x="271" y="80" width="42" height="34" rx="2" fill="none" stroke="#f0f0ee" stroke-width="2"/>
+                <path d="M267 80 H317 L313 90 Q306 96 299 90 Q292 96 285 90 Q278 96 271 90 Z" fill="none" stroke="#e8a020" stroke-width="2"/>
+                <rect x="286" y="98" width="12" height="16" fill="none" stroke="#f0f0ee" stroke-width="2"/>
+                <text class="ld-nl" x="292" y="146">Agency</text>
+              </g>
+              <!-- landlord: house -->
+              <g class="ld-n-ll">
+                <path d="M384 88 L405 70 L426 88" fill="none" stroke="#f0f0ee" stroke-width="2" stroke-linejoin="round"/>
+                <rect x="389" y="86" width="32" height="28" rx="2" fill="none" stroke="#f0f0ee" stroke-width="2"/>
+                <rect x="400" y="100" width="10" height="14" fill="none" stroke="#f0f0ee" stroke-width="2"/>
+                <text class="ld-nl" x="405" y="146">Landlord</text>
+              </g>
+              <!-- arrows -->
+              <path class="ld-d ld-a-file" pathLength="1" d="M262 84 H206 M214 78 L205 84 L214 90" stroke="#f0f0ee" stroke-width="2.5"/>
+              <path class="ld-d ld-a-verify" pathLength="1" d="M86 92 H146" stroke="#3dab72" stroke-width="2.5"/>
+              <path class="ld-d ld-a-pix" pathLength="1" d="M206 106 H262 M254 100 L263 106 L254 112" stroke="#e8a020" stroke-width="3"/>
+              <path class="ld-d ld-a-ll" pathLength="1" d="M324 100 H376 M368 94 L377 100 L368 106" stroke="#8a8f99" stroke-width="2"/>
+              <!-- checks -->
+              <g class="ld-chk-res" style="opacity:0"><circle cx="200" cy="64" r="10" fill="#16181c" stroke="#3dab72" stroke-width="2"/><path d="M195 64 l3.5 3.5 l6 -7" fill="none" stroke="#3dab72" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+              <g class="ld-chk-op" style="opacity:0"><circle cx="80" cy="66" r="10" fill="#16181c" stroke="#3dab72" stroke-width="2"/><path d="M75 66 l3.5 3.5 l6 -7" fill="none" stroke="#3dab72" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+            </g>
+
+            <!-- ===== mini gate bar (refusal). Bar axis R$36,000 → R$46,000 over x 24–436 (41.2 px per R$1,000) ===== -->
+            <g class="ld-mode ld-gate">
+              <text class="ld-nl" x="24" y="82" style="text-anchor:start;fill:#f0f0ee">Reserve <tspan fill="#e8a020">R$44,500</tspan></text>
+              <text class="ld-nl" x="209.4" y="118" style="text-anchor:end;fill:#c3c7ce">Required R$40,500</text>
+              <rect x="24" y="130" width="412" height="40" rx="6" fill="#0e0f11" stroke="#2a2d33" stroke-width="1.5"/>
+              <rect x="24" y="130" width="350.2" height="40" rx="6" fill="#e8a020" fill-opacity=".85"/>
+              <!-- next lease: from required (40,500) to 45,000 → x 209.4 → 394.8; overshoot past reserve edge 374.2 -->
+              <rect class="ld-g-next" x="209.4" y="143" width="185.4" height="14" rx="3" fill="rgba(240,240,238,.22)" stroke="#f0f0ee" stroke-width="1.5"/>
+              <rect class="ld-g-over" x="374.2" y="143" width="20.6" height="14" rx="2" fill="#c94040" style="opacity:0"/>
+              <line x1="209.4" y1="124" x2="209.4" y2="176" stroke="#f0f0ee" stroke-width="2"/>
+              <line class="ld-g-edge" x1="374.2" y1="124" x2="374.2" y2="176" stroke="#e8a020" stroke-width="2" stroke-dasharray="4 3" style="opacity:0"/>
+            </g>
+          </svg>
+          <div class="ld-step ld-s0"></div><div class="ld-step ld-s1"></div><div class="ld-step ld-s2"></div><div class="ld-step ld-s3"></div><div class="ld-step ld-s4"></div>
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          const root = document.querySelector(".ld-root:not([data-ld-init])") || document.querySelector(".ld-root");
+          root.setAttribute("data-ld-init", "1");
+          const q = (s) => root.querySelector(s);
+          // per-instance values: host data-variable-values first, then runtime variables, then defaults
+          let v = {};
+          try { v = (window.__hyperframes && window.__hyperframes.getVariables && window.__hyperframes.getVariables()) || {}; } catch (e) {}
+          const host = root.parentElement && root.parentElement.closest("[data-variable-values]");
+          if (host) { try { v = Object.assign({}, v, JSON.parse(host.getAttribute("data-variable-values"))); } catch (e) {} }
+          const mode = ["register", "refusal", "claim"].includes(v.mode) ? v.mode : "claim";
+          const amount = v.amount || "R$1,500";
+          const DEF = { register: [0.4], refusal: [0.4], claim: [0.4, 1.4, 2.4, 3.4, 4.4] };
+          let steps = String(v.steps || "").split(",").map((x) => parseFloat(x)).filter((x) => !isNaN(x));
+          if (steps.length < DEF[mode].length) steps = DEF[mode].map((d, i) => (steps[i] !== undefined ? steps[i] : d));
+
+          const DIM = "#555b66";
+          const tl = gsap.timeline({ paused: true });
+          tl.fromTo(q(".ld-card"), { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "power1.out" }, 0);
+          const stepEls = [0, 1, 2, 3, 4].map((i) => q(".ld-s" + i));
+          // one active label at a time: the previous one fades out as the next fades in
+          let prev = null;
+          const label = (i, text, t, color) => {
+            const el = stepEls[i];
+            el.textContent = text;
+            if (color) el.style.color = color;
+            if (prev) tl.to(prev, { opacity: 0, duration: 0.15, ease: "power1.in" }, t + 0.25);
+            tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "power1.out" }, t + 0.4);
+            prev = el;
+          };
+          const draw = (sel, t) => tl.to(q(sel), { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" }, t);
+          const dim = (sel, t) => tl.to(q(sel), { stroke: DIM, duration: 0.25 }, t);
+          const pop = (sel, t) => tl.fromTo(q(sel), { opacity: 0 }, { opacity: 1, duration: 0.2 }, t);
+
+          if (mode === "refusal") {
+            q(".ld-title").textContent = "COVERAGE GATE";
+            tl.set(q(".ld-gate"), { opacity: 1 }, 0);
+            const s0 = steps[0];
+            tl.fromTo(q(".ld-g-next"), { scaleX: 0, svgOrigin: "209.4 150" }, { scaleX: 1, duration: 0.4, ease: "power2.inOut" }, s0);
+            tl.to(q(".ld-g-edge"), { opacity: 1, duration: 0.15 }, s0 + 0.3);
+            tl.to(q(".ld-g-over"), { opacity: 1, duration: 0.2 }, s0 + 0.45);
+            label(0, "Next lease → R$45,000 > R$44,500 · refused", s0, "#e06060");
+          } else {
+            tl.set(q(".ld-nodes"), { opacity: 1 }, 0);
+            if (mode === "register") {
+              q(".ld-title").textContent = "REGISTER";
+              draw(".ld-a-file", steps[0]);
+              pop(".ld-chk-res", steps[0] + 0.4);
+              label(0, "Guarantee registered · on-chain", steps[0]);
+            } else {
+              q(".ld-title").textContent = "CLAIM";
+              const [a, b, c, d, e] = steps;
+              draw(".ld-a-file", a); label(0, "Claim filed", a);
+              dim(".ld-a-file", b); draw(".ld-a-verify", b); pop(".ld-chk-op", b + 0.4); label(1, "Operator verifies ✓", b);
+              dim(".ld-a-verify", c); tl.to(q(".ld-chk-op"), { opacity: 0.4, duration: 0.25 }, c);
+              draw(".ld-a-pix", c); label(2, amount + " · PIX to the agency", c, "#e8a020");
+              pop(".ld-chk-res", d); label(3, "PIX recorded on-chain ✓", d, "#3dab72");
+              dim(".ld-a-pix", e); tl.to(q(".ld-chk-res"), { opacity: 0.4, duration: 0.25 }, e);
+              draw(".ld-a-ll", e); label(4, "Agency pays the landlord · off-chain", e, "#a3a8b1");
+            }
+          }
+          window.__timelines["live-diagram"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

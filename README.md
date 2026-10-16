@@ -100,7 +100,7 @@ No command in this repo runs in watch mode.
 
 ## Pilot app
 
-[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana, live at [reserve.mutav.finance](https://reserve.mutav.finance): `/` redirects to `/reserve`, `/reserve` public transparency (sub-routes `coverage`, `claims`, `capital`, `risks`, `verify`: health, coverage, claims timeline, flows, every account on Explorer, with snapshot charts), `/operator` the operator console (with the live coverage-gate preview; `/demo` redirects there), `/capital` the allowlist-gated capital queue, `/admin` Squads v4 proposal builders, and `/simulator` the reserve simulator. Every action is tagged with the role that signs it: Reserve Admin, Operator or Investor. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
+[`app/`](app/) is a Next.js 16 app that shows the reserve working on Solana, live at [reserve.mutav.finance](https://reserve.mutav.finance): `/` redirects to `/reserve`, `/reserve` public transparency (tabs Overview, Coverage, Claims, Capital, Risks, Verify at sub-routes `coverage`, `claims`, `capital`, `risks`, `verify`: health, coverage, claims timeline, flows, every account on Explorer, with snapshot charts), `/operator` the operator console (with the live coverage-gate preview; `/demo` redirects there), `/capital` the allowlist-gated capital queue, `/admin` Squads v4 proposal builders, and `/simulator` the reserve simulator. Every action is tagged with the role that signs it: Reserve Admin, Operator or Investor. Every number on screen is read from on-chain accounts through `clients/js`. Wallets sign; the server composes unsigned transactions and relays signed ones. Details: [`app/README.md`](app/README.md), rules: [`app/CLAUDE.md`](app/CLAUDE.md), spec: [`app/docs/spec.md`](app/docs/spec.md).
 
 Run it locally against a seeded validator (port 3001, since 3000 is often taken):
 
@@ -199,7 +199,7 @@ The pilot demo reserve on devnet; test activity is visible. Every address opens 
 | Share mint | [`4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7`](https://explorer.solana.com/address/4p5WnL8mVk6gMV6Mwd68SQz1GdW6PvNbjYshttuFh4c7?cluster=devnet) |
 | Reserve (BRS token account) | [`FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa`](https://explorer.solana.com/address/FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa?cluster=devnet) |
 | BRS mint (Nora, devnet) | [`BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4`](https://explorer.solana.com/address/BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4?cluster=devnet) |
-| Operator | [`A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k`](https://explorer.solana.com/address/A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k?cluster=devnet) |
+| Operator | [`8MtERL18dFtNPZESghbxR3g21d8FvY2mnTq855SFURPk`](https://explorer.solana.com/address/8MtERL18dFtNPZESghbxR3g21d8FvY2mnTq855SFURPk?cluster=devnet) |
 | Pauser | [`2tW76Vpu1nqctZRBMdzSrzXHcnwnMcFMJqiZyP8t5P1T`](https://explorer.solana.com/address/2tW76Vpu1nqctZRBMdzSrzXHcnwnMcFMJqiZyP8t5P1T?cluster=devnet) |
 | Treasury token account | [`BiTXGCiXuKEJS8VxBUdGrqnMpKo4umFcpH7qevitPtAU`](https://explorer.solana.com/address/BiTXGCiXuKEJS8VxBUdGrqnMpKo4umFcpH7qevitPtAU?cluster=devnet) |
 | Payments token account | [`CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj`](https://explorer.solana.com/address/CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj?cluster=devnet) |
@@ -210,6 +210,7 @@ About this deploy:
 - The on-chain program hash matches the build (`fad721d5…e6e7`). The release `v1.0.0-devnet` carries its IDL.
 - Its multisig time locks are 60 s (admin) and 120 s (upgrade), a test exception to the devnet floors of [ADR 0028](docs/decisions/0028-pilot-parameters.md) (300 s and 3,600 s). The real pilot keeps 24 h and 7 days.
 - `mutav_adapter_mock` is not deployed on devnet.
+- The operator was rotated on 2026-10-12 through `propose_role` / `accept_role` (the previous test key had been exposed). Transactions before that date are signed by the previous operator, `A2gqm8f8…695k`.
 
 ## Documentation
 

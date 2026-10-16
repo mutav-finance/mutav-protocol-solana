@@ -1,0 +1,11 @@
+{
+  "name": "mutav-ch3-flows",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "placeholder": "node tools/make-placeholder.mjs",
+    "build": "node tools/build.mjs",
+    "check": "npx --yes hyperframes@0.8.150 check",
+    "render": "npx --yes hyperframes@0.8.150 render --workers 2 --fps 30 --output out/ch3.mp4"
+  }
+}

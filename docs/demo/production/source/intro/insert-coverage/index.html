@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>MUTAV coverage gate</title>
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Geist"; font-weight: 100 900; font-style: normal; src: url("assets/fonts/Geist.woff2") format("woff2"); }
+      @font-face { font-family: "Inter"; font-weight: 100 900; font-style: normal; src: url("assets/fonts/Inter.woff2") format("woff2"); }
+      @font-face { font-family: "JetBrains Mono"; font-weight: 100 800; font-style: normal; src: url("assets/fonts/JetBrainsMono.woff2") format("woff2"); }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0e0f11; color: #f0f0ee; font-family: "Inter", sans-serif; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #0e0f11; }
+      .clip { position: absolute; inset: 0; overflow: hidden; }
+      #grid { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+        background-image: linear-gradient(to right, rgba(240,240,238,.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(240,240,238,.04) 1px, transparent 1px);
+        background-size: 48px 48px; }
+      svg { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+      .disp { font-family: "Geist", sans-serif; font-weight: 600; }
+      .mono { font-family: "JetBrains Mono", monospace; }
+      .s { font-family: "Inter", sans-serif; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="3.0">
+      <section id="stage" class="clip" data-start="0" data-duration="3.0" data-track-index="0">
+        <div id="grid"></div>
+        <!-- scale: x = 220 + R$ value * 0.0296  (R$ 0 → 220, R$50,000 → 1700) -->
+        <svg viewBox="0 0 1920 1080">
+          <text class="mono" x="220" y="220" style="font-size:22px;letter-spacing:.16em;fill:#8a8f99">COVERAGE GATE</text>
+          <!-- track -->
+          <rect x="220" y="400" width="1480" height="72" rx="8" fill="#16181c" stroke="#2a2d33" stroke-width="2"/>
+          <!-- reserve bar: R$44,500 → x 1537.2 -->
+          <g id="res" style="opacity:0">
+            <text class="disp" x="220" y="330" style="font-size:44px;fill:#f0f0ee">Reserve <tspan fill="#e8a020">R$44,500</tspan></text>
+            <text class="mono" x="222" y="368" style="font-size:22px;letter-spacing:.1em;fill:#8a8f99">HELD IN BRS</text>
+          </g>
+          <rect id="resBar" x="220" y="400" width="1317.2" height="72" rx="8" fill="#e8a020" fill-opacity=".85"/>
+          <line id="resEdge" x1="1537.2" y1="384" x2="1537.2" y2="488" stroke="#e8a020" stroke-width="4" style="opacity:0"/>
+          <!-- required marker: R$40,500 → x 1418.8 -->
+          <g id="req" style="opacity:0">
+            <line x1="1418.8" y1="384" x2="1418.8" y2="560" stroke="#f0f0ee" stroke-width="4"/>
+            <text class="s" x="1400" y="540" style="font-size:30px;font-weight:600;fill:#f0f0ee;text-anchor:end">Required coverage R$40,500</text>
+            <text class="s" x="1400" y="578" style="font-size:24px;fill:#a3a8b1;text-anchor:end">set by the reserve admin</text>
+          </g>
+          <!-- free gap -->
+          <g id="free" style="opacity:0">
+            <rect x="1418.8" y="400" width="118.4" height="72" fill="#3dab72" fill-opacity=".35"/>
+            <path d="M1420 386 V376 H1536 V386" fill="none" stroke="#3dab72" stroke-width="3"/>
+            <text class="s" x="1478" y="358" style="font-size:28px;font-weight:600;fill:#3dab72;text-anchor:middle">Free R$4,000</text>
+          </g>
+          <!-- next lease ghost: +R$4,500 from 40.500 → 45.000 (x 1418.8 → 1552) -->
+          <g id="ghostG" style="opacity:0">
+            <rect id="ghost" x="1418.8" y="620" width="133.2" height="48" rx="4" fill="rgba(240,240,238,.06)" stroke="#f0f0ee" stroke-width="2.5" stroke-dasharray="8 6"/>
+            <line id="ghostEdge" x1="1552" y1="600" x2="1552" y2="690" stroke="#f0f0ee" stroke-width="3" stroke-dasharray="6 5"/>
+            <text id="ghostT" class="s" x="1400" y="654" style="font-size:28px;fill:#f0f0ee;text-anchor:end">Next lease needs +R$4,500</text>
+          </g>
+          <line id="overLine" x1="1537.2" y1="488" x2="1537.2" y2="690" stroke="#e8a020" stroke-width="3" stroke-dasharray="6 5" style="opacity:0"/>
+          <g id="refused" style="opacity:0">
+            <text class="mono" x="1552" y="750" style="font-size:32px;font-weight:600;fill:#e06060;text-anchor:end">R$45,000 &gt; R$44,500 · refused</text>
+          </g>
+        </svg>
+      </section>
+    </div>
+    <script>
+      function build() {
+        const tl = gsap.timeline({ paused: true });
+        tl.fromTo("#res", { opacity: 0 }, { opacity: 1, duration: 0.25, ease: "power2.out" }, 0.05);
+        tl.fromTo("#resBar", { scaleX: 0, svgOrigin: "220 436" }, { scaleX: 1, duration: 0.5, ease: "expo.out" }, 0.1);
+        tl.fromTo("#resEdge", { opacity: 0 }, { opacity: 1, duration: 0.15 }, 0.5);
+        tl.fromTo("#req", { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 0.6);
+        tl.fromTo("#free", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 1.0);
+        tl.fromTo("#ghostG", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 1.4);
+        tl.fromTo("#ghost", { scaleX: 0, svgOrigin: "1418.8 644" }, { scaleX: 1, duration: 0.4, ease: "power3.out" }, 1.4);
+        tl.fromTo("#ghostEdge", { opacity: 0 }, { opacity: 1, duration: 0.1 }, 1.75);
+        tl.fromTo("#overLine", { opacity: 0 }, { opacity: 1, duration: 0.15 }, 1.8);
+        // turns red
+        tl.to("#ghost", { stroke: "#c94040", fill: "rgba(201,64,64,.35)", strokeDasharray: "0 0", duration: 0.2 }, 1.95);
+        tl.to("#ghostEdge", { stroke: "#c94040", duration: 0.2 }, 1.95);
+        tl.to("#ghostT", { fill: "#e06060", duration: 0.2 }, 1.95);
+        tl.to("#free", { opacity: 0.6, duration: 0.2 }, 1.95);
+        tl.fromTo("#refused", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.25, ease: "power3.out" }, 2.1);
+        window.__timelines["main"] = tl;
+      }
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(build); else build();
+    </script>
+  </body>
+</html>

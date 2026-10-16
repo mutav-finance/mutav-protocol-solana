@@ -45,7 +45,7 @@ export function ProofCards({ r }: { r: ReserveView }) {
           title="Program"
           address={r.programId}
           rpc={rpc}
-          what={["The code that enforces the reserve's rules.", "Every deposit, fee and claim payment runs through it."]}
+          what={["The code that enforces the reserve's rules.", "Every capital movement, fee and claim payment runs through it."]}
           extra={{ label: "Upgrade authority", value: <Explorer value={r.config.admin} rpc={rpc} />, note: "Reserve Admin (Squads multisig)" }}
         />
         <Card title="Reserve token account" address={r.addresses.reserve} rpc={rpc} what={["Where the reserve balance sits.", "Only the program can move it, and only by its rules."]} />

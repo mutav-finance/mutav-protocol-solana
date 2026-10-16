@@ -20,7 +20,8 @@ import { IntroDialog, introSeen } from "@/components/reserve/IntroDialog";
 import { usePoll, type Poll } from "@/lib/client/use-poll";
 import { composeLedger, needs, panelStatus, readStatus, type Panel, type ReadPart, type ReadStatus } from "@/lib/client/reserve-reads";
 import type { LedgerAccounts, LedgerHistory, ReserveView } from "@/lib/view";
-import { fmtDuration, fmtTime } from "@/lib/format";
+import { fmtTime, liveLine } from "@/lib/format";
+import { mouseFocusProps } from "@/lib/client/mouse-focus";
 import type { Data } from "@/components/reserve/sections/shared";
 
 type Ctx = {
@@ -74,12 +75,12 @@ export function Needs({ panel, children }: { panel: Panel; children: ReactNode }
   return <ReadPending status={status} label={WAITING_LABEL[waitingOn]} error={poll.error} onRetry={() => void poll.refresh()} />;
 }
 
-/** The tabs, in order. `href` is the route; Overview is /reserve itself. The capital view is labelled "Money". */
+/** The tabs, in order. `href` is the route; Overview is /reserve itself. The capital view is labelled "Capital". */
 export const TABS: [string, string][] = [
   ["/reserve", "Overview"],
   ["/reserve/coverage", "Coverage"],
   ["/reserve/claims", "Claims"],
-  ["/reserve/capital", "Money"],
+  ["/reserve/capital", "Capital"],
   ["/reserve/risks", "Risks"],
   ["/reserve/verify", "Verify"],
 ];
@@ -117,10 +118,11 @@ export function ReserveShell({ children }: { children: ReactNode }) {
   const introOpen = d !== null && (intro ?? !introSeen());
 
   const published = d?.reserve.state.lastRefreshTs;
+  const live = d ? liveLine(d.reserve.now, published ?? 0n) : null;
   const liveTitle = [
     "This page reads the chain every 10 seconds.",
     poll.updatedAt ? `Last read ${new Date(poll.updatedAt).toISOString().slice(11, 19)} UTC.` : "",
-    published ? `NAV, coverage and mode were last published on-chain at ${fmtTime(published)}.` : "",
+    published ? `The share price, coverage and mode were last published on-chain at ${fmtTime(published)}.` : "",
     poll.busy ? "The RPC is busy: showing the last good read and retrying." : "",
   ]
     .filter(Boolean)
@@ -147,10 +149,11 @@ export function ReserveShell({ children }: { children: ReactNode }) {
           }
           aside={
             <div className="font-mono text-(--color-text-3) flex items-center gap-3 text-xs">
-              {d && (
+              {live && (
                 <span title={liveTitle} className="inline-flex cursor-default items-center gap-2 whitespace-nowrap">
-                  <span className="live-dot" aria-hidden="true" />
-                  Live · {published ? `updated on-chain ${fmtDuration(d.reserve.now - published)} ago` : "not yet updated on-chain"}
+                  {/* The pulse only while the on-chain figures are fresh: a stale refresh is not "live". */}
+                  {live.fresh && <span className="live-dot" aria-hidden="true" />}
+                  {live.text}
                   {poll.busy ? " · chain busy, retrying" : ""}
                 </span>
               )}
@@ -176,7 +179,8 @@ export function ReserveShell({ children }: { children: ReactNode }) {
                   key={href}
                   href={href}
                   aria-current={active ? "page" : undefined}
-                  className={`font-body inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm whitespace-nowrap no-underline ${active ? "text-(--color-text) border-(--color-accent) font-medium" : "text-(--color-text-2) hover:text-(--color-text) border-transparent"}`}
+                  {...mouseFocusProps}
+                  className={`font-body inline-flex shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm whitespace-nowrap tab-link no-underline ${active ? "text-(--color-text) border-(--color-accent) font-medium" : "text-(--color-text-2) hover:text-(--color-text) border-transparent"}`}
                 >
                   {label}
                 </Link>

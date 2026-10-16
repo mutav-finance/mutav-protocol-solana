@@ -1,0 +1,209 @@
+[
+  {
+    "key": "line-01",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-01.wav",
+    "start": 0.3,
+    "end": 3.3,
+    "dur": 2.74,
+    "over": -0.26,
+    "collides": false
+  },
+  {
+    "key": "line-02",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-02.wav",
+    "start": 3.4,
+    "end": 4.55,
+    "dur": 1.2,
+    "over": 0.05,
+    "collides": false
+  },
+  {
+    "key": "line-03",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-03.wav",
+    "start": 4.7,
+    "end": 9.95,
+    "dur": 4.78,
+    "over": -0.47,
+    "collides": false
+  },
+  {
+    "key": "line-04",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-04.wav",
+    "start": 10.1,
+    "end": 18,
+    "dur": 8.11,
+    "over": 0.21,
+    "collides": false
+  },
+  {
+    "key": "line-05",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-05.wav",
+    "start": 19,
+    "end": 28.92,
+    "dur": 9.92,
+    "over": 0,
+    "collides": false
+  },
+  {
+    "key": "line-06",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-06.wav",
+    "start": 29.3,
+    "end": 33.7,
+    "dur": 4.32,
+    "over": -0.08,
+    "collides": false
+  },
+  {
+    "key": "line-07",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-07.wav",
+    "start": 33.9,
+    "end": 39.7,
+    "dur": 3.47,
+    "over": -2.33,
+    "collides": false
+  },
+  {
+    "key": "line-08",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-08.wav",
+    "start": 40,
+    "end": 45.8,
+    "dur": 5.43,
+    "over": -0.37,
+    "collides": false
+  },
+  {
+    "key": "line-09",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-09.wav",
+    "start": 47.6,
+    "end": 48.4,
+    "dur": 0.67,
+    "over": -0.13,
+    "collides": false
+  },
+  {
+    "key": "line-10",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-10.wav",
+    "start": 48.8,
+    "end": 52,
+    "dur": 2.02,
+    "over": -1.18,
+    "collides": false
+  },
+  {
+    "key": "line-11",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-11.wav",
+    "start": 56.4,
+    "end": 57.81,
+    "dur": 1.41,
+    "over": 0,
+    "collides": false
+  },
+  {
+    "key": "line-12",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-12.wav",
+    "start": 61.4,
+    "end": 64.45,
+    "dur": 3.05,
+    "over": 0,
+    "collides": false
+  },
+  {
+    "key": "line-13",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-13.wav",
+    "start": 64.9,
+    "end": 68.42,
+    "dur": 3.02,
+    "over": -0.5,
+    "collides": false
+  },
+  {
+    "key": "line-14",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-14.wav",
+    "start": 70.5,
+    "end": 74.7,
+    "dur": 2.82,
+    "over": -1.38,
+    "collides": false
+  },
+  {
+    "key": "line-15",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-15.wav",
+    "start": 77,
+    "end": 80.4,
+    "dur": 2.97,
+    "over": -0.43,
+    "collides": false
+  },
+  {
+    "key": "line-16",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-16.wav",
+    "start": 81.2,
+    "end": 84.2,
+    "dur": 1.3,
+    "over": -1.7,
+    "collides": false
+  },
+  {
+    "key": "line-16b",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-16b.wav",
+    "start": 84.6,
+    "end": 91.6,
+    "dur": 5.7,
+    "over": -1.3,
+    "collides": false
+  },
+  {
+    "key": "line-17",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-17.wav",
+    "start": 94.5,
+    "end": 104.6,
+    "dur": 8.69,
+    "over": -1.41,
+    "collides": false
+  },
+  {
+    "key": "line-18",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-18.wav",
+    "start": 105.1,
+    "end": 110.7,
+    "dur": 5.58,
+    "over": -0.02,
+    "collides": false
+  },
+  {
+    "key": "line-19",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-19.wav",
+    "start": 115.1,
+    "end": 120.1,
+    "dur": 5.25,
+    "over": 0.25,
+    "collides": false
+  },
+  {
+    "key": "line-20",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-20.wav",
+    "start": 121.2,
+    "end": 125.6,
+    "dur": 2.01,
+    "over": -2.39,
+    "collides": false
+  },
+  {
+    "key": "line-23",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-23.wav",
+    "start": 130.2,
+    "end": 135.8,
+    "dur": 4.65,
+    "over": -0.95,
+    "collides": false
+  },
+  {
+    "key": "line-24",
+    "file": "/Users/jubs/Projects/tga-protocol/.claude/notes/demo-production/procut/assets/vo/eleven/line-24.wav",
+    "start": 136.1,
+    "end": 137.97,
+    "dur": 1.87,
+    "over": 0,
+    "collides": false
+  }
+]

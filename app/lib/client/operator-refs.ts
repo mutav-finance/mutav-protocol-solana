@@ -36,3 +36,11 @@ function keep(key: string, label: string): string {
 
 export const agencyIdFor = (agency: string) => keep(AGENCIES, agency);
 export const refsSaltFor = (lease: string) => keep(SALTS, lease);
+
+/** Lease references this browser registered (the salts' keys): the labels the guarantee ids were hashed from. */
+export const knownLeases = (): string[] => Object.keys(load(SALTS));
+
+/** Agency name by its opaque id (hex), for the agencies this browser assigned. */
+export function agencyNames(): Map<string, string> {
+  return new Map(Object.entries(load(AGENCIES)).map(([name, id]) => [id, name]));
+}

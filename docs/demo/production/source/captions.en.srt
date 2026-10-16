@@ -1,0 +1,144 @@
+1
+00:00:00,300 --> 00:00:03,300
+Brazilian agencies require
+a guarantee on every lease.
+
+2
+00:00:03,400 --> 00:00:04,550
+When tenants don't pay,
+
+3
+00:00:04,700 --> 00:00:09,950
+agencies cover it themselves.
+Other solutions take up to 60 days.
+
+4
+00:00:10,100 --> 00:00:12,600
+MUTAV backs the agency, on Solana.
+
+5
+00:00:13,000 --> 00:00:18,000
+19 agencies signed letters of intent.
+For the hackathon, we built the protocol.
+
+6
+00:00:19,000 --> 00:00:23,400
+Is every guarantee really backed? First,
+let's register Ana's guarantee: R$18,000.
+
+7
+00:00:23,400 --> 00:00:28,900
+On-chain, she's just an ID,
+no personal data.
+
+8
+00:00:29,300 --> 00:00:33,700
+The reserve holds BRS, a Brazilian
+stablecoin from Nora Finance,
+
+9
+00:00:33,900 --> 00:00:37,000
+and anyone can check
+
+10
+00:00:37,000 --> 00:00:39,700
+it meets the coverage
+the reserve admin sets.
+
+11
+00:00:40,000 --> 00:00:45,800
+Let's try one more lease.
+That needs R$45,000; we have R$44,500.
+
+12
+00:00:47,600 --> 00:00:48,400
+Refused.
+
+13
+00:00:48,800 --> 00:00:52,000
+We can't promise
+what we can't back.
+
+14
+00:00:56,400 --> 00:00:59,000
+What happens when Ana pays late?
+
+15
+00:01:01,400 --> 00:01:04,450
+The agency files a claim,
+our operator verifies it,
+
+16
+00:01:04,900 --> 00:01:08,450
+the reserve pays out,
+within the multisig's limits,
+
+17
+00:01:10,500 --> 00:01:14,700
+and our PIX to the agency
+is recorded on-chain.
+
+18
+00:01:17,000 --> 00:01:20,400
+Filed to settled, on-chain:
+65 seconds.
+
+19
+00:01:21,200 --> 00:01:24,200
+Not 60 days.
+
+20
+00:01:24,600 --> 00:01:28,200
+And it's all public: every guarantee,
+claim and account,
+
+21
+00:01:28,200 --> 00:01:31,600
+live at reserve.mutav.finance.
+
+22
+00:01:34,500 --> 00:01:37,800
+Today, our team signs each step
+from our operator console.
+
+23
+00:01:37,800 --> 00:01:41,200
+Next, a server wallet
+in our platform signs them,
+
+24
+00:01:41,200 --> 00:01:44,600
+within limits
+the program enforces.
+
+25
+00:01:45,100 --> 00:01:49,100
+How does the reserve grow? Six months
+of our pilot plan, simulated locally,
+
+26
+00:01:49,100 --> 00:01:53,100
+growing it
+to R$1 million.
+
+27
+00:01:55,100 --> 00:02:00,100
+New capital, guarantee fees and yield come in.
+Small claims go out.
+
+28
+00:02:01,200 --> 00:02:05,600
+So the reserve can back more leases.
+
+29
+00:02:10,200 --> 00:02:12,800
+MUTAV: a reserve you can see,
+
+30
+00:02:12,800 --> 00:02:15,800
+payments that run themselves,
+and capital that works.
+
+31
+00:02:16,100 --> 00:02:17,970
+Brazil's on-chain rent guarantee.
