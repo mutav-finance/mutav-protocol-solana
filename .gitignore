@@ -24,3 +24,4 @@ dist/
 
 # Copied from the repo root by clients/js prepack
 clients/js/LICENSE
+docs/demo/production/vo/
