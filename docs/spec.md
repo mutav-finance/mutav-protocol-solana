@@ -129,7 +129,7 @@ Seeds: `["config", reserve_mint]`. One per reserve. Written only by admin instru
 | `reserve_decimals` | `u8` | Immutable |
 | `share_mint` | `Pubkey` | Share mint (authority = vault authority PDA) |
 | `coverage_ratio_bps` | `u16` | `c`. Program bounds `MIN_COVERAGE_RATIO_BPS = 1_000` (0.10; ADR 0016) to `MAX_COVERAGE_RATIO_BPS = 10_000` (1.0; ADR 0022). Starts at `1_000` on devnet |
-| `fee_take_bps` | `u16` | MUTAV's take from each guarantee fee. `≤ MAX_FEE_TAKE_BPS = 3_000`. Value **TBD** |
+| `fee_take_bps` | `u16` | MUTAV's take from each guarantee fee. `≤ MAX_FEE_TAKE_BPS = 3_000`. Starts at **2_000** (20%, ADR 0028) |
 | `payments_account` | `Pubkey` | The whitelisted MUTAV payments token account (BRS) |
 | `treasury_account` | `Pubkey` | The whitelisted MUTAV treasury token account (BRS) that receives MUTAV's take. Changed only by the admin through `set_treasury_account` |
 | `investor_allowlist_root` | `[u8; 32]` | Merkle root of allowlisted investor wallets |
@@ -157,8 +157,8 @@ Every field from `adapter_count` to `attester_epoch` is written zero by `initial
 
 | Field | Type | Meaning |
 |---|---|---|
-| `claims_tail_secs` | `i64` | Length of the claims tail after the lease ends or an exoneration takes effect (ADR 0012). Value **TBD** (§12 Q35). `0` = not set: `notify_exoneration` and `record_keys_returned` fail with `ClaimsTailNotSet`, so no guarantee leaves `ACTIVE` except by exhaustion or `VOID` |
-| `payment_term_secs` | `i64` | Contractual term N from a complete payment request to payment (principal pagador, §2.2). Disclosure only: the program never refuses a payment because of it. Value **TBD** (§12 Q36). `0` = not disclosed |
+| `claims_tail_secs` | `i64` | Length of the claims tail after the lease ends or an exoneration takes effect (ADR 0012). Starts at **2_000** (20%, ADR 0028) (§12 Q35). `0` = not set: `notify_exoneration` and `record_keys_returned` fail with `ClaimsTailNotSet`, so no guarantee leaves `ACTIVE` except by exhaustion or `VOID` |
+| `payment_term_secs` | `i64` | Contractual term N from a complete payment request to payment (principal pagador, §2.2). Disclosure only: the program never refuses a payment because of it. Starts at **2_000** (20%, ADR 0028) (§12 Q36). `0` = not disclosed |
 | `optional_categories` | `u8` | Bitmask of claim categories that are off by default. Bit 0 = `CAT_TERMINATION_PENALTY`. `0` = all optional categories disabled. `set_config` rejects bits outside `SUPPORTED_OPTIONAL_CATEGORIES` (`0b1`) with `InvalidParameter` |
 | `backstop_amount` | `u64` | MUTAV Brasil's disclosed backstop commitment, in BRS base units (PC-34). A separate layer: never counted in `stable_assets`, `coverage_required` or NAV. `0` = none disclosed |
 | `backstop_commitment_hash` | `[u8; 32]` | Commitment to the signed backstop commitment and its latest attestation (e.g. quarterly: MUTAV Brasil's assets exceed its guarantee liabilities). Zero = none disclosed |
@@ -1020,7 +1020,7 @@ Outside `Caps`, in `VaultConfig`:
 | Field | Type | Enforced in | Devnet |
 |---|---|---|---|
 | `coverage_ratio_bps` (`c`) | `u16` | all gates. `1_000 ≤ c ≤ 10_000`; a change needs a `refresh` in the same slot | `2_500` (0.25; ADR 0028. Program floor 0.10, ADR 0016) |
-| `fee_take_bps` | `u16` | `contribute_fees` | TBD (§12 Q4), program max `3_000` |
+| `fee_take_bps` | `u16` | `contribute_fees` | `2_000` (20%) at launch (ADR 0028), program max `3_000` |
 | `claims_tail_secs` | `i64` | *ADR 0012 carve, built later.* `notify_exoneration`, `record_keys_returned` (fixes `claims_tail_until_ts`); `0` blocks both | TBD (§12 Q35); never longer than the 3-year prescription of rent claims (CC 206 §3º I) |
 | `payment_term_secs` | `i64` | *ADR 0012 carve.* Disclosure only (contractual term from a complete payment request) | TBD (§12 Q36) |
 | `optional_categories` | `u8` | *ADR 0012 carve.* `file_claim` (bit 0 enables `CAT_TERMINATION_PENALTY`) | `0` (disabled) |
@@ -1116,7 +1116,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 | PC-11 | Under-coverage mode | Adopted | §6 |
 | PC-12 | Provision booked at filing | Partial: provision = filed amount; full-leg and expected-exit terms TBD | §5.4 |
 | PC-13 | Payouts senior to redemptions for the liquid buffer | Partial: redemption fills and allocations leave `provisions` (filed claims) in liquid BRS (`liquid_budget`, ADR 0011); once claim notices are built (before outside capital), both queues close while a notice is open (missed rent known, not yet provisioned); unfiled exposure is not reserved | §4, §5.4, §5.5, §5.7, §12 |
-| PC-14 | Coverage ratio floor as a program constant | *Proposed in ADR 0016, pending founder confirmation:* `MIN_COVERAGE_RATIO_BPS = 1_000` (0.10); `coverage_required` never below provisions | §3.1, §12 |
+| PC-14 | Coverage ratio floor as a program constant | *Accepted in ADR 0016 (2026-10-15):* `MIN_COVERAGE_RATIO_BPS = 1_000` (0.10); `coverage_required` never below provisions | §3.1, §12 |
 | PC-15 | Fees streamed into NAV over 30 days | Not adopted (fees raise NAV on receipt) | §5.3, §12 |
 | PC-16 | Explicit TESOURO coverage weight | Not adopted: once an adapter adds it, TESOURO counts toward coverage at its bounded price, within the settlement floor and its adapter's limits (ADR 0018) | §4, §5.7, §12 |
 | PC-17 | Bounded TESOURO price (accrual ceiling, staleness, deviation) | Adopted; stale-haircut behaviour TBD | §7 |
@@ -1166,7 +1166,7 @@ The adversarial review (four reviews, 79 findings) proposed 48 changes (PC-1…P
 14. **Filing window on-chain.** Enforce the 15-day filing window in the program (PC-2) or only in the platform.
 15. **Program-level time lock and multisig split.** Rely on the Squads time lock only, or also delay privilege increases on-chain. The Squads v4 time lock applies to the **whole** multisig and counts from approval, so with one multisig every `fulfil_redeems` waits as long as a program upgrade. Options: (a) one multisig with a moderate time lock (e.g. 24 h; fills are priced at NAV at execution, so the delay only postpones them), or (b) an `upgrade` multisig as upgrade authority (72 h–7 d) and a separate `admin` multisig as `VaultConfig.admin` with a shorter time lock ([§14.5](#145-upgrade-runbook)). Needs an ADR. **Closed (ADR 0020): option (b), two multisigs with the same members, a short admin time lock and a long upgrade time lock.**
 16. **Pauser powers.** Can the pauser appoint the replacement operator, or only revoke? Can it unpause? **Closed (ADR 0020):** the pauser only pauses and revokes the operator; appointment and unpause stay with the admin.
-17. **`coverage_ratio_bps` floor.** *Proposed in ADR 0016, pending founder confirmation:* a program constant floor of 0.10 (`MIN_COVERAGE_RATIO_BPS = 1_000`, the worst-case floor of business rule 9w), with `coverage_required = max(ceil(c × remaining_cover_total), provisions)`. Devnet starts at 0.10. A per-lease tail floor is a later ADR.
+17. **`coverage_ratio_bps` floor.** *Accepted in ADR 0016 (2026-10-15):* a program constant floor of 0.10 (`MIN_COVERAGE_RATIO_BPS = 1_000`, the worst-case floor of business rule 9w), with `coverage_required = max(ceil(c × remaining_cover_total), provisions)`. Devnet starts at 0.10. A per-lease tail floor is a later ADR.
 18. **Allocation gate.** Must the allocated amount itself fit in `free_capital`, or is the coverage post-condition plus the settlement floor and the per-adapter limits enough?
 19. **Per-invoice idempotency for fees.** *Resolved (ADR 0009):* a receipt PDA seeded by `invoice_ref_hash` (since ADR 0019 an `IncomeReceipt` of kind `FEE`).
 20. **Virtual offset and seed deposit.** *Resolved (2026-10-06):* `k = 0`, so `V = 1`: one share is worth 1 BRS at launch with the 6-decimal share mint. No seed deposit is minted at `initialize`. Rationale: NAV ignores direct transfers (internal accounting, invariant 1), and deposits are allowlisted and fulfilled by the admin, so a larger offset is not needed against first-depositor inflation. `PRICE_SCALE = NAV_SCALE = 10^9` (§8).
