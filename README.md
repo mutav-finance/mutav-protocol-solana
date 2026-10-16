@@ -218,6 +218,8 @@ About this deploy:
 - [Protocol specification](docs/spec.md): accounts, instructions, invariants, caps, events.
 - [Implementation plan](docs/plan.md): task-by-task plan for the hackathon build.
 - [Architecture decisions](docs/decisions/): ADRs for the locked design choices.
+- [Deployments](deployments/): what is deployed on each cluster (program ID, commit, executable hash, multisigs, parameters).
+- [Security reviews](docs/reviews/): internal review and audit reports, dated.
 - [Demo](docs/demo/): storyboard, script and research for the Colosseum product demo video.
 - [Development provenance](docs/provenance.md): prior MUTAV work and what was built in the hackathon window.
 - [Security policy](SECURITY.md).
