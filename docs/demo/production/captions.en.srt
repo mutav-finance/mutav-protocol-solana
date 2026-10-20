@@ -1,127 +1,148 @@
 1
-00:00:00,300 --> 00:00:03,400
-Ana wants to rent an apartment
-in Passo Fundo.
+00:00:00,300 --> 00:00:03,300
+In Brazil, the agency
+requires a guarantee.
 
 2
-00:00:03,600 --> 00:00:05,600
-Her landlord wants a guarantor.
+00:00:03,400 --> 00:00:04,550
+When tenants don't pay,
 
 3
-00:00:05,800 --> 00:00:09,800
-MUTAV is that guarantor,
-and its reserve runs on Solana.
+00:00:04,700 --> 00:00:09,950
+agencies cover it or manage the risk.
+Other solutions take up to 60 days.
 
 4
-00:00:10,100 --> 00:00:14,900
-Her agency works in MUTAV's platform;
-every lease becomes an account on-chain.
+00:00:10,100 --> 00:00:12,600
+MUTAV backs the agency, on Solana.
 
 5
-00:00:17,000 --> 00:00:20,600
-Our operator puts Ana's lease on-chain:
-R$18,000 of cover,
+00:00:13,000 --> 00:00:17,000
+19 agencies tested our platform
+and signed letters of intent.
 
 6
-00:00:20,600 --> 00:00:24,500
-an opaque ID, no personal data.
+00:00:19,000 --> 00:00:22,600
+Let's register a MUTAV guarantee
+for Ana's lease: R$18,000.
 
 7
-00:00:27,300 --> 00:00:31,200
-Anyone can watch the reserve:
-what it holds in BRS,
+00:00:22,600 --> 00:00:26,500
+On-chain, she's just an ID,
+no personal data.
 
 8
-00:00:31,200 --> 00:00:35,000
-Nora's Brazilian real stablecoin,
-and what it must hold.
+00:00:29,100 --> 00:00:33,700
+The reserve holds BRS, a Brazilian
+stablecoin from Nora Finance,
 
 9
-00:00:35,400 --> 00:00:36,900
-The rule is code.
+00:00:33,900 --> 00:00:37,000
+and anyone can check
 
 10
-00:00:38,000 --> 00:00:43,000
-One more lease would need R$45,000;
-the reserve holds R$44,000.
+00:00:37,000 --> 00:00:39,700
+it meets the coverage
+the reserve admin sets.
 
 11
-00:00:45,600 --> 00:00:46,400
-Refused.
+00:00:40,000 --> 00:00:45,800
+Let's try one more lease.
+That needs R$45,000; we have R$44,500.
 
 12
-00:00:46,800 --> 00:00:50,000
-MUTAV can't promise
-what its reserve can't back.
+00:00:47,600 --> 00:00:48,400
+Refused.
 
 13
-00:00:59,400 --> 00:01:01,800
-Now say Ana misses a month.
+00:00:48,800 --> 00:00:52,000
+We can't promise
+what we can't back.
 
 14
-00:01:02,400 --> 00:01:04,600
-The operator files the claim,
+00:00:58,400 --> 00:01:00,200
+Say Ana misses rent.
 
 15
-00:01:06,400 --> 00:01:09,600
-the reserve pays
-within the admin's cap,
+00:01:01,400 --> 00:01:03,600
+Our operator files a claim,
 
 16
-00:01:11,400 --> 00:01:15,600
-and the PIX to the agency
-is recorded on-chain.
+00:01:05,400 --> 00:01:08,600
+the reserve pays, within
+the multisig's monthly limit,
 
 17
-00:01:21,000 --> 00:01:24,400
-On-chain, filed to settled
-in [N] seconds.
+00:01:10,500 --> 00:01:14,700
+and the landlord's PIX
+is recorded on-chain.
 
 18
-00:01:24,800 --> 00:01:28,200
-Seguro-fiança allows
-up to thirty days.
+00:01:17,000 --> 00:01:20,400
+Filed to paid, on-chain:
+65 seconds.
 
 19
-00:01:37,600 --> 00:01:41,600
-Here are six months of it,
-simulated locally on an accelerated clock.
+00:01:21,200 --> 00:01:24,200
+Not 60 days.
 
 20
-00:01:41,800 --> 00:01:46,200
-Guarantee fees and issuer revenue
-flow into the reserve.
+00:01:27,300 --> 00:01:29,900
+Today, our operator
+signs each step.
 
 21
-00:01:46,600 --> 00:01:50,200
-Claims are paid,
-large ones approved by the admin.
+00:01:30,300 --> 00:01:33,000
+Next, the agency platform
+does it automatically,
 
 22
-00:01:50,600 --> 00:01:55,000
-The reserve can back more leases,
-each share is worth more,
+00:01:33,000 --> 00:01:35,600
+inside limits
+the program already enforces.
 
 23
-00:01:55,400 --> 00:01:59,800
-and a capital provider takes out
-more than they put in.
+00:01:40,000 --> 00:01:44,200
+Let's fast-forward: six months
+of our pilot plan, simulated locally,
 
 24
-00:02:00,200 --> 00:02:05,400
-The same reserve that protects
-the landlord pays the people who fund it.
+00:01:44,200 --> 00:01:47,600
+growing the reserve
+to R$1 million.
 
 25
-00:02:06,000 --> 00:02:08,600
-MUTAV: a transparent,
-programmable reserve,
+00:01:47,900 --> 00:01:52,900
+Guarantee fees and yield come in.
+Small claims go out.
 
 26
-00:02:08,600 --> 00:02:11,600
-claims settled in minutes,
-capital that works.
+00:01:54,000 --> 00:01:58,400
+So the reserve can back more leases,
 
 27
-00:02:12,200 --> 00:02:14,400
-Brazil's onchain rent guarantee.
+00:01:58,700 --> 00:02:02,400
+and the capital behind it gets back
+more than it put in.
+
+28
+00:02:02,800 --> 00:02:08,200
+The reserve that protects agencies
+also pays its backers.
+
+29
+00:02:08,600 --> 00:02:10,200
+Check it on Solana.
+
+30
+00:02:11,000 --> 00:02:13,600
+MUTAV: a reserve you can see,
+
+31
+00:02:13,600 --> 00:02:16,600
+payments that run themselves,
+and capital that works.
+
+32
+00:02:16,900 --> 00:02:18,900
+Brazil's on-chain rent guarantee.

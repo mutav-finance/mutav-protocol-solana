@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>MUTAV close card</title>
-<!-- F13 close card, full frame, opaque. Hold 1:58-2:08; lines build in over 2 s.
+<!-- F14 close card, full frame, opaque. v9: the pilot-plan line (tagged "plan") under the tagline.
+     Hold 2:11-2:19.5; lines build in over 2 s.
      1920x1080. Self-contained: inline CSS/JS, fonts as data: URIs (Geist, Inter, JetBrains Mono; SIL OFL).
      Query params: ?static (final state, no animation) · ?t=<ms> (freeze the in-animation at ms). -->
 <style>
@@ -57,7 +58,11 @@ body.opaque{background-color:var(--canvas);background-image:var(--grid);backgrou
 .rule{height:1px;background:var(--border);margin:64px 0 40px;animation:fadeIn .5s 1.1s both}
 .tag{font-family:var(--font-sans);font-size:40px;font-weight:500;color:var(--text-2);margin:0;animation:fadeIn .5s 1.25s both}
 .tag b{color:var(--text);font-weight:600}
-.links{margin-top:110px;display:flex;gap:72px;align-items:center;animation:fadeIn .5s 1.5s both}
+.plan{margin:26px 0 0;display:flex;align-items:center;gap:18px;font-family:var(--font-sans);font-size:30px;font-weight:500;color:var(--text-2);animation:fadeIn .5s 1.4s both}
+.plan b{color:var(--text);font-weight:600}
+.plan .pt{font-family:var(--font-mono);font-size:16px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);
+  border:1px solid var(--accent-dim);padding:4px 9px 3px;line-height:1}
+.links{margin-top:72px;display:flex;gap:72px;align-items:center;animation:fadeIn .5s 1.5s both}
 .links .kicker{font-size:28px;color:var(--text);letter-spacing:.02em;text-transform:none}
 .links .kicker::before{height:28px;width:4px}
 .foot{position:absolute;right:160px;top:136px;font-family:var(--font-mono);font-size:20px;color:var(--text-3);
@@ -83,6 +88,7 @@ body.opaque{background-color:var(--canvas);background-image:var(--grid);backgrou
   </ol>
   <div class="rule"></div>
   <p class="tag">A guarantor on the agency's side · <b>Brazil's onchain rent guarantee</b></p>
+  <p class="plan"><span>Pilot plan · <b>R$1M reserve</b> · backs ~R$3.8M of guarantees</span><span class="pt">plan</span></p>
   <div class="links">
     <p class="kicker">github.com/mutav-finance/mutav-protocol-solana</p>
     <p class="kicker">reserve.mutav.finance</p>
