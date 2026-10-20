@@ -8,15 +8,20 @@
  * redeem (ADR 0023).
  * Cancels and collects need only the request's owner (spec §5.5).
  *
- * Layout: a left-aligned header with a decorative photo bleeding from the
- * right (never behind numbers), one strip of three reserve figures, then the
- * request card on the left as the lead and the wallet's requests beside it.
+ * Layout: the shared page header (PageHeader, as on /reserve: kicker, title,
+ * the decorative photo bleeding from the right, never behind numbers), then,
+ * left-aligned at the page width like every other page, the not-open note,
+ * one strip of three reserve figures, and the request card as the lead with
+ * the wallet's requests beside it.
  */
 import type { ReactNode } from "react";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { Money, MoneyProvider, UsdSource } from "@/components/MoneyProvider";
 import { Mono } from "@/components/Mono";
-import { ReadError } from "@/components/Section";
+import { PageHeader } from "@/components/PageHeader";
+import { ReadError, ReadPending } from "@/components/Section";
+import { SimulationNote } from "@/components/SimulationNote";
+import { CLUSTER } from "@/lib/client/env";
 import { LiveProvider } from "@/components/demo/shared";
 import { QueueEntries } from "./QueueEntries";
 import { useInvestor } from "./useInvestor";
@@ -24,7 +29,6 @@ import { fmtSharePrice, fmtTime } from "@/lib/format";
 import type { ReserveView } from "@/lib/view";
 import { RequestCard } from "./RequestCard";
 
-/** NAV per share as a share price in BRS, 4 places: `1.3240 BRS`. */
 /** One figure of the strip: a caps label with its definition, and the value. */
 function Stat({ label, tip, value }: { label: string; tip: string; value: ReactNode }) {
   return (
@@ -48,7 +52,7 @@ function Stats({ r }: { r: ReserveView }) {
       {/* The strip's labels do not wrap: the publication time goes in the definition. */}
       <Stat
         label="Share price"
-        tip={`Published at last refresh · ${fmtTime(r.state.lastRefreshTs)}. Reserve value after claims set aside, per share.`}
+        tip={`Reserve value per share, after claims set aside. Published at the last on-chain refresh, ${fmtTime(r.state.lastRefreshTs)}.`}
         value={fmtSharePrice(r.state.navPerShare)}
       />
       <Stat label="Reserve balance" tip="BRS the reserve holds now." value={<Money brs={r.coverage.stableAssets} block />} />
@@ -59,7 +63,7 @@ function Stats({ r }: { r: ReserveView }) {
 
 function Skeleton() {
   return (
-    <div aria-busy="true" aria-label="Reading the chain" className="mx-auto flex w-full max-w-[1040px] flex-col gap-6">
+    <div aria-busy="true" aria-label="Reading the chain" className="flex w-full flex-col gap-6">
       <span className="sr-only">Reading the chain…</span>
       <div className="bg-(--color-surface) h-[72px] border" />
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -70,64 +74,53 @@ function Skeleton() {
   );
 }
 
-/** Page header: amber mono kicker, display title and lede, left-aligned; a grayscale photo bleeds in from the right. */
-function Header() {
-  const pad = { paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" };
+/** Not open to public investment: the page leads with it, under the header. */
+function NotOpenNote() {
   return (
-    <header className="relative overflow-hidden py-8" style={pad}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/img/dashboard-header.jpg"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute top-0 right-0 hidden h-full w-[45%] object-cover grayscale md:block"
-        style={{ opacity: 0.14 }}
-      />
-      <div className="relative mx-auto flex w-full max-w-[1040px] flex-col gap-3">
-        <span className="font-mono text-(--color-accent) text-xs uppercase tracking-[0.12em]">Pilot reserve</span>
-        <h1
-          className="font-display text-(--color-text) m-0 uppercase md:max-w-[50%]"
-          style={{ fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.05 }}
-        >
-          Capital queue
-        </h1>
-        <p className="font-body text-(--color-text-2) m-0 max-w-[60ch] text-sm md:max-w-[50%]">The pilot reserve&apos;s capital queue: deposits of BRS for shares and redemptions of shares for BRS, filled in order.</p>
-        <p
-          role="note"
-          aria-label="Not open to public investment"
-          className="font-body text-(--color-text) m-0 max-w-[60ch] py-1 pl-3 text-sm font-medium md:max-w-[50%]"
-          style={{ borderLeft: "1px solid var(--color-copper)" }}
-        >
-          Pilot capital comes from MUTAV&apos;s own wallet only. This page is not open to public investment and nothing here is an offer. New capital needs a wallet on the on-chain allowlist; existing holders can always redeem.
-        </p>
-      </div>
-    </header>
+    <p
+      role="note"
+      aria-label="Not open to public investment"
+      className="font-body text-(--color-text) m-0 max-w-[72ch] py-1 pl-3 text-sm font-medium"
+      style={{ borderLeft: "1px solid var(--color-copper)" }}
+    >
+      Pilot capital comes from MUTAV&apos;s own wallet only. The pilot is not open to public investment and nothing here is an offer. New capital needs a wallet on the on-chain allowlist; existing holders can always redeem.
+    </p>
   );
 }
 
 export function InvestmentPage() {
-  const { connected, owner, poll, d, inv, invData, mine, refresh } = useInvestor();
+  const { connected, owner, poll, accounts, accountsStatus, d, inv, invData, mine, refresh } = useInvestor();
   const pad = { paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" };
   return (
     <MoneyProvider>
-    <main className="flex w-full flex-1 flex-col pb-8">
-      <Header />
+    <main className="flex w-full flex-1 flex-col pb-20">
+      <PageHeader
+        kicker={<>Capital · Solana {CLUSTER}</>}
+        title="Capital queue"
+        sub="The pilot reserve's capital queue: deposits of BRS for shares and redemptions of shares for BRS, filled in order."
+      />
 
-      <div className="flex flex-col gap-6" style={pad}>
+      <div className="flex flex-col gap-6 pt-8" style={pad}>
+        <NotOpenNote />
         {poll.error && !d && <ReadError error={poll.error} />}
         {!d && !poll.error && <Skeleton />}
 
         {d && (
           <LiveProvider value={{ reserve: d.reserve, ledger: d.ledger, refresh }}>
-            <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6">
+            <div className="flex w-full flex-col gap-6">
               <div className="flex flex-col gap-2">
                 <Stats r={d.reserve} />
+                <SimulationNote />
                 <UsdSource />
               </div>
               {inv.error && !invData && <ReadError error={inv.error} onRetry={() => void inv.refresh()} />}
               <div className="grid grid-cols-1 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
                 <RequestCard inv={invData} loading={inv.loading} connected={connected} />
-                <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} now={d.reserve.now} />
+                {accountsStatus === "ready" ? (
+                  <QueueEntries rows={mine} owner={owner} connected={connected} inv={invData} now={d.reserve.now} />
+                ) : (
+                  <ReadPending status={accountsStatus} label="Requests loading…" error={accounts.error} onRetry={() => void accounts.refresh()} />
+                )}
               </div>
             </div>
           </LiveProvider>

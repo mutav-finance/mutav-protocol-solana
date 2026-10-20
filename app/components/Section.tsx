@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { InfoTooltip } from "@/components/InfoTooltip";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 
 /**
  * A page section (web investidor rhythm, deck styling): amber mono caps kicker, 24px Geist ExtraBold heading,
@@ -35,11 +36,25 @@ export function Section({ id, title, kicker, subtitle, info, children, action, r
  * content capped at the brand max-width with the shared side padding, a 36px title and a
  * 14px subtitle.
  *
+ * `kicker`: the /reserve page header instead (amber kicker, display title,
+ * `lede` as its subline, `aside` on the right, the decorative photo).
+ *
  * `banner`: a decorative image (public path) in a bordered, centred frame at
  * low opacity, with the title in caps over it; the lede and `intro` sit
  * centred below.
  */
-export function Page({ children, title, lede, banner, intro }: { children: ReactNode; title: string; lede?: ReactNode; banner?: string; intro?: ReactNode }) {
+export function Page({ children, title, lede, banner, intro, kicker, aside }: { children: ReactNode; title: string; lede?: ReactNode; banner?: string; intro?: ReactNode; kicker?: ReactNode; aside?: ReactNode }) {
+  // With a kicker: the /reserve page header (PageHeader), the lede as its subline.
+  if (kicker)
+    return (
+      <div className="flex w-full flex-1 flex-col">
+        <PageHeader kicker={kicker} title={title} sub={lede} aside={aside} />
+        <main className="flex w-full flex-1 flex-col gap-4 pt-6 pb-20 md:gap-6" style={{ paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" }}>
+          {intro}
+          <div className="flex flex-col">{children}</div>
+        </main>
+      </div>
+    );
   return (
     <main className="flex w-full flex-1 flex-col gap-4 py-6 md:gap-6 md:py-8" style={{ paddingLeft: "var(--section-pad-x)", paddingRight: "var(--section-pad-x)" }}>
       {banner ? (
@@ -95,6 +110,23 @@ export function ReadError({ error, onRetry }: { error: Error & { notConfigured?:
           Retry
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * A panel waiting on a read the rest of the page does not need (e.g. the
+ * history behind an activity feed): a small state inside the panel, in the
+ * ReadError styles. Loading says what is coming; busy and failed reads show
+ * ReadError (busy retries on its own; a failure offers Retry).
+ */
+export function ReadPending({ status, label, error, onRetry }: { status: "loading" | "busy" | "error"; label: string; error?: (Error & { notConfigured?: boolean; busy?: boolean }) | null; onRetry?: () => void }) {
+  if (status === "error" && error) return <ReadError error={error} onRetry={onRetry} />;
+  return (
+    <div role="status" aria-busy={status === "loading"} style={{ border: "1px solid var(--color-border)", padding: "14px 16px", background: "var(--color-surface)" }}>
+      <p className="font-mono" style={{ fontSize: 12, color: "var(--color-text-2)", margin: 0 }}>
+        {status === "busy" ? "Chain busy, retrying…" : label}
+      </p>
     </div>
   );
 }

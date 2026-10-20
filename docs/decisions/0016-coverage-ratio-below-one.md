@@ -1,6 +1,6 @@
 # 0016 — Coverage ratio below 1.0, with a 0.10 floor and a provisions term
 
-- **Status:** Proposed (2026-10-07), pending founder confirmation (Julia, Draau). Resolves spec §12 Q17 and PC-14. Amends ADR 0006 (absolute per-lease coverage) on the value of `c`; the per-lease cover itself is unchanged.
+- **Status:** Accepted (2026-10-15), confirmed by the founders (Julia, Draau); proposed 2026-10-07. The 0.10 floor is the program minimum; the founders start the pilot at `c` ≥ 0.25 (ADR 0028), possibly higher. Resolves spec §12 Q17 and PC-14. Amends ADR 0006 (absolute per-lease coverage) on the value of `c`; the per-lease cover itself is unchanged.
 - **Amended by [ADR 0019](0019-v1-layout-for-the-devnet-release.md):** the devnet caps have no per-agency cap (`max_cover_per_agency` and `AgencyExposure` are removed), and the claim cap is R$20k per 31-day sliding window.
 
 ## Context

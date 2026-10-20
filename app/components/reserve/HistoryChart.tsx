@@ -13,7 +13,7 @@ import { Mono } from "@/components/Mono";
 import { UsdHint } from "@/components/MoneyProvider";
 import { PERIODS, PeriodPicker, inPeriod, type Period } from "@/components/reserve/sections/Flows";
 import { signed } from "@/components/reserve/sections/shared";
-import { historyWindow, pointAt, stableAssetsHistory, yTicks } from "@/lib/history";
+import { coveringPeriod, historyWindow, pointAt, stableAssetsHistory, yTicks } from "@/lib/history";
 import { fmtBrs, fmtTime } from "@/lib/format";
 import { FLOW_KIND_LABEL, type FlowRow } from "@/lib/view";
 
@@ -25,11 +25,13 @@ const NUM = { fontVariantNumeric: "tabular-nums" } as const;
 const day = (ts: bigint) => new Date(Number(ts) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 export function HistoryChart({ rows, stableAssets, now }: { rows: FlowRow[]; stableAssets: bigint; now: bigint }) {
-  const [period, setPeriod] = useState<Period>("90D");
+  // Until the reader picks a window, open on the smallest one that holds all the data.
+  const [picked, setPeriod] = useState<Period | null>(null);
   const [active, setActive] = useState<number | null>(null);
   const plot = useRef<HTMLDivElement>(null);
 
   const history = useMemo(() => stableAssetsHistory(rows, stableAssets, now), [rows, stableAssets, now]);
+  const period = picked ?? coveringPeriod<Period>(history, PERIODS, "90D");
   const w = useMemo(() => historyWindow(history, PERIODS[period]), [history, period]);
   const moves = rows.filter((r) => r.at !== null && inPeriod(r.at, now, period)).length;
 

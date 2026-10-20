@@ -4,7 +4,7 @@
  * Money display: BRS is always the figure. Inside a MoneyProvider, with a
  * USD/BRL rate from /api/fx (BCB PTAX), a small muted `≈ US$ X` hint follows
  * it, plus one source line per page. Display only; the reserve holds BRS.
- * Without a rate (or outside a provider: admin, operator) the hints render
+ * Without a rate (or outside a provider) the hints render
  * nothing and figures stay exactly as they were.
  */
 import { createContext, useContext, type ReactNode } from "react";

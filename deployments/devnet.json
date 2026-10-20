@@ -1,0 +1,54 @@
+{
+  "cluster": "devnet",
+  "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "status": "test deploy (disposable)",
+  "program": {
+    "id": "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV",
+    "declaredId": "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9",
+    "declaredIdNote": "The declared ID is reserved for the solana-verify release build and is not deployed yet (#91). This test deploy swaps in a throwaway ID.",
+    "commit": "833c114565bcec079c21f012170755d1e5ebc7ee",
+    "tag": "v1.0.0-devnet",
+    "executableHash": "fad721d55c8a5340f2a55dbc2d0e1d982bd7a3ec2f42dce90c7dcc93c984e6e7",
+    "hashMethod": "sha256 of the .so with trailing zero bytes trimmed (solana-verify get-executable-hash; scripts/devnet/lib/hash.ts)",
+    "build": "local anchor build of the commit with the throwaway ID; not a solana-verify (Docker) build",
+    "deployedAt": "2026-10-12T03:28:52Z"
+  },
+  "accounts": {
+    "config": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q",
+    "reserveMint": "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4",
+    "reserveTokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "treasuryAccount": "BiTXGCiXuKEJS8VxBUdGrqnMpKo4umFcpH7qevitPtAU",
+    "paymentsAccount": "CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj"
+  },
+  "governance": {
+    "adminMultisig": {
+      "multisig": "HrYif2YLwKJc5aMMp6qQjd9WhdkD9JBjajjGyr4a92xR",
+      "vault": "6CnwNdEp8dYeKFA6ns89vDBNdmdniR1xyBbrhub6ZKcy",
+      "threshold": "2 of 2",
+      "timeLockSecs": 60
+    },
+    "upgradeMultisig": {
+      "multisig": "6W3WxRCQ9fzz4jdZZVB2JQLaMf7WXx7F2DwYVjK1yUDs",
+      "vault": "AyKDdFrYQABjpkn29Sdj5hEGVymyEXzEHrGhzqPqvb1n",
+      "threshold": "2 of 2",
+      "timeLockSecs": 120
+    },
+    "timeLockNote": "Test exception for this disposable deploy (2026-10-12). ADR 0028 sets 300 s / 3600 s on devnet and 24 h / 7 d for the real pilot.",
+    "operator": "8MtERL18dFtNPZESghbxR3g21d8FvY2mnTq855SFURPk",
+    "operatorNote": "Rotated on 2026-10-12 through the two-step handover (propose_role, accept_role).",
+    "pauser": "2tW76Vpu1nqctZRBMdzSrzXHcnwnMcFMJqiZyP8t5P1T"
+  },
+  "parameters": {
+    "decimals": 6,
+    "coverageRatioBps": 2500,
+    "feeTakeBps": 2000,
+    "maxTvl": 1000000000000,
+    "maxCoverPerGuarantee": 120000000000,
+    "maxClaimPerCall": 15000000000,
+    "maxClaimPerPeriod": 20000000000,
+    "minRequest": 1000000000,
+    "maxRequest": 100000000000,
+    "maxNavMoveBps": 10000,
+    "stressBuffer": 19000000000
+  }
+}

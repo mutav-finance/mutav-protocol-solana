@@ -34,6 +34,7 @@ Every HTML file is self-contained (inline CSS and JS, fonts embedded as `data:` 
 | `overlays/timer.html` + `timer-sample-*.png` | Elapsed timer (mm:ss), driven by `?start=<ms>&end=<ms>&fps=30`. The samples show a 42 s run; render the real one from the logged timestamps. |
 | `overlays/caption.html` | Caption template, used to burn in captions when ffmpeg has no libass. |
 | `tools/render.cjs` | Headless-Chromium renderer: `stills` (all PNGs), `timer`, `captions`, `seq` (animated frames), `receipts` (receipt and rail PNGs from `tx-receipts.json`). One browser, exits on its own. Usage in its header and in `edl.md`. |
+| `tools/vo.cjs` | ElevenLabs voiceover from `vo-script.md`: one clip per line, edge silence trimmed, placed at its start second into a 2:15 `vo/vo.wav` (+ `timing.json`, overrun warnings). Needs `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`; `--only 3,9` regenerates lines, `VO_N` fills [N]. `vo/` is gitignored. An AI voice needs the narration credit in `submission-disclosure.md`. |
 
 ## Order of assembly
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { historyWindow, pointAt, stableAssetsHistory, yTicks } from "../history";
+import { coveringPeriod, historyWindow, pointAt, stableAssetsHistory, yTicks } from "../history";
 import type { FlowRow } from "../view";
 
 const DAY = 86_400n;
@@ -81,5 +81,22 @@ describe("yTicks", () => {
 
   it("handles a flat zero line", () => {
     expect(yTicks(0n, 0n)).toEqual([0n]);
+  });
+});
+
+describe("coveringPeriod", () => {
+  const SPANS = { "7D": 7n * DAY, "30D": 30n * DAY, "90D": 90n * DAY, All: null } as const;
+  const at = (...agos: bigint[]) => stableAssetsHistory(agos.map((a) => row("fee", a, 100n)), 10_000n, NOW);
+  it("picks the smallest window that holds every dated movement", () => {
+    expect(coveringPeriod(at(2n, 5n), SPANS, "90D")).toBe("7D");
+    expect(coveringPeriod(at(5n, 19n), SPANS, "90D")).toBe("30D");
+    expect(coveringPeriod(at(5n, 70n), SPANS, "90D")).toBe("90D");
+  });
+  it("opens on All when the history is longer than the widest window (six months)", () => {
+    expect(coveringPeriod(at(5n, 180n), SPANS, "90D")).toBe("All");
+  });
+  it("falls back to the given window with no dated movement", () => {
+    expect(coveringPeriod(at(), SPANS, "90D")).toBe("90D");
+    expect(coveringPeriod(stableAssetsHistory([row("fee", null, 5n)], 10n, NOW), SPANS, "30D")).toBe("30D");
   });
 });

@@ -8,7 +8,7 @@
 import { useState, type ReactNode } from "react";
 import { Grid, Note, TextField } from "@/components/demo/shared";
 import { AdminAction, Facts, type Mode } from "@/components/admin/shared";
-import { fmtBps, fmtBrs, fmtDuration, parseBrs } from "@/lib/format";
+import { fmtBrs, fmtDuration, fmtPct, parseBrs } from "@/lib/format";
 import { parseBps, parseIntIn } from "@/lib/reserve-assets";
 import type { AdminTx } from "@/lib/tx-kinds";
 
@@ -25,14 +25,17 @@ export type Field = {
 const I64_MAX = (1n << 63n) - 1n;
 
 /** BRS amount (6 decimals). */
-export const brsField = (key: string, label: string, now: bigint): Field => ({ key, label, now: fmtBrs(now, 0), parse: (s) => parseBrs(s), bound: "BRS amount" });
+export const brsField = (key: string, label: string, now: bigint): Field => ({ key, label, now: fmtBrs(now), parse: (s) => parseBrs(s), bound: "BRS amount" });
+
+/** The field's name without its input unit, for the on-chain value line: "Coverage ratio c: 25%", not "(bps): 25.00%". */
+const bare = (label: string) => label.replace(/\s*\((bps|BRS)\)$/, "");
 /** Seconds, with an inclusive minimum. */
 export const secsField = (key: string, label: string, now: bigint, min = 0n): Field => ({ key, label, now: fmtDuration(now), parse: (s) => parseIntIn(s, min, I64_MAX), bound: `seconds, ≥ ${min}` });
 /** Basis points, within `[min, max]`. */
 export const bpsField = (key: string, label: string, now: number, max: number, min = 0): Field => ({
   key,
   label,
-  now: fmtBps(now),
+  now: fmtPct(now),
   parse: (s) => {
     const v = parseBps(s, max);
     return v === null || v < min ? null : v;
@@ -60,7 +63,7 @@ export function ConfigCard({ title, mode, fields, build, bound, does }: { title:
   const request = built && typeof built !== "string" ? built : null;
   return (
     <AdminAction title={title} label="set_config" mode={mode} request={request}>
-      <Facts now={<span className="font-mono" style={{ fontSize: 12 }}>{fields.map((f) => `${f.label}: ${f.now}`).join(" · ")}</span>} bound={<span className="font-mono" style={{ fontSize: 12 }}>{bound}</span>} does={does} />
+      <Facts now={<span className="font-mono" style={{ fontSize: 12 }}>{fields.map((f) => `${bare(f.label)}: ${f.now}`).join(" · ")}</span>} bound={<span className="font-mono" style={{ fontSize: 12 }}>{bound}</span>} does={does} />
       <Grid>
         {fields.map((f) => (
           <TextField key={f.key} id={`adm-cfg-${f.key}`} label={f.label} value={input[f.key] ?? ""} onChange={(v) => setInput((s) => ({ ...s, [f.key]: v }))} numeric hint={errors.includes(f.key) ? `out of bound: ${f.bound}` : `now ${f.now} · blank keeps it`} />

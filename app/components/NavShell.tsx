@@ -3,7 +3,7 @@
 /**
  * Top navigation for the app routes (STYLE.md §3.6): 56px bar on the canvas,
  * logo left, tabs centred with a 1px amber border on the active one, wallet
- * right; hamburger below 768px. The landing page uses its own two-nav swap.
+ * right; hamburger below 768px. There is no app landing: the logo opens /reserve.
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -12,12 +12,12 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { ClusterBadge } from "@/components/ClusterBadge";
 import { Button } from "@/components/ui/button";
 
+/** Sentence case, as in the footer: "Capital queue". */
 const LINKS = [
-  { href: "/reserve", label: "transparency" },
-  { href: "/operator", label: "operator" },
-  { href: "/demo", label: "demo" },
-  { href: "/admin", label: "admin" },
-  { href: "/capital", label: "capital queue" },
+  { href: "/reserve", label: "Transparency" },
+  { href: "/operator", label: "Operator" },
+  { href: "/admin", label: "Admin" },
+  { href: "/capital", label: "Capital queue" },
 ];
 
 export function NavShell() {
@@ -36,8 +36,8 @@ export function NavShell() {
   }, [open]);
 
   const link = (l: (typeof LINKS)[number], mobile: boolean) => {
-    // "/" is active only on the home page itself; the others also match their sub-routes.
-    const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+    // Each tab also matches its sub-routes (Transparency is active on /reserve/*).
+    const active = pathname.startsWith(l.href);
     if (!mobile)
       return (
         <li key={l.href} className="flex list-none items-stretch">
@@ -52,7 +52,7 @@ export function NavShell() {
           href={l.href}
           aria-current={active ? "page" : undefined}
           onClick={() => setOpen(false)}
-          className={`font-body flex min-h-11 w-full items-center text-sm capitalize no-underline ${active ? "text-(--color-text) font-medium" : "text-(--color-text-2) hover:text-(--color-text)"}`}
+          className={`font-body flex min-h-11 w-full items-center text-sm no-underline ${active ? "text-(--color-text) font-medium" : "text-(--color-text-2) hover:text-(--color-text)"}`}
           style={{ borderLeft: active ? "2px solid var(--color-accent)" : "2px solid transparent", paddingLeft: 12 }}
         >
           {l.label}
@@ -64,7 +64,7 @@ export function NavShell() {
   return (
     <nav aria-label="Main navigation" className="bg-(--color-canvas) sticky top-0 z-[100] border-b">
       <div className="relative flex h-14 items-stretch justify-between" style={{ padding: "0 var(--section-pad-x)" }}>
-        <Link href="/" aria-label="MUTAV, home" className="flex shrink-0 items-center gap-2.5 no-underline">
+        <Link href="/reserve" aria-label="MUTAV" className="flex shrink-0 items-center gap-2.5 no-underline">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/logo-mutav.svg" alt="MUTAV" height={24} style={{ height: 24, width: "auto", display: "block" }} />
           {/* Wordmark (STYLE.md §3.6): "mutav", Geist Bold lowercase, amber. */}

@@ -22,8 +22,14 @@ export function fmtUnits(base: bigint, decimals: number, places = 2): string {
   return neg ? `-${body}` : body;
 }
 
-/** BRS amount as reais: `R$ 12,345.67`. */
-export const fmtBrs = (base: bigint, places = 2) => `R$ ${fmtUnits(base, BRS_DECIMALS, places)}`;
+/**
+ * Non-breaking space between a currency sign and its amount, so `R$` never
+ * wraps apart from the figure in a narrow cell or a sentence.
+ */
+const NBSP = "\u00a0";
+
+/** BRS amount as reais: `R$ 12,345.67` (the space is non-breaking). */
+export const fmtBrs = (base: bigint, places = 2) => `R$${NBSP}${fmtUnits(base, BRS_DECIMALS, places)}`;
 
 /** Scale of an FX rate: BRL per 1 USD × 1e6 (`5_400_000n` = R$5.40 per US$1). */
 export const FX_SCALE = 1_000_000n;
@@ -31,8 +37,8 @@ export const FX_SCALE = 1_000_000n;
 /** BRS base units (at par to BRL) as USD base units (6 decimals), truncated: never shown above its value. */
 export const brsToUsd = (base: bigint, usdBrl: bigint) => (base * FX_SCALE) / usdBrl;
 
-/** A BRS amount in US dollars at `usdBrl`: `US$ 2,285.18`. Display only; the chain holds BRS. */
-export const fmtUsd = (base: bigint, usdBrl: bigint, places = 2) => `US$ ${fmtUnits(brsToUsd(base, usdBrl), BRS_DECIMALS, places)}`;
+/** A BRS amount in US dollars at `usdBrl`: `US$ 2,285.18` (non-breaking space). Display only; the chain holds BRS. */
+export const fmtUsd = (base: bigint, usdBrl: bigint, places = 2) => `US$${NBSP}${fmtUnits(brsToUsd(base, usdBrl), BRS_DECIMALS, places)}`;
 
 /**
  * A rate as BRL per US$1 × FX_SCALE, always a bigint: a scaled bigint passes
@@ -55,10 +61,10 @@ export function fmtUsdHint(base: bigint, rate: unknown, sign = ""): string {
   return `≈ ${sign || (base < 0n ? "−" : "")}${fmtUsd(base < 0n ? -base : base, r)}`;
 }
 
-/** An FX `asOf` (ISO, `2026-10-09T13:07:30-03:00`) as the quote's own date, `09/10/2026`. */
+/** An FX `asOf` (ISO, `2026-10-09T13:07:30-03:00`) as the quote's own date, ISO: `2026-10-09`. */
 export function fmtFxDate(asOf: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(asOf);
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : asOf;
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : asOf;
 }
 
 /** The one source line wherever US$ hints show. */
@@ -67,8 +73,18 @@ export function fxSourceLine(fx: { source: string; asOf: string }): string {
   return `US$ at ${src}, ${fmtFxDate(fx.asOf)}. Display only; the reserve holds BRS.`;
 }
 
-/** Reserve shares: `12,345.678901`. */
-export const fmtShares = (base: bigint) => fmtUnits(base, SHARE_DECIMALS, 6);
+/** `base` rounded half up (away from zero) to `places` of its `decimals`, still in base units. */
+function roundHalfUp(base: bigint, decimals: number, places: number): bigint {
+  if (places >= decimals) return base;
+  const step = 10n ** BigInt(decimals - places);
+  const neg = base < 0n;
+  const abs = neg ? -base : base;
+  const r = ((abs + step / 2n) / step) * step;
+  return neg ? -r : r;
+}
+
+/** Reserve shares, 2 places, rounded half up: `35,833.33`. Display only; inputs keep full precision. */
+export const fmtShares = (base: bigint) => fmtUnits(roundHalfUp(base, SHARE_DECIMALS, 2), SHARE_DECIMALS, 2);
 
 /** NAV per share (`NAV_SCALE` = 1.0) with 6 places. `0` (no shares) shows as an em dash. */
 export function fmtNav(nav: bigint): string {
@@ -82,13 +98,39 @@ export function fmtSharePrice(nav: bigint): string {
   return `${fmtUnits(nav, Number(NAV_SCALE.toString().length - 1), 4)} BRS`;
 }
 
-/** Basis points as a percentage: `2000` → `20.00%`. */
-export function fmtBps(bps: number | bigint, places = 2): string {
-  const b = BigInt(bps);
-  const scaled = (b * 10n ** BigInt(places) * 100n) / BPS_DENOMINATOR;
-  const s = scaled.toString().padStart(places + 1, "0");
-  return `${s.slice(0, -places) || "0"}.${s.slice(-places)}%`;
+// ── Percentages: one formatter family, one decimal, rounded half up ─────────
+
+/** `num / den` in tenths of a percent, rounded half up (away from zero). `den` must be > 0. */
+function tenthsOfPct(num: bigint, den: bigint): bigint {
+  const neg = num < 0n !== den < 0n;
+  const n = num < 0n ? -num : num;
+  const d = den < 0n ? -den : den;
+  const t = (n * 2_000n + d) / (2n * d);
+  return neg ? -t : t;
 }
+
+const tenthsText = (t: bigint, trim: boolean) => {
+  const neg = t < 0n;
+  const a = neg ? -t : t;
+  const body = trim && a % 10n === 0n ? group((a / 10n).toString()) : `${group((a / 10n).toString())}.${a % 10n}`;
+  return `${neg ? "-" : ""}${body}%`;
+};
+
+/**
+ * `part` as a share of `whole`, one decimal, rounded half up: `18.2%`,
+ * `122.2%`. An em dash when `whole` is 0. The one formatter for measured
+ * shares and ratios on screen.
+ */
+export function fmtPctOf(part: bigint, whole: bigint): string {
+  if (whole === 0n) return "—";
+  return tenthsText(tenthsOfPct(part, whole), false);
+}
+
+/** Basis points as a percentage, one decimal, rounded half up: `2000` → `20.0%`, `5` → `0.1%`. For measured values. */
+export const fmtBps = (bps: number | bigint) => fmtPctOf(BigInt(bps), BPS_DENOMINATOR);
+
+/** A configured rate in basis points, one decimal at most (rounded half up), no trailing `.0`: 2_500 → "25%", 250 → "2.5%". */
+export const fmtPct = (bps: number | bigint) => tenthsText(tenthsOfPct(BigInt(bps), BPS_DENOMINATOR), true);
 
 /** Unix seconds (i64) as UTC: `2026-10-06 23:19:04 UTC`. `0` means unset. */
 export function fmtTime(ts: bigint): string {
@@ -163,12 +205,29 @@ export function parseUnitsOrZero(input: string, decimals = BRS_DECIMALS): bigint
   return parseBrs(input, decimals);
 }
 
-/** Ratio `a / b` as a percentage with one decimal; `—` when `b` is 0. */
-export function fmtRatio(a: bigint, b: bigint): string {
-  if (b === 0n) return "—";
-  const tenths = (a * 1000n) / b;
-  return `${group((tenths / 10n).toString())}.${(tenths % 10n).toString()}%`;
+/** Ratio `a / b` as a percentage (the coverage multiple: `122.2%`); `—` when `b` is 0. Same as {@link fmtPctOf}. */
+export const fmtRatio = fmtPctOf;
+
+// ── The /reserve header's read line ───────────────────────────────────────
+
+/** Below this age the on-chain figures count as fresh, and the header reads "Live". */
+export const LIVE_FRESH_SECS = 600n;
+
+/**
+ * The header's read line. Fresh (refreshed on-chain under ~10 minutes ago):
+ * "Live · read every 10 s", with the pulse. Older: says the page still reads
+ * every 10 s but the on-chain refresh is old, with no pulse.
+ */
+export function liveLine(now: bigint, published: bigint): { fresh: boolean; text: string } {
+  if (published === 0n) return { fresh: false, text: "Read every 10 s · not yet refreshed on-chain" };
+  const age = now - published;
+  if (age < LIVE_FRESH_SECS) return { fresh: true, text: "Live · read every 10 s" };
+  return { fresh: false, text: `Read every 10 s · last on-chain refresh ${fmtAgeShort(age)} ago` };
 }
 
-/** Basis points as a percentage with at most two decimals and no trailing zeros: 10_000 → "100%", 2_550 → "25.5%". */
-export const fmtPct = (bps: number | bigint) => `${Number(bps) / 100}%`;
+/** An age in its largest unit: "45m", "13h", "2d". */
+export function fmtAgeShort(secs: bigint): string {
+  if (secs >= 86_400n) return `${secs / 86_400n}d`;
+  if (secs >= 3_600n) return `${secs / 3_600n}h`;
+  return `${secs / 60n}m`;
+}

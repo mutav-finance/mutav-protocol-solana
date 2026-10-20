@@ -4,10 +4,13 @@ import * as React from "react"
 import { Tabs as TabsPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { mouseFocusProps } from "@/lib/client/mouse-focus"
 
 // Precision Brutalism: underline-active tabs (amber active border), NO pill
 // background, NO rounded corners, NO shadow. Matches the existing MUTAV tab bars.
-// Focus is the global amber `:focus-visible` outline.
+// Focus is the global amber `:focus-visible` outline, inset so it never sits
+// over the active underline, and dropped when a pointer gave the focus
+// (`data-mouse-focus`, lib/client/mouse-focus.ts): keyboard users keep it.
 
 function Tabs({
   className,
@@ -40,11 +43,21 @@ function TabsList({
 
 function TabsTrigger({
   className,
+  onPointerDown,
+  onBlur,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
+      onPointerDown={(e) => {
+        mouseFocusProps.onPointerDown(e)
+        onPointerDown?.(e)
+      }}
+      onBlur={(e) => {
+        mouseFocusProps.onBlur(e)
+        onBlur?.(e)
+      }}
       className={cn(
         "relative -mb-px inline-flex items-center justify-center gap-1.5 border-b-2 border-transparent px-3 py-2 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors outline-none select-none",
         "hover:text-foreground",

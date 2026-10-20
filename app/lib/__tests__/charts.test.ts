@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { coverageRequired, stressTerm } from "@mutav-finance/mutav-protocol-solana";
-import { capitalSplit, claimSpeed, coverBars, flowBars, frac, navBasis, coverageMeter } from "../charts";
+import { capacityLeft, capitalSplit, claimSpeed, coverBars, coverageCeiling, flowBars, frac, navBasis, coverageMeter, type CoverageCeilingInput } from "../charts";
 import type { ClaimRow, CoverageRow } from "../view";
 import { BRL } from "./fixtures";
 
@@ -90,5 +90,153 @@ describe("chart shaping", () => {
   it("commits every held unit and reports the shortfall when under-covered", () => {
     const s = capitalSplit({ stableAssets: 3_100n * BRL, coverageRequired: 3_500n * BRL, freeCapital: 0n }, 3_200n * BRL);
     expect(s).toMatchObject({ provisions: 3_100n * BRL, restRequired: 0n, freeCapital: 0n, shortfall: 400n * BRL, axis: 3_500n * BRL });
+  });
+});
+
+describe("coverage ceiling (inverse of the register_guarantee gate)", () => {
+  const base: CoverageCeilingInput = {
+    stableAssets: 44_000n * BRL,
+    coverageRatioBps: 2_500,
+    provisions: 0n,
+    stressBuffer: 19_000n * BRL,
+    remainingCoverTotal: 144_000n * BRL,
+    mode: 0,
+    paused: false,
+    frozen: false,
+  };
+
+  it("devnet today: R$44k at 25% carries R$176k, R$32k of headroom, the ratio binds", () => {
+    const c = coverageCeiling(base);
+    expect(c).toEqual({ ceiling: 176_000n * BRL, inUse: 144_000n * BRL, headroom: 32_000n * BRL, binding: "ratio", blockedBy: null });
+    expect(coverageRequired(base.remainingCoverTotal, 2_500, 0n, base.stressBuffer)).toBe(36_000n * BRL);
+  });
+
+  it("the stress floor binds while the reserve is below provisions + stress buffer", () => {
+    // S R$12k, P R$2k, B R$19k: P + B > S, so cover can grow only to S itself (ratio would allow R$48k).
+    const c = coverageCeiling({ ...base, stableAssets: 12_000n * BRL, provisions: 2_000n * BRL, remainingCoverTotal: 5_000n * BRL });
+    expect(c).toMatchObject({ ceiling: 12_000n * BRL, headroom: 7_000n * BRL, binding: "stress" });
+    expect(coverageRequired(c.ceiling, 2_500, 2_000n * BRL, 19_000n * BRL)).toBeLessThanOrEqual(12_000n * BRL);
+    expect(coverageRequired(c.ceiling + 1n, 2_500, 2_000n * BRL, 19_000n * BRL)).toBeGreaterThan(12_000n * BRL);
+  });
+
+  it("no headroom while paused, frozen, not NORMAL or below provisions", () => {
+    for (const [over, why] of [
+      [{ paused: true }, "paused"],
+      [{ frozen: true }, "frozen"],
+      [{ mode: 1 }, "under-covered"],
+      [{ stableAssets: 1_000n * BRL, provisions: 2_000n * BRL }, "provisions"],
+    ] as const) {
+      const c = coverageCeiling({ ...base, ...over });
+      expect(c.headroom).toBe(0n);
+      expect(c.binding).toBe("blocked");
+      expect(c.blockedBy).toBe(why);
+    }
+    // Below provisions the ceiling is today's cover: nothing can grow.
+    expect(coverageCeiling({ ...base, stableAssets: 1_000n * BRL, provisions: 2_000n * BRL }).ceiling).toBe(base.remainingCoverTotal);
+  });
+
+  it("cover already above the ceiling is under-covered even while the stored mode still reads NORMAL", () => {
+    // R$200k > R$176k: the gate's live `before.under_covered()` check refuses, whatever `state.mode` says.
+    const c = coverageCeiling({ ...base, remainingCoverTotal: 200_000n * BRL, mode: 0 });
+    expect(c).toMatchObject({ ceiling: 176_000n * BRL, headroom: 0n, binding: "blocked", blockedBy: "under-covered" });
+    expect(coverageRequired(200_000n * BRL, 2_500, 0n, base.stressBuffer)).toBeGreaterThan(base.stableAssets);
+    // Exactly at the ceiling is still covered: no block, no headroom.
+    expect(coverageCeiling({ ...base, remainingCoverTotal: 176_000n * BRL })).toMatchObject({ headroom: 0n, binding: "ratio", blockedBy: null });
+  });
+
+  it("parity with the client's coverageRequired over generated inputs", () => {
+    // LCG in bigint: a JS-double LCG loses its low bits past 2^53 and degenerates.
+    let seed = 0x5eed_1234n;
+    const rand = (n: number | bigint) => {
+      seed = (seed * 1_103_515_245n + 12_345n) & 0x7fff_ffffn;
+      return seed % BigInt(n);
+    };
+    const U64 = (1n << 64n) - 1n;
+    const seen = { ratio: 0, stress: 0, provisions: 0, over: 0, c10000: 0, huge: 0 };
+    const check = (S: bigint, P: bigint, B: bigint, c: number, X: bigint) => {
+      const out = coverageCeiling({ stableAssets: S, coverageRatioBps: c, provisions: P, stressBuffer: B, remainingCoverTotal: X, mode: 0, paused: false, frozen: false });
+      if (c === 10_000) seen.c10000++;
+      if (S < P) {
+        seen.provisions++;
+        expect(out).toMatchObject({ binding: "blocked", blockedBy: "provisions", headroom: 0n, ceiling: X });
+        return;
+      }
+      // The ceiling is the largest X the gate accepts (bounded by u64, where the program's sums overflow).
+      expect(coverageRequired(out.ceiling, c, P, B)).toBeLessThanOrEqual(S);
+      if (out.ceiling < U64) expect(coverageRequired(out.ceiling + 1n, c, P, B)).toBeGreaterThan(S);
+      expect(out.headroom).toBe(out.ceiling > X ? out.ceiling - X : 0n);
+      if (X > out.ceiling) {
+        seen.over++;
+        expect(out).toMatchObject({ binding: "blocked", blockedBy: "under-covered" });
+        expect(coverageRequired(X, c, P, B)).toBeGreaterThan(S);
+      } else {
+        expect(out.blockedBy).toBeNull();
+        expect(coverageRequired(X, c, P, B)).toBeLessThanOrEqual(S);
+        seen[out.binding as "ratio" | "stress"]++;
+      }
+      // A lease of exactly the headroom passes the gate; one unit more does not.
+      if (out.headroom > 0n) {
+        expect(coverageRequired(X + out.headroom, c, P, B)).toBeLessThanOrEqual(S);
+        if (X + out.headroom < U64) expect(coverageRequired(X + out.headroom + 1n, c, P, B)).toBeGreaterThan(S);
+      }
+    };
+    for (let k = 0; k < 2_000; k++) {
+      const scale = [1n, 1_000n, BRL, 1_000n * BRL][k % 4]!;
+      const S = rand(500_000) * scale + rand(1_000);
+      const P = rand(8) === 0n ? S + rand(1_000) + 1n : (S * rand(101)) / 100n;
+      const B = rand(3) === 0n ? 0n : rand(400_000) * scale;
+      const c = rand(10) === 0n ? 10_000 : Number(rand(10_000) + 1n);
+      const X = rand(2_000_000) * scale;
+      check(S, P, B, c, X);
+    }
+    // Explicit edges: c = 10000 (ceiling = S), and a near-u64::MAX reserve at a small ratio (ceiling clamps to u64).
+    for (const [S, P, B, X] of [
+      [44_000n * BRL, 0n, 19_000n * BRL, 0n],
+      [1n, 0n, 0n, 0n],
+      [12_000n * BRL, 2_000n * BRL, 19_000n * BRL, 5_000n * BRL],
+    ] as const)
+      check(S, P, B, 10_000, X);
+    for (const c of [1, 2, 7, 2_500]) {
+      seen.huge++;
+      check(U64 - 5n, 0n, 0n, c, 1_000n * BRL);
+    }
+    expect(coverageCeiling({ stableAssets: U64 - 5n, coverageRatioBps: 1, provisions: 0n, stressBuffer: 0n, remainingCoverTotal: 0n, mode: 0, paused: false, frozen: false }).ceiling).toBe(U64);
+    // The generated cases must reach every branch, not collapse onto one.
+    expect(seen.ratio).toBeGreaterThanOrEqual(200);
+    expect(seen.stress).toBeGreaterThanOrEqual(50);
+    expect(seen.provisions).toBeGreaterThanOrEqual(100);
+    expect(seen.over).toBeGreaterThanOrEqual(50);
+    expect(seen.c10000).toBeGreaterThanOrEqual(100);
+  });
+
+  it("matches the simulator's month 6: R$140,491.59 at 25% carries ~R$562.0k", () => {
+    const c = coverageCeiling({ ...base, stableAssets: 140_491_590_000n, remainingCoverTotal: 0n });
+    expect(c.ceiling).toBe(561_966_360_000n);
+    expect(c.binding).toBe("ratio");
+  });
+});
+
+describe("capacityLeft", () => {
+  const k = (ceiling: bigint, headroom: bigint, blockedBy: "paused" | "under-covered" | "frozen" | "provisions" | null = null) => ({ ceiling, headroom, blockedBy });
+
+  it("devnet today: R$32k of a R$176k ceiling is 18.2%", () => {
+    expect(capacityLeft(k(176_000n * BRL, 32_000n * BRL))).toBe("18.2%");
+  });
+
+  it("rounds half up to one decimal", () => {
+    expect(capacityLeft(k(1_000n, 1n))).toBe("0.1%"); // 0.10%
+    expect(capacityLeft(k(2_000n, 1n))).toBe("0.1%"); // 0.05% rounds up
+    expect(capacityLeft(k(10_000n, 4n))).toBe("0.0%"); // 0.04% rounds down
+    expect(capacityLeft(k(3n, 1n))).toBe("33.3%");
+    expect(capacityLeft(k(3n, 2n))).toBe("66.7%");
+    expect(capacityLeft(k(10_000n, 9_996n))).toBe("100.0%");
+    expect(capacityLeft(k(176_000n * BRL, 176_000n * BRL))).toBe("100.0%");
+  });
+
+  it("0.0% while blocked, at the ceiling, or with a zero ceiling", () => {
+    for (const why of ["paused", "under-covered", "frozen", "provisions"] as const) expect(capacityLeft(k(176_000n * BRL, 32_000n * BRL, why))).toBe("0.0%");
+    expect(capacityLeft(k(176_000n * BRL, 0n))).toBe("0.0%");
+    expect(capacityLeft(k(0n, 0n))).toBe("0.0%");
+    expect(capacityLeft(k(0n, 5n))).toBe("0.0%");
   });
 });

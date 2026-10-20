@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>MUTAV intro</title>
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Geist"; font-weight: 100 900; font-style: normal; src: url("assets/fonts/Geist.woff2") format("woff2"); }
+      @font-face { font-family: "Inter"; font-weight: 100 900; font-style: normal; src: url("assets/fonts/Inter.woff2") format("woff2"); }
+      @font-face { font-family: "JetBrains Mono"; font-weight: 100 800; font-style: normal; src: url("assets/fonts/JetBrainsMono.woff2") format("woff2"); }
+      :root {
+        --canvas: #0e0f11; --surface: #16181c; --border: #2a2d33; --text: #f0f0ee; --text-2: #8a8f99; --text-3: #555b66;
+        --accent: #e8a020; --error: #c94040; --success: #3dab72;
+        --font-display: "Geist", "Helvetica Neue", Arial, sans-serif;
+        --font-sans: "Inter", "Helvetica Neue", Arial, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--canvas); color: var(--text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--canvas); }
+      .clip { position: absolute; inset: 0; overflow: hidden; }
+      .abs { position: absolute; }
+
+      #grid { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+        background-image: linear-gradient(to right, rgba(240,240,238,.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(240,240,238,.04) 1px, transparent 1px);
+        background-size: 48px 48px; }
+      #photo { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover; opacity: 0; }
+      #vig { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; opacity: 0; background: radial-gradient(ellipse 75% 70% at 50% 45%, rgba(14,15,17,0) 45%, rgba(6,7,8,.75) 100%); }
+      #glow { position: absolute; left: 460px; top: 140px; width: 1000px; height: 640px; opacity: 0;
+        background: radial-gradient(closest-side, rgba(232,160,32,.16), rgba(232,160,32,0) 100%); }
+
+      /* ---------- Logo ident ---------- */
+      #identWrap { position: absolute; left: 0; top: 0; width: 1920px; height: 900px; display: flex; align-items: center; justify-content: center; }
+      #ident { position: relative; display: flex; align-items: flex-end; gap: 40px; }
+      #mark { width: 240px; height: 200px; overflow: visible; display: block; }
+      #mark .sh { fill: #f0f0ee; fill-opacity: 0; stroke: #f0f0ee; stroke-width: .7; stroke-dasharray: 1 1.2; stroke-dashoffset: 1.1; }
+      #mark .pill { fill: #e8a020; stroke: #e8a020; }
+      #wordBox { position: relative; height: 200px; width: 560px; }
+      .word { position: absolute; left: 0; bottom: -38px; font-family: var(--font-display); font-weight: 600; font-size: 228px; letter-spacing: -0.045em; line-height: 1; white-space: nowrap; }
+      #word { color: #f0f0ee; clip-path: inset(0 100% 0 -4%); }
+      #wordShine { color: transparent; background: linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 40%, rgba(255,214,140,.95) 50%, rgba(255,255,255,0) 60%, rgba(255,255,255,0) 100%);
+        background-size: 300% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text; opacity: 0; }
+
+      /* ---------- Line illustration ---------- */
+      #ill { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: visible; transform: scale(1.05); transform-origin: 965px 625px; }
+      #ill .d { fill: none; stroke-dasharray: 1 1.2; stroke-dashoffset: 1.1; stroke-linecap: round; stroke-linejoin: round; }
+      #ill .w { stroke: #f0f0ee; stroke-width: 2.5; }
+      #ill .w2 { stroke: #8a8f99; stroke-width: 2; }
+      #ill .a { stroke: #e8a020; stroke-width: 3; }
+      #ill .r { stroke: #c94040; stroke-width: 3; }
+      #ill .g { stroke: #3dab72; stroke-width: 3.5; }
+      #ill text { font-family: var(--font-mono); }
+      .lbl { font-size: 22px; letter-spacing: .08em; fill: #8a8f99; text-anchor: middle; }
+      .lblA { fill: #e8a020; }
+      .lblR { fill: #d86464; }
+      .lblW { fill: #f0f0ee; }
+      .hide { opacity: 0; }
+
+      /* ---------- Agency platform window ---------- */
+      .win { position: absolute; left: 249px; top: 40px; width: 1422px; height: 840px; border-radius: 12px; opacity: 0; }
+      .win-shadow { position: absolute; inset: 0; border-radius: 12px; box-shadow: 0 60px 120px -20px rgba(0,0,0,.75), 0 24px 48px -10px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.10); }
+      .win-body { position: absolute; inset: 0; border-radius: 12px; overflow: hidden; background: #111214; }
+      .chrome { position: absolute; left: 0; top: 0; width: 1422px; height: 40px; background: linear-gradient(to bottom, rgba(40,42,48,.98), rgba(28,30,34,.98)); border-bottom: 1px solid rgba(255,255,255,.07); }
+      .tab { position: absolute; left: 44px; top: 6px; width: 330px; height: 28px; border-radius: 7px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.06); }
+      .tabt { position: absolute; left: 140px; top: 4px; font-size: 15px; font-weight: 500; color: #c9ccd2; white-space: nowrap; }
+      .addr { position: absolute; left: 392px; top: 6px; width: 700px; height: 28px; border-radius: 7px; background: rgba(0,0,0,.30); border: 1px solid rgba(255,255,255,.06); }
+      .url { position: absolute; left: 14px; top: 4px; font-size: 15px; font-weight: 500; color: #a9adb5; white-space: nowrap; }
+      .dots { position: absolute; right: 18px; top: 15px; display: flex; gap: 7px; }
+      .dots i { width: 10px; height: 10px; border-radius: 50%; background: #3a3d44; display: block; }
+      .vp { position: absolute; left: 0; top: 40px; width: 1422px; height: 800px; overflow: hidden; background: #0f1012; }
+      #realImg { position: absolute; left: 0; top: 0; width: 1422px; display: block; }
+      .sweep { position: absolute; left: 0; top: 0; width: 1422px; height: 48px; opacity: 0;
+        background: linear-gradient(90deg, rgba(232,160,32,0), rgba(232,160,32,.16) 30%, rgba(232,160,32,.16) 70%, rgba(232,160,32,0)); border-top: 1px solid rgba(232,160,32,.35); border-bottom: 1px solid rgba(232,160,32,.35); }
+
+      /* illustrated dashboard */
+      .side { position: absolute; left: 0; top: 0; width: 220px; height: 800px; background: #131417; border-right: 1px solid #22252a; }
+      .side .it { position: absolute; left: 16px; width: 188px; height: 40px; border-radius: 8px; display: flex; align-items: center; gap: 12px; padding-left: 14px; font-size: 19px; color: #b4b8c0; font-weight: 500; }
+      .side .it i { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #555b66; display: block; }
+      .side .it.on { background: rgba(232,160,32,.10); color: #f0f0ee; }
+      .side .it.on i { border-color: #e8a020; }
+      .side .sec { position: absolute; left: 30px; font-family: var(--font-mono); font-size: 14px; letter-spacing: .12em; color: #9aa0aa; }
+      .h1 { position: absolute; left: 252px; top: 20px; font-family: var(--font-display); font-weight: 600; font-size: 36px; letter-spacing: -0.01em; }
+      .sub { position: absolute; left: 252px; top: 66px; font-size: 18px; color: #b4b8c0; }
+      .kpi { position: absolute; top: 104px; width: 272px; height: 108px; border-radius: 12px; background: #16181c; border: 1px solid #2a2d33; }
+      .kpi .k { position: absolute; left: 20px; top: 14px; font-size: 18px; color: #b4b8c0; font-weight: 500; }
+      .kpi .v { position: absolute; left: 20px; top: 44px; font-family: var(--font-display); font-weight: 600; font-size: 44px; letter-spacing: -0.02em; }
+      .list { position: absolute; left: 252px; top: 232px; width: 1138px; height: 548px; border-radius: 12px; background: #16181c; border: 1px solid #2a2d33; overflow: hidden; }
+      .lt { position: absolute; left: 24px; top: 15px; font-family: var(--font-display); font-weight: 600; font-size: 24px; }
+      .lc { position: absolute; left: 252px; top: 19px; font-family: var(--font-mono); font-size: 16px; color: #3dab72; background: rgba(61,171,114,.12); border-radius: 999px; padding: 3px 10px; }
+      .cols, .row { position: absolute; left: 0; width: 1138px; height: 48px; }
+      .cols { top: 58px; border-bottom: 1px solid #2a2d33; }
+      .cols span { position: absolute; top: 14px; font-family: var(--font-mono); font-size: 15px; letter-spacing: .1em; color: #a3a8b1; }
+      .row { border-bottom: 1px solid #202328; opacity: 0; }
+      .row span { position: absolute; top: 11px; font-size: 20px; color: #f0f0ee; white-space: nowrap; }
+      .row .m { font-family: var(--font-mono); font-size: 19px; color: #c3c7ce; top: 12px; }
+      .row .pill { top: 9px; font-family: var(--font-mono); font-size: 16px; color: #3dab72; background: rgba(61,171,114,.12); border: 1px solid rgba(61,171,114,.35); border-radius: 999px; padding: 3px 12px; }
+      .row.ana { background: rgba(232,160,32,.08); box-shadow: inset 3px 0 0 #e8a020; }
+      .row.ana .t { color: #f0f0ee; font-weight: 600; }
+      .c1 { left: 24px; } .c2 { left: 240px; } .c3 { left: 600px; } .c4 { left: 790px; } .c5 { left: 980px; }
+
+      .chip { position: absolute; left: 892px; top: 104px; height: 34px; padding: 0 14px; border-radius: 8px; display: flex; align-items: center; gap: 10px;
+        background: rgba(14,15,17,.9); border: 1px solid #3a3d44; font-family: var(--font-mono); font-size: 14px; letter-spacing: .05em; color: #c3c7ce; opacity: 0; white-space: nowrap; }
+      .chip i { width: 7px; height: 7px; border-radius: 50%; background: #e8a020; display: block; }
+      .chip i { width: 7px; height: 7px; border-radius: 50%; background: #e8a020; display: block; }
+
+      #loi { position: absolute; left: 1516px; top: 100px; width: 300px; height: 182px; border-radius: 14px; opacity: 0;
+        background: rgba(22,24,28,.94); border: 1px solid rgba(232,160,32,.55); box-shadow: 0 30px 60px -20px rgba(0,0,0,.8), 0 0 40px rgba(232,160,32,.18); }
+      #loiN { position: absolute; left: 24px; top: 14px; font-family: var(--font-display); font-weight: 600; font-size: 64px; color: #e8a020; letter-spacing: -0.02em; line-height: 1.1; }
+      #loiS { position: absolute; left: 24px; top: 122px; width: 256px; font-family: var(--font-sans); font-size: 17px; line-height: 1.35; color: #c3c7ce; }
+      #loiT { position: absolute; left: 24px; top: 92px; font-family: var(--font-mono); font-size: 17px; letter-spacing: .06em; color: #f0f0ee; }
+
+      #badge { position: absolute; left: 0; top: 724px; width: 1920px; display: flex; justify-content: center; opacity: 0; }
+      .badgeIn { position: relative; display: flex; align-items: center; gap: 18px; padding: 18px 30px 18px 26px; border-radius: 14px;
+        background: rgba(18,19,22,.92); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 30px 70px -20px rgba(0,0,0,.85); }
+      .badgeIn b { width: 5px; height: 40px; border-radius: 3px; background: #e8a020; display: block; }
+      .badgeIn span { font-family: var(--font-sans); font-size: 27px; font-weight: 500; color: #f0f0ee; white-space: nowrap; }
+      .badgeIn em { font-style: normal; color: #e8a020; font-weight: 600; }
+      .badgeIn .s2 { color: #8a8f99; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="17.7">
+      <section id="stage" class="clip" data-start="0" data-duration="17.7" data-track-index="0">
+        <div id="grid"></div>
+        <img id="photo" src="assets/opener-sao-paulo.jpg" alt="">
+        <div id="vig"></div>
+        
+
+        <!-- ================= ILLUSTRATION (scenes B–D) ================= -->
+        <svg id="ill" viewBox="0 0 1920 1080">
+          <defs>
+            <clipPath id="vesselClip"><rect x="332" y="332" width="196" height="266" rx="22"/></clipPath>
+          </defs>
+
+          <!-- B1: lease document (premise) -->
+          <g id="doc">
+            <rect class="d w" pathLength="1" x="820" y="220" width="280" height="370" rx="12"/>
+            <path class="d w2" pathLength="1" d="M1050 220 V262 H1100"/>
+            <text id="docT" class="hide" x="850" y="268" style="font-size:15px;letter-spacing:.1em;fill:#f0f0ee">CONTRATO DE</text>
+            <text id="docT2" class="hide" x="850" y="290" style="font-size:15px;letter-spacing:.1em;fill:#f0f0ee">LOCAÇÃO</text>
+            <path class="d w2" pathLength="1" d="M850 330 H1070"/>
+            <path class="d w2" pathLength="1" d="M850 356 H1050"/>
+            <path class="d w2" pathLength="1" d="M850 382 H1066"/>
+            <path class="d w2" pathLength="1" d="M850 408 H1000"/>
+            <path class="d w2" pathLength="1" d="M850 434 H1040"/>
+            <path class="d w" pathLength="1" d="M850 540 H960"/>
+            <path class="d w" pathLength="1" d="M856 528 q12 -18 22 -2 q8 12 18 -6 q10 -14 20 2"/>
+            <circle id="slot" class="d a" pathLength="1" cx="1040" cy="520" r="40" style="stroke-dasharray:.04 .03;stroke-width:2"/>
+            <g id="seal" style="opacity:0">
+              <circle cx="1040" cy="520" r="40" fill="rgba(232,160,32,.14)" stroke="#e8a020" stroke-width="3"/>
+              <circle cx="1040" cy="520" r="31" fill="none" stroke="#e8a020" stroke-width="1.5"/>
+              <path d="M1026 520 l10 10 l18 -20" fill="none" stroke="#e8a020" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            </g>
+            <text id="sealT" class="hide" x="1040" y="590" style="font-size:18px;letter-spacing:.12em;fill:#e8a020;text-anchor:middle" dy="30">GUARANTEE REQUIRED</text>
+          </g>
+          <g id="br" style="opacity:0" transform="translate(530 0)">
+            <path d="M636 300 a14 14 0 1 1 28 0 c0 12 -14 26 -14 26 s-14 -14 -14 -26z" fill="none" stroke="#e8a020" stroke-width="2.5"/>
+            <circle cx="650" cy="300" r="4.5" fill="#e8a020"/>
+            <rect x="590" y="336" width="120" height="38" rx="19" fill="rgba(232,160,32,.08)" stroke="#e8a020" stroke-width="2"/>
+            <text x="650" y="362" style="font-size:19px;letter-spacing:.16em;fill:#e8a020;text-anchor:middle">BRASIL</text>
+          </g>
+          <g id="ag0">
+            <rect class="d w" pathLength="1" x="574" y="450" width="152" height="140" rx="3"/>
+            <path class="d a" pathLength="1" d="M566 450 L734 450 L724 476 Q710 490 696 476 Q682 490 668 476 Q654 490 640 476 Q626 490 612 476 Q598 490 584 476 Q574 486 576 476 Z"/>
+            <rect class="d w" pathLength="1" x="636" y="528" width="28" height="62" rx="2"/>
+            <rect class="d w2" pathLength="1" x="590" y="500" width="34" height="26" rx="2"/>
+            <rect class="d w2" pathLength="1" x="676" y="500" width="34" height="26" rx="2"/>
+            <text id="ag0L" class="lbl lblW hide" x="650" y="634">Agency</text>
+          </g>
+          <g id="stamp" style="opacity:0">
+            <rect x="-32" y="-16" width="64" height="16" rx="3" fill="#0e0f11" stroke="#e8a020" stroke-width="3"/>
+            <rect x="-9" y="-44" width="18" height="28" fill="#0e0f11" stroke="#e8a020" stroke-width="3"/>
+            <circle cx="0" cy="-58" r="15" fill="#0e0f11" stroke="#e8a020" stroke-width="3"/>
+          </g>
+          <!-- ground -->
+          <path id="ground" class="d w2" pathLength="1" d="M250 600 H1670" style="stroke:#2a2d33"/>
+
+          <!-- B2: Ana's building -->
+          <g id="bld">
+            <rect class="d w" pathLength="1" x="330" y="300" width="200" height="300" rx="3"/>
+            <path class="d w" pathLength="1" d="M400 300 V266 H460 V300 M412 266 V252 H448 V266"/>
+            <g id="wins">
+              <rect class="d w2" pathLength="1" x="352" y="322" width="36" height="26" rx="2"/><rect class="d w2" pathLength="1" x="412" y="322" width="36" height="26" rx="2"/><rect class="d w2" pathLength="1" x="472" y="322" width="36" height="26" rx="2"/>
+              <rect class="d w2" pathLength="1" x="352" y="366" width="36" height="26" rx="2"/><rect class="d w2" pathLength="1" x="412" y="366" width="36" height="26" rx="2"/><rect class="d w2" pathLength="1" x="472" y="366" width="36" height="26" rx="2"/>
+              <rect class="d w2" pathLength="1" x="352" y="410" width="36" height="26" rx="2"/><rect class="d a" pathLength="1" x="412" y="410" width="36" height="26" rx="2" style="stroke-width:2.5"/><rect class="d w2" pathLength="1" x="472" y="410" width="36" height="26" rx="2"/>
+              <rect class="d w2" pathLength="1" x="352" y="454" width="36" height="26" rx="2"/><rect class="d w2" pathLength="1" x="412" y="454" width="36" height="26" rx="2"/><rect class="d w2" pathLength="1" x="472" y="454" width="36" height="26" rx="2"/>
+            </g>
+            <rect class="d w" pathLength="1" x="410" y="526" width="40" height="74" rx="2"/>
+            <circle class="d a" pathLength="1" cx="492" cy="560" r="10"/>
+            <path class="d a" pathLength="1" d="M474 600 Q492 568 510 600"/>
+            <text id="anaL" class="lbl lblW hide" x="430" y="648">Ana · tenant</text>
+          </g>
+
+          <!-- landlord house -->
+          <g id="house">
+            <path class="d w" pathLength="1" d="M1380 452 L1490 362 L1600 452"/>
+            <rect class="d w" pathLength="1" x="1402" y="440" width="176" height="160" rx="3"/>
+            <rect class="d w" pathLength="1" x="1475" y="530" width="30" height="70" rx="2"/>
+            <rect class="d w2" pathLength="1" x="1420" y="470" width="38" height="34" rx="2"/>
+            <rect class="d w2" pathLength="1" x="1522" y="470" width="38" height="34" rx="2"/>
+            <text id="lordL" class="lbl lblW hide" x="1490" y="648">Landlord</text>
+          </g>
+
+          <!-- B2: rent arrow + break -->
+          <g id="rent">
+            <path id="rentL" class="d a" pathLength="1" d="M560 500 H950"/>
+            <g id="rentRG"><path id="rentR" class="d a" pathLength="1" d="M970 500 H1360 M1344 488 L1362 500 L1344 512"/></g>
+            <g id="rentChip" style="opacity:0">
+              <rect x="890" y="446" width="140" height="34" rx="17" fill="#0e0f11" stroke="#e8a020" stroke-width="2"/>
+              <text x="960" y="469" style="font-size:17px;fill:#e8a020;text-anchor:middle">R$2,300</text>
+            </g>
+            <g id="xMark" style="opacity:0"><path d="M946 486 l28 28 M974 486 l-28 28" stroke="#c94040" stroke-width="5" stroke-linecap="round"/></g>
+            <text id="missL" class="lbl lblR hide" x="960" y="552">RENT MISSED</text>
+          </g>
+
+          <!-- C: agency -->
+          <g id="agency">
+            <rect id="agBox" class="d w" pathLength="1" x="872" y="440" width="176" height="160" rx="3"/>
+            <path id="agAwn" class="d a" pathLength="1" d="M862 440 L1058 440 L1046 470 Q1030 486 1014 470 Q998 486 982 470 Q966 486 950 470 Q934 486 918 470 Q902 486 886 470 Q874 482 874 470 Z"/>
+            <rect class="d w" pathLength="1" x="944" y="530" width="32" height="70" rx="2"/>
+            <rect class="d w2" pathLength="1" x="890" y="500" width="40" height="30" rx="2"/>
+            <rect class="d w2" pathLength="1" x="990" y="500" width="40" height="30" rx="2"/>
+            <text id="agL" class="lbl lblW hide" x="960" y="648">Agency</text>
+          </g>
+          <g id="arrL" style="opacity:0">
+            <path d="M560 520 H850" stroke="#c94040" stroke-width="3" stroke-dasharray="10 10" fill="none"/>
+            <path d="M694 506 l24 24 M718 506 l-24 24" stroke="#c94040" stroke-width="4.5" stroke-linecap="round"/>
+          </g>
+          <g id="arrR">
+            <path id="arrRp" class="d a" pathLength="1" d="M1070 520 H1360 M1344 508 L1362 520 L1344 532"/>
+          </g>
+          <text id="paysL" class="lbl lblA hide" x="1215" y="500" style="font-size:18px">AGENCY PAYS</text>
+          <g id="weight" style="opacity:0">
+            <path d="M914 432 L1006 432 L992 360 L928 360 Z" fill="rgba(201,64,64,.10)" stroke="#c94040" stroke-width="3" stroke-linejoin="round"/>
+            <path d="M938 360 C938 326 982 326 982 360" fill="none" stroke="#c94040" stroke-width="3"/>
+            <text x="960" y="406" style="font-size:20px;letter-spacing:.12em;fill:#d86464;text-anchor:middle">RISK</text>
+          </g>
+          <text id="absL" class="lbl lblR hide" x="960" y="684" style="font-size:18px">AGENCY CARRIES THE RISK</text>
+
+          <!-- C2: hourglass + 60-day timeline -->
+          <g id="hour" style="opacity:0">
+            <g id="hourIn">
+              <path d="M-22 -34 H22 M-22 34 H22 M-16 -34 C-16 -8 16 -8 16 0 C16 8 -16 8 -16 34 M16 -34 C16 -8 -16 -8 -16 0 C-16 8 16 8 16 34" fill="none" stroke="#f0f0ee" stroke-width="2.5" stroke-linecap="round"/>
+              <path d="M-9 -20 H9 L0 -6 Z" fill="#e8a020"/>
+              <path d="M0 18 L10 30 H-10 Z" fill="#e8a020"/>
+            </g>
+          </g>
+          <g id="tline" style="opacity:0" transform="translate(0 -40)">
+            <text x="300" y="738" style="font-size:18px;letter-spacing:.12em;fill:#8a8f99">OTHER SOLUTIONS · LANDLORD WAITS</text>
+            <path d="M300 780 H1250" stroke="#2a2d33" stroke-width="6" stroke-linecap="round"/>
+            <g id="ticks"></g>
+            <path id="tfill" d="M300 780 H1250" stroke="#e8a020" stroke-width="6" stroke-linecap="round"/>
+            <text id="dayN" x="1285" y="800" style="font-size:58px;font-weight:600;fill:#f0f0ee">day 01</text>
+          </g>
+
+          <!-- D: reserve vessel -->
+          <g id="vessel">
+            <g clip-path="url(#vesselClip)"><rect id="vFill" x="330" y="330" width="200" height="270" fill="#e8a020" fill-opacity=".9"/></g>
+            <rect class="d a" pathLength="1" x="330" y="330" width="200" height="270" rx="24" style="stroke-width:3.5"/>
+            <path class="d a" pathLength="1" d="M352 316 H508" style="stroke-width:3.5"/>
+            <g id="vMark" style="opacity:0" transform="translate(387 400) scale(1.2)">
+              <path d="M25.2002 3.59711C20.8004 7.26576 18.0001 12.7878 18 18.9643V59.0434C17.1113 59.3022 16.1724 59.4438 15.2002 59.4438H0V20.0444C0 8.99868 8.95431 0.0443737 20 0.0443726H25.2002V3.59711Z" fill="#f0f0ee"/>
+              <path d="M19.8 28.8H45V49.4C45 54.9228 40.5228 59.4 35 59.4H19.8V28.8Z" fill="#f0f0ee"/>
+              <path d="M45 0H39.8C28.7543 0 19.8 8.95431 19.8 20V35.8C19.8 36.9046 20.6954 37.8 21.8 37.8H45V0Z" fill="#f0f0ee"/>
+              <rect x="46.8" y="43.2" width="25.2" height="16.2" rx="8.1" fill="#0e0f11"/>
+              <path d="M72 0H66.8C55.7543 0 46.8 8.95431 46.8 20V31.8C46.8 35.1137 49.4863 37.8 52.8 37.8H72V0Z" fill="#f0f0ee"/>
+            </g>
+            <text id="vL" class="lbl lblA hide" x="430" y="648">MUTAV RESERVE</text>
+            <text id="vL2" class="lbl hide" x="430" y="680" style="font-size:19px">ON SOLANA</text>
+          </g>
+          <path id="link1" class="d a" pathLength="1" d="M540 520 H862" style="stroke-width:4.5"/>
+          <circle id="pulse" cx="540" cy="520" r="9" fill="#ffd28a" style="opacity:0"/>
+          <g id="check" style="opacity:0">
+            <circle cx="1590" cy="372" r="26" fill="#0e0f11" stroke="#3dab72" stroke-width="3.5"/>
+            <path d="M1578 373 l8 8 l16 -17" fill="none" stroke="#3dab72" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <text id="covL" class="lbl hide" x="1490" y="680" style="font-size:18px;fill:#3dab72">RENT COVERED</text>
+        </svg>
+
+        <!-- ================= SCENE E: agency platform ================= -->
+        <div class="win" id="win">
+          <div class="win-shadow"></div>
+          <div class="win-body">
+            <div class="chrome">
+              <div class="tab"><div class="tabt">Agency platform</div></div>
+              <div class="addr"><div class="url">app.mutav.finance / agency</div></div>
+              <div class="dots"><i></i><i></i><i></i></div>
+            </div>
+            <div class="vp" id="vp">
+              <img id="realImg" alt="" style="display:none">
+              <div id="sweep" class="sweep"></div>
+              <div id="dash">
+                <div class="side">
+                  <div class="sec" style="top:28px">AGENCY</div>
+                  <div class="it on" style="top:52px"><i></i>Overview</div>
+                  <div class="it" style="top:98px"><i></i>Guarantees</div>
+                  <div class="it" style="top:144px"><i></i>Tenants</div>
+                  <div class="it" style="top:190px"><i></i>Properties</div>
+                  <div class="it" style="top:236px"><i></i>Payments</div>
+                  <div class="sec" style="top:310px">ACCOUNT</div>
+                  <div class="it" style="top:334px"><i></i>Team</div>
+                  <div class="it" style="top:380px"><i></i>Settings</div>
+                </div>
+                <div class="h1">Overview</div>
+                <div class="sub">Your agency · São Paulo</div>
+                <div class="kpi" style="left:252px"><div class="k">Guarantees in force</div><div class="v">12</div></div>
+                <div class="kpi" style="left:540px"><div class="k">Rent under guarantee / mo</div><div class="v">R$27,450</div></div>
+                <div class="kpi" style="left:828px"><div class="k">Awaiting signature</div><div class="v">3</div></div>
+                <div class="kpi" style="left:1116px"><div class="k">Renewals due</div><div class="v">2</div></div>
+                <div class="list">
+                  <div class="lt">Rental guarantees</div>
+                  <div class="lc">12 active</div>
+                  <div class="cols"><span class="c1">GUARANTEE</span><span class="c2">TENANT</span><span class="c3">RENT</span><span class="c4">SINCE</span><span class="c5">STATUS</span></div>
+                  <div id="rows"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="chip" id="chip" data-layout-allow-occlusion data-layout-allow-overlap><i></i><span id="chipT">AGENCY PLATFORM · PROTOTYPE SHOWN TO AGENCIES · FICTIONAL DATA</span></div>
+        <div id="loi" data-layout-allow-occlusion data-layout-allow-overlap><div id="loiN">0</div><div id="loiT">letters of intent</div><div id="loiS">agencies waiting to sign the first guarantee contract</div></div>
+        <div id="badge" data-layout-allow-occlusion data-layout-allow-overlap><div class="badgeIn" data-layout-allow-overlap data-layout-allow-occlusion><b></b><span data-layout-allow-overlap data-layout-allow-occlusion><em>This demo:</em> the MUTAV Protocol on Solana — built for the hackathon <span class="s2" data-layout-allow-overlap data-layout-allow-occlusion>· integrates into this platform</span></span></div></div>
+
+        <!-- ================= LOGO (ident → signature) ================= -->
+        <div id="identWrap">
+          <div id="ident">
+            <svg id="mark" viewBox="0 0 72 60">
+              <defs>
+                <clipPath id="markClip">
+                  <path d="M25.2002 3.59711C20.8004 7.26576 18.0001 12.7878 18 18.9643V59.0434C17.1113 59.3022 16.1724 59.4438 15.2002 59.4438H0V20.0444C0 8.99868 8.95431 0.0443737 20 0.0443726H25.2002V3.59711Z"/>
+                  <path d="M19.8 28.8H45V49.4C45 54.9228 40.5228 59.4 35 59.4H19.8V28.8Z"/>
+                  <path d="M45 0H39.8C28.7543 0 19.8 8.95431 19.8 20V35.8C19.8 36.9046 20.6954 37.8 21.8 37.8H45V0Z"/>
+                  <path d="M72 0H66.8C55.7543 0 46.8 8.95431 46.8 20V31.8C46.8 35.1137 49.4863 37.8 52.8 37.8H72V0Z"/>
+                </clipPath>
+                <linearGradient id="shineG" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0" stop-color="#ffd28a" stop-opacity="0"/>
+                  <stop offset=".5" stop-color="#ffd28a" stop-opacity=".95"/>
+                  <stop offset="1" stop-color="#ffd28a" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path id="m1" class="sh" pathLength="1" d="M25.2002 3.59711C20.8004 7.26576 18.0001 12.7878 18 18.9643V59.0434C17.1113 59.3022 16.1724 59.4438 15.2002 59.4438H0V20.0444C0 8.99868 8.95431 0.0443737 20 0.0443726H25.2002V3.59711Z"/>
+              <path id="m2" class="sh" pathLength="1" d="M45 0H39.8C28.7543 0 19.8 8.95431 19.8 20V35.8C19.8 36.9046 20.6954 37.8 21.8 37.8H45V0Z"/>
+              <path id="m3" class="sh" pathLength="1" d="M19.8 28.8H45V49.4C45 54.9228 40.5228 59.4 35 59.4H19.8V28.8Z"/>
+              <path id="m4" class="sh" pathLength="1" d="M72 0H66.8C55.7543 0 46.8 8.95431 46.8 20V31.8C46.8 35.1137 49.4863 37.8 52.8 37.8H72V0Z"/>
+              <rect id="m5" class="sh pill" pathLength="1" x="46.8" y="43.2" width="25.2" height="16.2" rx="8.1"/>
+              <g clip-path="url(#markClip)"><rect id="shine" x="-30" y="-10" width="22" height="80" fill="url(#shineG)" transform="skewX(-18)" style="opacity:0"/></g>
+            </svg>
+            <div id="wordBox"><div class="word" id="word">mutav</div></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      // Scene E content: set USE_REAL = true once assets/agency-real.png exists (2880 px wide capture of a 1440 viewport).
+      const USE_REAL = false;
+
+      const rowsData = [
+        ["CTR-5KQ7…", "MTV-PF-0093", "R$1,800", "Feb 2026"],
+        ["CTR-8MZ2…", "MTV-PF-0094", "R$2,400", "Mar 2026"],
+        ["CTR-3HT9…", "MTV-PF-0095", "R$3,100", "Mar 2026"],
+        ["CTR-7RB3…", "Ana · tenant · MTV-PF-0100", "R$2,300", "Sep 2026", true],
+        ["CTR-A71C…", "MTV-PF-0096", "R$2,150", "Apr 2026"],
+        ["CTR-QW4E…", "MTV-PF-0097", "R$1,650", "May 2026"],
+        ["CTR-9JD6…", "MTV-PF-0098", "R$2,900", "Jun 2026"],
+        ["CTR-L2X8…", "MTV-PF-0099", "R$4,200", "Jul 2026"],
+        ["CTR-F6N1…", "MTV-PF-0101", "R$1,950", "Oct 2026"],
+      ];
+      const rowsEl = document.getElementById("rows");
+      rowsData.forEach((r, i) => {
+        const d = document.createElement("div");
+        d.className = "row" + (r[4] ? " ana" : "");
+        d.style.top = (106 + i * 48) + "px";
+        d.innerHTML = `<span class="m c1">${r[0]}</span><span class="t c2">${r[1]}</span><span class="c3">${r[2]}</span><span class="m c4">${r[3]}</span><span class="pill c5">Active</span>`;
+        rowsEl.appendChild(d);
+      });
+      // 60 ticks on the waiting timeline
+      const ticks = document.getElementById("ticks");
+      let tp = "";
+      for (let i = 0; i < 60; i++) { const x = 300 + i * (950 / 59); tp += `M${x.toFixed(1)} ${i % 10 === 0 ? 760 : 766} V770 `; }
+      ticks.innerHTML = `<path d="${tp}" stroke="#555b66" stroke-width="2"/>`;
+
+      if (USE_REAL) {
+        const ri = document.getElementById("realImg"); ri.src = "assets/agency-real.png"; ri.style.display = "block";
+        document.getElementById("dash").style.display = "none";
+      }
+
+      function build() {
+        const tl = gsap.timeline({ paused: true });
+        const E = { o: "expo.out", io: "expo.inOut", p: "power3.out", p2: "power2.inOut" };
+        const draw = (sel, t, dur = 0.6, stagger = 0, ease = "power2.out") =>
+          tl.to(sel, { strokeDashoffset: 0, duration: dur, stagger, ease }, t);
+        const fadeIn = (sel, t, dur = 0.4, extra = {}) => tl.fromTo(sel, { opacity: 0, ...(extra.from || {}) }, { opacity: 1, duration: dur, ease: E.p, ...(extra.to || {}) }, t);
+        const fadeOut = (sel, t, dur = 0.35) => tl.to(sel, { opacity: 0, duration: dur, ease: "power2.in" }, t);
+
+        // ---------- Start: the logo ident is a separate clip (logo-sting.html); the signature is already at top-left ----------
+        tl.set("#grid", { opacity: 1 }, 0);
+        const parts = ["#m1", "#m2", "#m3", "#m4", "#m5"];
+        tl.set(parts, { strokeDashoffset: 0, fillOpacity: 1, strokeOpacity: 0 }, 0);
+        tl.set("#word", { clipPath: "inset(0 -6% 0 -4%)" }, 0);
+        const r = document.getElementById("ident").getBoundingClientRect();
+        const s = 22 / 200;
+        tl.set("#ident", { x: 309 - r.left, y: 49 - r.top, scale: s, transformOrigin: "0 0" }, 0);
+        tl.fromTo(["#vig", "#photo"], { opacity: 0 }, { opacity: (i) => (i === 0 ? 1 : 0.09), duration: 0.6, ease: "power1.out" }, 0.1);
+
+        // ---------- B1: the agency requires a guarantee on the lease (0.2 – 3.4) ----------
+        draw(["#doc .d:not(#slot)", "#ag0 .d"], 0.2, 0.7, 0.025, "power2.out");
+        tl.to("#slot", { strokeDashoffset: 0, duration: 0.01 }, 0.2);
+        fadeIn(["#slot", "#docT", "#docT2", "#ag0L"], 1.15, 0.3);
+        fadeIn("#br", 1.5, 0.3);
+        tl.set("#stamp", { x: 650, y: 430 }, 0);
+        fadeIn("#stamp", 1.95, 0.12);
+        tl.to("#stamp", { x: 1040, y: 500, duration: 0.45, ease: E.io }, 2.0);
+        tl.to("#stamp", { y: 520, duration: 0.07, ease: "power3.in" }, 2.5);
+        tl.set("#seal", { opacity: 1 }, 2.57);
+        tl.to("#stamp", { opacity: 0, duration: 0.15 }, 2.6);
+        fadeIn("#sealT", 2.62, 0.2);
+        tl.to(["#doc", "#ag0", "#br"], { opacity: 0, duration: 0.18, ease: "power1.in" }, 3.4);
+
+        // ---------- B2: Ana, landlord, missed rent (3.6 – 4.6) ----------
+        draw(["#ground", "#bld .d", "#house .d"], 3.58, 0.35, 0.006, "power2.out");
+        fadeIn(["#anaL", "#lordL"], 3.9, 0.2);
+        draw(["#rentL", "#rentR"], 3.95, 0.22, 0.1, "power1.inOut");
+        fadeIn("#rentChip", 4.05, 0.15);
+        // rent missed on "don't pay"
+        tl.to(["#rentL", "#rentR"], { stroke: "#c94040", duration: 0.12 }, 4.25);
+        tl.to("#rentChip", { opacity: 0, duration: 0.12 }, 4.25);
+        tl.to("#rentRG", { opacity: 0.2, duration: 0.2 }, 4.3);
+        tl.fromTo("#xMark", { opacity: 0, scale: 0.5, svgOrigin: "960 500" }, { opacity: 1, scale: 1, duration: 0.2, ease: "back.out(2)" }, 4.3);
+        fadeIn("#missL", 4.42, 0.15);
+
+        // ---------- C1: agency carries the risk (4.7 – 7.3) ----------
+        fadeOut("#rent", 4.7, 0.2);
+        draw("#agency .d", 4.9, 0.45, 0.03);
+        fadeIn("#agL", 5.35, 0.25);
+        tl.fromTo(["#arrL", "#arrR"], { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power1.out" }, 5.5);
+        tl.to("#arrRp", { strokeDashoffset: 0, duration: 0.01 }, 5.5);
+        fadeIn("#paysL", 5.8, 0.25);
+        tl.fromTo("#weight", { opacity: 0, y: -200 }, { opacity: 1, y: 0, duration: 0.4, ease: "power4.in" }, 6.1);
+        tl.to("#agency", { scaleY: 0.95, svgOrigin: "960 600", duration: 0.08, ease: "power2.out" }, 6.5);
+        tl.to("#agency", { scaleY: 0.975, duration: 0.5, ease: "power3.out" }, 6.58);
+        tl.to("#weight", { y: 6, duration: 0.08 }, 6.5);
+        tl.to("#weight", { y: 3, duration: 0.5, ease: "power3.out" }, 6.58);
+        tl.to(["#agBox", "#agAwn"], { stroke: "#c94040", duration: 0.5, ease: "power1.inOut" }, 6.6);
+        fadeIn("#absL", 6.9, 0.3);
+
+        // ---------- C2: other solutions take up to 60 days (7.4 – 9.95) ----------
+        tl.set("#hour", { x: 1490, y: 296 }, 0);
+        fadeIn(["#tline", "#hour"], 7.4, 0.35);
+        tl.fromTo("#tfill", { scaleX: 0, svgOrigin: "300 780" }, { scaleX: 1, duration: 1.9, ease: "power1.in" }, 7.8);
+        tl.to("#tfill", { stroke: "#c94040", duration: 1.0, ease: "none" }, 8.7);
+        const dayEl = document.getElementById("dayN");
+        const pd = { v: 1 };
+        tl.fromTo(pd, { v: 1 }, { v: 60, duration: 1.9, ease: "power1.in", onUpdate: () => {
+          const n = Math.round(pd.v);
+          dayEl.textContent = n >= 60 ? "60 days" : "day " + String(n).padStart(2, "0");
+        } }, 7.8);
+        tl.to("#dayN", { fill: "#d86464", duration: 0.25 }, 9.65);
+
+        // ---------- D: MUTAV backs the agency, on Solana (10.0 – 12.45) ----------
+        tl.to(["#tline", "#hour", "#bld", "#arrL", "#absL", "#paysL", "#weight"], { opacity: 0, duration: 0.3, ease: "power1.in" }, 9.95);
+        tl.set("#agency", { scaleY: 1 }, 10.25);
+        tl.to("#agBox", { stroke: "#f0f0ee", duration: 0.3 }, 10.25);
+        tl.to("#agAwn", { stroke: "#e8a020", duration: 0.3 }, 10.25);
+        draw("#vessel .d", 10.3, 0.4, 0.05, "power2.inOut");
+        tl.fromTo("#vFill", { scaleY: 0, svgOrigin: "430 600" }, { scaleY: 0.78, duration: 0.7, ease: "power2.out" }, 10.7);
+        fadeIn("#vMark", 10.7, 0.3);
+        fadeIn(["#vL", "#vL2"], 10.95, 0.25);
+        draw("#link1", 11.25, 0.35, 0, "power2.inOut");
+        tl.to("#arrRp", { strokeWidth: 4.5, duration: 0.2 }, 11.5);
+        tl.set("#pulse", { opacity: 1 }, 11.6);
+        tl.fromTo("#pulse", { x: 0 }, { x: 820, duration: 0.5, ease: "power2.inOut" }, 11.6);
+        tl.to("#pulse", { opacity: 0, duration: 0.08 }, 12.08);
+        tl.fromTo("#check", { opacity: 0, scale: 0.5, svgOrigin: "1590 372" }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(2)" }, 12.1);
+        fadeIn("#covL", 12.2, 0.2);
+        // crossfade out
+        tl.to("#ill", { opacity: 0, duration: 0.3, ease: "power1.in" }, 12.5);
+        tl.to(["#vig", "#photo"], { opacity: 0, duration: 0.3 }, 12.5);
+
+        // ---------- E: the existing agency platform (12.8 – 17.7) ----------
+        tl.fromTo("#win", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45, ease: E.o }, 12.75);
+        tl.fromTo("#loi", { opacity: 0, x: 24 }, { opacity: 1, x: 0, duration: 0.35, ease: E.o }, 13.15);
+        const loiEl = document.getElementById("loiN");
+        const pl = { v: 0 };
+        tl.fromTo(pl, { v: 0 }, { v: 19, duration: 0.8, ease: "power2.out", onUpdate: () => { loiEl.textContent = String(Math.round(pl.v)); } }, 13.25);
+        if (USE_REAL) {
+          tl.set("#sweep", { opacity: 1 }, 14.1);
+          tl.fromTo("#sweep", { y: 290 }, { y: 690, duration: 1.0, ease: "steps(8)" }, 14.1);
+          tl.to("#sweep", { opacity: 0, duration: 0.25 }, 15.15);
+        } else {
+          tl.fromTo(".row", { opacity: 0 }, { opacity: 1, duration: 0.25, stagger: 0.09, ease: "power1.out" }, 14.1);
+          tl.fromTo(".row.ana", { backgroundColor: "rgba(232,160,32,.08)" }, { backgroundColor: "rgba(232,160,32,.2)", duration: 0.3 }, 15.0);
+        }
+        fadeIn("#chip", 12.95, 0.25);
+        tl.to("#vp", { opacity: 0.45, duration: 0.35, ease: "power1.out" }, 15.8);
+        tl.fromTo("#badge", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.45, ease: E.o }, 15.85);
+        // settle to the dark grid; the signature stays in the tab position, the badge holds to the end
+        tl.to(["#win", "#chip", "#loi"], { opacity: 0, duration: 0.35, ease: "power1.in" }, 17.2);
+
+
+        window.__timelines["main"] = tl;
+      }
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(build); else build();
+    </script>
+  </body>
+</html>

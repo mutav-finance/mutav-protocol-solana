@@ -6,14 +6,14 @@
 
 A small web app that shows the MUTAV reserve program working on Solana devnet. It is built for two audiences:
 
-- **Judges and investors**, who see the live reserve and a guided demo of the full guarantee flow.
+- **Judges and investors**, who see the live reserve and the full guarantee flow run from the operator console.
 - **MUTAV's team**, who runs the operator and admin actions from a connected wallet during the pilot demo.
 
 It is a demo and reference app. Production surfaces (agency platform, KMS-backed operator, Auth0) stay in `mutav-app`, which will port these screens after the hackathon (mutav-app #369).
 
 ## Stack
 
-- Next.js 16 (App Router), React 19, TypeScript, Bun, Tailwind 4, Radix / shadcn components, React Flow (protocol diagram), Vitest, Playwright.
+- Next.js 16 (App Router), React 19, TypeScript, Bun, Tailwind 4, Radix / shadcn components, Vitest, Playwright.
 - Solana: `@mutav-finance/mutav-protocol-solana` (Codama client, read helpers, math mirror, allowlist builder), `@solana/kit`, wallet-standard connection (Phantom, Solflare, Backpack). Squads v4 SDK for admin proposals.
 - Brand: vendored from the `brand` repo into `branding/` via `bun brand:import` (never edited here).
 - Deploy: Vercel, team `mutav`, at `reserve.mutav.finance` (the wildcard DNS already resolves).
@@ -30,20 +30,16 @@ It is a demo and reference app. Production surfaces (agency platform, KMS-backed
 
 ## Routes
 
-### `/` Landing
+### `/` Redirect
 
-- The one-line story: MUTAV is an institutional rental guarantor in Brazil; every guarantee is backed by a reserve anyone can verify on Solana.
-- A live reserve strip (reserve, coverage required, free capital, NAV, active guarantees, mode) linking to `/reserve`.
-- How it works in three steps (agency registers a lease → reserve covers it, gated by required coverage → claims are paid from the reserve, never blocked).
-- The protocol diagram (React Flow): reserve, escrows, treasury, payments account, operator, admin (Squads), Nora BRS, and the coverage gate between them.
-- Calls to action: "See the reserve" (`/reserve`), "Run the demo" (`/demo`).
-- Design reference: the full wordmark over the hero; past the hero, a compact pinned bar with a solid CTA (see the "two-nav swap" pattern, compositor-only animations).
+- No app landing: MUTAV's landing is https://www.mutav.finance. `/` permanently redirects to `/reserve`, so reserve.mutav.finance opens on Transparency.
+- The nav logo links to `/reserve`; the footer links out to mutav.finance.
 
 ### `/reserve` Public transparency
 
-Read-only, no wallet needed.
+Read-only, no wallet needed. Tabs: Overview (`/reserve`), Coverage, Claims, Capital (`/reserve/capital`: money flows, the dated ledger and the capital queue; `/reserve/flows` and `/reserve/queue` permanently redirect there), Risks, Verify.
 
-Money: BRS primary; US$ hint from PTAX/BCB, display only. Every amount shows in BRS; the main figures here, on `/capital` and on the landing strip carry a small muted `≈ US$ X` at the latest Banco Central PTAX selling rate (BRS = BRL 1:1), with one source line ("US$ at PTAX (Banco Central do Brasil), dd/mm/yyyy. Display only; the reserve holds BRS."). Without a rate the hints and the line are hidden. Nothing about the rate feeds a transaction.
+Money: BRS primary; US$ hint from PTAX/BCB, display only. Every amount shows in BRS; the main figures here and on `/capital` carry a small muted `≈ US$ X` at the latest Banco Central PTAX selling rate (BRS = BRL 1:1), with one source line ("US$ at PTAX (Banco Central do Brasil), dd/mm/yyyy. Display only; the reserve holds BRS."). Without a rate the hints and the line are hidden. Nothing about the rate feeds a transaction.
 
 - **Health:** `stable_assets`, `coverage_required`, surplus, `free_capital`, NAV per share, shares outstanding, `mode` (Normal / UnderCovered), `fulfil_halted`, paused, last refresh.
 - **Coverage:** remaining cover by guarantee (default and exit legs), active guarantee count, per-agency exposure.
@@ -59,7 +55,8 @@ Money: BRS primary; US$ hint from PTAX/BCB, display only. Every amount shows in 
 During the launch and the hackathon MUTAV's team operates the reserve by hand from this page with the operator wallet; later mutav-app's backend sends the same instructions with a KMS-held key. Anyone can read it; actions are enabled only when the connected wallet is `VaultConfig.operator` (localnet and devnet: the wallet signs).
 
 - **Limits now:** the claim-payment cap window (the last 31 days of `claim_day_buckets` vs `max_claim_per_period`, `max_claim_per_call`; ADR 0019), free capital for new guarantees.
-- **Console:** a form per operator instruction (shared with `/demo`), each with its on-chain bound shown before signing and the gate preview where it applies. `sweep_income` (ADR 0017) shows the income-inbox balance and previews the split; it sweeps exactly the amount on a Nora statement.
+- **Live figures:** reserve balance, coverage required, free capital, set aside for claims and the published share price (labelled as on `/reserve`, BRS with the US$ hint), the mode, and a permissionless **Refresh on-chain**. `/demo` redirects here.
+- **Console:** a form per operator instruction, each with its on-chain bound shown before signing and the gate preview where it applies. `sweep_income` (ADR 0017) shows the income-inbox balance and previews the split; it sweeps exactly the amount on a Nora statement.
 - **Responsibilities:** each instruction, what is done by hand today and what will trigger it in the backend; undocumented triggers say "triggered by the MUTAV platform".
 - **Close reasons:** `close_guarantee` takes RELEASED (the lease ended) or VOID (registered in error; refused once anything was paid). Demo agency ids are opaque random ids the operator keeps, and `refs_hash` is salted with a salt it keeps (ADR 0019 decision 8).
 - **Recent activity:** the operator key's last MUTAV transactions, and the last operator `accept_role` (role = 1) in VaultConfig's recent history, when the RPC keeps history.
@@ -73,19 +70,6 @@ Read by anyone; actions gated on the allowlist.
 - **Position:** reserve shares, value at NAV now (math mirror, labelled preview), BRS in the wallet, waiting deposits and redemptions.
 - **Queue entries** of the wallet, with `cancel_deposit`, `claim_shares`, `cancel_redeem`, `claim_assets` where the request's state allows them (owner only, no proof).
 - **New requests:** `request_deposit`, `request_redeem`, the proof built by the server, each with an optional price limit (`min_shares_out`, `min_assets_out`; 0 = none; a "preview − 1%" shortcut) and "Redeem all". A request that heads its queue and would not fill now says why (preview). Demo: the request form is visible to every visitor; on-chain actions stay allowlist-gated (holders can always redeem, ADR 0023). Before launch, set `CAPITAL_FORMS_PUBLIC` (`lib/flags.ts`, env `NEXT_PUBLIC_CAPITAL_FORMS_PUBLIC=false`) false to show the form only to allowlisted wallets (holders get redeem only).
-
-### `/demo` Guided demo (operator cockpit)
-
-A step-by-step flow for the demo video, run from the operator wallet. Each step shows the instruction, the accounts touched, the transaction link, and how the reserve numbers moved.
-
-1. **Capital in:** the allowlisted MUTAV capital wallet requests a deposit; the admin fulfils it (via `/admin`); shares are claimed.
-2. **Register guarantees:** register leases with a live gate preview (math mirror: "fits" / "would be refused"). Register until the gate **refuses** one — the key moment.
-3. **Guarantee fee:** `contribute_fees`; NAV rises; the take goes to the treasury.
-4. **Claim:** `file_claim`; the provision lowers NAV immediately.
-5. **Under-coverage:** show a reserve that is under-covered (seeded scenario), then `pay_claim` **still succeeds** while new guarantees and redemptions are blocked.
-6. **Settle:** `settle_payout` with the PIX end-to-end hash; the claims timeline on `/reserve` updates.
-
-Also usable outside the script: a free-form operator panel for each operator instruction. Signer checks come from the program; the UI only warns when the connected wallet isn't the configured operator.
 
 ### `/admin` Admin console
 

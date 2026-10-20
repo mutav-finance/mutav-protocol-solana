@@ -1,5 +1,5 @@
 /**
- * View models for /reserve and /demo: pure functions from decoded on-chain
+ * View models for /reserve and /operator: pure functions from decoded on-chain
  * accounts to rows the screens render. No numbers are invented here; each row
  * is a projection or a sum of account fields.
  */
@@ -45,7 +45,18 @@ export type Ledger = {
   income: (Row<IncomeReceipt> & { blockTime: bigint | null })[];
   deposits: Row<DepositRequest>[];
   redeems: Row<RedeemRequest>[];
+  /**
+   * Set when the history read answered before decoding every recent fill
+   * (the RPC's transaction budget): `capitalEvents` lacks this many
+   * transactions, which the next reads fill in.
+   */
+  fillsMissing?: number;
 };
+
+/** The ledger's account reads (/api/accounts): what coverage, claims and the queue need. */
+export type LedgerAccounts = Pick<Ledger, "guarantees" | "filings" | "deposits" | "redeems">;
+/** The ledger's history (/api/history): receipts and capital-queue fills, the heavy read. */
+export type LedgerHistory = Pick<Ledger, "fees" | "income" | "capitalEvents" | "fillsMissing">;
 
 export type ReserveAddressesView = {
   config: string;
@@ -126,6 +137,9 @@ export function paymentsAlerts(p: PaymentsFacts | undefined, c: Pick<VaultConfig
 /** `ClaimFiling.leg` ids (LEG_DEFAULT = 1, LEG_EXIT = 2; 0 names no leg). */
 export const LEG = { default: 1, exit: 2 } as const;
 export const legName = (leg: number) => (leg === LEG.exit ? "exit" : "default");
+
+/** A leg in reader words: the default leg is unpaid rent, the exit leg move-out debts. */
+export const LEG_LABEL: Record<"default" | "exit", string> = { default: "unpaid rent", exit: "move-out debts" };
 
 export const GUARANTEE_ACTIVE = 0;
 export const CLAIM_FILED = 0;
@@ -260,8 +274,7 @@ export type ClaimRow = {
 
 /**
  * One row per claim filing. The filing records its payment and settlement
- * (ADR 0019); the program sets no settlement deadline (the payout SLA is the
- * operator platform's). Pass `max_claim_per_call` to tell the filings that
+ * (ADR 0019); the program sets no settlement deadline. Pass `max_claim_per_call` to tell the filings that
  * need the Reserve Admin's approval (ADR 0021).
  */
 export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">, maxClaimPerCall?: bigint): ClaimRow[] {
@@ -297,7 +310,7 @@ export function claimsTimeline(ledger: Pick<Ledger, "guarantees" | "filings">, m
 export type FlowKind = "fee" | "income" | "claim" | "deposit" | "redemption";
 
 /** A movement's name in the reserve's activity list and balance history. */
-export const FLOW_KIND_LABEL: Record<FlowKind, string> = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Deposit filled", redemption: "Redemption filled" };
+export const FLOW_KIND_LABEL: Record<FlowKind, string> = { fee: "Guarantee fee", income: "Issuer income", claim: "Claim payment", deposit: "Capital in", redemption: "Capital out" };
 
 export type FlowRow = {
   kind: FlowKind;
@@ -339,12 +352,13 @@ export function moneyFlows(
   }
   for (const p of ledger.filings) {
     if (p.data.status !== CLAIM_PAID && p.data.status !== CLAIM_SETTLED) continue;
-    rows.push({ kind: "claim", account: p.address, at: p.data.paidAt, reserveDelta: -p.data.paidAmount, treasury: 0n, detail: legName(p.data.leg) });
+    rows.push({ kind: "claim", account: p.address, at: p.data.paidAt, reserveDelta: -p.data.paidAmount, treasury: 0n, detail: LEG_LABEL[legName(p.data.leg)] });
   }
   let depositsIn = 0n;
   let redemptionsOut = 0n;
   for (const e of ledger.capitalEvents) {
-    const seqs = e.fromSeq === e.toSeq ? `seq ${e.fromSeq}` : `seqs ${e.fromSeq}–${e.toSeq}`;
+    const n = e.toSeq - e.fromSeq + 1n;
+    const requests = `${n} request${n === 1n ? "" : "s"}`;
     if (e.side === "deposit") depositsIn += e.assets;
     else redemptionsOut += e.assets;
     rows.push({
@@ -354,7 +368,7 @@ export function moneyFlows(
       at: e.ts,
       reserveDelta: e.side === "deposit" ? e.assets : -e.assets,
       treasury: 0n,
-      detail: `${seqs} · ${e.side === "deposit" ? "minted" : "burned"} ${fmtShares(e.shares)} shares`,
+      detail: `${requests} · ${fmtShares(e.shares)} shares`,
     });
   }
   rows.sort((a, b) => Number((b.at ?? 0n) - (a.at ?? 0n)));

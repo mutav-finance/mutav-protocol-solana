@@ -61,6 +61,18 @@ type Act = "approve" | "reject" | "cancel" | "execute";
 
 const isConfigChange = (p: ProposalView) => p.decoded.some((d) => d.name === SQUADS_CONFIG_CHANGE);
 
+function DetailList({ items, warn = false }: { items: DecodedInstruction["details"]; warn?: boolean }) {
+  return (
+    <ul className="font-mono" style={{ margin: "2px 0 0", paddingLeft: 14, fontSize: 11, color: warn ? "var(--color-error)" : "var(--color-text-2)", listStyle: "square", overflowWrap: "anywhere" }}>
+      {items.map((x, j) => (
+        <li key={j}>
+          {x.label}: {x.value}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** What the vault transaction will do: each instruction, its decoded arguments and red flags (A3). */
 function ProposalInstructions({ p }: { p: ProposalView }) {
   if (p.decoded.length === 0) return <Mono style={{ fontSize: 12 }}>{p.instructions.join(", ") || "—"}</Mono>;
@@ -75,14 +87,13 @@ function ProposalInstructions({ p }: { p: ProposalView }) {
             ) : (
               <Mono style={{ fontSize: 12 }}>{d.name}</Mono>
             )}
-            {d.details.length > 0 && (
-              <ul className="font-mono" style={{ margin: "2px 0 0", paddingLeft: 14, fontSize: 11, color: "var(--color-text-2)", listStyle: "square", overflowWrap: "anywhere" }}>
-                {d.details.map((x, j) => (
-                  <li key={j} style={x.warn ? { color: "var(--color-error)" } : undefined}>
-                    {x.label}: {x.value}
-                  </li>
-                ))}
-              </ul>
+            {/* Red flags stay in view; the raw arguments (keys, bounds) fold behind Details. */}
+            {d.details.some((x) => x.warn) && <DetailList items={d.details.filter((x) => x.warn)} warn />}
+            {d.details.some((x) => !x.warn) && (
+              <details>
+                <summary className="font-mono" style={{ fontSize: 11, color: "var(--color-text-3)", cursor: "pointer" }}>Details</summary>
+                <DetailList items={d.details.filter((x) => !x.warn)} />
+              </details>
             )}
           </li>
         ))}
@@ -134,7 +145,7 @@ function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("approve")}>Approve</Button>}
           {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("reject")}>Reject</Button>}
-          {canExecute && <Button size="sm" disabled={busy} onClick={() => send("execute")}>Execute</Button>}
+          {canExecute && <Button size="sm" variant={busy ? "outline" : "default"} disabled={busy} onClick={() => send("execute")}>Execute</Button>}
           {canCancel && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("cancel")} title="Approved proposals: threshold cancel votes make it Cancelled">Cancel</Button>}
         </div>
         {last && <TxStatus state={tx.state} showAccounts={false} />}

@@ -106,7 +106,7 @@ export const C = {
   provision: "var(--color-copper)",
 };
 
-/** Stable assets against coverage required, on one axis. Used on /reserve and on the landing strip (`compact`). */
+/** Stable assets against coverage required, on one axis. Used on /reserve. */
 export function CoverageChart({ s, ratioBps, compact = false }: { s: Pick<Coverage, "stableAssets" | "coverageRequired" | "freeCapital">; ratioBps: number; compact?: boolean }) {
   const m = coverageMeter(s);
   const verdict = m.coveredBps === null ? "No cover outstanding" : m.underCovered ? `Under-covered: short ${fmtBrs(m.shortfall)}` : `Covered ${fmtBps(m.coveredBps)} · surplus ${fmtBrs(m.surplus)}`;

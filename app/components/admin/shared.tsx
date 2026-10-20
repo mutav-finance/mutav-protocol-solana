@@ -6,7 +6,7 @@ import { pendingSetConfigText } from "@/lib/config-diff";
 import { RoleTag } from "@/components/RoleTag";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Action, Note } from "@/components/demo/shared";
-import type { AdminTx, TxRequest } from "@/lib/tx-kinds";
+import { ixLabel, type AdminTx, type TxRequest } from "@/lib/tx-kinds";
 
 /** How admin actions are sent on this deployment. */
 export type Mode = { via: "squads" | "direct"; label: string } | null;
@@ -30,7 +30,7 @@ export function AdminAction({ title, children, mode, request, label, note }: { t
       {children}
       {blocked && <Note tone="warn">{pendingSetConfigText(pending!)}.</Note>}
       {mode ? (
-        <Action label={mode.via === "squads" ? `Propose: ${label}` : `Sign directly: ${label}`} request={blocked ? null : request} via={mode.via} variant={mode.via === "direct" ? "outline" : "default"} />
+        <Action label={mode.via === "squads" ? `Propose: ${ixLabel(label)}` : `Sign directly: ${ixLabel(label)}`} ix={label} request={blocked ? null : request} via={mode.via} variant={mode.via === "direct" ? "outline" : "default"} />
       ) : (
         <Note tone="warn">No Squads multisig configured, and direct signing is localnet-only.</Note>
       )}
@@ -115,7 +115,8 @@ export function DataTable({ label, head, children }: { label: string; head: stri
 
 /** A grid of action cards. */
 export const Cards = ({ children }: { children: ReactNode }) => (
-  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(360px, 100%), 1fr))", gap: 16 }}>{children}</div>
+  // align-items start: a card keeps its own height instead of stretching to a taller neighbour.
+  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(360px, 100%), 1fr))", gap: 16, alignItems: "start" }}>{children}</div>
 );
 
 export const LIVE = <StatusBadge color="var(--color-success)" label="LIVE · ON-CHAIN" />;

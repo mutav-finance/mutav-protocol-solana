@@ -10,9 +10,9 @@ import { parseCluster } from "@/lib/cluster";
 const CLUSTER = parseCluster(process.env.NEXT_PUBLIC_CLUSTER);
 
 export const metadata: Metadata = {
-  title: { default: "MUTAV pilot reserve", template: "%s · MUTAV pilot" },
+  title: { default: "MUTAV reserve transparency", template: "%s · MUTAV pilot" },
   description:
-    "MUTAV is an institutional rental guarantor in Brazil. Every guarantee is backed by a reserve anyone can verify on Solana.",
+    "Live transparency for the MUTAV pilot reserve on Solana: reserve balance, required coverage, guarantees, claim payments and every account, read from the chain.",
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -21,7 +21,7 @@ import {
   REFRESH_DISCRIMINATOR,
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
-import { COMPUTE_BUDGET_PROGRAM, decodeInstruction, squadsConfigChange, foreignPrograms, newMoneyAccount, tokenAccountFacts, type DecodeContext, type RawInstruction, type TokenAccountFacts } from "../proposal-decode";
+import { COMPUTE_BUDGET_PROGRAM, contextForProposal, decodeInstruction, squadsConfigChange, foreignPrograms, newMoneyAccount, tokenAccountFacts, type DecodeContext, type RawInstruction, type TokenAccountFacts } from "../proposal-decode";
 import { bytesToHex } from "../serde";
 import { config as baseConfig } from "./fixtures";
 
@@ -156,11 +156,20 @@ describe("A3 proposal decoding: fills", () => {
     expect(detail(outside, "conversion NAV now")).toMatchObject({ warn: true });
     expect(detail(outside, "conversion NAV now")?.value).toMatch(/OUTSIDE/);
   });
+  it("fulfil_deposits already executed: recorded NAV bounds, no check against the NAV now", () => {
+    const ix = raw(getFulfilDepositsInstruction({ ...accounts, pendingDeposits: ANY, count: 3, navBounds: bounds }, o));
+    const live = ctx({ nav: { conversion: 2n * NAV, published: NAV } });
+    const done = decodeInstruction(ix, contextForProposal(live, false));
+    expect(detail(done, "NAV bounds")).toBeDefined();
+    expect(detail(done, "conversion NAV now")).toBeUndefined();
+    expect(contextForProposal(live, true)).toBe(live);
+    expect(detail(decodeInstruction(ix, contextForProposal(live, true)), "conversion NAV now")?.warn).toBe(true);
+  });
   it("fulfil_redeems: count, max assets and NAV bounds", () => {
     const ix = raw(getFulfilRedeemsInstruction({ ...accounts, claims: ANY, pendingRedemptions: ANY, shareMint: ANY, shareTokenProgram: TOKEN, count: 2, maxAssets: 5_000_000n, navBounds: bounds }, o));
     const d = decodeInstruction(ix, ctx({ nav: { conversion: NAV, published: NAV } }));
     expect(detail(d, "count")?.value).toBe("2");
-    expect(detail(d, "max assets")?.value).toMatch(/^R\$ 5/);
+    expect(detail(d, "max assets")?.value).toMatch(/^R\$\s5/);
     expect(detail(d, "NAV bounds")).toBeDefined();
   });
   it("clear_fulfil_halt checks the published NAV", () => {

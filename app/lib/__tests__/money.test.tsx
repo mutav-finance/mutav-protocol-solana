@@ -14,7 +14,7 @@ describe("<Money>", () => {
         <UsdSource />
       </>,
     );
-    expect(html).toBe("R$ 58,700.00");
+    expect(html).toBe("R$\u00a058,700.00");
   });
 
   it("keeps BRS as the figure and adds a muted ≈ US$ hint with a rate", () => {
@@ -23,11 +23,11 @@ describe("<Money>", () => {
         <Money brs={58_700_000_000n} />
       </FxProvider>,
     );
-    expect(html.startsWith("R$ 58,700.00<span")).toBe(true);
+    expect(html.startsWith("R$\u00a058,700.00<span")).toBe(true);
     expect(html).toContain('data-testid="usd-hint"');
     expect(html).toContain("text-(--color-text-2)");
     expect(html).toContain("text-2xs");
-    expect(text(html)).toBe("R$ 58,700.00≈ US$ 10,870.37");
+    expect(text(html)).toBe("R$\u00a058,700.00≈ US$\u00a010,870.37");
   });
 
   it("puts the hint on its own line with `block`, and signs both", () => {
@@ -37,7 +37,7 @@ describe("<Money>", () => {
       </FxProvider>,
     );
     expect(html).toContain("block");
-    expect(text(html)).toBe("−R$ 5.40≈ −US$ 1.00");
+    expect(text(html)).toBe("−R$\u00a05.40≈ −US$\u00a01.00");
   });
 
   it("renders no hint for a rate that is not a usable number", () => {
@@ -47,7 +47,7 @@ describe("<Money>", () => {
 
   it("writes one source line with a rate", () => {
     expect(text(renderToStaticMarkup(<FxProvider value={fx}><UsdSource /></FxProvider>))).toBe(
-      "US$ at PTAX (Banco Central do Brasil), 09/10/2026. Display only; the reserve holds BRS.",
+      "US$ at PTAX (Banco Central do Brasil), 2026-10-09. Display only; the reserve holds BRS.",
     );
   });
 });

@@ -23,7 +23,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { UNSET_ADDRESS } from "@/lib/reserve-assets";
 import { SquadsPanel, type SquadsResp } from "@/components/admin/Squads";
 import { rolesError } from "@/lib/admin";
-import { fmtBps, fmtBrs, fmtTime } from "@/lib/format";
+import { fmtBrs, fmtPct, fmtTime } from "@/lib/format";
+import { ixLabel } from "@/lib/tx-kinds";
 import { useWallet } from "@/components/WalletProvider";
 import { ACCOUNT_ROLES } from "@/lib/roles";
 import { operatorDay } from "@/lib/operator";
@@ -51,11 +52,11 @@ function Emergency({ mode }: { mode: Mode }) {
   const revoked = reserve.config.operator === UNSET_ADDRESS;
   const flag = (bad: boolean, on: string, off: string) => <StatusBadge bordered color={bad ? "var(--color-error)" : "var(--color-success)"} label={bad ? on : off} />;
   return (
-    <div id="general-emergency" role="region" aria-label="Emergency" style={{ border: "1px solid var(--color-error)", borderLeftWidth: 4, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12, marginTop: 20, scrollMarginTop: 112 }}>
+    <div id="general-emergency" role="region" aria-label="Emergency" style={{ border: "1px solid var(--color-error)", padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12, marginTop: 20, scrollMarginTop: 112 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <h3 style={{ fontSize: 17, margin: 0 }}>Emergency</h3>
         {flag(paused, "PAUSED", "NOT PAUSED")}
-        {flag(halted, "FULFIL HALTED", "FULFIL OPEN")}
+        {flag(halted, "QUEUE FILLS HALTED", "QUEUE FILLS OPEN")}
         {flag(revoked, "OPERATOR REVOKED", "OPERATOR ACTIVE")}
       </div>
       <p className="font-body" style={{ fontSize: 13, color: "var(--color-text-2)", margin: 0, lineHeight: 1.6 }}>
@@ -64,20 +65,20 @@ function Emergency({ mode }: { mode: Mode }) {
       </p>
       <Cards>
         <PauserAction title="Pause" note="Stops capital flows and new guarantees. Fees, income sweeps and claim payments stay open.">
-          <Action label="pause" request={{ kind: "pause" }} variant="destructive" disabled={paused} />
+          <Action label={ixLabel("pause")} ix="pause" request={{ kind: "pause" }} variant="destructive-outline" disabled={paused} />
         </PauserAction>
         <AdminAction title="Unpause" label="unpause" mode={mode} request={paused ? { kind: "unpause" } : null} note={paused ? "Reopens what pause stopped." : "The reserve is not paused."} />
         <PauserAction title="Revoke operator" note={revoked ? "The operator role is already revoked: propose a new key below; it accepts with accept_role." : "Clears the operator key if it is compromised: every operator instruction fails until a key the admin proposes accepts the role."}>
-          <Action label="revoke_operator" request={{ kind: "revoke_operator" }} variant="destructive" disabled={revoked} />
+          <Action label={ixLabel("revoke_operator")} ix="revoke_operator" request={{ kind: "revoke_operator" }} variant="destructive-outline" disabled={revoked} />
         </PauserAction>
-        <AdminAction title="Clear fulfil halt" label="clear_fulfil_halt" mode={mode} request={halted ? { kind: "clear_fulfil_halt" } : null} note={halted ? "The NAV-move guard halted both queues. Clearing resets the NAV baseline (ADR 0015)." : "Fulfilment is not halted."} />
+        <AdminAction title="Reopen queue fills" label="clear_fulfil_halt" mode={mode} request={halted ? { kind: "clear_fulfil_halt" } : null} note={halted ? "The share-price guard halted both queues. Reopening resets the share-price baseline (ADR 0015)." : "Queue fills are open."} />
         <ConfigCard
-          title="NAV-move guard"
+          title="Share-price guard"
           mode={mode}
-          fields={[bpsField("maxNavMoveBps", "Max NAV move per refresh (bps)", reserve.config.caps.maxNavMoveBps, 10_000)]}
+          fields={[bpsField("maxNavMoveBps", "Max share-price move per refresh (bps)", reserve.config.caps.maxNavMoveBps, 10_000)]}
           build={(v) => ({ kind: "set_config", maxNavMoveBps: v.maxNavMoveBps as number })}
           bound="0–10000 bps"
-          does="If NAV per share moves more than this in one refresh (net of fees and swept income), refresh sets fulfil_halted and both capital queues stop until clear_fulfil_halt. Lower it for the real pilot; the devnet example uses 100%."
+          does="If the share price moves more than this in one refresh (net of fees and swept income), refresh sets fulfil_halted and both capital queues stop until clear_fulfil_halt. Lower it for the real pilot; the devnet example uses 100%."
         />
       </Cards>
     </div>
@@ -101,11 +102,11 @@ function Watch() {
       <div className="grid-2">
         <KV
           rows={[
-            [<Meaning key="r" label="Guarantees registered">register_guarantee by the operator key</Meaning>, m(`${day.registered.count} · ${fmtBrs(day.registered.cover, 0)} cover`)],
+            [<Meaning key="r" label="Guarantees registered">register_guarantee by the operator key</Meaning>, m(`${day.registered.count} · ${fmtBrs(day.registered.cover)} cover`)],
             [<Meaning key="c" label="Guarantees closed">close_guarantee</Meaning>, m(String(day.closed.count))],
-            [<Meaning key="f" label="Claims filed">file_claim (provisions)</Meaning>, m(`${day.filed.count} · ${fmtBrs(day.filed.amount, 0)}`)],
-            [<Meaning key="p" label="Claims paid">pay_claim, bounded by the claim caps</Meaning>, m(`${day.paid.count} · ${fmtBrs(day.paid.amount, 0)} of ${fmtBrs(reserve.config.caps.maxClaimPerPeriod, 0)} per 31 days`)],
-            [<Meaning key="g" label="Guarantee fees booked">contribute_fees</Meaning>, m(`${day.fees.count} · ${fmtBrs(day.fees.amount, 0)}`)],
+            [<Meaning key="f" label="Claims filed">file_claim (provisions)</Meaning>, m(`${day.filed.count} · ${fmtBrs(day.filed.amount)}`)],
+            [<Meaning key="p" label="Claims paid">pay_claim, bounded by the claim caps</Meaning>, m(`${day.paid.count} · ${fmtBrs(day.paid.amount)} of ${fmtBrs(reserve.config.caps.maxClaimPerPeriod)} per 31 days`)],
+            [<Meaning key="g" label="Guarantee fees booked">contribute_fees</Meaning>, m(`${day.fees.count} · ${fmtBrs(day.fees.amount)}`)],
           ]}
         />
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -159,7 +160,7 @@ function CoverageControl({ mode }: { mode: Mode }) {
         for (const k of ["maxTvl", "maxCoverPerGuarantee"]) if (v[k] !== undefined) caps[k] = v[k] as bigint;
         return { kind: "set_config", coverageRatioBps: v.coverageRatioBps as number | undefined, caps };
       }}
-      bound={`c ≥ ${fmtBps(MIN_COVERAGE_RATIO_BPS)} (ADR 0016)`}
+      bound={`c ≥ ${fmtPct(MIN_COVERAGE_RATIO_BPS)} (ADR 0016)`}
       does="c sizes the reserve against the book: coverage required = c × remaining cover (never below open provisions). The limits bound the reserve and each guarantee."
     />
   );
@@ -171,9 +172,9 @@ function CoverageTable() {
   return (
     <KV
       rows={[
-        [<Meaning key="c" label="Coverage ratio c">Share of remaining cover the reserve must hold in stable assets (≥ 10%, ADR 0016).</Meaning>, m(fmtBps(c.coverageRatioBps))],
-        [<Meaning key="t" label="Max reserve (TVL)">fulfil_deposits stops at this size.</Meaning>, m(fmtBrs(c.caps.maxTvl, 0))],
-        [<Meaning key="g" label="Max cover per guarantee">register_guarantee refuses a larger lease.</Meaning>, m(fmtBrs(c.caps.maxCoverPerGuarantee, 0))],
+        [<Meaning key="c" label="Coverage ratio c">Share of remaining cover the reserve must hold in stable assets (≥ 10%, ADR 0016).</Meaning>, m(fmtPct(c.coverageRatioBps))],
+        [<Meaning key="t" label="Max reserve (TVL)">fulfil_deposits stops at this size.</Meaning>, m(fmtBrs(c.caps.maxTvl))],
+        [<Meaning key="g" label="Max cover per guarantee">register_guarantee refuses a larger lease.</Meaning>, m(fmtBrs(c.caps.maxCoverPerGuarantee))],
         ["Feature flags", m(`0x${c.featureFlags.toString(16)}${c.featureFlags === 0n ? " (none: pilot)" : ""}`)],
       ]}
     />
@@ -189,8 +190,8 @@ function AccountsTable() {
     <KV
       rows={[
         [<Meaning key="r" label="Allowlist root">Merkle root of the wallets allowed to request deposits (holders can always redeem).</Meaning>, m(`${bytesToHex(Uint8Array.from(c.investorAllowlistRoot)).slice(0, 24)}…`)],
-        [<Meaning key="t" label="Treasury account">Receives the fee take and the income take. Outside the reserve.</Meaning>, <Explorer key="t" value={c.treasuryAccount} full />],
-        [<Meaning key="p" label="Payments account">Receives every pay_claim; MUTAV forwards it to the landlord by PIX.</Meaning>, <Explorer key="p" value={c.paymentsAccount} full />],
+        [<Meaning key="t" label="Treasury account">Receives MUTAV&apos;s take of each guarantee fee (issuer income has no take). Outside the reserve.</Meaning>, <Explorer key="t" value={c.treasuryAccount} full />],
+        [<Meaning key="p" label="Payments account">Receives every pay_claim; MUTAV forwards it to the agency by PIX (recorded on-chain), and the agency pays the landlord.</Meaning>, <Explorer key="p" value={c.paymentsAccount} full />],
         [<Meaning key="m" label="BRS mint">The reserve asset (issued by Nora). Fixed at initialize.</Meaning>, <Explorer key="m" value={c.reserveMint} full />],
         ["Share mint", <Explorer key="s" value={c.shareMint} full />],
       ]}
@@ -252,7 +253,7 @@ function Handovers({ mode }: { mode: Mode }) {
                   <>
                     {!mine && <Note tone="dim">Connect the proposed key&apos;s wallet to accept.</Note>}
                     {expired && <Note tone="warn">Expired: the admin cancels it and proposes again.</Note>}
-                    <Action label={`accept_role (${r.name})`} request={mine && !expired ? { kind: "accept_role", role: r.role } : null} />
+                    <Action label={`Accept the ${r.name} role`} ix="accept_role" request={mine && !expired ? { kind: "accept_role", role: r.role } : null} />
                   </>
                 )}
                 <AdminAction title={`Cancel the ${r.name} handover`} label="cancel_pending" mode={mode} request={{ kind: "cancel_pending", role: r.role }} />
@@ -295,7 +296,7 @@ function AllowlistControl({ mode }: { mode: Mode }) {
   const list = inv.data?.allowlist ?? null;
   const inSync = list?.listRoot !== null && list?.listRoot === onChain;
   return (
-    <AdminAction title="Investor allowlist" label="set_allowlist_root" mode={mode} request={list?.listRoot && !inSync ? { kind: "set_allowlist_root" } : null}>
+    <AdminAction title="Capital allowlist" label="set_allowlist_root" mode={mode} request={list?.listRoot && !inSync ? { kind: "set_allowlist_root" } : null}>
       <Facts
         now={m(`${onChain.slice(0, 24)}…`)}
         bound={m("the root of the server's ALLOWLIST")}

@@ -6,6 +6,7 @@
  * and, where the form has them, the preview numbers; the raw text stays
  * available behind a disclosure in the UI.
  */
+import * as client from "@mutav-finance/mutav-protocol-solana";
 import {
   MUTAV_ERROR__CLAIM_CALL_CAP_EXCEEDED,
   MUTAV_ERROR__CLAIM_NOT_FILED,
@@ -54,18 +55,67 @@ const CODES: Record<number, string> = {
   [MUTAV_ERROR__REFRESH_REQUIRED]: "RefreshRequired",
 };
 
+/** Every other MUTAV program error, named from the client's `MUTAV_ERROR__SNAKE_CASE` constants (Rust's PascalCase name). */
+const ALL_CODES: Record<number, string> = Object.fromEntries(
+  Object.entries(client)
+    .filter(([k, v]) => k.startsWith("MUTAV_ERROR__") && typeof v === "number")
+    .map(([k, v]) => [
+      v as number,
+      k
+        .slice("MUTAV_ERROR__".length)
+        .toLowerCase()
+        .replace(/(^|_)([a-z])/g, (_, __, c: string) => c.toUpperCase()),
+    ]),
+);
+
+const nameOf = (code: number): string | null => CODES[code] ?? ALL_CODES[code] ?? null;
+
+/**
+ * Every piece of text a thrown value carries. Wallets (Phantom, Wallet
+ * Standard) often throw `{ message: "Unexpected error" }` with the program
+ * error in `.cause`, `.error`, `.data` or `.logs`; this flattens them all, so
+ * the decoder sees `custom program error: 0x1778` or `{"Custom":6008}` wherever
+ * it sits. Cycle-safe and depth-limited.
+ */
+export function errorText(e: unknown): string {
+  const out: string[] = [];
+  const seen = new Set<unknown>();
+  const walk = (v: unknown, depth: number) => {
+    if (v === null || v === undefined || depth > 5) return;
+    if (typeof v === "string") return void out.push(v);
+    if (typeof v === "number" || typeof v === "bigint" || typeof v === "boolean") return;
+    if (typeof v !== "object" || seen.has(v)) return;
+    seen.add(v);
+    if (Array.isArray(v)) return v.forEach((x) => walk(x, depth + 1));
+    const o = v as Record<string, unknown>;
+    if (typeof o.message === "string") out.push(o.message);
+    for (const k of ["cause", "error", "data", "logs", "err", "simulationResponse", "transactionError", "InstructionError"]) walk(o[k], depth + 1);
+    // Structured errors such as {"InstructionError":[0,{"Custom":6008}]}: keep their JSON too.
+    if (!(v instanceof Error)) {
+      try {
+        out.push(JSON.stringify(v, (_, x) => (typeof x === "bigint" ? x.toString() : x)));
+      } catch {
+        /* unserialisable: the walked fields above are enough */
+      }
+    }
+  };
+  walk(e, 0);
+  return [...new Set(out.filter(Boolean))].join("\n");
+}
+
 /** The system program's "account already in use": a reference recorded twice. */
 export const ALREADY_RECORDED = "AlreadyRecorded";
 
 /** The program error's name, or null when the failure is not a program error. */
 export function decodeProgramError(message: string, logs: string[] | null): string | null {
-  const named = logs?.map((l) => /Error Code: (\w+)/.exec(l)?.[1]).find(Boolean);
-  if (named) return named;
   const text = [message, ...(logs ?? [])].join("\n");
+  const named = /Error Code: (\w+)/.exec(text)?.[1];
+  if (named) return named;
   const hex = /custom program error: 0x([0-9a-f]+)/i.exec(text)?.[1];
   const dec = /"Custom"\s*:\s*(\d+)/.exec(text)?.[1] ?? /Custom\((\d+)\)/.exec(text)?.[1];
   const code = hex !== undefined ? parseInt(hex, 16) : dec !== undefined ? Number(dec) : null;
-  if (code !== null && CODES[code]) return CODES[code]!;
+  const name = code !== null ? nameOf(code) : null;
+  if (name) return name;
   if (/already in use/i.test(text)) return ALREADY_RECORDED;
   return null;
 }
@@ -106,7 +156,7 @@ const PLAIN: Record<string, string> = {
 export function refusalLine(name: string, ctx: RefusalContext = {}): string {
   const { gate, claim } = ctx;
   if (name === "InsufficientFreeCapital" && gate) {
-    return `Refused by the coverage gate: needs ${fmtBrs(gate.needed)} of required coverage, the reserve holds ${fmtBrs(gate.stableAssets)}.`;
+    return `Refused by the coverage gate: needs ${fmtBrs(gate.needed)} of required coverage; the reserve holds ${fmtBrs(gate.stableAssets)}.`;
   }
   if (name === "UnderCovered") return `Refused by the coverage gate: ${PLAIN.UnderCovered}`;
   if (name === "GuaranteeCapExceeded" && gate) {
@@ -119,4 +169,9 @@ export function refusalLine(name: string, ctx: RefusalContext = {}): string {
     return `Refused by the claim caps: ${fmtBrs(claim.amount)} is above the ${fmtBrs(claim.remaining)} left in the last 31 days.`;
   }
   return `Refused by the program: ${PLAIN[name] ?? `${name}.`}`;
+}
+
+/** The plain-English reason alone (no "Refused by…" prefix), for previews: "the cover is above the per-guarantee cap". */
+export function refusalReason(name: string): string {
+  return (PLAIN[name] ?? `${name}.`).replace(/\.$/, "");
 }

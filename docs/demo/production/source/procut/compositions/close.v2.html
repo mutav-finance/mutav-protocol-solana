@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>MUTAV close card (v2, simplified)</title>
+    <!-- v2 (2026-10-12): logo + one tagline + URL + one small credits/disclaimer line. Static, holds to the last frame. Previous: close.v1b.html -->
+  </head>
+  <body>
+    <template>
+      <style>
+@font-face { font-family: "Geist"; font-weight: 100 900; font-style: normal; src: url("assets/fonts/Geist.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 100 900; font-style: normal; src: url("assets/fonts/Inter.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 100 800; font-style: normal; src: url("assets/fonts/JetBrainsMono.woff2") format("woff2"); }
+#close-root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #0e0f11; color: #f0f0ee; }
+#close-root .cl-grid { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;
+  background-image: linear-gradient(to right, rgba(240,240,238,.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(240,240,238,.04) 1px, transparent 1px); background-size: 48px 48px; }
+#close-root .cl-stage { position: absolute; left: 0; top: 0; width: 1920px; height: 860px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 44px; }
+#close-root .cl-logo { width: 144px; height: 120px; display: block; }
+#close-root .cl-tag { font-family: "Geist", "Helvetica Neue", Arial, sans-serif; font-weight: 700; font-size: 84px; line-height: 1.08; letter-spacing: -.025em; text-align: center; max-width: 1500px; }
+#close-root .cl-tag em { font-style: normal; color: #e8a020; }
+#close-root .cl-url { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; font-size: 34px; letter-spacing: .02em; color: #c9ccd2; }
+#close-root .cl-foot { position: absolute; left: 0; top: 820px; width: 1920px; text-align: center; font-family: "Inter", "Helvetica Neue", Arial, sans-serif; font-size: 19px; font-weight: 500; color: #8a8f99; }
+      </style>
+      <div id="close-root" data-composition-id="close" data-width="1920" data-height="1080" data-duration="9.1">
+        <div class="cl-grid" data-layout-allow-overflow></div>
+        <div class="cl-stage">
+          <img class="cl-logo" id="cl-logo" src="assets/logo-mutav.svg" alt="MUTAV" />
+          <h1 class="cl-tag" id="cl-tag">Creating the rental guarantee <em>category on Solana</em></h1>
+          <p class="cl-url" id="cl-url">reserve.mutav.finance</p>
+        </div>
+        <p class="cl-foot" id="cl-foot">Narration: AI voice by ElevenLabs · Guarantor (fiança), not insurance · devnet test amounts · not an offer of investment</p>
+        <script>
+          (function () {
+            var T = gsap.timeline({ paused: true });
+            T.fromTo("#cl-logo", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power1.out" }, 0.3);
+            T.fromTo("#cl-foot", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power1.out" }, 0.8);
+            T.fromTo("#cl-tag", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power1.out" }, 6.5); // line 24 start (136.1 - 129.6)
+            T.fromTo("#cl-url", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power1.out" }, 7.2);
+            window.__timelines["close"] = T;
+          })();
+        </script>
+      </div>
+    </template>
+  </body>
+</html>
