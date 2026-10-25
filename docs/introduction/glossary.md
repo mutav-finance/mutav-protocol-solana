@@ -85,19 +85,44 @@ Terms used across the MUTAV docs, grouped by topic. Code names are in `monospace
 | Sub-minimum exit | A redemption worth less than `min_request` (valued in BRS at current NAV). Allowed only as an exit of the balance: from the owner's canonical share account, leaving a remainder worth less than `min_request`, and worth at least the sub-minimum exit floor, `max(1, min_request / 10)` (R$100 at the pilot minimum of R$1,000). A smaller balance waits; it stays transferable and valued at NAV. |
 | Whole fills | The pilot fills each request in full or not at all. Partial fills at the queue head are planned. |
 
+## Authority
+
+The roles, their powers and what each must never do are defined once, without chain terms, in the [authority model and security baseline](../security/baseline.md#roles) (proposed, [ADR 0031](../decisions/0031-chain-neutral-authority-model-and-security-levels.md)). This table maps them on Solana and in mutav-app. Off-chain layers prove identity and run the back office; only the on-chain keys move the reserve.
+
+| Role | On Solana / in mutav-app | Power |
+|---|---|---|
+| **Protocol admin** (the reserve admin) | Squads v4 multisig vault = `VaultConfig.admin`, short time lock ([spec §2](../spec.md#2-roles-and-keys)) | Reserve health through ceilings. See [baseline](../security/baseline.md#protocol-admin-the-reserve-admin) |
+| **Upgrade authority** | A second Squads v4 multisig vault, same members, long time lock ([ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md)) | Program upgrades and `initialize` only |
+| **Operator** | `VaultConfig.operator`; held in KMS by mutav-app, used from Convex actions (devnet: a key file used by hand; may be a separate company) | Contracts, agencies and the guarantee and claim cycle, within the admin's caps |
+| **Pauser** | `VaultConfig.pauser` | `pause` and `revoke_operator`, with no time lock |
+| **Guardians** | `VaultConfig.guardians`, up to three (devnet: 1) | `pause` only |
+| **Identity** | Auth0 login for mutav-app's `apps/agency` and `apps/admin` (dev tenant today; a separate prod tenant before launch, [mutav-app#119](https://github.com/mutav-finance/mutav-app/issues/119)) | Proves who you are. Grants nothing on its own |
+| **MUTAV staff** | A `mutavStaff` row with role `admin`, `compliance`, `support` or `treasury` in mutav-app's Convex backend (`convex/mutavStaff/domain.ts`, guards in `convex/lib/auth.ts`). The ladder is `support` < `compliance` < `admin`; `treasury` sits outside it | Off-chain back-office actions. No on-chain authority |
+| **Admin app** | mutav-app's `apps/admin`, at admin.mutav.finance | The UI staff use. No on-chain authority |
+
+Writing rules, for people and agents:
+
+- Never write a bare "admin". Write **"staff admin role"** (the `mutavStaff` role) or **"protocol admin"** (the Squads multisig). The program, spec and app call the protocol admin the "reserve admin" or "Admin"; both mean the Squads multisig.
+- **"Operator"** means only the protocol key. People doing back-office work are **"staff"**.
+- Qualify **"treasury"**: the `mutavStaff` treasury role, the Solana treasury account (`treasury_account`, which receives the fee take), or the Stellar treasury account (legacy).
+- Today Squads proposals are created, approved and executed in the `/admin` console on [reserve.mutav.finance](https://reserve.mutav.finance/admin), or in the Squads app. mutav-app's `apps/admin` becomes the signing home later (tracked in the mutav repo).
+- The Auth0 staff connection with MFA is **planned** ([mutav-app#206](https://github.com/mutav-finance/mutav-app/issues/206)). It does not exist yet.
+
 ## Roles and governance
 
 | Term | Meaning |
 |---|---|
+| Admin app | mutav-app's `apps/admin`, the back-office console MUTAV staff use at admin.mutav.finance. Off-chain: it has no on-chain authority. It is not the protocol admin. See [Authority](#authority). |
 | Anyone | Any signer. May run the permissionless cranks `refresh` and `advance_queue_head` (and `skim`, once it ships). |
 | Guardian | One of up to three keys, appointed by the admin in one step with `set_guardians`, that can only pause. Cannot revoke, unpause or change anything. Devnet: 1 guardian. With the first adapter upgrade, guardians may also take the risk-reducing adapter actions of ADR 0027. |
-| Operator | MUTAV's hot key that runs contracts, agencies and the whole guarantee and claim cycle. Every operator registry action can be reversed by another operator action. Only `pay_claim` is irreversible, and it is bounded by the admin's caps. |
+| MUTAV staff | People with a `mutavStaff` role (`admin`, `compliance`, `support` or `treasury`) in mutav-app's Convex backend. Off-chain: the role grants back-office actions and no on-chain authority. The staff admin role is not the protocol admin. See [Authority](#authority). |
+| Operator | The operator key (MUTAV's today; may be held by a separate company, [ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md)): a hot key that runs contracts, agencies and the whole guarantee and claim cycle. Every operator registry action can be reversed by another operator action. Only `pay_claim` is irreversible, and it is bounded by the admin's caps. |
 | Operator-compromise recovery | Freeze (the pauser revokes the operator), appoint a new operator, reconcile the platform's records with on-chain events, and correct with ordinary operator actions. |
 | Pause | Stops only capital flows and new guarantees. Never stops claims and never traps holders' money. Only the admin unpauses. |
 | Pauser | A separate key for emergencies. Can `pause` and `revoke_operator`, with no time lock. |
 | Reserve admin | A Squads v4 multisig that looks after the reserve's financial health and security through ceilings: caps, coverage ratio, stress buffer, roles, accounts, the allowlist, capital fills, unpause, and, once those instructions ship, claim approvals above the per-call cap and unsolicited money. It does not judge contracts. |
 | Squads | A multisig program on Solana. Its vault address is the reserve admin and, through a second multisig, the upgrade authority. |
-| Time lock | The delay between approval and execution of a multisig proposal. Devnet: 5 minutes for the admin multisig, 1 hour for the upgrade multisig. Real pilot: 24 hours and 7 days. |
+| Time lock | The delay between approval and execution of a multisig proposal. ADR 0020 targets 5 minutes (admin) and 1 hour (upgrade) on devnet; the current test deploy runs 60 s and 120 s (#99 raises them). Real pilot (L1): 24 hours and 7 days. See `docs/security/baseline.md`. |
 | Two-step handover | A new operator, pauser or admin key must accept its role before it takes effect, so a typo can't appoint a dead address. Operator and pauser use `propose_role` / `accept_role`; the admin uses `propose_admin` / `accept_admin`; the admin clears any pending handover with `cancel_pending`. Pending handovers expire after 72 hours, and revoking the operator clears the pending operator key (not the pending pauser key). |
 | Two multisigs | The admin multisig (short time lock) and the upgrade multisig (long time lock), with the same members. |
 

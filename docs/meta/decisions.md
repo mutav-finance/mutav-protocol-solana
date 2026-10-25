@@ -2,7 +2,7 @@
 
 This page indexes every architecture decision behind the MUTAV reserve program. It has three parts:
 
-1. [Architecture decision records](#architecture-decision-records) (ADRs 0001 to 0030) as they stand in [`docs/decisions/`](../decisions/).
+1. [Architecture decision records](#architecture-decision-records) (ADRs 0001 to 0031) as they stand in [`docs/decisions/`](../decisions/).
 2. A [decision log](#decision-log) of the devnet release design, one row per decision, each pointing to the ADR that records it.
 3. A pointer to the [open questions and possible improvements](open-questions.md): what is still undecided, and what is deliberately deferred.
 
@@ -50,6 +50,7 @@ Where a newer ADR changes an older one, the index says so. The older ADR keeps i
 | [0028](../decisions/0028-pilot-parameters.md) | Pilot parameters | Accepted, 2026-10-11 | On-chain values for devnet and the pilot: `c = 0.25`, `max_tvl` R$1M, R$120k per guarantee, claim caps R$15k per call and R$20k per 31 days, `stress_buffer` R$19k (set and locked), requests R$1k to R$100k, fee take 20%, BRS only. The simulator's business plan (R$100k start plus R$100k a month, up to 60 leases) is off-chain | Supersedes the devnet caps of [0016](../decisions/0016-coverage-ratio-below-one.md) and [0022](../decisions/0022-coverage-stress-buffer-underwater-reserve.md) |
 | [0029](../decisions/0029-claims-and-capital-rules-in-the-program.md) | Claims and capital rules in the program | Accepted, 2026-10-11 | Implements 0022 and the fill and exit rules of 0023 in the devnet binary: the stress-buffer term (saturating on the claim path), `NoSharesOutstanding` on inflows while no shares exist, `ReserveUnderwater` on both fills, the inline NAV guard (refuses without latching), the guard baseline across an empty supply, holders skip the allowlist, the sub-minimum exit rule and a 0-value head that is never filled. Confirms the claim rules of 0021 shipped | None |
 | [0030](../decisions/0030-admin-cancel-parks-the-request.md) | The admin's cancel parks the request | Accepted, 2026-10-11 | The admin's `cancel_deposit` / `cancel_redeem` parks a pending request (`CANCELLED = 2`): no transfer, no account creation. The escrow stays owed to the owner, who alone collects it. Fills skip it, `advance_queue_head` moves past it, `claim_*` refuse it. Closes the queue wedge found by the Wave 1 audit | Amends the cancel rule of [0023](../decisions/0023-capital-flows-and-exit-rights.md) |
+| [0031](../decisions/0031-chain-neutral-authority-model-and-security-levels.md) | Chain-neutral authority model and security levels | Proposed, 2026-10-25 | Roles defined without chain terms; security levels L0 (test), L1 (capped pilot), L2 (outside capital); a deployment holds a level's capital only once its chain's conformance table is green; exceptions need an ADR. Baseline in [`security/baseline.md`](../security/baseline.md). Acceptance before the real Solana deploy (#91). | |
 
 ## Decision log
 
@@ -194,7 +195,7 @@ The pilot parameters of [ADR 0028](../decisions/0028-pilot-parameters.md) (2026-
 
 ## Sources
 
-- [`docs/decisions/`](../decisions/): ADRs 0001 to 0030 (0013 is not used).
+- [`docs/decisions/`](../decisions/): ADRs 0001 to 0031 (0013 is not used).
 - [`spec.md`](../spec.md), in particular [§12 Open questions](../spec.md#12-open-questions) and [§14 Upgrade readiness](../spec.md#14-upgrade-readiness).
 - [`plan.md`](../plan.md), for the history of ADR number 0013.
 - [`app/docs/spec.md`](../../app/docs/spec.md), for the pilot app.

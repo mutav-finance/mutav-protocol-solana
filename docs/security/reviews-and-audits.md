@@ -93,7 +93,7 @@ The [OWASP Smart Contract Top 10](https://scs.owasp.org/sctop10/) is used as a c
 
 ## Independent audit
 
-An independent security audit is planned before mainnet. The auditor, scope and date are not yet chosen. The mainnet pilot stays capped, and caps are raised only through time-locked admin proposals.
+An independent security audit is planned before mainnet. The auditor, scope and date are not yet chosen. The review each security level requires (internal, independent, full external audit) is set in the [security baseline](baseline.md#security-levels) (proposed). The mainnet pilot stays capped, and caps are raised only through time-locked admin proposals.
 
 ## Sources
 
@@ -117,3 +117,4 @@ An independent security audit is planned before mainnet. The auditor, scope and 
 - [ADR 0026: Program simplification for the freeze](../decisions/0026-program-simplification-for-the-freeze.md)
 - [ADR 0027: Multi-asset adapters, liquidity floor and rebalancing](../decisions/0027-multi-asset-adapters-liquidity-floor-rebalancing.md) (Proposed)
 - [ADR 0029: Claims and capital rules in the program](../decisions/0029-claims-and-capital-rules-in-the-program.md)
+- [ADR 0031: Chain-neutral authority model and security levels](../decisions/0031-chain-neutral-authority-model-and-security-levels.md) (Proposed)
