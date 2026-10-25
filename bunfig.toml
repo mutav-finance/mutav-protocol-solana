@@ -1,0 +1,5 @@
+# Supply-chain guard: only resolve package versions published at least 3 days ago.
+# Gives the registry time to pull compromised releases before we install them.
+# https://bun.com/docs/runtime/bunfig#install-minimumreleaseage
+[install]
+minimumReleaseAge = 259200 # seconds (3 days)
