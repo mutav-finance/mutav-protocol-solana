@@ -3,8 +3,9 @@
  * Renders the production kit's HTML cards and overlays to PNG with headless Chromium (Playwright).
  * One browser, one page, no server: files are opened with file:// URLs. Run from anywhere:
  *
- *   node docs/demo/production/tools/render.cjs stills
- *       All the committed PNGs (cards/*.png, overlays/*.png). Transparent where the HTML is.
+ *   node docs/demo/production/tools/render.cjs stills [filter ...]
+ *       All the committed PNGs (cards/*.png, overlays/*.png), or only those whose path contains a filter.
+ *       Transparent where the HTML is.
  *   node docs/demo/production/tools/render.cjs timer --start <ms> --end <ms> [--fps 30] [--tail 4] [--every-frame] --out <dir>
  *       The elapsed timer as a PNG sequence plus an ffmpeg concat list; prints the encode command.
  *   node docs/demo/production/tools/render.cjs captions <file.srt> --out <dir>
@@ -12,6 +13,12 @@
  *       for ffmpeg builds without libass (no `subtitles` filter).
  *   node docs/demo/production/tools/render.cjs seq <file.html> --ms 1600 [--fps 30] --out <dir>
  *       Frame sequence of an animated card or overlay (chapter titles, later wipe, close card).
+ *   node docs/demo/production/tools/render.cjs receipts <tx-receipts.json> --out <dir>
+ *       One transaction-receipt PNG per entry (overlays/tx-receipt.html) and one transaction-rail PNG per
+ *       landed transaction (overlays/tx-rail.html?upto=k), from real getTransaction data. The file is an array
+ *       (or {"receipts": [...]}) of {instruction, signature, slot, blockTime (unix s), fee (lamports),
+ *       status ("ok" | "failed"), error?, cluster?}, in landing order. The raw export's block_time, fee_lamports
+ *       and error object ({mutav_error: {name}}) are read too.
  *
  * Playwright is resolved from $PLAYWRIGHT_FROM, the current directory, or the repo's app/ (installed there).
  * Exits on its own; no watch mode.
@@ -41,7 +48,6 @@ const STILLS = [
   ["cards/chapter-1.html", "static", "cards/chapter-1.png"],
   ["cards/chapter-2.html", "static", "cards/chapter-2.png"],
   ["cards/chapter-3.html", "static", "cards/chapter-3.png"],
-  ["cards/capital-card.html", "static", "cards/capital-card.png"],
   ["cards/close.html", "static", "cards/close.png"],
   ["overlays/coverage-refused-chip.html", "static", "overlays/coverage-refused-chip.png"],
   ["overlays/minimap.html", "static&active=1", "overlays/minimap-1-agency.png"],
@@ -50,15 +56,19 @@ const STILLS = [
   ["overlays/minimap.html", "static&active=4", "overlays/minimap-4-reserve.png"],
   ["overlays/minimap.html", "static&active=5", "overlays/minimap-5-pix.png"],
   ["overlays/minimap.html", "static&legend", "overlays/minimap-legend.png"],
+  ["overlays/minimap.html", "static&roadmap", "overlays/minimap-roadmap.png"],
+  ["overlays/safeguards-card.html", "static", "overlays/safeguards-card.png"],
   ["overlays/honesty-label.html", "static&id=built", "overlays/honesty-built.png"],
   ["overlays/honesty-label.html", "static&id=agency", "overlays/honesty-agency.png"],
   ["overlays/honesty-label.html", "static&id=pix", "overlays/honesty-pix.png"],
-  ["overlays/honesty-label.html", "static&id=fees", "overlays/honesty-fees.png"],
+  ["overlays/honesty-label.html", "static&id=mock", "overlays/honesty-mock.png"],
   ["overlays/later-wipe.html", "static", "overlays/later-wipe.png"],
-  ["overlays/figure-callout.html", "static&id=share", "overlays/callout-share-value.png"],
-  ["overlays/figure-callout.html", "static&id=inout", "overlays/callout-in-out.png"],
+  ["overlays/scale-caption.html", "static", "overlays/scale-caption.png"],
   ["overlays/timer.html", "static&start=0&end=42000&frame=600", "overlays/timer-sample-running.png"],
   ["overlays/timer.html", "static&start=0&end=42000&frame=1300", "overlays/timer-sample-settled.png"],
+  ["overlays/tx-receipt.html", "static", "overlays/tx-receipt-sample.png"],
+  ["overlays/tx-receipt.html", "static&sample&ix=register_guarantee&sig=2222222222222222222222222222222222222222222222222222222222222222&slot=123456790&time=1791800021&fee=5000&status=failed&err=InsufficientFreeCapital", "overlays/tx-receipt-sample-failed.png"],
+  ["overlays/tx-rail.html", "static", "overlays/tx-rail-sample.png"],
 ];
 
 function parseSrt(text) {
@@ -73,8 +83,8 @@ function parseSrt(text) {
 }
 
 (async () => {
-  if (!["stills", "timer", "captions", "seq"].includes(cmd)) {
-    console.error("usage: render.cjs stills | timer --start <ms> --end <ms> --out <dir> | captions <srt> --out <dir> | seq <html> --ms <n> --out <dir>");
+  if (!["stills", "timer", "captions", "seq", "receipts"].includes(cmd)) {
+    console.error("usage: render.cjs stills | timer --start <ms> --end <ms> --out <dir> | captions <srt> --out <dir> | seq <html> --ms <n> --out <dir> | receipts <tx-receipts.json> --out <dir>");
     process.exit(2);
   }
   const { chromium } = loadPlaywright();
@@ -83,7 +93,9 @@ function parseSrt(text) {
   const shot = async (file) => { fs.mkdirSync(path.dirname(file), { recursive: true }); await page.screenshot({ path: file, omitBackground: true }); };
   try {
     if (cmd === "stills") {
+      const filters = args.slice(1).filter((a) => !a.startsWith("--"));
       for (const [html, q, png] of STILLS) {
+        if (filters.length && !filters.some((f) => png.includes(f))) continue;
         await page.goto(url(html, q));
         await page.evaluate(() => document.fonts.ready);
         await shot(path.join(KIT, png));
@@ -154,6 +166,29 @@ function parseSrt(text) {
       }
       console.log(`wrote ${total + 1} frames to ${out}`);
       console.log(`encode: ffmpeg -framerate ${fps} -i ${out}/f_%05d.png -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le out.mov`);
+    } else if (cmd === "receipts") {
+      const raw = JSON.parse(fs.readFileSync(path.resolve(args[1]), "utf8"));
+      const list = Array.isArray(raw) ? raw : raw.receipts;
+      if (!Array.isArray(list) || !list.length) throw new Error("tx-receipts.json: expected a non-empty array (or {receipts: [...]})");
+      const out = path.resolve(opt("out", "receipt-frames"));
+      // Accepts the documented shape and the raw export's snake_case fields (block_time, fee_lamports, error object).
+      const errName = (e) => !e ? "" : typeof e === "string" ? e : (e.mutav_error && e.mutav_error.name) || (e.custom_code != null ? `Custom ${e.custom_code}` : "Error");
+      list.forEach((r) => { r.blockTime = r.blockTime ?? r.block_time; r.fee = r.fee ?? r.fee_lamports; r.error = errName(r.error); });
+      const items = list.map((r) => ({ ix: r.instruction, sig: r.signature, ok: r.status !== "failed" }));
+      for (let i = 0; i < list.length; i++) {
+        const r = list[i];
+        const q = new URLSearchParams({ ix: r.instruction, sig: r.signature, slot: String(r.slot), time: String(r.blockTime),
+          fee: String(r.fee), status: r.status === "failed" ? "failed" : "ok", err: r.error || "", cluster: r.cluster || "Solana devnet" });
+        await page.goto(url("overlays/tx-receipt.html", `static&${q}`));
+        await page.evaluate(() => document.fonts.ready);
+        await shot(path.join(out, `receipt_${pad(i + 1, 2)}_${r.instruction}.png`));
+        const rq = new URLSearchParams({ items: JSON.stringify(items), upto: String(i + 1) });
+        if (r.cluster) rq.set("cluster", r.cluster);
+        await page.goto(url("overlays/tx-rail.html", `static&${rq}`));
+        await page.evaluate(() => document.fonts.ready);
+        await shot(path.join(out, `rail_${pad(i + 1, 2)}.png`));
+      }
+      console.log(`wrote ${list.length} receipts and ${list.length} rail states to ${out}`);
     }
   } finally {
     await browser.close();

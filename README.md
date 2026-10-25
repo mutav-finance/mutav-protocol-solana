@@ -210,7 +210,7 @@ About this deploy:
 - The on-chain program hash matches the build (`fad721d5…e6e7`). The release `v1.0.0-devnet` carries its IDL.
 - Its multisig time locks are 60 s (admin) and 120 s (upgrade), a test exception to the devnet floors of [ADR 0028](docs/decisions/0028-pilot-parameters.md) (300 s and 3,600 s). The real pilot keeps 24 h and 7 days.
 - `mutav_adapter_mock` is not deployed on devnet.
-- The operator was rotated on 2026-10-12 through `propose_role` / `accept_role` (the previous test key had been exposed). Transactions before that date are signed by the previous operator, `A2gqm8f8…695k`.
+- The operator role was rotated on 2026-10-12 through `propose_role` / `accept_role` (the previous test key had been exposed) to `8MtERL18dFtNPZESghbxR3g21d8FvY2mnTq855SFURPk`. Transactions before that date, including the demo's recorded ones, are signed by the previous operator, `A2gqm8f8hG7RSty9CKAu16F3B2cNimW2qbXcEthQ695k`, which is revoked.
 
 ## Documentation
 

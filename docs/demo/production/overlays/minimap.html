@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Flow minimap</title>
-<!-- Flow minimap, top right. ?active=1..5 (agency platform, operator, program, BRS reserve, PIX record) · ?legend adds the provenance legend.
+<!-- Flow minimap, top right. ?active=1..5 (agency platform, operator, program, BRS reserve, PIX record) · ?legend adds the provenance legend ·
+     ?roadmap lights agency platform → operator in the "next" colour, labelled as roadmap (F8b).
      1920x1080. Self-contained: inline CSS/JS, fonts as data: URIs (Geist, Inter, JetBrains Mono; SIL OFL).
      Query params: ?static (final state, no animation) · ?t=<ms> (freeze the in-animation at ms). -->
 <style>
@@ -65,6 +66,12 @@ body.opaque{background-color:var(--canvas);background-image:var(--grid);backgrou
 .legend i.sim{border-style:dashed}
 .legend i.next{height:0;width:26px;border:0;border-top:1.5px dashed var(--accent)}
 .withlegend .legend{display:flex}
+.roadmap{display:none;margin-top:14px;font-family:var(--font-mono);font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.roadmap b{font-weight:700}
+.isroadmap .roadmap{display:block}
+.isroadmap .node[data-n="1"]{border:2px dashed var(--accent);color:var(--accent);padding:9px 13px}
+.isroadmap .link.next{border-top-width:3px;width:46px}
+.isroadmap .link.next::after{top:-6.5px;border-width:6px}
 
 </style>
 </head>
@@ -81,6 +88,7 @@ body.opaque{background-color:var(--canvas);background-image:var(--grid);backgrou
     <span class="link"></span>
     <span class="node sim" data-n="5">PIX record</span>
   </div>
+  <div class="roadmap"><b>Roadmap</b> · agency platform → operator · not live yet</div>
   <div class="legend">
     <span><i></i>Built in the hackathon</span>
     <span><i class="pre"></i>Pre-existing</span>
@@ -101,6 +109,7 @@ var q=new URLSearchParams(location.search);
 var a=q.get('active');
 if(a){var n=document.querySelector('[data-n="'+a+'"]');if(n)n.classList.add('on');}
 if(q.has('legend'))document.querySelector('.mm').classList.add('withlegend');
+if(q.has('roadmap'))document.querySelector('.mm').classList.add('isroadmap');
 </script>
 <script>(function(){function f(){var s=Math.min(innerWidth/1920,innerHeight/1080);document.body.style.zoom=s<1?s:1}f();addEventListener("resize",f)})();</script>
 </body>
