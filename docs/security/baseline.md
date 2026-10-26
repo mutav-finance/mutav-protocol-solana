@@ -55,7 +55,7 @@ Runs contracts, agencies and the guarantee and claim cycle. It holds the contrac
 
 Every operator registry action can be reversed by another operator action. Only the claim payment is irreversible, so the worst case of a lost operator key is the admin-set claim caps.
 
-**Single-registrant assumption.** The pilot platform holds an offer's required coverage off-chain for 7 days before signatures (mutav-app ADR 0010). That is sound only because one operator is the sole caller of `register_guarantee` on a reserve, so the platform sees every consumer of free capital. **A reserve with more than one operator or registrant must move that hold on-chain** (a reservation with an expiry, by ADR and spec change) before the second registrant goes live.
+**Single-registrant assumption.** The pilot platform holds an offer's required coverage off-chain for a hold period before signatures (mutav-app ADR 0010). That is sound only because one operator is the sole caller of `register_guarantee` on a reserve, so the platform sees every consumer of free capital. **A reserve with more than one operator or registrant must move that hold on-chain** (a reservation with an expiry, by ADR and spec change) before the second registrant goes live.
 
 ### Pauser
 
