@@ -55,6 +55,8 @@ Runs contracts, agencies and the guarantee and claim cycle. It holds the contrac
 
 Every operator registry action can be reversed by another operator action. Only the claim payment is irreversible, so the worst case of a lost operator key is the admin-set claim caps.
 
+**Single-registrant assumption.** The pilot platform holds an offer's required coverage off-chain for 7 days before signatures (mutav-app ADR 0010). That is sound only because one operator is the sole caller of `register_guarantee` on a reserve, so the platform sees every consumer of free capital. **A reserve with more than one operator or registrant must move that hold on-chain** (a reservation with an expiry, by ADR and spec change) before the second registrant goes live.
+
 ### Pauser
 
 A separate key for emergencies. It acts at once.
@@ -202,7 +204,7 @@ L1 is reached when rows 3, 4, 5, 8, 12, 14, 15, 18, 19 and 21 turn green on the 
 
 ## Adding a chain
 
-1. **Map the roles.** For each role above, name the account or contract that holds it on the new chain, and confirm the program refuses a key holding two roles.
+1. **Map the roles.** For each role above, name the account or contract that holds it on the new chain, and confirm the program refuses a key holding two roles. State how many operators can register against each reserve; more than one breaks the [single-registrant assumption](#operator).
 2. **Check the program rules.** Confirm the coverage gate, claim caps, pause scope (claims never stopped), fixed outflow destinations and internal accounting hold as on the reference implementation, with tests.
 3. **Pick the custody mechanisms.** A threshold multisig with a time lock for the admin, a second for upgrades, and a locked configuration for both. Record the floors the deploy tooling checks.
 4. **Pick the build path.** A verifiable, reproducible build and a way for anyone to compare the deployed hash.
