@@ -1,0 +1,81 @@
+# Publish the TypeScript client (clients/js) to npm as
+# @mutav-finance/mutav-protocol-solana, with npm provenance.
+#
+# Manual only. It publishes the version already in clients/js/package.json
+# at `ref` and refuses a version that is already on the registry.
+#
+# Auth, in order:
+#   NPM_TOKEN secret   granular automation token scoped to @mutav-finance
+#                      (needed for the very first publish, before a trusted
+#                      publisher can be configured on the package)
+#   trusted publishing OIDC (`id-token: write`), once npmjs.com lists this
+#                      repo + workflow as the package's trusted publisher;
+#                      then delete NPM_TOKEN
+name: publish-client
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git tag or commit to publish from (e.g. client-v0.1.0)"
+        required: true
+
+concurrency:
+  group: publish-client
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # Same gates as ci.yml's client checks, on the exact ref being published.
+      - name: Typecheck client
+        run: bun run typecheck
+
+      - name: No secret-key or signing APIs
+        run: bash scripts/check-no-keys.sh --allowlist scripts/no-keys-allowlist.txt clients/js/src
+
+      - name: Client tests
+        run: bun test
+        working-directory: clients/js
+
+      # Provenance and trusted publishing need npm >= 11.5.
+      - name: npm 11
+        run: npm install -g npm@11.6.2 && npm --version
+
+      - name: Refuse an already-published version
+        working-directory: clients/js
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if npm view "${name}@${version}" version >/dev/null 2>&1; then
+            echo "::error::${name}@${version} is already published. Bump clients/js/package.json."
+            exit 1
+          fi
+          echo "Publishing ${name}@${version}"
+
+      # prepack copies LICENSE and builds dist/.
+      - name: Publish
+        working-directory: clients/js
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN}" ]; then
+            echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > "$HOME/.npmrc"
+          fi
+          npm publish --provenance --access public
