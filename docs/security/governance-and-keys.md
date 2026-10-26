@@ -2,6 +2,8 @@
 
 The core security rule is the split between the operator and the reserve admin. The operator holds the information about contracts and runs the guarantee and claim cycle. The reserve admin looks after the reserve's financial health and security through ceilings, and does not judge contracts. They may be separate companies.
 
+This page describes the Solana implementation. The chain-neutral roles, the security levels every deployment must meet, and the Solana conformance table are in the [authority model and security baseline](baseline.md) (proposed, [ADR 0031](../decisions/0031-chain-neutral-authority-model-and-security-levels.md)).
+
 ## Roles
 
 | Role | Holder | May do | Cannot do |

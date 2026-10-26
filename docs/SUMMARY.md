@@ -46,6 +46,7 @@
 ## Security and verification
 
 * [Security and verification](security/README.md)
+* [Authority model and security baseline](security/baseline.md)
 * [Invariants](security/invariants.md)
 * [Governance and keys](security/governance-and-keys.md)
 * [Incident response](security/incident-response.md)
