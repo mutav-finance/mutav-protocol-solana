@@ -276,6 +276,7 @@ h3:first-child{margin-top:0}
 .legend .sw.s2{background:var(--s2)} .legend .ln.s2{border-color:var(--s2)} .legend .sw.s3{background:var(--s3)}
 .legend .ref{display:inline-block;width:16px;border-top:1.5px dashed var(--ink-2);margin-right:6px}
 .legend .req{display:inline-block;width:16px;border-top:2px solid var(--ink);margin-right:6px}
+.legend .plan{display:inline-block;width:16px;border-top:1.5px dashed var(--risk);margin-right:6px}
 .legend .blk{display:inline-block;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--risk);margin-right:6px}
 .c-grid{stroke:var(--line);stroke-width:1}
 .c-base{stroke:var(--line-input);stroke-width:1}
@@ -291,6 +292,8 @@ h3:first-child{margin-top:0}
 .c-dot{fill:var(--accent);stroke:var(--surface);stroke-width:2}
 .c-ref{stroke:var(--ink-2);stroke-width:1.5;stroke-dasharray:5 4;fill:none}
 .c-blk{fill:var(--risk)}
+.c-blkn{fill:var(--risk);font:600 10.5px var(--mono);font-variant-numeric:tabular-nums}
+.c-plan{stroke:var(--risk);stroke-width:1.5;stroke-dasharray:4 3;fill:none}
 .c-hit{fill:transparent;cursor:crosshair}
 .c-hover{fill:var(--ink);opacity:.05}
 .tip{position:absolute;pointer-events:none;background:var(--surface-2);border:1px solid var(--line-input);padding:var(--sp2) var(--sp3);font-size:var(--fs-help);line-height:1.5;display:none;min-width:220px;z-index:3}
@@ -415,7 +418,8 @@ h3:first-child{margin-top:0}
           <span><i class="sw"></i>Stable assets</span>
           <span><i class="req"></i>Coverage required</span>
           <span id="lgW"><i class="sw s3"></i>Redemptions</span>
-          <span><i class="blk"></i>Registrations refused</span>
+          <span id="lgPlan"><i class="plan"></i>Coverage the planned book needs</span>
+          <span><i class="blk"></i>Leases refused that month (−n)</span>
           <span><i class="ln"></i>Cumulative reserve net gain (business view)</span>
           <span><i class="ref"></i>Same capital at Selic</span>
           <span class="adv"><i class="sw s2"></i>MUTAV take (monthly)</span>
@@ -553,7 +557,7 @@ bad_year_net_gain    = net fees − leases × bad_year_claims + stable × (brs_s
       <ul>
         <li><strong>Pilot parameters:</strong> <code>mutav/docs/operation/02-parameters.md</code> on <code>origin/main</code> (reviewed 2026-09-19, the single source of business numbers): rent R$2.200, guarantee fee 10% (modelled value inside 9–15% by score), default-leg cover 12× rent (working value, under legal review), exit-leg cover 6× as a separate sublimit, capitalized reserve R$300.000, ~6-month pilot, ~28 new contracts/month to a 170-lease book. The pilot scenarios use the founders' pilot parameters instead (ADR 0028, amended 2026-10-12, the path to R$1M): guarantee fee 12%, R$120.000 start plus R$170.000 a month from month 2, 17 new leases a month (97 by month 6, at the R$1M max_tvl), c = 0,25, issuer income 70% of CDI (≈ 9,6% a year, planning assumption), redemptions above a 25% buffer. 02's “reserve ~80% TESOURO once an adapter exists” is superseded: the pilot reserve is BRS-only (2026-10-07), with TESOURO as the first adapter candidate once Etherfuse has a BRS leg. Fee charged 12× a year: agencies are billed one boleto a month.</li>
         <li><strong>Coverage ratio (c):</strong> ADR 0016 and <code>40-reserve.md</code> 9w. The program holds <code>coverage_required = max(ceil(c × remaining cover), provisions)</code> with <code>c ≥ 0,10</code> (<code>MIN_COVERAGE_RATIO_BPS = 1_000</code>); devnet and the pilot run at 0,25 (ADR 0028). Filed claims stay fully covered at any c. At R$39.600 of cover per lease, R$100.000 backs 10 leases at c = 0,25 and 2 at c = 1,0; R$300.000 backs 30 at c = 0,25; 170 leases need R$1.683.000 at c = 0,25.</li>
-        <li><strong>Caps (devnet config):</strong> <code>coverage_ratio_bps</code> 2.500; <code>max_tvl</code> R$1M; <code>max_cover_per_guarantee</code> R$120k; <code>stress_buffer</code> R$19k (ADR 0028); <code>max_cover_per_agency</code> R$10M in the simulator only (no program cap since ADR 0019; well above max_tvl ÷ 0,25 plus fee growth, so it never binds: one reserve may serve a single agency); <code>max_claim_per_call</code> / <code>max_claim_per_period</code> R$15k / R$20k per 31 days (a 6×-rent eviction, R$13.200, fits the per-call cap); <code>min_settlement_bps</code> 100% (claims and redemptions pay out in BRS, the settlement token; the pilot holds BRS only, so adapter income is a what-if until the floor is lowered); fee take ≤ 30% (<code>MAX_FEE_TAKE_BPS</code>). Request limits (R$1k–R$100k, R$500 minimum fill) do not affect this model.</li>
+        <li><strong>Caps (devnet config):</strong> the caps are off by default in the simulator (0 = no limit); the <em>Devnet caps</em> scenario turns them on. Devnet values: <code>coverage_ratio_bps</code> 2.500; <code>max_tvl</code> R$1M; <code>max_cover_per_guarantee</code> R$120k; <code>stress_buffer</code> R$19k (ADR 0028); <code>max_cover_per_agency</code> R$10M in the simulator only (no program cap since ADR 0019; well above max_tvl ÷ 0,25 plus fee growth, so it never binds: one reserve may serve a single agency); <code>max_claim_per_call</code> / <code>max_claim_per_period</code> R$15k / R$20k per 31 days (a 6×-rent eviction, R$13.200, fits the per-call cap); <code>min_settlement_bps</code> 100% (claims and redemptions pay out in BRS, the settlement token; the pilot holds BRS only, so adapter income is a what-if until the floor is lowered); fee take ≤ 30% (<code>MAX_FEE_TAKE_BPS</code>). Request limits (R$1k–R$100k, R$500 minimum fill) do not affect this model.</li>
         <li><strong>Bad-year check:</strong> <code>40-reserve.md</code> 9w asks the reserve to grow to 2,0 bad years of claims and never hold fewer than 1,0. It is not enforced on-chain yet (a later ADR), so it is shown as an off-chain planning signal next to the coverage figures.</li>
         <li><strong>Delinquency:</strong> base 2,5% of annual rent, the founders' working figure for the starting region (2026-10-11): a round number set above the measured anchors for the pilot's segment. Measured: Superlógica IIL, RS apartments, average of the three latest prints (abr/jun/jul 2026), 2,01%, verified at source 2026-09-08; South region 2,67%. Stress 2,87% (IIL RS aggregate). Tail 5,93% (Loft IIA RS, 15-day threshold). Applied as an annual rate on annual rent: <code>12 × rate × rent</code>.</li>
         <li><strong>Evictions:</strong> <code>12-eviction-cost-south.md</code>. While the fiança is live the art. 59 §1º IX liminar is unavailable, so a forced exit costs about 6× rent (capped at the exit leg). If the fiança extinguishes once the default leg is exhausted, the liminar becomes arguable: base 5,5×, low 2,5×. <strong>Eviction rate</strong>: <code>12-eviction-rate-south.md</code>, measured filings, adjusted (not MUTAV data). CNJ DataJud first-instance despejo filings (all 27 state courts, own query 2026-10-02) ÷ IBGE PNAD rented households give 0,5–0,7% of South leases facing a suit per year; about a third end in a court-ordered exit. Adjusted for an underwritten, agency-managed book: <strong>low 0,10% / base 0,25% / high 0,60%</strong> per year.</li>
@@ -598,8 +602,8 @@ var MUTAV_DEFAULTS = {
   nonEvictX: 0.19, penaltyX: 0.077, ramp: true, stressOn: false, stressMonth: 3,
   startCapital: 300000, monthlyRaise: 0, raiseFrom: 2, raiseUntil: 0,
   coverageRatio: 0.25, tailMult: 2.33,
-  maxTvl: 1000000, maxCoverPerGuarantee: 120000, maxCoverPerAgency: 10000000,
-  maxClaimPerCall: 15000, maxClaimPerPeriod: 20000, stressBuffer: 19000, maxTesouroSharePct: 0,
+  maxTvl: 0, maxCoverPerGuarantee: 0, maxCoverPerAgency: 0,
+  maxClaimPerCall: 0, maxClaimPerPeriod: 0, stressBuffer: 19000, maxTesouroSharePct: 0,
   tesouroSharePct: 0, tesouroPct: 11.58, selicPct: 13.75,
   /* issuer income (Nora): CDI-linked tiers on the whole balance; public planning default one tier at 70% of CDI.
      brsYieldPct: a flat % of TVL a year from older links; null = use the tiers. */
@@ -681,13 +685,17 @@ function mutavPayouts(p, scope) {
     grossAnnual: grossAnnual, ratio: grossAnnual > 0 ? total / grossAnnual : 0 };
 }
 
+/* VaultConfig caps: 0 means no limit (the simulator default; the devnet values are a scenario). */
+var MUTAV_DEVNET_CAPS = { maxTvl: 1000000, maxCoverPerGuarantee: 120000, maxCoverPerAgency: 10000000, maxClaimPerCall: 15000, maxClaimPerPeriod: 20000 };
+function mutavCap(v) { return +v > 0 ? +v : Infinity; }
+
 /* Coverage required per lease at full cover, and the per-guarantee cap check. */
 function mutavRequirement(p, pay) {
   var cover = p.rent * (p.defaultCover + p.exitCover);
   var cBps = mutavCoverageBps(p.coverageRatio);
   var tail = p.tailMult * pay.total;
   return { cBps: cBps, c: cBps / MUTAV_PROTOCOL.BPS, cover: cover, perLease: cBps / MUTAV_PROTOCOL.BPS * cover, tail: tail,
-    overGuaranteeCap: cover > p.maxCoverPerGuarantee + 1e-9 };
+    overGuaranteeCap: cover > mutavCap(p.maxCoverPerGuarantee) + 1e-9 };
 }
 
 function mutavCompute(p) {
@@ -713,7 +721,7 @@ function mutavCompute(p) {
   for (var m = 1; m <= N; m++) {
     /* fulfil_deposits: stable_assets + deposit ≤ max_tvl */
     var want = (m === 1 ? p.startCapital : 0) + (p.monthlyRaise > 0 && m >= p.raiseFrom && m <= until ? p.monthlyRaise : 0);
-    var deposit = Math.max(0, Math.min(want, p.maxTvl - balance));
+    var deposit = Math.max(0, Math.min(want, mutavCap(p.maxTvl) - balance));
     tvlRefused += want - deposit;
     capital += deposit;
     var opening = balance + deposit;
@@ -722,12 +730,12 @@ function mutavCompute(p) {
     for (var k = Math.max(1, m - term + 1); k < m; k++) if (cohorts[k] && remPer[k] > 0) { existing += cohorts[k]; remBefore += cohorts[k] * remPer[k]; }
     /* register_guarantee, in the program's order: per-guarantee cap, per-agency cap (one agency), required coverage */
     var allowed = planned, refusal = null;
-    if (planned > 0) {
+    if (planned > 0 && !p.noGate) {
       var openU = mutavUnits(opening), remU = mutavUnits(remBefore);
       if (mutavCoverageRequired(remU, cBps, 0, sbU) > openU) { allowed = 0; refusal = 'under-covered'; }
       else if (req.overGuaranteeCap) { allowed = 0; refusal = 'guarantee-cap'; }
       else {
-        var byAgency = cover > 0 ? Math.max(0, Math.floor((p.maxCoverPerAgency - remBefore) / cover + 1e-9)) : planned;
+        var byAgency = cover > 0 ? Math.max(0, Math.floor((mutavCap(p.maxCoverPerAgency) - remBefore) / cover + 1e-9)) : planned;
         if (byAgency < allowed) { allowed = byAgency; refusal = 'agency-cap'; }
         var byGate = mutavGateCount(openU, remU, coverU, cBps, 0, allowed, sbU);
         if (byGate < allowed) { allowed = byGate; refusal = 'free-capital'; }
@@ -753,7 +761,7 @@ function mutavCompute(p) {
       remAfter += cohorts[j] * remPer[j];
     }
     var claimsPaid = claims + stress;
-    var overClaimCap = claimsPaid > p.maxClaimPerPeriod + 1e-6;
+    var overClaimCap = claimsPaid > mutavCap(p.maxClaimPerPeriod) + 1e-6;
     if (overClaimCap) { claimCapMonths++; if (!firstClaimCap) firstClaimCap = m; }
     var tesouro = Math.max(0, opening) * tShare * tRate / 12;
     issuer = mutavIssuerRate(p, Math.max(0, opening)); bRate = issuer.rate;
@@ -823,11 +831,11 @@ function mutavCompute(p) {
     selfFundedLeases: req.overGuaranteeCap ? 0 : mutavLeasesBacked(last.balance, cover, cBps),
     selfFundMonth: selfFundMonth, selfFundProjected: selfFundProjected,
     finalActive: last.active, plannedActive: plannedActive, plannedRequired: plannedActive * rpl,
-    capacityAtStart: req.overGuaranteeCap ? 0 : mutavLeasesBacked(Math.min(p.startCapital, p.maxTvl), cover, cBps),
+    capacityAtStart: req.overGuaranteeCap ? 0 : mutavLeasesBacked(Math.min(p.startCapital, mutavCap(p.maxTvl)), cover, cBps),
     steady: { underwriting: underwriting, tesouro: tesouroYield, brs: brsYield, total: steady },
     selic: p.selicPct / 100, spreadVsSelic: steady - p.selicPct / 100,
     take: take, tesouroShare: tShare, brsShare: bShare, brsRate: bRate, issuer: issuer, tesouroShareWanted: tWanted, tesouroCapped: tWanted > tCap + 1e-9,
-    claimCapMonths: claimCapMonths, firstClaimCap: firstClaimCap, largestEvent: largestEvent, overCallCap: largestEvent > p.maxClaimPerCall + 1e-6,
+    claimCapMonths: claimCapMonths, firstClaimCap: firstClaimCap, largestEvent: largestEvent, overCallCap: largestEvent > mutavCap(p.maxClaimPerCall) + 1e-6,
     exhaustedLeases: exhaustedLeases,
     tailPerLease: req.tail, coverPerLease: cover,
     pctCover: last.remaining > 0 ? last.balance / last.remaining : Infinity,
@@ -877,7 +885,8 @@ function mutavMinToAvoidBlocking(p, key, step, lo) {
 if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute, mutavPayouts: mutavPayouts, mutavIssuerRate: mutavIssuerRate, mutavRequirement: mutavRequirement,
   mutavSizingRow: mutavSizingRow, mutavSizingTable: mutavSizingTable, mutavMinToAvoidBlocking: mutavMinToAvoidBlocking,
   mutavCoverageRequired: mutavCoverageRequired, mutavFreeCapital: mutavFreeCapital, mutavGateAdmits: mutavGateAdmits, mutavGateCount: mutavGateCount,
-  mutavCoverageBps: mutavCoverageBps, mutavLeasesBacked: mutavLeasesBacked, MUTAV_DEFAULTS: MUTAV_DEFAULTS, MUTAV_PROTOCOL: MUTAV_PROTOCOL };
+  mutavCoverageBps: mutavCoverageBps, mutavLeasesBacked: mutavLeasesBacked, MUTAV_DEFAULTS: MUTAV_DEFAULTS, MUTAV_PROTOCOL: MUTAV_PROTOCOL,
+  MUTAV_DEVNET_CAPS: MUTAV_DEVNET_CAPS, mutavCap: mutavCap };
 </script>
 
 <script>
@@ -926,11 +935,11 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       { sub: 'Fee take' },
       { k: 'takePct', l: 'MUTAV take rate', code: 'fee_take_bps', u: '% fees', step: 1, min: 0, max: 30, src: 'estimate', i: 'fee_take_bps: share of each guarantee fee kept by MUTAV (ADR 0009). The program caps it at 30%. 20% is the config placeholder; the value is still open.' },
       { sub: 'Caps (VaultConfig.caps)' },
-      { k: 'maxTvl', l: 'Max reserve size', code: 'max_tvl', u: 'R$', step: 10000, min: 0, src: 'protocol', i: 'fulfil_deposits refuses capital that would take stable assets above this. Devnet: R$1M (ADR 0028). It also stops starting capital and raises.' },
-      { k: 'maxCoverPerGuarantee', l: 'Max cover per guarantee', code: 'max_cover_per_guarantee', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'register_guarantee refuses a lease whose cover (default + exit leg) is above this. Devnet: R$120k (ADR 0028).' },
-      { k: 'maxCoverPerAgency', l: 'Max cover per agency', code: 'max_cover_per_agency', u: 'R$', step: 100000, min: 0, src: 'protocol', i: 'Outstanding cover one agency may hold. The simulator assumes a single agency, so every lease counts. Not a program cap since ADR 0019; the simulator keeps R$10M, well above max_tvl ÷ 0,25 (R$4M) plus fee growth, so it never binds.' },
-      { k: 'maxClaimPerCall', l: 'Max claim per call', code: 'max_claim_per_call', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'Largest operator claim payment in one call. Above it, pay_claim_admin. Devnet: R$15k (ADR 0028), so a 6×-rent eviction fits.' },
-      { k: 'maxClaimPerPeriod', l: 'Max claims per 31 days', code: 'max_claim_per_period', u: 'R$/31 d', step: 1000, min: 0, src: 'protocol', i: 'Operator claim payments per 31 days (the simulator checks each month). A month above it needs pay_claim_admin for the excess. Devnet: R$20k.' },
+      { k: 'maxTvl', l: 'Max reserve size', code: 'max_tvl', u: 'R$', step: 10000, min: 0, src: 'protocol', i: 'fulfil_deposits refuses capital that would take stable assets above this. It also stops starting capital and raises. 0 = no limit (default); devnet: R$1M (ADR 0028).' },
+      { k: 'maxCoverPerGuarantee', l: 'Max cover per guarantee', code: 'max_cover_per_guarantee', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'register_guarantee refuses a lease whose cover (default + exit leg) is above this. 0 = no limit (default); devnet: R$120k (ADR 0028).' },
+      { k: 'maxCoverPerAgency', l: 'Max cover per agency', code: 'max_cover_per_agency', u: 'R$', step: 100000, min: 0, src: 'protocol', i: 'Outstanding cover one agency may hold. The simulator assumes a single agency, so every lease counts. Not a program cap since ADR 0019. 0 = no limit (default).' },
+      { k: 'maxClaimPerCall', l: 'Max claim per call', code: 'max_claim_per_call', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'Largest operator claim payment in one call. Above it, pay_claim_admin. 0 = no limit (default); devnet: R$15k (ADR 0028), so a 6×-rent eviction fits.' },
+      { k: 'maxClaimPerPeriod', l: 'Max claims per 31 days', code: 'max_claim_per_period', u: 'R$/31 d', step: 1000, min: 0, src: 'protocol', i: 'Operator claim payments per 31 days (the simulator checks each month). A month above it needs pay_claim_admin for the excess. 0 = no limit (default); devnet: R$20k.' },
       { k: 'stressBuffer', l: 'Stress buffer', code: 'stress_buffer', u: 'R$', step: 1000, min: 0, src: 'protocol', i: 'caps.stress_buffer: claims that could be filed next, held on top of open provisions (ADR 0022). Coverage required = max(c × remaining cover, provisions + min(stress buffer, unprovisioned cover)), so on a small book the buffer binds. Devnet: R$19k (ADR 0028).' },
       { k: 'maxTesouroSharePct', inv: 100, l: 'Min held in settlement token (BRS)', code: 'min_settlement_bps', u: '%', step: 5, min: 0, max: 100, src: 'protocol', i: 'Claims and redemptions pay out in BRS, so the reserve keeps at least this share in BRS; adapters can use the rest. 100% in the pilot.' }
     ]},
@@ -1005,13 +1014,14 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
 
   var PILOT = { months: 6, perMonth: 17, rent: 2200, feePct: 12, periods: 12, takePct: 20, defaultCover: 12, exitCover: 6, scope: 'B',
     evictRatePct: 0.25, coverageRatio: 0.25, startCapital: 120000, monthlyRaise: 170000, raiseFrom: 2, raiseUntil: 0, growthTarget: 102,
-    maxTvl: 1000000, maxCoverPerGuarantee: 120000, maxClaimPerCall: 15000, maxClaimPerPeriod: 20000, stressBuffer: 19000,
+    stressBuffer: 19000,
     withdraw: 'buffer', tesouroSharePct: 0, maxTesouroSharePct: 0, tesouroPct: 11.58, selicPct: 13.75 };
   var SCEN = [
-    { id: 'default', g: '', l: 'Default (02 parameters)', d: '02 inputs on the devnet config: 28 new leases a month for 6 months, R$300k start, no raise, c = 0,25, BRS only (issuer income 70% of CDI, ≈ 9,6% a year). R$300k backs 30 leases; the book stalls at 33 (insufficient free capital). max_tvl (R$1M) would back about 101 leases at c = 0,25.', o: {} },
-    { id: 'pilotRec', g: 'Pilot', l: 'Pilot · path to R$1M', d: 'The pilot plan (ADR 0028, amended 2026-10-12): 17 new leases a month (growth target 102), R$2.200 rent, 12% guarantee fee, R$120k start plus R$170k a month from month 2, c = 0,25, debts B, redemptions above a 25% buffer, BRS only (settlement floor 100%), issuer income 70% of CDI (≈ 9,6% a year, planning assumption). Month 1 is capital-bound (the start backs 12 of the 17); the reserve reaches the R$1M max_tvl in month 6 with 97 leases and about R$3,8M of cover (R$22k of the last raise is refused at the cap). About R$948k of MUTAV capital, none of it redeemed.', o: PILOT },
+    { id: 'default', g: '', l: 'Default (02 parameters)', d: '02 inputs on the devnet config: 28 new leases a month for 6 months, R$300k start, no raise, c = 0,25, BRS only (issuer income 70% of CDI, ≈ 9,6% a year). R$300k backs 30 leases; the book stalls at 33 (insufficient free capital). Caps off.', o: {} },
+    { id: 'pilotRec', g: 'Pilot', l: 'Pilot · path to R$1M', d: 'The pilot plan (ADR 0028, amended 2026-10-12): 17 new leases a month (growth target 102), R$2.200 rent, 12% guarantee fee, R$120k start plus R$170k a month from month 2, c = 0,25, debts B, redemptions above a 25% buffer, BRS only (settlement floor 100%), issuer income 70% of CDI (≈ 9,6% a year, planning assumption). Month 1 is capital-bound (the start backs 12 of the 17); the reserve passes R$1M in month 6 with 97 leases. About R$970k of MUTAV capital, none of it redeemed. No max_tvl ceiling (caps off); see Devnet caps for the R$1M cap.', o: PILOT },
     { id: 'pilotCons', g: 'Pilot', l: 'Pilot · conservative', d: 'The founders’ conservative variant, unchanged: c = 0,50, 5 leases a month and R$100k a month from month 2, to 30 leases. R$19.800 of coverage required per lease, R$594.000 for the 30. Every lease is admitted.', o: ext(PILOT, { coverageRatio: 0.5, perMonth: 5, growthTarget: 30, monthlyRaise: 100000 }) },
-    { id: 'scale170', g: 'Growth', l: 'Scale to 170', d: 'Pilot inputs at 28 a month toward 170. The R$120k start backs 12 leases and each R$170k raise about 17 more, so the book stalls at 101 by month 6, at the R$1M max_tvl. 170 leases need R$1.683.000 of coverage required at c = 0,25, so max_tvl must rise too.', o: ext(PILOT, { perMonth: 28, growthTarget: 170 }) },
+    { id: 'scale170', g: 'Growth', l: 'Scale to 170', d: 'Pilot inputs at 28 a month toward 170. The R$120k start backs 12 leases and each R$170k raise about 17 more, so the book stalls at 103 by month 6 (insufficient free capital). 170 leases need R$1.683.000 of coverage required at c = 0,25.', o: ext(PILOT, { perMonth: 28, growthTarget: 170 }) },
+    { id: 'devnetCaps', g: 'What-if', l: 'Devnet caps', d: 'Pilot · path to R$1M with the devnet VaultConfig caps on (ADR 0028): max_tvl R$1M, R$120k per guarantee, claims R$15k per call / R$20k per 31 days, plus R$10M per agency in the simulator. The reserve stops at R$1M in month 6 and the cap refuses part of the last raise.', o: ext(PILOT, MUTAV_DEVNET_CAPS) },
     { id: 'pilot10', g: 'Pilot', l: 'Pilot · 10 a month (earlier plan)', d: 'The plan before 2026-10-12: 10 leases a month and R$100k a month from month 2, to 60 leases. R$620k of MUTAV capital; the reserve ends month 6 at about R$668k and reaches R$1M in month 9.', o: ext(PILOT, { perMonth: 10, growthTarget: 60, monthlyRaise: 100000 }) },
     { id: 'fullBacking', g: 'What-if', l: 'Full backing (c = 1,0)', d: 'Pilot recommended at c = 1,0: every lease’s full cover held in stable assets. R$120k backs 3 leases; with the monthly raises the book reaches 25 by month 6.', o: ext(PILOT, { coverageRatio: 1 }) },
     { id: 'broad', g: 'What-if', l: 'Debts A (all debts)', d: 'Pilot recommended, fiança covers all tenant debts incl. the termination penalty.', o: ext(PILOT, { scope: 'A' }) },
@@ -1053,6 +1063,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
       if (saved && saved.values) {
         for (var k in DEF) if (k in saved.values) state[k] = coerce(k, saved.values[k]);
+        if (saved.scen !== 'devnetCaps') for (var ck in MUTAV_DEVNET_CAPS) if (state[ck] === MUTAV_DEVNET_CAPS[ck]) state[ck] = 0;
         activeScen = saved.scen || ''; baseScen = saved.base || 'default';
         if (activeScen && !scenById(activeScen)) activeScen = '';
         if (TABS.indexOf(saved.tab) >= 0) curTab = saved.tab;
@@ -1077,6 +1088,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
   var decF = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
   var dec1 = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 });
   function R(x){ if (!isFinite(x)) return '∞'; var s = brl.format(Math.round(Math.abs(x))).replace(/ /g, ' '); return (Math.round(x) < 0 ? '−' : '') + s; }
+  function RL(x){ return +x > 0 ? R(x) : 'no limit'; }
   function RC(x){ return (x < 0 ? '−' : '') + 'R$ ' + brlC.format(Math.abs(x)).replace(/ /g, ' '); }
   function P(x, d){ if (!isFinite(x)) return '∞'; return (x < 0 ? '−' : '') + Math.abs(x * 100).toFixed(d == null ? 1 : d).replace('.', ',') + '%'; }
   function PP(x){ return (x >= 0 ? '+' : '−') + Math.abs(x * 100).toFixed(1).replace('.', ',') + ' pp'; }
@@ -1406,10 +1418,10 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var N = r.months, rpl = r.req.perLease, m = r.mutav, n = r.finalActive, out = [];
     var safe = !r.blockedMonths && !r.belowFloorMonths && !(n > 0 && r.tailCover < MUTAV_PROTOCOL.BAD_YEARS_FLOOR);
     var s1;
-    if (r.req.overGuaranteeCap) s1 = '<b>Refused: cover above the per-guarantee cap.</b> Each lease carries <b>' + R(r.req.cover) + '</b> of cover (' + decF.format(state.defaultCover) + ' + ' + decF.format(state.exitCover) + ' × ' + R(state.rent) + ' rent), above max_cover_per_guarantee of <b>' + R(state.maxCoverPerGuarantee) + '</b>, so register_guarantee refuses every lease. Lower the cover per lease or raise the cap.';
+    if (r.req.overGuaranteeCap) s1 = '<b>Refused: cover above the per-guarantee cap.</b> Each lease carries <b>' + R(r.req.cover) + '</b> of cover (' + decF.format(state.defaultCover) + ' + ' + decF.format(state.exitCover) + ' × ' + R(state.rent) + ' rent), above max_cover_per_guarantee of <b>' + RL(state.maxCoverPerGuarantee) + '</b>, so register_guarantee refuses every lease. Lower the cover per lease or raise the cap.';
     else if (n === 0) s1 = 'No leases are on the book: the starting capital of <b>' + R(state.startCapital) + '</b> backs ' + N0(r.capacityAtStart) + ' leases at <b>' + R(rpl) + '</b> of coverage required each (' + cWhy(r) + ').';
     else if (!r.blockedMonths) s1 = 'The <b>' + R(state.startCapital) + '</b> starting reserve covers the ' + N0(n) + '-lease book. At month ' + N + ' coverage required is <b>' + R(r.endRequired) + '</b> (c = ' + decF.format(r.req.c) + ' × ' + R(r.endRemaining) + ' remaining cover) and stable assets are <b>' + R(r.endBalance) + '</b>, free capital <b>' + R(r.endSurplus) + '</b>. No registration is refused' + (r.belowFloorMonths ? ', but the reserve is under-covered in ' + plural(r.belowFloorMonths, 'month', 'months') : '') + '; ' + badYears(r.tailCover) + '.';
-    else s1 = 'The <b>' + R(Math.min(state.startCapital, state.maxTvl)) + '</b> starting reserve backs <b>' + N0(r.capacityAtStart) + ' leases</b> at <b>' + R(rpl) + '</b> each (' + cWhy(r) + '). <b>Refused: ' + esc(REFUSAL[r.firstRefusal]) + '</b> in ' + plural(r.blockedMonths, 'month', 'months') + ' from month ' + r.firstBlocked + ': the book reaches <b>' + N0(n) + ' of ' + N0(r.plannedActive) + '</b> planned leases. Month-' + N + ' stable assets are <b>' + R(r.endBalance) + '</b> against <b>' + R(r.endRequired) + '</b> coverage required; ' + badYears(r.tailCover) + '.';
+    else s1 = 'The <b>' + R(Math.min(state.startCapital, mutavCap(state.maxTvl))) + '</b> starting reserve backs <b>' + N0(r.capacityAtStart) + ' leases</b> at <b>' + R(rpl) + '</b> each (' + cWhy(r) + '). <b>Refused: ' + esc(REFUSAL[r.firstRefusal]) + '</b> in ' + plural(r.blockedMonths, 'month', 'months') + ' from month ' + r.firstBlocked + ': the book reaches <b>' + N0(n) + ' of ' + N0(r.plannedActive) + '</b> planned leases. Month-' + N + ' stable assets are <b>' + R(r.endBalance) + '</b> against <b>' + R(r.endRequired) + '</b> coverage required; ' + badYears(r.tailCover) + '.';
     if (r.tvlRefused > 0) s1 += ' max_tvl (' + R(state.maxTvl) + ') refused <b>' + R(r.tvlRefused) + '</b> of new capital.';
     if (r.claimCapMonths) s1 += ' Claims exceed max_claim_per_period (' + R(state.maxClaimPerPeriod) + ') in ' + plural(r.claimCapMonths, 'month', 'months') + ' from month ' + r.firstClaimCap + ': the excess goes through pay_claim_admin.';
     out.push({ q: '1 · Coverage & safety', c: safe ? 'ok' : 'risk', s: s1 });
@@ -1435,7 +1447,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var T = Math.max(0, state.growthTarget || 0), needT = T * rpl, gapT = needT - r.endBalance, lastGain = r.rows[N - 1].gain;
     var s4 = '';
     if (r.blockedMonths && (r.firstRefusal === 'guarantee-cap' || r.firstRefusal === 'agency-cap')) {
-      s4 = 'New capital does not help: ' + (r.firstRefusal === 'guarantee-cap' ? 'each lease’s cover is above max_cover_per_guarantee. Lower the cover per lease or raise the cap. ' : 'the book reaches max_cover_per_agency (' + R(state.maxCoverPerAgency) + '). Raise the cap; one agency holds the whole book here. ');
+      s4 = 'New capital does not help: ' + (r.firstRefusal === 'guarantee-cap' ? 'each lease’s cover is above max_cover_per_guarantee. Lower the cover per lease or raise the cap. ' : 'the book reaches max_cover_per_agency (' + RL(state.maxCoverPerAgency) + '). Raise the cap; one agency holds the whole book here. ');
     } else if (r.blockedMonths) {
       var lifted = ext(state, { maxTvl: 1e13 });
       var minRaise = mutavMinToAvoidBlocking(lifted, 'monthlyRaise', 1000, 0);
@@ -1445,14 +1457,14 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       var tvlNeed = 0;
       if (isFinite(minRaise)) mutavCompute(ext(lifted, { monthlyRaise: minRaise })).rows.forEach(function(x){ tvlNeed = Math.max(tvlNeed, x.opening); });
       if (isFinite(minStart)) tvlNeed = isFinite(minRaise) ? Math.min(tvlNeed, minStart) : minStart;
-      if (tvlNeed > state.maxTvl + 1) s4 += 'max_tvl must also rise from ' + R(state.maxTvl) + ' to at least <b>' + R(tvlNeed) + '</b>. ';
+      if (tvlNeed > mutavCap(state.maxTvl) + 1) s4 += 'max_tvl must also rise from ' + R(state.maxTvl) + ' to at least <b>' + R(tvlNeed) + '</b>. ';
     } else {
       var extra = r.selfFundedLeases - n;
       s4 = 'With no new capital, the month-' + N + ' stable assets back <b>' + N0(r.selfFundedLeases) + ' leases</b>' + (n > 0 ? ' (' + N0(Math.max(0, extra)) + ' more than the book)' : '') + '. ';
       var perMo = rpl > 0 ? lastGain / rpl : 0;
       s4 += lastGain > 0 ? 'Monthly net gain (' + R(lastGain) + ') funds about <b>' + dec1.format(Math.floor(perMo * 10) / 10) + ' new leases a month</b> on its own; faster growth draws down free capital. ' : 'The reserve is not yet making a monthly net gain, so growth relies on free capital and new capital. ';
     }
-    if (T > 0) s4 += T + ' leases need <b>' + R(needT) + '</b> of coverage required at c = ' + decF.format(r.req.c) + ': ' + (gapT > 0 ? '<b>' + R(gapT) + '</b> more than the month-' + N + ' stable assets' : 'the month-' + N + ' stable assets already cover it') + (needT > state.maxTvl ? ', above max_tvl (' + R(state.maxTvl) + ').' : '.');
+    if (T > 0) s4 += T + ' leases need <b>' + R(needT) + '</b> of coverage required at c = ' + decF.format(r.req.c) + ': ' + (gapT > 0 ? '<b>' + R(gapT) + '</b> more than the month-' + N + ' stable assets' : 'the month-' + N + ' stable assets already cover it') + (needT > mutavCap(state.maxTvl) ? ', above max_tvl (' + R(state.maxTvl) + ').' : '.');
     out.push({ q: '4 · Funding growth', c: r.blockedMonths ? 'risk' : 'ok', s: s4 });
 
     var s5;
@@ -1493,7 +1505,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
       take: { l: 'MUTAV take, ' + N + ' mo', v: R(m.takeTotal), d: R(m.takePerLease) + ' / lease / mo · gross', t: 'MUTAV’s share of guarantee fees (fee_take_bps, at most 30%), before costs and taxes. Never counted in the reserve.' }
     };
     /* hero row: Covered? · What the reserve earns (with vs Selic) · MUTAV take */
-    var startIn = Math.min(state.startCapital, state.maxTvl), raisedIn = r.capitalRaised - startIn;
+    var startIn = Math.min(state.startCapital, mutavCap(state.maxTvl)), raisedIn = r.capitalRaised - startIn;
     var capTxt = 'Capital in ' + R(r.capitalRaised) + ': ' + R(startIn) + ' start' + (raisedIn > 0 ? ' + ' + R(raisedIn) + ' raises' : '') + (r.tvlRefused > 0 ? ', ' + R(r.tvlRefused) + ' refused by max_tvl' : '') + '.';
     var covered = r.endBalance >= r.endRequired;
     document.getElementById('kstripA').innerHTML = '<h2 class="kh" id="kgA">Coverage &amp; capital <span>on-chain model</span></h2>' + heroCard({
@@ -1534,13 +1546,13 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     tiles('yieldKpis', yk);
     renderYieldTable(r);
 
-    var tcCount = r.req.cover > 0 ? Math.floor(state.maxCoverPerAgency / r.req.cover + 1e-9) : Infinity;
+    var tcCount = r.req.cover > 0 ? Math.floor(mutavCap(state.maxCoverPerAgency) / r.req.cover + 1e-9) : Infinity;
     var maxClaimMonth = r.rows.reduce(function(a, x){ return Math.max(a, x.claims); }, 0);
     var rn = 'Cover per lease <b>' + R(r.req.cover) + '</b> (' + decF.format(state.defaultCover) + ' + ' + decF.format(state.exitCover) + ' × rent). Coverage required per lease at ' + esc(cName(r.req.c)) + ': <b>' + R(rpl) + '</b>.';
-    rn += r.req.overGuaranteeCap ? '<br><b>Refused: cover above max_cover_per_guarantee (' + R(state.maxCoverPerGuarantee) + ').</b> Every registration fails.' : '<br>Per guarantee: within ' + R(state.maxCoverPerGuarantee) + '.';
-    rn += ' Per agency (one agency): ' + R(state.maxCoverPerAgency) + ' fits ' + N0(tcCount) + ' leases' + (r.refusals['agency-cap'] ? ', <b>binding</b>.' : ', not binding.');
-    rn += ' max_tvl ' + R(state.maxTvl) + (r.tvlRefused > 0 ? ': <b>' + R(r.tvlRefused) + ' refused</b>.' : '.');
-    rn += '<br>Claims: largest month ' + R(maxClaimMonth) + ' vs ' + R(state.maxClaimPerPeriod) + ' per 31 days' + (r.claimCapMonths ? ', <b>over in ' + plural(r.claimCapMonths, 'month', 'months') + '</b> (pay_claim_admin)' : '') + '. One eviction ' + R(r.largestEvent) + (r.overCallCap ? ' is above max_claim_per_call (' + R(state.maxClaimPerCall) + '): pay_claim_admin.' : ' fits max_claim_per_call (' + R(state.maxClaimPerCall) + ').');
+    rn += r.req.overGuaranteeCap ? '<br><b>Refused: cover above max_cover_per_guarantee (' + R(state.maxCoverPerGuarantee) + ').</b> Every registration fails.' : '<br>Per guarantee: ' + (state.maxCoverPerGuarantee > 0 ? 'within ' + R(state.maxCoverPerGuarantee) : 'no limit') + '.';
+    rn += ' Per agency (one agency): ' + (state.maxCoverPerAgency > 0 ? R(state.maxCoverPerAgency) + ' fits ' + N0(tcCount) + ' leases' + (r.refusals['agency-cap'] ? ', <b>binding</b>.' : ', not binding.') : 'no limit.');
+    rn += ' max_tvl ' + RL(state.maxTvl) + (r.tvlRefused > 0 ? ': <b>' + R(r.tvlRefused) + ' refused</b>.' : '.');
+    rn += '<br>Claims: largest month ' + R(maxClaimMonth) + (state.maxClaimPerPeriod > 0 ? ' vs ' + R(state.maxClaimPerPeriod) + ' per 31 days' : ' (no period limit)') + (r.claimCapMonths ? ', <b>over in ' + plural(r.claimCapMonths, 'month', 'months') + '</b> (pay_claim_admin)' : '') + '. One eviction ' + R(r.largestEvent) + (r.overCallCap ? ' is above max_claim_per_call (' + R(state.maxClaimPerCall) + '): pay_claim_admin.' : state.maxClaimPerCall > 0 ? ' fits max_claim_per_call (' + R(state.maxClaimPerCall) + ').' : ' (no per-call limit).');
     rn += (r.tesouroShareWanted > 0 || state.maxTesouroSharePct > 0 ? ' Adapter asset (what-if): ' + P(r.tesouroShareWanted, 0) + ' wanted, BRS floor ' + P(1 - Math.max(0, Math.min(100, state.maxTesouroSharePct)) / 100, 0) + ' → ' + P(r.tesouroShare, 0) + '.' : ' Assets: BRS only (settlement-token floor 100%).') + ' Fee take ' + P(r.take, 0) + (state.takePct > 30 ? ' (capped at 30%)' : '') + '.';
     if (r.finalActive > 0) rn += '<br>' + badYears(r.tailCover) + '.';
     var sn = r.tesouroShareWanted <= 0 && r.tesouroShare <= 0 ? '<b>BRS only</b> (the pilot): no adapter asset wanted.' : 'Effective split: <b>BRS ' + P(r.brsShare, 0) + ' · adapter asset ' + P(r.tesouroShare, 0) + '</b>. Wanted: BRS ' + P(1 - r.tesouroShareWanted, 0) + ' · adapter asset ' + P(r.tesouroShareWanted, 0) + '.';
@@ -1690,18 +1702,21 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     /* panel 1: stable assets vs coverage required, redemptions, refused registrations */
     var p1 = panel(plot);
     var hasW = r.cumWithdrawals > 0;
-    var max1 = niceMax(Math.max.apply(null, r.rows.map(function(x){ return Math.max(x.balance, x.required); })) * 1.06);
+    var refusedTot = r.rows.reduce(function(a, x){ return a + (x.planned - x.newLeases); }, 0);
+    var planRows = refusedTot > 0 ? mutavCompute(ext(state, { noGate: true })).rows : null;
+    var max1 = niceMax(Math.max.apply(null, r.rows.map(function(x, i){ return Math.max(x.balance, x.required, planRows ? planRows[i].required : 0); })) * (refusedTot > 0 ? 1.16 : 1.06));
     var maxW = hasW ? Math.max.apply(null, r.rows.map(function(x){ return x.withdrawal; })) : 0;
     var lo1 = hasW ? -Math.min(max1 * 0.3, niceMax(maxW * 1.1)) : 0;
     var minBal = Math.min.apply(null, r.rows.map(function(x){ return x.balance; }));
     if (minBal < lo1) lo1 = -niceMax(-minBal * 1.06);
     var y1 = scale(p1, lo1, max1);
-    header(p1, narrow ? 'Stable assets vs coverage req.' : 'Stable assets vs coverage required', R(lastRow.balance) + ' at M' + N + (narrow ? '' : ' · required ' + R(lastRow.required) + ' · free capital ' + R(Math.max(0, lastRow.balance - lastRow.required))));
+    header(p1, narrow ? 'Stable assets vs coverage req.' : 'Stable assets vs coverage required', R(lastRow.balance) + ' at M' + N + (narrow ? '' : ' · required ' + R(lastRow.required) + ' · free capital ' + R(Math.max(0, lastRow.balance - lastRow.required)) + (refusedTot > 0 ? ' · ' + N0(refusedTot) + ' leases refused' : '')));
     axis(y1, 0, max1, 2, lo1 < 0 ? [lo1, 0, max1 / 2, max1] : null);
     r.rows.forEach(function(x, i){ bar(y1, x.balance, i, 'c-bar'); if (x.withdrawal > 0) bar(y1, -x.withdrawal, i, 'c-bar s3', Math.max(2, bw * 0.6)); });
     line(y1, r.rows.map(function(x){ return x.required; }), 'c-req', false, 'c-reqdot');
-    r.rows.forEach(function(x, i){ if (x.blocked) { var ty = p1.t + 2; s += '<path class="c-blk" d="M' + (cx(i) - 5) + ',' + ty + 'H' + (cx(i) + 5) + 'L' + cx(i) + ',' + (ty + 7) + 'Z"><title>Registrations refused in month ' + x.month + ': ' + esc(REFUSAL[x.refusal]) + '</title></path>'; } });
+    r.rows.forEach(function(x, i){ if (x.blocked) { var ty = p1.t + 2, nRef = x.planned - x.newLeases; s += '<g><title>' + N0(nRef) + ' of ' + N0(x.planned) + ' planned leases refused in month ' + x.month + ': ' + esc(REFUSAL[x.refusal]) + '</title><path class="c-blk" d="M' + (cx(i) - 5) + ',' + ty + 'H' + (cx(i) + 5) + 'L' + cx(i) + ',' + (ty + 7) + 'Z"/><text class="c-blkn" x="' + (cx(i) + 8) + '" y="' + (ty + 7) + '">−' + N0(nRef) + '</text></g>'; } });
     document.getElementById('lgW').hidden = !hasW;
+    document.getElementById('lgPlan').hidden = !planRows;
     /* panel 2 */
     var p2 = panel(plotS), gMin = 0, gMax = 0;
     r.rows.forEach(function(x){ gMin = Math.min(gMin, x.cumGain); gMax = Math.max(gMax, x.cumGain, x.cumSelic); });
@@ -1780,7 +1795,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     var x = last.rows[i]; if (!x) return;
     var hov = document.getElementById('hov'); hov.setAttribute('x', geo.L + geo.band * i); hov.style.display = '';
     function rr(a, b){ return '<div class="r"><span>' + a + '</span><span>' + b + '</span></div>'; }
-    tip.innerHTML = '<b>Month ' + x.month + ' · ' + intF.format(x.active) + ' active · ' + intF.format(x.newLeases) + ' registered' + (x.blocked ? ' (refused: ' + esc(REFUSAL[x.refusal]) + ')' : '') + '</b>' +
+    tip.innerHTML = '<b>Month ' + x.month + ' · ' + intF.format(x.active) + ' active · ' + intF.format(x.newLeases) + ' registered' + (x.blocked ? ' · ' + intF.format(x.planned - x.newLeases) + ' refused (' + esc(REFUSAL[x.refusal]) + ')' : '') + '</b>' +
       (x.deposit ? rr('Capital in', R(x.deposit)) : '') + (x.depositRefused ? rr('Refused by max_tvl', R(x.depositRefused)) : '') + rr('Stable assets', R(x.balance)) + rr('Remaining cover', R(x.remaining)) + rr('Coverage required', R(x.required)) + rr('Free capital / shortfall', R(x.headroom)) +
       rr('Net fees', R(x.netFees)) + rr('Claims paid', '−' + R(x.claims)) + rr('Adapter yield', R(x.tesouro)) + rr('Issuer income', R(x.brsIncome)) + rr('Net gain', R(x.gain)) +
       rr('Cumulative gain', R(x.cumGain)) + rr('Same capital at Selic', R(x.cumSelic)) +
@@ -1883,7 +1898,7 @@ if (typeof module !== 'undefined') module.exports = { mutavCompute: mutavCompute
     try {
       var head = ['month','planned_new','guarantees_registered','registrations_refused','refusal','active_guarantees','capital_in','capital_refused_max_tvl','opening_stable_assets','remaining_cover_total','coverage_required','stable_assets','free_capital','stable_minus_coverage_required','guarantee_fees','fee_take','net_fees_to_reserve','claims_paid','claims_over_period_cap','adapter_yield','brs_income','net_gain','redemptions','cumulative_net_gain','cumulative_redemptions','cumulative_fee_take','operating_cost','net_fees_minus_claims','yield_annualized','selic_on_capital','cumulative_selic'];
       var lines = ['# coverage_ratio_bps=' + last.req.cBps + ' starting_capital=' + state.startCapital + ' monthly_raise=' + state.monthlyRaise + ' raise_from=' + state.raiseFrom + ' raise_until=' + (state.raiseUntil > 0 ? state.raiseUntil : last.months) +
-        ' max_tvl=' + state.maxTvl + ' max_cover_per_guarantee=' + state.maxCoverPerGuarantee + ' max_cover_per_agency=' + state.maxCoverPerAgency + ' max_claim_per_call=' + state.maxClaimPerCall + ' max_claim_per_period=' + state.maxClaimPerPeriod + ' stress_buffer=' + state.stressBuffer + ' min_settlement_bps=' + Math.round((100 - state.maxTesouroSharePct) * 100) + ' adapter_share_wanted_pct=' + state.tesouroSharePct + ' adapter_yield_pct=' + state.tesouroPct + ' issuer_income_pct_tvl=' + (last.brsRate * 100).toFixed(4) + ' issuer_tier=' + last.issuer.tier + (last.issuer.flat ? ' issuer_flat=1' : '') + ' issuer_cdi_pct=' + state.issuerCdiPct + ' fee_take_bps=' + Math.round(last.take * 10000), head.join(',')];
+        ' max_tvl=' + (state.maxTvl || 'none') + ' max_cover_per_guarantee=' + (state.maxCoverPerGuarantee || 'none') + ' max_cover_per_agency=' + (state.maxCoverPerAgency || 'none') + ' max_claim_per_call=' + (state.maxClaimPerCall || 'none') + ' max_claim_per_period=' + (state.maxClaimPerPeriod || 'none') + ' stress_buffer=' + state.stressBuffer + ' min_settlement_bps=' + Math.round((100 - state.maxTesouroSharePct) * 100) + ' adapter_share_wanted_pct=' + state.tesouroSharePct + ' adapter_yield_pct=' + state.tesouroPct + ' issuer_income_pct_tvl=' + (last.brsRate * 100).toFixed(4) + ' issuer_tier=' + last.issuer.tier + (last.issuer.flat ? ' issuer_flat=1' : '') + ' issuer_cdi_pct=' + state.issuerCdiPct + ' fee_take_bps=' + Math.round(last.take * 10000), head.join(',')];
       function num(v){ return (Math.round(v * 10000) / 10000).toString(); }
       last.rows.forEach(function(x){
         lines.push([num(x.month), num(x.planned), num(x.newLeases), x.blocked ? 1 : 0, x.refusal || '', num(x.active), num(x.deposit), num(x.depositRefused), num(x.opening), num(x.remaining), num(x.required), num(x.balance), num(x.surplus), num(x.headroom), num(x.gross), num(x.take), num(x.netFees), num(x.claims), x.overClaimCap ? 1 : 0, num(x.tesouro), num(x.brsIncome), num(x.gain), num(x.withdrawal), num(x.cumGain), num(x.cumW), num(x.cumTake), num(x.opCost), num(x.uw), num(x.yieldAnn), num(x.selicOpp), num(x.cumSelic)].join(','));
