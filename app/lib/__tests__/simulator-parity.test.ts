@@ -43,6 +43,8 @@ type Sim = {
   mutavIssuerRate: (p: Params, tvl: number) => { rate: number; tier: number; flat: boolean; pctOfCdi: number };
   mutavCompute: (p: Params) => Result;
   MUTAV_DEFAULTS: Params;
+  MUTAV_DEVNET_CAPS: Record<"maxTvl" | "maxCoverPerGuarantee" | "maxCoverPerAgency" | "maxClaimPerCall" | "maxClaimPerPeriod", number>;
+  mutavCap: (v: number) => number;
   MUTAV_PROTOCOL: { MIN_COVERAGE_RATIO_BPS: number; MAX_FEE_TAKE_BPS: number };
 };
 
@@ -154,7 +156,7 @@ describe("simulator ↔ client coverage maths", () => {
   });
 });
 
-describe("simulator defaults = the devnet config", () => {
+describe("simulator defaults and the devnet config", () => {
   // Read from the devnet config the deploy uses, so the simulator can't drift from it.
   const BRL = 1_000_000;
   const cfg = JSON.parse(readFileSync(fileURLToPath(new URL("../../../scripts/devnet/devnet.example.json", import.meta.url)), "utf8"));
@@ -171,18 +173,35 @@ describe("simulator defaults = the devnet config", () => {
   };
   const d = sim.MUTAV_DEFAULTS;
 
-  it("pins c and every cap the simulator enforces", () => {
+  it("pins c and the stress buffer to devnet, and the Devnet caps scenario to every devnet cap", () => {
     expect(sim.mutavCoverageBps(d.coverageRatio as number)).toBe(devnet.coverageRatioBps);
-    expect((d.maxTvl as number) * BRL).toBe(devnet.caps.maxTvl);
-    expect((d.maxCoverPerGuarantee as number) * BRL).toBe(devnet.caps.maxCoverPerGuarantee);
-    expect((d.maxClaimPerCall as number) * BRL).toBe(devnet.caps.maxClaimPerCall);
-    expect((d.maxClaimPerPeriod as number) * BRL).toBe(devnet.caps.maxClaimPerPeriod);
+    const caps = sim.MUTAV_DEVNET_CAPS;
+    expect(caps.maxTvl * BRL).toBe(devnet.caps.maxTvl);
+    expect(caps.maxCoverPerGuarantee * BRL).toBe(devnet.caps.maxCoverPerGuarantee);
+    expect(caps.maxClaimPerCall * BRL).toBe(devnet.caps.maxClaimPerCall);
+    expect(caps.maxClaimPerPeriod * BRL).toBe(devnet.caps.maxClaimPerPeriod);
     expect((d.stressBuffer as number) * BRL).toBe(devnet.caps.stressBuffer);
     // TODO(PR 3): the simulator still models a per-agency cap and a settlement floor; the program has
     // neither since ADR 0019 (the pilot holds BRS only, so the floor is 100%).
     expect(Math.round((100 - (d.maxTesouroSharePct as number)) * 100)).toBe(10_000);
     expect(sim.MUTAV_PROTOCOL.MAX_FEE_TAKE_BPS).toBe(devnet.feeTakeBpsMax);
     expect((d.takePct as number) * 100).toBeLessThanOrEqual(devnet.feeTakeBpsMax);
+  });
+
+  it("leaves the caps off by default (0 = no limit)", () => {
+    for (const k of ["maxTvl", "maxCoverPerGuarantee", "maxCoverPerAgency", "maxClaimPerCall", "maxClaimPerPeriod"]) expect(d[k]).toBe(0);
+    expect(sim.mutavCap(0)).toBe(Infinity);
+    expect(sim.mutavCap(1_000_000)).toBe(1_000_000);
+    const r = sim.mutavCompute({ ...d, startCapital: 50_000_000, perMonth: 2_000 });
+    expect(r.tvlRefused).toBe(0);
+    expect(r.claimCapMonths).toBe(0);
+    expect(r.firstRefusal).toBe("free-capital");
+  });
+
+  it("noGate registers every planned lease (the chart's 'coverage the planned book needs')", () => {
+    const r = sim.mutavCompute({ ...d, noGate: true });
+    expect(r.blockedMonths).toBe(0);
+    expect(r.finalActive).toBe(r.plannedActive);
   });
 });
 
@@ -194,9 +213,9 @@ describe("simulator Default (02 inputs on the devnet config)", () => {
     expect(r.firstRefusal).toBe("free-capital");
   });
 
-  it("max_tvl (R$1M) backs about 101 working-product leases at c = 0.25", () => {
+  it("the devnet max_tvl (R$1M) backs about 101 working-product leases at c = 0.25", () => {
     const d = sim.MUTAV_DEFAULTS;
-    expect(sim.mutavLeasesBacked(d.maxTvl as number, 39_600, sim.mutavCoverageBps(d.coverageRatio as number))).toBe(101);
+    expect(sim.mutavLeasesBacked(sim.MUTAV_DEVNET_CAPS.maxTvl, 39_600, sim.mutavCoverageBps(d.coverageRatio as number))).toBe(101);
   });
 });
 
@@ -212,25 +231,35 @@ describe("simulator on the pilot", () => {
     expect(PILOT).toMatchObject({
       perMonth: 17, months: 6, growthTarget: 102, feePct: 12, rent: 2200, defaultCover: 12, exitCover: 6,
       coverageRatio: 0.25, startCapital: 120_000, monthlyRaise: 170_000, raiseFrom: 2,
-      maxTvl: 1_000_000, maxCoverPerGuarantee: 120_000, maxClaimPerCall: 15_000, maxClaimPerPeriod: 20_000,
-      maxTesouroSharePct: 0, withdraw: "buffer",
+      stressBuffer: 19_000, maxTesouroSharePct: 0, withdraw: "buffer",
     });
+    // no pilot ceiling: the caps come from the defaults (off) unless the Devnet caps scenario sets them
+    expect(PILOT).not.toHaveProperty("maxTvl");
   });
 
-  it("reaches the R$1M cap in month 6 on the path (97 leases) and runs the conservative 30-lease variant", () => {
+  it("passes R$1M in month 6 on the path (97 leases) and runs the conservative 30-lease variant", () => {
     const rec = pilot();
     expect(rec.capacityAtStart).toBe(12);
     expect(rec.rows[0].active).toBe(12); // month 1 is capital-bound: the start backs 12 of the 17
     expect(rec.rows[4].balance).toBeLessThan(1_000_000);
     expect(rec.rows[5].balance).toBeGreaterThanOrEqual(1_000_000);
     expect(rec.finalActive).toBe(97);
-    expect(rec.tvlRefused).toBeGreaterThan(0); // the last raise is refused at max_tvl
+    expect(rec.tvlRefused).toBe(0); // no max_tvl by default
+    expect(rec.capitalRaised).toBe(970_000);
     expect(rec.cumWithdrawals).toBe(0);
     expect(rec.claimCapMonths).toBe(0);
     const cons = pilot({ coverageRatio: 0.5, perMonth: 5, growthTarget: 30, monthlyRaise: 100_000 });
     expect(cons.capacityAtStart).toBe(6);
     expect(cons.finalActive).toBe(30);
     expect(cons.blockedMonths).toBe(0);
+  });
+
+  it("with the devnet caps on, the R$1M max_tvl refuses part of the last raise (97 leases)", () => {
+    const capped = pilot(sim.MUTAV_DEVNET_CAPS);
+    expect(capped.finalActive).toBe(97);
+    expect(capped.tvlRefused).toBeGreaterThan(0);
+    expect(capped.capitalRaised).toBeLessThan(1_000_000);
+    expect(capped.rows[5].balance).toBeGreaterThanOrEqual(1_000_000);
   });
 
   it("drops to 3 leases at full backing (c = 1.0); the raises take it to 25", () => {
@@ -240,9 +269,10 @@ describe("simulator on the pilot", () => {
     expect(full.firstRefusal).toBe("free-capital");
   });
 
-  it("stalls at 101 leases at 28 a month (Scale to 170)", () => {
+  it("stalls at 103 leases at 28 a month (Scale to 170), 101 with the devnet max_tvl", () => {
     const r = pilot({ perMonth: 28 });
-    expect(r.finalActive).toBe(101);
+    expect(r.finalActive).toBe(103);
+    expect(pilot({ perMonth: 28, ...sim.MUTAV_DEVNET_CAPS }).finalActive).toBe(101);
     expect(r.firstRefusal).toBe("free-capital");
     expect(sim.mutavCoverageRequired(170 * 39_600 * BRL_UNITS, 2_500, 0) / BRL_UNITS).toBe(1_683_000);
   });
