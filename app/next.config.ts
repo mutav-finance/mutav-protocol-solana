@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { NextConfig } from "next";
-import { inlineScriptHashes, SAFE_HEADERS } from "./lib/security-headers";
+import { inlineScriptHashes, SAFE_HEADERS, STATIC_CSP, UNPROXIED_SOURCES } from "./lib/security-headers";
 
 // The static simulator's inline scripts, hashed at build time for the
-// report-only CSP (proxy.ts), so they never go stale when the page changes.
+// enforced CSP (proxy.ts), so they never go stale when the page changes.
 const simulatorHashes = (() => {
   try {
     return inlineScriptHashes(readFileSync(join(process.cwd(), "public", "simulator.html"), "utf8")).join(" ");
@@ -23,9 +23,14 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: "/simulator", destination: "/simulator.html" }];
   },
-  // A6: enforced on every response (pages, API routes, static files).
+  // A6: enforced on every response (pages, API routes, static files). The
+  // CSP: proxy.ts sends the full nonce CSP on pages; the paths it skips get
+  // `frame-ancestors 'none'` here, and only those (see lib/security-headers.ts).
   async headers() {
-    return [{ source: "/:path*", headers: SAFE_HEADERS }];
+    return [
+      { source: "/:path*", headers: SAFE_HEADERS },
+      ...UNPROXIED_SOURCES.map((source) => ({ source, headers: [STATIC_CSP] })),
+    ];
   },
 };
 

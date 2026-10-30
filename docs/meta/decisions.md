@@ -182,6 +182,7 @@ The pilot parameters of [ADR 0028](../decisions/0028-pilot-parameters.md) (2026-
 | Reads use the public devnet RPC with short CDN caching | 2026-10-09 | No private RPC key in the app | [app spec](../../app/docs/spec.md) |
 | The admin screen scans every live Squads proposal and can reject or cancel them | 2026-10-09 | Signers see every pending change, not only the latest | [app spec](../../app/docs/spec.md) |
 | Safe response headers now; a full CSP header in report-only mode, enforced after the demo | 2026-10-09 | Protects the pages without breaking the demo | [app spec](../../app/docs/spec.md) |
+| Enforce the full nonce CSP on every page (audit #2, A-R3-1) | 2026-10-30 | Report-only blocked nothing, and the scripts carried no nonce | [app spec](../../app/docs/spec.md) |
 | An operator-activity feed (registers, closes, filings, amendments, payments and reinstatements in the last 24 hours) on the reserve or admin page | 2026-10-09 | Early detection of unexpected operator actions | [app spec](../../app/docs/spec.md) |
 
 ## Related sections

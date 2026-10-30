@@ -284,6 +284,40 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
     await noBannedWords(page);
   });
 
+  test("CSP is enforced: every served script carries the per-request nonce, no violations (A-R3-1)", async ({ page, request }) => {
+    const routes = ["/reserve", "/reserve/coverage", "/admin", "/operator", "/capital", "/simulator"];
+    for (const route of routes) {
+      const res = await request.get(route);
+      expect([route, res.status()]).toEqual([route, 200]);
+      const h = res.headers();
+      expect([route, h["content-security-policy-report-only"]]).toEqual([route, undefined]);
+      const csp = h["content-security-policy"] ?? "";
+      expect(csp).toMatch(/frame-ancestors 'none'/);
+      const html = await res.text();
+      const tags = html.match(/<script\b[^>]*>/gi) ?? [];
+      expect(tags.length).toBeGreaterThan(0);
+      if (route === "/simulator") {
+        // Static page: no nonce; its inline scripts are allowed by hash.
+        expect(csp).toMatch(/'sha256-/);
+        continue;
+      }
+      const nonce = csp.match(/'nonce-([^']+)'/)?.[1];
+      expect([route, nonce]).not.toEqual([route, undefined]);
+      expect([route, tags.filter((t) => !t.includes(`nonce="${nonce}"`))]).toEqual([route, []]);
+      expect(html).not.toContain('"nonce":"$undefined"');
+    }
+    // The browser enforces it: no violation on load.
+    await page.addInitScript(() => {
+      (window as unknown as { __csp: string[] }).__csp = [];
+      document.addEventListener("securitypolicyviolation", (e) => (window as unknown as { __csp: string[] }).__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+    });
+    for (const route of routes) {
+      await page.goto(route);
+      await page.waitForLoadState("networkidle");
+      expect([route, await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp)]).toEqual([route, []]);
+    }
+  });
+
   test("API refuses to relay an unsigned or foreign transaction", async ({ request }) => {
     const res = await request.post("/api/tx/send", { data: { tx: "AA==" } });
     expect(res.status()).toBeGreaterThanOrEqual(400);

@@ -91,7 +91,7 @@ For Squads members. A sticky in-page nav (General controls · Money in & out · 
 
 - Every route checks the RPC's genesis hash against the cluster (mainnet refused); errors cut URLs to their host.
 - Read routes: CDN `s-maxage=3, stale-while-revalidate=10`, and an in-process cache (3 s; 1 s for a `?fresh=` read after a transaction).
-- Every response: `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`. Pages: a nonce CSP in report-only mode (`proxy.ts`), enforced after the demo.
+- Every response: `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`. Pages: an enforced nonce CSP (`proxy.ts`, `lib/csp.ts`): a per-request nonce on every script, hashes for the static simulator, `connect-src 'self'`, `frame-ancestors 'none'`; the paths the proxy skips get `frame-ancestors 'none'` alone. Enforced since audit #2 (A-R3-1); no violation-report endpoint.
 - A Vercel WAF rate limit is staged in `docs/waf-rule.md`, applied only once confirmed.
 
 ## Seed scenario
