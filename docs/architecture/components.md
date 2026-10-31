@@ -110,7 +110,7 @@ A typical integration reads with `fetchReserve`, previews with the math mirror, 
 - **No keys.** The server composes unsigned transactions. On devnet the connected wallet signs and sends through its own RPC. The relay never signs and accepts only the pilot's programs and the configured multisig.
 - **Read the chain.** Every number comes from on-chain accounts through the client. Previews are labelled as previews.
 - **Cluster by environment.** `localnet` or `devnet`, checked by genesis hash. Mainnet is refused.
-- **Headers.** Clickjacking, sniffing and referrer protections are on. A full content security header runs in report-only mode first.
+- **Headers.** Clickjacking, sniffing and referrer protections are on. A full content security header (CSP) is enforced on every page: only scripts carrying the per-request nonce (or the simulator's known hashes) run.
 
 ## Scripts
 
