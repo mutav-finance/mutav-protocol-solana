@@ -285,10 +285,11 @@ test.describe("smoke: every route renders against a seeded localnet", () => {
   });
 
   test("CSP is enforced: every served script carries the per-request nonce, no violations (A-R3-1)", async ({ page, request }) => {
-    const routes = ["/reserve", "/reserve/coverage", "/admin", "/operator", "/capital", "/simulator"];
+    const tabs = ["coverage", "claims", "capital", "risks", "verify", "accounts", "queue", "flows", "disclosures"].map((t) => `/reserve/${t}`);
+    const routes = ["/reserve", ...tabs, "/admin", "/operator", "/capital", "/simulator", "/no-such-page"];
     for (const route of routes) {
       const res = await request.get(route);
-      expect([route, res.status()]).toEqual([route, 200]);
+      expect([route, res.status()]).toEqual([route, route === "/no-such-page" ? 404 : 200]);
       const h = res.headers();
       expect([route, h["content-security-policy-report-only"]]).toEqual([route, undefined]);
       const csp = h["content-security-policy"] ?? "";

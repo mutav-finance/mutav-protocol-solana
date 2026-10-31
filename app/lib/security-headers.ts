@@ -7,7 +7,8 @@
  *   - pages and public files (proxy.ts): the full CSP (lib/csp.ts), a
  *     per-request nonce for the app's scripts plus the hashes of the static
  *     simulator's inline scripts (A-R3-1, audit #2);
- *   - the paths the proxy skips (UNPROXIED_SOURCES): `frame-ancestors 'none'`.
+ *   - the paths the proxy skips (UNPROXIED_SOURCES) and the prefetch
+ *     requests it skips (PREFETCH_REQUESTS): `frame-ancestors 'none'`.
  *   Never send the static one on a proxied path: Next takes the nonce from
  *   the request's `content-security-policy`, and a nonce-less one there
  *   strips the nonce from every script.
@@ -28,6 +29,12 @@ export const STATIC_CSP = { key: "Content-Security-Policy", value: "frame-ancest
 
 /** next.config.ts `headers()` sources for the paths proxy.ts's matcher excludes. Keep in step with it. */
 export const UNPROXIED_SOURCES = ["/api/:path*", "/_next/static/:path*", "/_next/image/:path*", "/favicon.ico", "/brand/:path*"];
+
+/** The prefetch requests proxy.ts's matcher skips (its `missing` list), as next.config.ts `has` conditions. Keep in step with it. */
+export const PREFETCH_REQUESTS: { type: "header"; key: string; value?: string }[] = [
+  { type: "header", key: "next-router-prefetch" },
+  { type: "header", key: "purpose", value: "prefetch" },
+];
 
 /** `'sha256-…'` sources for every inline <script> body in an HTML page (no src attribute). */
 export function inlineScriptHashes(html: string): string[] {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { config as proxyConfig, CSP_HEADER, proxy } from "../../proxy";
 import { contentSecurityPolicy } from "../csp";
-import { inlineScriptHashes, SAFE_HEADERS, STATIC_CSP, UNPROXIED_SOURCES } from "../security-headers";
+import { inlineScriptHashes, PREFETCH_REQUESTS, SAFE_HEADERS, STATIC_CSP, UNPROXIED_SOURCES } from "../security-headers";
 import { READ_CACHE } from "../server/respond";
 import { vi } from "vitest";
 
@@ -29,7 +29,9 @@ describe("A6 headers", () => {
   });
   it("sends the full CSP ENFORCED, with the same nonce on the request Next reads (A-R3-1)", () => {
     // A nonce-less client CSP must not win: Next prefers the request's content-security-policy.
-    const req = new NextRequest("http://localhost/reserve", { headers: { "content-security-policy": "frame-ancestors 'none'" } });
+    const req = new NextRequest("http://localhost/reserve", {
+      headers: { "content-security-policy": "frame-ancestors 'none'", "content-security-policy-report-only": "default-src 'self'" },
+    });
     const res = proxy(req);
     expect(CSP_HEADER).toBe("Content-Security-Policy");
     const csp = res.headers.get("content-security-policy") ?? "";
@@ -51,6 +53,8 @@ describe("A6 headers", () => {
     expect(skipped.length).toBeGreaterThan(0);
     const prefixes = UNPROXIED_SOURCES.map((s) => s.replace(/^\//, "").replace(/\/:path\*$/, ""));
     expect(prefixes.sort()).toEqual([...skipped].sort());
+    // The prefetch requests it skips get the static CSP too.
+    expect(PREFETCH_REQUESTS).toEqual(proxyConfig.matcher[0]!.missing);
   });
   it("hashes inline scripts only", () => {
     const hashes = inlineScriptHashes(`<script>alert(1)</script><script src="/x.js"></script><script id="calc">var a</script>`);
