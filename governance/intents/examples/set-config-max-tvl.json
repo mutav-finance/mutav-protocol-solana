@@ -1,0 +1,31 @@
+{
+  "version": "mutav-proposal-intent/v1",
+  "cluster": "localnet",
+  "multisig": "5842jNQd5C7pWXFxcDu3kQ5XtgqH5st25tf2ZBjYaKg8",
+  "index": 5,
+  "title": "EXAMPLE ONLY: lower caps.max_tvl to R$5,000 (set_config, one param)",
+  "notes": "Documentation example (docs/security/verify-proposal.md). The multisig and accounts are placeholder addresses and the index is not a real proposal. A real intent lives at governance/intents/<cluster>/<first 8 chars of the multisig>/<index>.json and carries the real config, state, treasury, payments and event-authority accounts as the verifier prints them.",
+  "minTimeLockSecs": 300,
+  "transaction": {
+    "kind": "vault",
+    "vaultIndex": 0,
+    "instructions": [
+      {
+        "program": "mutav",
+        "name": "set_config",
+        "args": {
+          "params": [{ "__kind": "MaxTvl", "fields": ["5000000000"] }]
+        },
+        "accounts": {
+          "admin": "$vault",
+          "config": "5ByKsfsdfVR3ecWU3XDy3GrJ8r3UkwZqeJKgcZn9Kezq",
+          "state": "5Ftd1yLeFniGnhkyUpYtL9d4P1FgS1FfChzLfwpk4zKY",
+          "treasuryAccount": "5KovAGoer61Vvo1Uv7sod2PpdATt74wUm7ezjKsLpKeF",
+          "paymentsAccount": "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+          "eventAuthority": "5TeWSsjg2gbxCyWVniXeCmwM7UtHTCK7svzJr5xYJzHf",
+          "program": "8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9"
+        }
+      }
+    ]
+  }
+}

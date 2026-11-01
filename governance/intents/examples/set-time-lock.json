@@ -1,0 +1,12 @@
+{
+  "version": "mutav-proposal-intent/v1",
+  "cluster": "localnet",
+  "multisig": "5842jNQd5C7pWXFxcDu3kQ5XtgqH5st25tf2ZBjYaKg8",
+  "index": 6,
+  "title": "EXAMPLE ONLY: raise the admin multisig time lock to 24 hours (Squads config transaction)",
+  "notes": "Documentation example (docs/security/verify-proposal.md). Placeholder multisig, not a real index. A config transaction changes the multisig itself; every action is flagged critical.",
+  "transaction": {
+    "kind": "config",
+    "actions": [{ "name": "SetTimeLock", "args": { "newTimeLock": 86400 } }]
+  }
+}
