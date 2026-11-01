@@ -58,13 +58,16 @@ describe('MUTAV (Codama client)', () => {
     expect(d.risks[0]!.level).toBe('critical');
   });
 
-  test('trailing data or an unknown discriminator is raw', () => {
+  test('trailing data or an unknown discriminator is raw and fatal (never pinnable)', () => {
     const ix = getProposeAdminInstruction({ admin: createNoopSigner(VAULT), config: A, eventAuthority: B, program: MUTAV_PROGRAM_ADDRESS, key: C });
     const extra = roundTrip({ ...ix, data: new Uint8Array([...ix.data, 0]) });
     expect(extra.family).toBe('raw');
     expect(extra.error).toContain('trailing');
+    expect(extra.fatal).toContain('malformed instruction for a known program');
+    expect(extra.unknownTag).toBeUndefined();
     const unknown = roundTrip({ ...ix, data: new Uint8Array(16) });
     expect(unknown.family).toBe('raw');
+    expect(unknown.fatal).toContain('malformed instruction for a known program');
   });
 });
 
@@ -99,9 +102,19 @@ describe('BPF Loader Upgradeable', () => {
     expect(d.args).toMatchObject({ offset: 16, length: 3 });
   });
 
-  test('an unknown tag or short accounts is raw', () => {
-    expect(roundTrip({ programAddress: BPF_LOADER_UPGRADEABLE, accounts: [], data: new Uint8Array(le(42, 4)) }).family).toBe('raw');
-    expect(roundTrip({ programAddress: BPF_LOADER_UPGRADEABLE, accounts: [w(A)], data: new Uint8Array(le(3, 4)) }).error).toContain('at least 7');
+  test('an unknown tag, short accounts or a trailing byte is raw and fatal', async () => {
+    const tag = roundTrip({ programAddress: BPF_LOADER_UPGRADEABLE, accounts: [], data: new Uint8Array(le(42, 4)) });
+    expect(tag.family).toBe('raw');
+    expect(tag.fatal).toContain('malformed instruction for a known program');
+    expect(tag.unknownTag).toBeUndefined();
+    const short = roundTrip({ programAddress: BPF_LOADER_UPGRADEABLE, accounts: [w(A)], data: new Uint8Array(le(3, 4)) });
+    expect(short.error).toContain('at least 7');
+    expect(short.fatal).toBeDefined();
+    // bincode allow_trailing_bytes: the runtime runs this as a plain Upgrade.
+    const up = (await composeUpgrade({ programId: A, buffer: B, vault: VAULT, spill: VAULT, soLen: 100, programDataLen: 145 })).find((ix) => ix.data![0] === 3);
+    const padded = roundTrip({ ...up!, data: new Uint8Array([...up!.data!, 0]) });
+    expect(padded.family).toBe('raw');
+    expect(padded.fatal).toContain('malformed instruction for a known program');
   });
 });
 
@@ -126,6 +139,18 @@ describe('System', () => {
     const d = roundTrip({ programAddress: SYSTEM_PROGRAM, accounts, data: new Uint8Array(data as number[]) });
     expect(d.name).toBe(name as string);
     expect(d.fatal).toContain('durable nonce');
+  });
+  test('a decoded kind with a trailing byte is fatal; an undecoded kind is raw and pinnable', () => {
+    const padded = roundTrip({ programAddress: SYSTEM_PROGRAM, accounts: [ws(VAULT), w(A)], data: new Uint8Array([...le(2, 4), ...le(1, 8), 0]) });
+    expect(padded.family).toBe('raw');
+    expect(padded.fatal).toContain('malformed instruction for a known program');
+    // CreateAccountWithSeed (3) is not decoded.
+    const seed = roundTrip({ programAddress: SYSTEM_PROGRAM, accounts: [ws(VAULT), w(A)], data: new Uint8Array([...le(3, 4), 1, 2, 3]) });
+    expect(seed).toMatchObject({ family: 'raw', unknownTag: true });
+    expect(seed.fatal).toBeUndefined();
+    const mint = roundTrip({ programAddress: TOKEN_PROGRAM, accounts: [w(A)], data: new Uint8Array([0, 6]) });
+    expect(mint).toMatchObject({ family: 'raw', unknownTag: true });
+    expect(roundTrip({ programAddress: SYSTEM_PROGRAM, accounts: [], data: new Uint8Array([2, 0]) }).fatal).toBeDefined(); // tag unreadable
   });
   test('a nonce instruction stays fatal when its accounts do not decode', () => {
     const d = roundTrip({ programAddress: SYSTEM_PROGRAM, accounts: [], data: new Uint8Array(le(4, 4)) });
@@ -159,7 +184,9 @@ describe('SPL Token, Token-2022, ATA, Compute Budget', () => {
   test('Compute Budget', () => {
     expect(roundTrip({ programAddress: COMPUTE_BUDGET_PROGRAM, data: new Uint8Array([2, ...le(400_000, 4)]) })).toMatchObject({ name: 'SetComputeUnitLimit', args: { units: 400000 } });
     expect(roundTrip({ programAddress: COMPUTE_BUDGET_PROGRAM, data: new Uint8Array([3, ...le(5, 8)]) }).args).toEqual({ microLamports: '5' });
-    expect(roundTrip({ programAddress: COMPUTE_BUDGET_PROGRAM, data: new Uint8Array([2, 1]) }).family).toBe('raw');
+    const short = roundTrip({ programAddress: COMPUTE_BUDGET_PROGRAM, data: new Uint8Array([2, 1]) });
+    expect(short.family).toBe('raw');
+    expect(short.fatal).toBeDefined();
   });
 });
 

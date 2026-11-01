@@ -11,12 +11,15 @@
  * - the buffer's program bytes hash (solana-verify style, trailing zeros
  *   trimmed) to the intent's `expectedHash` AND to the member's own
  *   reproducible build (`--so`);
+ * - every BPF Loader Upgradeable instruction (selected by program id, not by
+ *   decoded family) decoded cleanly: a padded or otherwise malformed one is
+ *   refused, so it cannot slip past these checks as a raw instruction;
  * - the buffer's program bytes contain the 32 bytes of the target program
  *   ID (`declare_id!` embeds them; S14), so the upgrade cannot brick the
  *   program with `DeclaredProgramIdMismatch`.
  */
 import { getAddressEncoder, type Address } from '@solana/kit';
-import { programDataAddress } from '../../devnet/lib/compose';
+import { BPF_LOADER_UPGRADEABLE, programDataAddress } from '../../devnet/lib/compose';
 import { BUFFER_HEADER, executableHash } from '../../devnet/lib/hash';
 import { checkUpgradeSources } from '../upgrade-proposal';
 import type { DecodedInstruction } from './decode';
@@ -51,10 +54,11 @@ const acct = (ix: DecodedInstruction, name: string) => ix.accounts.find((a) => a
 /** The instruction-level checks: which accounts the loader instructions name. */
 export async function checkUpgradeInstructions(ixs: DecodedInstruction[], u: Upgrade | undefined, vault: Address): Promise<string[]> {
   const out: string[] = [];
-  const loader = ixs.filter((x) => x.family === 'loader');
-  const ups = loader.filter((x) => x.name === 'Upgrade');
-  if (!ups.length) return u ? ['the intent describes an upgrade, but the transaction holds no loader Upgrade'] : [];
-  if (!u) return ['the transaction upgrades a program, but the intent has no "upgrade" block'];
+  const loader = ixs.filter((x) => x.programId === BPF_LOADER_UPGRADEABLE);
+  for (const x of loader) if (x.family !== 'loader') out.push(`a BPF Loader Upgradeable instruction does not decode cleanly (${x.error ?? 'not decoded'}): refused`);
+  const ups = loader.filter((x) => x.family === 'loader' && x.name === 'Upgrade');
+  if (!ups.length) return u ? [...out, 'the intent describes an upgrade, but the transaction holds no loader Upgrade'] : out;
+  if (!u) return [...out, 'the transaction upgrades a program, but the intent has no "upgrade" block'];
   if (ups.length > 1) out.push(`the transaction holds ${ups.length} loader Upgrade instructions; one is allowed`);
   for (const x of loader) {
     if (['SetAuthority', 'SetAuthorityChecked', 'Close'].includes(x.name)) out.push(`loader ${x.name} beside an Upgrade is refused (audit S9)`);

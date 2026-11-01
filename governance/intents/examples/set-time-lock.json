@@ -4,7 +4,8 @@
   "multisig": "5842jNQd5C7pWXFxcDu3kQ5XtgqH5st25tf2ZBjYaKg8",
   "index": 6,
   "title": "EXAMPLE ONLY: raise the admin multisig time lock to 24 hours (Squads config transaction)",
-  "notes": "Documentation example (docs/security/verify-proposal.md). Placeholder multisig, not a real index. A config transaction changes the multisig itself; every action is flagged critical.",
+  "notes": "Documentation example (docs/security/verify-proposal.md). Placeholder multisig, not a real index. A config transaction changes the multisig itself; every action is flagged critical. minTimeLockSecs is the admin multisig floor on localnet and devnet (300 s, ADR 0020; the upgrade multisig floor is 3600 s; the pilot floors are 24 h admin and 7 d upgrade): the multisig's current time lock and the new value must both be at or above it.",
+  "minTimeLockSecs": 300,
   "transaction": {
     "kind": "config",
     "actions": [{ "name": "SetTimeLock", "args": { "newTimeLock": 86400 } }]

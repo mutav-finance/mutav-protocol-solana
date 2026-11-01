@@ -7,13 +7,13 @@ import { BPF_LOADER_UPGRADEABLE, programDataAddress, SYSTEM_PROGRAM } from '../d
 import { DEVNET_GENESIS, MAINNET_GENESIS } from '../devnet/lib/cluster';
 import { BUFFER_HEADER, executableHash } from '../devnet/lib/hash';
 import { squadsVaultAddress, SQUADS_V4_PROGRAM } from '../devnet/lib/squads';
-import { sha256Hex, type DecodedInstruction } from '../release/lib/decode';
-import { compareVault, intentPath, parseIntent } from '../release/lib/intent';
+import { decodeInstruction, resolveMessage, sha256Hex, type DecodedInstruction } from '../release/lib/decode';
+import { compareVault, intentPath, parseIntent, type Intent } from '../release/lib/intent';
 import { squadsProposalAddress, squadsTransactionAddress, type ConfigAction, type VaultTransactionMessage } from '../release/lib/squads-tx';
 import type { Account } from '../release/lib/upgrade-check';
 import { containsBytes } from '../release/lib/upgrade-check';
 import { composeUpgrade } from '../release/upgrade-proposal';
-import { main, parseIndex, type VerifyDeps } from '../release/verify-proposal';
+import { main, parseIndex, verify, type VerifyDeps } from '../release/verify-proposal';
 import { multisigBytes, programData, testAddress } from './fixtures';
 import { compileMessage, configTransactionBytes, proposalBytes, vaultTransactionBytes } from './squads-tx-fixtures';
 
@@ -184,6 +184,75 @@ describe('vault transactions', () => {
     expect((await run(intent, { tx })).out).toContain('data sha256');
   });
 
+  /** Pads one instruction with a trailing byte (the runtime ignores it) and pins it raw, bypassing parseIntent. */
+  async function paddedRaw(ix: Instruction) {
+    const vault = await squadsVaultAddress(MS, 0);
+    const padded: Instruction = { ...ix, data: new Uint8Array([...ix.data!, 0]) };
+    const tx = await vaultTx([padded]);
+    const [d] = resolveMessage(compileMessage(vault, [padded])).map((r) => decodeInstruction(r));
+    const entry = {
+      program: 'raw' as const,
+      programId: ix.programAddress,
+      dataSha256: sha256Hex(new Uint8Array(padded.data!)),
+      reason: 'padded',
+      accounts: d!.accounts.map((a) => ({ address: a.address === vault ? '$vault' : a.address, signer: a.signer, writable: a.writable })),
+    };
+    return { tx, entry, d: d! };
+  }
+  const intentObj = (instructions: unknown[]): Intent =>
+    ({ version: 'mutav-proposal-intent/v1', cluster: 'localnet', multisig: MS, index: 5n, title: 't', mutavProgramId: address('8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9'), minTimeLockSecs: 300, transaction: { kind: 'vault', vaultIndex: 0, ephemeralSigners: 0, instructions } }) as Intent;
+  const reader = async (tx: Uint8Array) => {
+    const reads = new Map<string, Account>([
+      [MS, { owner: SQUADS_V4_PROGRAM, data: multisigBytes({ timeLock: 600 }) }],
+      [await squadsTransactionAddress(MS, 5n), { owner: SQUADS_V4_PROGRAM, data: tx }],
+    ]);
+    return async (a: Address) => reads.get(a) ?? null;
+  };
+
+  test('a loader Upgrade with one trailing byte fails even when a raw entry pins it', async () => {
+    const vault = await squadsVaultAddress(MS, 0);
+    const up = (await composeUpgrade({ programId: address('8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9'), buffer: testAddress(80), vault, spill: vault, soLen: 100, programDataLen: 145 })).find((ix) => ix.data![0] === 3)!;
+    const { tx, entry, d } = await paddedRaw(up);
+    expect(d.fatal).toContain('malformed instruction for a known program');
+    expect(compareVault([entry], [d], vault).join()).toContain('cannot be pinned raw');
+    const r = await verify({ intent: intentObj([entry]), multisig: MS, index: 5n, read: await reader(tx) });
+    expect(r.failures.join('\n')).toContain('malformed instruction for a known program');
+    expect(r.failures.join('\n')).toContain('BPF Loader Upgradeable instruction does not decode cleanly');
+    expect(r.lines.join('\n')).toContain('MALFORMED INSTRUCTION FOR A KNOWN PROGRAM');
+    // Through the CLI the raw loader entry is refused when the intent is read.
+    const cli = await run({ ...example('set-config-max-tvl.json'), transaction: { kind: 'vault', vaultIndex: 0, instructions: [entry] } }, { tx });
+    expect(cli.code).toBe(2);
+    expect(cli.out).toContain('must be named, never listed raw');
+  });
+
+  test('a MUTAV set_config with one trailing byte fails even when a raw entry pins it', async () => {
+    const { tx, entry, d } = await paddedRaw(await exampleSetConfig());
+    expect(d.fatal).toContain('trailing');
+    const r = await verify({ intent: intentObj([entry]), multisig: MS, index: 5n, read: await reader(tx) });
+    expect(r.failures.join('\n')).toContain('malformed instruction for a known program');
+    expect(r.failures.join('\n')).toContain('cannot be pinned raw');
+  });
+
+  test('a System instruction of a kind the tool does not decode can be pinned raw', async () => {
+    const vault = await squadsVaultAddress(MS, 0);
+    const data = new Uint8Array([...le(3, 4), 1, 2, 3]); // CreateAccountWithSeed: not decoded
+    const ix: Instruction = { programAddress: SYSTEM_PROGRAM, accounts: [{ address: vault, role: AccountRole.WRITABLE_SIGNER }, { address: testAddress(70), role: AccountRole.WRITABLE }], data };
+    const tx = await vaultTx([ix]);
+    const intent = example('set-config-max-tvl.json');
+    intent.transaction.instructions = [
+      { program: 'raw', programId: SYSTEM_PROGRAM, dataSha256: sha256Hex(data), reason: 'CreateAccountWithSeed', accounts: [{ address: '$vault', signer: true, writable: true }, { address: testAddress(70), signer: false, writable: true }] },
+    ];
+    const r = await run(intent, { tx });
+    expect(r.out).toContain('MATCH: the on-chain transaction is exactly the intent');
+    expect(r.code).toBe(0);
+    // A decoded kind (Transfer) with a trailing byte cannot be pinned the same way.
+    const { tx: tx2, entry } = await paddedRaw(await transfer());
+    intent.transaction.instructions = [entry];
+    const bad = await run(intent, { tx: tx2 });
+    expect(bad.code).toBe(1);
+    expect(bad.out).toContain('malformed instruction for a known program');
+  });
+
   test('a signer other than the vault is a MISMATCH', async () => {
     const ix = await transfer();
     const other: Instruction = { ...ix, accounts: [{ address: testAddress(73), role: AccountRole.WRITABLE_SIGNER }, ix.accounts![1]!] };
@@ -222,7 +291,14 @@ describe('multisig and proposal', () => {
     expect(controlled.code).toBe(1);
     expect(controlled.out).toContain('config_authority');
     const short = await run(example('set-config-max-tvl.json'), { tx, multisig: multisigBytes({ timeLock: 60 }) });
+    expect(short.code).toBe(1);
     expect(short.out).toContain("time lock 60s is below the intent's floor 300s");
+  });
+
+  test('the time-lock floor is required in the intent', () => {
+    const { minTimeLockSecs: _m, ...i } = example('set-config-max-tvl.json');
+    expect(() => parseIntent(i)).toThrow('missing "minTimeLockSecs"');
+    expect(() => parseIntent({ ...example('set-config-max-tvl.json'), minTimeLockSecs: -1 })).toThrow('intent.minTimeLockSecs');
   });
 
   test('proposal status and approvals are reported; stale and absent proposals warn', async () => {
@@ -266,6 +342,19 @@ describe('config transactions', () => {
     expect(extra.out).toContain('action #1: unexpected extra AddMember');
   });
 
+  test('a SetTimeLock below the floor fails, in the intent and on chain', async () => {
+    const low = example('set-time-lock.json');
+    low.transaction.actions[0].args.newTimeLock = 60;
+    expect(() => parseIntent(low)).toThrow('at or above minTimeLockSecs (300)');
+    // The chain sets 60 s while the intent says 86400: the floor is reported on top of the arg diff.
+    const r = await run(example('set-time-lock.json'), { index: 6n, tx: ct([{ name: 'SetTimeLock', args: { newTimeLock: 60 } }]) });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("action #0 SetTimeLock sets the time lock to 60s, below the intent's floor 300s");
+    // A vault intent checked against a config SetTimeLock still gets the floor check.
+    const v = await run({ ...example('set-config-max-tvl.json'), index: 6 }, { index: 6n, tx: ct([{ name: 'SetTimeLock', args: { newTimeLock: 0 } }]) });
+    expect(v.out).toContain("sets the time lock to 0s, below the intent's floor 300s");
+  });
+
   test('a config transaction checked against a vault intent is a MISMATCH', async () => {
     const r = await run({ ...example('set-config-max-tvl.json'), index: 6 }, { index: 6n, tx: ct([{ name: 'ChangeThreshold', args: { newThreshold: 1 } }]) });
     expect(r.code).toBe(1);
@@ -298,6 +387,7 @@ describe('upgrades (S9, S14)', () => {
       multisig: MS,
       index: 5,
       title: 'upgrade',
+      minTimeLockSecs: 300,
       transaction: {
         kind: 'vault',
         vaultIndex: 0,
@@ -419,6 +509,20 @@ describe('intent validation', () => {
     const ata = example('set-config-max-tvl.json');
     ata.transaction.instructions = [{ program: 'ata', name: 'CreateIdempotent', accounts: { payer: '$any' } }];
     expect(() => parseIntent(ata)).not.toThrow();
+  });
+  test('a raw entry for the loader or the MUTAV program is refused', () => {
+    for (const programId of [BPF_LOADER_UPGRADEABLE, '8scC79jkU7SPM9v6M4nB833R8EeqKknfwdRdjn73Qqv9', testAddress(30)]) {
+      const i = { ...example('set-config-max-tvl.json'), mutavProgramId: testAddress(30) };
+      i.transaction = { kind: 'vault', vaultIndex: 0, instructions: [{ program: 'raw', programId, dataSha256: 'a'.repeat(64), reason: 'r', accounts: [] }] };
+      expect(() => parseIntent(i)).toThrow('must be named, never listed raw');
+    }
+  });
+  test('null and the string "null" differ', () => {
+    const want = parseIntent({ ...example('set-time-lock.json'), transaction: { kind: 'vault', vaultIndex: 0, instructions: [{ program: 'spl-token', name: 'SetAuthority', args: { newAuthority: null } }] } });
+    const t = want.transaction as Extract<typeof want.transaction, { kind: 'vault' }>;
+    const got: DecodedInstruction = { family: 'spl-token', programId: address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'), name: 'SetAuthority', args: { newAuthority: null }, accounts: [], remaining: [], dataHex: '', dataSha256: '', risks: [] };
+    expect(compareVault(t.instructions, [got], MS)).toEqual([]);
+    expect(compareVault(t.instructions, [{ ...got, args: { newAuthority: 'null' } }], MS).length).toBe(1);
   });
   test('raw entries need a data hash and a reason; mainnet and non-object input are refused', () => {
     const i = example('set-config-max-tvl.json');

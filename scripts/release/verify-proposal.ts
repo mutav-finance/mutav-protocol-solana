@@ -22,10 +22,10 @@ import { readFileSync } from 'node:fs';
 import { address, getBase58Decoder, type Address } from '@solana/kit';
 import { opt, parseArgs, req, type Args } from '../devnet/lib/cli';
 import { assertConfigCluster, guardCluster, rpcGenesis, type GenesisSource } from '../devnet/lib/cluster';
-import { programDataAddress } from '../devnet/lib/compose';
+import { BPF_LOADER_UPGRADEABLE, programDataAddress } from '../devnet/lib/compose';
 import { accountInfo, rpcFor } from '../devnet/lib/rpc';
 import { decodeSquadsMultisig, DEFAULT_PUBKEY, squadsVaultAddress, SQUADS_V4_PROGRAM, type SquadsMultisig } from '../devnet/lib/squads';
-import { decodeInstruction, resolveMessage, toJson, type DecodedInstruction, type Json, type Risk } from './lib/decode';
+import { decodeInstruction, NONCE_FATAL, resolveMessage, toJson, type DecodedInstruction, type Json, type Risk } from './lib/decode';
 import { compareConfig, compareVault, intentPath, parseIntent, type Intent } from './lib/intent';
 import {
   decodeConfigTransaction,
@@ -93,7 +93,7 @@ function multisigFacts(m: SquadsMultisig, intent: Intent, out: string[], failure
   out.push(`multisig: threshold ${m.threshold} of ${m.members.length}, time lock ${m.timeLock}s, transaction index ${m.transactionIndex}, stale below or at ${m.staleTransactionIndex}`);
   for (const x of m.members) out.push(`  member ${x.key} permissions ${x.permissions}`);
   if (m.configAuthority !== DEFAULT_PUBKEY) failures.push(`multisig config_authority is ${m.configAuthority}: a controlled multisig can change members, threshold or time lock without a vote (spec §14.5 step 8)`);
-  if (intent.minTimeLockSecs !== undefined && m.timeLock < intent.minTimeLockSecs) failures.push(`multisig time lock ${m.timeLock}s is below the intent's floor ${intent.minTimeLockSecs}s`);
+  if (m.timeLock < intent.minTimeLockSecs) failures.push(`multisig time lock ${m.timeLock}s is below the intent's floor ${intent.minTimeLockSecs}s`);
 }
 
 function proposalFacts(p: Proposal | null, m: SquadsMultisig, index: bigint, out: string[], warnings: string[]) {
@@ -172,6 +172,9 @@ export async function verify(p: {
       out.push(`     ${fmtRisk(CONFIG_ACTION_RISK[a.name as ConfigAction['name']])}`);
       for (const [k, v] of Object.entries(a.args)) out.push(`     arg ${k} = ${fmtJson(v)}`);
     });
+    for (const [i, a] of got.entries()) {
+      if (a.name === 'SetTimeLock' && !(Number(a.args.newTimeLock) >= intent.minTimeLockSecs)) failures.push(`action #${i} SetTimeLock sets the time lock to ${fmtJson(a.args.newTimeLock ?? null)}s, below the intent's floor ${intent.minTimeLockSecs}s`);
+    }
     if (intent.transaction.kind === 'config') failures.push(...compareConfig(intent.transaction.actions, got));
   } else {
     let vt;
@@ -195,13 +198,13 @@ export async function verify(p: {
     }
     const decoded = resolveMessage(m).map((ix) => decodeInstruction(ix, { mutavProgramIds: [intent.mutavProgramId] }));
     decoded.forEach((d, i) => printInstruction(i, d, vault, out));
-    const nonce = decoded.filter((d) => d.fatal);
-    if (nonce.length) {
-      out.push('!!!!!!!! DURABLE NONCE INSTRUCTION IN THE VAULT MESSAGE: DO NOT APPROVE !!!!!!!!');
-      failures.push(...nonce.map((d) => `${d.name}: ${d.fatal}`));
-    }
+    const fatal = decoded.filter((d) => d.fatal);
+    if (fatal.some((d) => d.fatal === NONCE_FATAL)) out.push('!!!!!!!! DURABLE NONCE INSTRUCTION IN THE VAULT MESSAGE: DO NOT APPROVE !!!!!!!!');
+    if (fatal.some((d) => d.fatal !== NONCE_FATAL)) out.push('!!!!!!!! MALFORMED INSTRUCTION FOR A KNOWN PROGRAM IN THE VAULT MESSAGE: DO NOT APPROVE !!!!!!!!');
+    failures.push(...fatal.map((d) => `${d.family === 'raw' ? `raw ${d.programId}` : d.name}: ${d.fatal}`));
     if (want) failures.push(...compareVault(want.instructions, decoded, vault));
-    if (decoded.some((d) => d.family === 'loader' && d.name === 'Upgrade') || intent.upgrade) {
+    // Selected by program id, not decoded family: a loader instruction that did not decode must still fail here.
+    if (decoded.some((d) => d.programId === BPF_LOADER_UPGRADEABLE) || intent.upgrade) {
       failures.push(...(await checkUpgradeInstructions(decoded, intent.upgrade, vault)));
       if (intent.upgrade) {
         const buffer = await p.read(intent.upgrade.buffer);

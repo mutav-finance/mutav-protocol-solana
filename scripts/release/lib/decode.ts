@@ -8,9 +8,14 @@
  * - SPL Token and Token-2022 (the base instruction set);
  * - Associated Token Account and Compute Budget.
  *
- * Anything else, any instruction whose data does not decode exactly (no
- * trailing bytes) and any instruction with an address-lookup-table account
- * comes back as `family: 'raw'` with the reason in `error`. Risk flags follow
+ * An unknown program, an instruction with an address-lookup-table account,
+ * and an instruction tag this tool does not decode for System, SPL Token,
+ * Token-2022, ATA or Compute Budget (`unknownTag`) come back as
+ * `family: 'raw'` with the reason in `error`: an intent may pin those by
+ * program id and data hash. A known tag whose data or accounts do not decode
+ * exactly (short data, trailing bytes the runtime would ignore, missing
+ * accounts), and any MUTAV or BPF Loader Upgradeable instruction that does
+ * not decode, is raw AND `fatal`: it can never be pinned. Risk flags follow
  * the app's proposal decoder conceptually (lib/proposal-decode.ts) but are
  * kept here: root scripts never import from app/. Signs nothing.
  */
@@ -54,9 +59,14 @@ export type DecodedInstruction = {
   risks: Risk[];
   /** Why the instruction is raw. */
   error?: string;
-  /** Set when the instruction must never be approved, whatever the intent says (a durable nonce). */
+  /** Set when the instruction must never be approved, whatever the intent says (a durable nonce, a malformed instruction for a known program). */
   fatal?: string;
+  /** Raw only: a known program (System, token, ATA, Compute Budget) whose instruction tag this tool does not decode; may be pinned raw. */
+  unknownTag?: true;
 };
+
+/** A tag the decoder does not cover, read cleanly from a program whose other instructions it decodes. */
+class UnknownTag extends Error {}
 
 /** One message instruction with its accounts resolved; `null` where an address lookup table supplies it. */
 export type ResolvedInstruction = { programId: Address | null; accounts: (Omit<DecodedAccount, 'name'> | null)[]; data: Uint8Array };
@@ -230,7 +240,7 @@ function decodeLoader(r: Reader, a: Omit<DecodedAccount, 'name'>[]): Body {
   }
 }
 
-const NONCE_FATAL = 'durable-nonce instruction: a member never signs a transaction with a durable nonce, and a vault never touches one';
+export const NONCE_FATAL = 'durable-nonce instruction: a member never signs a transaction with a durable nonce, and a vault never touches one';
 
 function decodeSystem(r: Reader, a: Omit<DecodedAccount, 'name'>[]): Body {
   const tag = r.u32('system tag');
@@ -265,7 +275,7 @@ function decodeSystem(r: Reader, a: Omit<DecodedAccount, 'name'>[]): Body {
     case 12:
       return { name: 'UpgradeNonceAccount', ...named(a, ['nonceAccount']), risks: [{ level: 'critical', note: NONCE_FATAL }], fatal: NONCE_FATAL };
     default:
-      throw new Error(`System instruction ${tag} is not decoded`);
+      throw new UnknownTag(`System instruction ${tag} is not decoded`);
   }
 }
 
@@ -323,7 +333,7 @@ function decodeToken(r: Reader, a: Omit<DecodedAccount, 'name'>[]): Body {
     case 17:
       return { name: 'SyncNative', ...named(a, ['account']) };
     default:
-      throw new Error(`token instruction ${tag} is not decoded`);
+      throw new UnknownTag(`token instruction ${tag} is not decoded`);
   }
 }
 
@@ -339,7 +349,7 @@ function decodeAta(r: Reader, a: Omit<DecodedAccount, 'name'>[]): Body {
       risks: [{ level: 'high', note: 'moves tokens out of a nested associated token account' }],
     };
   }
-  throw new Error(`associated token account instruction ${tag} is not decoded`);
+  throw new UnknownTag(`associated token account instruction ${tag} is not decoded`);
 }
 
 function decodeComputeBudget(r: Reader, a: Omit<DecodedAccount, 'name'>[]): Body {
@@ -358,7 +368,7 @@ function decodeComputeBudget(r: Reader, a: Omit<DecodedAccount, 'name'>[]): Body
     case 4:
       return { name: 'SetLoadedAccountsDataSizeLimit', args: { bytes: r.u32() }, ...none };
     default:
-      throw new Error(`Compute Budget instruction ${tag} is not decoded`);
+      throw new UnknownTag(`Compute Budget instruction ${tag} is not decoded`);
   }
 }
 
@@ -377,6 +387,9 @@ export function familyOf(programId: Address, o: DecodeOptions = {}): Family {
   if (programId === COMPUTE_BUDGET_PROGRAM) return 'compute-budget';
   return 'raw';
 }
+
+/** The runtime ignores trailing bytes (bincode, Anchor, SPL Token): padding must not turn a known instruction into a pinnable raw one. */
+export const MALFORMED_FATAL = 'malformed instruction for a known program';
 
 export function decodeInstruction(ix: ResolvedInstruction, o: DecodeOptions = {}): DecodedInstruction {
   const base = { dataHex: hex(ix.data), dataSha256: sha256Hex(ix.data), args: {}, remaining: [] as DecodedAccount[] };
@@ -410,10 +423,13 @@ export function decodeInstruction(ix: ResolvedInstruction, o: DecodeOptions = {}
       r.end('instruction data');
     }
   } catch (e) {
-    // A System nonce instruction stays fatal even when its accounts are short.
-    const fatal = family === 'system' && ix.data.length >= 4 && [4, 5, 6, 7, 12].includes(new DataView(ix.data.buffer, ix.data.byteOffset).getUint32(0, true));
-    const out = raw(programId, `${family} data or accounts do not decode: ${(e as Error).message}`);
-    return fatal ? { ...out, fatal: NONCE_FATAL } : out;
+    const reason = (e as Error).message;
+    // An undecoded tag of a native program may be pinned raw; never for the loader or MUTAV (they only throw plain errors).
+    if (e instanceof UnknownTag && family !== 'loader' && family !== 'mutav') return { ...raw(programId, reason), unknownTag: true };
+    // A System nonce instruction stays fatal (with its own message) even when its accounts are short.
+    const nonce = family === 'system' && ix.data.length >= 4 && [4, 5, 6, 7, 12].includes(new DataView(ix.data.buffer, ix.data.byteOffset).getUint32(0, true));
+    const out = raw(programId, `${family} data or accounts do not decode: ${reason}`);
+    return { ...out, fatal: nonce ? NONCE_FATAL : `${MALFORMED_FATAL}: ${reason}` };
   }
   return { ...base, family, programId, args: body.args ?? {}, name: body.name, accounts: body.accounts, remaining: body.remaining ?? [], risks: body.risks ?? [], ...(body.fatal ? { fatal: body.fatal } : {}) };
 }

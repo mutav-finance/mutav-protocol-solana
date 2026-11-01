@@ -14,7 +14,7 @@
 import { address, isAddress, type Address } from '@solana/kit';
 import { MUTAV_PROGRAM_ADDRESS } from '../../../clients/js/src';
 import { ASSOCIATED_TOKEN_PROGRAM, BPF_LOADER_UPGRADEABLE, SYSTEM_PROGRAM, TOKEN_PROGRAM } from '../../devnet/lib/compose';
-import { COMPUTE_BUDGET_PROGRAM, DECODED_FAMILIES, TOKEN_2022_PROGRAM, type DecodedAccount, type DecodedInstruction, type Json } from './decode';
+import { COMPUTE_BUDGET_PROGRAM, DECODED_FAMILIES, familyOf, TOKEN_2022_PROGRAM, type DecodedAccount, type DecodedInstruction, type Json } from './decode';
 import type { ConfigAction } from './squads-tx';
 
 export const INTENT_VERSION = 'mutav-proposal-intent/v1';
@@ -43,6 +43,8 @@ export type ExpectedRaw = {
   /** Why this instruction cannot be decoded (e.g. "Program Metadata IDL write"). */
   reason: string;
 };
+/** Programs an intent may never list raw: their instructions always decode, or the check fails. */
+const NEVER_RAW = (mutavProgramId: Address) => new Set<string>([BPF_LOADER_UPGRADEABLE, MUTAV_PROGRAM_ADDRESS, mutavProgramId]);
 export type ExpectedInstruction = ExpectedDecoded | ExpectedRaw;
 export type ExpectedConfigAction = { name: ConfigAction['name']; args: Record<string, Json> };
 export type Upgrade = { programId: Address; buffer: Address; spill: Address; expectedHash: string };
@@ -54,7 +56,8 @@ export type Intent = {
   index: bigint;
   title: string;
   mutavProgramId: Address;
-  minTimeLockSecs?: number;
+  /** The time-lock floor: the multisig's time lock, and any SetTimeLock action's new value, must be at least this. */
+  minTimeLockSecs: number;
   transaction:
     | { kind: 'vault'; vaultIndex: number; ephemeralSigners: number; instructions: ExpectedInstruction[] }
     | { kind: 'config'; actions: ExpectedConfigAction[] };
@@ -125,7 +128,7 @@ export function parseIntent(raw: unknown): Intent {
     return addr(v, where);
   };
 
-  keys(raw, 'intent', ['version', 'cluster', 'multisig', 'index', 'title', 'mutavProgramId', 'minTimeLockSecs', 'transaction', 'upgrade', 'notes'], ['version', 'cluster', 'multisig', 'index', 'title', 'transaction']);
+  keys(raw, 'intent', ['version', 'cluster', 'multisig', 'index', 'title', 'mutavProgramId', 'minTimeLockSecs', 'transaction', 'upgrade', 'notes'], ['version', 'cluster', 'multisig', 'index', 'title', 'minTimeLockSecs', 'transaction']);
   if (raw.version !== INTENT_VERSION) err(`intent.version: must be "${INTENT_VERSION}"`);
   if (raw.cluster !== 'devnet' && raw.cluster !== 'localnet') err('intent.cluster: must be "devnet" or "localnet" (mainnet is not supported)');
   const multisig = addr(raw.multisig, 'intent.multisig');
@@ -137,7 +140,7 @@ export function parseIntent(raw: unknown): Intent {
   if (typeof raw.title !== 'string' || !raw.title.trim()) err('intent.title: required, describe what the proposal does');
   if (raw.notes !== undefined && typeof raw.notes !== 'string') err('intent.notes: must be a string');
   const mutavProgramId = raw.mutavProgramId === undefined ? MUTAV_PROGRAM_ADDRESS : addr(raw.mutavProgramId, 'intent.mutavProgramId');
-  const minTimeLockSecs = raw.minTimeLockSecs === undefined ? undefined : int(raw.minTimeLockSecs, 'intent.minTimeLockSecs', 0xffffffff);
+  const minTimeLockSecs = int(raw.minTimeLockSecs, 'intent.minTimeLockSecs', 0xffffffff);
 
   let transaction: Intent['transaction'] = { kind: 'config', actions: [] };
   const t = raw.transaction;
@@ -167,7 +170,9 @@ export function parseIntent(raw: unknown): Intent {
                 return { address: accountValue(a.address, `${w}.accounts[${j}].address`, ''), signer: a.signer === true, writable: a.writable === true };
               })
             : (err(`${w}.accounts: must be an array`), []);
-          instructions.push({ program: 'raw', programId: addr(ix.programId, `${w}.programId`), dataSha256: String(ix.dataSha256).toLowerCase(), accounts, reason: String(ix.reason) });
+          const programId = addr(ix.programId, `${w}.programId`);
+          if (NEVER_RAW(mutavProgramId).has(programId)) err(`${w}.programId: ${programId} is the BPF Loader Upgradeable or the MUTAV program; its instructions must be named, never listed raw`);
+          instructions.push({ program: 'raw', programId, dataSha256: String(ix.dataSha256).toLowerCase(), accounts, reason: String(ix.reason) });
           return;
         }
         keys(ix, w, ['program', 'programId', 'name', 'args', 'accounts', 'remainingAccounts'], ['program', 'name']);
@@ -202,6 +207,10 @@ export function parseIntent(raw: unknown): Intent {
         if (!CONFIG_ACTIONS.includes(a.name as string)) err(`${w}.name: must be one of ${CONFIG_ACTIONS.join(', ')}`);
         actions.push({ name: a.name as ConfigAction['name'], args: record(a.args, `${w}.args`) });
       });
+    for (const [i, a] of actions.entries()) {
+      const v = a.args.newTimeLock;
+      if (a.name === 'SetTimeLock' && !(typeof v === 'number' && v >= minTimeLockSecs)) err(`actions[${i}].args.newTimeLock: must be an integer at or above minTimeLockSecs (${minTimeLockSecs})`);
+    }
     transaction = { kind: 'config', actions };
   } else err('transaction.kind: must be "vault" or "config"');
 
@@ -240,7 +249,7 @@ export function parseIntent(raw: unknown): Intent {
     index,
     title: String(raw.title),
     mutavProgramId,
-    ...(minTimeLockSecs === undefined ? {} : { minTimeLockSecs }),
+    minTimeLockSecs,
     transaction,
     ...(upgrade ? { upgrade } : {}),
   };
@@ -251,7 +260,6 @@ export const intentPath = (i: Pick<Intent, 'cluster' | 'multisig' | 'index'>) =>
 
 // ---------------------------------------------------------------- comparison
 
-const leaf = (v: Json) => (v === null ? 'null' : String(v));
 const show = (v: Json | undefined) => (v === undefined ? '(absent)' : JSON.stringify(v));
 
 /**
@@ -267,7 +275,8 @@ export function diffJson(path: string, want: Json | undefined, got: Json | undef
   const wo = typeof want === 'object' && want !== null;
   const go = typeof got === 'object' && got !== null;
   if (!wo || !go) {
-    if (wo !== go || leaf(want) !== leaf(got) || (typeof want === 'boolean') !== (typeof got === 'boolean')) out.push(`${path}: expected ${show(want)}, got ${show(got)}`);
+    const same = want === null || got === null ? want === got : String(want) === String(got) && (typeof want === 'boolean') === (typeof got === 'boolean');
+    if (wo !== go || !same) out.push(`${path}: expected ${show(want)}, got ${show(got)}`);
     return;
   }
   if (Array.isArray(want) !== Array.isArray(got)) return void out.push(`${path}: expected ${show(want)}, got ${show(got)}`);
@@ -299,6 +308,10 @@ export function compareInstruction(where: string, want: ExpectedInstruction, got
   const out: string[] = [];
   if (want.program === 'raw') {
     if (got.family !== 'raw') return [`${where}: decodes as ${label(got)}; name it in the intent instead of listing it raw`];
+    // Only a genuinely unknown program, or an undecoded tag of a native program, may be pinned by hash.
+    if (got.fatal) return [`${where}: ${got.fatal}; it cannot be pinned raw`];
+    if (got.programId === BPF_LOADER_UPGRADEABLE || got.programId === MUTAV_PROGRAM_ADDRESS) return [`${where}: a raw instruction for ${got.programId} is never accepted`];
+    if (familyOf(got.programId) !== 'raw' && !got.unknownTag) return [`${where}: ${got.programId} is a known program and this instruction did not decode (${got.error}); it cannot be pinned raw`];
     if (got.programId !== want.programId) out.push(`${where} program: expected ${want.programId}, got ${got.programId}`);
     if (got.dataSha256 !== want.dataSha256) out.push(`${where} data sha256: expected ${want.dataSha256}, got ${got.dataSha256}`);
     if (got.accounts.length !== want.accounts.length) out.push(`${where}: expected ${want.accounts.length} account(s), got ${got.accounts.length}`);

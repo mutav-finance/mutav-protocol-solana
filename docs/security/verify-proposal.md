@@ -32,7 +32,7 @@ The format is validated by [`scripts/release/lib/intent.ts`](../../scripts/relea
 | `multisig`, `index` | The multisig address and the transaction index. Both must equal `--multisig` and `--index`. |
 | `title`, `notes` | What the proposal does and why, in words. |
 | `mutavProgramId` | The MUTAV program the instructions call. Defaults to the declared ID `8scC79…`; set it to the deployed ID on devnet ([`deployments/devnet.json`](../../deployments/devnet.json)). |
-| `minTimeLockSecs` | Optional: the time-lock floor the multisig must meet. |
+| `minTimeLockSecs` | Required: the time-lock floor (ADR 0020). The multisig's current time lock and the new value of any `SetTimeLock` action must be at or above it. Devnet and localnet: 300 (admin multisig) or 3600 (upgrade multisig); real pilot: 86400 (admin) or 604800 (upgrade). |
 | `transaction.kind` | `"vault"` or `"config"`. |
 | `transaction.vaultIndex`, `ephemeralSigners` | Vault transactions: the vault index (0) and the number of ephemeral signers (default 0). |
 | `transaction.instructions` | Vault transactions: the instructions, **in order**. |
@@ -45,7 +45,7 @@ Each instruction is `{ "program", "name", "args", "accounts", "remainingAccounts
 - `args` and `accounts` use the names the report prints (the Codama client's names for MUTAV, e.g. `treasuryAccount`). Write the intent by hand from the change you mean to make, not by copying the report of the proposal you are checking.
 - Values are exact. u64 values may be written as numbers or strings (`"5000000000"`); bytes are hex. Every named account must be listed.
 - Two placeholders: `"$vault"` is the multisig's vault at `vaultIndex` (exact, derived); `"$any"` is allowed only for payer accounts (`ata.Create.payer`, `ata.CreateIdempotent.payer`, `loader.ExtendProgram.payer`, `loader.ExtendProgramChecked.payer`). Any message signer must still be the vault.
-- An instruction the tool cannot decode (for example the Program Metadata IDL write or the verify-PDA write in an upgrade) is listed as `{ "program": "raw", "programId", "dataSha256", "accounts": [{ "address", "signer", "writable" }], "reason" }`. The flags are the message's (the vault, as payer, is always a writable signer). Anything raw that the intent does not list this way is a mismatch.
+- An instruction the tool cannot decode (for example the Program Metadata IDL write or the verify-PDA write in an upgrade) is listed as `{ "program": "raw", "programId", "dataSha256", "accounts": [{ "address", "signer", "writable" }], "reason" }`. The flags are the message's (the vault, as payer, is always a writable signer). Anything raw that the intent does not list this way is a mismatch. Raw entries are for unknown programs, and for an instruction of System, SPL Token, Token-2022, ATA or Compute Budget whose kind the tool does not decode (for example System `CreateAccountWithSeed`). A raw entry for the BPF Loader Upgradeable or the MUTAV program is refused. An instruction of a decoded kind whose data or accounts do not decode exactly (short data, extra trailing bytes the runtime would ignore, missing accounts), and any loader or MUTAV instruction that does not decode, always fails: it cannot be pinned by hash.
 
 For an upgrade, the intent lists the loader `Upgrade` (and `ExtendProgramChecked` first if the program grows) with every account, and the `upgrade` block repeats the program, buffer and spill. An upgrade intent may not also hold a loader `SetAuthority`, `SetAuthorityChecked` or `Close` (audit S9).
 
@@ -59,7 +59,7 @@ bun run verify-proposal --cluster devnet --rpc <your RPC URL> \
   --multisig <multisig> --index <n> --intent governance/intents/devnet/<ms>/<n>.json
 ```
 
-Use an RPC URL you chose. The tool refuses mainnet (by `--cluster`, by the URL and by the genesis hash), reads only from the RPC (never from the reserve app's API) and signs nothing.
+Use an RPC URL you chose, **from a different provider than the other members use**. A malicious or compromised RPC can serve a benign-looking transaction account to everyone who reads through it; the digest comparison over a second channel only catches that when the members read through different providers. The tool refuses mainnet (by `--cluster`, by the URL and by the genesis hash), reads only from the RPC (never from the reserve app's API) and signs nothing.
 
 For an upgrade, first reproduce the build at the signed release tag, as the release workflow does ([`release.yml`](../../.github/workflows/release.yml)):
 
@@ -73,17 +73,18 @@ then add `--so target/deploy/mutav.so`. Without `--so` an upgrade always fails.
 
 ## What it checks
 
-- The multisig is owned by Squads v4, has no config authority (spec §14.5 step 8) and meets `minTimeLockSecs`.
+- The multisig is owned by Squads v4, has no config authority (spec §14.5 step 8) and meets `minTimeLockSecs`; no `SetTimeLock` action goes below it.
 - The account at the index is a `VaultTransaction` or `ConfigTransaction` of that multisig and index, of the kind the intent expects.
 - Vault transactions: the vault index and ephemeral signers match; no address lookup tables; every message signer is the vault (or one of its ephemeral signers); every instruction is decoded and compared with the intent in order. Differences are listed one by one (extra, missing, reordered, other args, other accounts).
-- Upgrades (S9, S14): one `Upgrade` naming the intent's program, its ProgramData, the buffer, the spill and the vault as authority; the buffer is owned by the loader with the vault as authority, ProgramData's upgrade authority is the vault; the buffer's program bytes hash (solana-verify style: sha256 with trailing zero bytes trimmed) to the intent's `expectedHash` **and** to your `--so`; and the buffer contains the 32 bytes of the target program ID, so it was built with the right `declare_id!`.
+- Every MUTAV and loader instruction, and every decoded kind of the native programs, decodes exactly (no trailing bytes); otherwise the check fails, whatever the intent says.
+- Upgrades (S9, S14): every loader instruction (selected by program id) decodes cleanly; one `Upgrade` naming the intent's program, its ProgramData, the buffer, the spill and the vault as authority; the buffer is owned by the loader with the vault as authority, ProgramData's upgrade authority is the vault; the buffer's program bytes hash (solana-verify style: sha256 with trailing zero bytes trimmed) to the intent's `expectedHash` **and** to your `--so`; and the buffer contains the 32 bytes of the target program ID, so it was built with the right `declare_id!`.
 - The proposal: status, approvals against the threshold, who approved, and when it becomes executable. A stale, rejected, cancelled or executed proposal is a warning: it can no longer be approved.
 
 Every instruction is printed with every argument and account and a risk flag (`CRITICAL`: authority or code change; `HIGH`: moves money or changes reserve rules; `CAUTION`: worth a second look).
 
 ## What MATCH means
 
-`MATCH` (exit code 0) means: the transaction account at that index, as your RPC serves it at `confirmed`, holds exactly the instructions or config actions of the intent, with the same arguments, accounts and order, and for an upgrade the buffer is your own reproduced build. It does not mean the change is a good idea; that was decided when the intent PR was reviewed.
+`MATCH` (exit code 0) means: the transaction account at that index, as your RPC serves it at `confirmed`, holds exactly the instructions or config actions of the intent, with the same arguments, accounts and order, and for an upgrade the buffer is your own reproduced build. It does not mean the change is a good idea; that was decided when the intent PR was reviewed. It also says nothing about the member transaction that carries your approval: the tool reads the proposal, not what your wallet is asked to sign, so whether that outer transaction uses a durable nonce (rule 6) is for you to check in the wallet prompt.
 
 `MISMATCH` (exit code 1) lists each difference. Do not approve. Exit code 2 means the check could not run (bad arguments, an invalid intent, a refused cluster).
 

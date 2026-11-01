@@ -4,7 +4,7 @@
   "multisig": "5842jNQd5C7pWXFxcDu3kQ5XtgqH5st25tf2ZBjYaKg8",
   "index": 5,
   "title": "EXAMPLE ONLY: lower caps.max_tvl to R$5,000 (set_config, one param)",
-  "notes": "Documentation example (docs/security/verify-proposal.md). The multisig and accounts are placeholder addresses and the index is not a real proposal. A real intent lives at governance/intents/<cluster>/<first 8 chars of the multisig>/<index>.json and carries the real config, state, treasury, payments and event-authority accounts as the verifier prints them.",
+  "notes": "Documentation example (docs/security/verify-proposal.md). The multisig and accounts are placeholder addresses and the index is not a real proposal. A real intent lives at governance/intents/<cluster>/<first 8 chars of the multisig>/<index>.json and carries the real config, state, treasury, payments and event-authority accounts as the verifier prints them. minTimeLockSecs is the admin multisig floor on localnet and devnet (300 s, ADR 0020); an upgrade-multisig intent uses 3600 s, and the pilot floors are 86400 s (admin) and 604800 s (upgrade).",
   "minTimeLockSecs": 300,
   "transaction": {
     "kind": "vault",
