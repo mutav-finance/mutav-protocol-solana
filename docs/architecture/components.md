@@ -91,7 +91,7 @@ A typical integration reads with `fetchReserve`, previews with the math mirror, 
 | `/reserve` | Everyone, no wallet | Health, coverage, claims timeline, money flows, the capital queue, tracked against actual balances per account, an operator-activity feed, every account on the explorer |
 | `/operator` | Operator | One form per operator instruction with its on-chain bound and the gate preview. On devnet MUTAV's team signs by hand with the operator wallet |
 | `/investor` | Investors | Allowlist status, position, queue entries, new requests, "redeem all" |
-| `/admin` | Admin multisig members | Squads proposal builders: create, approve, execute after the time lock, reject and cancel. Includes `nav_bounds` for fills and role handovers with their expiry. `approve_claim` is in the program; its proposal builder is still to come in the console, and the unsolicited-money to-do list comes with its instructions |
+| `/admin` | Admin multisig members | Squads proposal builders: create, then each proposal decoded read-only with a link to approve, reject, cancel and execute in the Squads app (in-app votes on localnet only). Includes `nav_bounds` for fills and role handovers with their expiry. `approve_claim` is in the program; its proposal builder is still to come in the console, and the unsolicited-money to-do list comes with its instructions |
 | `/demo` | Judges, team | A guided walkthrough with the coverage-gate preview |
 | `/simulator` | Everyone | Static reserve simulator (`public/simulator.html`) |
 

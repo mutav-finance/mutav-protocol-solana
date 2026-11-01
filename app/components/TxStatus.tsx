@@ -8,6 +8,7 @@
  */
 import type { TxState } from "@/lib/client/use-tx";
 import { Explorer } from "@/components/Explorer";
+import { IN_APP_APPROVAL } from "@/lib/flags";
 import { refusalLine, type RefusalContext } from "@/lib/tx-error";
 
 const PHASE: Record<TxState["phase"], string> = {
@@ -29,7 +30,7 @@ export function TxStatus({ state, showAccounts = true, refusal }: { state: TxSta
         <span aria-hidden="true" style={{ width: 6, height: 6, background: color, flexShrink: 0 }} />
         <span className="font-body" style={{ fontSize: 12, color }}>
           {state.phase === "failed" && state.errorName ? "Refused" : PHASE[state.phase]}
-          {state.proposalIndex !== null && state.phase === "confirmed" ? ` — Squads proposal #${state.proposalIndex} created and approved by you` : ""}
+          {state.proposalIndex !== null && state.phase === "confirmed" ? IN_APP_APPROVAL ? ` — Squads proposal #${state.proposalIndex} created and approved by you` : ` — Squads proposal #${state.proposalIndex} created: approve it in the Squads client after the local verification step` : ""}
         </span>
         {state.signature && <Explorer kind="tx" value={state.signature} />}
       </div>

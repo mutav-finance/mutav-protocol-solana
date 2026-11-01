@@ -105,7 +105,7 @@ Writing rules, for people and agents:
 - Never write a bare "admin". Write **"staff admin role"** (the `mutavStaff` role) or **"protocol admin"** (the Squads multisig). The program, spec and app call the protocol admin the "reserve admin" or "Admin"; both mean the Squads multisig.
 - **"Operator"** means only the protocol key. People doing back-office work are **"staff"**.
 - Qualify **"treasury"**: the `mutavStaff` treasury role, the Solana treasury account (`treasury_account`, which receives the fee take), or the Stellar treasury account (legacy).
-- Today Squads proposals are created, approved and executed in the `/admin` console on [reserve.mutav.finance](https://reserve.mutav.finance/admin), or in the Squads app. mutav-app's `apps/admin` becomes the signing home later (tracked in the mutav repo).
+- Today Squads proposals are created in the `/admin` console on [reserve.mutav.finance](https://reserve.mutav.finance/admin), which shows them decoded, read-only; members approve and execute them in the Squads app, after the local verification step. mutav-app's `apps/admin` becomes the signing home later (tracked in the mutav repo).
 - The Auth0 staff connection with MFA is **planned** ([mutav-app#206](https://github.com/mutav-finance/mutav-app/issues/206)). It does not exist yet.
 
 ## Roles and governance

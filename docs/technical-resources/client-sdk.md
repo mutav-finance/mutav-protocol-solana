@@ -152,7 +152,7 @@ Deposit and redeem request PDAs are seeded by the global queue `seq`. If two req
 
 ### Admin instructions
 
-Admin instructions are signed by the admin multisig's vault, so they are wrapped in a Squads v4 vault-transaction proposal. Members create, approve and execute it from the admin console or the Squads app, after the time lock.
+Admin instructions are signed by the admin multisig's vault, so they are wrapped in a Squads v4 vault-transaction proposal. Members create it in the admin console and approve and execute it in the Squads app, after the local verification step and the time lock.
 
 - `set_config`: pass only the `ConfigParam` values being changed, at least 1, at most 16 and no duplicates (`configParamsDiff` builds the list). The program validates the whole resulting config. A change of `coverage_ratio_bps`, `max_nav_move_bps` or `stress_buffer` needs a `refresh` in the same slot (`RefreshRequired`); `configParamsNeedRefresh` tells the console to put `refresh` first in the same transaction. The admin console lists the edited fields in the proposal memo.
 - `set_payments_account`, `set_treasury_account`, `set_allowlist_root`, the role handover (`propose_role`, `propose_admin`, `cancel_pending`, `revoke_pauser`) and `set_guardians` are separate instructions, never part of `set_config`.

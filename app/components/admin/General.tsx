@@ -22,6 +22,7 @@ import { ConfigCard, brsField, bpsField } from "@/components/admin/ConfigCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UNSET_ADDRESS } from "@/lib/reserve-assets";
 import { SquadsPanel, type SquadsResp } from "@/components/admin/Squads";
+import { IN_APP_APPROVAL } from "@/lib/flags";
 import { rolesError } from "@/lib/admin";
 import { fmtBrs, fmtPct, fmtTime } from "@/lib/format";
 import { ixLabel } from "@/lib/tx-kinds";
@@ -331,7 +332,11 @@ export function General({ mode, sq, sqError, onSquadsDone }: { mode: Mode; sq: S
       <Watch />
       <Sub id="general-roles" title="Roles & multisig">
         <Note>
-          Every admin change on this page is a Squads vault-transaction proposal: one member creates and approves it, the others approve from their own wallets, and anyone executes it once the threshold is met and the time lock has passed. Members reject a proposal while it is Active, or vote to cancel it once Approved; a live set_config blocks the next one until it runs or is rejected or cancelled. This app refuses to execute a set_config whose fields moved on-chain since it was proposed; the check is the app&apos;s own, so executing from the Squads UI skips it: read the diff before approving. This page holds no key.
+          Every admin change on this page is a Squads vault-transaction proposal: one member creates it here, members approve it (the creator too, outside localnet), and any member executes it once the threshold is met and the time lock has passed. Members reject a proposal while it is Active, or vote to cancel it once Approved; a live set_config blocks the next one until it runs or is rejected or cancelled.{" "}
+          {IN_APP_APPROVAL
+            ? "On localnet, approve, reject, cancel and execute below; execute refuses a set_config whose fields moved on-chain since it was proposed."
+            : "Every member, the creator included, approves, rejects, cancels and executes in the Squads client, after checking the proposal with the local verification step; this page shows each proposal decoded, read-only, as a cross-check. The Squads app does not run this app's stale-carry check: confirm a set_config diff still holds before executing."}{" "}
+          This page holds no key.
         </Note>
         <SquadsPanel sq={sq} error={sqError} onDone={onSquadsDone} />
         <div className="grid-2">

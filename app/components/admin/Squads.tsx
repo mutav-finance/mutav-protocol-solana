@@ -2,9 +2,13 @@
 
 /**
  * The Squads v4 multisig behind the Reserve Admin: its status, time lock,
- * every live proposal and the last finished ones, with approve, reject,
- * cancel and execute from the member's own wallet (A3). Execute refuses a
- * set_config built against values that have moved since (stale carry).
+ * every live proposal and the last finished ones, each decoded with every
+ * argument open and red flags marked (A3, A-R3-3, NEW-R3-2). Read-only on
+ * devnet: members approve, reject, cancel and execute in the Squads app,
+ * after the local verification step (NEW-R3-1; founder decision 2026-10-29).
+ * Localnet builds only (`IN_APP_APPROVAL`) keep in-app votes and execute,
+ * because the Squads app cannot reach a local validator; there, execute
+ * refuses a set_config built against values that have moved (stale carry).
  */
 import { useEffect, useState } from "react";
 import { ReadError } from "@/components/Section";
@@ -16,9 +20,13 @@ import { Button } from "@/components/ui/button";
 import { useWallet } from "@/components/WalletProvider";
 import { Note } from "@/components/demo/shared";
 import { postJson } from "@/lib/client/api";
+import { CLUSTER } from "@/lib/client/env";
+import type { Cluster } from "@/lib/cluster";
+import { IN_APP_APPROVAL } from "@/lib/flags";
+import { squadsApproval, VERIFY_BEFORE_APPROVING } from "@/lib/squads-link";
 import { useTx } from "@/lib/client/use-tx";
 import { fmtDuration, fmtTime } from "@/lib/format";
-import { SQUADS_CONFIG_CHANGE, type DecodedInstruction } from "@/lib/proposal-decode";
+import { SQUADS_CONFIG_CHANGE, squadsPermissions, type DecodedInstruction } from "@/lib/proposal-decode";
 
 export type ProposalView = {
   index: bigint;
@@ -87,14 +95,9 @@ function ProposalInstructions({ p }: { p: ProposalView }) {
             ) : (
               <Mono style={{ fontSize: 12 }}>{d.name}</Mono>
             )}
-            {/* Red flags stay in view; the raw arguments (keys, bounds) fold behind Details. */}
+            {/* Every argument stays open; red flags first (A-R3-3). */}
             {d.details.some((x) => x.warn) && <DetailList items={d.details.filter((x) => x.warn)} warn />}
-            {d.details.some((x) => !x.warn) && (
-              <details>
-                <summary className="font-mono" style={{ fontSize: 11, color: "var(--color-text-3)", cursor: "pointer" }}>Details</summary>
-                <DetailList items={d.details.filter((x) => !x.warn)} />
-              </details>
-            )}
+            {d.details.some((x) => !x.warn) && <DetailList items={d.details.filter((x) => !x.warn)} />}
           </li>
         ))}
       </ol>
@@ -102,14 +105,32 @@ function ProposalInstructions({ p }: { p: ProposalView }) {
   );
 }
 
-function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold: number; now: bigint; onDone: () => void }) {
+const statusText = (p: ProposalView, left: bigint | null) =>
+  p.status === "Approved" ? (left !== null && left <= 0n ? "Executable" : "Approved · time lock") : p.stale && (p.status === "Active" || p.status === "Draft") ? `${p.status} · stale` : p.status;
+
+/** Where and how members approve: the Squads app, after the local check. */
+function ApproveElsewhere({ p, multisig, cluster }: { p: ProposalView; multisig: string; cluster: Cluster }) {
+  const link = squadsApproval(cluster, multisig, p.index);
+  const open = p.status === "Active" || p.status === "Approved" || p.status === "Draft";
+  if (!link || !open) return <Mono dim>—</Mono>;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <a href={link.href} target="_blank" rel="noopener noreferrer" className="font-mono ext-link" style={{ fontSize: 12 }}>
+        {link.label} ↗
+      </a>
+      <Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>{link.steps}</Mono>
+      <Mono style={{ fontSize: 11, color: "var(--color-error)" }}>{VERIFY_BEFORE_APPROVING}</Mono>
+    </div>
+  );
+}
+
+/** Localnet builds only: approve, reject, cancel and execute from the connected wallet. */
+function InAppVotes({ p, now, onDone }: { p: ProposalView; now: bigint; onDone: () => void }) {
   const { address } = useWallet();
   const tx = useTx(onDone);
   const [last, setLast] = useState<Act | null>(null);
   const left = p.executableAt !== null ? p.executableAt - now : null;
   const voted = !!address && (p.approvals.includes(address) || p.rejections.includes(address));
-  const status =
-    p.status === "Approved" ? (left !== null && left <= 0n ? "Executable" : "Approved · time lock") : p.stale && (p.status === "Active" || p.status === "Draft") ? `${p.status} · stale` : p.status;
   const send = (action: Act) => {
     setLast(action);
     return tx.runWith(() => postJson<{ tx: string }>("/api/squads", { action, index: p.index, member: address }));
@@ -118,6 +139,25 @@ function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold
   const canVote = p.status === "Active" && !p.stale && !!address && !voted;
   const canCancel = p.status === "Approved" && !!address && !p.cancellations.includes(address);
   const canExecute = p.status === "Approved" && left !== null && left <= 0n && !!address;
+  return (
+    <>
+      {(canVote || canExecute) && p.decoded.some((d) => d.details.some((x) => x.warn)) && (
+        <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>Red flags above: read every one before approving.</Mono>
+      )}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("approve")}>Approve</Button>}
+        {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("reject")}>Reject</Button>}
+        {canExecute && <Button size="sm" variant={busy ? "outline" : "default"} disabled={busy} onClick={() => send("execute")}>Execute</Button>}
+        {canCancel && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("cancel")} title="Approved proposals: threshold cancel votes make it Cancelled">Cancel</Button>}
+      </div>
+      {last && <TxStatus state={tx.state} showAccounts={false} />}
+    </>
+  );
+}
+
+function ProposalRow({ p, threshold, now, onDone, multisig, cluster, inAppApproval }: { p: ProposalView; threshold: number; now: bigint; onDone: () => void; multisig: string; cluster: Cluster; inAppApproval: boolean }) {
+  const left = p.executableAt !== null ? p.executableAt - now : null;
+  const status = statusText(p, left);
   return (
     <tr>
       <td className="num"><Mono>#{p.index.toString()}</Mono></td>
@@ -132,31 +172,40 @@ function ProposalRow({ p, threshold, now, onDone }: { p: ProposalView; threshold
       </td>
       <td><Mono dim>{left === null ? "—" : left > 0n ? `${fmtDuration(left)} left` : `since ${fmtTime(p.executableAt!)}`}</Mono></td>
       <td style={{ whiteSpace: "normal" }}>
-        {(canVote || canExecute) && p.foreign.length > 0 && (
+        {p.foreign.length > 0 && !isConfigChange(p) && (
           <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>
-            {isConfigChange(p)
-              ? "Squads config change: members/threshold — review in the Squads UI."
-              : `Foreign instruction (${p.foreign.join(", ")}): the vault would sign it. Approve only if you know what it does.`}
+            Foreign instruction ({p.foreign.join(", ")}): the vault would sign it. Approve only if you know what it does.
           </Mono>
         )}
-        {(canVote || canExecute) && p.foreign.length === 0 && p.decoded.some((d) => d.details.some((x) => x.warn)) && (
-          <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>Red flags above: read them before approving.</Mono>
+        {isConfigChange(p) && (
+          <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>
+            Squads config change: it changes the multisig itself. Every action and argument is listed in red.
+          </Mono>
         )}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("approve")}>Approve</Button>}
-          {canVote && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("reject")}>Reject</Button>}
-          {canExecute && <Button size="sm" variant={busy ? "outline" : "default"} disabled={busy} onClick={() => send("execute")}>Execute</Button>}
-          {canCancel && <Button size="sm" variant="outline" disabled={busy} onClick={() => send("cancel")} title="Approved proposals: threshold cancel votes make it Cancelled">Cancel</Button>}
-        </div>
-        {last && <TxStatus state={tx.state} showAccounts={false} />}
+        {inAppApproval ? <InAppVotes p={p} now={now} onDone={onDone} /> : <ApproveElsewhere p={p} multisig={multisig} cluster={cluster} />}
       </td>
       <td><Explorer value={p.proposal} /></td>
     </tr>
   );
 }
 
-export function SquadsPanel({ sq, error, onDone }: { sq: SquadsResp | null; error: Error | null; onDone: () => void }) {
+export function SquadsPanel({
+  sq,
+  error,
+  onDone,
+  inAppApproval = IN_APP_APPROVAL,
+  cluster = CLUSTER,
+}: {
+  sq: SquadsResp | null;
+  error: Error | null;
+  onDone: () => void;
+  /** Narrows the build-time flag (never widens it: votes need IN_APP_APPROVAL too). */
+  inAppApproval?: boolean;
+  cluster?: Cluster;
+}) {
   const now = useNow(sq && sq.configured ? sq.now : null);
+  // Folds to false on devnet builds, so the vote code is dropped there.
+  const votes = IN_APP_APPROVAL && inAppApproval;
   if (error && !sq) return <ReadError error={error} />;
   if (!sq) return <Note>Reading the multisig…</Note>;
   if (!sq.configured) {
@@ -179,6 +228,14 @@ export function SquadsPanel({ sq, error, onDone }: { sq: SquadsResp | null; erro
           threshold {ms.threshold} of {ms.members.length} · time lock {fmtDuration(BigInt(ms.timeLock))} · multisig <Explorer value={ms.address} /> · vault <Explorer value={ms.vault} />
         </Mono>
       </div>
+      <Mono style={{ fontSize: 11, color: "var(--color-text-3)", overflowWrap: "anywhere" }}>
+        members: {ms.members.map((m) => `${m.key} (${squadsPermissions(m.permissions)})`).join(" · ") || "none"}
+      </Mono>
+      {!votes && (
+        <Note>
+          Read-only here: members approve, reject, cancel and execute in the Squads app, not on this page. {VERIFY_BEFORE_APPROVING} Executing a set_config from the Squads app skips this app&apos;s stale-carry check, so confirm its diff still holds before executing.
+        </Note>
+      )}
       {ms.proposals.length === 0 ? (
         <Note>No live proposal, and none finished recently.</Note>
       ) : (
@@ -191,13 +248,13 @@ export function SquadsPanel({ sq, error, onDone }: { sq: SquadsResp | null; erro
                 <th>Status</th>
                 <th className="num">Approvals</th>
                 <th>Time lock</th>
-                <th>Actions</th>
+                <th>{votes ? "Actions" : "Approve in Squads"}</th>
                 <th>Proposal</th>
               </tr>
             </thead>
             <tbody>
               {ms.proposals.map((p) => (
-                <ProposalRow key={p.index.toString()} p={p} threshold={ms.threshold} now={now} onDone={onDone} />
+                <ProposalRow key={p.index.toString()} p={p} threshold={ms.threshold} now={now} onDone={onDone} multisig={ms.address} cluster={cluster} inAppApproval={votes} />
               ))}
             </tbody>
           </table>

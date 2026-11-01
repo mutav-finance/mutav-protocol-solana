@@ -71,6 +71,45 @@ export function setConfigChanges(data: Uint8Array, config: VaultConfig): ConfigC
   return changes;
 }
 
+/** The values a sparse `set_config` writes, in program field names, without the on-chain values. */
+export function setConfigValues(data: Uint8Array): { field: string; to: string }[] {
+  return getSetConfigInstructionDataDecoder().decode(data).params.map((p) => ({ field: FIELD[p.__kind], to: show(p.fields[0]) }));
+}
+
+/** Risk caps a raise loosens (A-R3-3). */
+const LOOSER_WHEN_HIGHER = new Set(["caps.max_tvl", "caps.max_cover_per_guarantee", "caps.max_claim_per_call", "caps.max_claim_per_period", "caps.max_nav_move_bps"]);
+/** Risk settings a cut loosens (A-R3-3). */
+const LOOSER_WHEN_LOWER = new Set(["coverage_ratio_bps", "caps.stress_buffer"]);
+/** Fields flagged on any change: a wallet and the feature switches. */
+const FLAG_ANY_CHANGE = new Set(["mutav_capital_wallet", "feature_flags"]);
+
+const big = (v: string): bigint | null => {
+  try {
+    return BigInt(v);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Why a `set_config` change is a red flag, or null (A-R3-3): it loosens a
+ * risk cap (raises a limit, lowers the coverage ratio or the stress buffer),
+ * or it changes the capital wallet or the feature flags. `from` null: the
+ * on-chain value is not known, so every risk field it writes is flagged.
+ */
+export function configChangeRisk(field: string, from: string | null, to: string): string | null {
+  if (FLAG_ANY_CHANGE.has(field)) return from === to ? null : "changes a wallet or feature switch";
+  const higher = LOOSER_WHEN_HIGHER.has(field);
+  const lower = LOOSER_WHEN_LOWER.has(field);
+  if (!higher && !lower) return null;
+  const f = from === null ? null : big(from);
+  const t = big(to);
+  if (f === null || t === null) return "risk cap: on-chain value not compared";
+  if (higher && t > f) return "loosens a risk cap (raised)";
+  if (lower && t < f) return "loosens a risk cap (lowered)";
+  return null;
+}
+
 /** A proposal as /api/squads lists it. */
 type ProposalLike = { index: bigint; status: string; instructions: string[]; stale?: boolean };
 
