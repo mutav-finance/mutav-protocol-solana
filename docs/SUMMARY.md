@@ -49,6 +49,7 @@
 * [Authority model and security baseline](security/baseline.md)
 * [Invariants](security/invariants.md)
 * [Governance and keys](security/governance-and-keys.md)
+* [Verify a proposal](security/verify-proposal.md)
 * [Incident response](security/incident-response.md)
 * [Reviews and audits](security/reviews-and-audits.md)
 * [Known limitations](security/known-limitations.md)
