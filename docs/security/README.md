@@ -11,6 +11,7 @@ This section describes how the MUTAV reserve program protects the reserve, who h
 | [Authority model and security baseline](baseline.md) | Proposed ([ADR 0031](../decisions/0031-chain-neutral-authority-model-and-security-levels.md)): the roles without chain terms, security levels L0 to L2, and the conformance table per chain. |
 | [Invariants](invariants.md) | The numbered rules the program keeps after every instruction. |
 | [Governance and keys](governance-and-keys.md) | Roles, multisigs, time locks, guardians, the pauser, and where every key lives. |
+| [Verify a proposal](verify-proposal.md) | The member-side check before approving a Squads proposal: intent files, `verify-proposal`, what MATCH means. |
 | [Incident response](incident-response.md) | Pause scope, the operator-compromise runbook, frozen reserve handling, unsolicited money. |
 | [Reviews and audits](reviews-and-audits.md) | Test suites, layout fixtures, CI gates, the pre-devnet review cycle, the audit plan. |
 | [Known limitations](known-limitations.md) | Features deferred from this release and when they are planned. |
