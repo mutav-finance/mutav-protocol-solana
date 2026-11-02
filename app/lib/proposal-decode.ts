@@ -22,7 +22,7 @@ import {
   type NavBounds,
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
-import { configChangeRisk, setConfigChanges, setConfigValues } from "./config-diff";
+import { configChangeRisk, setConfigValues, setConfigWrites } from "./config-diff";
 import { fmtBrs, fmtDuration, fmtNav } from "./format";
 import { bytesToHex } from "./serde";
 
@@ -241,13 +241,20 @@ function mutavDetails(kind: MutavInstruction, ix: RawInstruction, ctx: DecodeCon
           return { label: c.field, value: `→ ${c.to} (on-chain value not read)${risk ? `: ${risk}` : ""}`, warn: !!risk };
         });
       }
-      const changes = setConfigChanges(d, ctx.config);
-      if (changes.length === 0) return [{ label: "changes", value: "no field differs from on-chain now" }];
-      return changes.map((c) => {
+      // Every written field, also those equal to on-chain now: the proposal still writes them.
+      const writes = setConfigWrites(d, ctx.config);
+      if (writes.length === 0) return [{ label: "changes", value: "writes no field" }];
+      return writes.map((c) => {
+        if (c.same) return { label: c.field, value: `${c.to} (same as on-chain now)` };
         const risk = configChangeRisk(c.field, c.from, c.to);
         return { label: c.field, value: `${c.from} → ${c.to}${risk ? ` (${risk})` : ""}`, warn: !!risk };
       });
     }
+    case MutavInstruction.Unpause:
+      // Lifts the emergency stop: flagged so approvers confirm the cause is fixed.
+      return [{ label: "effect", value: "lifts the pause: capital requests and fills, new guarantees and allocations resume; confirm the cause of the pause is fixed", warn: true }];
+    case MutavInstruction.RevokePauser:
+      return [{ label: "effect", value: "removes the pauser key at once: until a new one accepts, only the guardians and the admin (through Squads) can pause", warn: true }];
     case MutavInstruction.SetGuardians:
       return [{ label: "guardians", value: getSetGuardiansInstructionDataDecoder().decode(d).guardians.join(", ") || "none", warn: true }];
     case MutavInstruction.ApproveClaim: {
@@ -407,6 +414,32 @@ export function squadsConfigChange(squadsProgram: string, actions: SquadsConfigA
   if (actions === null) return { program: "foreign", programId: squadsProgram, name: SQUADS_CONFIG_CHANGE, details: [head, { label: "actions", value: "could not be decoded", warn: true }] };
   if (actions.length === 0) return { program: "foreign", programId: squadsProgram, name: SQUADS_CONFIG_CHANGE, details: [head, { label: "actions", value: "none", warn: true }] };
   return { program: "foreign", programId: squadsProgram, name: SQUADS_CONFIG_CHANGE, details: [head, ...actions.flatMap((a) => configActionDetails(a, now))] };
+}
+
+export const EMPTY_VAULT_TRANSACTION = "empty vault transaction";
+export const UNKNOWN_TRANSACTION_ACCOUNT = "unknown transaction account";
+
+/**
+ * A vault transaction with no instruction: executing it does nothing, and
+ * this app never proposes one. Flagged: it may be a mis-decoded account.
+ */
+export function emptyVaultTransaction(squadsProgram: string): DecodedInstruction {
+  return {
+    program: "foreign",
+    programId: squadsProgram,
+    name: EMPTY_VAULT_TRANSACTION,
+    details: [{ label: "instructions", value: "none: this app never proposes an empty vault transaction; check the proposal in the Squads app before voting", warn: true }],
+  };
+}
+
+/** The proposal's transaction account is neither a Squads vault nor config transaction: nothing about it can be read. */
+export function unknownTransactionAccount(owner: string, reason: string): DecodedInstruction {
+  return {
+    program: "foreign",
+    programId: owner,
+    name: UNKNOWN_TRANSACTION_ACCOUNT,
+    details: [{ label: "account", value: `${reason}: what it would do cannot be shown; do not approve`, warn: true }],
+  };
 }
 
 /** Program ids of the foreign instructions in a decoded proposal. */

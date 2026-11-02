@@ -12,11 +12,13 @@ import {
   getFulfilRedeemsInstruction,
   getProposeAdminInstruction,
   getProposeRoleInstruction,
+  getRevokePauserInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
   getSetGuardiansInstruction,
   getSetPaymentsAccountInstruction,
   getSetTreasuryAccountInstruction,
+  getUnpauseInstruction,
   MUTAV_PROGRAM_ADDRESS,
   NAV_SCALE,
   REFRESH_DISCRIMINATOR,
@@ -209,9 +211,47 @@ describe("A3 proposal decoding: set_config", () => {
   });
   it("without the on-chain config, shows every value open and flags the risk fields", () => {
     const d = decodeInstruction(setConfig([{ __kind: "FeeTakeBps", fields: [1_500] }, { __kind: "MaxClaimPerPeriod", fields: [5n] }]), ctx({ config: undefined }));
-    expect(detail(d, "fee_take_bps")).toEqual({ label: "fee_take_bps", value: "→ 1500 (on-chain value not read)", warn: false });
+    expect(detail(d, "fee_take_bps")).toEqual({ label: "fee_take_bps", value: "→ 1500 (on-chain value not read): risk cap: on-chain value not compared", warn: true });
     expect(detail(d, "caps.max_claim_per_period")?.warn).toBe(true);
     expect(detail(d, "caps.max_claim_per_period")?.value).toContain("→ 5");
+  });
+  it("flags a raised fee take: more of each guarantee fee leaves the reserve for the treasury", () => {
+    const d = decodeInstruction(setConfig([{ __kind: "FeeTakeBps", fields: [config.feeTakeBps + 500] }]), ctx());
+    expect(warns(d)).toEqual(["fee_take_bps"]);
+    expect(detail(d, "fee_take_bps")?.value).toMatch(new RegExp(`^${config.feeTakeBps} → ${config.feeTakeBps + 500} \\(raises MUTAV's take: .*treasury, less to the reserve\\)$`));
+  });
+  it("flags a raised max_request and a lowered min_request, not the reverse", () => {
+    const { minRequest, maxRequest } = config.caps;
+    expect(warns(decodeInstruction(setConfig([{ __kind: "MaxRequest", fields: [maxRequest + 1n] }]), ctx()))).toEqual(["caps.max_request"]);
+    expect(warns(decodeInstruction(setConfig([{ __kind: "MaxRequest", fields: [maxRequest - 1n] }]), ctx()))).toEqual([]);
+    expect(warns(decodeInstruction(setConfig([{ __kind: "MinRequest", fields: [minRequest - 1n] }]), ctx()))).toEqual(["caps.min_request"]);
+    expect(warns(decodeInstruction(setConfig([{ __kind: "MinRequest", fields: [minRequest + 1n] }]), ctx()))).toEqual([]);
+  });
+  it("flags any change to the carved fallbacks (0 → non-zero turns one on)", () => {
+    const d = decodeInstruction(setConfig([{ __kind: "MaxQueueWaitSecs", fields: [config.caps.maxQueueWaitSecs + 86_400n] }, { __kind: "MaxReinstateAge", fields: [config.caps.maxReinstateAge + 1n] }]), ctx());
+    expect(warns(d)).toEqual(["caps.max_queue_wait_secs", "caps.max_reinstate_age"]);
+    expect(detail(d, "caps.max_queue_wait_secs")?.value).toMatch(/exit fallback/);
+    expect(detail(d, "caps.max_reinstate_age")?.value).toMatch(/reinstatement/);
+  });
+  it("lists a written field equal to on-chain now, labelled, not hidden", () => {
+    const d = decodeInstruction(setConfig([{ __kind: "FeeTakeBps", fields: [config.feeTakeBps] }, { __kind: "MaxTvl", fields: [config.caps.maxTvl + 1n] }]), ctx());
+    expect(detail(d, "fee_take_bps")).toEqual({ label: "fee_take_bps", value: `${config.feeTakeBps} (same as on-chain now)` });
+    expect(warns(d)).toEqual(["caps.max_tvl"]);
+  });
+});
+
+describe("A3 proposal decoding: unpause and revoke_pauser", () => {
+  it("flags unpause signed by the vault", () => {
+    const d = decodeInstruction(raw(getUnpauseInstruction({ ...common, admin }, o)), ctx());
+    expect(d.name).toBe("Unpause");
+    expect(warns(d)).toEqual(["effect"]);
+    expect(detail(d, "effect")?.value).toMatch(/lifts the pause/);
+  });
+  it("flags revoke_pauser signed by the vault", () => {
+    const d = decodeInstruction(raw(getRevokePauserInstruction({ ...common, admin }, o)), ctx());
+    expect(d.name).toBe("RevokePauser");
+    expect(warns(d)).toEqual(["effect"]);
+    expect(detail(d, "effect")?.value).toMatch(/removes the pauser key/);
   });
 });
 

@@ -60,15 +60,20 @@ export function setConfigFields(data: Uint8Array): string[] {
 }
 
 export function setConfigChanges(data: Uint8Array, config: VaultConfig): ConfigChange[] {
+  return setConfigWrites(data, config)
+    .filter((c) => !c.same)
+    .map(({ field, from, to }) => ({ field, from, to }));
+}
+
+/** Every field a sparse `set_config` writes, against `config`, including those equal to the on-chain value (`same`). */
+export function setConfigWrites(data: Uint8Array, config: VaultConfig): (ConfigChange & { same: boolean })[] {
   const { params } = getSetConfigInstructionDataDecoder().decode(data);
   const now = configFieldValues(config);
-  const changes: ConfigChange[] = [];
-  for (const p of params) {
+  return params.map((p) => {
     const field = FIELD[p.__kind];
     const to = show(p.fields[0]);
-    if (now[field] !== to) changes.push({ field, from: now[field] ?? "—", to });
-  }
-  return changes;
+    return { field, from: now[field] ?? "—", to, same: now[field] === to };
+  });
 }
 
 /** The values a sparse `set_config` writes, in program field names, without the on-chain values. */
@@ -76,12 +81,25 @@ export function setConfigValues(data: Uint8Array): { field: string; to: string }
   return getSetConfigInstructionDataDecoder().decode(data).params.map((p) => ({ field: FIELD[p.__kind], to: show(p.fields[0]) }));
 }
 
-/** Risk caps a raise loosens (A-R3-3). */
-const LOOSER_WHEN_HIGHER = new Set(["caps.max_tvl", "caps.max_cover_per_guarantee", "caps.max_claim_per_call", "caps.max_claim_per_period", "caps.max_nav_move_bps"]);
-/** Risk settings a cut loosens (A-R3-3). */
-const LOOSER_WHEN_LOWER = new Set(["coverage_ratio_bps", "caps.stress_buffer"]);
-/** Fields flagged on any change: a wallet and the feature switches. */
-const FLAG_ANY_CHANGE = new Set(["mutav_capital_wallet", "feature_flags"]);
+/**
+ * Risk settings a raise loosens (A-R3-3). `fee_take_bps`: a higher take moves
+ * more of each guarantee fee out of the reserve to the treasury
+ * (`contribute_fees`). `caps.max_request`: larger single requests.
+ */
+const LOOSER_WHEN_HIGHER = new Set(["fee_take_bps", "caps.max_tvl", "caps.max_cover_per_guarantee", "caps.max_claim_per_call", "caps.max_claim_per_period", "caps.max_request", "caps.max_nav_move_bps"]);
+/** Risk settings a cut loosens (A-R3-3). `caps.min_request`: smaller requests, more of them in the queue. */
+const LOOSER_WHEN_LOWER = new Set(["coverage_ratio_bps", "caps.stress_buffer", "caps.min_request"]);
+/**
+ * Fields flagged on any change: a wallet, the feature switches, and the carved
+ * fallbacks whose `0` means off (a change from 0 turns on the exit fallback,
+ * ADR 0025, or reinstatement, ADR 0020).
+ */
+const FLAG_ANY_CHANGE: Record<string, string> = {
+  mutav_capital_wallet: "changes a wallet",
+  feature_flags: "changes a feature switch",
+  "caps.max_queue_wait_secs": "changes the exit fallback wait (0 = off)",
+  "caps.max_reinstate_age": "changes the reinstatement window (0 = never)",
+};
 
 const big = (v: string): bigint | null => {
   try {
@@ -93,19 +111,21 @@ const big = (v: string): bigint | null => {
 
 /**
  * Why a `set_config` change is a red flag, or null (A-R3-3): it loosens a
- * risk cap (raises a limit, lowers the coverage ratio or the stress buffer),
- * or it changes the capital wallet or the feature flags. `from` null: the
+ * risk setting (raises a limit or the fee take, lowers the coverage ratio,
+ * the stress buffer or the minimum request), or it changes the capital
+ * wallet, the feature flags or a carved fallback. `from` null: the
  * on-chain value is not known, so every risk field it writes is flagged.
  */
 export function configChangeRisk(field: string, from: string | null, to: string): string | null {
-  if (FLAG_ANY_CHANGE.has(field)) return from === to ? null : "changes a wallet or feature switch";
+  const any = FLAG_ANY_CHANGE[field];
+  if (any) return from === to ? null : any;
   const higher = LOOSER_WHEN_HIGHER.has(field);
   const lower = LOOSER_WHEN_LOWER.has(field);
   if (!higher && !lower) return null;
   const f = from === null ? null : big(from);
   const t = big(to);
   if (f === null || t === null) return "risk cap: on-chain value not compared";
-  if (higher && t > f) return "loosens a risk cap (raised)";
+  if (higher && t > f) return field === "fee_take_bps" ? "raises MUTAV's take: more of each guarantee fee goes to the treasury, less to the reserve" : "loosens a risk cap (raised)";
   if (lower && t < f) return "loosens a risk cap (lowered)";
   return null;
 }

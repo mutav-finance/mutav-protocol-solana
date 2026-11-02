@@ -23,6 +23,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { UNSET_ADDRESS } from "@/lib/reserve-assets";
 import { SquadsPanel, type SquadsResp } from "@/components/admin/Squads";
 import { IN_APP_APPROVAL } from "@/lib/flags";
+import { VERIFY_COMMAND, VERIFY_PROPOSAL_DOC } from "@/lib/squads-link";
 import { rolesError } from "@/lib/admin";
 import { fmtBrs, fmtPct, fmtTime } from "@/lib/format";
 import { ixLabel } from "@/lib/tx-kinds";
@@ -335,7 +336,7 @@ export function General({ mode, sq, sqError, onSquadsDone }: { mode: Mode; sq: S
           Every admin change on this page is a Squads vault-transaction proposal: one member creates it here, members approve it (the creator too, outside localnet), and any member executes it once the threshold is met and the time lock has passed. Members reject a proposal while it is Active, or vote to cancel it once Approved; a live set_config blocks the next one until it runs or is rejected or cancelled.{" "}
           {IN_APP_APPROVAL
             ? "On localnet, approve, reject, cancel and execute below; execute refuses a set_config whose fields moved on-chain since it was proposed."
-            : "Every member, the creator included, approves, rejects, cancels and executes in the Squads client, after checking the proposal with the local verification step; this page shows each proposal decoded, read-only, as a cross-check. The Squads app does not run this app's stale-carry check: confirm a set_config diff still holds before executing."}{" "}
+            : `Every member, the creator included, approves, rejects, cancels and executes in the Squads client, after checking it on their own machine with ${VERIFY_COMMAND} (${VERIFY_PROPOSAL_DOC}); this page shows each proposal decoded, read-only, as a cross-check. When you create one here, your wallet must show only vault_transaction_create and proposal_create: refuse to sign anything else. The Squads app does not run this app's stale-carry check: confirm a set_config diff still holds before executing.`}{" "}
           This page holds no key.
         </Note>
         <SquadsPanel sq={sq} error={sqError} onDone={onSquadsDone} />

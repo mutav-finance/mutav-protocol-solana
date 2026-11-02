@@ -5,7 +5,8 @@
  * every live proposal and the last finished ones, each decoded with every
  * argument open and red flags marked (A3, A-R3-3, NEW-R3-2). Read-only on
  * devnet: members approve, reject, cancel and execute in the Squads app,
- * after the local verification step (NEW-R3-1; founder decision 2026-10-29).
+ * after `bun run verify-proposal` prints MATCH (NEW-R3-1; founder decision
+ * 2026-10-29).
  * Localnet builds only (`IN_APP_APPROVAL`) keep in-app votes and execute,
  * because the Squads app cannot reach a local validator; there, execute
  * refuses a set_config built against values that have moved (stale carry).
@@ -23,10 +24,10 @@ import { postJson } from "@/lib/client/api";
 import { CLUSTER } from "@/lib/client/env";
 import type { Cluster } from "@/lib/cluster";
 import { IN_APP_APPROVAL } from "@/lib/flags";
-import { squadsApproval, VERIFY_BEFORE_APPROVING } from "@/lib/squads-link";
+import { squadsApproval, VERIFY_BEFORE_APPROVING, VERIFY_PROPOSAL_DOC_URL } from "@/lib/squads-link";
 import { useTx } from "@/lib/client/use-tx";
 import { fmtDuration, fmtTime } from "@/lib/format";
-import { SQUADS_CONFIG_CHANGE, squadsPermissions, type DecodedInstruction } from "@/lib/proposal-decode";
+import { EMPTY_VAULT_TRANSACTION, SQUADS_CONFIG_CHANGE, squadsPermissions, UNKNOWN_TRANSACTION_ACCOUNT, type DecodedInstruction } from "@/lib/proposal-decode";
 
 export type ProposalView = {
   index: bigint;
@@ -68,6 +69,9 @@ function useNow(serverNow: bigint | null) {
 type Act = "approve" | "reject" | "cancel" | "execute";
 
 const isConfigChange = (p: ProposalView) => p.decoded.some((d) => d.name === SQUADS_CONFIG_CHANGE);
+/** The transaction account itself is a red flag: unknown, or a vault transaction with no instruction. */
+const isUnreadable = (p: ProposalView) => p.decoded.some((d) => d.name === UNKNOWN_TRANSACTION_ACCOUNT || d.name === EMPTY_VAULT_TRANSACTION);
+const flagLabel = (p: ProposalView) => (isConfigChange(p) ? "SQUADS CONFIG CHANGE" : isUnreadable(p) ? "UNREADABLE PROPOSAL" : "FOREIGN INSTRUCTION");
 
 function DetailList({ items, warn = false }: { items: DecodedInstruction["details"]; warn?: boolean }) {
   return (
@@ -86,7 +90,7 @@ function ProposalInstructions({ p }: { p: ProposalView }) {
   if (p.decoded.length === 0) return <Mono style={{ fontSize: 12 }}>{p.instructions.join(", ") || "—"}</Mono>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {p.foreign.length > 0 && <StatusBadge bordered color="var(--color-error)" label={isConfigChange(p) ? "SQUADS CONFIG CHANGE" : "FOREIGN INSTRUCTION"} />}
+      {p.foreign.length > 0 && <StatusBadge bordered color="var(--color-error)" label={flagLabel(p)} />}
       <ol aria-label={`instructions in proposal ${p.index}`} style={{ margin: 0, paddingLeft: 16, display: "flex", flexDirection: "column", gap: 4 }}>
         {p.decoded.map((d, k) => (
           <li key={k}>
@@ -108,7 +112,7 @@ function ProposalInstructions({ p }: { p: ProposalView }) {
 const statusText = (p: ProposalView, left: bigint | null) =>
   p.status === "Approved" ? (left !== null && left <= 0n ? "Executable" : "Approved · time lock") : p.stale && (p.status === "Active" || p.status === "Draft") ? `${p.status} · stale` : p.status;
 
-/** Where and how members approve: the Squads app, after the local check. */
+/** Where and how members approve: the Squads app, after `bun run verify-proposal`. */
 function ApproveElsewhere({ p, multisig, cluster }: { p: ProposalView; multisig: string; cluster: Cluster }) {
   const link = squadsApproval(cluster, multisig, p.index);
   const open = p.status === "Active" || p.status === "Approved" || p.status === "Draft";
@@ -120,6 +124,9 @@ function ApproveElsewhere({ p, multisig, cluster }: { p: ProposalView; multisig:
       </a>
       <Mono style={{ fontSize: 11, color: "var(--color-text-3)" }}>{link.steps}</Mono>
       <Mono style={{ fontSize: 11, color: "var(--color-error)" }}>{VERIFY_BEFORE_APPROVING}</Mono>
+      <a href={VERIFY_PROPOSAL_DOC_URL} target="_blank" rel="noopener noreferrer" className="font-mono ext-link" style={{ fontSize: 11 }}>
+        How to verify a proposal ↗
+      </a>
     </div>
   );
 }
@@ -172,7 +179,12 @@ function ProposalRow({ p, threshold, now, onDone, multisig, cluster, inAppApprov
       </td>
       <td><Mono dim>{left === null ? "—" : left > 0n ? `${fmtDuration(left)} left` : `since ${fmtTime(p.executableAt!)}`}</Mono></td>
       <td style={{ whiteSpace: "normal" }}>
-        {p.foreign.length > 0 && !isConfigChange(p) && (
+        {isUnreadable(p) && (
+          <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>
+            Unreadable proposal: its transaction account could not be read as a vault transaction with instructions. Do not approve it.
+          </Mono>
+        )}
+        {p.foreign.length > 0 && !isConfigChange(p) && !isUnreadable(p) && (
           <Mono style={{ display: "block", marginBottom: 6, fontSize: 11, color: "var(--color-error)" }}>
             Foreign instruction ({p.foreign.join(", ")}): the vault would sign it. Approve only if you know what it does.
           </Mono>
@@ -204,7 +216,7 @@ export function SquadsPanel({
   cluster?: Cluster;
 }) {
   const now = useNow(sq && sq.configured ? sq.now : null);
-  // Folds to false on devnet builds, so the vote code is dropped there.
+  // False on devnet builds (NEXT_PUBLIC_CLUSTER is inlined at build time); the prop can only narrow it.
   const votes = IN_APP_APPROVAL && inAppApproval;
   if (error && !sq) return <ReadError error={error} />;
   if (!sq) return <Note>Reading the multisig…</Note>;
@@ -233,7 +245,8 @@ export function SquadsPanel({
       </Mono>
       {!votes && (
         <Note>
-          Read-only here: members approve, reject, cancel and execute in the Squads app, not on this page. {VERIFY_BEFORE_APPROVING} Executing a set_config from the Squads app skips this app&apos;s stale-carry check, so confirm its diff still holds before executing.
+          Read-only here: members approve, reject, cancel and execute in the Squads app, not on this page. {VERIFY_BEFORE_APPROVING}{" "}
+          <a href={VERIFY_PROPOSAL_DOC_URL} target="_blank" rel="noopener noreferrer" className="ext-link">How to verify a proposal</a>. When you create a proposal here, your wallet must show only vault_transaction_create and proposal_create: refuse to sign anything else. Executing a set_config from the Squads app skips this app&apos;s stale-carry check, so confirm its diff still holds before executing.
         </Note>
       )}
       {ms.proposals.length === 0 ? (

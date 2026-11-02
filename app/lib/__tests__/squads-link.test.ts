@@ -18,8 +18,10 @@ describe("Squads approval link (NEW-R3-1)", () => {
   it("on localnet there is none: the Squads app cannot reach a local validator", () => {
     expect(squadsApproval("localnet", MS, 1n)).toBeNull();
   });
-  it("the verification note names the local step and says the view is not proof", () => {
-    expect(VERIFY_BEFORE_APPROVING).toMatch(/local verification step/);
+  it("the verification note names bun run verify-proposal, its doc, and says the view is not proof", () => {
+    expect(VERIFY_BEFORE_APPROVING).toContain("bun run verify-proposal");
+    expect(VERIFY_BEFORE_APPROVING).toContain("docs/security/verify-proposal.md");
+    expect(VERIFY_BEFORE_APPROVING).toMatch(/MATCH/);
     expect(VERIFY_BEFORE_APPROVING).toMatch(/not proof/);
   });
 });

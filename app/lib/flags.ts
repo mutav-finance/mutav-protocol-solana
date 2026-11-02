@@ -27,8 +27,12 @@ export const ACCELERATED_CLOCK = process.env.NEXT_PUBLIC_ACCELERATED_CLOCK === "
 export const inAppApproval = (cluster: string | undefined) => cluster === "localnet";
 /**
  * Exactly "localnet" (fails closed on any other spelling, which `parseCluster`
- * would still accept as localnet). The vote component may still ship in devnet
- * bundles, unrendered; the control is server-side: POST /api/squads answers
- * 404 and `composeProposalAction` refuses off localnet.
+ * would still accept as localnet). The literal `process.env.NEXT_PUBLIC_CLUSTER`
+ * reference is inlined by `next build` (only dynamic `process.env[name]`
+ * lookups are not), and going through `inAppApproval` keeps the test on the
+ * real rule. The vote component may still ship in devnet bundles, unrendered;
+ * the control is server-side: POST /api/squads answers 404, and
+ * `composeProposalAction` and the create's approval need this flag and a
+ * localnet `env.cluster` both.
  */
-export const IN_APP_APPROVAL = process.env.NEXT_PUBLIC_CLUSTER === "localnet";
+export const IN_APP_APPROVAL = inAppApproval(process.env.NEXT_PUBLIC_CLUSTER);

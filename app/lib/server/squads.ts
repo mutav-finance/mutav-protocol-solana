@@ -29,9 +29,10 @@ import {
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
 import type { ServerEnv } from "./env";
+import { IN_APP_APPROVAL } from "../flags";
 import { SQUADS_EXECUTE_COMPUTE_UNIT_LIMIT } from "./compose";
 import { baselineCovers, isLiveProposal, parseBaselineMemo, setConfigFields, staleCarry, staleCarryText } from "../config-diff";
-import { contextForProposal, decodeInstruction, foreignPrograms, newMoneyAccount, squadsConfigChange, tokenAccountFacts, type DecodeContext, type DecodedInstruction, type MultisigNow, type RawInstruction, type SquadsConfigAction } from "../proposal-decode";
+import { contextForProposal, decodeInstruction, emptyVaultTransaction, foreignPrograms, newMoneyAccount, squadsConfigChange, tokenAccountFacts, unknownTransactionAccount, type DecodeContext, type DecodedInstruction, type MultisigNow, type RawInstruction, type SquadsConfigAction } from "../proposal-decode";
 import { bytesToHex } from "../serde";
 import type { ReserveView } from "../view";
 
@@ -91,6 +92,35 @@ export function rawInstructions(tx: multisig.generated.VaultTransaction): RawIns
   }));
 }
 
+const VAULT_TX_DISC = Buffer.from(multisig.generated.vaultTransactionDiscriminator);
+const CONFIG_TX_DISC = Buffer.from(multisig.generated.configTransactionDiscriminator);
+
+/**
+ * A proposal's transaction account, decoded by what it is. The SDK decoders
+ * do not check the account discriminator, and a ConfigTransaction's first 81
+ * bytes share the VaultTransaction layout, so trying one decoder and falling
+ * back on a throw can read a config change as an empty vault transaction. The
+ * owner must be the Squads v4 program and the 8-byte discriminator picks the
+ * decoder; anything else is `unknown` (never a clean decode).
+ */
+export type TransactionAccount =
+  | { kind: "vault"; raw: RawInstruction[] }
+  | { kind: "config"; actions: SquadsConfigAction[] }
+  | { kind: "unknown"; owner: string; reason: string };
+
+export function decodeTransactionAccount(info: { owner: PublicKey; data: Buffer }): TransactionAccount {
+  const owner = info.owner.toBase58();
+  if (owner !== SQUADS_PROGRAM) return { kind: "unknown", owner, reason: `owned by ${owner}, not the Squads v4 program ${SQUADS_PROGRAM}` };
+  const disc = Buffer.from(info.data.subarray(0, 8));
+  try {
+    if (disc.length === 8 && disc.equals(VAULT_TX_DISC)) return { kind: "vault", raw: rawInstructions(multisig.generated.VaultTransaction.deserialize(info.data)[0]) };
+    if (disc.length === 8 && disc.equals(CONFIG_TX_DISC)) return { kind: "config", actions: multisig.generated.ConfigTransaction.deserialize(info.data)[0].actions.map(plainConfigAction) };
+  } catch {
+    return { kind: "unknown", owner, reason: "the account data could not be decoded" };
+  }
+  return { kind: "unknown", owner, reason: `discriminator ${bytesToHex(new Uint8Array(disc))} is neither a vault nor a config transaction` };
+}
+
 /** The token accounts each proposal points the payments or treasury at, read once. */
 async function readMoneyAccounts(c: Connection, addrs: string[]): Promise<DecodeContext["tokenAccounts"]> {
   const unique = [...new Set(addrs)];
@@ -111,14 +141,14 @@ async function readMoneyAccounts(c: Connection, addrs: string[]): Promise<Decode
  * once the facts they need: the token accounts set_payments_account /
  * set_treasury_account point at, the NAV now, and the ALLOWLIST root.
  */
-async function decodeProposals<P extends Omit<ProposalView, "decoded" | "foreign"> & { raw: RawInstruction[] | null; configActions: SquadsConfigAction[] | null }>(
+async function decodeProposals<P extends Omit<ProposalView, "decoded" | "foreign"> & { account: TransactionAccount | null }>(
   env: ServerEnv,
   c: Connection,
   shown: P[],
   reserve?: Pick<ReserveView, "config" | "state">,
   msNow?: MultisigNow,
 ): Promise<ProposalView[]> {
-  const flat = shown.flatMap((p) => p.raw ?? []);
+  const flat = shown.flatMap((p) => (p.account?.kind === "vault" ? p.account.raw : []));
   const ctx: DecodeContext = { programId: env.programId, configAddress: env.configAddress };
   if (reserve) {
     const sol = coverageFromAccounts(reserve.config, reserve.state);
@@ -136,14 +166,31 @@ async function decodeProposals<P extends Omit<ProposalView, "decoded" | "foreign
     }
   };
   if (flat.some(isRoot)) ctx.allowlistRoot = env.allowlist.length > 0 ? bytesToHex((await buildAllowlist(env.allowlist)).root) : null;
-  return shown.map(({ raw, configActions, ...p }) => {
-    // Not a vault transaction: a Squads config change, every action decoded and flagged (NEW-R3-2).
+  return shown.map(({ account, ...p }) => {
     // Checks against the NAV now only for proposals that can still execute.
     const pctx = contextForProposal(ctx, isLiveProposal(p));
-    const decoded = raw ? raw.map((ix) => decodeInstruction(ix, pctx)) : [squadsConfigChange(SQUADS_PROGRAM, configActions, msNow)];
+    const decoded = decodeAccount(account, pctx, msNow);
     const instructions = decoded.map((d) => (d.program === "foreign" ? `${d.name} (${d.programId})` : d.name));
     return { ...p, instructions, decoded, foreign: foreignPrograms(decoded) };
   });
+}
+
+/**
+ * One transaction account as the approvers read it. A config change has every
+ * action decoded and flagged (NEW-R3-2); an unknown account or a vault
+ * transaction with no instruction is a red flag of its own. No account (closed
+ * or never created): nothing to show.
+ */
+export function decodeAccount(account: TransactionAccount | null, ctx: DecodeContext, msNow?: MultisigNow): DecodedInstruction[] {
+  if (!account) return [];
+  switch (account.kind) {
+    case "vault":
+      return account.raw.length === 0 ? [emptyVaultTransaction(SQUADS_PROGRAM)] : account.raw.map((ix) => decodeInstruction(ix, ctx));
+    case "config":
+      return [squadsConfigChange(SQUADS_PROGRAM, account.actions, msNow)];
+    case "unknown":
+      return [unknownTransactionAccount(account.owner, account.reason)];
+  }
 }
 
 /** A Squads `ConfigAction` as plain values for the decoder (every variant of `ConfigActionRecord`). */
@@ -215,26 +262,13 @@ export async function readMultisig(env: ServerEnv, now: bigint, reserve?: Pick<R
   ]);
   const infos: Awaited<ReturnType<Connection["getMultipleAccountsInfo"]>> = [];
   for (let k = 0; k < pdas.length; k += BATCH) infos.push(...(await c.getMultipleAccountsInfo(pdas.slice(k, k + BATCH))));
-  type Scanned = Omit<ProposalView, "decoded" | "foreign"> & { raw: RawInstruction[] | null; configActions: SquadsConfigAction[] | null };
+  type Scanned = Omit<ProposalView, "decoded" | "foreign"> & { account: TransactionAccount | null };
   const all: Scanned[] = indices.map((i, n) => {
     const txPda = pdas[2 * n]!;
     const propPda = pdas[2 * n + 1]!;
     const txInfo = infos[2 * n] ?? null;
     const propInfo = infos[2 * n + 1] ?? null;
-    let raw: RawInstruction[] | null = [];
-    let configActions: SquadsConfigAction[] | null = null;
-    if (txInfo) {
-      try {
-        raw = rawInstructions(multisig.accounts.VaultTransaction.fromAccountInfo(txInfo)[0]);
-      } catch {
-        raw = null;
-        try {
-          configActions = multisig.accounts.ConfigTransaction.fromAccountInfo(txInfo)[0].actions.map(plainConfigAction);
-        } catch {
-          configActions = null;
-        }
-      }
-    }
+    const account = txInfo ? decodeTransactionAccount(txInfo) : null;
     let view: Omit<ProposalView, "instructions" | "decoded" | "foreign" | "index" | "transaction" | "proposal" | "stale"> = {
       status: "None",
       statusAt: null,
@@ -258,7 +292,7 @@ export async function readMultisig(env: ServerEnv, now: bigint, reserve?: Pick<R
         executableAt,
       };
     }
-    return { index: i, transaction: txPda.toBase58(), proposal: propPda.toBase58(), instructions: [], raw, configActions, stale: i <= staleIndex, ...view };
+    return { index: i, transaction: txPda.toBase58(), proposal: propPda.toBase58(), instructions: [], account, stale: i <= staleIndex, ...view };
   });
   const live = all.filter((p) => isLiveProposal(p));
   const finished = all.filter((p) => !isLiveProposal(p) && p.status !== "None").slice(0, RECENT_FINISHED);
@@ -308,10 +342,14 @@ async function unsigned(env: ServerEnv, payer: string, ixs: TransactionInstructi
 
 /**
  * Compose an unsigned proposal create for a member's wallet. Off localnet it
- * is create-only (vault transaction + proposal): the creator approves in the
- * Squads client after the local verification step, like every other member,
- * so bytes swapped on this origin never carry an approval (NEW-R3-1). On
- * localnet the creator's approval is included, for the demo and the e2e.
+ * is create-only (vault_transaction_create + proposal_create): the creator
+ * approves in the Squads client after `bun run verify-proposal`, like every
+ * other member, so this app never composes an approval off localnet
+ * (NEW-R3-1). The member's wallet must show only those two instructions; it
+ * cannot tell whether this server swapped the inner bytes, which is what the
+ * local verification checks. The creator's approval is included only when
+ * both the build (`IN_APP_APPROVAL`) and `env.cluster` are localnet, for the
+ * demo and the e2e.
  */
 export async function composeProposalCreate(env: ServerEnv, member: string, inner: Instruction[], memo: string): Promise<{ tx: string; index: bigint }> {
   if (!env.squadsMultisig) throw new Error("SQUADS_MULTISIG is not set");
@@ -335,7 +373,7 @@ export async function composeProposalCreate(env: ServerEnv, member: string, inne
       memo,
     }),
     multisig.instructions.proposalCreate({ multisigPda: msPda, transactionIndex: index, creator, rentPayer: creator }),
-    ...(env.cluster === "localnet" ? [multisig.instructions.proposalApprove({ multisigPda: msPda, transactionIndex: index, member: creator })] : []),
+    ...(IN_APP_APPROVAL && env.cluster === "localnet" ? [multisig.instructions.proposalApprove({ multisigPda: msPda, transactionIndex: index, member: creator })] : []),
   ];
   return { tx: await unsigned(env, member, ixs), index };
 }
@@ -344,12 +382,12 @@ export type ProposalAction = "approve" | "reject" | "cancel" | "execute";
 
 /**
  * Compose an unsigned vote (approve, reject, cancel) or execute for a
- * member's wallet. Localnet only: on devnet members vote and execute in the
- * Squads app, after the local verification step (NEW-R3-1). The route also
- * refuses on a non-localnet build (`IN_APP_APPROVAL`).
+ * member's wallet. Localnet only, by build (`IN_APP_APPROVAL`) and by
+ * `env.cluster` both: on devnet members vote and execute in the Squads app,
+ * after `bun run verify-proposal` (NEW-R3-1). The route also refuses.
  */
 export async function composeProposalAction(env: ServerEnv, member: string, index: bigint, action: ProposalAction, config?: VaultConfig): Promise<string> {
-  if (env.cluster !== "localnet") throw new ProposalRefusedError(`${action} is not offered on ${env.cluster}: approve, reject, cancel and execute in the Squads app`);
+  if (!IN_APP_APPROVAL || env.cluster !== "localnet") throw new ProposalRefusedError(`${action} is not offered on ${env.cluster}: approve, reject, cancel and execute in the Squads app`);
   if (!env.squadsMultisig) throw new Error("SQUADS_MULTISIG is not set");
   const args = { multisigPda: pk(env.squadsMultisig), transactionIndex: index, member: pk(member) };
   switch (action) {
@@ -535,7 +573,9 @@ async function assertNoStaleCarry(env: ServerEnv, index: bigint, config: VaultCo
   const [txPda] = multisig.getTransactionPda({ multisigPda: pk(env.squadsMultisig!), index });
   const info = await conn(env).getAccountInfo(txPda, "confirmed");
   if (!info) return;
-  const [vt] = multisig.accounts.VaultTransaction.fromAccountInfo(info);
+  const account = decodeTransactionAccount(info);
+  if (account.kind !== "vault") throw new ProposalRefusedError(`proposal #${index} is not a vault transaction${account.kind === "unknown" ? ` (${account.reason})` : ""}: nothing to execute here`);
+  const [vt] = multisig.generated.VaultTransaction.deserialize(info.data);
   const fields = setConfigFieldsOf(vt, env.programId);
   if (fields === null) return;
   const baseline = parseBaselineMemo(await readCreateMemo(env, index, vt.creator.toBase58()));

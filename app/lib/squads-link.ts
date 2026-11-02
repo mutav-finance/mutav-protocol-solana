@@ -37,6 +37,16 @@ export function squadsApproval(cluster: Cluster, multisig: string, index: bigint
   };
 }
 
+/** The local check every member runs before approving (repo root; PR #114). */
+export const VERIFY_COMMAND = "bun run verify-proposal";
+/** How to run it: intent file, RPC, MATCH. */
+export const VERIFY_PROPOSAL_DOC = "docs/security/verify-proposal.md";
+export const VERIFY_PROPOSAL_DOC_URL = "https://github.com/mutav-finance/mutav-protocol-solana/blob/main/docs/security/verify-proposal.md";
+
 /** The one-line rule shown with every proposal. */
 export const VERIFY_BEFORE_APPROVING =
-  "Before approving, check this proposal with the local verification step: this decoded view comes from the same site that built it, so it is a cross-check, not proof.";
+  `Before approving, run ${VERIFY_COMMAND} on your own machine (${VERIFY_PROPOSAL_DOC}) and approve only on MATCH: this decoded view comes from the same site that built it, so it is a cross-check, not proof.`;
+
+/** What the wallet must show when this app creates a proposal (NEW-R3-1). */
+export const CREATE_PREVIEW_RULE =
+  "Your wallet must show only vault_transaction_create and proposal_create: refuse to sign anything else.";
