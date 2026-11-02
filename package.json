@@ -14,6 +14,7 @@
     "idl-compat": "bun scripts/idl-compat.ts",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
     "dry-run": "bun scripts/devnet/dry-run.ts",
+    "governance-watch": "bun scripts/governance/watch.ts",
     "fork": "bun tests-fork/happy-path.ts"
   },
   "devDependencies": {

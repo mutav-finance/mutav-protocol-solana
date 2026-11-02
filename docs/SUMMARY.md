@@ -49,6 +49,8 @@
 * [Authority model and security baseline](security/baseline.md)
 * [Invariants](security/invariants.md)
 * [Governance and keys](security/governance-and-keys.md)
+* [Signing ceremony](security/signing-ceremony.md)
+* [Governance watch](security/governance-watch.md)
 * [Incident response](security/incident-response.md)
 * [Reviews and audits](security/reviews-and-audits.md)
 * [Known limitations](security/known-limitations.md)
