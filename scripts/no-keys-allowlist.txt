@@ -53,6 +53,9 @@ scripts/governance/notify.ts import \{ existsSync, readFileSync \} from 'node:fs
 # Reads the program binary (--so, never a key) to check its executable hash.
 scripts/devnet/deploy.ts import \{ readFileSync, statSync \} from 'node:fs'|readSo: \(p\) => readFileSync\(p\)
 
+# Reads the intent JSON (--intent, .json) and the locally built program (--so, .so) to verify a proposal; never a key.
+scripts/release/verify-proposal.ts import \{ readFileSync \} from 'node:fs'|const readLocal = \(p: string\) => new Uint8Array\(readFileSync\(p\)\)
+
 # The program keypair path handed to the Solana CLI; never opened.
 scripts/devnet/deploy.ts -keypair\.json
 scripts/devnet/lib/cli.ts -keypair\.json

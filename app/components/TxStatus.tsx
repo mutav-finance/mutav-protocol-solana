@@ -8,6 +8,8 @@
  */
 import type { TxState } from "@/lib/client/use-tx";
 import { Explorer } from "@/components/Explorer";
+import { IN_APP_APPROVAL } from "@/lib/flags";
+import { CREATE_PREVIEW_RULE, VERIFY_COMMAND } from "@/lib/squads-link";
 import { refusalLine, type RefusalContext } from "@/lib/tx-error";
 
 const PHASE: Record<TxState["phase"], string> = {
@@ -29,10 +31,14 @@ export function TxStatus({ state, showAccounts = true, refusal }: { state: TxSta
         <span aria-hidden="true" style={{ width: 6, height: 6, background: color, flexShrink: 0 }} />
         <span className="font-body" style={{ fontSize: 12, color }}>
           {state.phase === "failed" && state.errorName ? "Refused" : PHASE[state.phase]}
-          {state.proposalIndex !== null && state.phase === "confirmed" ? ` — Squads proposal #${state.proposalIndex} created and approved by you` : ""}
+          {state.proposalIndex !== null && state.phase === "confirmed" ? IN_APP_APPROVAL ? ` — Squads proposal #${state.proposalIndex} created and approved by you` : ` — Squads proposal #${state.proposalIndex} created: approve it in the Squads client after ${VERIFY_COMMAND} prints MATCH` : ""}
         </span>
         {state.signature && <Explorer kind="tx" value={state.signature} />}
       </div>
+      {/* A proposal create off localnet carries no approval: anything else in the wallet preview is not what this app composed (NEW-R3-1). */}
+      {state.proposalIndex !== null && state.phase === "signing" && !IN_APP_APPROVAL && (
+        <span className="font-mono" style={{ fontSize: 11, color: "var(--color-error)" }}>{CREATE_PREVIEW_RULE}</span>
+      )}
       {state.error && state.errorName ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <p className="font-body" style={{ fontSize: 14, color: "var(--color-text)", margin: 0, lineHeight: 1.5 }}>

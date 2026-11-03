@@ -11,6 +11,7 @@ This section describes how the MUTAV reserve program protects the reserve, who h
 | [Authority model and security baseline](baseline.md) | Proposed ([ADR 0031](../decisions/0031-chain-neutral-authority-model-and-security-levels.md)): the roles without chain terms, security levels L0 to L2, and the conformance table per chain. |
 | [Invariants](invariants.md) | The numbered rules the program keeps after every instruction. |
 | [Governance and keys](governance-and-keys.md) | Roles, multisigs, time locks, guardians, the pauser, and where every key lives. |
+| [Verify a proposal](verify-proposal.md) | The member-side check before approving a Squads proposal: intent files, `verify-proposal`, what MATCH means. |
 | [Signing ceremony](signing-ceremony.md) | The steps for every Squads proposal: intent first, create only, verify on your own machine, approve through different interfaces. |
 | [Governance watch](governance-watch.md) | The scheduled read-only watcher that compares multisigs, program, config, nonces and reserve outflows against the repo, and its limits. |
 | [Incident response](incident-response.md) | Pause scope, the operator-compromise runbook, frozen reserve handling, unsolicited money. |

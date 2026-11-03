@@ -12,16 +12,19 @@ import {
   getFulfilRedeemsInstruction,
   getProposeAdminInstruction,
   getProposeRoleInstruction,
+  getRevokePauserInstruction,
   getSetAllowlistRootInstruction,
   getSetConfigInstruction,
+  getSetGuardiansInstruction,
   getSetPaymentsAccountInstruction,
   getSetTreasuryAccountInstruction,
+  getUnpauseInstruction,
   MUTAV_PROGRAM_ADDRESS,
   NAV_SCALE,
   REFRESH_DISCRIMINATOR,
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
-import { COMPUTE_BUDGET_PROGRAM, contextForProposal, decodeInstruction, squadsConfigChange, foreignPrograms, newMoneyAccount, tokenAccountFacts, type DecodeContext, type RawInstruction, type TokenAccountFacts } from "../proposal-decode";
+import { COMPUTE_BUDGET_PROGRAM, contextForProposal, decodeInstruction, squadsConfigChange, squadsPermissions, SQUADS_CONFIG_CHANGE, type SquadsConfigAction, foreignPrograms, newMoneyAccount, tokenAccountFacts, type DecodeContext, type RawInstruction, type TokenAccountFacts } from "../proposal-decode";
 import { bytesToHex } from "../serde";
 import { config as baseConfig } from "./fixtures";
 
@@ -39,6 +42,7 @@ const TREASURY = a("SysvarRent111111111111111111111111111111111");
 const PAYMENTS = a("SysvarC1ock11111111111111111111111111111111");
 const NEW_ACCOUNT = a("Stake11111111111111111111111111111111111111");
 const ANY = a("11111111111111111111111111111111");
+const SQUADS = "SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf";
 
 const config = { ...baseConfig(), reserveMint: MINT, reserveTokenProgram: TOKEN, operator: OPERATOR, treasuryAccount: TREASURY, paymentsAccount: PAYMENTS } as unknown as VaultConfig;
 const admin = createNoopSigner(VAULT);
@@ -71,12 +75,12 @@ function splAccount(f: { mint: Address; owner: Address; delegate?: Address; clos
 }
 
 describe("A3 proposal decoding: roles", () => {
-  it("propose_role shows the role and the new key", () => {
+  it("propose_role shows the role and flags the new key (A-R3-3)", () => {
     const d = decodeInstruction(raw(getProposeRoleInstruction({ ...common, admin, role: 2, key: NEW_KEY }, o)), ctx());
     expect(d).toMatchObject({ program: "mutav", name: "ProposeRole" });
     expect(detail(d, "role")?.value).toBe("pauser");
-    expect(detail(d, "new key")?.value).toBe(NEW_KEY);
-    expect(warns(d)).toEqual([]);
+    expect(detail(d, "new key")).toEqual({ label: "new key", value: NEW_KEY, warn: true });
+    expect(warns(d)).toEqual(["new key"]);
   });
   it("cancel_pending shows the role", () => {
     const d = decodeInstruction(raw(getCancelPendingInstruction({ ...common, admin, role: 1 }, o)), ctx());
@@ -86,6 +90,10 @@ describe("A3 proposal decoding: roles", () => {
     const d = decodeInstruction(raw(getProposeAdminInstruction({ ...common, admin, key: NEW_KEY }, o)), ctx());
     expect(detail(d, "role")?.value).toBe("admin");
     expect(detail(d, "new key")).toEqual({ label: "new key", value: NEW_KEY, warn: true });
+  });
+  it("set_guardians shows the guardians, flagged (A-R3-3)", () => {
+    const d = decodeInstruction(raw(getSetGuardiansInstruction({ ...common, admin, guardians: [NEW_KEY, OWNER, ANY] }, o)), ctx());
+    expect(detail(d, "guardians")).toEqual({ label: "guardians", value: `${NEW_KEY}, ${OWNER}, ${ANY}`, warn: true });
   });
   it("flags an instruction aimed at another reserve's config", () => {
     const d = decodeInstruction(raw(getCancelPendingInstruction({ ...common, config: OTHER_CONFIG, admin, role: 1 }, o)), ctx());
@@ -105,14 +113,14 @@ describe("A3 proposal decoding: payments and treasury accounts", () => {
     expect(newMoneyAccount(treasury, PROGRAM)).toBe(NEW_ACCOUNT);
     expect(newMoneyAccount(raw(getCancelPendingInstruction({ ...common, admin, role: 1 }, o)), PROGRAM)).toBeNull();
   });
-  it("shows the SPL owner, mint and delegate of a clean account with no flag", () => {
+  it("shows the SPL owner, mint and delegate of a clean account; only the account change itself is flagged (A-R3-3)", () => {
     const d = decodeInstruction(payments, ctx({ tokenAccounts: facts({ mint: MINT, owner: OWNER }), paymentsOwner: OWNER }));
     expect(d.name).toBe("SetPaymentsAccount");
     expect(detail(d, "new payments account")?.value).toBe(NEW_ACCOUNT);
     expect(detail(d, "SPL owner")?.value).toBe(OWNER);
     expect(detail(d, "mint")?.value).toBe(MINT);
     expect(detail(d, "delegate")?.value).toBe("none");
-    expect(warns(d)).toEqual([]);
+    expect(warns(d)).toEqual(["new payments account"]);
   });
   it("flags a delegate, a close authority, a foreign mint, an operator owner and a freeze", () => {
     const d = decodeInstruction(treasury, ctx({ tokenAccounts: facts({ mint: ANY, owner: OPERATOR, delegate: NEW_KEY, closeAuthority: NEW_KEY, frozen: true }) }));
@@ -185,6 +193,65 @@ describe("A3 proposal decoding: set_config", () => {
     const d = decodeInstruction(ix, ctx());
     expect(d.name).toBe("SetConfig");
     expect(detail(d, "fee_take_bps")?.value).toBe("2000 → 1500");
+    expect(warns(d)).toEqual([]);
+  });
+  const setConfig = (params: Parameters<typeof getSetConfigInstruction>[0]["params"]) =>
+    raw(getSetConfigInstruction({ ...common, admin, state: ANY, treasuryAccount: TREASURY, paymentsAccount: PAYMENTS, params }, o));
+  it("flags a raised risk cap and a lowered coverage ratio, not a tightening (A-R3-3)", () => {
+    const c = config.caps.maxClaimPerCall;
+    const raised = decodeInstruction(setConfig([{ __kind: "MaxClaimPerCall", fields: [c * 1000n] }]), ctx());
+    expect(warns(raised)).toEqual(["caps.max_claim_per_call"]);
+    expect(detail(raised, "caps.max_claim_per_call")?.value).toMatch(/loosens a risk cap \(raised\)/);
+    const lowered = decodeInstruction(setConfig([{ __kind: "MaxClaimPerCall", fields: [c / 2n] }]), ctx());
+    expect(warns(lowered)).toEqual([]);
+    const ratio = decodeInstruction(setConfig([{ __kind: "CoverageRatioBps", fields: [config.coverageRatioBps - 1] }]), ctx());
+    expect(warns(ratio)).toEqual(["coverage_ratio_bps"]);
+    const tvl = decodeInstruction(setConfig([{ __kind: "MaxTvl", fields: [config.caps.maxTvl + 1n] }]), ctx());
+    expect(warns(tvl)).toEqual(["caps.max_tvl"]);
+  });
+  it("without the on-chain config, shows every value open and flags the risk fields", () => {
+    const d = decodeInstruction(setConfig([{ __kind: "FeeTakeBps", fields: [1_500] }, { __kind: "MaxClaimPerPeriod", fields: [5n] }]), ctx({ config: undefined }));
+    expect(detail(d, "fee_take_bps")).toEqual({ label: "fee_take_bps", value: "→ 1500 (on-chain value not read): risk cap: on-chain value not compared", warn: true });
+    expect(detail(d, "caps.max_claim_per_period")?.warn).toBe(true);
+    expect(detail(d, "caps.max_claim_per_period")?.value).toContain("→ 5");
+  });
+  it("flags a raised fee take: more of each guarantee fee leaves the reserve for the treasury", () => {
+    const d = decodeInstruction(setConfig([{ __kind: "FeeTakeBps", fields: [config.feeTakeBps + 500] }]), ctx());
+    expect(warns(d)).toEqual(["fee_take_bps"]);
+    expect(detail(d, "fee_take_bps")?.value).toMatch(new RegExp(`^${config.feeTakeBps} → ${config.feeTakeBps + 500} \\(raises MUTAV's take: .*treasury, less to the reserve\\)$`));
+  });
+  it("flags a raised max_request and a lowered min_request, not the reverse", () => {
+    const { minRequest, maxRequest } = config.caps;
+    expect(warns(decodeInstruction(setConfig([{ __kind: "MaxRequest", fields: [maxRequest + 1n] }]), ctx()))).toEqual(["caps.max_request"]);
+    expect(warns(decodeInstruction(setConfig([{ __kind: "MaxRequest", fields: [maxRequest - 1n] }]), ctx()))).toEqual([]);
+    expect(warns(decodeInstruction(setConfig([{ __kind: "MinRequest", fields: [minRequest - 1n] }]), ctx()))).toEqual(["caps.min_request"]);
+    expect(warns(decodeInstruction(setConfig([{ __kind: "MinRequest", fields: [minRequest + 1n] }]), ctx()))).toEqual([]);
+  });
+  it("flags any change to the carved fallbacks (0 → non-zero turns one on)", () => {
+    const d = decodeInstruction(setConfig([{ __kind: "MaxQueueWaitSecs", fields: [config.caps.maxQueueWaitSecs + 86_400n] }, { __kind: "MaxReinstateAge", fields: [config.caps.maxReinstateAge + 1n] }]), ctx());
+    expect(warns(d)).toEqual(["caps.max_queue_wait_secs", "caps.max_reinstate_age"]);
+    expect(detail(d, "caps.max_queue_wait_secs")?.value).toMatch(/exit fallback/);
+    expect(detail(d, "caps.max_reinstate_age")?.value).toMatch(/reinstatement/);
+  });
+  it("lists a written field equal to on-chain now, labelled, not hidden", () => {
+    const d = decodeInstruction(setConfig([{ __kind: "FeeTakeBps", fields: [config.feeTakeBps] }, { __kind: "MaxTvl", fields: [config.caps.maxTvl + 1n] }]), ctx());
+    expect(detail(d, "fee_take_bps")).toEqual({ label: "fee_take_bps", value: `${config.feeTakeBps} (same as on-chain now)` });
+    expect(warns(d)).toEqual(["caps.max_tvl"]);
+  });
+});
+
+describe("A3 proposal decoding: unpause and revoke_pauser", () => {
+  it("flags unpause signed by the vault", () => {
+    const d = decodeInstruction(raw(getUnpauseInstruction({ ...common, admin }, o)), ctx());
+    expect(d.name).toBe("Unpause");
+    expect(warns(d)).toEqual(["effect"]);
+    expect(detail(d, "effect")?.value).toMatch(/lifts the pause/);
+  });
+  it("flags revoke_pauser signed by the vault", () => {
+    const d = decodeInstruction(raw(getRevokePauserInstruction({ ...common, admin }, o)), ctx());
+    expect(d.name).toBe("RevokePauser");
+    expect(warns(d)).toEqual(["effect"]);
+    expect(detail(d, "effect")?.value).toMatch(/removes the pauser key/);
   });
 });
 
@@ -223,11 +290,11 @@ describe("A3 proposal decoding: outside the admin set", () => {
     expect(d.name).toBe("unknown");
     expect(warns(d)).toEqual(["data"]);
   });
-  it("flags a Squads config change as foreign, pointing to the Squads UI", () => {
-    const d = squadsConfigChange("SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf", ["AddMember", "ChangeThreshold"]);
-    expect(d.program).toBe("foreign");
-    expect(d.details[0]).toEqual({ label: "changes", value: "members/threshold — review in the Squads UI", warn: true });
-    expect(d.details[1]?.value).toBe("AddMember, ChangeThreshold");
+  it("flags a Squads config change whose actions cannot be decoded", () => {
+    const d = squadsConfigChange(SQUADS, null);
+    expect(d).toMatchObject({ program: "foreign", programId: SQUADS, name: SQUADS_CONFIG_CHANGE });
+    expect(d.details.every((x) => x.warn)).toBe(true);
+    expect(d.details[1]).toEqual({ label: "actions", value: "could not be decoded", warn: true });
   });
 });
 
@@ -259,5 +326,82 @@ describe("A3 proposal decoding: claims and the capital queue (ADR 0021, ADR 0030
     const d = decodeInstruction(raw(getAdvanceQueueHeadInstruction({ ...common, state: ANY, queue: 2, max: 4 }, o)), ctx());
     expect(warns(d)).toEqual([]);
     expect(detail(d, "queue")?.value).toBe("2");
+  });
+});
+
+describe("NEW-R3-2 Squads config actions: every action decoded with its arguments, all flagged", () => {
+  const M1 = "Vote111111111111111111111111111111111111111";
+  const M2 = "Stake11111111111111111111111111111111111111";
+  const now = { threshold: 2, timeLock: 86_400, members: [{ key: M1, permissions: 7 }, { key: M2, permissions: 7 }] };
+  const one = (a: SquadsConfigAction) => squadsConfigChange(SQUADS, [a], now);
+  const values = (d: ReturnType<typeof one>) => Object.fromEntries(d.details.map((x) => [x.label, x.value]));
+  const allWarn = (d: ReturnType<typeof one>) => expect(d.details.every((x) => x.warn === true)).toBe(true);
+
+  it("AddMember: key and permissions", () => {
+    const d = one({ kind: "AddMember", key: OWNER, permissions: 7 });
+    allWarn(d);
+    expect(d.name).toBe(SQUADS_CONFIG_CHANGE);
+    expect(values(d)["AddMember: key"]).toBe(OWNER);
+    expect(values(d)["AddMember: permissions"]).toBe("Initiate, Vote, Execute (mask 7)");
+  });
+  it("AddMember: an existing member is named", () => {
+    expect(values(one({ kind: "AddMember", key: M1, permissions: 2 }))["AddMember: key"]).toBe(`${M1} (already a member)`);
+  });
+  it("RemoveMember: key, and a key that is not a member", () => {
+    const d = one({ kind: "RemoveMember", key: M2 });
+    allWarn(d);
+    expect(values(d)["RemoveMember: key"]).toBe(M2);
+    expect(values(one({ kind: "RemoveMember", key: OWNER }))["RemoveMember: key"]).toBe(`${OWNER} (not a member now)`);
+  });
+  it("ChangeThreshold: old → new, and a threshold of 1 called out", () => {
+    const d = one({ kind: "ChangeThreshold", threshold: 1 });
+    allWarn(d);
+    expect(values(d)["ChangeThreshold: threshold"]).toBe("2 → 1 (one key alone controls the vault)");
+    expect(values(squadsConfigChange(SQUADS, [{ kind: "ChangeThreshold", threshold: 3 }]))["ChangeThreshold: threshold"]).toBe("3");
+  });
+  it("SetTimeLock: old → new in seconds, and zero called out", () => {
+    const d = one({ kind: "SetTimeLock", seconds: 0 });
+    allWarn(d);
+    expect(values(d)["SetTimeLock: time lock"]).toBe("1d 00h → 0s (0 s) (no delay: approved proposals execute at once)");
+    expect(values(one({ kind: "SetTimeLock", seconds: 3_600 }))["SetTimeLock: time lock"]).toBe("1d 00h → 1h 00m (3600 s)");
+  });
+  it("AddSpendingLimit: every field", () => {
+    const d = one({ kind: "AddSpendingLimit", createKey: ANY, vaultIndex: 0, mint: MINT, amount: 5_000_000n, period: 1, members: [M1], destinations: [] });
+    allWarn(d);
+    const v = values(d);
+    expect(v["AddSpendingLimit: mint"]).toBe(MINT);
+    expect(v["AddSpendingLimit: amount (base units)"]).toBe("5000000");
+    expect(v["AddSpendingLimit: period"]).toBe("per day");
+    expect(v["AddSpendingLimit: members"]).toBe(M1);
+    expect(v["AddSpendingLimit: destinations"]).toBe("any destination");
+    expect(v["AddSpendingLimit: vault index"]).toBe("0");
+    expect(v["AddSpendingLimit: create key"]).toBe(ANY);
+    expect(v["AddSpendingLimit: effect"]).toMatch(/no vote/);
+  });
+  it("RemoveSpendingLimit: the spending limit account", () => {
+    const d = one({ kind: "RemoveSpendingLimit", spendingLimit: NEW_ACCOUNT });
+    allWarn(d);
+    expect(values(d)["RemoveSpendingLimit: spending limit"]).toBe(NEW_ACCOUNT);
+  });
+  it("SetRentCollector: a key or none", () => {
+    const d = one({ kind: "SetRentCollector", rentCollector: OWNER });
+    allWarn(d);
+    expect(values(d)["SetRentCollector: rent collector"]).toBe(OWNER);
+    expect(values(one({ kind: "SetRentCollector", rentCollector: null }))["SetRentCollector: rent collector"]).toMatch(/^none/);
+  });
+  it("an unknown action is named and flagged", () => {
+    const d = one({ kind: "Unknown", name: "Mystery" });
+    allWarn(d);
+    expect(values(d)["unknown config action"]).toBe("Mystery");
+  });
+  it("several actions in one proposal are all listed, in order", () => {
+    const d = squadsConfigChange(SQUADS, [{ kind: "AddMember", key: OWNER, permissions: 7 }, { kind: "ChangeThreshold", threshold: 1 }], now);
+    expect(d.details.map((x) => x.label)).toEqual(["changes", "AddMember: key", "AddMember: permissions", "ChangeThreshold: threshold"]);
+    allWarn(d);
+  });
+  it("permissions name each bit and any unknown one", () => {
+    expect(squadsPermissions(2)).toBe("Vote (mask 2)");
+    expect(squadsPermissions(0)).toBe("none (mask 0)");
+    expect(squadsPermissions(9)).toBe("Initiate + unknown bits 0x8 (mask 9)");
   });
 });

@@ -7,6 +7,7 @@ import { boundedBody } from "@/lib/server/relay";
 import { composeProposalAction, readMultisig, vaultAddress, type ProposalAction } from "@/lib/server/squads";
 import { decode, jsonResponse } from "@/lib/serde";
 import { MockChainError, mockEnabled, mockSquads } from "@/lib/server/mock";
+import { IN_APP_APPROVAL } from "@/lib/flags";
 
 /** The admin multisig and its recent proposals, or why there is none. */
 export async function GET(req: Request) {
@@ -29,8 +30,14 @@ export async function GET(req: Request) {
 
 const ACTIONS: readonly ProposalAction[] = ["approve", "reject", "cancel", "execute"];
 
-/** Compose an unsigned approve, reject, cancel or execute transaction for a member's wallet. */
+/**
+ * Compose an unsigned approve, reject, cancel or execute transaction for a
+ * member's wallet. Localnet builds only (`IN_APP_APPROVAL`, fixed at build
+ * time): elsewhere members vote and execute in the Squads app (NEW-R3-1,
+ * NEW-R3-2), and this route answers 404 before reading the body.
+ */
 export async function POST(req: Request) {
+  if (!IN_APP_APPROVAL) return jsonResponse({ error: "not found: approve, reject, cancel and execute proposals in the Squads app" }, { status: 404 });
   try {
     if (mockEnabled()) throw new MockChainError();
     const body = decode<{ action: ProposalAction; index: bigint; member: string }>(await boundedBody(req));

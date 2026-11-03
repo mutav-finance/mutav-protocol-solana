@@ -13,6 +13,7 @@
     "check:no-keys": "bash scripts/check-no-keys.sh --allowlist scripts/no-keys-allowlist.txt clients/js/src app scripts",
     "idl-compat": "bun scripts/idl-compat.ts",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
+    "verify-proposal": "bun scripts/release/verify-proposal.ts",
     "dry-run": "bun scripts/devnet/dry-run.ts",
     "governance-watch": "bun scripts/governance/watch.ts",
     "fork": "bun tests-fork/happy-path.ts"
