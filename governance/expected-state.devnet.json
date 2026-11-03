@@ -1,0 +1,67 @@
+{
+  "_comment": "What the governance watcher (scripts/governance/watch.ts) expects on devnet. Addresses and parameters only. Update it in the same PR as the executed proposal that changes it (docs/security/governance-watch.md). lastKnownTransactionIndex 8 (admin) and 4 (upgrade) acknowledge the 2026-10-12 test-deploy proposals, created before intent files existed.",
+  "cluster": "devnet",
+  "multisigs": {
+    "admin": {
+      "address": "HrYif2YLwKJc5aMMp6qQjd9WhdkD9JBjajjGyr4a92xR",
+      "vaultIndex": 0,
+      "vault": "6CnwNdEp8dYeKFA6ns89vDBNdmdniR1xyBbrhub6ZKcy",
+      "members": [
+        { "key": "HEJfQ5zeWU3KnxwwddMEWhPBweQFKHKvfeNo2DmTEGZz", "permissions": 7 },
+        { "key": "8NLUJMqgGyXL7U6peGN6CJPRvTWK168AjXcnfR3dCSCJ", "permissions": 7 }
+      ],
+      "threshold": 2,
+      "timeLockSecs": 60,
+      "configAuthority": "11111111111111111111111111111111",
+      "lastKnownTransactionIndex": 8
+    },
+    "upgrade": {
+      "address": "6W3WxRCQ9fzz4jdZZVB2JQLaMf7WXx7F2DwYVjK1yUDs",
+      "vaultIndex": 0,
+      "vault": "AyKDdFrYQABjpkn29Sdj5hEGVymyEXzEHrGhzqPqvb1n",
+      "members": [
+        { "key": "25WUJBgeitL9NskvEdsm5nuMaf65fDttn8E4qQzvoe6y", "permissions": 7 },
+        { "key": "5bnpjrrbsPBKvyrpNwpyF91BKgpgc9HfjZu5YC8SV4Lk", "permissions": 7 }
+      ],
+      "threshold": 2,
+      "timeLockSecs": 120,
+      "configAuthority": "11111111111111111111111111111111",
+      "lastKnownTransactionIndex": 4
+    }
+  },
+  "program": {
+    "id": "GhPkq95RkY7PrJLsv74X73s6ozcwf6JqJtjFouqQeZbV",
+    "upgradeAuthority": "AyKDdFrYQABjpkn29Sdj5hEGVymyEXzEHrGhzqPqvb1n",
+    "executableHash": "fad721d55c8a5340f2a55dbc2d0e1d982bd7a3ec2f42dce90c7dcc93c984e6e7"
+  },
+  "config": {
+    "address": "CFJWXE5JsvcdciwWc4jJYqzz445gVCwCd1p1NaZHsS6Q",
+    "reserveMint": "BRS2CELW6Cueo2mrMUVvAr5GDT7Pw8TeostC2JLMpBk4",
+    "admin": "6CnwNdEp8dYeKFA6ns89vDBNdmdniR1xyBbrhub6ZKcy",
+    "operator": "8MtERL18dFtNPZESghbxR3g21d8FvY2mnTq855SFURPk",
+    "pauser": "2tW76Vpu1nqctZRBMdzSrzXHcnwnMcFMJqiZyP8t5P1T",
+    "guardians": ["8mHUNLAZMKUiNneLtSpufLuagtHfxfhPCtc6gQwDnsEY"],
+    "paymentsAccount": "CVbQVyeuLV5WLybQa9CtGsrTFw9QeAaeiZgBjxufrKAj",
+    "treasuryAccount": "BiTXGCiXuKEJS8VxBUdGrqnMpKo4umFcpH7qevitPtAU",
+    "paused": false,
+    "coverageRatioBps": 2500,
+    "feeTakeBps": 2000,
+    "caps": {
+      "maxTvl": "1000000000000",
+      "maxCoverPerGuarantee": "120000000000",
+      "maxClaimPerCall": "15000000000",
+      "maxClaimPerPeriod": "20000000000",
+      "minRequest": "1000000000",
+      "maxRequest": "100000000000",
+      "maxNavMoveBps": 10000,
+      "stressBuffer": "19000000000",
+      "maxQueueWaitSecs": "0",
+      "maxReinstateAge": "0"
+    }
+  },
+  "reserve": {
+    "tokenAccount": "FWvkQzQXxUjUSy89iJFveZfdnNpp2g43b8MHUdr1vCKa",
+    "outflowAlertThreshold": "1000000000",
+    "outflowWindowSecs": 25200
+  }
+}

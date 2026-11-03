@@ -15,6 +15,7 @@
     "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
     "verify-proposal": "bun scripts/release/verify-proposal.ts",
     "dry-run": "bun scripts/devnet/dry-run.ts",
+    "governance-watch": "bun scripts/governance/watch.ts",
     "fork": "bun tests-fork/happy-path.ts"
   },
   "devDependencies": {

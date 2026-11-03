@@ -45,6 +45,8 @@ Rules:
 - When `/admin` creates a proposal, the member's wallet preview must show only `vault_transaction_create` and `proposal_create` (a Squads config change made elsewhere: `config_transaction_create` and `proposal_create`). Refuse to sign anything else: an approval, an execute or any other instruction in a create means the bytes are not what this app composes off localnet. The wallet cannot show what the vault transaction holds; `bun run verify-proposal` checks that before anyone approves.
 - The deploy scripts check the exact member set, the exact threshold, that the multisig account is owned by Squads v4, and that the time lock meets the agreed floor (300 s and 3,600 s on devnet).
 - Before approving any proposal, each member runs [`verify-proposal`](verify-proposal.md) on their own machine against an intent file merged before the proposal was created, approves only on `MATCH`, and approves from a second interface (never the one that composed it). Members never sign with a durable nonce.
+- Every proposal follows the [signing ceremony](signing-ceremony.md): the intent is committed first, each member verifies the proposal on their own machine, and approvals come from different interfaces.
+- The [governance watch](governance-watch.md) checks both multisigs, the program, the config PDA, durable nonces on member keys and reserve outflows every 6 hours against `governance/expected-state.<cluster>.json`, and mails any difference. It covers time locks longer than about 6 hours.
 - On devnet the multisigs are 2-of-2, with two devnet wallets standing in for the founders. Hardware-held keys replace the stand-ins before real money.
 - Once the exit fallback is built, the upgrade time lock is at least its maximum queue wait (7 days and 7 days on the real pilot), so holders can leave before an upgrade they disagree with takes effect. `max_queue_wait_secs` ships at 0. See [Known limitations](known-limitations.md) for when the exit fallback is built.
 
@@ -122,6 +124,7 @@ No signing key exists in the program, the client or the pilot app.
 - [Verify a proposal before you approve it](verify-proposal.md)
 - [`SECURITY.md`](../../SECURITY.md), [`CLAUDE.md`](../../CLAUDE.md) (no signing-key code)
 - [`scripts/check-no-keys.sh`](../../scripts/check-no-keys.sh), [`scripts/devnet/`](../../scripts/devnet/)
+- [`scripts/governance/`](../../scripts/governance/), [`governance/expected-state.devnet.json`](../../governance/expected-state.devnet.json)
 - Code: [`programs/mutav/src/instructions/admin/`](../../programs/mutav/src/instructions/admin/), [`programs/mutav/src/state/config.rs`](../../programs/mutav/src/state/config.rs)
 - Technical reference §2.5 and §3, devnet release design (branch `docs/protocol-reference`, PR #32)
 - Role instructions: [`programs/mutav/src/instructions/admin/roles.rs`](../../programs/mutav/src/instructions/admin/roles.rs), [`revoke_operator.rs`](../../programs/mutav/src/instructions/admin/revoke_operator.rs)
