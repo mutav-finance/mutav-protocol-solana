@@ -170,7 +170,7 @@ Status on 2026-10-25 against the devnet test deploy ([`deployments/devnet.json`]
 | 4 | Admin time lock ≥ 24 h | Squads time lock, checked against a floor by the deploy scripts | 60 s (test exception; ADR 0020 floor is 300 s) | **Not met** |
 | 5 | Upgrade time lock ≥ 7 d | Squads time lock on the upgrade multisig | 120 s (test exception; ADR 0020 floor is 3,600 s) | **Not met** |
 | 6 | Multisig settings change only through their own proposals | Squads `configAuthority` unset, checked by `scripts/devnet/lib/squads.ts` | Checked | Met |
-| 7 | Decode before signing; no durable-nonce pre-signing | Signer practice; `/admin` decodes proposals | Practice | Practice, not enforceable |
+| 7 | Decode before signing; no durable-nonce pre-signing | Signer practice; `/admin` decodes proposals read-only, members approve in the Squads app after `bun run verify-proposal` ([Verify a proposal](verify-proposal.md)) | Practice | Practice, not enforceable |
 | 8 | Operator key in a KMS | mutav-app KMS, used from Convex actions | Key file used by hand from the operator console | **Not met** |
 | 9 | Claim caps per call and per window; approval above | `caps.max_claim_per_call`, `caps.max_claim_per_period` (31 days), `approve_claim` | R$15k / R$20k, locked by `verify.ts` | Met |
 | 10 | Distinct roles; two-step handover | Program checks (`RolesNotDistinct`, 72 h pending keys) | In the binary | Met |

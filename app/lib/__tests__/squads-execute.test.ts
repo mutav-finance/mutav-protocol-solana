@@ -1,4 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+
+// Execute is composed only on a localnet build (IN_APP_APPROVAL, read when lib/flags loads).
+vi.hoisted(() => vi.stubEnv("NEXT_PUBLIC_CLUSTER", "localnet"));
+afterAll(() => vi.unstubAllEnvs());
 import * as multisig from "@sqds/multisig";
 import { Connection, PublicKey, TransactionMessage } from "@solana/web3.js";
 import { clearMemoCache, composeProposalAction, ProposalRefusedError, readCreateMemo } from "../server/squads";
