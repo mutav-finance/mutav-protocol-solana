@@ -2,7 +2,7 @@
 
 This page lists the verification that exists for the mutav program, its client and the pilot app, and the reviews planned before devnet and before mainnet.
 
-> **Status.** The program is unaudited. An internal pre-devnet review cycle is under way. Its report is published after its fixes land. An independent audit is planned before mainnet; its auditor and date are not yet chosen (see [open questions](../meta/open-questions.md#possible-improvements)).
+> **Status.** The program is unaudited. It has had internal reviews only: the pre-devnet review cycle, internal security audit #1 (2026-10-11) and internal security audit #2 (2026-10-29) of the deployed code, whose findings are under review with fixes pending. Each report is published after its fixes land. An independent audit is planned before mainnet; its auditor and date are not yet chosen (see [open questions](../meta/open-questions.md#possible-improvements)).
 
 ## Test suites
 
@@ -48,7 +48,7 @@ Every pull request to `main` runs [`ci.yml`](../../.github/workflows/ci.yml). A 
 
 Release builds keep overflow checks on ([`Cargo.toml`](../../Cargo.toml)). Releases use a verified build: the [`release.yml`](../../.github/workflows/release.yml) workflow builds with `solana-verify`, records the executable hash, writes a buffer and prepares a Squads upgrade proposal. It never executes an upgrade. Squads members review, reproduce the hash, decode every instruction in the proposal, and execute after the time lock. See [specification §14.5](../spec.md#145-upgrade-runbook).
 
-## The pre-devnet review cycle
+## The review cycle
 
 ```mermaid
 flowchart LR
@@ -57,9 +57,11 @@ flowchart LR
     R3 --> S["Simplification review"]
     S --> D["Decisions and ADRs 0020 to 0029"]
     D --> W["Fix wave<br/>bounded PRs, tests first"]
-    W --> A["Internal security audit<br/>(fresh session)"]
+    W --> A["Internal security audit #1<br/>(fresh session)"]
     A --> DP["Devnet deploy"]
-    DP --> P["Review report published<br/>after its fixes land"]
+    DP --> A2["Internal security audit #2<br/>deployed program, app, scripts, CI"]
+    A2 --> F2["Audit #2 fixes<br/>separate PRs"]
+    F2 --> P["Review reports published<br/>after their fixes land"]
 ```
 
 | Step | Scope | Status |
@@ -69,10 +71,11 @@ flowchart LR
 | OWASP Smart Contract Top 10 (2026) pass | The target design checked against each category. | Done. Its decisions are part of the design on these pages. |
 | Simplification review (2026-10-10) | The planned v1 checked against Solana and Anchor guidance (transaction size, Borsh enum evolution, `init_if_needed`, sealevel attacks) to remove state the pilot does not use before the freeze. | Done. Recorded in [ADR 0026](../decisions/0026-program-simplification-for-the-freeze.md). |
 | Fix wave | Bounded pull requests, each with tests first, an ADR and spec update for every economic change, and a regenerated client for every IDL change. | In progress. |
-| Internal security audit #1 (2026-10-11) | A fresh review of the fixed code before deploy. | Done: the Wave 1 review (five finders plus verifiers). Every confirmed finding is fixed (#51, #52, #54, #58); the High finding is ADR 0030. |
-| Review report | Published in this repository after its fixes land. | Pending. |
+| Internal security audit #1 (2026-10-11) | A fresh review of the fixed code before deploy. | Done: the Wave 1 review (five finders plus verifiers). Its fixes landed in #51, #52, #54 and #58; the High finding is ADR 0030. Not everything it touched is closed: #55 and #56 are open, CSP enforcement and the WAF rule are deferred, and the reversals that resolve pre-devnet AV-1 and AV-2 (`reinstate_guarantee`, `amend_claim`) are deferred to the first upgrade ([known limitations](known-limitations.md)). Corrected by audit #2, which found the impact of that deferral understated (NEW-R1-1). |
+| Internal security audit #2 (2026-10-29) | The deployed program and client (`46ca747` to `833c114`, live on devnet as `v1.0.0-devnet`, unchanged at `893f3a9`) and the app, scripts and CI (`46ca747` to `893f3a9`). Four read-only finders: program logic under a compromised operator or admin; refactor equivalence of #50, #60 and #61 and the fixes #53, #54 and #58; app server and signing; scripts, CI, supply chain and verifiability. Internal, not independent; no tests or builds were run. | Draft: findings under review; fixes pending. 30 findings: 0 Critical, 0 High, 6 Medium, 15 Low, 9 Informational. [Report](../reviews/2026-10-internal-audit-2.md). |
+| Review reports | Published in [`docs/reviews/`](../reviews/) after their fixes land. | Pre-devnet report in review (#94); audit #2 report in draft. |
 
-The report is held back until the fixes are merged, so these pages describe the decided design, not the findings.
+Each report is held back until its fixes are merged, so these pages describe the decided design, not the findings.
 
 ## OWASP Smart Contract Top 10 (2026) as a checklist
 
