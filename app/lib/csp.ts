@@ -1,8 +1,8 @@
 /**
- * The report-only Content-Security-Policy (A6), built per request in
- * proxy.ts. No Node imports: proxy code stays runtime-neutral.
+ * The enforced Content-Security-Policy on pages (A6, A-R3-1), built per
+ * request in proxy.ts. No Node imports: proxy code stays runtime-neutral.
  */
-export function cspReportOnly({ nonce, scriptHashes = [], dev = false }: { nonce: string; scriptHashes?: string[]; dev?: boolean }): string {
+export function contentSecurityPolicy({ nonce, scriptHashes = [], dev = false }: { nonce: string; scriptHashes?: string[]; dev?: boolean }): string {
   return [
     "default-src 'self'",
     // 'strict-dynamic': scripts the nonced ones load are trusted; hashes cover the static simulator.

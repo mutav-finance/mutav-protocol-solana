@@ -124,7 +124,6 @@ These were open in the spec and the earlier ADRs, and are now decided and in the
 | A `refresh` crank on a fixed cadence and a watcher for events and Squads proposals (including the alert on a change of the payments account's owner, and the `skim` monitor) | Keeps published NAV fresh and surfaces unexpected actions early | implementation | Outside capital | [ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md), [ADR 0024](../decisions/0024-unsolicited-money-and-backstop.md), [Deployment and operations](../technical-resources/deployment-and-operations.md) |
 | `/reserve` reads the role keys and authorities from chain and shows MUTAV's own share of the capital | The public page then cannot drift from the program's real configuration | implementation | Outside capital | [Transparency](../introduction/transparency.md) |
 | An attestation of the registry and of claim settlements once operator and admin are separate companies | The admin then relies on operator data it did not produce | founders | Later (role split) | [ADR 0020](../decisions/0020-operator-admin-separation-and-recovery.md) |
-| Enforce the full CSP header in the app (report-only today) | Hardens the admin screens after the demo | implementation | Later | [Decisions](decisions.md#pilot-app) |
 
 ### Verification
 

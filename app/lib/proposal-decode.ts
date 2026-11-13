@@ -22,8 +22,8 @@ import {
   type NavBounds,
   type VaultConfig,
 } from "@mutav-finance/mutav-protocol-solana";
-import { setConfigChanges, setConfigFields } from "./config-diff";
-import { fmtBrs, fmtNav } from "./format";
+import { configChangeRisk, setConfigValues, setConfigWrites } from "./config-diff";
+import { fmtBrs, fmtDuration, fmtNav } from "./format";
 import { bytesToHex } from "./serde";
 
 export const COMPUTE_BUDGET_PROGRAM = "ComputeBudget111111111111111111111111111111";
@@ -159,7 +159,8 @@ function navCheck(bounds: NavBounds, nav: bigint | undefined, which: string): Pr
 
 function moneyAccountDetails(account: string | null, side: "payments" | "treasury", ctx: DecodeContext): ProposalDetail[] {
   if (!account) return [{ label: `new ${side} account`, value: "not resolvable", warn: true }];
-  const out: ProposalDetail[] = [{ label: `new ${side} account`, value: account }];
+  // Where money goes: always a red flag to check (A-R3-3).
+  const out: ProposalDetail[] = [{ label: `new ${side} account`, value: account, warn: true }];
   const c = ctx.config;
   const other = side === "payments" ? c?.treasuryAccount : c?.paymentsAccount;
   if (other && account === other) out.push({ label: "same account", value: `it is also the ${side === "payments" ? "treasury" : "payments"} account`, warn: true });
@@ -186,7 +187,8 @@ function mutavDetails(kind: MutavInstruction, ix: RawInstruction, ctx: DecodeCon
       const a = getProposeRoleInstructionDataDecoder().decode(d);
       return [
         { label: "role", value: roleName(a.role) },
-        { label: "new key", value: a.key },
+        // A role key is authority: shown open and flagged (A-R3-3).
+        { label: "new key", value: a.key, warn: true },
       ];
     }
     case MutavInstruction.CancelPending:
@@ -232,13 +234,29 @@ function mutavDetails(kind: MutavInstruction, ix: RawInstruction, ctx: DecodeCon
     case MutavInstruction.ClearFulfilHalt:
       return navCheck(getClearFulfilHaltInstructionDataDecoder().decode(d).navBounds, ctx.nav?.published, "published");
     case MutavInstruction.SetConfig: {
-      if (!ctx.config) return setConfigFields(d).map((f) => ({ label: f, value: "(on-chain value not read)" }));
-      const changes = setConfigChanges(d, ctx.config);
-      if (changes.length === 0) return [{ label: "changes", value: "no field differs from on-chain now" }];
-      return changes.map((c) => ({ label: c.field, value: `${c.from} → ${c.to}` }));
+      // Every value open; loosening a risk cap is a red flag (A-R3-3).
+      if (!ctx.config) {
+        return setConfigValues(d).map((c) => {
+          const risk = configChangeRisk(c.field, null, c.to);
+          return { label: c.field, value: `→ ${c.to} (on-chain value not read)${risk ? `: ${risk}` : ""}`, warn: !!risk };
+        });
+      }
+      // Every written field, also those equal to on-chain now: the proposal still writes them.
+      const writes = setConfigWrites(d, ctx.config);
+      if (writes.length === 0) return [{ label: "changes", value: "writes no field" }];
+      return writes.map((c) => {
+        if (c.same) return { label: c.field, value: `${c.to} (same as on-chain now)` };
+        const risk = configChangeRisk(c.field, c.from, c.to);
+        return { label: c.field, value: `${c.from} → ${c.to}${risk ? ` (${risk})` : ""}`, warn: !!risk };
+      });
     }
+    case MutavInstruction.Unpause:
+      // Lifts the emergency stop: flagged so approvers confirm the cause is fixed.
+      return [{ label: "effect", value: "lifts the pause: capital requests and fills, new guarantees and allocations resume; confirm the cause of the pause is fixed", warn: true }];
+    case MutavInstruction.RevokePauser:
+      return [{ label: "effect", value: "removes the pauser key at once: until a new one accepts, only the guardians and the admin (through Squads) can pause", warn: true }];
     case MutavInstruction.SetGuardians:
-      return [{ label: "guardians", value: getSetGuardiansInstructionDataDecoder().decode(d).guardians.join(", ") || "none" }];
+      return [{ label: "guardians", value: getSetGuardiansInstructionDataDecoder().decode(d).guardians.join(", ") || "none", warn: true }];
     case MutavInstruction.ApproveClaim: {
       const a = getApproveClaimInstructionDataDecoder().decode(d);
       return [
@@ -310,20 +328,117 @@ export function decodeInstruction(ix: RawInstruction, ctx: DecodeContext): Decod
 
 export const SQUADS_CONFIG_CHANGE = "Squads config change";
 
+/** Squads v4 member permissions (bit mask), as `@sqds/multisig` defines them. */
+export const SQUADS_PERMISSIONS = [
+  [1, "Initiate"],
+  [2, "Vote"],
+  [4, "Execute"],
+] as const;
+
+export const squadsPermissions = (mask: number): string => {
+  const names = SQUADS_PERMISSIONS.filter(([bit]) => (mask & bit) !== 0).map(([, n]) => n);
+  const unknown = mask & ~7;
+  return `${names.join(", ") || "none"}${unknown ? ` + unknown bits 0x${unknown.toString(16)}` : ""} (mask ${mask})`;
+};
+
+const SPENDING_PERIODS = ["one time", "per day", "per week", "per month"];
+
+/**
+ * One Squads v4 `ConfigAction` with its arguments, as plain values (the
+ * server converts the SDK's web3.js types; `lib/server/squads.ts`). The set
+ * is `ConfigActionRecord` in `@sqds/multisig` 2.1.x.
+ */
+export type SquadsConfigAction =
+  | { kind: "AddMember"; key: string; permissions: number }
+  | { kind: "RemoveMember"; key: string }
+  | { kind: "ChangeThreshold"; threshold: number }
+  | { kind: "SetTimeLock"; seconds: number }
+  | { kind: "AddSpendingLimit"; createKey: string; vaultIndex: number; mint: string; amount: bigint; period: number; members: string[]; destinations: string[] }
+  | { kind: "RemoveSpendingLimit"; spendingLimit: string }
+  | { kind: "SetRentCollector"; rentCollector: string | null }
+  | { kind: "Unknown"; name: string };
+
+/** The multisig now, to show each config action as old → new. */
+export type MultisigNow = { threshold: number; timeLock: number; members: { key: string; permissions: number }[] };
+
+/** Every argument of one config action. All are red flags: a config change can hand over the vault. */
+export function configActionDetails(a: SquadsConfigAction, now?: MultisigNow): ProposalDetail[] {
+  const w = (label: string, value: string): ProposalDetail => ({ label, value, warn: true });
+  switch (a.kind) {
+    case "AddMember": {
+      const already = now?.members.some((m) => m.key === a.key);
+      return [w("AddMember: key", `${a.key}${already ? " (already a member)" : ""}`), w("AddMember: permissions", squadsPermissions(a.permissions))];
+    }
+    case "RemoveMember": {
+      const known = now ? now.members.some((m) => m.key === a.key) : true;
+      return [w("RemoveMember: key", `${a.key}${known ? "" : " (not a member now)"}`)];
+    }
+    case "ChangeThreshold": {
+      const from = now ? `${now.threshold} → ` : "";
+      const one = a.threshold <= 1 ? " (one key alone controls the vault)" : "";
+      return [w("ChangeThreshold: threshold", `${from}${a.threshold}${one}`)];
+    }
+    case "SetTimeLock": {
+      const from = now ? `${fmtDuration(BigInt(now.timeLock))} → ` : "";
+      const none = a.seconds === 0 ? " (no delay: approved proposals execute at once)" : "";
+      return [w("SetTimeLock: time lock", `${from}${fmtDuration(BigInt(a.seconds))} (${a.seconds} s)${none}`)];
+    }
+    case "AddSpendingLimit":
+      return [
+        w("AddSpendingLimit: effect", "the listed members may move vault funds up to the amount with no vote"),
+        w("AddSpendingLimit: vault index", String(a.vaultIndex)),
+        w("AddSpendingLimit: mint", a.mint),
+        w("AddSpendingLimit: amount (base units)", a.amount.toString()),
+        w("AddSpendingLimit: period", SPENDING_PERIODS[a.period] ?? `unknown period ${a.period}`),
+        w("AddSpendingLimit: members", a.members.join(", ") || "none"),
+        w("AddSpendingLimit: destinations", a.destinations.join(", ") || "any destination"),
+        w("AddSpendingLimit: create key", a.createKey),
+      ];
+    case "RemoveSpendingLimit":
+      return [w("RemoveSpendingLimit: spending limit", a.spendingLimit)];
+    case "SetRentCollector":
+      return [w("SetRentCollector: rent collector", a.rentCollector ?? "none (rent stays in the accounts)")];
+    case "Unknown":
+      return [w("unknown config action", a.name)];
+  }
+}
+
 /**
  * A proposal whose transaction is a Squads ConfigTransaction (not a vault
- * transaction): it changes the multisig itself (members, threshold, time
- * lock), so it is flagged and left to the Squads UI.
+ * transaction): it changes the multisig itself. Every action is decoded with
+ * its arguments and flagged (NEW-R3-2). `actions` null: the account could not
+ * be decoded.
  */
-export function squadsConfigChange(squadsProgram: string, actions: string[] | null): DecodedInstruction {
+export function squadsConfigChange(squadsProgram: string, actions: SquadsConfigAction[] | null, now?: MultisigNow): DecodedInstruction {
+  const head: ProposalDetail = { label: "changes", value: "the multisig itself (members, threshold, time lock or spending limits)", warn: true };
+  if (actions === null) return { program: "foreign", programId: squadsProgram, name: SQUADS_CONFIG_CHANGE, details: [head, { label: "actions", value: "could not be decoded", warn: true }] };
+  if (actions.length === 0) return { program: "foreign", programId: squadsProgram, name: SQUADS_CONFIG_CHANGE, details: [head, { label: "actions", value: "none", warn: true }] };
+  return { program: "foreign", programId: squadsProgram, name: SQUADS_CONFIG_CHANGE, details: [head, ...actions.flatMap((a) => configActionDetails(a, now))] };
+}
+
+export const EMPTY_VAULT_TRANSACTION = "empty vault transaction";
+export const UNKNOWN_TRANSACTION_ACCOUNT = "unknown transaction account";
+
+/**
+ * A vault transaction with no instruction: executing it does nothing, and
+ * this app never proposes one. Flagged: it may be a mis-decoded account.
+ */
+export function emptyVaultTransaction(squadsProgram: string): DecodedInstruction {
   return {
     program: "foreign",
     programId: squadsProgram,
-    name: SQUADS_CONFIG_CHANGE,
-    details: [
-      { label: "changes", value: "members/threshold — review in the Squads UI", warn: true },
-      ...(actions && actions.length > 0 ? [{ label: "actions", value: actions.join(", "), warn: true }] : []),
-    ],
+    name: EMPTY_VAULT_TRANSACTION,
+    details: [{ label: "instructions", value: "none: this app never proposes an empty vault transaction; check the proposal in the Squads app before voting", warn: true }],
+  };
+}
+
+/** The proposal's transaction account is neither a Squads vault nor config transaction: nothing about it can be read. */
+export function unknownTransactionAccount(owner: string, reason: string): DecodedInstruction {
+  return {
+    program: "foreign",
+    programId: owner,
+    name: UNKNOWN_TRANSACTION_ACCOUNT,
+    details: [{ label: "account", value: `${reason}: what it would do cannot be shown; do not approve`, warn: true }],
   };
 }
 

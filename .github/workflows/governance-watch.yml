@@ -1,0 +1,79 @@
+# Governance watch (docs/security/governance-watch.md): every 6 hours, compare
+# the chain against governance/expected-state.devnet.json and mail any
+# finding, or any failure to run, through Resend. Read-only: no keys, no
+# writes, no caches.
+#
+# Settings (repository → Settings → Secrets and variables → Actions):
+#   secret   RESEND_API_KEY   Resend API key with send access only
+#   variable ALERT_FROM       sender on a domain verified in Resend
+#   variable ALERT_TO         comma list of recipients
+#   variable DEVNET_RPC_URL   optional devnet RPC; use the secret of the same
+#                             name instead when the URL carries an API key.
+#                             Falls back to the public devnet RPC.
+# Until the alert settings exist, a run with findings fails loudly.
+name: governance-watch
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: governance-watch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install root deps
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # Exit 0: no findings. 1: findings. 2: could not complete (RPC error,
+      # bad expected state). The step itself never fails, so the alert step
+      # below always sees the code.
+      - name: Watch
+        id: watch
+        env:
+          RPC_URL: ${{ secrets.DEVNET_RPC_URL || vars.DEVNET_RPC_URL || 'https://api.devnet.solana.com' }}
+        run: |
+          set +e
+          bun scripts/governance/watch.ts \
+            --expected governance/expected-state.devnet.json \
+            --confirm-cluster devnet \
+            --report "$RUNNER_TEMP/governance-report.txt"
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+
+      # Runs on findings, on run errors, and when an earlier step failed
+      # before the watcher reported (empty code). Fails when the alert
+      # settings are missing or Resend refuses the email.
+      - name: Alert
+        if: always() && steps.watch.outputs.code != '0'
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_FROM: ${{ vars.ALERT_FROM }}
+          ALERT_TO: ${{ vars.ALERT_TO }}
+          WATCH_CODE: ${{ steps.watch.outputs.code }}
+        run: bun scripts/governance/notify.ts --report "$RUNNER_TEMP/governance-report.txt" --exit-code "$WATCH_CODE"
+
+      # A run with findings is red in the Actions tab too (GitHub also mails
+      # failed scheduled runs to the workflow's last committer).
+      - name: Fail on findings
+        if: always() && steps.watch.outputs.code != '0'
+        env:
+          WATCH_CODE: ${{ steps.watch.outputs.code }}
+        run: |
+          echo "::error::governance watch exited ${WATCH_CODE:-before reporting}; see the report above"
+          exit 1
