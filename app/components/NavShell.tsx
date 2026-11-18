@@ -64,11 +64,10 @@ export function NavShell() {
   return (
     <nav aria-label="Main navigation" className="bg-(--color-canvas) sticky top-0 z-[100] border-b">
       <div className="relative flex h-14 items-stretch justify-between" style={{ padding: "0 var(--section-pad-x)" }}>
-        <Link href="/reserve" aria-label="MUTAV" className="flex shrink-0 items-center gap-2.5 no-underline">
+        <Link href="/reserve" className="flex shrink-0 items-center no-underline">
+          {/* The kit's dark lockup, unchanged (public/brand/.kit-version names the brand commit). */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo-mutav.svg" alt="MUTAV" height={24} style={{ height: 24, width: "auto", display: "block" }} />
-          {/* Wordmark (STYLE.md §3.6): "mutav", Geist Bold lowercase, amber. */}
-          <span className="font-display text-(--color-accent) text-xl font-bold leading-none" aria-hidden="true">mutav</span>
+          <img src="/brand/mutav-lockup-dark.svg" alt="MUTAV" height={24} style={{ height: 24, width: "auto", display: "block" }} />
         </Link>
         <div className="nav-links-desktop pointer-events-none absolute inset-0 justify-center">
           <ul className="pointer-events-auto m-0 flex items-stretch p-0">{LINKS.map((l) => link(l, false))}</ul>

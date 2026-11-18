@@ -20,7 +20,7 @@ export const PARKED_ACTION_LABEL = { cancel_deposit: "Collect BRS", cancel_redee
 export const actionLabel = (x: InvestorRequest, a: InvestorRequest["actions"][number]) =>
   x.status === "parked" && (a === "cancel_deposit" || a === "cancel_redeem") ? PARKED_ACTION_LABEL[a] : ACTION_LABEL[a];
 
-/** Inter Medium 12px caps label (STYLE.md card label). */
+/** DM Sans Medium 12px caps label (STYLE.md card label). */
 export const LABEL = "font-body text-(--color-text-2) text-xs font-medium uppercase";
 export const TRACKING = { letterSpacing: "0.01em" };
 

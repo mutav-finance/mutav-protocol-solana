@@ -76,7 +76,7 @@ const FLOW_LABEL = FLOW_KIND_LABEL;
 /** Ledger rows shown before "Show all". */
 const LEDGER_ROWS = 10;
 
-/** Inter Medium 12px caps label (brand card label). */
+/** DM Sans Medium 12px caps label (brand card label). */
 const Label = ({ children }: { children: ReactNode }) => (
   <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={{ letterSpacing: "0.01em" }}>
     {children}

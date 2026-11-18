@@ -26,7 +26,7 @@ import type { Data } from "@/components/reserve/sections/shared";
 
 const LABEL = { letterSpacing: "0.01em" } as const;
 
-/** Inter Medium 12px caps label (STYLE.md card label). */
+/** DM Sans Medium 12px caps label (STYLE.md card label). */
 function Label({ children }: { children: ReactNode }) {
   return (
     <span className="font-body text-(--color-text-2) text-xs font-medium uppercase" style={LABEL}>

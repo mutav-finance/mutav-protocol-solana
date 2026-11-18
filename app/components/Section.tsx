@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 
 /**
- * A page section (web investidor rhythm, deck styling): amber mono caps kicker, 24px Geist ExtraBold heading,
+ * A page section (web investidor rhythm, deck styling): amber mono caps kicker, 24px DM Sans ExtraBold heading,
  * optional explainer and actions; sections are separated by space, not rules.
  * `subtitle`: one line, at most ~12 words, under the heading.
  * `roles`: who signs or owns what this section shows (a RoleLine), under the heading.

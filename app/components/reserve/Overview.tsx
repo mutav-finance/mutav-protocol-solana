@@ -40,7 +40,7 @@ const ACTIVITY_DAYS = 60n;
 const NUM = { fontVariantNumeric: "tabular-nums" } as const;
 const share = fmtPctOf;
 
-/** Inter Medium 12px caps label (STYLE.md card label), with an optional definition tooltip. */
+/** DM Sans Medium 12px caps label (STYLE.md card label), with an optional definition tooltip. */
 function Label({ children, tip }: { children: string; tip?: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">

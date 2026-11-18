@@ -3,9 +3,9 @@
 /**
  * MetricCard — a single metric in the reserve dashboard metric grid.
  *
- * Design: brand card (STYLE.md §3.1) — Inter Medium 12px ALL CAPS label in
+ * Design: brand card (STYLE.md §3.1) — DM Sans Medium 12px ALL CAPS label in
  * text-2, bold value in JetBrains Mono (figures are always mono), sub-value
- * note in Inter (body font), text-3.
+ * note in DM Sans (body font), text-3.
  * - Optional tooltip on label
  * - No rounded corners, no shadows, surface-1 background
  */
@@ -61,7 +61,7 @@ export function MetricCard({
         overflow: "hidden",
       }}
     >
-      {/* Label row — Inter Medium, ALL CAPS, with optional tooltip trigger */}
+      {/* Label row — DM Sans Medium, ALL CAPS, with optional tooltip trigger */}
       <div
         style={{
           display: "flex",
@@ -91,7 +91,7 @@ export function MetricCard({
         )}
       </div>
 
-      {/* Value — Geist Bold, large */}
+      {/* Value — DM Sans Bold, large */}
       {loading ? (
         <div
           aria-hidden="true"

@@ -235,7 +235,7 @@ The program runs on **devnet only** and is **pre-pilot**. It has had internal re
 ## License
 
 - **Code:** MIT, Copyright (c) 2026 MUTAV. See [LICENSE](LICENSE). Versions up to commit `9c883d5` were published under Apache-2.0 and remain available under those terms.
-- **Brand:** the MUTAV name, logo (`app/public/brand/logo-mutav.svg`) and brand assets are not licensed under MIT.
+- **Brand:** the MUTAV name, logo (`app/public/brand/`, from the brand kit) and brand assets are not licensed under MIT.
 - **Fonts:** the app and the simulator use Geist, Inter and JetBrains Mono under the SIL Open Font License 1.1.
 
 ### Acknowledgements

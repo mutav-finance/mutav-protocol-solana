@@ -1,6 +1,5 @@
 @import "tailwindcss";
-@import "@fontsource-variable/geist";
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/dm-sans/opsz.css";
 @import "@fontsource-variable/jetbrains-mono";
 
 /* ─── MUTAV Brand Theme ───────────────────────────────────────────────────── */
@@ -10,8 +9,8 @@
 
 @theme {
   /* ── Fonts (all self-hosted via @fontsource-variable; no network at build) ── */
-  --font-display: "Geist Variable", "Geist", "Inter Variable", system-ui, sans-serif;
-  --font-body:    "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-display: "DM Sans Variable", "DM Sans", system-ui, sans-serif;
+  --font-body:    "DM Sans Variable", "DM Sans", system-ui, sans-serif;
   --font-mono:    "JetBrains Mono Variable", "JetBrains Mono", "Fira Code", monospace;
 
   /* ── Amber scale (primary accent — scarce, <5% of pixels) ── */
@@ -271,13 +270,13 @@ p {
 
 /* ── Three-layer typography classes ── */
 
-/* Layer 1: Declaration — Geist Bold */
+/* Layer 1: Declaration — DM Sans Bold */
 .font-display {
   font-family: var(--font-display);
   font-weight: 700;
 }
 
-/* Layer 2: Explanation — Inter */
+/* Layer 2: Explanation — DM Sans */
 .font-body {
   font-family: var(--font-body);
 }
